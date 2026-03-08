@@ -1,2 +1,0 @@
-[console_scripts]
-well-log-os = well_log_os.cli:main

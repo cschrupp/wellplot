@@ -11,6 +11,11 @@ uv.lock.bak
 *_render.pdf
 synthetic_triple_combo.pdf
 
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
 # Raw well data (keep local; do not version by default)
 *.las
 *.dlis
