@@ -1,0 +1,333 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from .errors import TemplateValidationError
+from .model import (
+    CurveElement,
+    DepthAxisSpec,
+    FooterSpec,
+    GridSpec,
+    HeaderField,
+    HeaderSpec,
+    LogDocument,
+    MarkerSpec,
+    PageSpec,
+    RasterElement,
+    ScaleKind,
+    ScaleSpec,
+    StyleSpec,
+    TrackHeaderObjectKind,
+    TrackHeaderObjectSpec,
+    TrackHeaderSpec,
+    TrackKind,
+    TrackSpec,
+    ZoneSpec,
+)
+
+
+def _ensure_mapping(value: Any, *, context: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TemplateValidationError(
+            f"Expected a mapping for {context}, got {type(value).__name__}."
+        )
+    return value
+
+
+def _ensure_sequence(value: Any, *, context: str) -> Sequence[Any]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray, Mapping)):
+        raise TemplateValidationError(
+            f"Expected a sequence for {context}, got {type(value).__name__}."
+        )
+    return value
+
+
+def _build_style(data: Mapping[str, Any] | None) -> StyleSpec:
+    if not data:
+        return StyleSpec()
+    style_data = dict(data)
+    return StyleSpec(
+        color=style_data.get("color", "black"),
+        line_width=float(style_data.get("line_width", 0.8)),
+        line_style=style_data.get("line_style", "-"),
+        opacity=float(style_data.get("opacity", 1.0)),
+        fill_color=style_data.get("fill_color"),
+        fill_alpha=float(style_data.get("fill_alpha", 0.2)),
+        colormap=style_data.get("colormap", "viridis"),
+    )
+
+
+def _parse_scale_ratio(value: str | int | float | None) -> int:
+    if value is None:
+        return 200
+    if isinstance(value, (int, float)):
+        return int(value)
+    text = str(value).strip()
+    if ":" in text:
+        _, right = text.split(":", 1)
+        return int(float(right.strip()))
+    return int(float(text))
+
+
+def _build_scale(data: Mapping[str, Any] | None) -> ScaleSpec | None:
+    if not data:
+        return None
+    scale_data = dict(data)
+    kind = ScaleKind(scale_data.get("kind", "linear"))
+    return ScaleSpec(
+        kind=kind,
+        minimum=float(scale_data.get("min", scale_data.get("minimum", 0.0))),
+        maximum=float(scale_data.get("max", scale_data.get("maximum", 1.0))),
+        reverse=bool(scale_data.get("reverse", False)),
+    )
+
+
+def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
+    if not data:
+        return HeaderSpec()
+    fields = tuple(
+        HeaderField(
+            label=str(item["label"]),
+            source_key=str(item["source_key"]),
+            default=str(item.get("default", "")),
+        )
+        for item in data.get("fields", [])
+    )
+    return HeaderSpec(
+        title=data.get("title"),
+        subtitle=data.get("subtitle"),
+        fields=fields,
+    )
+
+
+def _build_footer(data: Mapping[str, Any] | None) -> FooterSpec:
+    if not data:
+        return FooterSpec()
+    lines = tuple(str(item) for item in data.get("lines", []))
+    return FooterSpec(lines=lines)
+
+
+def _build_track_header(data: Any) -> TrackHeaderSpec:
+    if data is None:
+        return TrackHeaderSpec()
+    header_data = _ensure_mapping(data, context="track_header")
+
+    objects_data = header_data.get("objects")
+    if objects_data is not None:
+        object_items = _ensure_sequence(objects_data, context="track_header.objects")
+        objects = []
+        for index, item in enumerate(object_items):
+            object_data = _ensure_mapping(item, context=f"track_header.objects[{index}]")
+            try:
+                objects.append(
+                    TrackHeaderObjectSpec(
+                        kind=TrackHeaderObjectKind(str(object_data["kind"])),
+                        enabled=bool(object_data.get("enabled", True)),
+                        reserve_space=bool(object_data.get("reserve_space", True)),
+                        line_units=int(object_data.get("line_units", 1)),
+                    )
+                )
+            except (KeyError, TypeError, ValueError) as exc:
+                raise TemplateValidationError(
+                    f"Invalid track header object at index {index}."
+                ) from exc
+        try:
+            return TrackHeaderSpec(objects=tuple(objects))
+        except ValueError as exc:
+            raise TemplateValidationError("Invalid track_header.objects configuration.") from exc
+
+    defaults = TrackHeaderSpec().objects
+    object_map = {obj.kind: obj for obj in defaults}
+    for kind in TrackHeaderObjectKind:
+        key = kind.value
+        if key not in header_data:
+            continue
+        object_data = _ensure_mapping(header_data[key], context=f"track_header.{key}")
+        default = object_map[kind]
+        try:
+            object_map[kind] = TrackHeaderObjectSpec(
+                kind=kind,
+                enabled=bool(object_data.get("enabled", default.enabled)),
+                reserve_space=bool(object_data.get("reserve_space", default.reserve_space)),
+                line_units=int(object_data.get("line_units", default.line_units)),
+            )
+        except (TypeError, ValueError) as exc:
+            raise TemplateValidationError(f"Invalid track_header.{key} configuration.") from exc
+    ordered = tuple(object_map[item.kind] for item in defaults)
+    return TrackHeaderSpec(objects=ordered)
+
+
+def _build_markers(data: Any) -> tuple[MarkerSpec, ...]:
+    if data is None:
+        return ()
+
+    markers_data = _ensure_sequence(data, context="markers")
+    markers = []
+    for index, item in enumerate(markers_data):
+        marker_data = _ensure_mapping(item, context=f"markers[{index}]")
+        try:
+            markers.append(
+                MarkerSpec(
+                    depth=float(marker_data["depth"]),
+                    label=str(marker_data.get("label", "")),
+                    color=str(marker_data.get("color", "#666666")),
+                    line_style=str(marker_data.get("line_style", "--")),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TemplateValidationError(f"Invalid marker at index {index}.") from exc
+    return tuple(markers)
+
+
+def _build_zones(data: Any) -> tuple[ZoneSpec, ...]:
+    if data is None:
+        return ()
+
+    zones_data = _ensure_sequence(data, context="zones")
+    zones = []
+    for index, item in enumerate(zones_data):
+        zone_data = _ensure_mapping(item, context=f"zones[{index}]")
+        try:
+            zones.append(
+                ZoneSpec(
+                    top=float(zone_data["top"]),
+                    base=float(zone_data["base"]),
+                    label=str(zone_data.get("label", "")),
+                    fill_color=str(zone_data.get("fill_color", "#d9d9d9")),
+                    alpha=float(zone_data.get("alpha", 0.25)),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TemplateValidationError(f"Invalid zone at index {index}.") from exc
+    return tuple(zones)
+
+
+def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
+    kind = TrackKind(track_data.get("kind", "curve"))
+    elements = []
+    for item in track_data.get("elements", []):
+        element_data = _ensure_mapping(item, context=f"track {track_data.get('id', '')} element")
+        element_kind = element_data.get("kind", "curve")
+        if element_kind == "curve":
+            elements.append(
+                CurveElement(
+                    channel=str(element_data["channel"]),
+                    label=element_data.get("label"),
+                    style=_build_style(element_data.get("style")),
+                    scale=_build_scale(element_data.get("scale")),
+                )
+            )
+        elif element_kind in {"raster", "image"}:
+            limits = element_data.get("color_limits")
+            color_limits = None
+            if limits is not None:
+                if not isinstance(limits, Sequence) or len(limits) != 2:
+                    raise TemplateValidationError(
+                        "Raster color_limits must contain two numeric values."
+                    )
+                color_limits = (float(limits[0]), float(limits[1]))
+            elements.append(
+                RasterElement(
+                    channel=str(element_data["channel"]),
+                    style=_build_style(element_data.get("style")),
+                    interpolation=str(element_data.get("interpolation", "nearest")),
+                    color_limits=color_limits,
+                )
+            )
+        else:
+            raise TemplateValidationError(f"Unsupported element kind {element_kind!r}.")
+    grid_data = _ensure_mapping(
+        track_data.get("grid", {}), context=f"track {track_data.get('id', '')} grid"
+    )
+    return TrackSpec(
+        id=str(track_data["id"]),
+        title=str(track_data.get("title", track_data["id"])),
+        kind=kind,
+        width_mm=float(track_data["width_mm"]),
+        elements=tuple(elements),
+        x_scale=_build_scale(track_data.get("x_scale")),
+        header=_build_track_header(track_data.get("track_header")),
+        grid=GridSpec(
+            major=bool(grid_data.get("major", True)),
+            minor=bool(grid_data.get("minor", True)),
+            major_alpha=float(grid_data.get("major_alpha", 0.35)),
+            minor_alpha=float(grid_data.get("minor_alpha", 0.15)),
+        ),
+    )
+
+
+def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
+    root = _ensure_mapping(data, context="document")
+    page_data = _ensure_mapping(root.get("page", {}), context="page")
+    if "size" in page_data:
+        page = PageSpec.from_name(
+            str(page_data["size"]),
+            orientation=str(page_data.get("orientation", "portrait")),
+            continuous=bool(page_data.get("continuous", False)),
+            margin_left_mm=float(page_data.get("margin_left_mm", 10.0)),
+            margin_right_mm=float(page_data.get("margin_right_mm", 10.0)),
+            margin_top_mm=float(page_data.get("margin_top_mm", 10.0)),
+            margin_bottom_mm=float(page_data.get("margin_bottom_mm", 10.0)),
+            header_height_mm=float(page_data.get("header_height_mm", 18.0)),
+            track_header_height_mm=float(page_data.get("track_header_height_mm", 8.0)),
+            footer_height_mm=float(page_data.get("footer_height_mm", 10.0)),
+            track_gap_mm=float(page_data.get("track_gap_mm", 1.5)),
+        )
+    else:
+        page = PageSpec(
+            width_mm=float(page_data["width_mm"]),
+            height_mm=float(page_data["height_mm"]),
+            continuous=bool(page_data.get("continuous", False)),
+            margin_left_mm=float(page_data.get("margin_left_mm", 10.0)),
+            margin_right_mm=float(page_data.get("margin_right_mm", 10.0)),
+            margin_top_mm=float(page_data.get("margin_top_mm", 10.0)),
+            margin_bottom_mm=float(page_data.get("margin_bottom_mm", 10.0)),
+            header_height_mm=float(page_data.get("header_height_mm", 18.0)),
+            track_header_height_mm=float(page_data.get("track_header_height_mm", 8.0)),
+            footer_height_mm=float(page_data.get("footer_height_mm", 10.0)),
+            track_gap_mm=float(page_data.get("track_gap_mm", 1.5)),
+        )
+
+    depth_data = _ensure_mapping(root.get("depth", {}), context="depth")
+    depth_axis = DepthAxisSpec(
+        unit=str(depth_data.get("unit", "m")),
+        scale_ratio=_parse_scale_ratio(depth_data.get("scale", depth_data.get("scale_ratio", 200))),
+        major_step=float(depth_data.get("major_step", 10.0)),
+        minor_step=float(depth_data.get("minor_step", 2.0)),
+    )
+
+    track_items = root.get("tracks", [])
+    if not isinstance(track_items, Sequence):
+        raise TemplateValidationError("tracks must be a sequence.")
+    tracks = tuple(_build_track(_ensure_mapping(item, context="track")) for item in track_items)
+
+    depth_range_data = root.get("depth_range")
+    depth_range = None
+    if depth_range_data is not None:
+        if not isinstance(depth_range_data, Sequence) or len(depth_range_data) != 2:
+            raise TemplateValidationError("depth_range must contain two numeric values.")
+        depth_range = (float(depth_range_data[0]), float(depth_range_data[1]))
+
+    return LogDocument(
+        name=str(root.get("name", "well-log")),
+        page=page,
+        depth_axis=depth_axis,
+        tracks=tracks,
+        depth_range=depth_range,
+        header=_build_header(_ensure_mapping(root.get("header", {}), context="header")),
+        footer=_build_footer(_ensure_mapping(root.get("footer", {}), context="footer")),
+        markers=_build_markers(root.get("markers")),
+        zones=_build_zones(root.get("zones")),
+        metadata=dict(root.get("metadata", {})),
+    )
+
+
+def load_document(path: str | Path) -> LogDocument:
+    template_path = Path(path)
+    with template_path.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    return document_from_mapping(payload)

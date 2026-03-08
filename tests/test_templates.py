@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import unittest
+
+from well_log_os.errors import TemplateValidationError
+from well_log_os.model import (
+    CurveElement,
+    RasterElement,
+    TrackHeaderObjectKind,
+    TrackKind,
+)
+from well_log_os.templates import document_from_mapping
+
+
+class TemplateTests(unittest.TestCase):
+    def test_image_track_accepts_raster_and_curve_overlay(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "image overlay",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16},
+                    {
+                        "id": "image",
+                        "title": "Image",
+                        "kind": "image",
+                        "width_mm": 40,
+                        "x_scale": {"kind": "linear", "min": 0, "max": 360},
+                        "elements": [
+                            {"kind": "raster", "channel": "FMI"},
+                            {"kind": "curve", "channel": "FRACTURE_INTENSITY"},
+                        ],
+                    },
+                ],
+            }
+        )
+        image_track = document.tracks[1]
+        self.assertEqual(image_track.kind, TrackKind.IMAGE)
+        self.assertIsInstance(image_track.elements[0], RasterElement)
+        self.assertIsInstance(image_track.elements[1], CurveElement)
+
+    def test_curve_track_rejects_raster_elements(self) -> None:
+        with self.assertRaises(ValueError):
+            document_from_mapping(
+                {
+                    "name": "bad curve track",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "tracks": [
+                        {
+                            "id": "bad",
+                            "title": "Bad",
+                            "kind": "curve",
+                            "width_mm": 40,
+                            "elements": [{"kind": "raster", "channel": "FMI"}],
+                        }
+                    ],
+                }
+            )
+
+    def test_invalid_element_kind_raises_template_error(self) -> None:
+        with self.assertRaises(TemplateValidationError):
+            document_from_mapping(
+                {
+                    "name": "bad",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "tracks": [
+                        {
+                            "id": "track",
+                            "title": "Track",
+                            "kind": "curve",
+                            "width_mm": 20,
+                            "elements": [{"kind": "unknown", "channel": "GR"}],
+                        }
+                    ],
+                }
+            )
+
+    def test_markers_and_zones_parse_from_template(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "annotations",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "markers": [{"depth": 1002.5, "label": "Top A", "color": "#ff0000"}],
+                "zones": [{"top": 1005, "base": 1012, "label": "Zone 1"}],
+                "tracks": [{"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16}],
+            }
+        )
+        self.assertEqual(len(document.markers), 1)
+        self.assertEqual(document.markers[0].label, "Top A")
+        self.assertAlmostEqual(document.markers[0].depth, 1002.5)
+        self.assertEqual(len(document.zones), 1)
+        self.assertEqual(document.zones[0].label, "Zone 1")
+        self.assertAlmostEqual(document.zones[0].top, 1005.0)
+        self.assertAlmostEqual(document.zones[0].base, 1012.0)
+
+    def test_invalid_markers_or_zones_raise_template_error(self) -> None:
+        with self.assertRaises(TemplateValidationError):
+            document_from_mapping(
+                {
+                    "name": "bad markers",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "markers": {"depth": 1000},
+                    "tracks": [{"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16}],
+                }
+            )
+        with self.assertRaises(TemplateValidationError):
+            document_from_mapping(
+                {
+                    "name": "bad zones",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "zones": [{"top": 1010, "base": 1000}],
+                    "tracks": [{"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16}],
+                }
+            )
+
+    def test_track_header_objects_parse_with_reserved_space(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "header objects",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "Gamma Ray",
+                        "kind": "curve",
+                        "width_mm": 30,
+                        "track_header": {
+                            "objects": [
+                                {"kind": "title", "enabled": True, "line_units": 1},
+                                {"kind": "scale", "enabled": False, "reserve_space": True},
+                                {"kind": "legend", "enabled": True, "line_units": 2},
+                            ]
+                        },
+                        "elements": [{"kind": "curve", "channel": "GR"}],
+                    }
+                ],
+            }
+        )
+        objects = document.tracks[0].header.objects
+        self.assertEqual(len(objects), 3)
+        self.assertEqual(objects[0].kind, TrackHeaderObjectKind.TITLE)
+        self.assertEqual(objects[1].kind, TrackHeaderObjectKind.SCALE)
+        self.assertFalse(objects[1].enabled)
+        self.assertTrue(objects[1].reserve_space)
+        self.assertEqual(objects[2].line_units, 2)
+
+    def test_invalid_track_header_configuration_raises_template_error(self) -> None:
+        with self.assertRaises(TemplateValidationError):
+            document_from_mapping(
+                {
+                    "name": "bad header objects",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "tracks": [
+                        {
+                            "id": "gr",
+                            "title": "Gamma Ray",
+                            "kind": "curve",
+                            "width_mm": 30,
+                            "track_header": {
+                                "objects": [
+                                    {"kind": "title"},
+                                    {"kind": "title"},
+                                ]
+                            },
+                            "elements": [{"kind": "curve", "channel": "GR"}],
+                        }
+                    ],
+                }
+            )
+
+
+if __name__ == "__main__":
+    unittest.main()

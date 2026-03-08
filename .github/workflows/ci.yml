@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Verify lockfile
+        run: uv lock --check
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Run Ruff
+        run: uv run ruff format --check .
+
+      - name: Run Ruff lint
+        run: uv run ruff check .
+
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Run unit tests
+        run: uv run python -m unittest discover -s tests -v
+
+  extras:
+    name: Extras Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync environment with all extras
+        run: uv sync --locked --all-extras
+
+      - name: Smoke test optional dependencies
+        run: |
+          uv run python - <<'PY'
+          import dlisio
+          import lasio
+          import matplotlib
+          import pint
+          import plotly
+          import welly
+
+          from well_log_os.io import load_dlis, load_las
+          from well_log_os.renderers import MatplotlibRenderer, PlotlyRenderer
+
+          print("lasio", lasio.__version__)
+          print("welly", welly.__version__)
+          print("dlisio", getattr(dlisio, "__version__", "unknown"))
+          print("matplotlib", matplotlib.__version__)
+          print("plotly", plotly.__version__)
+          print("pint", pint.__version__)
+          print(load_las, load_dlis, MatplotlibRenderer, PlotlyRenderer)
+          PY

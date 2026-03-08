@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "well-log-os"
+version = "0.1.0"
+description = "Printable and interactive well-log display toolkit for LAS and DLIS data."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {file = "LICENSE"}
+authors = [
+  {name = "well_log_os contributors"},
+]
+dependencies = [
+  "matplotlib>=3.10.8",
+  "numpy>=1.26",
+  "PyYAML>=6.0",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+las = [
+  "lasio>=0.31",
+  "welly>=0.5.2",
+]
+dlis = [
+  "dlisio>=1.0",
+]
+pdf = [
+  "matplotlib>=3.8",
+]
+interactive = [
+  "plotly>=5.18",
+]
+units = [
+  "pint>=0.24",
+]
+all = [
+  "lasio>=0.31",
+  "welly>=0.5.2",
+  "dlisio>=1.0",
+  "matplotlib>=3.8",
+  "plotly>=5.18",
+  "pint>=0.24",
+]
+
+[project.scripts]
+well-log-os = "well_log_os.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.8.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "examples"]
+extend-exclude = ["splice-main"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = [
+  "B",
+  "E",
+  "F",
+  "I",
+  "UP",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["well_log_os"]
