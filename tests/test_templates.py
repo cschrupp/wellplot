@@ -38,6 +38,12 @@ class TemplateTests(unittest.TestCase):
                                     "font_size": 6.0,
                                     "horizontal_alignment": "center",
                                 },
+                                "header_display": {
+                                    "show_name": True,
+                                    "show_unit": False,
+                                    "show_limits": True,
+                                    "show_color": False,
+                                },
                             }
                         ],
                     }
@@ -49,6 +55,10 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.render_mode, "value_labels")
         self.assertEqual(element.value_labels.step, 10.0)
         self.assertEqual(element.value_labels.number_format, NumberFormatKind.FIXED)
+        self.assertTrue(element.header_display.show_name)
+        self.assertFalse(element.header_display.show_unit)
+        self.assertTrue(element.header_display.show_limits)
+        self.assertFalse(element.header_display.show_color)
 
     def test_reference_track_can_define_layout_axis(self) -> None:
         document = document_from_mapping(

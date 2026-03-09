@@ -232,6 +232,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "scale_left_x": {"type": "number"},
                 "scale_unit_x": {"type": "number"},
                 "scale_right_x": {"type": "number"},
+                "paired_scale_text_offset_ratio": {"type": "number", "minimum": 0},
             },
         },
         "matplotlibStyleTrack": {
@@ -392,6 +393,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "position": {"type": "integer", "minimum": 1},
                 "curve_render_mode": {"type": "string", "enum": ["line", "value_labels"]},
                 "value_labels": {"$ref": "#/$defs/curveValueLabels"},
+                "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
                 "style": {"$ref": "#/$defs/style"},
                 "grid": {"$ref": "#/$defs/grid"},
                 "scale": {"$ref": "#/$defs/autoTrackScale"},
@@ -496,10 +498,21 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "position": {"type": "integer", "minimum": 1},
                 "curve_render_mode": {"type": "string", "enum": ["line", "value_labels"]},
                 "value_labels": {"$ref": "#/$defs/curveValueLabels"},
+                "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
                 "style": {"$ref": "#/$defs/stylePatch"},
                 "grid": {"$ref": "#/$defs/grid"},
                 "scale": {"$ref": "#/$defs/autoTrackScalePatch"},
                 "track_header": {"$ref": "#/$defs/trackHeader"},
+            },
+        },
+        "curveHeaderDisplay": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "show_name": {"type": "boolean"},
+                "show_unit": {"type": "boolean"},
+                "show_limits": {"type": "boolean"},
+                "show_color": {"type": "boolean"},
             },
         },
         "curveValueLabels": {

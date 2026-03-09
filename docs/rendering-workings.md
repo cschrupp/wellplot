@@ -144,3 +144,7 @@ Track-header legend space auto-fits to curve count:
 - legend slot line units are expanded to at least the number of curves
 - page `track_header_height_mm` is increased when needed to preserve readable legend rows
 - multi-curve headers render per-curve blocks (name row + scale row) with curve-colored separators
+- each curve can control header visibility via `configure.header_display`:
+  - `show_name`, `show_unit`, `show_limits`, `show_color`
+- in paired mode, each curve is ordered as `name` then `scale` immediately below.
+- paired-mode spacing can be tuned with `render.matplotlib.style.track_header.paired_scale_text_offset_ratio`.

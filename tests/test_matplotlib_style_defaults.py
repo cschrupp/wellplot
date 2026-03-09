@@ -2,7 +2,18 @@ from __future__ import annotations
 
 import unittest
 
-from well_log_os import document_from_mapping
+import numpy as np
+
+from well_log_os import (
+    CurveElement,
+    CurveHeaderDisplaySpec,
+    ScalarChannel,
+    ScaleKind,
+    ScaleSpec,
+    StyleSpec,
+    WellDataset,
+    document_from_mapping,
+)
 from well_log_os.renderers.matplotlib import (
     DEFAULT_MPL_STYLE_PATH,
     MatplotlibRenderer,
@@ -24,6 +35,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track"]["reference_grid_mode"], "edge_ticks")
         self.assertEqual(renderer.style["track"]["reference_label_align"], "center")
         self.assertEqual(renderer.style["track"]["reference_label_x"], 0.5)
+        self.assertEqual(renderer.style["track_header"]["paired_scale_text_offset_ratio"], 0.08)
 
     def test_renderer_style_override_deep_merges(self) -> None:
         renderer = MatplotlibRenderer(
@@ -72,6 +84,69 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertAlmostEqual(rows[-1][1], 0.3)
         self.assertAlmostEqual(rows[0][1], rows[1][0])
         self.assertAlmostEqual(rows[1][1], rows[2][0])
+
+    def test_curve_header_pair_slot_joins_legend_and_scale_slots(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "pair slot",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {"kind": "curve", "channel": "A"},
+                            {"kind": "curve", "channel": "B"},
+                        ],
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        track = document.tracks[0]
+        slots = renderer._track_header_slots(track)
+        pair = renderer._curve_header_pair_slot(track, slots)
+        self.assertIsNotNone(pair)
+        assert pair is not None
+        self.assertEqual(pair[0], 1)
+        self.assertEqual(pair[1], 2)
+        self.assertGreater(pair[2], pair[3])
+
+    def test_curve_header_display_controls_scale_text_and_color(self) -> None:
+        depth = np.array([1000.0, 1001.0, 1002.0])
+        dataset = WellDataset(name="sample")
+        dataset.add_channel(
+            ScalarChannel(
+                "TENS",
+                depth,
+                "m",
+                "lbf",
+                values=np.array([5000.0, 7000.0, 9000.0]),
+            )
+        )
+        element = CurveElement(
+            channel="TENS",
+            style=StyleSpec(color="#123456"),
+            scale=ScaleSpec(kind=ScaleKind.LINEAR, minimum=5000.0, maximum=15000.0, reverse=False),
+            header_display=CurveHeaderDisplaySpec(
+                show_name=False,
+                show_unit=False,
+                show_limits=True,
+                show_color=False,
+            ),
+        )
+        renderer = MatplotlibRenderer()
+        left, unit, right = renderer._curve_scale_text_triplet(
+            track=None, element=element, dataset=dataset
+        )
+        self.assertEqual(left, "5000")
+        self.assertEqual(unit, "")
+        self.assertEqual(right, "15000")
+        self.assertEqual(renderer._curve_header_label(element), "")
+        self.assertEqual(renderer._curve_header_color(element), "#111111")
 
 
 if __name__ == "__main__":

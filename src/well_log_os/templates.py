@@ -9,6 +9,7 @@ import yaml
 from .errors import TemplateValidationError
 from .model import (
     CurveElement,
+    CurveHeaderDisplaySpec,
     CurveValueLabelsSpec,
     DepthAxisSpec,
     FooterSpec,
@@ -183,6 +184,18 @@ def _build_curve_value_labels(data: Any) -> CurveValueLabelsSpec:
         raise TemplateValidationError("Invalid curve.value_labels configuration.") from exc
 
 
+def _build_curve_header_display(data: Any) -> CurveHeaderDisplaySpec:
+    if data is None:
+        return CurveHeaderDisplaySpec()
+    display_data = _ensure_mapping(data, context="curve.header_display")
+    return CurveHeaderDisplaySpec(
+        show_name=bool(display_data.get("show_name", True)),
+        show_unit=bool(display_data.get("show_unit", True)),
+        show_limits=bool(display_data.get("show_limits", True)),
+        show_color=bool(display_data.get("show_color", True)),
+    )
+
+
 def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
     if not data:
         return HeaderSpec()
@@ -318,6 +331,7 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
                     scale=_build_scale(element_data.get("scale")),
                     render_mode=str(element_data.get("render_mode", "line")),
                     value_labels=_build_curve_value_labels(element_data.get("value_labels")),
+                    header_display=_build_curve_header_display(element_data.get("header_display")),
                 )
             )
         elif element_kind in {"raster", "image"}:

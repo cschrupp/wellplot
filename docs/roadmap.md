@@ -50,12 +50,12 @@ Implementable now (already in project):
 - Curve line color, thickness, style, opacity.
 - Multi-curve track overlays with independent per-curve scaling.
 - Per-curve header rows (name + scale/limits + unit).
+- Per-curve header display toggles (`show_name`, `show_unit`, `show_limits`, `show_color`).
 - Value-label mode with step, number format, precision, alignment, font.
 - Header typography and frame styling through `render.matplotlib.style`.
 
 Near-term additions (next phases):
 
-- Per-curve header toggles (`show_name`, `show_unit`, `show_limits`, `show_color`).
 - Points/symbol mode (`marker` type, size, optional color-by-variable).
 - Area-fill modes (left/right, baseline/fill rules).
 - Vertical thresholds and repeat/wrap display behavior.

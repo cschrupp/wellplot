@@ -476,7 +476,10 @@ class MatplotlibRenderer(Renderer):
         ax.set_yticks([])
         self._style_track_frame(ax)
         slots = self._track_header_slots(track)
+        paired_slot = self._curve_header_pair_slot(track, slots)
         for index, (item, slot_top, slot_bottom) in enumerate(slots):
+            if paired_slot is not None and index == paired_slot[1]:
+                continue
             if index > 0:
                 ax.plot(
                     [0.0, 1.0],
@@ -487,12 +490,43 @@ class MatplotlibRenderer(Renderer):
                 )
             if not item.enabled:
                 continue
+            if paired_slot is not None and index == paired_slot[0]:
+                self._draw_track_header_curve_pairs(
+                    ax,
+                    track,
+                    dataset,
+                    paired_slot[2],
+                    paired_slot[3],
+                )
+                continue
             if item.kind == TrackHeaderObjectKind.TITLE:
                 self._draw_track_header_title(ax, track, slot_top, slot_bottom)
             elif item.kind == TrackHeaderObjectKind.SCALE:
                 self._draw_track_header_scale(ax, track, document, dataset, slot_top, slot_bottom)
             elif item.kind == TrackHeaderObjectKind.LEGEND:
                 self._draw_track_header_legend(ax, track, slot_top, slot_bottom)
+
+    def _curve_header_pair_slot(self, track, slots) -> tuple[int, int, float, float] | None:
+        if self._curve_count(track) <= 0:
+            return None
+        scale_index = None
+        legend_index = None
+        for index, (item, _, _) in enumerate(slots):
+            if not item.enabled or not item.reserve_space:
+                continue
+            if item.kind == TrackHeaderObjectKind.SCALE:
+                scale_index = index
+            elif item.kind == TrackHeaderObjectKind.LEGEND:
+                legend_index = index
+        if scale_index is None or legend_index is None:
+            return None
+        if abs(scale_index - legend_index) != 1:
+            return None
+        first = min(scale_index, legend_index)
+        second = max(scale_index, legend_index)
+        top = slots[first][1]
+        bottom = slots[second][2]
+        return first, second, top, bottom
 
     def _track_header_slots(self, track) -> tuple[tuple[object, float, float], ...]:
         reserved = track.header.reserved_objects()
@@ -614,13 +648,17 @@ class MatplotlibRenderer(Renderer):
                 element,
                 dataset,
             )
+            row_color = self._curve_header_color(element)
             ax.plot(
                 [0.0, 1.0],
                 [row_top, row_top],
                 transform=ax.transAxes,
-                color=element.style.color,
-                linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
-                linestyle=element.style.line_style,
+                color=row_color,
+                linewidth=max(
+                    float(track_header_style["separator_linewidth"]),
+                    self._curve_header_line_width(element),
+                ),
+                linestyle=self._curve_header_line_style(element),
             )
             ax.text(
                 float(track_header_style["scale_left_x"]),
@@ -630,7 +668,7 @@ class MatplotlibRenderer(Renderer):
                 ha="left",
                 va="center",
                 fontsize=fontsize,
-                color=element.style.color,
+                color=row_color,
                 clip_on=True,
             )
             ax.text(
@@ -641,7 +679,7 @@ class MatplotlibRenderer(Renderer):
                 ha="center",
                 va="center",
                 fontsize=fontsize,
-                color=element.style.color,
+                color=row_color,
                 clip_on=True,
             )
             ax.text(
@@ -652,7 +690,7 @@ class MatplotlibRenderer(Renderer):
                 ha="right",
                 va="center",
                 fontsize=fontsize,
-                color=element.style.color,
+                color=row_color,
                 clip_on=True,
             )
             if index == row_count - 1:
@@ -660,9 +698,12 @@ class MatplotlibRenderer(Renderer):
                     [0.0, 1.0],
                     [row_bottom, row_bottom],
                     transform=ax.transAxes,
-                    color=element.style.color,
-                    linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
-                    linestyle=element.style.line_style,
+                    color=row_color,
+                    linewidth=max(
+                        float(track_header_style["separator_linewidth"]),
+                        self._curve_header_line_width(element),
+                    ),
+                    linestyle=self._curve_header_line_style(element),
                 )
 
     def _curve_elements(self, track) -> list[CurveElement]:
@@ -691,16 +732,52 @@ class MatplotlibRenderer(Renderer):
         element: CurveElement,
         dataset: WellDataset,
     ) -> tuple[str, str, str]:
-        scale = element.scale or track.x_scale
-        if scale is None:
-            return "auto", "", ""
-        left = scale.maximum if scale.reverse else scale.minimum
-        right = scale.minimum if scale.reverse else scale.maximum
-        unit_text = ""
+        show_limits = element.header_display.show_limits
+        show_unit = element.header_display.show_unit
+
         channel = dataset.get_channel(element.channel)
-        if isinstance(channel, ScalarChannel):
+        unit_text = ""
+        if show_unit and isinstance(channel, ScalarChannel):
             unit_text = channel.value_unit or ""
-        return f"{left:g}", unit_text, f"{right:g}"
+
+        if not show_limits:
+            return "", unit_text, ""
+
+        scale = element.scale or track.x_scale
+        if scale is not None:
+            left = scale.maximum if scale.reverse else scale.minimum
+            right = scale.minimum if scale.reverse else scale.maximum
+            return f"{left:g}", unit_text, f"{right:g}"
+
+        if isinstance(channel, ScalarChannel):
+            values = channel.masked_values()
+            finite = values[np.isfinite(values)]
+            if finite.size >= 1:
+                left = float(np.nanmin(finite))
+                right = float(np.nanmax(finite))
+                return f"{left:g}", unit_text, f"{right:g}"
+
+        return "auto", unit_text, "auto"
+
+    def _curve_header_color(self, element: CurveElement) -> str:
+        if element.header_display.show_color:
+            return element.style.color
+        return "#111111"
+
+    def _curve_header_label(self, element: CurveElement) -> str:
+        if not element.header_display.show_name:
+            return ""
+        return element.label or element.channel
+
+    def _curve_header_line_style(self, element: CurveElement) -> str:
+        if not element.header_display.show_color:
+            return "-"
+        return element.style.line_style
+
+    def _curve_header_line_width(self, element: CurveElement) -> float:
+        if not element.header_display.show_color:
+            return 0.7
+        return max(0.7, element.style.line_width)
 
     def _draw_track_header_legend(self, ax, track, slot_top: float, slot_bottom: float) -> None:
         track_header_style = self._style_section("track_header")
@@ -728,13 +805,17 @@ class MatplotlibRenderer(Renderer):
         row_count = len(curves)
         rows = self._curve_row_bounds(slot_top, slot_bottom, row_count)
         for element, (_, row_bottom) in zip(curves, rows, strict=False):
+            row_color = self._curve_header_color(element)
             ax.plot(
                 [0.0, 1.0],
                 [row_bottom, row_bottom],
                 transform=ax.transAxes,
-                color=element.style.color,
-                linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
-                linestyle=element.style.line_style,
+                color=row_color,
+                linewidth=max(
+                    float(track_header_style["separator_linewidth"]),
+                    self._curve_header_line_width(element),
+                ),
+                linestyle=self._curve_header_line_style(element),
             )
         for element, (row_top, row_bottom) in zip(curves, rows, strict=False):
             y_center = 0.5 * (row_top + row_bottom)
@@ -745,7 +826,7 @@ class MatplotlibRenderer(Renderer):
                 min_pt=float(track_header_style["legend_row_min_pt"]),
                 max_pt=float(track_header_style["legend_row_max_pt"]),
             )
-            label = element.label or element.channel
+            label = self._curve_header_label(element)
             available_px = max(ax.bbox.width * 0.9, 1.0)
             approx_char_px = max(
                 fontsize * float(track_header_style["legend_char_width_ratio"]), 1.0
@@ -756,6 +837,7 @@ class MatplotlibRenderer(Renderer):
             if len(label) > max_chars:
                 label = f"{label[: max_chars - 3]}..."
 
+            row_color = self._curve_header_color(element)
             ax.text(
                 0.5,
                 y_center,
@@ -764,7 +846,121 @@ class MatplotlibRenderer(Renderer):
                 ha="center",
                 va="center",
                 fontsize=fontsize,
-                color=element.style.color,
+                color=row_color,
+                clip_on=True,
+            )
+
+    def _draw_track_header_curve_pairs(
+        self,
+        ax,
+        track,
+        dataset: WellDataset,
+        slot_top: float,
+        slot_bottom: float,
+    ) -> None:
+        track_header_style = self._style_section("track_header")
+        curves = self._curve_elements(track)
+        if not curves:
+            return
+
+        rows = self._curve_row_bounds(slot_top, slot_bottom, len(curves) * 2)
+        for curve_index, element in enumerate(curves):
+            name_top, name_bottom = rows[curve_index * 2]
+            scale_top, scale_bottom = rows[curve_index * 2 + 1]
+            row_color = self._curve_header_color(element)
+
+            name_fontsize = self._slot_font_size(
+                ax,
+                name_top,
+                name_bottom,
+                min_pt=float(track_header_style["legend_row_min_pt"]),
+                max_pt=float(track_header_style["legend_row_max_pt"]),
+            )
+            label = self._curve_header_label(element)
+            available_px = max(ax.bbox.width * 0.9, 1.0)
+            approx_char_px = max(
+                name_fontsize * float(track_header_style["legend_char_width_ratio"]), 1.0
+            )
+            max_chars = max(
+                int(track_header_style["legend_min_chars"]),
+                int(available_px / approx_char_px),
+            )
+            if len(label) > max_chars:
+                label = f"{label[: max_chars - 3]}..."
+            ax.text(
+                0.5,
+                0.5 * (name_top + name_bottom),
+                label,
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=name_fontsize,
+                color=row_color,
+                clip_on=True,
+            )
+
+            # The curve style sample line sits between the name and scale rows.
+            ax.plot(
+                [
+                    float(track_header_style["scale_left_x"]),
+                    float(track_header_style["scale_right_x"]),
+                ],
+                [name_bottom, name_bottom],
+                transform=ax.transAxes,
+                color=row_color,
+                linewidth=max(
+                    float(track_header_style["separator_linewidth"]),
+                    self._curve_header_line_width(element),
+                ),
+                linestyle=self._curve_header_line_style(element),
+            )
+
+            scale_fontsize = self._slot_font_size(
+                ax,
+                scale_top,
+                scale_bottom,
+                min_pt=float(track_header_style["scale_min_pt"]),
+                max_pt=float(track_header_style["scale_max_pt"]),
+            )
+            left_value, unit_text, right_value = self._curve_scale_text_triplet(
+                track, element, dataset
+            )
+            scale_row_height = scale_top - scale_bottom
+            y_offset = scale_row_height * float(
+                track_header_style.get("paired_scale_text_offset_ratio", 0.08)
+            )
+            y_center = 0.5 * (scale_top + scale_bottom) - y_offset
+            ax.text(
+                float(track_header_style["scale_left_x"]),
+                y_center,
+                left_value,
+                transform=ax.transAxes,
+                ha="left",
+                va="center",
+                fontsize=scale_fontsize,
+                color=row_color,
+                clip_on=True,
+            )
+            ax.text(
+                float(track_header_style["scale_unit_x"]),
+                y_center,
+                unit_text,
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=scale_fontsize,
+                color=row_color,
+                clip_on=True,
+            )
+            ax.text(
+                float(track_header_style["scale_right_x"]),
+                y_center,
+                right_value,
+                transform=ax.transAxes,
+                ha="right",
+                va="center",
+                fontsize=scale_fontsize,
+                color=row_color,
                 clip_on=True,
             )
 

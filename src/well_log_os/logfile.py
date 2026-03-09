@@ -190,6 +190,14 @@ def _validate_track_configure(configure: dict[str, Any], *, context: str) -> Non
                 raise TemplateValidationError(
                     f"{context}.value_labels.vertical_alignment is invalid."
                 )
+    if "header_display" in configure:
+        header_display = _ensure_mapping(
+            configure["header_display"],
+            context=f"{context}.header_display",
+        )
+        for key in ("show_name", "show_unit", "show_limits", "show_color"):
+            if key in header_display and not isinstance(header_display[key], bool):
+                raise TemplateValidationError(f"{context}.header_display.{key} must be boolean.")
     style = _ensure_mapping(configure["style"], context=f"{context}.style")
     if "color" not in style:
         raise TemplateValidationError(f"{context}.style.color is required.")
@@ -566,6 +574,7 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
             )
         )
         value_labels = deepcopy(configure.get("value_labels", {}))
+        header_display = deepcopy(configure.get("header_display", {}))
         grid = deepcopy(configure.get("grid", {}))
         header = deepcopy(configure.get("track_header", {}))
         width_mm = float(configure["width_mm"])
@@ -595,6 +604,7 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
             "scale": curve_scale,
             "render_mode": str(configure.get("curve_render_mode", "line")),
             "value_labels": value_labels,
+            "header_display": header_display,
         }
 
         if track_id in grouped_tracks:

@@ -176,6 +176,14 @@ class CurveValueLabelsSpec:
 
 
 @dataclass(slots=True)
+class CurveHeaderDisplaySpec:
+    show_name: bool = True
+    show_unit: bool = True
+    show_limits: bool = True
+    show_color: bool = True
+
+
+@dataclass(slots=True)
 class CurveElement:
     channel: str
     label: str | None = None
@@ -183,6 +191,7 @@ class CurveElement:
     scale: ScaleSpec | None = None
     render_mode: str = "line"
     value_labels: CurveValueLabelsSpec = field(default_factory=CurveValueLabelsSpec)
+    header_display: CurveHeaderDisplaySpec = field(default_factory=CurveHeaderDisplaySpec)
 
     def __post_init__(self) -> None:
         mode = self.render_mode.strip().lower()

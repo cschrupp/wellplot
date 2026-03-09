@@ -10,6 +10,7 @@ from .logfile_schema import get_logfile_json_schema, validate_logfile_mapping
 from .model import (
     ArrayChannel,
     CurveElement,
+    CurveHeaderDisplaySpec,
     DepthAxisSpec,
     FooterSpec,
     GridSpec,
@@ -38,6 +39,7 @@ from .templates import document_from_mapping, load_document
 __all__ = [
     "ArrayChannel",
     "CurveElement",
+    "CurveHeaderDisplaySpec",
     "DepthAxisSpec",
     "FooterSpec",
     "GridSpec",

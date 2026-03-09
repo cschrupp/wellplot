@@ -239,6 +239,26 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.render_mode, "value_labels")
         self.assertEqual(curve.value_labels.step, 5.0)
 
+    def test_auto_track_can_configure_curve_header_display(self) -> None:
+        payload = build_mapping()
+        payload["auto_tracks"]["tracks"][0]["configure"]["header_display"] = {
+            "show_name": False,
+            "show_unit": False,
+            "show_limits": True,
+            "show_color": False,
+        }
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[1].elements[0]
+        self.assertFalse(curve.header_display.show_name)
+        self.assertFalse(curve.header_display.show_unit)
+        self.assertTrue(curve.header_display.show_limits)
+        self.assertFalse(curve.header_display.show_color)
+
     def test_auto_tracks_can_group_multiple_curves_in_one_track(self) -> None:
         payload = build_mapping()
         payload["auto_tracks"]["tracks"][0]["configure"]["id"] = "combo"
