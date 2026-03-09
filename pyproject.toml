@@ -13,6 +13,7 @@ authors = [
   {name = "well_log_os contributors"},
 ]
 dependencies = [
+  "jsonschema>=4.23",
   "matplotlib>=3.10.8",
   "numpy>=1.26",
   "PyYAML>=6.0",

@@ -127,6 +127,20 @@ class LogFileTests(unittest.TestCase):
         with self.assertRaises(TemplateValidationError):
             logfile_from_mapping(payload)
 
+    def test_schema_error_reports_required_path(self) -> None:
+        payload = build_mapping()
+        del payload["auto_tracks"]["tracks"][0]["configure"]
+        with self.assertRaises(TemplateValidationError) as ctx:
+            logfile_from_mapping(payload)
+        self.assertIn("$.auto_tracks.tracks[0]", str(ctx.exception))
+
+    def test_schema_error_reports_invalid_dpi_path(self) -> None:
+        payload = build_mapping()
+        payload["render"]["dpi"] = 0
+        with self.assertRaises(TemplateValidationError) as ctx:
+            logfile_from_mapping(payload)
+        self.assertIn("$.render.dpi", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,7 @@ import yaml
 
 from .errors import TemplateValidationError
 from .io import load_dlis, load_las
+from .logfile_schema import validate_logfile_mapping
 from .model import LogDocument, ScalarChannel, WellDataset
 from .templates import document_from_mapping
 
@@ -43,24 +44,28 @@ def _ensure_sequence(value: Any, *, context: str) -> list[Any]:
 
 
 def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
+    validate_logfile_mapping(data)
     root = _ensure_mapping(data, context="logfile")
-    _ = int(root["version"])
-    name = str(root["name"])
+    try:
+        _ = int(root["version"])
+        name = str(root["name"])
 
-    data_section = _ensure_mapping(root["data"], context="data")
-    data_source_path = str(data_section["source_path"])
-    data_source_format = str(data_section.get("source_format", "auto")).strip().lower()
+        data_section = _ensure_mapping(root["data"], context="data")
+        data_source_path = str(data_section["source_path"])
+        data_source_format = str(data_section.get("source_format", "auto")).strip().lower()
 
-    render_section = _ensure_mapping(root["render"], context="render")
-    render_backend = str(render_section.get("backend", "matplotlib")).strip().lower()
-    render_output_path = str(render_section["output_path"])
-    render_dpi = int(render_section["dpi"])
-    if render_dpi <= 0:
-        raise TemplateValidationError("render.dpi must be positive.")
+        render_section = _ensure_mapping(root["render"], context="render")
+        render_backend = str(render_section.get("backend", "matplotlib")).strip().lower()
+        render_output_path = str(render_section["output_path"])
+        render_dpi = int(render_section["dpi"])
+        if render_dpi <= 0:
+            raise TemplateValidationError("render.dpi must be positive.")
 
-    document = deepcopy(_ensure_mapping(root["document"], context="document"))
-    auto_tracks = deepcopy(_ensure_mapping(root["auto_tracks"], context="auto_tracks"))
-    _validate_auto_tracks(auto_tracks)
+        document = deepcopy(_ensure_mapping(root["document"], context="document"))
+        auto_tracks = deepcopy(_ensure_mapping(root["auto_tracks"], context="auto_tracks"))
+        _validate_auto_tracks(auto_tracks)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise TemplateValidationError("Invalid logfile configuration.") from exc
 
     return LogFileSpec(
         name=name,

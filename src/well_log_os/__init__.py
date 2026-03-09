@@ -6,6 +6,7 @@ from .logfile import (
     load_logfile,
     logfile_from_mapping,
 )
+from .logfile_schema import get_logfile_json_schema, validate_logfile_mapping
 from .model import (
     ArrayChannel,
     CurveElement,
@@ -64,6 +65,8 @@ __all__ = [
     "load_dataset_for_logfile",
     "load_logfile",
     "logfile_from_mapping",
+    "get_logfile_json_schema",
+    "validate_logfile_mapping",
     "render_from_logfile",
     "document_from_mapping",
     "load_document",

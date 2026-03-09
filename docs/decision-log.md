@@ -1,6 +1,6 @@
 # well_log_os Decision Log
 
-Last updated: 2026-03-07
+Last updated: 2026-03-09
 
 ## Purpose
 
@@ -31,6 +31,8 @@ This file records project decisions that should remain stable unless explicitly 
 - Log configurations are persisted in a dedicated YAML "log-file" spec (not hardcoded in scripts).
 - Auto-generated curve tracks are configured per-track in YAML (`auto_tracks.tracks[*].configure`).
 - Rendering is executed through a master log-file pipeline/CLI, not per-file loaders.
+- Log-file YAML is validated with a JSON Schema before parsing/building.
+- CLI includes a dedicated `validate` command for logfile preflight checks.
 - Track header data is modeled as typed objects (`title`, `scale`, `legend`), not ad-hoc text.
 - Track header objects support:
   - `enabled` to show/hide content

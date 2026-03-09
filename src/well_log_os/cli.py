@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from .errors import TemplateValidationError
+from .logfile import load_logfile
 from .pipeline import render_from_logfile
 
 
@@ -22,6 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Optional output override path",
     )
+
+    validate_parser = subparsers.add_parser("validate", help="Validate a log-file YAML")
+    validate_parser.add_argument("logfile", type=Path, help="Path to log-file YAML")
     return parser
 
 
@@ -34,6 +40,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(result.output_path)
         else:
             print("Render completed.")
+        return 0
+    if args.command == "validate":
+        try:
+            load_logfile(args.logfile)
+        except TemplateValidationError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        except OSError as exc:
+            print(f"Failed to read logfile: {exc}", file=sys.stderr)
+            return 1
+        print(f"Valid logfile: {args.logfile}")
         return 0
     parser.error(f"Unsupported command {args.command!r}.")
     return 2

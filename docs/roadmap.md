@@ -1,6 +1,6 @@
 # well_log_os Roadmap
 
-Last updated: 2026-03-07
+Last updated: 2026-03-09
 
 ## Scope Summary
 
@@ -23,6 +23,7 @@ Decision history is tracked in `docs/decision-log.md`.
   - structured track header object slots
 - Plotly renderer provides interactive visualization baseline.
 - Synthetic example exists for fast iteration (`examples/synthetic_demo.py` + `examples/triple_combo.yaml`).
+- Log-file schema validation is implemented (JSON Schema + CLI `validate`).
 
 ## Development Plan
 

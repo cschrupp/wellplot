@@ -81,6 +81,12 @@ Use the master loader (single command for any log-file YAML):
 uv run python -m well_log_os.cli render examples/cbl_main.log.yaml
 ```
 
+Validate a log-file against the JSON Schema before rendering:
+
+```bash
+uv run python -m well_log_os.cli validate examples/cbl_main.log.yaml
+```
+
 Optional output override:
 
 ```bash
