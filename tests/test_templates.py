@@ -5,6 +5,7 @@ import unittest
 from well_log_os.errors import TemplateValidationError
 from well_log_os.model import (
     CurveElement,
+    NumberFormatKind,
     RasterElement,
     TrackHeaderObjectKind,
     TrackKind,
@@ -13,6 +14,42 @@ from well_log_os.templates import document_from_mapping
 
 
 class TemplateTests(unittest.TestCase):
+    def test_curve_element_can_use_value_labels_mode(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "value labels",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "render_mode": "value_labels",
+                                "value_labels": {
+                                    "step": 10,
+                                    "format": "fixed",
+                                    "precision": 1,
+                                    "font_size": 6.0,
+                                    "horizontal_alignment": "center",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        self.assertEqual(element.render_mode, "value_labels")
+        self.assertEqual(element.value_labels.step, 10.0)
+        self.assertEqual(element.value_labels.number_format, NumberFormatKind.FIXED)
+
     def test_reference_track_can_define_layout_axis(self) -> None:
         document = document_from_mapping(
             {

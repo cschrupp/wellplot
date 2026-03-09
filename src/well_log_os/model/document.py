@@ -148,11 +148,47 @@ class TrackHeaderSpec:
 
 
 @dataclass(slots=True)
+class CurveValueLabelsSpec:
+    step: float = 5.0
+    number_format: NumberFormatKind = NumberFormatKind.AUTOMATIC
+    precision: int = 2
+    color: str | None = None
+    font_size: float = 5.5
+    font_family: str | None = None
+    font_weight: str = "normal"
+    font_style: str = "normal"
+    horizontal_alignment: str = "center"
+    vertical_alignment: str = "center"
+
+    def __post_init__(self) -> None:
+        if self.step <= 0:
+            raise ValueError("Curve value-label step must be positive.")
+        if self.precision < 0:
+            raise ValueError("Curve value-label precision must be non-negative.")
+        if self.font_size <= 0:
+            raise ValueError("Curve value-label font_size must be positive.")
+        if self.horizontal_alignment not in {"left", "center", "right"}:
+            raise ValueError(
+                "Curve value-label horizontal_alignment must be left, center, or right."
+            )
+        if self.vertical_alignment not in {"top", "center", "bottom"}:
+            raise ValueError("Curve value-label vertical_alignment must be top, center, or bottom.")
+
+
+@dataclass(slots=True)
 class CurveElement:
     channel: str
     label: str | None = None
     style: StyleSpec = field(default_factory=StyleSpec)
     scale: ScaleSpec | None = None
+    render_mode: str = "line"
+    value_labels: CurveValueLabelsSpec = field(default_factory=CurveValueLabelsSpec)
+
+    def __post_init__(self) -> None:
+        mode = self.render_mode.strip().lower()
+        if mode not in {"line", "value_labels"}:
+            raise ValueError("Curve render_mode must be line or value_labels.")
+        self.render_mode = mode
 
 
 @dataclass(slots=True)

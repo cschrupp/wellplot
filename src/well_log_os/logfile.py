@@ -162,6 +162,34 @@ def _validate_track_configure(configure: dict[str, Any], *, context: str) -> Non
     if "position" in configure:
         if int(configure["position"]) <= 0:
             raise TemplateValidationError(f"{context}.position must be positive.")
+    if "curve_render_mode" in configure:
+        render_mode = str(configure["curve_render_mode"]).strip().lower()
+        if render_mode not in {"line", "value_labels"}:
+            raise TemplateValidationError(f"{context}.curve_render_mode is invalid.")
+    if "value_labels" in configure:
+        labels = _ensure_mapping(configure["value_labels"], context=f"{context}.value_labels")
+        if "step" in labels and float(labels["step"]) <= 0:
+            raise TemplateValidationError(f"{context}.value_labels.step must be positive.")
+        if "precision" in labels and int(labels["precision"]) < 0:
+            raise TemplateValidationError(f"{context}.value_labels.precision must be non-negative.")
+        if "font_size" in labels and float(labels["font_size"]) <= 0:
+            raise TemplateValidationError(f"{context}.value_labels.font_size must be positive.")
+        if "format" in labels:
+            fmt = str(labels["format"]).strip().lower()
+            if fmt not in {"automatic", "fixed", "scientific", "concise"}:
+                raise TemplateValidationError(f"{context}.value_labels.format is invalid.")
+        if "horizontal_alignment" in labels:
+            align = str(labels["horizontal_alignment"]).strip().lower()
+            if align not in {"left", "center", "right"}:
+                raise TemplateValidationError(
+                    f"{context}.value_labels.horizontal_alignment is invalid."
+                )
+        if "vertical_alignment" in labels:
+            align = str(labels["vertical_alignment"]).strip().lower()
+            if align not in {"top", "center", "bottom"}:
+                raise TemplateValidationError(
+                    f"{context}.value_labels.vertical_alignment is invalid."
+                )
     style = _ensure_mapping(configure["style"], context=f"{context}.style")
     if "color" not in style:
         raise TemplateValidationError(f"{context}.style.color is required.")
@@ -535,6 +563,7 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
                 context=f"auto_tracks.tracks[{index - 1}].configure.style",
             )
         )
+        value_labels = deepcopy(configure.get("value_labels", {}))
         grid = deepcopy(configure.get("grid", {}))
         header = deepcopy(configure.get("track_header", {}))
         width_mm = float(configure["width_mm"])
@@ -572,6 +601,8 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
                             "channel": channel.mnemonic,
                             "label": channel.mnemonic,
                             "style": style,
+                            "render_mode": str(configure.get("curve_render_mode", "line")),
+                            "value_labels": value_labels,
                         }
                     ],
                 },

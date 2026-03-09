@@ -123,14 +123,17 @@ class MatplotlibRenderer(Renderer):
 
     def _format_reference_value(self, value: float, reference: ReferenceTrackSpec) -> str:
         precision = reference.precision
-        if reference.number_format == NumberFormatKind.FIXED:
+        return self._format_number(value, reference.number_format, precision)
+
+    def _format_number(self, value: float, number_format: NumberFormatKind, precision: int) -> str:
+        if number_format == NumberFormatKind.FIXED:
             return f"{value:.{precision}f}"
-        if reference.number_format == NumberFormatKind.SCIENTIFIC:
+        if number_format == NumberFormatKind.SCIENTIFIC:
             return f"{value:.{precision}e}"
-        if reference.number_format == NumberFormatKind.CONCISE:
+        if number_format == NumberFormatKind.CONCISE:
             return f"{value:.{precision}g}"
 
-        # Automatic mode: integers stay clean, otherwise use concise scientific fallback.
+        # Automatic mode: integers stay clean, otherwise use concise notation.
         rounded = round(value)
         if np.isclose(value, rounded):
             return f"{int(rounded)}"
@@ -743,7 +746,9 @@ class MatplotlibRenderer(Renderer):
         else:
             xmin = scale.minimum
             xmax = scale.maximum
-        if scale is not None and scale.kind == ScaleKind.LOG:
+        if element.render_mode == "value_labels":
+            self._draw_curve_value_labels(ax, depth, values, element, scale)
+        elif scale is not None and scale.kind == ScaleKind.LOG:
             ax.set_xscale("log")
             valid = values > 0
             ax.plot(
@@ -765,6 +770,50 @@ class MatplotlibRenderer(Renderer):
             ax.set_xlim(xmax, xmin)
         else:
             ax.set_xlim(xmin, xmax)
+
+    def _draw_curve_value_labels(self, ax, depth, values, element, scale) -> None:
+        labels = element.value_labels
+        mask = np.isfinite(depth) & np.isfinite(values)
+        if scale is not None and scale.kind == ScaleKind.LOG:
+            mask &= values > 0
+        if not np.any(mask):
+            return
+
+        valid_depth = depth[mask]
+        valid_values = values[mask]
+        step = labels.step
+        window_top = float(min(ax.get_ylim()))
+        window_base = float(max(ax.get_ylim()))
+        start = np.floor(window_top / step) * step
+        epsilon = max(abs(step) * 1e-6, 1e-8)
+
+        sample_indices: list[int] = []
+        used: set[int] = set()
+        target = start
+        while target <= window_base + epsilon:
+            if target >= window_top - epsilon:
+                nearest = int(np.argmin(np.abs(valid_depth - target)))
+                if nearest not in used:
+                    used.add(nearest)
+                    sample_indices.append(nearest)
+            target += step
+
+        for index in sample_indices:
+            x_value = float(valid_values[index])
+            y_value = float(valid_depth[index])
+            text = self._format_number(x_value, labels.number_format, labels.precision)
+            kwargs = {
+                "ha": labels.horizontal_alignment,
+                "va": labels.vertical_alignment,
+                "fontsize": labels.font_size,
+                "color": labels.color or element.style.color,
+                "fontweight": labels.font_weight,
+                "fontstyle": labels.font_style,
+                "clip_on": True,
+            }
+            if labels.font_family:
+                kwargs["fontfamily"] = labels.font_family
+            ax.text(x_value, y_value, text, **kwargs)
 
     def _draw_raster(self, ax, track, element, document, dataset) -> None:
         channel = dataset.get_channel(element.channel)

@@ -220,6 +220,25 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(document.tracks[0].id, "gr")
         self.assertEqual(document.tracks[1].id, "depth")
 
+    def test_auto_track_can_render_curve_values_as_labels(self) -> None:
+        payload = build_mapping()
+        payload["auto_tracks"]["tracks"][0]["configure"]["curve_render_mode"] = "value_labels"
+        payload["auto_tracks"]["tracks"][0]["configure"]["value_labels"] = {
+            "step": 5,
+            "format": "fixed",
+            "precision": 1,
+            "font_size": 6,
+        }
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[1].elements[0]
+        self.assertEqual(curve.render_mode, "value_labels")
+        self.assertEqual(curve.value_labels.step, 5.0)
+
     def test_load_logfile_merges_template_yaml_with_savefile_overrides(self) -> None:
         template_payload = {
             "render": {"backend": "matplotlib", "output_path": "base.pdf", "dpi": 300},

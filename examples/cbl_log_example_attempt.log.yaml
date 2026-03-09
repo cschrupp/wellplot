@@ -17,6 +17,13 @@ auto_tracks:
     - channel: GR_STGC
       configure:
         id: gr_stgc
+        curve_render_mode: value_labels
+        value_labels:
+          step: 10
+          format: fixed
+          precision: 1
+          font_size: 6.0
+          horizontal_alignment: center
         style:
           color: "#2e7d32"
     - channel: TT

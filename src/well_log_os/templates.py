@@ -9,6 +9,7 @@ import yaml
 from .errors import TemplateValidationError
 from .model import (
     CurveElement,
+    CurveValueLabelsSpec,
     DepthAxisSpec,
     FooterSpec,
     GridSpec,
@@ -153,6 +154,35 @@ def _build_reference_track(data: Any) -> ReferenceTrackSpec:
         raise TemplateValidationError("Invalid reference track configuration.") from exc
 
 
+def _build_curve_value_labels(data: Any) -> CurveValueLabelsSpec:
+    if data is None:
+        return CurveValueLabelsSpec()
+    label_data = _ensure_mapping(data, context="curve.value_labels")
+    format_text = str(label_data.get("format", "automatic")).strip().lower()
+    try:
+        number_format = NumberFormatKind(format_text)
+    except ValueError as exc:
+        raise TemplateValidationError("Invalid curve.value_labels.format.") from exc
+
+    try:
+        return CurveValueLabelsSpec(
+            step=float(label_data.get("step", 5.0)),
+            number_format=number_format,
+            precision=int(label_data.get("precision", 2)),
+            color=label_data.get("color"),
+            font_size=float(label_data.get("font_size", 5.5)),
+            font_family=label_data.get("font_family"),
+            font_weight=str(label_data.get("font_weight", "normal")),
+            font_style=str(label_data.get("font_style", "normal")),
+            horizontal_alignment=str(label_data.get("horizontal_alignment", "center"))
+            .strip()
+            .lower(),
+            vertical_alignment=str(label_data.get("vertical_alignment", "center")).strip().lower(),
+        )
+    except (TypeError, ValueError) as exc:
+        raise TemplateValidationError("Invalid curve.value_labels configuration.") from exc
+
+
 def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
     if not data:
         return HeaderSpec()
@@ -286,6 +316,8 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
                     label=element_data.get("label"),
                     style=_build_style(element_data.get("style")),
                     scale=_build_scale(element_data.get("scale")),
+                    render_mode=str(element_data.get("render_mode", "line")),
+                    value_labels=_build_curve_value_labels(element_data.get("value_labels")),
                 )
             )
         elif element_kind in {"raster", "image"}:
