@@ -253,14 +253,14 @@ class PageSpec:
     width_mm: float
     height_mm: float
     continuous: bool = False
-    margin_left_mm: float = 10.0
+    margin_left_mm: float = 0.0
     margin_right_mm: float = 10.0
     margin_top_mm: float = 10.0
     margin_bottom_mm: float = 10.0
     header_height_mm: float = 18.0
     track_header_height_mm: float = 8.0
     footer_height_mm: float = 10.0
-    track_gap_mm: float = 1.5
+    track_gap_mm: float = 0.0
 
     @classmethod
     def from_name(cls, name: str, orientation: str = "portrait", **kwargs: Any) -> PageSpec:

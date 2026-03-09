@@ -239,6 +239,19 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.render_mode, "value_labels")
         self.assertEqual(curve.value_labels.step, 5.0)
 
+    def test_page_spacing_fields_are_supported_in_logfile_yaml(self) -> None:
+        payload = build_mapping()
+        payload["document"]["page"]["margin_left_mm"] = 2.5
+        payload["document"]["page"]["track_gap_mm"] = 1.25
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        self.assertAlmostEqual(document.page.margin_left_mm, 2.5)
+        self.assertAlmostEqual(document.page.track_gap_mm, 1.25)
+
     def test_load_logfile_merges_template_yaml_with_savefile_overrides(self) -> None:
         template_payload = {
             "render": {"backend": "matplotlib", "output_path": "base.pdf", "dpi": 300},

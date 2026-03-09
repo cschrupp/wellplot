@@ -401,28 +401,28 @@ def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
             str(page_data["size"]),
             orientation=str(page_data.get("orientation", "portrait")),
             continuous=bool(page_data.get("continuous", False)),
-            margin_left_mm=float(page_data.get("margin_left_mm", 10.0)),
+            margin_left_mm=float(page_data.get("margin_left_mm", 0.0)),
             margin_right_mm=float(page_data.get("margin_right_mm", 10.0)),
             margin_top_mm=float(page_data.get("margin_top_mm", 10.0)),
             margin_bottom_mm=float(page_data.get("margin_bottom_mm", 10.0)),
             header_height_mm=float(page_data.get("header_height_mm", 18.0)),
             track_header_height_mm=float(page_data.get("track_header_height_mm", 8.0)),
             footer_height_mm=float(page_data.get("footer_height_mm", 10.0)),
-            track_gap_mm=float(page_data.get("track_gap_mm", 1.5)),
+            track_gap_mm=float(page_data.get("track_gap_mm", 0.0)),
         )
     else:
         page = PageSpec(
             width_mm=float(page_data["width_mm"]),
             height_mm=float(page_data["height_mm"]),
             continuous=bool(page_data.get("continuous", False)),
-            margin_left_mm=float(page_data.get("margin_left_mm", 10.0)),
+            margin_left_mm=float(page_data.get("margin_left_mm", 0.0)),
             margin_right_mm=float(page_data.get("margin_right_mm", 10.0)),
             margin_top_mm=float(page_data.get("margin_top_mm", 10.0)),
             margin_bottom_mm=float(page_data.get("margin_bottom_mm", 10.0)),
             header_height_mm=float(page_data.get("header_height_mm", 18.0)),
             track_header_height_mm=float(page_data.get("track_header_height_mm", 8.0)),
             footer_height_mm=float(page_data.get("footer_height_mm", 10.0)),
-            track_gap_mm=float(page_data.get("track_gap_mm", 1.5)),
+            track_gap_mm=float(page_data.get("track_gap_mm", 0.0)),
         )
 
     depth_data = _ensure_mapping(root.get("depth", {}), context="depth")

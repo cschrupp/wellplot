@@ -69,6 +69,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "margin_right_mm": {"type": "number"},
                 "margin_top_mm": {"type": "number"},
                 "margin_bottom_mm": {"type": "number"},
+                "track_gap_mm": {"type": "number"},
                 "header_height_mm": {"type": "number"},
                 "track_header_height_mm": {"type": "number"},
                 "footer_height_mm": {"type": "number"},

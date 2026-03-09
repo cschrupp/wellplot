@@ -91,7 +91,19 @@ Benefits:
   - array tracks accept raster + scalar overlays
   - normal and reference tracks do not accept raster elements
 
-## 6) Track Types
+## 6) Page Spacing Controls
+
+Track placement spacing is controlled by page config, not renderer hardcoding:
+
+- `document.page.margin_left_mm`: first track start offset from the page origin.
+- `document.page.track_gap_mm`: spacing between adjacent track frames.
+
+Defaults are:
+
+- `margin_left_mm: 0`
+- `track_gap_mm: 0`
+
+## 7) Track Types
 
 The document model supports these track types:
 
@@ -106,7 +118,7 @@ Backward-compatible aliases are accepted in configs:
 - `curve` -> `normal`
 - `image` -> `array`
 
-## 7) Reference Track Contract
+## 8) Reference Track Contract
 
 A `reference` track is not only visual: it can define the layout reference axis.
 

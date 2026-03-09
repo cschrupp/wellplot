@@ -16,10 +16,11 @@ document:
     size: A4
     orientation: portrait
     continuous: true
-    margin_left_mm: 8
+    margin_left_mm: 0
     margin_right_mm: 8
     margin_top_mm: 8
     margin_bottom_mm: 8
+    track_gap_mm: 0
     header_height_mm: 22
     track_header_height_mm: 10
     footer_height_mm: 10

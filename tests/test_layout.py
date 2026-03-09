@@ -40,6 +40,42 @@ class LayoutTests(unittest.TestCase):
         self.assertGreaterEqual(len(layout), 2)
         self.assertEqual(layout[0].track_frames[1].track.id, "gr")
 
+    def test_default_page_spacing_starts_tracks_at_page_origin(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "defaults",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16},
+                    {"id": "gr", "title": "GR", "kind": "curve", "width_mm": 25, "elements": []},
+                ],
+            }
+        )
+        frame_depth, frame_gr = LayoutEngine().track_frames(document)
+        self.assertAlmostEqual(frame_depth.frame.x_mm, 0.0)
+        self.assertAlmostEqual(frame_gr.frame.x_mm, 16.0)
+
+    def test_page_spacing_is_configurable_from_yaml(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "spacing config",
+                "page": {
+                    "size": "A4",
+                    "margin_left_mm": 3.0,
+                    "track_gap_mm": 2.5,
+                },
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16},
+                    {"id": "gr", "title": "GR", "kind": "curve", "width_mm": 25, "elements": []},
+                ],
+            }
+        )
+        frame_depth, frame_gr = LayoutEngine().track_frames(document)
+        self.assertAlmostEqual(frame_depth.frame.x_mm, 3.0)
+        self.assertAlmostEqual(frame_gr.frame.x_mm, 21.5)
+
     def test_track_width_overflow_raises(self) -> None:
         document = document_from_mapping(
             {
