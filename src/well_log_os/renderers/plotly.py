@@ -12,6 +12,7 @@ from ..model import (
     RasterElement,
     ScalarChannel,
     ScaleKind,
+    TrackKind,
     WellDataset,
 )
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
@@ -52,7 +53,7 @@ class PlotlyRenderer(Renderer):
 
         for column, track_frame in enumerate(page_layout.track_frames, start=1):
             track = track_frame.track
-            if track.kind.value == "depth":
+            if track.kind == TrackKind.REFERENCE:
                 continue
             for element in track.elements:
                 if isinstance(element, CurveElement):

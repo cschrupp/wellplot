@@ -112,6 +112,7 @@ class LogFileTests(unittest.TestCase):
 
     def test_logfile_builds_document_without_hardcoded_tracks(self) -> None:
         spec = logfile_from_mapping(build_mapping())
+        self.assertIsNone(spec.render_continuous_strip_page_height_mm)
         document = build_document_for_logfile(
             spec,
             self.build_dataset(),
@@ -144,6 +145,27 @@ class LogFileTests(unittest.TestCase):
             logfile_from_mapping(payload)
         self.assertIn("$.render.dpi", str(ctx.exception))
 
+    def test_logfile_parses_continuous_strip_page_height(self) -> None:
+        payload = build_mapping()
+        payload["render"]["continuous_strip_page_height_mm"] = 279.4
+        spec = logfile_from_mapping(payload)
+        self.assertEqual(spec.render_continuous_strip_page_height_mm, 279.4)
+
+    def test_logfile_parses_matplotlib_style_overrides(self) -> None:
+        payload = build_mapping()
+        payload["render"]["matplotlib"] = {
+            "style": {
+                "track": {"x_tick_labelsize": 7.5},
+                "track_header": {"background_color": "#ffffff"},
+            }
+        }
+        spec = logfile_from_mapping(payload)
+        self.assertEqual(spec.render_matplotlib["style"]["track"]["x_tick_labelsize"], 7.5)
+        self.assertEqual(
+            spec.render_matplotlib["style"]["track_header"]["background_color"],
+            "#ffffff",
+        )
+
     def test_default_configure_supports_string_track_entries(self) -> None:
         payload = build_mapping()
         payload["auto_tracks"]["default_configure"] = deepcopy(
@@ -163,6 +185,27 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(spec.auto_tracks["tracks"][0]["channel"], "GR")
         self.assertEqual(spec.auto_tracks["tracks"][0]["configure"]["width_mm"], 28)
         self.assertEqual(spec.auto_tracks["tracks"][1]["configure"]["style"]["color"], "#ff5500")
+
+    def test_depth_track_reference_config_controls_layout_axis(self) -> None:
+        payload = build_mapping()
+        payload["auto_tracks"]["depth_track"]["reference"] = {
+            "define_layout": True,
+            "unit": "ft",
+            "scale_ratio": 500,
+            "major_step": 50,
+            "secondary_grid": {"display": True, "line_count": 5},
+            "number_format": {"format": "automatic", "precision": 1},
+        }
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        self.assertEqual(document.depth_axis.unit, "ft")
+        self.assertEqual(document.depth_axis.scale_ratio, 500)
+        self.assertEqual(document.depth_axis.major_step, 50.0)
+        self.assertAlmostEqual(document.depth_axis.minor_step, 10.0)
 
     def test_load_logfile_merges_template_yaml_with_savefile_overrides(self) -> None:
         template_payload = {

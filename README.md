@@ -24,7 +24,9 @@ The package separates three layers:
 - `LogDocument`: page, depth, track, and annotation specifications
 - renderers: backend-specific drawing implementations that consume the same document
 
-Image tracks are first-class objects. They can host raster data and scalar curve overlays, but curve tracks do not accept raster elements.
+Track types are explicit: `reference`, `normal`, `array`, and `annotation`
+(with compatibility aliases `depth`, `curve`, `image`).
+Array tracks can host raster data and scalar overlays, while normal/reference tracks do not accept raster elements.
 Set `page.continuous: true` in templates to render a single continuous-depth PDF page.
 Set `page.track_header_height_mm` to reserve a dedicated per-track header band.
 Track headers now support explicit object slots (`title`, `scale`, `legend`) with `enabled`,
@@ -94,6 +96,25 @@ Behavior:
 - `auto_tracks.tracks` uses channel-aware merging (match by `channel`).
 - Track entries can be short (`- GR`) when `auto_tracks.default_configure` is defined.
 - Template YAML files can be partial; the merged savefile result is what gets validated and rendered.
+- For continuous logs in PDF viewers, set `render.continuous_strip_page_height_mm` to export
+  depth-continuous strip segments without vertical blank gaps while keeping readability.
+- Matplotlib visuals can be configured in YAML using `render.matplotlib.style` instead of
+  hardcoded renderer values.
+
+```yaml
+render:
+  backend: matplotlib
+  output_path: ../workspace/renders/job.pdf
+  dpi: 300
+  matplotlib:
+    style:
+      track_header:
+        background_color: "#efefef"
+      track:
+        x_tick_labelsize: 7.5
+      grid:
+        depth_major_linewidth: 0.8
+```
 
 ## Real Data Demo
 
@@ -140,6 +161,7 @@ Note: LAS ingestion is implemented; DLIS normalization is still scaffolded.
 
 - [docs/decision-log.md](docs/decision-log.md): agreed architectural and product decisions.
 - [docs/roadmap.md](docs/roadmap.md): phased development plan and near-term priorities.
+- [docs/rendering-workings.md](docs/rendering-workings.md): rendering flow and style-resolution model.
 
 ## License
 

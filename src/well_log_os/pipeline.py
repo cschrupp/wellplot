@@ -31,7 +31,15 @@ def render_from_logfile(
     resolved_output = _resolve_output_path(resolved_logfile, spec.render_output_path, output_path)
 
     if spec.render_backend == "matplotlib":
-        renderer = MatplotlibRenderer(dpi=spec.render_dpi)
+        renderer_kwargs = {"dpi": spec.render_dpi}
+        if spec.render_continuous_strip_page_height_mm is not None:
+            renderer_kwargs["continuous_strip_page_height_mm"] = (
+                spec.render_continuous_strip_page_height_mm
+            )
+        matplotlib_style = spec.render_matplotlib.get("style")
+        if matplotlib_style is not None:
+            renderer_kwargs["style"] = matplotlib_style
+        renderer = MatplotlibRenderer(**renderer_kwargs)
     elif spec.render_backend == "plotly":
         renderer = PlotlyRenderer()
     else:

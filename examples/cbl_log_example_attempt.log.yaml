@@ -1,0 +1,43 @@
+template:
+  path: ../templates/wireline_base.template.yaml
+version: 1
+name: CBL Log Example Attempt
+data:
+  source_path: ../workspace/data/CBL_Main_REV1.las
+  source_format: las
+render:
+  output_path: ../workspace/renders/CBL_log_attempt.pdf
+  dpi: 300
+  continuous_strip_page_height_mm: 297
+auto_tracks:
+  max_tracks: 5
+  tracks:
+    - channel: GR_STGC
+      configure:
+        id: gr_stgc
+        style:
+          color: "#2e7d32"
+    - channel: TT
+      configure:
+        id: tt
+        style:
+          color: "#1e40af"
+    - channel: CBL
+      configure:
+        id: cbl
+        scale:
+          kind: linear
+          min: 0
+          max: 100
+        style:
+          color: "#424242"
+    - channel: BI
+      configure:
+        id: bi
+        style:
+          color: "#8d6e63"
+    - channel: MTEM
+      configure:
+        id: mtem
+        style:
+          color: "#111827"

@@ -8,6 +8,12 @@ data:
 render:
   output_path: ../workspace/renders/CBL_Main_REV1_render.pdf
   dpi: 300
+  matplotlib:
+    style:
+      track_header:
+        separator_linewidth: 0.4
+      markers:
+        callout_fontsize: 6.2
 auto_tracks:
   max_tracks: 5
   tracks:

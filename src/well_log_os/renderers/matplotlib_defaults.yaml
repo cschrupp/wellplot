@@ -1,0 +1,70 @@
+header:
+  title_x: 0.5
+  title_y: 0.98
+  title_fontsize: 11.0
+  subtitle_x: 0.5
+  subtitle_y: 0.955
+  subtitle_fontsize: 8.0
+  field_x: 0.05
+  field_start_y: 0.935
+  field_step_y: 0.018
+  field_fontsize: 7.0
+footer:
+  line_x: 0.05
+  line_start_y: 0.03
+  line_step_y: 0.012
+  line_fontsize: 6.0
+  page_x: 0.95
+  page_y: 0.02
+  page_fontsize: 6.0
+track_header:
+  background_color: "#e8e8e8"
+  separator_color: "#9a9a9a"
+  separator_linewidth: 0.35
+  slot_top: 0.97
+  slot_bottom: 0.03
+  font_scale_factor: 0.45
+  title_min_pt: 4.6
+  title_max_pt: 6.8
+  scale_min_pt: 4.3
+  scale_max_pt: 6.2
+  legend_empty_min_pt: 3.6
+  legend_empty_max_pt: 5.4
+  legend_row_min_pt: 3.2
+  legend_row_max_pt: 5.2
+  text_x: 0.03
+  legend_line_start: 0.04
+  legend_line_end: 0.14
+  legend_text_x: 0.16
+  legend_label_width_ratio: 0.78
+  legend_char_width_ratio: 0.75
+  legend_min_chars: 4
+  legend_line_min_width: 0.75
+track:
+  background_color: white
+  depth_background_color: "#f2f2f2"
+  depth_tick_labelsize: 6.0
+  depth_tick_color: "#333333"
+  x_tick_labelsize: 6.0
+  frame_color: "#2f2f2f"
+  frame_linewidth: 0.8
+  marker_linewidth: 0.6
+  reference_label_x: 0.04
+  reference_label_fontsize: 6.0
+  reference_label_color: "#333333"
+grid:
+  x_major_linewidth: 0.45
+  x_minor_linewidth: 0.35
+  depth_major_color: "#5f5f5f"
+  depth_major_linewidth: 0.65
+  depth_major_alpha: 0.9
+  depth_minor_color: "#b6b6b6"
+  depth_minor_linewidth: 0.3
+  depth_minor_alpha: 0.9
+markers:
+  callout_anchor_x: 0.03
+  callout_text_x: 0.7
+  callout_fontsize: 5.8
+  callout_text_color: "#222222"
+  callout_arrow_style: "-|>"
+  callout_arrow_linewidth: 0.7

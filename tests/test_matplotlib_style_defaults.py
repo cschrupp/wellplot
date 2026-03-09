@@ -1,0 +1,38 @@
+from __future__ import annotations
+
+import unittest
+
+from well_log_os.renderers.matplotlib import (
+    DEFAULT_MPL_STYLE_PATH,
+    MatplotlibRenderer,
+    _load_default_mpl_style,
+)
+
+
+class MatplotlibStyleDefaultsTests(unittest.TestCase):
+    def test_defaults_yaml_exists_and_loads(self) -> None:
+        self.assertTrue(DEFAULT_MPL_STYLE_PATH.is_file())
+        style = _load_default_mpl_style(DEFAULT_MPL_STYLE_PATH)
+        self.assertEqual(style["track"]["frame_color"], "#2f2f2f")
+        self.assertEqual(style["markers"]["callout_arrow_style"], "-|>")
+
+    def test_renderer_uses_yaml_defaults(self) -> None:
+        renderer = MatplotlibRenderer()
+        self.assertEqual(renderer.style["track"]["frame_linewidth"], 0.8)
+        self.assertEqual(renderer.style["grid"]["depth_major_alpha"], 0.9)
+
+    def test_renderer_style_override_deep_merges(self) -> None:
+        renderer = MatplotlibRenderer(
+            style={
+                "track": {"frame_color": "#111111"},
+                "track_header": {"separator_linewidth": 0.5},
+            }
+        )
+        self.assertEqual(renderer.style["track"]["frame_color"], "#111111")
+        self.assertEqual(renderer.style["track"]["frame_linewidth"], 0.8)
+        self.assertEqual(renderer.style["track_header"]["separator_linewidth"], 0.5)
+        self.assertEqual(renderer.style["track_header"]["background_color"], "#e8e8e8")
+
+
+if __name__ == "__main__":
+    unittest.main()

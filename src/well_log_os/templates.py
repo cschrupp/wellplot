@@ -16,8 +16,11 @@ from .model import (
     HeaderSpec,
     LogDocument,
     MarkerSpec,
+    NumberFormatKind,
     PageSpec,
     RasterElement,
+    ReferenceAxisKind,
+    ReferenceTrackSpec,
     ScaleKind,
     ScaleSpec,
     StyleSpec,
@@ -84,6 +87,70 @@ def _build_scale(data: Mapping[str, Any] | None) -> ScaleSpec | None:
         maximum=float(scale_data.get("max", scale_data.get("maximum", 1.0))),
         reverse=bool(scale_data.get("reverse", False)),
     )
+
+
+def _parse_track_kind(raw_kind: Any) -> TrackKind:
+    text = str(raw_kind or "normal").strip().lower()
+    alias_map = {
+        "reference": TrackKind.REFERENCE,
+        "depth": TrackKind.REFERENCE,
+        "normal": TrackKind.NORMAL,
+        "curve": TrackKind.NORMAL,
+        "array": TrackKind.ARRAY,
+        "image": TrackKind.ARRAY,
+        "annotation": TrackKind.ANNOTATION,
+    }
+    kind = alias_map.get(text)
+    if kind is None:
+        raise TemplateValidationError(f"Unsupported track kind {text!r}.")
+    return kind
+
+
+def _build_reference_track(data: Any) -> ReferenceTrackSpec:
+    if data is None:
+        return ReferenceTrackSpec()
+    ref_data = _ensure_mapping(data, context="track.reference")
+
+    secondary_grid_data = _ensure_mapping(
+        ref_data.get("secondary_grid", {}),
+        context="track.reference.secondary_grid",
+    )
+    header_data = _ensure_mapping(
+        ref_data.get("header", {}),
+        context="track.reference.header",
+    )
+    number_format_data = _ensure_mapping(
+        ref_data.get("number_format", {}),
+        context="track.reference.number_format",
+    )
+
+    axis_text = str(ref_data.get("axis", "depth")).strip().lower()
+    number_format_text = str(number_format_data.get("format", "automatic")).strip().lower()
+    try:
+        axis = ReferenceAxisKind(axis_text)
+        number_format = NumberFormatKind(number_format_text)
+    except ValueError as exc:
+        raise TemplateValidationError("Invalid reference track axis or number format.") from exc
+
+    try:
+        return ReferenceTrackSpec(
+            axis=axis,
+            define_layout=bool(ref_data.get("define_layout", True)),
+            unit=ref_data.get("unit"),
+            scale_ratio=(int(ref_data["scale_ratio"]) if "scale_ratio" in ref_data else None),
+            major_step=(float(ref_data["major_step"]) if "major_step" in ref_data else None),
+            minor_step=(float(ref_data["minor_step"]) if "minor_step" in ref_data else None),
+            secondary_grid_display=bool(secondary_grid_data.get("display", True)),
+            secondary_grid_line_count=int(secondary_grid_data.get("line_count", 4)),
+            display_unit_in_header=bool(header_data.get("display_unit", True)),
+            display_scale_in_header=bool(header_data.get("display_scale", True)),
+            display_annotations_in_header=bool(header_data.get("display_annotations", True)),
+            number_format=number_format,
+            precision=int(number_format_data.get("precision", 2)),
+            values_orientation=str(ref_data.get("values_orientation", "horizontal")),
+        )
+    except (TypeError, ValueError) as exc:
+        raise TemplateValidationError("Invalid reference track configuration.") from exc
 
 
 def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
@@ -207,7 +274,7 @@ def _build_zones(data: Any) -> tuple[ZoneSpec, ...]:
 
 
 def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
-    kind = TrackKind(track_data.get("kind", "curve"))
+    kind = _parse_track_kind(track_data.get("kind", "normal"))
     elements = []
     for item in track_data.get("elements", []):
         element_data = _ensure_mapping(item, context=f"track {track_data.get('id', '')} element")
@@ -243,6 +310,9 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
     grid_data = _ensure_mapping(
         track_data.get("grid", {}), context=f"track {track_data.get('id', '')} grid"
     )
+    reference = (
+        _build_reference_track(track_data.get("reference")) if kind == TrackKind.REFERENCE else None
+    )
     return TrackSpec(
         id=str(track_data["id"]),
         title=str(track_data.get("title", track_data["id"])),
@@ -257,7 +327,38 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
             major_alpha=float(grid_data.get("major_alpha", 0.35)),
             minor_alpha=float(grid_data.get("minor_alpha", 0.15)),
         ),
+        reference=reference,
     )
+
+
+def _resolve_depth_axis_from_reference_tracks(
+    depth_axis: DepthAxisSpec,
+    tracks: tuple[TrackSpec, ...],
+) -> DepthAxisSpec:
+    for track in tracks:
+        if track.kind != TrackKind.REFERENCE:
+            continue
+        reference = track.reference or ReferenceTrackSpec()
+        if not reference.define_layout:
+            continue
+
+        major_step = (
+            reference.major_step if reference.major_step is not None else depth_axis.major_step
+        )
+        if reference.minor_step is not None:
+            minor_step = reference.minor_step
+        elif reference.secondary_grid_display and reference.secondary_grid_line_count > 0:
+            minor_step = major_step / reference.secondary_grid_line_count
+        else:
+            minor_step = depth_axis.minor_step
+
+        return DepthAxisSpec(
+            unit=str(reference.unit or depth_axis.unit),
+            scale_ratio=reference.scale_ratio or depth_axis.scale_ratio,
+            major_step=major_step,
+            minor_step=minor_step,
+        )
+    return depth_axis
 
 
 def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
@@ -304,6 +405,7 @@ def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
     if not isinstance(track_items, Sequence):
         raise TemplateValidationError("tracks must be a sequence.")
     tracks = tuple(_build_track(_ensure_mapping(item, context="track")) for item in track_items)
+    depth_axis = _resolve_depth_axis_from_reference_tracks(depth_axis, tracks)
 
     depth_range_data = root.get("depth_range")
     depth_range = None

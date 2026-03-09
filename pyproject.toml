@@ -68,6 +68,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"well_log_os.renderers" = ["*.yaml"]
+
 [tool.uv]
 default-groups = ["dev"]
 

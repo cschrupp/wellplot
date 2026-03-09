@@ -10,9 +10,14 @@ from .dataset import WellDataset
 
 
 class TrackKind(StrEnum):
-    DEPTH = "depth"
-    CURVE = "curve"
-    IMAGE = "image"
+    REFERENCE = "reference"
+    NORMAL = "normal"
+    ARRAY = "array"
+    ANNOTATION = "annotation"
+    # Backward-compatible aliases.
+    DEPTH = "reference"
+    CURVE = "normal"
+    IMAGE = "array"
 
 
 class ScaleKind(StrEnum):
@@ -24,6 +29,18 @@ class TrackHeaderObjectKind(StrEnum):
     TITLE = "title"
     SCALE = "scale"
     LEGEND = "legend"
+
+
+class ReferenceAxisKind(StrEnum):
+    DEPTH = "depth"
+    TIME = "time"
+
+
+class NumberFormatKind(StrEnum):
+    AUTOMATIC = "automatic"
+    FIXED = "fixed"
+    SCIENTIFIC = "scientific"
+    CONCISE = "concise"
 
 
 @dataclass(slots=True)
@@ -57,6 +74,40 @@ class GridSpec:
     minor: bool = True
     major_alpha: float = 0.35
     minor_alpha: float = 0.15
+
+
+@dataclass(slots=True)
+class ReferenceTrackSpec:
+    axis: ReferenceAxisKind = ReferenceAxisKind.DEPTH
+    define_layout: bool = True
+    unit: str | None = None
+    scale_ratio: int | None = None
+    major_step: float | None = None
+    minor_step: float | None = None
+    secondary_grid_display: bool = True
+    secondary_grid_line_count: int = 4
+    display_unit_in_header: bool = True
+    display_scale_in_header: bool = True
+    display_annotations_in_header: bool = True
+    number_format: NumberFormatKind = NumberFormatKind.AUTOMATIC
+    precision: int = 2
+    values_orientation: str = "horizontal"
+
+    def __post_init__(self) -> None:
+        if self.scale_ratio is not None and self.scale_ratio <= 0:
+            raise ValueError("Reference track scale_ratio must be positive when provided.")
+        if self.major_step is not None and self.major_step <= 0:
+            raise ValueError("Reference track major_step must be positive when provided.")
+        if self.minor_step is not None and self.minor_step <= 0:
+            raise ValueError("Reference track minor_step must be positive when provided.")
+        if self.secondary_grid_line_count <= 0:
+            raise ValueError("Reference track secondary_grid_line_count must be positive.")
+        if self.precision < 0:
+            raise ValueError("Reference track precision must be non-negative.")
+        orientation = self.values_orientation.strip().lower()
+        if orientation not in {"horizontal", "vertical"}:
+            raise ValueError("Reference track values_orientation must be horizontal or vertical.")
+        self.values_orientation = orientation
 
 
 @dataclass(slots=True, frozen=True)
@@ -229,19 +280,31 @@ class TrackSpec:
     x_scale: ScaleSpec | None = None
     header: TrackHeaderSpec = field(default_factory=TrackHeaderSpec)
     grid: GridSpec = field(default_factory=GridSpec)
+    reference: ReferenceTrackSpec | None = None
 
     def __post_init__(self) -> None:
         if self.width_mm <= 0:
             raise ValueError(f"Track {self.id} width must be positive.")
-        if self.kind == TrackKind.CURVE:
+        if self.kind == TrackKind.REFERENCE:
+            if self.reference is None:
+                self.reference = ReferenceTrackSpec()
             invalid = [element for element in self.elements if isinstance(element, RasterElement)]
             if invalid:
                 raise ValueError(
-                    f"Curve track {self.id} cannot contain raster elements. "
-                    "Use an image track instead."
+                    f"Reference track {self.id} cannot contain raster elements. "
+                    "Use an array track instead."
                 )
-        if self.kind == TrackKind.DEPTH and self.elements:
-            raise ValueError(f"Depth track {self.id} does not accept elements.")
+        if self.kind == TrackKind.NORMAL:
+            invalid = [element for element in self.elements if isinstance(element, RasterElement)]
+            if invalid:
+                raise ValueError(
+                    f"Normal track {self.id} cannot contain raster elements. "
+                    "Use an array track instead."
+                )
+        if self.kind == TrackKind.ANNOTATION and self.elements:
+            raise ValueError(
+                f"Annotation track {self.id} currently does not accept curve/raster elements."
+            )
 
 
 @dataclass(slots=True)

@@ -1,33 +1,189 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
+from dataclasses import replace
 from pathlib import Path
+from typing import Any
 
 import numpy as np
+import yaml
 
 from ..errors import DependencyUnavailableError
 from ..layout import LayoutEngine
 from ..model import (
     CurveElement,
+    FooterSpec,
+    HeaderSpec,
     LogDocument,
+    NumberFormatKind,
     RasterChannel,
     RasterElement,
+    ReferenceTrackSpec,
     ScalarChannel,
     ScaleKind,
     TrackHeaderObjectKind,
+    TrackKind,
     WellDataset,
 )
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 from .base import Renderer, RenderResult
 
+DEFAULT_MPL_STYLE_PATH = Path(__file__).with_name("matplotlib_defaults.yaml")
+
+
+def _load_default_mpl_style(path: Path = DEFAULT_MPL_STYLE_PATH) -> dict[str, Any]:
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            payload = yaml.safe_load(handle) or {}
+    except OSError as exc:
+        raise RuntimeError(f"Unable to load matplotlib defaults from {path}.") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Matplotlib defaults file must contain a mapping: {path}.")
+    return payload
+
+
+DEFAULT_MPL_STYLE = _load_default_mpl_style()
+
+
+def _deep_merge_dicts(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:
+    merged: dict[str, Any] = deepcopy(base)
+    for key, value in overrides.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_dicts(existing, value)
+        else:
+            merged[key] = value
+    return merged
+
 
 class MatplotlibRenderer(Renderer):
-    def __init__(self, registry: SimpleUnitRegistry = DEFAULT_UNITS, *, dpi: int = 200) -> None:
+    def __init__(
+        self,
+        registry: SimpleUnitRegistry = DEFAULT_UNITS,
+        *,
+        dpi: int = 200,
+        continuous_strip_page_height_mm: float | None = None,
+        style: dict[str, Any] | None = None,
+    ) -> None:
         if dpi <= 0:
             raise ValueError("Renderer dpi must be positive.")
+        if continuous_strip_page_height_mm is not None and continuous_strip_page_height_mm <= 0:
+            raise ValueError("continuous_strip_page_height_mm must be positive when provided.")
+        if style is not None and not isinstance(style, dict):
+            raise ValueError("Renderer style overrides must be a mapping when provided.")
         self.registry = registry
         self.layout_engine = LayoutEngine(registry)
         self.dpi = dpi
+        self.continuous_strip_page_height_mm = continuous_strip_page_height_mm
+        self.style = _deep_merge_dicts(DEFAULT_MPL_STYLE, style or {})
+
+    def _style_section(self, section: str) -> dict[str, Any]:
+        values = self.style.get(section, {})
+        return values if isinstance(values, dict) else {}
+
+    def _style_value(self, section: str, key: str) -> Any:
+        return self._style_section(section)[key]
+
+    def _is_reference_track(self, track) -> bool:
+        return track.kind == TrackKind.REFERENCE
+
+    def _is_annotation_track(self, track) -> bool:
+        return track.kind == TrackKind.ANNOTATION
+
+    def _reference_spec(self, track) -> ReferenceTrackSpec:
+        reference = track.reference
+        if reference is None:
+            return ReferenceTrackSpec()
+        return reference
+
+    def _reference_scale_text(self, track, document) -> str:
+        reference = self._reference_spec(track)
+        parts: list[str] = []
+        if reference.display_unit_in_header:
+            parts.append(document.depth_axis.unit)
+        if reference.display_scale_in_header:
+            parts.append(f"1:{document.depth_axis.scale_ratio}")
+        if reference.display_annotations_in_header and document.markers:
+            parts.append(f"ANN {len(document.markers)}")
+        if not parts:
+            return "Reference"
+        return " ".join(parts)
+
+    def _resolve_reference_steps(self, track, document) -> tuple[float, float, bool]:
+        reference = self._reference_spec(track)
+        major_step = reference.major_step or document.depth_axis.major_step
+        if reference.minor_step is not None:
+            minor_step = reference.minor_step
+        elif reference.secondary_grid_display and reference.secondary_grid_line_count > 0:
+            minor_step = major_step / reference.secondary_grid_line_count
+        else:
+            minor_step = document.depth_axis.minor_step
+        return major_step, minor_step, reference.secondary_grid_display
+
+    def _format_reference_value(self, value: float, reference: ReferenceTrackSpec) -> str:
+        precision = reference.precision
+        if reference.number_format == NumberFormatKind.FIXED:
+            return f"{value:.{precision}f}"
+        if reference.number_format == NumberFormatKind.SCIENTIFIC:
+            return f"{value:.{precision}e}"
+        if reference.number_format == NumberFormatKind.CONCISE:
+            return f"{value:.{precision}g}"
+
+        # Automatic mode: integers stay clean, otherwise use concise scientific fallback.
+        rounded = round(value)
+        if np.isclose(value, rounded):
+            return f"{int(rounded)}"
+        return f"{value:.{precision}g}"
+
+    def _draw_reference_values_inside(
+        self, ax, track, document, window, *, major_step: float
+    ) -> None:
+        from matplotlib.transforms import blended_transform_factory
+
+        track_style = self._style_section("track")
+        reference = self._reference_spec(track)
+        transform = blended_transform_factory(ax.transAxes, ax.transData)
+        x = float(track_style["reference_label_x"])
+        start = np.floor(window.start / major_step) * major_step
+        epsilon = max(abs(major_step) * 1e-6, 1e-8)
+        value = start
+        while value <= window.stop + epsilon:
+            if value >= window.start - epsilon:
+                text = self._format_reference_value(float(value), reference)
+                rotation = 90 if reference.values_orientation == "vertical" else 0
+                ax.text(
+                    x,
+                    float(value),
+                    text,
+                    transform=transform,
+                    ha="left",
+                    va="center",
+                    fontsize=float(track_style["reference_label_fontsize"]),
+                    color=str(track_style["reference_label_color"]),
+                    rotation=rotation,
+                    clip_on=True,
+                )
+            value += major_step
+
+    def _build_continuous_strip_document(self, document: LogDocument) -> LogDocument:
+        if self.continuous_strip_page_height_mm is None:
+            return document
+        strip_page = replace(
+            document.page,
+            continuous=False,
+            height_mm=self.continuous_strip_page_height_mm,
+            margin_top_mm=0.0,
+            margin_bottom_mm=0.0,
+            header_height_mm=0.0,
+            footer_height_mm=0.0,
+        )
+        return replace(
+            document,
+            page=strip_page,
+            header=HeaderSpec(),
+            footer=FooterSpec(),
+        )
 
     def render(
         self,
@@ -44,6 +200,9 @@ class MatplotlibRenderer(Renderer):
             # Use a non-GUI backend when writing files or when no display is available.
             if output is not None or not os.environ.get("DISPLAY"):
                 matplotlib.use("Agg", force=True)
+            matplotlib.rcParams["pdf.fonttype"] = 42
+            matplotlib.rcParams["ps.fonttype"] = 42
+            matplotlib.rcParams["path.simplify"] = False
             import matplotlib.pyplot as plt
             from matplotlib.backends.backend_pdf import PdfPages
         except ImportError as exc:
@@ -51,34 +210,77 @@ class MatplotlibRenderer(Renderer):
                 "Matplotlib is required for static rendering. Install well-log-os[pdf]."
             ) from exc
 
-        layouts = self.layout_engine.layout(document, dataset)
-        figures = []
-        pdf = None
-        if output is not None and output.suffix.lower() == ".pdf":
-            pdf = PdfPages(output)
+        render_document = document
+        draw_header = True
+        draw_track_header = True
+        draw_footer = True
+        if (
+            output is not None
+            and output.suffix.lower() == ".pdf"
+            and document.page.continuous
+            and self.continuous_strip_page_height_mm is not None
+        ):
+            render_document = self._build_continuous_strip_document(document)
+            draw_header = False
+            draw_footer = False
 
-        try:
-            for page_layout in layouts:
-                fig = plt.figure(
-                    figsize=(page_layout.page.width_mm / 25.4, page_layout.page.height_mm / 25.4),
-                    dpi=self.dpi,
-                )
-                self._draw_header(fig, document, dataset, page_layout)
-                self._draw_footer(fig, document, page_layout)
-                for track_header in page_layout.track_header_frames:
-                    ax = fig.add_axes(self._normalize_frame(page_layout.page, track_header.frame))
-                    self._draw_track_header(ax, track_header.track, document)
-                for track_frame in page_layout.track_frames:
-                    ax = fig.add_axes(self._normalize_frame(page_layout.page, track_frame.frame))
-                    self._draw_track(ax, track_frame.track, document, dataset, page_layout)
+        layouts = self.layout_engine.layout(render_document, dataset)
+        figures = []
+
+        # Keep PDF output crisp in standard viewers:
+        # - Embed TrueType fonts instead of Type3 glyphs.
+        # - Avoid path simplification artifacts on dense log curves.
+        rc_overrides = {
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "savefig.dpi": self.dpi,
+            "figure.dpi": self.dpi,
+            "path.simplify": False,
+        }
+
+        with matplotlib.rc_context(rc_overrides):
+            pdf = None
+            if output is not None and output.suffix.lower() == ".pdf":
+                pdf = PdfPages(output)
+            try:
+                for page_layout in layouts:
+                    fig = plt.figure(
+                        figsize=(
+                            page_layout.page.width_mm / 25.4,
+                            page_layout.page.height_mm / 25.4,
+                        ),
+                        dpi=self.dpi,
+                    )
+                    if draw_header:
+                        self._draw_header(fig, render_document, dataset, page_layout)
+                    if draw_footer:
+                        self._draw_footer(fig, render_document, page_layout)
+                    if draw_track_header:
+                        for track_header in page_layout.track_header_frames:
+                            if (
+                                track_header.frame.width_mm <= 0
+                                or track_header.frame.height_mm <= 0
+                            ):
+                                continue
+                            frame = self._normalize_frame(page_layout.page, track_header.frame)
+                            ax = fig.add_axes(frame)
+                            self._draw_track_header(ax, track_header.track, render_document)
+                    for track_frame in page_layout.track_frames:
+                        if track_frame.frame.width_mm <= 0 or track_frame.frame.height_mm <= 0:
+                            continue
+                        frame = self._normalize_frame(page_layout.page, track_frame.frame)
+                        ax = fig.add_axes(frame)
+                        self._draw_track(
+                            ax, track_frame.track, render_document, dataset, page_layout
+                        )
+                    if pdf is not None:
+                        pdf.savefig(fig, dpi=self.dpi)
+                        plt.close(fig)
+                    else:
+                        figures.append(fig)
+            finally:
                 if pdf is not None:
-                    pdf.savefig(fig)
-                    plt.close(fig)
-                else:
-                    figures.append(fig)
-        finally:
-            if pdf is not None:
-                pdf.close()
+                    pdf.close()
 
         artifact = str(output) if output is not None else figures
         return RenderResult(
@@ -96,35 +298,67 @@ class MatplotlibRenderer(Renderer):
         return [left, bottom, width, height]
 
     def _draw_header(self, fig, document, dataset, page_layout) -> None:
+        header_style = self._style_section("header")
         header = document.header
         if header.title:
-            fig.text(0.5, 0.98, header.title, ha="center", va="top", fontsize=11, fontweight="bold")
+            fig.text(
+                float(header_style["title_x"]),
+                float(header_style["title_y"]),
+                header.title,
+                ha="center",
+                va="top",
+                fontsize=float(header_style["title_fontsize"]),
+                fontweight="bold",
+            )
         if header.subtitle:
-            fig.text(0.5, 0.955, header.subtitle, ha="center", va="top", fontsize=8)
+            fig.text(
+                float(header_style["subtitle_x"]),
+                float(header_style["subtitle_y"]),
+                header.subtitle,
+                ha="center",
+                va="top",
+                fontsize=float(header_style["subtitle_fontsize"]),
+            )
         if not header.fields:
             return
-        start_y = 0.935
-        step_y = 0.018
+        start_y = float(header_style["field_start_y"])
+        step_y = float(header_style["field_step_y"])
         for index, field in enumerate(header.fields):
             value = dataset.header_value(field.source_key, field.default)
             fig.text(
-                0.05,
+                float(header_style["field_x"]),
                 start_y - index * step_y,
                 f"{field.label}: {value}",
                 ha="left",
                 va="top",
-                fontsize=7,
+                fontsize=float(header_style["field_fontsize"]),
             )
 
     def _draw_footer(self, fig, document, page_layout) -> None:
+        footer_style = self._style_section("footer")
         if not document.footer.lines:
             return
         for index, line in enumerate(document.footer.lines):
-            fig.text(0.05, 0.03 + index * 0.012, line, ha="left", va="bottom", fontsize=6)
-        fig.text(0.95, 0.02, f"Page {page_layout.page_number}", ha="right", va="bottom", fontsize=6)
+            fig.text(
+                float(footer_style["line_x"]),
+                float(footer_style["line_start_y"]) + index * float(footer_style["line_step_y"]),
+                line,
+                ha="left",
+                va="bottom",
+                fontsize=float(footer_style["line_fontsize"]),
+            )
+        fig.text(
+            float(footer_style["page_x"]),
+            float(footer_style["page_y"]),
+            f"Page {page_layout.page_number}",
+            ha="right",
+            va="bottom",
+            fontsize=float(footer_style["page_fontsize"]),
+        )
 
     def _draw_track_header(self, ax, track, document) -> None:
-        ax.set_facecolor("#e8e8e8")
+        track_header_style = self._style_section("track_header")
+        ax.set_facecolor(str(track_header_style["background_color"]))
         ax.set_xticks([])
         ax.set_yticks([])
         self._style_track_frame(ax)
@@ -135,8 +369,8 @@ class MatplotlibRenderer(Renderer):
                     [0.0, 1.0],
                     [slot_top, slot_top],
                     transform=ax.transAxes,
-                    color="#9a9a9a",
-                    linewidth=0.35,
+                    color=str(track_header_style["separator_color"]),
+                    linewidth=float(track_header_style["separator_linewidth"]),
                 )
             if not item.enabled:
                 continue
@@ -151,8 +385,8 @@ class MatplotlibRenderer(Renderer):
         reserved = track.header.reserved_objects()
         if not reserved:
             return ()
-        top = 0.97
-        bottom = 0.03
+        top = float(self._style_value("track_header", "slot_top"))
+        bottom = float(self._style_value("track_header", "slot_bottom"))
         span = top - bottom
         total_units = sum(item.line_units for item in reserved)
         cursor = top
@@ -175,12 +409,20 @@ class MatplotlibRenderer(Renderer):
         max_pt: float,
     ) -> float:
         slot_height_px = max((slot_top - slot_bottom) * ax.bbox.height, 1.0)
-        return max(min_pt, min(max_pt, slot_height_px * 0.45))
+        scale_factor = float(self._style_value("track_header", "font_scale_factor"))
+        return max(min_pt, min(max_pt, slot_height_px * scale_factor))
 
     def _draw_track_header_title(self, ax, track, slot_top: float, slot_bottom: float) -> None:
-        fontsize = self._slot_font_size(ax, slot_top, slot_bottom, min_pt=4.6, max_pt=6.8)
+        track_header_style = self._style_section("track_header")
+        fontsize = self._slot_font_size(
+            ax,
+            slot_top,
+            slot_bottom,
+            min_pt=float(track_header_style["title_min_pt"]),
+            max_pt=float(track_header_style["title_max_pt"]),
+        )
         ax.text(
-            0.03,
+            float(track_header_style["text_x"]),
             0.5 * (slot_top + slot_bottom),
             track.title,
             transform=ax.transAxes,
@@ -199,17 +441,24 @@ class MatplotlibRenderer(Renderer):
         slot_top: float,
         slot_bottom: float,
     ) -> None:
-        if track.kind.value == "depth":
-            scale_text = f"{document.depth_axis.unit} 1:{document.depth_axis.scale_ratio}"
+        if self._is_reference_track(track):
+            scale_text = self._reference_scale_text(track, document)
         elif track.x_scale is None:
             scale_text = "Scale: auto"
         else:
             kind = track.x_scale.kind.value.upper()
             scale_text = f"{kind} {track.x_scale.minimum:g} to {track.x_scale.maximum:g}"
 
-        fontsize = self._slot_font_size(ax, slot_top, slot_bottom, min_pt=4.3, max_pt=6.2)
+        track_header_style = self._style_section("track_header")
+        fontsize = self._slot_font_size(
+            ax,
+            slot_top,
+            slot_bottom,
+            min_pt=float(track_header_style["scale_min_pt"]),
+            max_pt=float(track_header_style["scale_max_pt"]),
+        )
         ax.text(
-            0.03,
+            float(track_header_style["text_x"]),
             0.5 * (slot_top + slot_bottom),
             scale_text,
             transform=ax.transAxes,
@@ -220,11 +469,18 @@ class MatplotlibRenderer(Renderer):
         )
 
     def _draw_track_header_legend(self, ax, track, slot_top: float, slot_bottom: float) -> None:
+        track_header_style = self._style_section("track_header")
         curves = [element for element in track.elements if isinstance(element, CurveElement)]
         if not curves:
-            fontsize = self._slot_font_size(ax, slot_top, slot_bottom, min_pt=3.6, max_pt=5.4)
+            fontsize = self._slot_font_size(
+                ax,
+                slot_top,
+                slot_bottom,
+                min_pt=float(track_header_style["legend_empty_min_pt"]),
+                max_pt=float(track_header_style["legend_empty_max_pt"]),
+            )
             ax.text(
-                0.03,
+                float(track_header_style["text_x"]),
                 0.5 * (slot_top + slot_bottom),
                 "-",
                 transform=ax.transAxes,
@@ -241,26 +497,41 @@ class MatplotlibRenderer(Renderer):
             row_top = slot_top - (index * slot_height / row_count)
             row_bottom = slot_top - ((index + 1) * slot_height / row_count)
             y_center = 0.5 * (row_top + row_bottom)
-            fontsize = self._slot_font_size(ax, row_top, row_bottom, min_pt=3.2, max_pt=5.2)
-            line_start = 0.04
-            line_end = 0.14
+            fontsize = self._slot_font_size(
+                ax,
+                row_top,
+                row_bottom,
+                min_pt=float(track_header_style["legend_row_min_pt"]),
+                max_pt=float(track_header_style["legend_row_max_pt"]),
+            )
+            line_start = float(track_header_style["legend_line_start"])
+            line_end = float(track_header_style["legend_line_end"])
             ax.plot(
                 [line_start, line_end],
                 [y_center, y_center],
                 transform=ax.transAxes,
                 color=element.style.color,
-                linewidth=max(0.75, element.style.line_width),
+                linewidth=max(
+                    float(track_header_style["legend_line_min_width"]),
+                    element.style.line_width,
+                ),
             )
 
             label = element.label or element.channel
-            available_px = max(ax.bbox.width * 0.78, 1.0)
-            approx_char_px = max(fontsize * 0.75, 1.0)
-            max_chars = max(4, int(available_px / approx_char_px))
+            available_px = max(
+                ax.bbox.width * float(track_header_style["legend_label_width_ratio"]), 1.0
+            )
+            approx_char_px = max(
+                fontsize * float(track_header_style["legend_char_width_ratio"]), 1.0
+            )
+            max_chars = max(
+                int(track_header_style["legend_min_chars"]), int(available_px / approx_char_px)
+            )
             if len(label) > max_chars:
                 label = f"{label[: max_chars - 3]}..."
 
             ax.text(
-                0.16,
+                float(track_header_style["legend_text_x"]),
                 y_center,
                 label,
                 transform=ax.transAxes,
@@ -271,17 +542,27 @@ class MatplotlibRenderer(Renderer):
             )
 
     def _draw_track(self, ax, track, document, dataset, page_layout) -> None:
+        track_style = self._style_section("track")
+        grid_style = self._style_section("grid")
+        is_reference_track = self._is_reference_track(track)
         window = page_layout.depth_window
         ax.set_ylim(window.stop, window.start)
-        ax.set_facecolor("white")
+        ax.set_facecolor(str(track_style["background_color"]))
         ax.set_axisbelow(True)
         self._style_track_frame(ax)
+        major_step = max(document.depth_axis.major_step, document.depth_axis.minor_step)
+        minor_step = document.depth_axis.minor_step
+        draw_minor_grid = True
+        if is_reference_track:
+            major_step, minor_step, draw_minor_grid = self._resolve_reference_steps(track, document)
         self._configure_depth_axis(
             ax,
             document,
-            show_labels=track.kind.value == "depth",
+            show_labels=False,
+            major_step=major_step,
+            minor_step=minor_step,
         )
-        self._draw_depth_grid(ax)
+        self._draw_depth_grid(ax, show_minor=draw_minor_grid)
 
         for zone in document.zones:
             if zone.base < window.start or zone.top > window.stop:
@@ -292,13 +573,57 @@ class MatplotlibRenderer(Renderer):
         for marker in document.markers:
             if marker.depth < window.start or marker.depth > window.stop:
                 continue
-            ax.axhline(marker.depth, color=marker.color, linestyle=marker.line_style, linewidth=0.6)
+            ax.axhline(
+                marker.depth,
+                color=marker.color,
+                linestyle=marker.line_style,
+                linewidth=float(track_style["marker_linewidth"]),
+            )
 
-        if track.kind.value == "depth":
-            ax.set_facecolor("#f2f2f2")
+        if is_reference_track:
+            ax.set_facecolor(str(track_style["depth_background_color"]))
+            if track.elements:
+                for element in track.elements:
+                    if isinstance(element, CurveElement):
+                        self._draw_curve(ax, track, element, document, dataset)
+                    elif isinstance(element, RasterElement):
+                        self._draw_raster(ax, track, element, document, dataset)
+                self._configure_x_axis(ax, track)
+                self._apply_scale(ax, track)
+                ax.grid(
+                    track.grid.major,
+                    axis="x",
+                    which="major",
+                    alpha=track.grid.major_alpha,
+                    linewidth=float(grid_style["x_major_linewidth"]),
+                )
+                ax.grid(
+                    track.grid.minor,
+                    axis="x",
+                    which="minor",
+                    alpha=track.grid.minor_alpha,
+                    linewidth=float(grid_style["x_minor_linewidth"]),
+                )
+                ax.tick_params(axis="x", labelsize=float(track_style["x_tick_labelsize"]))
+                ax.xaxis.tick_top()
+            else:
+                ax.set_xlim(0, 1)
+                ax.set_xticks([])
+            ax.tick_params(axis="y", length=0, labelleft=False)
+            self._draw_reference_values_inside(
+                ax,
+                track,
+                document,
+                window,
+                major_step=major_step,
+            )
+            self._draw_marker_callouts(ax, document, window)
+            return
+
+        if self._is_annotation_track(track):
             ax.set_xlim(0, 1)
             ax.set_xticks([])
-            ax.tick_params(axis="y", labelsize=6, colors="#333333")
+            ax.tick_params(axis="y", length=0, labelleft=False)
             self._draw_marker_callouts(ax, document, window)
             return
 
@@ -315,16 +640,16 @@ class MatplotlibRenderer(Renderer):
             axis="x",
             which="major",
             alpha=track.grid.major_alpha,
-            linewidth=0.45,
+            linewidth=float(grid_style["x_major_linewidth"]),
         )
         ax.grid(
             track.grid.minor,
             axis="x",
             which="minor",
             alpha=track.grid.minor_alpha,
-            linewidth=0.35,
+            linewidth=float(grid_style["x_minor_linewidth"]),
         )
-        ax.tick_params(axis="x", labelsize=6)
+        ax.tick_params(axis="x", labelsize=float(track_style["x_tick_labelsize"]))
         ax.xaxis.tick_top()
         ax.tick_params(axis="y", length=0, labelleft=False)
 
@@ -402,13 +727,27 @@ class MatplotlibRenderer(Renderer):
         else:
             ax.set_xlim(scale.minimum, scale.maximum)
 
-    def _configure_depth_axis(self, ax, document, *, show_labels: bool) -> None:
+    def _configure_depth_axis(
+        self,
+        ax,
+        document,
+        *,
+        show_labels: bool,
+        major_step: float | None = None,
+        minor_step: float | None = None,
+    ) -> None:
         import matplotlib.ticker as mticker
 
-        major_step = max(document.depth_axis.major_step, document.depth_axis.minor_step)
-        minor_step = document.depth_axis.minor_step
-        ax.yaxis.set_major_locator(mticker.MultipleLocator(major_step))
-        ax.yaxis.set_minor_locator(mticker.MultipleLocator(minor_step))
+        resolved_major_step = (
+            max(document.depth_axis.major_step, document.depth_axis.minor_step)
+            if major_step is None
+            else max(major_step, 1e-12)
+        )
+        resolved_minor_step = (
+            document.depth_axis.minor_step if minor_step is None else max(minor_step, 1e-12)
+        )
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(resolved_major_step))
+        ax.yaxis.set_minor_locator(mticker.MultipleLocator(resolved_minor_step))
         ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%.0f"))
         ax.tick_params(axis="y", which="major", length=0, labelleft=show_labels)
         ax.tick_params(axis="y", which="minor", length=0, labelleft=False)
@@ -424,20 +763,39 @@ class MatplotlibRenderer(Renderer):
 
         ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
 
-    def _draw_depth_grid(self, ax) -> None:
-        ax.grid(True, axis="y", which="major", color="#5f5f5f", linewidth=0.65, alpha=0.9)
-        ax.grid(True, axis="y", which="minor", color="#b6b6b6", linewidth=0.3, alpha=0.9)
+    def _draw_depth_grid(self, ax, *, show_minor: bool = True) -> None:
+        grid_style = self._style_section("grid")
+        ax.grid(
+            True,
+            axis="y",
+            which="major",
+            color=str(grid_style["depth_major_color"]),
+            linewidth=float(grid_style["depth_major_linewidth"]),
+            alpha=float(grid_style["depth_major_alpha"]),
+        )
+        if not show_minor:
+            return
+        ax.grid(
+            True,
+            axis="y",
+            which="minor",
+            color=str(grid_style["depth_minor_color"]),
+            linewidth=float(grid_style["depth_minor_linewidth"]),
+            alpha=float(grid_style["depth_minor_alpha"]),
+        )
 
     def _style_track_frame(self, ax) -> None:
+        track_style = self._style_section("track")
         for spine in ax.spines.values():
-            spine.set_color("#2f2f2f")
-            spine.set_linewidth(0.8)
+            spine.set_color(str(track_style["frame_color"]))
+            spine.set_linewidth(float(track_style["frame_linewidth"]))
 
     def _draw_marker_callouts(self, ax, document, window) -> None:
         if not document.markers:
             return
         from matplotlib.transforms import blended_transform_factory
 
+        marker_style = self._style_section("markers")
         transform = blended_transform_factory(ax.transAxes, ax.transData)
         y_offset = max(document.depth_axis.minor_step * 0.4, 1.0)
         for marker in document.markers:
@@ -447,18 +805,18 @@ class MatplotlibRenderer(Renderer):
                 continue
             ax.annotate(
                 marker.label,
-                xy=(0.03, marker.depth),
+                xy=(float(marker_style["callout_anchor_x"]), marker.depth),
                 xycoords=transform,
-                xytext=(0.7, marker.depth - y_offset),
+                xytext=(float(marker_style["callout_text_x"]), marker.depth - y_offset),
                 textcoords=transform,
-                fontsize=5.8,
-                color="#222222",
+                fontsize=float(marker_style["callout_fontsize"]),
+                color=str(marker_style["callout_text_color"]),
                 ha="left",
                 va="center",
                 arrowprops={
-                    "arrowstyle": "-|>",
+                    "arrowstyle": str(marker_style["callout_arrow_style"]),
                     "color": marker.color,
-                    "lw": 0.7,
+                    "lw": float(marker_style["callout_arrow_linewidth"]),
                     "shrinkA": 0,
                     "shrinkB": 0,
                 },

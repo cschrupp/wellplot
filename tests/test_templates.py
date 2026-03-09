@@ -13,6 +13,54 @@ from well_log_os.templates import document_from_mapping
 
 
 class TemplateTests(unittest.TestCase):
+    def test_reference_track_can_define_layout_axis(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference axis",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "ref",
+                        "title": "Reference",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "reference": {
+                            "define_layout": True,
+                            "unit": "ft",
+                            "scale_ratio": 500,
+                            "major_step": 50,
+                            "secondary_grid": {"display": True, "line_count": 5},
+                        },
+                    }
+                ],
+            }
+        )
+        self.assertEqual(document.depth_axis.unit, "ft")
+        self.assertEqual(document.depth_axis.scale_ratio, 500)
+        self.assertEqual(document.depth_axis.major_step, 50.0)
+        self.assertAlmostEqual(document.depth_axis.minor_step, 10.0)
+
+    def test_reference_track_accepts_curve_overlay(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference overlay",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "ref",
+                        "title": "Reference",
+                        "kind": "reference",
+                        "width_mm": 20,
+                        "elements": [{"kind": "curve", "channel": "CBL"}],
+                    }
+                ],
+            }
+        )
+        self.assertEqual(document.tracks[0].kind, TrackKind.REFERENCE)
+        self.assertIsInstance(document.tracks[0].elements[0], CurveElement)
+
     def test_image_track_accepts_raster_and_curve_overlay(self) -> None:
         document = document_from_mapping(
             {

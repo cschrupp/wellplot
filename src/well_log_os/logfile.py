@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +25,8 @@ class LogFileSpec:
     render_dpi: int
     document: dict[str, Any]
     auto_tracks: dict[str, Any]
+    render_continuous_strip_page_height_mm: float | None = None
+    render_matplotlib: dict[str, Any] = field(default_factory=dict)
 
 
 def _ensure_mapping(value: Any, *, context: str) -> dict[str, Any]:
@@ -186,6 +188,50 @@ def _validate_track_configure(configure: dict[str, Any], *, context: str) -> Non
                 raise TemplateValidationError(f"{context}.scale.min_positive must be positive.")
 
 
+def _validate_reference_track(reference: dict[str, Any], *, context: str) -> None:
+    if "axis" in reference:
+        axis = str(reference["axis"]).strip().lower()
+        if axis not in {"depth", "time"}:
+            raise TemplateValidationError(f"{context}.axis must be either depth or time.")
+    if "unit" in reference:
+        _ = str(reference["unit"])
+    if "scale_ratio" in reference:
+        if int(reference["scale_ratio"]) <= 0:
+            raise TemplateValidationError(f"{context}.scale_ratio must be positive.")
+    if "major_step" in reference and float(reference["major_step"]) <= 0:
+        raise TemplateValidationError(f"{context}.major_step must be positive.")
+    if "minor_step" in reference and float(reference["minor_step"]) <= 0:
+        raise TemplateValidationError(f"{context}.minor_step must be positive.")
+    if "values_orientation" in reference:
+        orientation = str(reference["values_orientation"]).strip().lower()
+        if orientation not in {"horizontal", "vertical"}:
+            raise TemplateValidationError(
+                f"{context}.values_orientation must be horizontal or vertical."
+            )
+
+    secondary_grid_data = reference.get("secondary_grid")
+    if secondary_grid_data is not None:
+        secondary_grid = _ensure_mapping(secondary_grid_data, context=f"{context}.secondary_grid")
+        if "line_count" in secondary_grid and int(secondary_grid["line_count"]) <= 0:
+            raise TemplateValidationError(f"{context}.secondary_grid.line_count must be positive.")
+
+    header_data = reference.get("header")
+    if header_data is not None:
+        _ = _ensure_mapping(header_data, context=f"{context}.header")
+
+    number_format_data = reference.get("number_format")
+    if number_format_data is not None:
+        number_format = _ensure_mapping(number_format_data, context=f"{context}.number_format")
+        if "format" in number_format:
+            fmt = str(number_format["format"]).strip().lower()
+            if fmt not in {"automatic", "fixed", "scientific", "concise"}:
+                raise TemplateValidationError(f"{context}.number_format.format is invalid.")
+        if "precision" in number_format and int(number_format["precision"]) < 0:
+            raise TemplateValidationError(
+                f"{context}.number_format.precision must be non-negative."
+            )
+
+
 def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
     validate_logfile_mapping(data)
     root = _ensure_mapping(data, context="logfile")
@@ -203,6 +249,26 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
         render_dpi = int(render_section["dpi"])
         if render_dpi <= 0:
             raise TemplateValidationError("render.dpi must be positive.")
+        render_matplotlib = deepcopy(
+            _ensure_mapping(
+                render_section.get("matplotlib", {}),
+                context="render.matplotlib",
+            )
+        )
+        if "style" in render_matplotlib:
+            _ensure_mapping(render_matplotlib["style"], context="render.matplotlib.style")
+        render_continuous_strip_page_height_mm_value = render_section.get(
+            "continuous_strip_page_height_mm"
+        )
+        render_continuous_strip_page_height_mm = None
+        if render_continuous_strip_page_height_mm_value is not None:
+            render_continuous_strip_page_height_mm = float(
+                render_continuous_strip_page_height_mm_value
+            )
+            if render_continuous_strip_page_height_mm <= 0:
+                raise TemplateValidationError(
+                    "render.continuous_strip_page_height_mm must be positive."
+                )
 
         document = deepcopy(_ensure_mapping(root["document"], context="document"))
         auto_tracks = deepcopy(_ensure_mapping(root["auto_tracks"], context="auto_tracks"))
@@ -217,6 +283,8 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
         render_backend=render_backend,
         render_output_path=render_output_path,
         render_dpi=render_dpi,
+        render_continuous_strip_page_height_mm=render_continuous_strip_page_height_mm,
+        render_matplotlib=render_matplotlib,
         document=document,
         auto_tracks=auto_tracks,
     )
@@ -234,6 +302,13 @@ def _validate_auto_tracks(auto_tracks: dict[str, Any]) -> None:
     _ = str(depth_track["id"])
     _ = str(depth_track["title"])
     _ = float(depth_track["width_mm"])
+    reference_data = depth_track.get("reference")
+    if reference_data is not None:
+        reference = _ensure_mapping(
+            reference_data,
+            context="auto_tracks.depth_track.reference",
+        )
+        _validate_reference_track(reference, context="auto_tracks.depth_track.reference")
 
     on_missing = str(auto_tracks.get("on_missing", "skip")).strip().lower()
     if on_missing not in {"skip", "error"}:
@@ -419,9 +494,10 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
         {
             "id": str(depth_track["id"]),
             "title": str(depth_track["title"]),
-            "kind": "depth",
+            "kind": "reference",
             "width_mm": float(depth_track["width_mm"]),
             "track_header": deepcopy(depth_track.get("track_header", {})),
+            "reference": deepcopy(depth_track.get("reference", {})),
         }
     ]
 
@@ -471,7 +547,7 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
             {
                 "id": track_id,
                 "title": title or channel.mnemonic,
-                "kind": "curve",
+                "kind": "normal",
                 "width_mm": width_mm,
                 "track_header": header,
                 "grid": grid,
@@ -495,6 +571,52 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
     return tracks
 
 
+def _apply_reference_layout_overrides(document: dict[str, Any]) -> None:
+    tracks = document.get("tracks")
+    if not isinstance(tracks, list):
+        return
+
+    depth_data: dict[str, Any]
+    existing_depth = document.get("depth")
+    if existing_depth is None:
+        depth_data = {}
+        document["depth"] = depth_data
+    else:
+        depth_data = dict(existing_depth)
+        document["depth"] = depth_data
+
+    for index, item in enumerate(tracks):
+        track = _ensure_mapping(item, context=f"document.tracks[{index}]")
+        kind = str(track.get("kind", "")).strip().lower()
+        if kind not in {"reference", "depth"}:
+            continue
+        reference_data = track.get("reference")
+        if reference_data is None:
+            continue
+        reference = _ensure_mapping(reference_data, context=f"document.tracks[{index}].reference")
+        if not bool(reference.get("define_layout", True)):
+            continue
+
+        if "unit" in reference:
+            depth_data["unit"] = str(reference["unit"])
+        if "scale_ratio" in reference:
+            depth_data["scale"] = int(reference["scale_ratio"])
+        if "major_step" in reference:
+            depth_data["major_step"] = float(reference["major_step"])
+        if "minor_step" in reference:
+            depth_data["minor_step"] = float(reference["minor_step"])
+        elif "major_step" in reference:
+            secondary_grid = _ensure_mapping(
+                reference.get("secondary_grid", {}),
+                context=f"document.tracks[{index}].reference.secondary_grid",
+            )
+            if bool(secondary_grid.get("display", True)):
+                line_count = int(secondary_grid.get("line_count", 4))
+                if line_count > 0:
+                    depth_data["minor_step"] = float(reference["major_step"]) / line_count
+        break
+
+
 def build_document_for_logfile(
     spec: LogFileSpec,
     dataset: WellDataset,
@@ -506,4 +628,5 @@ def build_document_for_logfile(
         document["name"] = spec.name
     _resolve_text_tokens(document, dataset, source_path)
     document["tracks"] = _build_tracks(dataset, spec.auto_tracks)
+    _apply_reference_layout_overrides(document)
     return document_from_mapping(document)
