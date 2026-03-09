@@ -18,6 +18,10 @@ auto_tracks:
       configure:
         id: combo_gr_tt
         title: GR_STGC / TT
+        scale:
+          kind: linear
+          min: 0
+          max: 150
         curve_render_mode: value_labels
         value_labels:
           step: 10
@@ -30,6 +34,11 @@ auto_tracks:
     - channel: TT
       configure:
         id: combo_gr_tt
+        scale:
+          kind: linear
+          min: 400
+          max: 200
+          reverse: true
         style:
           color: "#1e40af"
     - channel: CBL

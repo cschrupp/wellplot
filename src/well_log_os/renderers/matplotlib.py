@@ -598,11 +598,9 @@ class MatplotlibRenderer(Renderer):
             )
             return
 
-        slot_height = slot_top - slot_bottom
         row_count = len(curves)
-        for index, element in enumerate(curves):
-            row_top = slot_top - (index * slot_height / row_count)
-            row_bottom = slot_top - ((index + 1) * slot_height / row_count)
+        rows = self._curve_row_bounds(slot_top, slot_bottom, row_count)
+        for index, (element, (row_top, row_bottom)) in enumerate(zip(curves, rows, strict=False)):
             y_center = 0.5 * (row_top + row_bottom)
             fontsize = self._slot_font_size(
                 ax,
@@ -615,6 +613,14 @@ class MatplotlibRenderer(Renderer):
                 track,
                 element,
                 dataset,
+            )
+            ax.plot(
+                [0.0, 1.0],
+                [row_top, row_top],
+                transform=ax.transAxes,
+                color=element.style.color,
+                linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
+                linestyle=element.style.line_style,
             )
             ax.text(
                 float(track_header_style["scale_left_x"]),
@@ -649,9 +655,35 @@ class MatplotlibRenderer(Renderer):
                 color=element.style.color,
                 clip_on=True,
             )
+            if index == row_count - 1:
+                ax.plot(
+                    [0.0, 1.0],
+                    [row_bottom, row_bottom],
+                    transform=ax.transAxes,
+                    color=element.style.color,
+                    linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
+                    linestyle=element.style.line_style,
+                )
 
     def _curve_elements(self, track) -> list[CurveElement]:
         return [element for element in track.elements if isinstance(element, CurveElement)]
+
+    def _curve_row_bounds(
+        self,
+        slot_top: float,
+        slot_bottom: float,
+        row_count: int,
+    ) -> tuple[tuple[float, float], ...]:
+        if row_count <= 0:
+            return ()
+        slot_height = slot_top - slot_bottom
+        return tuple(
+            (
+                slot_top - (index * slot_height / row_count),
+                slot_top - ((index + 1) * slot_height / row_count),
+            )
+            for index in range(row_count)
+        )
 
     def _curve_scale_text_triplet(
         self,
@@ -693,11 +725,18 @@ class MatplotlibRenderer(Renderer):
             )
             return
 
-        slot_height = slot_top - slot_bottom
         row_count = len(curves)
-        for index, element in enumerate(curves):
-            row_top = slot_top - (index * slot_height / row_count)
-            row_bottom = slot_top - ((index + 1) * slot_height / row_count)
+        rows = self._curve_row_bounds(slot_top, slot_bottom, row_count)
+        for element, (_, row_bottom) in zip(curves, rows, strict=False):
+            ax.plot(
+                [0.0, 1.0],
+                [row_bottom, row_bottom],
+                transform=ax.transAxes,
+                color=element.style.color,
+                linewidth=max(0.6, float(track_header_style["separator_linewidth"])),
+                linestyle=element.style.line_style,
+            )
+        for element, (row_top, row_bottom) in zip(curves, rows, strict=False):
             y_center = 0.5 * (row_top + row_bottom)
             fontsize = self._slot_font_size(
                 ax,
@@ -706,23 +745,8 @@ class MatplotlibRenderer(Renderer):
                 min_pt=float(track_header_style["legend_row_min_pt"]),
                 max_pt=float(track_header_style["legend_row_max_pt"]),
             )
-            line_start = float(track_header_style["legend_line_start"])
-            line_end = float(track_header_style["legend_line_end"])
-            ax.plot(
-                [line_start, line_end],
-                [y_center, y_center],
-                transform=ax.transAxes,
-                color=element.style.color,
-                linewidth=max(
-                    float(track_header_style["legend_line_min_width"]),
-                    element.style.line_width,
-                ),
-            )
-
             label = element.label or element.channel
-            available_px = max(
-                ax.bbox.width * float(track_header_style["legend_label_width_ratio"]), 1.0
-            )
+            available_px = max(ax.bbox.width * 0.9, 1.0)
             approx_char_px = max(
                 fontsize * float(track_header_style["legend_char_width_ratio"]), 1.0
             )
@@ -733,13 +757,14 @@ class MatplotlibRenderer(Renderer):
                 label = f"{label[: max_chars - 3]}..."
 
             ax.text(
-                float(track_header_style["legend_text_x"]),
+                0.5,
                 y_center,
                 label,
                 transform=ax.transAxes,
-                ha="left",
+                ha="center",
                 va="center",
                 fontsize=fontsize,
+                color=element.style.color,
                 clip_on=True,
             )
 

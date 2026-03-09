@@ -143,3 +143,4 @@ Track-header legend space auto-fits to curve count:
 
 - legend slot line units are expanded to at least the number of curves
 - page `track_header_height_mm` is increased when needed to preserve readable legend rows
+- multi-curve headers render per-curve blocks (name row + scale row) with curve-colored separators

@@ -64,6 +64,15 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         adjusted = renderer._auto_adjust_track_header_height(document)
         self.assertAlmostEqual(adjusted.page.track_header_height_mm, 22.0)
 
+    def test_curve_row_bounds_partition_slot(self) -> None:
+        renderer = MatplotlibRenderer()
+        rows = renderer._curve_row_bounds(0.9, 0.3, 3)
+        self.assertEqual(len(rows), 3)
+        self.assertAlmostEqual(rows[0][0], 0.9)
+        self.assertAlmostEqual(rows[-1][1], 0.3)
+        self.assertAlmostEqual(rows[0][1], rows[1][0])
+        self.assertAlmostEqual(rows[1][1], rows[2][0])
+
 
 if __name__ == "__main__":
     unittest.main()

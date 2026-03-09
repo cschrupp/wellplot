@@ -41,6 +41,33 @@ Compared against `workspace/renders/CBL_log_example.Pdf`, the current renderer i
 - Multi-page report composition mode (in addition to continuous strip mode).
 - Richer visual theming and table/border styles for commercial-style output.
 
+## Curve Properties Matrix (Techlog Comparison, 2026-03-09)
+
+Implementable now (already in project):
+
+- Horizontal limits (`min`/`max`) and scale type (`linear`/`log`) per curve.
+- Inversion (`reverse`) per curve.
+- Curve line color, thickness, style, opacity.
+- Multi-curve track overlays with independent per-curve scaling.
+- Per-curve header rows (name + scale/limits + unit).
+- Value-label mode with step, number format, precision, alignment, font.
+- Header typography and frame styling through `render.matplotlib.style`.
+
+Near-term additions (next phases):
+
+- Per-curve header toggles (`show_name`, `show_unit`, `show_limits`, `show_color`).
+- Points/symbol mode (`marker` type, size, optional color-by-variable).
+- Area-fill modes (left/right, baseline/fill rules).
+- Vertical thresholds and repeat/wrap display behavior.
+- Per-curve decimation/display optimization policy.
+- Per-curve number formatting for header limits (separate from label mode).
+
+Longer-term / UI-centric:
+
+- Full variable-management metadata blocks (family/alias/version history).
+- Interactive graphical editing and audit/history panel.
+- Per-curve reference-window controls (top/base limits in alternate units).
+
 ## Development Plan
 
 ### Phase A: Core Stabilization (current)
