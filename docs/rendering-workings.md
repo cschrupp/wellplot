@@ -41,6 +41,10 @@ Track assembly is track-first:
 
 - `document.layout.log_sections[*].tracks` defines the physical layout.
 - `document.bindings.channels` assigns dataset channels into those tracks.
+- Data-source routing:
+  - root `data` is the default source for all sections
+  - each section can override source with `document.layout.log_sections[*].data`
+  - section data block supports `source_path` and optional `source_format` (`auto|las|dlis`)
 - Multi-section binding routing:
   - if `binding.section` is set, binding is applied to that section only
   - if `binding.section` is omitted, `track_id` must be unique across sections

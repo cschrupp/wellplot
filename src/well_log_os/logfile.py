@@ -44,6 +44,15 @@ def _ensure_sequence(value: Any, *, context: str) -> list[Any]:
     return value
 
 
+def _normalized_source_format(value: Any, *, context: str) -> str:
+    source_format = str(value).strip().lower()
+    if source_format not in {"auto", "las", "dlis"}:
+        raise TemplateValidationError(
+            f"{context} must be one of: auto, las, dlis."
+        )
+    return source_format
+
+
 def _deep_merge_config(base: Any, override: Any) -> Any:
     if isinstance(base, dict) and isinstance(override, dict):
         merged: dict[str, Any] = deepcopy(base)
@@ -193,6 +202,20 @@ def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
             _ = str(section["title"])
         if "subtitle" in section:
             _ = str(section["subtitle"])
+        if "data" in section:
+            section_data = _ensure_mapping(
+                section["data"],
+                context=f"{context}.log_sections[{index}].data",
+            )
+            source_path = section_data.get("source_path")
+            if not isinstance(source_path, str) or not source_path.strip():
+                raise TemplateValidationError(
+                    f"{context}.log_sections[{index}].data.source_path must be a non-empty string."
+                )
+            _normalized_source_format(
+                section_data.get("source_format", "auto"),
+                context=f"{context}.log_sections[{index}].data.source_format",
+            )
         tracks = _ensure_sequence(
             section["tracks"], context=f"{context}.log_sections[{index}].tracks"
         )
@@ -275,7 +298,10 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
 
         data_section = _ensure_mapping(root["data"], context="data")
         data_source_path = str(data_section["source_path"])
-        data_source_format = str(data_section.get("source_format", "auto")).strip().lower()
+        data_source_format = _normalized_source_format(
+            data_section.get("source_format", "auto"),
+            context="data.source_format",
+        )
 
         render_section = _ensure_mapping(root["render"], context="render")
         render_backend = str(render_section.get("backend", "matplotlib")).strip().lower()
@@ -375,22 +401,102 @@ def _resolve_text_tokens(document: dict[str, Any], dataset: WellDataset, source_
             ]
 
 
+def _resolve_data_source_path(source_path: str, *, base_dir: Path | None = None) -> Path:
+    resolved_path = Path(source_path)
+    if not resolved_path.is_absolute():
+        resolved_path = (base_dir or Path.cwd()) / resolved_path
+    return resolved_path.resolve()
+
+
+def _load_dataset_from_source(
+    source_path: str,
+    source_format: str,
+    *,
+    base_dir: Path | None = None,
+) -> tuple[WellDataset, Path]:
+    resolved_path = _resolve_data_source_path(source_path, base_dir=base_dir)
+    resolved_format = _normalized_source_format(source_format, context="source_format")
+    if resolved_format == "auto":
+        resolved_format = resolved_path.suffix.lower().lstrip(".")
+
+    if resolved_format == "las":
+        return load_las(resolved_path), resolved_path
+    if resolved_format == "dlis":
+        return load_dlis(resolved_path), resolved_path
+    raise TemplateValidationError(f"Unsupported data source format {resolved_format!r}.")
+
+
+def _section_data_sources_for_logfile(
+    spec: LogFileSpec,
+) -> dict[str, tuple[str, str]]:
+    layout = _ensure_mapping(spec.document["layout"], context="document.layout")
+    sections = _layout_sections(layout, context="document.layout.log_sections")
+
+    default_path = spec.data_source_path
+    default_format = _normalized_source_format(
+        spec.data_source_format,
+        context="data.source_format",
+    )
+    section_sources: dict[str, tuple[str, str]] = {}
+    for index, section in enumerate(sections):
+        section_id = str(section["id"])
+        source_path = default_path
+        source_format = default_format
+        if "data" in section:
+            section_data = _ensure_mapping(
+                section["data"],
+                context=f"document.layout.log_sections[{index}].data",
+            )
+            source_path = str(section_data["source_path"])
+            source_format = _normalized_source_format(
+                section_data.get("source_format", "auto"),
+                context=f"document.layout.log_sections[{index}].data.source_format",
+            )
+        section_sources[section_id] = (source_path, source_format)
+    return section_sources
+
+
+def load_datasets_for_logfile(
+    spec: LogFileSpec,
+    *,
+    base_dir: Path | None = None,
+) -> tuple[dict[str, WellDataset], dict[str, Path]]:
+    section_sources = _section_data_sources_for_logfile(spec)
+    cache: dict[tuple[Path, str], tuple[WellDataset, Path]] = {}
+    datasets_by_section: dict[str, WellDataset] = {}
+    source_paths_by_section: dict[str, Path] = {}
+
+    for section_id, (source_path, source_format) in section_sources.items():
+        resolved_path = _resolve_data_source_path(source_path, base_dir=base_dir)
+        resolved_format = _normalized_source_format(
+            source_format,
+            context=f"document.layout.log_sections[{section_id}].data.source_format",
+        )
+        if resolved_format == "auto":
+            resolved_format = resolved_path.suffix.lower().lstrip(".")
+        cache_key = (resolved_path, resolved_format)
+        if cache_key not in cache:
+            dataset, loaded_path = _load_dataset_from_source(
+                str(resolved_path),
+                resolved_format,
+                base_dir=base_dir,
+            )
+            cache[cache_key] = (dataset, loaded_path)
+        dataset, loaded_path = cache[cache_key]
+        datasets_by_section[section_id] = dataset
+        source_paths_by_section[section_id] = loaded_path
+
+    return datasets_by_section, source_paths_by_section
+
+
 def load_dataset_for_logfile(
     spec: LogFileSpec, *, base_dir: Path | None = None
 ) -> tuple[WellDataset, Path]:
-    source_path = Path(spec.data_source_path)
-    if not source_path.is_absolute():
-        source_path = (base_dir or Path.cwd()) / source_path
-    source_path = source_path.resolve()
-
-    source_format = spec.data_source_format
-    if source_format == "auto":
-        source_format = source_path.suffix.lower().lstrip(".")
-    if source_format == "las":
-        return load_las(source_path), source_path
-    if source_format == "dlis":
-        return load_dlis(source_path), source_path
-    raise TemplateValidationError(f"Unsupported data source format {source_format!r}.")
+    return _load_dataset_from_source(
+        spec.data_source_path,
+        spec.data_source_format,
+        base_dir=base_dir,
+    )
 
 
 def _build_scale(values: np.ndarray, scale_cfg: dict[str, Any] | None) -> dict[str, Any]:
@@ -584,7 +690,8 @@ def _binding_target_section(
 
 
 def _build_tracks_from_layout_bindings(
-    dataset: WellDataset, document: dict[str, Any]
+    datasets_by_section: dict[str, WellDataset],
+    document: dict[str, Any],
 ) -> dict[str, list[dict[str, Any]]]:
     layout = _ensure_mapping(document["layout"], context="document.layout")
     bindings = _ensure_mapping(document["bindings"], context="document.bindings")
@@ -607,7 +714,11 @@ def _build_tracks_from_layout_bindings(
 
     on_missing = str(bindings.get("on_missing", "skip")).strip().lower()
     channel_items = _ensure_sequence(bindings["channels"], context="document.bindings.channels")
-    by_upper = {channel.mnemonic.upper(): channel for channel in dataset.channels.values()}
+    channels_by_section_upper: dict[str, dict[str, Any]] = {}
+    for section_id, section_dataset in datasets_by_section.items():
+        channels_by_section_upper[section_id] = {
+            channel.mnemonic.upper(): channel for channel in section_dataset.channels.values()
+        }
 
     for index, item in enumerate(channel_items):
         binding = _ensure_mapping(item, context=f"document.bindings.channels[{index}]")
@@ -620,6 +731,11 @@ def _build_tracks_from_layout_bindings(
         )
         track_id = str(binding["track_id"])
         track = section_track_maps[section_id][track_id]
+        by_upper = channels_by_section_upper.get(section_id)
+        if by_upper is None:
+            raise TemplateValidationError(
+                f"Missing dataset for section {section_id!r}."
+            )
 
         channel_name = str(binding["channel"])
         channel = by_upper.get(channel_name.upper())
@@ -829,24 +945,50 @@ def _apply_reference_layout_overrides(document: dict[str, Any]) -> None:
 
 def build_documents_for_logfile(
     spec: LogFileSpec,
-    dataset: WellDataset,
+    dataset: WellDataset | dict[str, WellDataset],
     *,
-    source_path: Path,
+    source_path: Path | dict[str, Path],
 ) -> tuple[LogDocument, ...]:
     base_document = deepcopy(spec.document)
     if "name" not in base_document:
         base_document["name"] = spec.name
     _apply_layout_section_placeholders(base_document)
-    _resolve_text_tokens(base_document, dataset, source_path)
 
     layout = _ensure_mapping(base_document["layout"], context="document.layout")
     sections = _layout_sections(layout, context="document.layout.log_sections")
-    tracks_by_section = _build_tracks_from_layout_bindings(dataset, base_document)
+    section_ids = [str(section["id"]) for section in sections]
+
+    if isinstance(dataset, WellDataset):
+        datasets_by_section = {section_id: dataset for section_id in section_ids}
+    else:
+        datasets_by_section = {}
+        for section_id in section_ids:
+            section_dataset = dataset.get(section_id)
+            if section_dataset is None:
+                raise TemplateValidationError(f"Missing dataset for section {section_id!r}.")
+            datasets_by_section[section_id] = section_dataset
+
+    if isinstance(source_path, Path):
+        source_paths_by_section = {section_id: source_path for section_id in section_ids}
+    else:
+        source_paths_by_section = {}
+        for section_id in section_ids:
+            section_source_path = source_path.get(section_id)
+            if section_source_path is None:
+                raise TemplateValidationError(f"Missing source path for section {section_id!r}.")
+            source_paths_by_section[section_id] = section_source_path
+
+    tracks_by_section = _build_tracks_from_layout_bindings(datasets_by_section, base_document)
 
     documents: list[LogDocument] = []
     for section in sections:
         section_id = str(section["id"])
         section_document = deepcopy(base_document)
+        _resolve_text_tokens(
+            section_document,
+            datasets_by_section[section_id],
+            source_paths_by_section[section_id],
+        )
         section_document["tracks"] = deepcopy(tracks_by_section[section_id])
         _set_active_layout_section(section_document, section)
         _apply_reference_layout_overrides(section_document)

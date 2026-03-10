@@ -37,6 +37,9 @@ Decision history is tracked in `docs/decision-log.md`.
   - `layout.comments`
   - `layout.log_sections`
   - `layout.tail`
+- Log sections can override data source independently with:
+  - `layout.log_sections[*].data.source_path`
+  - `layout.log_sections[*].data.source_format`
 
 ## MVP Architecture Gaps (layout/bindings model, 2026-03-10)
 

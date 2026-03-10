@@ -16,15 +16,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
     "properties": {
         "version": {"type": "integer", "const": 1},
         "name": {"type": "string", "minLength": 1},
-        "data": {
-            "type": "object",
-            "required": ["source_path"],
-            "additionalProperties": False,
-            "properties": {
-                "source_path": {"type": "string", "minLength": 1},
-                "source_format": {"type": "string", "enum": ["auto", "las", "dlis"]},
-            },
-        },
+        "data": {"$ref": "#/$defs/dataSource"},
         "render": {
             "type": "object",
             "required": ["output_path", "dpi"],
@@ -58,6 +50,15 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
         },
     },
     "$defs": {
+        "dataSource": {
+            "type": "object",
+            "required": ["source_path"],
+            "additionalProperties": False,
+            "properties": {
+                "source_path": {"type": "string", "minLength": 1},
+                "source_format": {"type": "string", "enum": ["auto", "las", "dlis"]},
+            },
+        },
         "documentPage": {
             "type": "object",
             "properties": {
@@ -182,6 +183,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "id": {"type": "string", "minLength": 1},
                 "title": {"type": "string"},
                 "subtitle": {"type": "string"},
+                "data": {"$ref": "#/$defs/dataSource"},
                 "tracks": {
                     "type": "array",
                     "minItems": 1,

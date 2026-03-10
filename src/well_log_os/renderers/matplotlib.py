@@ -408,19 +408,27 @@ class MatplotlibRenderer(Renderer):
     def render_documents(
         self,
         documents: tuple[LogDocument, ...] | list[LogDocument],
-        dataset: WellDataset,
+        dataset: WellDataset | tuple[WellDataset, ...] | list[WellDataset],
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
         normalized_documents = tuple(documents)
         if not normalized_documents:
             raise ValueError("render_documents requires at least one document.")
-        return self._render_documents(normalized_documents, dataset, output_path=output_path)
+        if isinstance(dataset, WellDataset):
+            normalized_datasets = tuple(dataset for _ in normalized_documents)
+        else:
+            normalized_datasets = tuple(dataset)
+            if len(normalized_datasets) != len(normalized_documents):
+                raise ValueError(
+                    "render_documents requires one dataset per document."
+                )
+        document_dataset_pairs = tuple(zip(normalized_documents, normalized_datasets, strict=True))
+        return self._render_documents(document_dataset_pairs, output_path=output_path)
 
     def _render_documents(
         self,
-        documents: tuple[LogDocument, ...],
-        dataset: WellDataset,
+        document_dataset_pairs: tuple[tuple[LogDocument, WellDataset], ...],
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
@@ -461,7 +469,7 @@ class MatplotlibRenderer(Renderer):
             if output is not None and output.suffix.lower() == ".pdf":
                 pdf = PdfPages(output)
             try:
-                for source_document in documents:
+                for source_document, section_dataset in document_dataset_pairs:
                     render_document = source_document
                     draw_header = True
                     draw_track_header = True
@@ -469,7 +477,7 @@ class MatplotlibRenderer(Renderer):
                     auto_multisection_strip = (
                         output is not None
                         and output.suffix.lower() == ".pdf"
-                        and len(documents) > 1
+                        and len(document_dataset_pairs) > 1
                         and source_document.page.continuous
                         and self.continuous_strip_page_height_mm is None
                     )
@@ -495,7 +503,7 @@ class MatplotlibRenderer(Renderer):
                         draw_footer = False
 
                     render_document = self._auto_adjust_track_header_height(render_document)
-                    layouts = self.layout_engine.layout(render_document, dataset)
+                    layouts = self.layout_engine.layout(render_document, section_dataset)
 
                     for local_page_number, page_layout in enumerate(layouts, start=1):
                         global_page_number = total_pages + local_page_number
@@ -507,7 +515,7 @@ class MatplotlibRenderer(Renderer):
                             dpi=self.dpi,
                         )
                         if draw_header:
-                            self._draw_header(fig, render_document, dataset, page_layout)
+                            self._draw_header(fig, render_document, section_dataset, page_layout)
                         if draw_footer:
                             self._draw_footer(
                                 fig,
@@ -534,7 +542,7 @@ class MatplotlibRenderer(Renderer):
                                 frame = self._normalize_frame(page_layout.page, header_frame)
                                 ax = fig.add_axes(frame)
                                 self._draw_track_header(
-                                    ax, track_header.track, render_document, dataset
+                                    ax, track_header.track, render_document, section_dataset
                                 )
                             for track_header in page_layout.track_header_bottom_frames:
                                 header_frame = track_header.frame
@@ -543,7 +551,7 @@ class MatplotlibRenderer(Renderer):
                                 frame = self._normalize_frame(page_layout.page, header_frame)
                                 ax = fig.add_axes(frame)
                                 self._draw_track_header(
-                                    ax, track_header.track, render_document, dataset
+                                    ax, track_header.track, render_document, section_dataset
                                 )
                         for track_frame in page_layout.track_frames:
                             if track_frame.frame.width_mm <= 0 or track_frame.frame.height_mm <= 0:
@@ -551,7 +559,11 @@ class MatplotlibRenderer(Renderer):
                             frame = self._normalize_frame(page_layout.page, track_frame.frame)
                             ax = fig.add_axes(frame)
                             self._draw_track(
-                                ax, track_frame.track, render_document, dataset, page_layout
+                                ax,
+                                track_frame.track,
+                                render_document,
+                                section_dataset,
+                                page_layout,
                             )
                         if pdf is not None:
                             pdf.savefig(fig, dpi=self.dpi)

@@ -4,6 +4,7 @@ from .logfile import (
     build_document_for_logfile,
     build_documents_for_logfile,
     load_dataset_for_logfile,
+    load_datasets_for_logfile,
     load_logfile,
     logfile_from_mapping,
 )
@@ -66,6 +67,7 @@ __all__ = [
     "ZoneSpec",
     "build_document_for_logfile",
     "build_documents_for_logfile",
+    "load_datasets_for_logfile",
     "load_dataset_for_logfile",
     "load_logfile",
     "logfile_from_mapping",

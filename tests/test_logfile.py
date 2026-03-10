@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 import numpy as np
 import yaml
@@ -11,6 +12,7 @@ from well_log_os.errors import TemplateValidationError
 from well_log_os.logfile import (
     build_document_for_logfile,
     build_documents_for_logfile,
+    load_datasets_for_logfile,
     load_logfile,
     logfile_from_mapping,
 )
@@ -109,6 +111,22 @@ class LogFileTests(unittest.TestCase):
             ScalarChannel(
                 "RT", depth, "m", "ohm.m", values=np.exp(np.linspace(0.1, 5.0, depth.size))
             )
+        )
+        return dataset
+
+    def build_dataset_gr_only(self) -> WellDataset:
+        depth = np.linspace(1000.0, 1020.0, 50)
+        dataset = WellDataset(name="main", well_metadata={"WELL": "MAIN-1"})
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.linspace(20, 120, depth.size))
+        )
+        return dataset
+
+    def build_dataset_rt_only(self) -> WellDataset:
+        depth = np.linspace(1000.0, 1020.0, 50)
+        dataset = WellDataset(name="repeat", well_metadata={"WELL": "REPEAT-1"})
+        dataset.add_channel(
+            ScalarChannel("RT", depth, "m", "ohm.m", values=np.linspace(2.0, 50.0, depth.size))
         )
         return dataset
 
@@ -226,6 +244,82 @@ class LogFileTests(unittest.TestCase):
                 self.build_dataset(),
                 source_path=Path("example_input.las"),
             )
+
+    def test_multisection_build_uses_section_specific_datasets(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"] = [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "depth_main", "title": "Depth", "kind": "reference", "width_mm": 16},
+                    {"id": "gr_main", "title": "GR", "kind": "normal", "width_mm": 28},
+                ],
+            },
+            {
+                "id": "repeat",
+                "tracks": [
+                    {"id": "depth_repeat", "title": "Depth", "kind": "reference", "width_mm": 16},
+                    {"id": "rt_repeat", "title": "RT", "kind": "normal", "width_mm": 28},
+                ],
+            },
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {"section": "main", "channel": "GR", "track_id": "gr_main", "kind": "curve"},
+            {"section": "repeat", "channel": "RT", "track_id": "rt_repeat", "kind": "curve"},
+        ]
+        spec = logfile_from_mapping(payload)
+        documents = build_documents_for_logfile(
+            spec,
+            {
+                "main": self.build_dataset_gr_only(),
+                "repeat": self.build_dataset_rt_only(),
+            },
+            source_path={
+                "main": Path("main_run.las"),
+                "repeat": Path("repeat_run.las"),
+            },
+        )
+        self.assertEqual(documents[0].tracks[1].elements[0].channel, "GR")
+        self.assertEqual(documents[1].tracks[1].elements[0].channel, "RT")
+        self.assertEqual(documents[0].header.subtitle, "main_run.las")
+        self.assertEqual(documents[1].header.subtitle, "repeat_run.las")
+
+    @patch("well_log_os.logfile.load_las")
+    def test_load_datasets_for_logfile_supports_section_data_overrides(self, mock_load_las) -> None:
+        payload = build_mapping()
+        payload["data"] = {"source_path": "main.las", "source_format": "las"}
+        payload["document"]["layout"]["log_sections"] = [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "depth_main", "title": "Depth", "kind": "reference", "width_mm": 16}
+                ],
+            },
+            {
+                "id": "repeat",
+                "data": {"source_path": "repeat.las", "source_format": "las"},
+                "tracks": [
+                    {"id": "depth_repeat", "title": "Depth", "kind": "reference", "width_mm": 16}
+                ],
+            },
+        ]
+        spec = logfile_from_mapping(payload)
+        dataset_main = WellDataset(name="main")
+        dataset_repeat = WellDataset(name="repeat")
+        mock_load_las.side_effect = [dataset_main, dataset_repeat]
+
+        datasets_by_section, source_paths_by_section = load_datasets_for_logfile(
+            spec,
+            base_dir=Path("/tmp/project"),
+        )
+
+        self.assertEqual(datasets_by_section["main"], dataset_main)
+        self.assertEqual(datasets_by_section["repeat"], dataset_repeat)
+        self.assertEqual(source_paths_by_section["main"], Path("/tmp/project/main.las").resolve())
+        self.assertEqual(
+            source_paths_by_section["repeat"],
+            Path("/tmp/project/repeat.las").resolve(),
+        )
 
     def test_invalid_logfile_configuration_raises(self) -> None:
         payload = build_mapping()
