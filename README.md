@@ -93,9 +93,14 @@ template:
 
 Behavior:
 - Savefile values override template values.
-- `auto_tracks.tracks` uses channel-aware merging (match by `channel`).
-- Track entries can be short (`- GR`) when `auto_tracks.default_configure` is defined.
-- `auto_tracks` can group multiple curves in one track by reusing the same `configure.id`.
+- Tracks are defined in `document.layout.log_sections[*].tracks`.
+- Channels are assigned in `document.bindings.channels` (`channel` + `track_id`).
+- Multiple curves per track are supported by assigning multiple bindings to the same `track_id`.
+- Section placeholders are first-class in YAML:
+  - `document.layout.heading`
+  - `document.layout.comments`
+  - `document.layout.log_sections`
+  - `document.layout.tail`
 - Template YAML files can be partial; the merged savefile result is what gets validated and rendered.
 - Page spacing is YAML-configurable:
   - `document.page.margin_left_mm` (default: `0`)

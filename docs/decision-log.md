@@ -29,7 +29,8 @@ This file records project decisions that should remain stable unless explicitly 
 - Curve tracks reject raster elements.
 - Curves can overlay inside image tracks.
 - Log configurations are persisted in a dedicated YAML "log-file" spec (not hardcoded in scripts).
-- Auto-generated curve tracks are configured per-track in YAML (`auto_tracks.tracks[*].configure`).
+- Track layouts are configured first in YAML (`document.layout.log_sections[*].tracks`),
+  then channels are assigned via `document.bindings.channels`.
 - Rendering is executed through a master log-file pipeline/CLI, not per-file loaders.
 - Log-file YAML is validated with a JSON Schema before parsing/building.
 - CLI includes a dedicated `validate` command for logfile preflight checks.

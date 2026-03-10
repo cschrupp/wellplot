@@ -30,7 +30,6 @@ class PipelineTests(unittest.TestCase):
             render_output_path="result.pdf",
             render_dpi=320,
             document={"name": "test"},
-            auto_tracks={},
         )
         dataset = Mock(name="dataset")
         document = Mock(name="document")
@@ -71,7 +70,6 @@ class PipelineTests(unittest.TestCase):
             render_dpi=320,
             render_continuous_strip_page_height_mm=280.0,
             document={"name": "test"},
-            auto_tracks={},
         )
         dataset = Mock(name="dataset")
         document = Mock(name="document")
@@ -111,7 +109,6 @@ class PipelineTests(unittest.TestCase):
             render_dpi=300,
             render_matplotlib={"style": {"track": {"x_tick_labelsize": 7.2}}},
             document={"name": "test"},
-            auto_tracks={},
         )
         dataset = Mock(name="dataset")
         document = Mock(name="document")
@@ -148,7 +145,6 @@ class PipelineTests(unittest.TestCase):
             render_output_path="result.pdf",
             render_dpi=200,
             document={"name": "test"},
-            auto_tracks={},
         )
         mock_load_logfile.return_value = spec
         mock_load_dataset.return_value = (Mock(name="dataset"), Path("/tmp/input.las"))

@@ -30,12 +30,26 @@ Flow:
 1. Load and merge template + savefile (`load_logfile`).
 2. Validate against JSON schema (`logfile_schema.py`).
 3. Load source data (`.las` / `.dlis`) into `WellDataset`.
-4. Build `LogDocument` from document config + auto-track rules.
+4. Build `LogDocument` from `document.layout` + `document.bindings`.
 5. Build renderer with backend options:
    - `dpi`
    - `continuous_strip_page_height_mm`
    - `style` from `render.matplotlib.style`
 6. Render to file/figures.
+
+Track assembly is track-first:
+
+- `document.layout.log_sections[*].tracks` defines the physical layout.
+- `document.bindings.channels` assigns dataset channels into those tracks.
+
+In layout/bindings mode, section placeholders are available:
+
+- `document.layout.heading`
+- `document.layout.comments`
+- `document.layout.log_sections`
+- `document.layout.tail`
+
+Current renderer uses the first entry in `log_sections`; the full multi-section report composer is planned.
 
 ## 3) Matplotlib Style Sections
 
@@ -134,17 +148,16 @@ A `reference` track is not only visual: it can define the layout reference axis.
   - `reference.header.display_scale`
   - `reference.header.display_annotations`
 
-## 9) Multi-Curve Auto Tracks
+## 9) Multi-Curve Track Bindings
 
-`auto_tracks` can build multi-curve tracks by reusing the same `configure.id` across entries.
-Those entries are grouped into one normal track and rendered with multiple curve elements.
+Assign multiple curve bindings to the same `track_id` to render multi-curve overlays in one track.
 
 Track-header legend space auto-fits to curve count:
 
 - legend slot line units are expanded to at least the number of curves
 - page `track_header_height_mm` is increased when needed to preserve readable legend rows
 - multi-curve headers render per-curve blocks (name row + scale row) with curve-colored separators
-- each curve can control header visibility via `configure.header_display`:
+- each curve can control header visibility via `document.bindings.channels[*].header_display`:
   - `show_name`, `show_unit`, `show_limits`, `show_color`
 - in paired mode, each curve is ordered as `name` then `scale` immediately below.
 - paired-mode spacing can be tuned with `render.matplotlib.style.track_header.paired_scale_text_offset_ratio`.

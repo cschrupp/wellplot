@@ -11,7 +11,7 @@ import yaml
 from .errors import TemplateValidationError
 from .io import load_dlis, load_las
 from .logfile_schema import validate_logfile_mapping
-from .model import LogDocument, ScalarChannel, WellDataset
+from .model import LogDocument, RasterChannel, ScalarChannel, WellDataset
 from .templates import document_from_mapping
 
 
@@ -24,7 +24,6 @@ class LogFileSpec:
     render_output_path: str
     render_dpi: int
     document: dict[str, Any]
-    auto_tracks: dict[str, Any]
     render_continuous_strip_page_height_mm: float | None = None
     render_matplotlib: dict[str, Any] = field(default_factory=dict)
 
@@ -45,63 +44,20 @@ def _ensure_sequence(value: Any, *, context: str) -> list[Any]:
     return value
 
 
-def _track_channel_key(item: Any) -> str | None:
-    if isinstance(item, str):
-        return item.strip().upper() or None
-    if isinstance(item, dict):
-        channel = item.get("channel")
-        if isinstance(channel, str):
-            return channel.strip().upper() or None
-    return None
-
-
-def _normalize_track_for_merge(item: Any) -> Any:
-    if isinstance(item, str):
-        return {"channel": item}
-    return deepcopy(item)
-
-
-def _deep_merge_config(base: Any, override: Any, *, path: tuple[str, ...] = ()) -> Any:
+def _deep_merge_config(base: Any, override: Any) -> Any:
     if isinstance(base, dict) and isinstance(override, dict):
         merged: dict[str, Any] = deepcopy(base)
         for key, value in override.items():
             if key in merged:
-                merged[key] = _deep_merge_config(merged[key], value, path=(*path, key))
+                merged[key] = _deep_merge_config(merged[key], value)
             else:
                 merged[key] = deepcopy(value)
         return merged
 
     if isinstance(base, list) and isinstance(override, list):
-        if path == ("auto_tracks", "tracks"):
-            return _merge_auto_track_lists(base, override)
         return deepcopy(override)
 
     return deepcopy(override)
-
-
-def _merge_auto_track_lists(base_items: list[Any], override_items: list[Any]) -> list[Any]:
-    merged_items = [_normalize_track_for_merge(item) for item in base_items]
-    by_channel: dict[str, int] = {}
-    for index, item in enumerate(merged_items):
-        channel_key = _track_channel_key(item)
-        if channel_key is not None and channel_key not in by_channel:
-            by_channel[channel_key] = index
-
-    for item in override_items:
-        normalized_item = _normalize_track_for_merge(item)
-        channel_key = _track_channel_key(normalized_item)
-        if channel_key is not None and channel_key in by_channel:
-            existing_index = by_channel[channel_key]
-            existing_item = merged_items[existing_index]
-            if isinstance(existing_item, dict) and isinstance(normalized_item, dict):
-                merged_items[existing_index] = _deep_merge_config(existing_item, normalized_item)
-            else:
-                merged_items[existing_index] = normalized_item
-            continue
-        merged_items.append(normalized_item)
-        if channel_key is not None:
-            by_channel[channel_key] = len(merged_items) - 1
-    return merged_items
 
 
 def _load_yaml_mapping(path: Path, *, context: str) -> dict[str, Any]:
@@ -150,83 +106,6 @@ def _resolve_template_inheritance(
     return _deep_merge_config(resolved_template, override)
 
 
-def _normalize_track_item(item: Any, *, context: str) -> dict[str, Any]:
-    if isinstance(item, str):
-        return {"channel": item}
-    return _ensure_mapping(item, context=context)
-
-
-def _validate_track_configure(configure: dict[str, Any], *, context: str) -> None:
-    _ = float(configure["width_mm"])
-    _ = str(configure.get("title_template", "{mnemonic} [{unit}]"))
-    if "position" in configure:
-        if int(configure["position"]) <= 0:
-            raise TemplateValidationError(f"{context}.position must be positive.")
-    if "curve_render_mode" in configure:
-        render_mode = str(configure["curve_render_mode"]).strip().lower()
-        if render_mode not in {"line", "value_labels"}:
-            raise TemplateValidationError(f"{context}.curve_render_mode is invalid.")
-    if "value_labels" in configure:
-        labels = _ensure_mapping(configure["value_labels"], context=f"{context}.value_labels")
-        if "step" in labels and float(labels["step"]) <= 0:
-            raise TemplateValidationError(f"{context}.value_labels.step must be positive.")
-        if "precision" in labels and int(labels["precision"]) < 0:
-            raise TemplateValidationError(f"{context}.value_labels.precision must be non-negative.")
-        if "font_size" in labels and float(labels["font_size"]) <= 0:
-            raise TemplateValidationError(f"{context}.value_labels.font_size must be positive.")
-        if "format" in labels:
-            fmt = str(labels["format"]).strip().lower()
-            if fmt not in {"automatic", "fixed", "scientific", "concise"}:
-                raise TemplateValidationError(f"{context}.value_labels.format is invalid.")
-        if "horizontal_alignment" in labels:
-            align = str(labels["horizontal_alignment"]).strip().lower()
-            if align not in {"left", "center", "right"}:
-                raise TemplateValidationError(
-                    f"{context}.value_labels.horizontal_alignment is invalid."
-                )
-        if "vertical_alignment" in labels:
-            align = str(labels["vertical_alignment"]).strip().lower()
-            if align not in {"top", "center", "bottom"}:
-                raise TemplateValidationError(
-                    f"{context}.value_labels.vertical_alignment is invalid."
-                )
-    if "header_display" in configure:
-        header_display = _ensure_mapping(
-            configure["header_display"],
-            context=f"{context}.header_display",
-        )
-        for key in ("show_name", "show_unit", "show_limits", "show_color"):
-            if key in header_display and not isinstance(header_display[key], bool):
-                raise TemplateValidationError(f"{context}.header_display.{key} must be boolean.")
-    style = _ensure_mapping(configure["style"], context=f"{context}.style")
-    if "color" not in style:
-        raise TemplateValidationError(f"{context}.style.color is required.")
-    _ = str(style["color"])
-    if "scale" in configure:
-        scale = _ensure_mapping(
-            configure["scale"],
-            context=f"{context}.scale",
-        )
-        if "min" in scale or "max" in scale:
-            if "min" not in scale or "max" not in scale:
-                raise TemplateValidationError(f"{context}.scale must define both min and max.")
-            _ = float(scale["min"])
-            _ = float(scale["max"])
-        if "kind" in scale:
-            kind = str(scale["kind"]).strip().lower()
-            if kind not in {"auto", "linear", "log"}:
-                raise TemplateValidationError(f"{context}.scale.kind must be auto, linear, or log.")
-        if "percentile_low" in scale:
-            _ = float(scale["percentile_low"])
-        if "percentile_high" in scale:
-            _ = float(scale["percentile_high"])
-        if "log_ratio_threshold" in scale:
-            _ = float(scale["log_ratio_threshold"])
-        if "min_positive" in scale:
-            if float(scale["min_positive"]) <= 0:
-                raise TemplateValidationError(f"{context}.scale.min_positive must be positive.")
-
-
 def _validate_reference_track(reference: dict[str, Any], *, context: str) -> None:
     if "axis" in reference:
         axis = str(reference["axis"]).strip().lower()
@@ -271,6 +150,112 @@ def _validate_reference_track(reference: dict[str, Any], *, context: str) -> Non
             )
 
 
+def _validate_layout_track(track: dict[str, Any], *, context: str) -> None:
+    _ = str(track["id"])
+    _ = float(track["width_mm"])
+    kind = str(track.get("kind", "normal")).strip().lower()
+    if kind not in {"reference", "normal", "array", "annotation", "depth", "curve", "image"}:
+        raise TemplateValidationError(f"{context}.kind is invalid.")
+    if "x_scale" in track:
+        _ = _ensure_mapping(track["x_scale"], context=f"{context}.x_scale")
+    if "grid" in track:
+        _ = _ensure_mapping(track["grid"], context=f"{context}.grid")
+    if "track_header" in track:
+        _ = _ensure_mapping(track["track_header"], context=f"{context}.track_header")
+    if kind in {"reference", "depth"} and "reference" in track:
+        reference = _ensure_mapping(track["reference"], context=f"{context}.reference")
+        _validate_reference_track(reference, context=f"{context}.reference")
+
+
+def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
+    if "heading" in layout:
+        _ = _ensure_mapping(layout["heading"], context=f"{context}.heading")
+    if "comments" in layout:
+        comments = _ensure_sequence(layout["comments"], context=f"{context}.comments")
+        for index, item in enumerate(comments):
+            _ = _ensure_mapping(item, context=f"{context}.comments[{index}]")
+    if "tail" in layout:
+        _ = _ensure_mapping(layout["tail"], context=f"{context}.tail")
+
+    sections = _ensure_sequence(layout["log_sections"], context=f"{context}.log_sections")
+    if not sections:
+        raise TemplateValidationError(f"{context}.log_sections cannot be empty.")
+    for index, item in enumerate(sections):
+        section = _ensure_mapping(item, context=f"{context}.log_sections[{index}]")
+        _ = str(section["id"])
+        tracks = _ensure_sequence(
+            section["tracks"], context=f"{context}.log_sections[{index}].tracks"
+        )
+        if not tracks:
+            raise TemplateValidationError(
+                f"{context}.log_sections[{index}].tracks cannot be empty."
+            )
+        for track_index, track_item in enumerate(tracks):
+            track = _ensure_mapping(
+                track_item,
+                context=f"{context}.log_sections[{index}].tracks[{track_index}]",
+            )
+            _validate_layout_track(
+                track,
+                context=f"{context}.log_sections[{index}].tracks[{track_index}]",
+            )
+
+
+def _validate_document_bindings(
+    bindings: dict[str, Any],
+    *,
+    context: str,
+    available_sections: set[str],
+) -> None:
+    on_missing = str(bindings.get("on_missing", "skip")).strip().lower()
+    if on_missing not in {"skip", "error"}:
+        raise TemplateValidationError(f"{context}.on_missing must be either 'skip' or 'error'.")
+
+    channels = _ensure_sequence(bindings["channels"], context=f"{context}.channels")
+    if not channels:
+        raise TemplateValidationError(f"{context}.channels cannot be empty.")
+    for index, item in enumerate(channels):
+        channel_cfg = _ensure_mapping(item, context=f"{context}.channels[{index}]")
+        _ = str(channel_cfg["channel"])
+        _ = str(channel_cfg["track_id"])
+        if "section" in channel_cfg:
+            section = str(channel_cfg["section"])
+            if section not in available_sections:
+                raise TemplateValidationError(
+                    f"{context}.channels[{index}].section must match one of the layout section ids."
+                )
+        kind = str(channel_cfg.get("kind", "curve")).strip().lower()
+        if kind not in {"curve", "raster"}:
+            raise TemplateValidationError(f"{context}.channels[{index}].kind is invalid.")
+        if "style" in channel_cfg:
+            _ = _ensure_mapping(channel_cfg["style"], context=f"{context}.channels[{index}].style")
+        if "scale" in channel_cfg:
+            _ = _ensure_mapping(channel_cfg["scale"], context=f"{context}.channels[{index}].scale")
+        if "value_labels" in channel_cfg:
+            labels = _ensure_mapping(
+                channel_cfg["value_labels"],
+                context=f"{context}.channels[{index}].value_labels",
+            )
+            if "step" in labels and float(labels["step"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.channels[{index}].value_labels.step must be positive."
+                )
+            if "precision" in labels and int(labels["precision"]) < 0:
+                raise TemplateValidationError(
+                    f"{context}.channels[{index}].value_labels.precision must be non-negative."
+                )
+        if "header_display" in channel_cfg:
+            display = _ensure_mapping(
+                channel_cfg["header_display"],
+                context=f"{context}.channels[{index}].header_display",
+            )
+            for key in ("show_name", "show_unit", "show_limits", "show_color"):
+                if key in display and not isinstance(display[key], bool):
+                    raise TemplateValidationError(
+                        f"{context}.channels[{index}].header_display.{key} must be boolean."
+                    )
+
+
 def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
     validate_logfile_mapping(data)
     root = _ensure_mapping(data, context="logfile")
@@ -310,8 +295,20 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
                 )
 
         document = deepcopy(_ensure_mapping(root["document"], context="document"))
-        auto_tracks = deepcopy(_ensure_mapping(root["auto_tracks"], context="auto_tracks"))
-        _validate_auto_tracks(auto_tracks)
+        layout = _ensure_mapping(document.get("layout"), context="document.layout")
+        bindings = _ensure_mapping(document.get("bindings"), context="document.bindings")
+        _validate_document_layout(layout, context="document.layout")
+        section_ids = {
+            str(_ensure_mapping(section, context="document.layout.log_sections item")["id"])
+            for section in _ensure_sequence(
+                layout["log_sections"], context="document.layout.log_sections"
+            )
+        }
+        _validate_document_bindings(
+            bindings,
+            context="document.bindings",
+            available_sections=section_ids,
+        )
     except (KeyError, TypeError, ValueError) as exc:
         raise TemplateValidationError("Invalid logfile configuration.") from exc
 
@@ -325,7 +322,6 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
         render_continuous_strip_page_height_mm=render_continuous_strip_page_height_mm,
         render_matplotlib=render_matplotlib,
         document=document,
-        auto_tracks=auto_tracks,
     )
 
 
@@ -334,77 +330,6 @@ def load_logfile(path: str | Path) -> LogFileSpec:
     payload = _load_yaml_mapping(file_path, context="Log file")
     resolved_payload = _resolve_template_inheritance(payload, base_dir=file_path.parent)
     return logfile_from_mapping(resolved_payload)
-
-
-def _validate_auto_tracks(auto_tracks: dict[str, Any]) -> None:
-    depth_track = _ensure_mapping(auto_tracks["depth_track"], context="auto_tracks.depth_track")
-    _ = str(depth_track["id"])
-    _ = str(depth_track["title"])
-    _ = float(depth_track["width_mm"])
-    if "position" in depth_track:
-        if int(depth_track["position"]) <= 0:
-            raise TemplateValidationError("auto_tracks.depth_track.position must be positive.")
-    reference_data = depth_track.get("reference")
-    if reference_data is not None:
-        reference = _ensure_mapping(
-            reference_data,
-            context="auto_tracks.depth_track.reference",
-        )
-        _validate_reference_track(reference, context="auto_tracks.depth_track.reference")
-
-    on_missing = str(auto_tracks.get("on_missing", "skip")).strip().lower()
-    if on_missing not in {"skip", "error"}:
-        raise TemplateValidationError("auto_tracks.on_missing must be either 'skip' or 'error'.")
-
-    max_tracks = int(auto_tracks.get("max_tracks", 9999))
-    if max_tracks <= 0:
-        raise TemplateValidationError("auto_tracks.max_tracks must be positive.")
-
-    default_configure_data = auto_tracks.get("default_configure")
-    default_configure: dict[str, Any] | None = None
-    if default_configure_data is not None:
-        default_configure = deepcopy(
-            _ensure_mapping(default_configure_data, context="auto_tracks.default_configure")
-        )
-        _validate_track_configure(default_configure, context="auto_tracks.default_configure")
-
-    track_items = _ensure_sequence(auto_tracks["tracks"], context="auto_tracks.tracks")
-    if not track_items:
-        raise TemplateValidationError("auto_tracks.tracks cannot be empty.")
-
-    normalized_items: list[dict[str, Any]] = []
-    for index, item in enumerate(track_items):
-        track_item = _normalize_track_item(item, context=f"auto_tracks.tracks[{index}]")
-        if "channel" not in track_item:
-            raise TemplateValidationError(f"auto_tracks.tracks[{index}].channel is required.")
-        _ = str(track_item["channel"])
-        raw_configure = track_item.get("configure")
-        if raw_configure is None and default_configure is None:
-            raise TemplateValidationError(
-                f"auto_tracks.tracks[{index}].configure is required when "
-                "auto_tracks.default_configure is not defined."
-            )
-        if raw_configure is None:
-            configure = deepcopy(default_configure)
-        else:
-            explicit_configure = _ensure_mapping(
-                raw_configure, context=f"auto_tracks.tracks[{index}].configure"
-            )
-            if default_configure is None:
-                configure = deepcopy(explicit_configure)
-            else:
-                configure = _deep_merge_config(default_configure, explicit_configure)
-        _validate_track_configure(configure, context=f"auto_tracks.tracks[{index}].configure")
-
-        normalized_item = deepcopy(track_item)
-        normalized_item["configure"] = configure
-        normalized_items.append(normalized_item)
-
-    auto_tracks["tracks"] = normalized_items
-
-
-def _sanitize_id(text: str) -> str:
-    return "".join(char.lower() if char.isalnum() else "_" for char in text).strip("_")
 
 
 def _safe_format(template: str, values: dict[str, Any]) -> str:
@@ -519,43 +444,110 @@ def _build_scale(values: np.ndarray, scale_cfg: dict[str, Any] | None) -> dict[s
     return scale
 
 
-def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dict[str, Any]]:
-    scalar_channels = [
-        channel for channel in dataset.channels.values() if isinstance(channel, ScalarChannel)
-    ]
-    if not scalar_channels:
-        raise TemplateValidationError("Dataset has no scalar channels for auto track generation.")
+def _normalized_track_kind(kind: str) -> str:
+    lowered = kind.strip().lower()
+    if lowered == "depth":
+        return "reference"
+    if lowered == "curve":
+        return "normal"
+    if lowered == "image":
+        return "array"
+    return lowered
 
-    depth_track = _ensure_mapping(auto_tracks["depth_track"], context="auto_tracks.depth_track")
-    track_items = _ensure_sequence(auto_tracks["tracks"], context="auto_tracks.tracks")
-    on_missing = str(auto_tracks.get("on_missing", "skip")).strip().lower()
-    max_tracks = max(int(auto_tracks.get("max_tracks", len(track_items))), 1)
-    by_upper = {channel.mnemonic.upper(): channel for channel in scalar_channels}
 
-    positioned_tracks: list[tuple[int | None, int, dict[str, Any]]] = []
-    positioned_tracks.append(
-        (
-            int(depth_track["position"]) if "position" in depth_track else None,
-            0,
-            {
-                "id": str(depth_track["id"]),
-                "title": str(depth_track["title"]),
-                "kind": "reference",
-                "width_mm": float(depth_track["width_mm"]),
-                "track_header": deepcopy(depth_track.get("track_header", {})),
-                "reference": deepcopy(depth_track.get("reference", {})),
-            },
-        )
+def _ordered_layout_tracks(section: dict[str, Any], *, context: str) -> list[dict[str, Any]]:
+    track_items = _ensure_sequence(section["tracks"], context=f"{context}.tracks")
+    indexed: list[tuple[int | None, int, dict[str, Any]]] = []
+    for index, item in enumerate(track_items):
+        track = deepcopy(_ensure_mapping(item, context=f"{context}.tracks[{index}]"))
+        position = int(track["position"]) if "position" in track else None
+        indexed.append((position, index, track))
+
+    count = len(indexed)
+    ordered: list[dict[str, Any] | None] = [None] * count
+    explicit = sorted(
+        (item for item in indexed if item[0] is not None),
+        key=lambda item: (int(item[0] or 0), item[1]),
     )
+    for position, _, track in explicit:
+        assert position is not None
+        slot = min(max(position, 1), count) - 1
+        while slot < count and ordered[slot] is not None:
+            slot += 1
+        if slot >= count:
+            slot = next(index for index, current in enumerate(ordered) if current is None)
+        ordered[slot] = track
 
-    grouped_tracks: dict[str, dict[str, Any]] = {}
-    grouped_meta: dict[str, dict[str, Any]] = {}
-    added = 0
-    for index, item in enumerate(track_items, start=1):
-        track_item = _ensure_mapping(item, context=f"auto_tracks.tracks[{index - 1}]")
-        channel_name = str(track_item["channel"])
+    for _, _, track in sorted(
+        (item for item in indexed if item[0] is None),
+        key=lambda item: item[1],
+    ):
+        slot = next(index for index, current in enumerate(ordered) if current is None)
+        ordered[slot] = track
+
+    return [track for track in ordered if track is not None]
+
+
+def _build_tracks_from_layout_bindings(
+    dataset: WellDataset, document: dict[str, Any]
+) -> list[dict[str, Any]]:
+    layout = _ensure_mapping(document["layout"], context="document.layout")
+    bindings = _ensure_mapping(document["bindings"], context="document.bindings")
+
+    section_items = _ensure_sequence(layout["log_sections"], context="document.layout.log_sections")
+    if not section_items:
+        raise TemplateValidationError("document.layout.log_sections cannot be empty.")
+    active_section = _ensure_mapping(section_items[0], context="document.layout.log_sections[0]")
+    active_section_id = str(active_section["id"])
+
+    tracks: list[dict[str, Any]] = []
+    tracks_by_id: dict[str, dict[str, Any]] = {}
+    for index, track_data in enumerate(
+        _ordered_layout_tracks(active_section, context="document.layout.log_sections[0]")
+    ):
+        track_id = str(track_data["id"])
+        if track_id in tracks_by_id:
+            raise TemplateValidationError(
+                f"document.layout.log_sections[0].tracks[{index}].id must be unique."
+            )
+        kind = _normalized_track_kind(str(track_data.get("kind", "normal")))
+        built = {
+            "id": track_id,
+            "title": str(track_data.get("title", track_id)),
+            "kind": kind,
+            "width_mm": float(track_data["width_mm"]),
+            "elements": [],
+            "track_header": deepcopy(track_data.get("track_header", {})),
+            "grid": deepcopy(track_data.get("grid", {})),
+        }
+        if "x_scale" in track_data:
+            built["x_scale"] = deepcopy(track_data["x_scale"])
+        if kind == "reference":
+            built["reference"] = deepcopy(track_data.get("reference", {}))
+        tracks.append(built)
+        tracks_by_id[track_id] = built
+
+    on_missing = str(bindings.get("on_missing", "skip")).strip().lower()
+    channel_items = _ensure_sequence(bindings["channels"], context="document.bindings.channels")
+    by_upper = {channel.mnemonic.upper(): channel for channel in dataset.channels.values()}
+
+    for index, item in enumerate(channel_items):
+        binding = _ensure_mapping(item, context=f"document.bindings.channels[{index}]")
+        section = str(binding.get("section", active_section_id))
+        if section != active_section_id:
+            continue
+
+        track_id = str(binding["track_id"])
+        track = tracks_by_id.get(track_id)
+        if track is None:
+            raise TemplateValidationError(
+                f"document.bindings.channels[{index}].track_id {track_id!r} was not found in "
+                f"document.layout.log_sections[0].tracks."
+            )
+
+        channel_name = str(binding["channel"])
         channel = by_upper.get(channel_name.upper())
-        required = bool(track_item.get("required", False))
+        required = bool(binding.get("required", False))
         if channel is None:
             if required or on_missing == "error":
                 raise TemplateValidationError(
@@ -563,127 +555,111 @@ def _build_tracks(dataset: WellDataset, auto_tracks: dict[str, Any]) -> list[dic
                 )
             continue
 
-        configure = _ensure_mapping(
-            track_item["configure"],
-            context=f"auto_tracks.tracks[{index - 1}].configure",
-        )
-        style = deepcopy(
-            _ensure_mapping(
-                configure["style"],
-                context=f"auto_tracks.tracks[{index - 1}].configure.style",
+        track_kind = _normalized_track_kind(str(track.get("kind", "normal")))
+        element_kind = str(binding.get("kind", "curve")).strip().lower()
+        if element_kind == "curve":
+            if not isinstance(channel, ScalarChannel):
+                raise TemplateValidationError(
+                    f"Binding channel {channel_name!r} is not scalar and cannot be used as curve."
+                )
+            if track_kind == "annotation":
+                raise TemplateValidationError(
+                    f"Track {track_id!r} is annotation and does not accept curve bindings."
+                )
+            style = deepcopy(_ensure_mapping(binding.get("style", {}), context="binding.style"))
+            scale = _build_scale(
+                channel.masked_values(),
+                _ensure_mapping(binding.get("scale", {}), context="binding.scale"),
             )
-        )
-        value_labels = deepcopy(configure.get("value_labels", {}))
-        header_display = deepcopy(configure.get("header_display", {}))
-        grid = deepcopy(configure.get("grid", {}))
-        header = deepcopy(configure.get("track_header", {}))
-        width_mm = float(configure["width_mm"])
-        title_template = str(configure.get("title_template", "{mnemonic} [{unit}]"))
-        configured_title = configure.get("title")
-
-        unit = channel.value_unit or ""
-        format_values = {
-            "mnemonic": channel.mnemonic,
-            "unit": unit,
-            "description": channel.description or "",
-        }
-        if isinstance(configured_title, str) and configured_title.strip():
-            title = _safe_format(configured_title, format_values).strip()
-        else:
-            title = _safe_format(title_template, format_values).strip()
-        default_id = f"{_sanitize_id(channel.mnemonic) or 'curve'}_{index}"
-        track_id = str(configure.get("id", default_id))
-        position = int(configure["position"]) if "position" in configure else None
-        curve_scale = _build_scale(channel.masked_values(), configure.get("scale"))
-
-        curve_element = {
-            "kind": "curve",
-            "channel": channel.mnemonic,
-            "label": channel.mnemonic,
-            "style": style,
-            "scale": curve_scale,
-            "render_mode": str(configure.get("curve_render_mode", "line")),
-            "value_labels": value_labels,
-            "header_display": header_display,
-        }
-
-        if track_id in grouped_tracks:
-            grouped_track = grouped_tracks[track_id]
-            grouped_track["elements"].append(curve_element)
-
-            existing_width = float(grouped_track["width_mm"])
-            if not np.isclose(existing_width, width_mm):
-                raise TemplateValidationError(
-                    "Track entries grouped under the same configure.id must share width_mm."
-                )
-
-            existing_position = grouped_meta[track_id]["position"]
-            if position is not None and existing_position is None:
-                grouped_meta[track_id]["position"] = position
-            elif (
-                position is not None
-                and existing_position is not None
-                and int(existing_position) != position
-            ):
-                raise TemplateValidationError(
-                    "Track entries grouped under the same configure.id must share position."
-                )
+            element: dict[str, Any] = {
+                "kind": "curve",
+                "channel": channel.mnemonic,
+                "label": str(binding.get("label", channel.mnemonic)),
+                "style": style,
+                "scale": scale,
+                "render_mode": str(binding.get("render_mode", "line")),
+                "value_labels": deepcopy(
+                    _ensure_mapping(binding.get("value_labels", {}), context="binding.value_labels")
+                ),
+                "header_display": deepcopy(
+                    _ensure_mapping(
+                        binding.get("header_display", {}),
+                        context="binding.header_display",
+                    )
+                ),
+            }
+            track["elements"].append(element)
             continue
 
-        if added >= max_tracks:
+        if element_kind == "raster":
+            if track_kind != "array":
+                raise TemplateValidationError(
+                    f"Track {track_id!r} must be array kind to accept raster bindings."
+                )
+            if not isinstance(channel, RasterChannel):
+                raise TemplateValidationError(
+                    f"Binding channel {channel_name!r} is not raster-compatible."
+                )
+            style = deepcopy(_ensure_mapping(binding.get("style", {}), context="binding.style"))
+            element = {
+                "kind": "raster",
+                "channel": channel.mnemonic,
+                "style": style,
+                "interpolation": str(binding.get("interpolation", "nearest")),
+            }
+            if "color_limits" in binding:
+                limits = _ensure_sequence(binding["color_limits"], context="binding.color_limits")
+                if len(limits) != 2:
+                    raise TemplateValidationError("binding.color_limits must contain two values.")
+                element["color_limits"] = [float(limits[0]), float(limits[1])]
+            track["elements"].append(element)
             continue
 
-        grouped_tracks[track_id] = {
-            "id": track_id,
-            "title": title or channel.mnemonic,
-            "kind": "normal",
-            "width_mm": width_mm,
-            "track_header": header,
-            "grid": grid,
-            "x_scale": curve_scale,
-            "elements": [curve_element],
-        }
-        grouped_meta[track_id] = {"position": position, "order": index}
-        added += 1
+        raise TemplateValidationError(f"Unsupported binding kind {element_kind!r}.")
 
-    if added == 0:
-        raise TemplateValidationError("No configured tracks were added from auto_tracks.tracks.")
+    for track in tracks:
+        track_kind = _normalized_track_kind(str(track.get("kind", "normal")))
+        if track_kind not in {"reference", "normal", "array"}:
+            continue
+        if "x_scale" in track and track["x_scale"] is not None:
+            continue
+        curves = [element for element in track["elements"] if element.get("kind") == "curve"]
+        if len(curves) == 1:
+            track["x_scale"] = deepcopy(curves[0].get("scale"))
+        elif len(curves) > 1:
+            track["x_scale"] = None
 
-    for track_id, grouped_track in grouped_tracks.items():
-        curve_count = sum(
-            1 for element in grouped_track["elements"] if element.get("kind") == "curve"
-        )
-        if curve_count > 1:
-            # Multi-curve overlays use per-curve element scales instead of one shared track scale.
-            grouped_track["x_scale"] = None
-        meta = grouped_meta[track_id]
-        positioned_tracks.append((meta["position"], int(meta["order"]), grouped_track))
+    return tracks
 
-    track_count = len(positioned_tracks)
-    ordered: list[dict[str, Any] | None] = [None] * track_count
 
-    explicit = sorted(
-        (item for item in positioned_tracks if item[0] is not None),
-        key=lambda item: (int(item[0] or 0), item[1]),
-    )
-    for position, _, track in explicit:
-        assert position is not None  # for type checkers
-        slot = min(max(position, 1), track_count) - 1
-        while slot < track_count and ordered[slot] is not None:
-            slot += 1
-        if slot >= track_count:
-            slot = next(index for index, current in enumerate(ordered) if current is None)
-        ordered[slot] = track
+def _apply_layout_section_placeholders(document: dict[str, Any]) -> None:
+    layout_data = document.get("layout")
+    if layout_data is None:
+        return
+    layout = _ensure_mapping(layout_data, context="document.layout")
+    heading = layout.get("heading")
+    if isinstance(heading, dict):
+        header = dict(_ensure_mapping(document.get("header", {}), context="document.header"))
+        for key in ("title", "subtitle", "fields"):
+            if key in heading and key not in header:
+                header[key] = deepcopy(heading[key])
+        document["header"] = header
 
-    for position, _, track in sorted(
-        (item for item in positioned_tracks if item[0] is None),
-        key=lambda item: item[1],
-    ):
-        _ = position
-        slot = next(index for index, current in enumerate(ordered) if current is None)
-        ordered[slot] = track
+    tail = layout.get("tail")
+    if isinstance(tail, dict):
+        footer = dict(_ensure_mapping(document.get("footer", {}), context="document.footer"))
+        if "lines" in tail and "lines" not in footer:
+            footer["lines"] = deepcopy(tail["lines"])
+        document["footer"] = footer
 
-    return [track for track in ordered if track is not None]
+    metadata = dict(_ensure_mapping(document.get("metadata", {}), context="document.metadata"))
+    metadata["layout_sections"] = {
+        "heading": deepcopy(layout.get("heading", {})),
+        "comments": deepcopy(layout.get("comments", [])),
+        "log_sections": deepcopy(layout.get("log_sections", [])),
+        "tail": deepcopy(layout.get("tail", {})),
+    }
+    document["metadata"] = metadata
 
 
 def _apply_reference_layout_overrides(document: dict[str, Any]) -> None:
@@ -741,7 +717,8 @@ def build_document_for_logfile(
     document = deepcopy(spec.document)
     if "name" not in document:
         document["name"] = spec.name
+    _apply_layout_section_placeholders(document)
     _resolve_text_tokens(document, dataset, source_path)
-    document["tracks"] = _build_tracks(dataset, spec.auto_tracks)
+    document["tracks"] = _build_tracks_from_layout_bindings(dataset, document)
     _apply_reference_layout_overrides(document)
     return document_from_mapping(document)

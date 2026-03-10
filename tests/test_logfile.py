@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -31,67 +30,63 @@ def build_mapping() -> dict:
             "footer": {"lines": ["Generated from {SOURCE_FILENAME}"]},
             "markers": [],
             "zones": [],
-        },
-        "auto_tracks": {
-            "on_missing": "skip",
-            "max_tracks": 2,
-            "depth_track": {"id": "depth", "title": "Depth", "width_mm": 16},
-            "tracks": [
-                {
-                    "channel": "GR",
-                    "configure": {
-                        "id": "gr",
-                        "width_mm": 28,
-                        "title_template": "{mnemonic} [{unit}]",
-                        "style": {
-                            "color": "#1b5e20",
-                            "line_width": 0.9,
-                            "line_style": "-",
-                            "opacity": 1.0,
-                        },
-                        "grid": {
-                            "major": True,
-                            "minor": True,
-                            "major_alpha": 0.35,
-                            "minor_alpha": 0.15,
-                        },
-                        "scale": {
-                            "kind": "auto",
-                            "percentile_low": 2,
-                            "percentile_high": 98,
-                            "log_ratio_threshold": 200,
-                            "min_positive": 1e-6,
-                        },
+            "layout": {
+                "heading": {"enabled": True},
+                "comments": [],
+                "log_sections": [
+                    {
+                        "id": "main",
+                        "tracks": [
+                            {
+                                "id": "gr",
+                                "title": "GR",
+                                "kind": "normal",
+                                "width_mm": 28,
+                                "position": 1,
+                            },
+                            {
+                                "id": "depth",
+                                "title": "Depth",
+                                "kind": "reference",
+                                "width_mm": 16,
+                                "position": 2,
+                                "reference": {
+                                    "define_layout": True,
+                                    "unit": "m",
+                                    "scale_ratio": 200,
+                                    "major_step": 20,
+                                    "secondary_grid": {"display": True, "line_count": 4},
+                                },
+                            },
+                            {
+                                "id": "rt",
+                                "title": "RT",
+                                "kind": "normal",
+                                "width_mm": 28,
+                                "position": 3,
+                            },
+                        ],
+                    }
+                ],
+                "tail": {"enabled": True},
+            },
+            "bindings": {
+                "on_missing": "skip",
+                "channels": [
+                    {
+                        "channel": "GR",
+                        "track_id": "gr",
+                        "kind": "curve",
+                        "style": {"color": "#1b5e20"},
                     },
-                },
-                {
-                    "channel": "RT",
-                    "configure": {
-                        "id": "rt",
-                        "width_mm": 28,
-                        "title_template": "{mnemonic} [{unit}]",
-                        "style": {
-                            "color": "#0d47a1",
-                            "line_width": 0.9,
-                            "line_style": "-",
-                            "opacity": 1.0,
-                        },
-                        "grid": {
-                            "major": True,
-                            "minor": True,
-                            "major_alpha": 0.35,
-                            "minor_alpha": 0.15,
-                        },
-                        "scale": {
-                            "kind": "auto",
-                            "percentile_low": 2,
-                            "percentile_high": 98,
-                            "log_ratio_threshold": 200,
-                            "min_positive": 1e-6,
-                        },
+                    {
+                        "channel": "RT",
+                        "track_id": "rt",
+                        "kind": "curve",
+                        "style": {"color": "#0d47a1"},
                     },
-                },
-            ],
+                ],
+            },
         },
     }
 
@@ -110,7 +105,7 @@ class LogFileTests(unittest.TestCase):
         )
         return dataset
 
-    def test_logfile_builds_document_without_hardcoded_tracks(self) -> None:
+    def test_logfile_builds_document_from_layout_bindings(self) -> None:
         spec = logfile_from_mapping(build_mapping())
         self.assertIsNone(spec.render_continuous_strip_page_height_mm)
         document = build_document_for_logfile(
@@ -121,22 +116,25 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(document.name, "TEST-1 Layout")
         self.assertEqual(document.header.title, "TEST-1")
         self.assertEqual(document.header.subtitle, "example_input.las")
-        self.assertEqual(len(document.tracks), 3)  # depth + 2 selected scalar tracks
-        self.assertEqual(document.tracks[1].elements[0].channel, "GR")
+        self.assertEqual(len(document.tracks), 3)
+        self.assertEqual(document.tracks[0].id, "gr")
+        self.assertEqual(document.tracks[1].id, "depth")
+        self.assertEqual(document.tracks[2].id, "rt")
+        self.assertEqual(document.tracks[0].elements[0].channel, "GR")
         self.assertEqual(document.tracks[2].elements[0].channel, "RT")
+        self.assertIn("layout_sections", document.metadata)
 
     def test_invalid_logfile_configuration_raises(self) -> None:
         payload = build_mapping()
-        del payload["auto_tracks"]["tracks"][0]["configure"]["style"]["color"]
+        del payload["document"]["bindings"]["channels"][0]["track_id"]
         with self.assertRaises(TemplateValidationError):
             logfile_from_mapping(payload)
 
-    def test_track_configure_is_required_without_default(self) -> None:
+    def test_layout_and_bindings_are_required(self) -> None:
         payload = build_mapping()
-        del payload["auto_tracks"]["tracks"][0]["configure"]
-        with self.assertRaises(TemplateValidationError) as ctx:
+        del payload["document"]["layout"]
+        with self.assertRaises(TemplateValidationError):
             logfile_from_mapping(payload)
-        self.assertIn("auto_tracks.tracks[0].configure is required", str(ctx.exception))
 
     def test_schema_error_reports_invalid_dpi_path(self) -> None:
         payload = build_mapping()
@@ -166,29 +164,9 @@ class LogFileTests(unittest.TestCase):
             "#ffffff",
         )
 
-    def test_default_configure_supports_string_track_entries(self) -> None:
+    def test_reference_track_config_controls_layout_axis(self) -> None:
         payload = build_mapping()
-        payload["auto_tracks"]["default_configure"] = deepcopy(
-            payload["auto_tracks"]["tracks"][0]["configure"]
-        )
-        payload["auto_tracks"]["tracks"] = [
-            "GR",
-            {
-                "channel": "RT",
-                "configure": {
-                    "style": {"color": "#ff5500"},
-                },
-            },
-        ]
-
-        spec = logfile_from_mapping(payload)
-        self.assertEqual(spec.auto_tracks["tracks"][0]["channel"], "GR")
-        self.assertEqual(spec.auto_tracks["tracks"][0]["configure"]["width_mm"], 28)
-        self.assertEqual(spec.auto_tracks["tracks"][1]["configure"]["style"]["color"], "#ff5500")
-
-    def test_depth_track_reference_config_controls_layout_axis(self) -> None:
-        payload = build_mapping()
-        payload["auto_tracks"]["depth_track"]["reference"] = {
+        payload["document"]["layout"]["log_sections"][0]["tracks"][1]["reference"] = {
             "define_layout": True,
             "unit": "ft",
             "scale_ratio": 500,
@@ -209,21 +187,21 @@ class LogFileTests(unittest.TestCase):
 
     def test_track_positions_allow_reordering_in_layout(self) -> None:
         payload = build_mapping()
-        payload["auto_tracks"]["depth_track"]["position"] = 2
-        payload["auto_tracks"]["tracks"][0]["configure"]["position"] = 1
+        payload["document"]["layout"]["log_sections"][0]["tracks"][0]["position"] = 2
+        payload["document"]["layout"]["log_sections"][0]["tracks"][1]["position"] = 1
         spec = logfile_from_mapping(payload)
         document = build_document_for_logfile(
             spec,
             self.build_dataset(),
             source_path=Path("example_input.las"),
         )
-        self.assertEqual(document.tracks[0].id, "gr")
-        self.assertEqual(document.tracks[1].id, "depth")
+        self.assertEqual(document.tracks[0].id, "depth")
+        self.assertEqual(document.tracks[1].id, "gr")
 
-    def test_auto_track_can_render_curve_values_as_labels(self) -> None:
+    def test_binding_can_render_curve_values_as_labels(self) -> None:
         payload = build_mapping()
-        payload["auto_tracks"]["tracks"][0]["configure"]["curve_render_mode"] = "value_labels"
-        payload["auto_tracks"]["tracks"][0]["configure"]["value_labels"] = {
+        payload["document"]["bindings"]["channels"][0]["render_mode"] = "value_labels"
+        payload["document"]["bindings"]["channels"][0]["value_labels"] = {
             "step": 5,
             "format": "fixed",
             "precision": 1,
@@ -235,13 +213,13 @@ class LogFileTests(unittest.TestCase):
             self.build_dataset(),
             source_path=Path("example_input.las"),
         )
-        curve = document.tracks[1].elements[0]
+        curve = document.tracks[0].elements[0]
         self.assertEqual(curve.render_mode, "value_labels")
         self.assertEqual(curve.value_labels.step, 5.0)
 
-    def test_auto_track_can_configure_curve_header_display(self) -> None:
+    def test_binding_can_configure_curve_header_display(self) -> None:
         payload = build_mapping()
-        payload["auto_tracks"]["tracks"][0]["configure"]["header_display"] = {
+        payload["document"]["bindings"]["channels"][0]["header_display"] = {
             "show_name": False,
             "show_unit": False,
             "show_limits": True,
@@ -253,34 +231,49 @@ class LogFileTests(unittest.TestCase):
             self.build_dataset(),
             source_path=Path("example_input.las"),
         )
-        curve = document.tracks[1].elements[0]
+        curve = document.tracks[0].elements[0]
         self.assertFalse(curve.header_display.show_name)
         self.assertFalse(curve.header_display.show_unit)
         self.assertTrue(curve.header_display.show_limits)
         self.assertFalse(curve.header_display.show_color)
 
-    def test_auto_tracks_can_group_multiple_curves_in_one_track(self) -> None:
+    def test_bindings_can_group_multiple_curves_in_one_track(self) -> None:
         payload = build_mapping()
-        payload["auto_tracks"]["tracks"][0]["configure"]["id"] = "combo"
-        payload["auto_tracks"]["tracks"][0]["configure"]["title"] = "GR / RT"
-        payload["auto_tracks"]["tracks"][1]["configure"]["id"] = "combo"
-        payload["auto_tracks"]["tracks"][1]["configure"]["style"]["color"] = "#0d47a1"
+        payload["document"]["layout"]["log_sections"][0]["tracks"] = [
+            {
+                "id": "depth",
+                "title": "Depth",
+                "kind": "reference",
+                "width_mm": 16,
+                "position": 2,
+                "reference": {"define_layout": True, "unit": "m", "scale_ratio": 200},
+            },
+            {
+                "id": "combo",
+                "title": "GR / RT",
+                "kind": "normal",
+                "width_mm": 28,
+                "position": 1,
+            },
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {"channel": "GR", "track_id": "combo", "kind": "curve", "style": {"color": "#1b5e20"}},
+            {"channel": "RT", "track_id": "combo", "kind": "curve", "style": {"color": "#0d47a1"}},
+        ]
         spec = logfile_from_mapping(payload)
         document = build_document_for_logfile(
             spec,
             self.build_dataset(),
             source_path=Path("example_input.las"),
         )
-        self.assertEqual(len(document.tracks), 2)  # depth + grouped combo
-        combo = document.tracks[1]
+        self.assertEqual(len(document.tracks), 2)
+        combo = document.tracks[0]
         self.assertEqual(combo.id, "combo")
         self.assertEqual(combo.title, "GR / RT")
         self.assertEqual(len(combo.elements), 2)
         self.assertIsNone(combo.x_scale)
         self.assertEqual(combo.elements[0].channel, "GR")
         self.assertEqual(combo.elements[1].channel, "RT")
-        self.assertIsNotNone(combo.elements[0].scale)
-        self.assertIsNotNone(combo.elements[1].scale)
 
     def test_page_spacing_fields_are_supported_in_logfile_yaml(self) -> None:
         payload = build_mapping()
@@ -306,19 +299,31 @@ class LogFileTests(unittest.TestCase):
                 "footer": {"lines": []},
                 "markers": [],
                 "zones": [],
-            },
-            "auto_tracks": {
-                "on_missing": "skip",
-                "max_tracks": 8,
-                "depth_track": {"id": "depth", "title": "Depth", "width_mm": 16},
-                "default_configure": {
-                    "width_mm": 28,
-                    "title_template": "{mnemonic} [{unit}]",
-                    "style": {"color": "#1b5e20"},
-                    "grid": {"major": True, "minor": True},
-                    "scale": {"kind": "auto", "percentile_low": 2, "percentile_high": 98},
+                "layout": {
+                    "heading": {"enabled": True},
+                    "comments": [],
+                    "log_sections": [
+                        {
+                            "id": "main",
+                            "tracks": [
+                                {
+                                    "id": "depth",
+                                    "title": "Depth",
+                                    "kind": "reference",
+                                    "width_mm": 16,
+                                    "position": 1,
+                                    "reference": {
+                                        "define_layout": True,
+                                        "unit": "m",
+                                        "scale_ratio": 200,
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                    "tail": {"enabled": True},
                 },
-                "tracks": [],
+                "bindings": {"on_missing": "skip", "channels": []},
             },
         }
         savefile_payload = {
@@ -327,11 +332,41 @@ class LogFileTests(unittest.TestCase):
             "name": "From Savefile",
             "data": {"source_path": "job.las", "source_format": "auto"},
             "render": {"output_path": "job.pdf", "dpi": 350},
-            "auto_tracks": {
-                "tracks": [
-                    "GR",
-                    {"channel": "RT", "configure": {"style": {"color": "#0d47a1"}}},
-                ]
+            "document": {
+                "layout": {
+                    "log_sections": [
+                        {
+                            "id": "main",
+                            "tracks": [
+                                {
+                                    "id": "depth",
+                                    "title": "Depth",
+                                    "kind": "reference",
+                                    "width_mm": 16,
+                                    "position": 1,
+                                    "reference": {
+                                        "define_layout": True,
+                                        "unit": "m",
+                                        "scale_ratio": 200,
+                                    },
+                                },
+                                {
+                                    "id": "combo",
+                                    "title": "Combo",
+                                    "kind": "normal",
+                                    "width_mm": 28,
+                                    "position": 2,
+                                },
+                            ],
+                        }
+                    ]
+                },
+                "bindings": {
+                    "channels": [
+                        {"channel": "GR", "track_id": "combo", "kind": "curve"},
+                        {"channel": "RT", "track_id": "combo", "kind": "curve"},
+                    ]
+                },
             },
         }
 
@@ -351,9 +386,8 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(spec.name, "From Savefile")
         self.assertEqual(spec.render_output_path, "job.pdf")
         self.assertEqual(spec.render_dpi, 350)
-        self.assertEqual(spec.auto_tracks["tracks"][0]["channel"], "GR")
-        self.assertEqual(spec.auto_tracks["tracks"][0]["configure"]["width_mm"], 28)
-        self.assertEqual(spec.auto_tracks["tracks"][1]["configure"]["style"]["color"], "#0d47a1")
+        self.assertEqual(spec.document["bindings"]["channels"][0]["channel"], "GR")
+        self.assertEqual(spec.document["bindings"]["channels"][0]["track_id"], "combo")
 
 
 if __name__ == "__main__":

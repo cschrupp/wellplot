@@ -11,7 +11,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "title": "well_log_os Logfile",
     "type": "object",
-    "required": ["version", "name", "data", "render", "document", "auto_tracks"],
+    "required": ["version", "name", "data", "render", "document"],
     "additionalProperties": False,
     "properties": {
         "version": {"type": "integer", "const": 1},
@@ -42,7 +42,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
         },
         "document": {
             "type": "object",
-            "required": ["page"],
+            "required": ["page", "layout", "bindings"],
             "properties": {
                 "name": {"type": "string"},
                 "page": {"$ref": "#/$defs/documentPage"},
@@ -51,10 +51,11 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "footer": {"$ref": "#/$defs/documentFooter"},
                 "markers": {"$ref": "#/$defs/documentMarkers"},
                 "zones": {"$ref": "#/$defs/documentZones"},
+                "layout": {"$ref": "#/$defs/documentLayout"},
+                "bindings": {"$ref": "#/$defs/documentBindings"},
             },
             "additionalProperties": True,
         },
-        "auto_tracks": {"$ref": "#/$defs/autoTracks"},
     },
     "$defs": {
         "documentPage": {
@@ -153,6 +154,103 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                     "alpha": {"type": "number"},
                 },
                 "additionalProperties": False,
+            },
+        },
+        "documentLayout": {
+            "type": "object",
+            "required": ["log_sections"],
+            "additionalProperties": False,
+            "properties": {
+                "heading": {"type": "object"},
+                "comments": {
+                    "type": "array",
+                    "items": {"type": "object"},
+                },
+                "tail": {"type": "object"},
+                "log_sections": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/layoutLogSection"},
+                },
+            },
+        },
+        "layoutLogSection": {
+            "type": "object",
+            "required": ["id", "tracks"],
+            "additionalProperties": False,
+            "properties": {
+                "id": {"type": "string", "minLength": 1},
+                "title": {"type": "string"},
+                "tracks": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/layoutTrack"},
+                },
+            },
+        },
+        "layoutTrack": {
+            "type": "object",
+            "required": ["id", "width_mm"],
+            "additionalProperties": False,
+            "properties": {
+                "id": {"type": "string", "minLength": 1},
+                "title": {"type": "string"},
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "reference",
+                        "normal",
+                        "array",
+                        "annotation",
+                        "depth",
+                        "curve",
+                        "image",
+                    ],
+                },
+                "width_mm": {"type": "number", "exclusiveMinimum": 0},
+                "position": {"type": "integer", "minimum": 1},
+                "x_scale": {"$ref": "#/$defs/trackScale"},
+                "grid": {"$ref": "#/$defs/grid"},
+                "track_header": {"$ref": "#/$defs/trackHeader"},
+                "reference": {"$ref": "#/$defs/referenceTrack"},
+            },
+        },
+        "documentBindings": {
+            "type": "object",
+            "required": ["channels"],
+            "additionalProperties": False,
+            "properties": {
+                "on_missing": {"type": "string", "enum": ["skip", "error"]},
+                "channels": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"$ref": "#/$defs/documentChannelBinding"},
+                },
+            },
+        },
+        "documentChannelBinding": {
+            "type": "object",
+            "required": ["channel", "track_id"],
+            "additionalProperties": False,
+            "properties": {
+                "section": {"type": "string", "minLength": 1},
+                "channel": {"type": "string", "minLength": 1},
+                "track_id": {"type": "string", "minLength": 1},
+                "required": {"type": "boolean"},
+                "kind": {"type": "string", "enum": ["curve", "raster"]},
+                "label": {"type": "string"},
+                "style": {"$ref": "#/$defs/stylePatch"},
+                "scale": {"$ref": "#/$defs/trackScale"},
+                "render_mode": {"type": "string", "enum": ["line", "value_labels"]},
+                "value_labels": {"$ref": "#/$defs/curveValueLabels"},
+                "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
+                "interpolation": {"type": "string"},
+                "color_limits": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
             },
         },
         "matplotlibRender": {
@@ -301,40 +399,6 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "callout_arrow_linewidth": {"type": "number", "exclusiveMinimum": 0},
             },
         },
-        "autoTracks": {
-            "type": "object",
-            "required": ["depth_track", "tracks"],
-            "additionalProperties": False,
-            "properties": {
-                "on_missing": {"type": "string", "enum": ["skip", "error"]},
-                "max_tracks": {"type": "integer", "minimum": 1},
-                "depth_track": {"$ref": "#/$defs/depthTrack"},
-                "default_configure": {"$ref": "#/$defs/trackConfigure"},
-                "tracks": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "anyOf": [
-                            {"type": "string", "minLength": 1},
-                            {"$ref": "#/$defs/autoTrackEntry"},
-                        ]
-                    },
-                },
-            },
-        },
-        "depthTrack": {
-            "type": "object",
-            "required": ["id", "title", "width_mm"],
-            "additionalProperties": False,
-            "properties": {
-                "id": {"type": "string", "minLength": 1},
-                "title": {"type": "string", "minLength": 1},
-                "width_mm": {"type": "number", "exclusiveMinimum": 0},
-                "position": {"type": "integer", "minimum": 1},
-                "track_header": {"$ref": "#/$defs/trackHeader"},
-                "reference": {"$ref": "#/$defs/referenceTrack"},
-            },
-        },
         "referenceTrack": {
             "type": "object",
             "additionalProperties": False,
@@ -379,35 +443,6 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "precision": {"type": "integer", "minimum": 0},
             },
         },
-        "autoTrackEntry": {
-            "type": "object",
-            "required": ["channel"],
-            "additionalProperties": False,
-            "properties": {
-                "channel": {"type": "string", "minLength": 1},
-                "required": {"type": "boolean"},
-                "configure": {"$ref": "#/$defs/trackConfigurePatch"},
-            },
-        },
-        "trackConfigure": {
-            "type": "object",
-            "required": ["width_mm", "style"],
-            "additionalProperties": False,
-            "properties": {
-                "id": {"type": "string", "minLength": 1},
-                "title": {"type": "string"},
-                "title_template": {"type": "string"},
-                "width_mm": {"type": "number", "exclusiveMinimum": 0},
-                "position": {"type": "integer", "minimum": 1},
-                "curve_render_mode": {"type": "string", "enum": ["line", "value_labels"]},
-                "value_labels": {"$ref": "#/$defs/curveValueLabels"},
-                "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
-                "style": {"$ref": "#/$defs/style"},
-                "grid": {"$ref": "#/$defs/grid"},
-                "scale": {"$ref": "#/$defs/autoTrackScale"},
-                "track_header": {"$ref": "#/$defs/trackHeader"},
-            },
-        },
         "style": {
             "type": "object",
             "required": ["color"],
@@ -445,7 +480,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "minor_alpha": {"type": "number", "minimum": 0, "maximum": 1},
             },
         },
-        "autoTrackScale": {
+        "trackScale": {
             "type": "object",
             "additionalProperties": False,
             "properties": {
@@ -469,49 +504,6 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                     "then": {"required": ["min", "max"]},
                 }
             ],
-        },
-        "autoTrackScalePatch": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "kind": {"type": "string", "enum": ["auto", "linear", "log"]},
-                "min": {"type": "number"},
-                "max": {"type": "number"},
-                "reverse": {"type": "boolean"},
-                "percentile_low": {"type": "number"},
-                "percentile_high": {"type": "number"},
-                "log_ratio_threshold": {"type": "number"},
-                "min_positive": {"type": "number", "exclusiveMinimum": 0},
-            },
-            "allOf": [
-                {
-                    "if": {
-                        "anyOf": [
-                            {"required": ["min"]},
-                            {"required": ["max"]},
-                        ]
-                    },
-                    "then": {"required": ["min", "max"]},
-                }
-            ],
-        },
-        "trackConfigurePatch": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "id": {"type": "string", "minLength": 1},
-                "title": {"type": "string"},
-                "title_template": {"type": "string"},
-                "width_mm": {"type": "number", "exclusiveMinimum": 0},
-                "position": {"type": "integer", "minimum": 1},
-                "curve_render_mode": {"type": "string", "enum": ["line", "value_labels"]},
-                "value_labels": {"$ref": "#/$defs/curveValueLabels"},
-                "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
-                "style": {"$ref": "#/$defs/stylePatch"},
-                "grid": {"$ref": "#/$defs/grid"},
-                "scale": {"$ref": "#/$defs/autoTrackScalePatch"},
-                "track_header": {"$ref": "#/$defs/trackHeader"},
-            },
         },
         "curveHeaderDisplay": {
             "type": "object",

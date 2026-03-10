@@ -1,6 +1,6 @@
 # well_log_os Roadmap
 
-Last updated: 2026-03-09
+Last updated: 2026-03-10
 
 ## Scope Summary
 
@@ -15,6 +15,10 @@ Decision history is tracked in `docs/decision-log.md`.
 ## Current Baseline
 
 - YAML templates define page, depth axis, tracks, styles, annotations.
+- Logfile config is now track-first:
+  - `document.layout.log_sections[*].tracks` defines layout
+  - `document.bindings.channels[*]` assigns channels to tracks
+- Legacy `auto_tracks` flow has been removed from the MVP path.
 - Physical layout engine computes page windows and track frames.
 - Track taxonomy is explicit with compatibility aliases:
   - `reference` (`depth` alias), `normal` (`curve` alias), `array` (`image` alias), `annotation`.
@@ -28,6 +32,23 @@ Decision history is tracked in `docs/decision-log.md`.
 - Synthetic example exists for fast iteration (`examples/synthetic_demo.py` + `examples/triple_combo.yaml`).
 - Log-file schema validation is implemented (JSON Schema + CLI `validate`).
 - YAML template/savefile inheritance is implemented for reusable log designs.
+- Section placeholders exist in YAML for report composition:
+  - `layout.heading`
+  - `layout.comments`
+  - `layout.log_sections`
+  - `layout.tail`
+
+## MVP Architecture Gaps (layout/bindings model, 2026-03-10)
+
+Needed next to complete the intended workflow:
+
+- Render all `layout.log_sections` sequentially (currently only the first section is rendered).
+- Add real renderer primitives for `heading`, `comments`, and `tail` sections.
+- Allow per-section depth windows and per-section page/layout settings.
+- Add section-aware bindings (`binding.section`) in rendering, not only schema/validation.
+- Add track-level default element properties to reduce binding repetition (style/scale/header display).
+- Add validation for unbound required tracks and optional strict mode for empty tracks.
+- Add CLI/report diagnostics that summarize section coverage and binding coverage.
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
@@ -109,6 +130,24 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
+- Implement multi-section composition engine:
+  - render all `log_sections` in configured order
+  - support section breaks for continuous and paginated outputs
+- Implement section object rendering:
+  - heading blocks
+  - comment/notes blocks
+  - tail blocks
+- Add per-section layout contracts:
+  - optional `depth_range` per section
+  - optional section-specific track-header height and spacing
+- Add binding ergonomics:
+  - track defaults (`curve_defaults` / `raster_defaults`)
+  - optional per-track binding templates
+  - strict validation mode for missing channels/empty tracks
+- Add end-to-end examples using the new model:
+  - single-section CBL
+  - multi-section report with comments
+  - mixed section layouts (reference + array + normal)
 - Complete reference-track properties from parity screenshots:
   - header orientation/alignment controls
   - values orientation modes

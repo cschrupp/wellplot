@@ -14,31 +14,74 @@ render:
         separator_linewidth: 0.4
       markers:
         callout_fontsize: 6.2
-auto_tracks:
-  max_tracks: 5
-  tracks:
-    - channel: CBL
-      configure:
-        id: cbl
+document:
+  layout:
+    log_sections:
+      - id: main
+        tracks:
+          - id: depth
+            title: Depth
+            kind: reference
+            width_mm: 16
+            position: 1
+            reference:
+              axis: depth
+              define_layout: true
+              unit: m
+              scale_ratio: 200
+              major_step: 50
+              secondary_grid:
+                display: true
+                line_count: 5
+          - id: cbl
+            title: CBL
+            kind: normal
+            width_mm: 28
+            position: 2
+          - id: vdl
+            title: VDL
+            kind: normal
+            width_mm: 28
+            position: 3
+          - id: gr
+            title: GR
+            kind: normal
+            width_mm: 28
+            position: 4
+          - id: cali
+            title: CALI
+            kind: normal
+            width_mm: 28
+            position: 5
+          - id: rt
+            title: RT
+            kind: normal
+            width_mm: 28
+            position: 6
+  bindings:
+    channels:
+      - channel: CBL
+        track_id: cbl
+        kind: curve
         style:
           color: "#1b5e20"
-    - channel: VDL
-      configure:
-        id: vdl
+      - channel: VDL
+        track_id: vdl
+        kind: curve
         style:
           color: "#0d47a1"
-    - channel: GR
-      configure:
-        id: gr
+      - channel: GR
+        track_id: gr
+        kind: curve
         style:
           color: "#b71c1c"
-    - channel: CALI
-      configure:
-        id: cali
+      - channel: CALI
+        track_id: cali
+        kind: curve
         style:
           color: "#4a148c"
-    - channel: RT
-      configure:
-        id: rt
+      - channel: RT
+        track_id: rt
+        kind: curve
         style:
           color: "#e65100"

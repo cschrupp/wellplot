@@ -9,69 +9,111 @@ render:
   output_path: ../workspace/renders/CBL_log_attempt.pdf
   dpi: 300
   continuous_strip_page_height_mm: 297
-auto_tracks:
-  depth_track:
-    position: 2
-  max_tracks: 5
-  tracks:
-    - channel: GR_STGC
-      configure:
-        id: combo_gr_tt
-        title: GR_STGC / TT
+document:
+  layout:
+    heading:
+      enabled: true
+    comments: []
+    log_sections:
+      - id: main
+        title: Main Log
+        tracks:
+          - id: combo_gr_tt
+            title: GR_STGC / TT
+            kind: normal
+            width_mm: 28
+            position: 1
+          - id: depth
+            title: Depth
+            kind: reference
+            width_mm: 16
+            position: 2
+            reference:
+              axis: depth
+              define_layout: true
+              unit: m
+              scale_ratio: 200
+              major_step: 50
+              secondary_grid:
+                display: true
+                line_count: 5
+          - id: cbl
+            title: CBL [MV]
+            kind: normal
+            width_mm: 28
+            position: 3
+            track_header:
+              objects:
+                - kind: title
+                  enabled: true
+                  line_units: 1
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: true
+                  line_units: 2
+                - kind: divisions
+                  enabled: true
+                  reserve_space: true
+                  line_units: 1
+          - id: bi
+            title: BI
+            kind: normal
+            width_mm: 28
+            position: 4
+          - id: mtem
+            title: MTEM
+            kind: normal
+            width_mm: 28
+            position: 5
+    tail:
+      enabled: true
+  bindings:
+    on_missing: skip
+    channels:
+      - channel: GR_STGC
+        track_id: combo_gr_tt
+        kind: curve
+        style:
+          color: "#2e7d32"
         scale:
           kind: linear
           min: 0
           max: 150
-        curve_render_mode: value_labels
+        render_mode: value_labels
         value_labels:
           step: 10
           format: fixed
           precision: 1
           font_size: 6.0
           horizontal_alignment: center
+      - channel: TT
+        track_id: combo_gr_tt
+        kind: curve
         style:
-          color: "#2e7d32"
-    - channel: TT
-      configure:
-        id: combo_gr_tt
+          color: "#1e40af"
         scale:
           kind: linear
           min: 400
           max: 200
           reverse: true
+      - channel: CBL
+        track_id: cbl
+        kind: curve
         style:
-          color: "#1e40af"
-    - channel: CBL
-      configure:
-        id: cbl
+          color: "#424242"
         scale:
           kind: linear
           min: 0
           max: 100
-        track_header:
-          objects:
-            - kind: title
-              enabled: true
-              line_units: 1
-            - kind: scale
-              enabled: true
-              line_units: 1
-            - kind: legend
-              enabled: true
-              line_units: 2
-            - kind: divisions
-              enabled: true
-              reserve_space: true
-              line_units: 1
-        style:
-          color: "#424242"
-    - channel: BI
-      configure:
-        id: bi
+      - channel: BI
+        track_id: bi
+        kind: curve
         style:
           color: "#8d6e63"
-    - channel: MTEM
-      configure:
-        id: mtem
+      - channel: MTEM
+        track_id: mtem
+        kind: curve
         style:
           color: "#111827"
