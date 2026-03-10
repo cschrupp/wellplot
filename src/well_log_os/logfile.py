@@ -180,9 +180,19 @@ def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
     sections = _ensure_sequence(layout["log_sections"], context=f"{context}.log_sections")
     if not sections:
         raise TemplateValidationError(f"{context}.log_sections cannot be empty.")
+    seen_section_ids: set[str] = set()
     for index, item in enumerate(sections):
         section = _ensure_mapping(item, context=f"{context}.log_sections[{index}]")
-        _ = str(section["id"])
+        section_id = str(section["id"])
+        if section_id in seen_section_ids:
+            raise TemplateValidationError(
+                f"{context}.log_sections[{index}].id {section_id!r} must be unique."
+            )
+        seen_section_ids.add(section_id)
+        if "title" in section:
+            _ = str(section["title"])
+        if "subtitle" in section:
+            _ = str(section["subtitle"])
         tracks = _ensure_sequence(
             section["tracks"], context=f"{context}.log_sections[{index}].tracks"
         )
@@ -488,28 +498,34 @@ def _ordered_layout_tracks(section: dict[str, Any], *, context: str) -> list[dic
     return [track for track in ordered if track is not None]
 
 
-def _build_tracks_from_layout_bindings(
-    dataset: WellDataset, document: dict[str, Any]
-) -> list[dict[str, Any]]:
-    layout = _ensure_mapping(document["layout"], context="document.layout")
-    bindings = _ensure_mapping(document["bindings"], context="document.bindings")
-
-    section_items = _ensure_sequence(layout["log_sections"], context="document.layout.log_sections")
+def _layout_sections(layout: dict[str, Any], *, context: str) -> list[dict[str, Any]]:
+    section_items = _ensure_sequence(layout["log_sections"], context=context)
     if not section_items:
-        raise TemplateValidationError("document.layout.log_sections cannot be empty.")
-    active_section = _ensure_mapping(section_items[0], context="document.layout.log_sections[0]")
-    active_section_id = str(active_section["id"])
+        raise TemplateValidationError(f"{context} cannot be empty.")
 
+    sections: list[dict[str, Any]] = []
+    seen_section_ids: set[str] = set()
+    for index, item in enumerate(section_items):
+        section = _ensure_mapping(item, context=f"{context}[{index}]")
+        section_id = str(section["id"])
+        if section_id in seen_section_ids:
+            raise TemplateValidationError(
+                f"{context}[{index}].id {section_id!r} must be unique."
+            )
+        seen_section_ids.add(section_id)
+        sections.append(section)
+    return sections
+
+
+def _build_empty_tracks_for_section(
+    section: dict[str, Any], *, context: str
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     tracks: list[dict[str, Any]] = []
     tracks_by_id: dict[str, dict[str, Any]] = {}
-    for index, track_data in enumerate(
-        _ordered_layout_tracks(active_section, context="document.layout.log_sections[0]")
-    ):
+    for index, track_data in enumerate(_ordered_layout_tracks(section, context=context)):
         track_id = str(track_data["id"])
         if track_id in tracks_by_id:
-            raise TemplateValidationError(
-                f"document.layout.log_sections[0].tracks[{index}].id must be unique."
-            )
+            raise TemplateValidationError(f"{context}.tracks[{index}].id must be unique.")
         kind = _normalized_track_kind(str(track_data.get("kind", "normal")))
         built = {
             "id": track_id,
@@ -526,6 +542,68 @@ def _build_tracks_from_layout_bindings(
             built["reference"] = deepcopy(track_data.get("reference", {}))
         tracks.append(built)
         tracks_by_id[track_id] = built
+    return tracks, tracks_by_id
+
+
+def _binding_target_section(
+    binding: dict[str, Any],
+    *,
+    binding_context: str,
+    section_track_maps: dict[str, dict[str, dict[str, Any]]],
+    track_to_sections: dict[str, list[str]],
+) -> str:
+    track_id = str(binding["track_id"])
+    explicit_section = binding.get("section")
+    if explicit_section is not None:
+        section_id = str(explicit_section)
+        section_tracks = section_track_maps.get(section_id)
+        if section_tracks is None:
+            raise TemplateValidationError(
+                f"{binding_context}.section {section_id!r} does not exist in "
+                "document.layout.log_sections."
+            )
+        if track_id not in section_tracks:
+            raise TemplateValidationError(
+                f"{binding_context}.track_id {track_id!r} was not found in section {section_id!r}."
+            )
+        return section_id
+
+    candidate_sections = track_to_sections.get(track_id, [])
+    if not candidate_sections:
+        raise TemplateValidationError(
+            f"{binding_context}.track_id {track_id!r} was not found in "
+            "document.layout.log_sections."
+        )
+    if len(candidate_sections) > 1:
+        joined = ", ".join(candidate_sections)
+        raise TemplateValidationError(
+            f"{binding_context}.track_id {track_id!r} exists in multiple sections ({joined}). "
+            "Set document.bindings.channels[].section explicitly."
+        )
+    return candidate_sections[0]
+
+
+def _build_tracks_from_layout_bindings(
+    dataset: WellDataset, document: dict[str, Any]
+) -> dict[str, list[dict[str, Any]]]:
+    layout = _ensure_mapping(document["layout"], context="document.layout")
+    bindings = _ensure_mapping(document["bindings"], context="document.bindings")
+
+    sections = _layout_sections(layout, context="document.layout.log_sections")
+    tracks_by_section: dict[str, list[dict[str, Any]]] = {}
+    section_track_maps: dict[str, dict[str, dict[str, Any]]] = {}
+    track_to_sections: dict[str, list[str]] = {}
+    for section_index, section in enumerate(sections):
+        section_id = str(section["id"])
+        section_context = f"document.layout.log_sections[{section_index}]"
+        section_tracks, section_tracks_by_id = _build_empty_tracks_for_section(
+            section,
+            context=section_context,
+        )
+        tracks_by_section[section_id] = section_tracks
+        section_track_maps[section_id] = section_tracks_by_id
+        for track_id in section_tracks_by_id:
+            track_to_sections.setdefault(track_id, []).append(section_id)
 
     on_missing = str(bindings.get("on_missing", "skip")).strip().lower()
     channel_items = _ensure_sequence(bindings["channels"], context="document.bindings.channels")
@@ -533,17 +611,15 @@ def _build_tracks_from_layout_bindings(
 
     for index, item in enumerate(channel_items):
         binding = _ensure_mapping(item, context=f"document.bindings.channels[{index}]")
-        section = str(binding.get("section", active_section_id))
-        if section != active_section_id:
-            continue
-
+        binding_context = f"document.bindings.channels[{index}]"
+        section_id = _binding_target_section(
+            binding,
+            binding_context=binding_context,
+            section_track_maps=section_track_maps,
+            track_to_sections=track_to_sections,
+        )
         track_id = str(binding["track_id"])
-        track = tracks_by_id.get(track_id)
-        if track is None:
-            raise TemplateValidationError(
-                f"document.bindings.channels[{index}].track_id {track_id!r} was not found in "
-                f"document.layout.log_sections[0].tracks."
-            )
+        track = section_track_maps[section_id][track_id]
 
         channel_name = str(binding["channel"])
         channel = by_upper.get(channel_name.upper())
@@ -566,10 +642,12 @@ def _build_tracks_from_layout_bindings(
                 raise TemplateValidationError(
                     f"Track {track_id!r} is annotation and does not accept curve bindings."
                 )
-            style = deepcopy(_ensure_mapping(binding.get("style", {}), context="binding.style"))
+            style = deepcopy(
+                _ensure_mapping(binding.get("style", {}), context=f"{binding_context}.style")
+            )
             scale = _build_scale(
                 channel.masked_values(),
-                _ensure_mapping(binding.get("scale", {}), context="binding.scale"),
+                _ensure_mapping(binding.get("scale", {}), context=f"{binding_context}.scale"),
             )
             element: dict[str, Any] = {
                 "kind": "curve",
@@ -579,12 +657,15 @@ def _build_tracks_from_layout_bindings(
                 "scale": scale,
                 "render_mode": str(binding.get("render_mode", "line")),
                 "value_labels": deepcopy(
-                    _ensure_mapping(binding.get("value_labels", {}), context="binding.value_labels")
+                    _ensure_mapping(
+                        binding.get("value_labels", {}),
+                        context=f"{binding_context}.value_labels",
+                    )
                 ),
                 "header_display": deepcopy(
                     _ensure_mapping(
                         binding.get("header_display", {}),
-                        context="binding.header_display",
+                        context=f"{binding_context}.header_display",
                     )
                 ),
             }
@@ -600,7 +681,9 @@ def _build_tracks_from_layout_bindings(
                 raise TemplateValidationError(
                     f"Binding channel {channel_name!r} is not raster-compatible."
                 )
-            style = deepcopy(_ensure_mapping(binding.get("style", {}), context="binding.style"))
+            style = deepcopy(
+                _ensure_mapping(binding.get("style", {}), context=f"{binding_context}.style")
+            )
             element = {
                 "kind": "raster",
                 "channel": channel.mnemonic,
@@ -608,28 +691,34 @@ def _build_tracks_from_layout_bindings(
                 "interpolation": str(binding.get("interpolation", "nearest")),
             }
             if "color_limits" in binding:
-                limits = _ensure_sequence(binding["color_limits"], context="binding.color_limits")
+                limits = _ensure_sequence(
+                    binding["color_limits"],
+                    context=f"{binding_context}.color_limits",
+                )
                 if len(limits) != 2:
-                    raise TemplateValidationError("binding.color_limits must contain two values.")
+                    raise TemplateValidationError(
+                        f"{binding_context}.color_limits must contain two values."
+                    )
                 element["color_limits"] = [float(limits[0]), float(limits[1])]
             track["elements"].append(element)
             continue
 
         raise TemplateValidationError(f"Unsupported binding kind {element_kind!r}.")
 
-    for track in tracks:
-        track_kind = _normalized_track_kind(str(track.get("kind", "normal")))
-        if track_kind not in {"reference", "normal", "array"}:
-            continue
-        if "x_scale" in track and track["x_scale"] is not None:
-            continue
-        curves = [element for element in track["elements"] if element.get("kind") == "curve"]
-        if len(curves) == 1:
-            track["x_scale"] = deepcopy(curves[0].get("scale"))
-        elif len(curves) > 1:
-            track["x_scale"] = None
+    for section_tracks in tracks_by_section.values():
+        for track in section_tracks:
+            track_kind = _normalized_track_kind(str(track.get("kind", "normal")))
+            if track_kind not in {"reference", "normal", "array"}:
+                continue
+            if "x_scale" in track and track["x_scale"] is not None:
+                continue
+            curves = [element for element in track["elements"] if element.get("kind") == "curve"]
+            if len(curves) == 1:
+                track["x_scale"] = deepcopy(curves[0].get("scale"))
+            elif len(curves) > 1:
+                track["x_scale"] = None
 
-    return tracks
+    return tracks_by_section
 
 
 def _apply_layout_section_placeholders(document: dict[str, Any]) -> None:
@@ -653,12 +742,42 @@ def _apply_layout_section_placeholders(document: dict[str, Any]) -> None:
         document["footer"] = footer
 
     metadata = dict(_ensure_mapping(document.get("metadata", {}), context="document.metadata"))
+    log_sections = _ensure_sequence(
+        layout.get("log_sections", []), context="document.layout.log_sections"
+    )
+    active_section: dict[str, Any] = {}
+    if log_sections:
+        first = _ensure_mapping(log_sections[0], context="document.layout.log_sections[0]")
+        active_section = {
+            "id": str(first.get("id", "")),
+            "title": str(first.get("title", "")),
+            "subtitle": str(first.get("subtitle", "")),
+        }
     metadata["layout_sections"] = {
         "heading": deepcopy(layout.get("heading", {})),
         "comments": deepcopy(layout.get("comments", [])),
-        "log_sections": deepcopy(layout.get("log_sections", [])),
+        "log_sections": deepcopy(log_sections),
         "tail": deepcopy(layout.get("tail", {})),
+        "active_section": active_section,
     }
+    document["metadata"] = metadata
+
+
+def _set_active_layout_section(document: dict[str, Any], section: dict[str, Any]) -> None:
+    metadata = dict(_ensure_mapping(document.get("metadata", {}), context="document.metadata"))
+    layout_sections_data = metadata.get("layout_sections", {})
+    layout_sections = dict(
+        _ensure_mapping(
+            layout_sections_data,
+            context="document.metadata.layout_sections",
+        )
+    )
+    layout_sections["active_section"] = {
+        "id": str(section.get("id", "")),
+        "title": str(section.get("title", "")),
+        "subtitle": str(section.get("subtitle", "")),
+    }
+    metadata["layout_sections"] = layout_sections
     document["metadata"] = metadata
 
 
@@ -708,17 +827,38 @@ def _apply_reference_layout_overrides(document: dict[str, Any]) -> None:
         break
 
 
+def build_documents_for_logfile(
+    spec: LogFileSpec,
+    dataset: WellDataset,
+    *,
+    source_path: Path,
+) -> tuple[LogDocument, ...]:
+    base_document = deepcopy(spec.document)
+    if "name" not in base_document:
+        base_document["name"] = spec.name
+    _apply_layout_section_placeholders(base_document)
+    _resolve_text_tokens(base_document, dataset, source_path)
+
+    layout = _ensure_mapping(base_document["layout"], context="document.layout")
+    sections = _layout_sections(layout, context="document.layout.log_sections")
+    tracks_by_section = _build_tracks_from_layout_bindings(dataset, base_document)
+
+    documents: list[LogDocument] = []
+    for section in sections:
+        section_id = str(section["id"])
+        section_document = deepcopy(base_document)
+        section_document["tracks"] = deepcopy(tracks_by_section[section_id])
+        _set_active_layout_section(section_document, section)
+        _apply_reference_layout_overrides(section_document)
+        documents.append(document_from_mapping(section_document))
+    return tuple(documents)
+
+
 def build_document_for_logfile(
     spec: LogFileSpec,
     dataset: WellDataset,
     *,
     source_path: Path,
 ) -> LogDocument:
-    document = deepcopy(spec.document)
-    if "name" not in document:
-        document["name"] = spec.name
-    _apply_layout_section_placeholders(document)
-    _resolve_text_tokens(document, dataset, source_path)
-    document["tracks"] = _build_tracks_from_layout_bindings(dataset, document)
-    _apply_reference_layout_overrides(document)
-    return document_from_mapping(document)
+    documents = build_documents_for_logfile(spec, dataset, source_path=source_path)
+    return documents[0]

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .errors import TemplateValidationError
-from .logfile import build_document_for_logfile, load_dataset_for_logfile, load_logfile
+from .logfile import build_documents_for_logfile, load_dataset_for_logfile, load_logfile
 from .renderers import MatplotlibRenderer, PlotlyRenderer
 from .renderers.base import RenderResult
 
@@ -27,7 +27,7 @@ def render_from_logfile(
     resolved_logfile = Path(logfile_path).resolve()
     spec = load_logfile(resolved_logfile)
     dataset, source_path = load_dataset_for_logfile(spec, base_dir=resolved_logfile.parent)
-    document = build_document_for_logfile(spec, dataset, source_path=source_path)
+    documents = build_documents_for_logfile(spec, dataset, source_path=source_path)
     resolved_output = _resolve_output_path(resolved_logfile, spec.render_output_path, output_path)
 
     if spec.render_backend == "matplotlib":
@@ -40,11 +40,17 @@ def render_from_logfile(
         if matplotlib_style is not None:
             renderer_kwargs["style"] = matplotlib_style
         renderer = MatplotlibRenderer(**renderer_kwargs)
+        return renderer.render_documents(documents, dataset, output_path=resolved_output)
     elif spec.render_backend == "plotly":
+        if len(documents) > 1:
+            raise TemplateValidationError(
+                "Plotly backend currently supports a single log section. "
+                "Use matplotlib for multisection rendering."
+            )
         renderer = PlotlyRenderer()
+        return renderer.render(documents[0], dataset, output_path=resolved_output)
     else:
         raise TemplateValidationError(
             f"Unsupported render backend {spec.render_backend!r}. "
             "Supported backends: matplotlib, plotly."
         )
-    return renderer.render(document, dataset, output_path=resolved_output)

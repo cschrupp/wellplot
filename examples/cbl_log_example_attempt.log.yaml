@@ -17,6 +17,7 @@ document:
     log_sections:
       - id: main
         title: Main Log
+        subtitle: CBL Service
         tracks:
           - id: combo_gr_tt
             title: GR_STGC / TT

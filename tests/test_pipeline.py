@@ -12,14 +12,14 @@ from well_log_os.renderers.base import RenderResult
 
 class PipelineTests(unittest.TestCase):
     @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_document_for_logfile")
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
     @patch("well_log_os.pipeline.load_dataset_for_logfile")
     @patch("well_log_os.pipeline.load_logfile")
     def test_render_from_logfile_uses_master_matplotlib_loader(
         self,
         mock_load_logfile,
         mock_load_dataset,
-        mock_build_document,
+        mock_build_documents,
         mock_renderer_class,
     ) -> None:
         spec = LogFileSpec(
@@ -35,9 +35,9 @@ class PipelineTests(unittest.TestCase):
         document = Mock(name="document")
         mock_load_logfile.return_value = spec
         mock_load_dataset.return_value = (dataset, Path("/tmp/input.las"))
-        mock_build_document.return_value = document
+        mock_build_documents.return_value = (document,)
         renderer = mock_renderer_class.return_value
-        renderer.render.return_value = RenderResult(
+        renderer.render_documents.return_value = RenderResult(
             backend="matplotlib",
             page_count=1,
             output_path=Path("/tmp/result.pdf"),
@@ -46,19 +46,19 @@ class PipelineTests(unittest.TestCase):
         result = render_from_logfile("/tmp/config.log.yaml")
         self.assertEqual(result.backend, "matplotlib")
         mock_renderer_class.assert_called_once_with(dpi=320)
-        renderer.render.assert_called_once()
-        called_output = renderer.render.call_args.kwargs["output_path"]
+        renderer.render_documents.assert_called_once()
+        called_output = renderer.render_documents.call_args.kwargs["output_path"]
         self.assertEqual(called_output, Path("/tmp/result.pdf"))
 
     @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_document_for_logfile")
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
     @patch("well_log_os.pipeline.load_dataset_for_logfile")
     @patch("well_log_os.pipeline.load_logfile")
     def test_render_from_logfile_passes_continuous_strip_page_height(
         self,
         mock_load_logfile,
         mock_load_dataset,
-        mock_build_document,
+        mock_build_documents,
         mock_renderer_class,
     ) -> None:
         spec = LogFileSpec(
@@ -75,9 +75,9 @@ class PipelineTests(unittest.TestCase):
         document = Mock(name="document")
         mock_load_logfile.return_value = spec
         mock_load_dataset.return_value = (dataset, Path("/tmp/input.las"))
-        mock_build_document.return_value = document
+        mock_build_documents.return_value = (document,)
         renderer = mock_renderer_class.return_value
-        renderer.render.return_value = RenderResult(
+        renderer.render_documents.return_value = RenderResult(
             backend="matplotlib",
             page_count=1,
             output_path=Path("/tmp/result.pdf"),
@@ -90,14 +90,14 @@ class PipelineTests(unittest.TestCase):
         )
 
     @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_document_for_logfile")
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
     @patch("well_log_os.pipeline.load_dataset_for_logfile")
     @patch("well_log_os.pipeline.load_logfile")
     def test_render_from_logfile_passes_matplotlib_style(
         self,
         mock_load_logfile,
         mock_load_dataset,
-        mock_build_document,
+        mock_build_documents,
         mock_renderer_class,
     ) -> None:
         spec = LogFileSpec(
@@ -114,9 +114,9 @@ class PipelineTests(unittest.TestCase):
         document = Mock(name="document")
         mock_load_logfile.return_value = spec
         mock_load_dataset.return_value = (dataset, Path("/tmp/input.las"))
-        mock_build_document.return_value = document
+        mock_build_documents.return_value = (document,)
         renderer = mock_renderer_class.return_value
-        renderer.render.return_value = RenderResult(
+        renderer.render_documents.return_value = RenderResult(
             backend="matplotlib",
             page_count=1,
             output_path=Path("/tmp/result.pdf"),
@@ -128,14 +128,14 @@ class PipelineTests(unittest.TestCase):
             style={"track": {"x_tick_labelsize": 7.2}},
         )
 
-    @patch("well_log_os.pipeline.build_document_for_logfile")
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
     @patch("well_log_os.pipeline.load_dataset_for_logfile")
     @patch("well_log_os.pipeline.load_logfile")
     def test_render_from_logfile_rejects_unknown_backend(
         self,
         mock_load_logfile,
         mock_load_dataset,
-        mock_build_document,
+        mock_build_documents,
     ) -> None:
         spec = LogFileSpec(
             name="test",
@@ -148,7 +148,70 @@ class PipelineTests(unittest.TestCase):
         )
         mock_load_logfile.return_value = spec
         mock_load_dataset.return_value = (Mock(name="dataset"), Path("/tmp/input.las"))
-        mock_build_document.return_value = Mock(name="document")
+        mock_build_documents.return_value = (Mock(name="document"),)
+
+        with self.assertRaises(TemplateValidationError):
+            render_from_logfile("/tmp/config.log.yaml")
+
+    @patch("well_log_os.pipeline.MatplotlibRenderer")
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
+    @patch("well_log_os.pipeline.load_dataset_for_logfile")
+    @patch("well_log_os.pipeline.load_logfile")
+    def test_render_from_logfile_renders_all_sections_with_matplotlib(
+        self,
+        mock_load_logfile,
+        mock_load_dataset,
+        mock_build_documents,
+        mock_renderer_class,
+    ) -> None:
+        spec = LogFileSpec(
+            name="test",
+            data_source_path="input.las",
+            data_source_format="las",
+            render_backend="matplotlib",
+            render_output_path="result.pdf",
+            render_dpi=300,
+            document={"name": "test"},
+        )
+        dataset = Mock(name="dataset")
+        doc_main = Mock(name="doc_main")
+        doc_aux = Mock(name="doc_aux")
+        mock_load_logfile.return_value = spec
+        mock_load_dataset.return_value = (dataset, Path("/tmp/input.las"))
+        mock_build_documents.return_value = (doc_main, doc_aux)
+        renderer = mock_renderer_class.return_value
+        renderer.render_documents.return_value = RenderResult(
+            backend="matplotlib",
+            page_count=3,
+            output_path=Path("/tmp/result.pdf"),
+        )
+
+        render_from_logfile("/tmp/config.log.yaml")
+        renderer.render_documents.assert_called_once()
+        called_documents = renderer.render_documents.call_args.args[0]
+        self.assertEqual(called_documents, (doc_main, doc_aux))
+
+    @patch("well_log_os.pipeline.build_documents_for_logfile")
+    @patch("well_log_os.pipeline.load_dataset_for_logfile")
+    @patch("well_log_os.pipeline.load_logfile")
+    def test_render_from_logfile_rejects_multisection_plotly(
+        self,
+        mock_load_logfile,
+        mock_load_dataset,
+        mock_build_documents,
+    ) -> None:
+        spec = LogFileSpec(
+            name="test",
+            data_source_path="input.las",
+            data_source_format="las",
+            render_backend="plotly",
+            render_output_path="result.html",
+            render_dpi=200,
+            document={"name": "test"},
+        )
+        mock_load_logfile.return_value = spec
+        mock_load_dataset.return_value = (Mock(name="dataset"), Path("/tmp/input.las"))
+        mock_build_documents.return_value = (Mock(name="document_1"), Mock(name="document_2"))
 
         with self.assertRaises(TemplateValidationError):
             render_from_logfile("/tmp/config.log.yaml")

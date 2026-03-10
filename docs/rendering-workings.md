@@ -30,7 +30,7 @@ Flow:
 1. Load and merge template + savefile (`load_logfile`).
 2. Validate against JSON schema (`logfile_schema.py`).
 3. Load source data (`.las` / `.dlis`) into `WellDataset`.
-4. Build `LogDocument` from `document.layout` + `document.bindings`.
+4. Build one `LogDocument` per `document.layout.log_sections[*]` from `document.layout` + `document.bindings`.
 5. Build renderer with backend options:
    - `dpi`
    - `continuous_strip_page_height_mm`
@@ -41,6 +41,10 @@ Track assembly is track-first:
 
 - `document.layout.log_sections[*].tracks` defines the physical layout.
 - `document.bindings.channels` assigns dataset channels into those tracks.
+- Multi-section binding routing:
+  - if `binding.section` is set, binding is applied to that section only
+  - if `binding.section` is omitted, `track_id` must be unique across sections
+  - ambiguous `track_id` across sections requires explicit `binding.section`
 
 In layout/bindings mode, section placeholders are available:
 
@@ -49,7 +53,7 @@ In layout/bindings mode, section placeholders are available:
 - `document.layout.log_sections`
 - `document.layout.tail`
 
-Current renderer uses the first entry in `log_sections`; the full multi-section report composer is planned.
+Each section is rendered in sequence into the same output artifact (matplotlib backend).
 
 ## 3) Matplotlib Style Sections
 
@@ -57,6 +61,7 @@ Current renderer uses the first entry in `log_sections`; the full multi-section 
 
 - `header`
 - `footer`
+- `section_title`
 - `track_header`
 - `track`
 - `grid`
@@ -164,3 +169,7 @@ Track-header legend space auto-fits to curve count:
 - track-header title alignment is configurable with `render.matplotlib.style.track_header.title_align` and `title_x`.
 - optional `track_header.divisions` object renders header tick values in its own reserved line.
 - top x-axis labels are hidden in the plot area so scale/division text stays inside header slots.
+- each `layout.log_sections[*]` may define:
+  - `title` (required to render the section banner)
+  - `subtitle` (optional)
+- section banners are drawn as full-width boxed titles across the track span.

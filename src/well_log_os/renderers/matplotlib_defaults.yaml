@@ -17,6 +17,18 @@ footer:
   page_x: 0.95
   page_y: 0.02
   page_fontsize: 6.0
+section_title:
+  enabled: true
+  height_mm: 6.0
+  background_color: "#efefef"
+  border_color: "#222222"
+  border_linewidth: 0.8
+  title_fontsize: 10.5
+  subtitle_fontsize: 7.2
+  title_color: "#111111"
+  subtitle_color: "#222222"
+  title_y: 0.66
+  subtitle_y: 0.27
 track_header:
   background_color: "#e8e8e8"
   separator_color: "#9a9a9a"

@@ -18,6 +18,8 @@ document:
   layout:
     log_sections:
       - id: main
+        title: Main Log
+        subtitle: CBL Main Configuration
         tracks:
           - id: depth
             title: Depth

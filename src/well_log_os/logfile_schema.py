@@ -181,6 +181,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "id": {"type": "string", "minLength": 1},
                 "title": {"type": "string"},
+                "subtitle": {"type": "string"},
                 "tracks": {
                     "type": "array",
                     "minItems": 1,
@@ -266,10 +267,28 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "header": {"$ref": "#/$defs/matplotlibStyleHeader"},
                 "footer": {"$ref": "#/$defs/matplotlibStyleFooter"},
+                "section_title": {"$ref": "#/$defs/matplotlibStyleSectionTitle"},
                 "track_header": {"$ref": "#/$defs/matplotlibStyleTrackHeader"},
                 "track": {"$ref": "#/$defs/matplotlibStyleTrack"},
                 "grid": {"$ref": "#/$defs/matplotlibStyleGrid"},
                 "markers": {"$ref": "#/$defs/matplotlibStyleMarkers"},
+            },
+        },
+        "matplotlibStyleSectionTitle": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "height_mm": {"type": "number", "minimum": 0},
+                "background_color": {"type": "string", "minLength": 1},
+                "border_color": {"type": "string", "minLength": 1},
+                "border_linewidth": {"type": "number", "exclusiveMinimum": 0},
+                "title_fontsize": {"type": "number", "exclusiveMinimum": 0},
+                "subtitle_fontsize": {"type": "number", "exclusiveMinimum": 0},
+                "title_color": {"type": "string", "minLength": 1},
+                "subtitle_color": {"type": "string", "minLength": 1},
+                "title_y": {"type": "number", "minimum": 0, "maximum": 1},
+                "subtitle_y": {"type": "number", "minimum": 0, "maximum": 1},
             },
         },
         "matplotlibStyleHeader": {

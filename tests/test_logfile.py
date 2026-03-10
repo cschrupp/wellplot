@@ -8,7 +8,12 @@ import numpy as np
 import yaml
 
 from well_log_os.errors import TemplateValidationError
-from well_log_os.logfile import build_document_for_logfile, load_logfile, logfile_from_mapping
+from well_log_os.logfile import (
+    build_document_for_logfile,
+    build_documents_for_logfile,
+    load_logfile,
+    logfile_from_mapping,
+)
 from well_log_os.model import ScalarChannel, WellDataset
 
 
@@ -36,6 +41,8 @@ def build_mapping() -> dict:
                 "log_sections": [
                     {
                         "id": "main",
+                        "title": "Main Log Section",
+                        "subtitle": "Service Interval",
                         "tracks": [
                             {
                                 "id": "gr",
@@ -123,6 +130,102 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(document.tracks[0].elements[0].channel, "GR")
         self.assertEqual(document.tracks[2].elements[0].channel, "RT")
         self.assertIn("layout_sections", document.metadata)
+        active_section = document.metadata["layout_sections"]["active_section"]
+        self.assertEqual(active_section["title"], "Main Log Section")
+        self.assertEqual(active_section["subtitle"], "Service Interval")
+
+    def test_logfile_builds_multisection_documents(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"] = [
+            {
+                "id": "main",
+                "title": "Main Section",
+                "tracks": [
+                    {
+                        "id": "depth_main",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "position": 1,
+                        "reference": {"define_layout": True, "unit": "m", "scale_ratio": 200},
+                    },
+                    {
+                        "id": "gr_main",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 28,
+                        "position": 2,
+                    },
+                ],
+            },
+            {
+                "id": "aux",
+                "title": "Aux Section",
+                "tracks": [
+                    {
+                        "id": "depth_aux",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "position": 1,
+                        "reference": {"define_layout": True, "unit": "m", "scale_ratio": 200},
+                    },
+                    {
+                        "id": "rt_aux",
+                        "title": "RT",
+                        "kind": "normal",
+                        "width_mm": 28,
+                        "position": 2,
+                    },
+                ],
+            },
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {"channel": "GR", "track_id": "gr_main", "kind": "curve"},
+            {"channel": "RT", "track_id": "rt_aux", "kind": "curve"},
+        ]
+        spec = logfile_from_mapping(payload)
+        documents = build_documents_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        self.assertEqual(len(documents), 2)
+        self.assertEqual(documents[0].metadata["layout_sections"]["active_section"]["id"], "main")
+        self.assertEqual(documents[1].metadata["layout_sections"]["active_section"]["id"], "aux")
+        self.assertEqual([track.id for track in documents[0].tracks], ["depth_main", "gr_main"])
+        self.assertEqual([track.id for track in documents[1].tracks], ["depth_aux", "rt_aux"])
+        self.assertEqual(documents[0].tracks[1].elements[0].channel, "GR")
+        self.assertEqual(documents[1].tracks[1].elements[0].channel, "RT")
+
+    def test_logfile_requires_section_for_ambiguous_track_id_bindings(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"] = [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "reference", "width_mm": 16},
+                    {"id": "curve", "title": "Curve", "kind": "normal", "width_mm": 28},
+                ],
+            },
+            {
+                "id": "aux",
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "reference", "width_mm": 16},
+                    {"id": "curve", "title": "Curve", "kind": "normal", "width_mm": 28},
+                ],
+            },
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {"channel": "GR", "track_id": "curve", "kind": "curve"},
+        ]
+        spec = logfile_from_mapping(payload)
+        with self.assertRaises(TemplateValidationError):
+            build_documents_for_logfile(
+                spec,
+                self.build_dataset(),
+                source_path=Path("example_input.las"),
+            )
 
     def test_invalid_logfile_configuration_raises(self) -> None:
         payload = build_mapping()

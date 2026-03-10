@@ -51,6 +51,7 @@ document:
     log_sections:
       - id: main
         title: Main
+        subtitle: ""
         tracks:
           - id: depth
             title: Depth

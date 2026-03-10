@@ -42,7 +42,7 @@ Decision history is tracked in `docs/decision-log.md`.
 
 Needed next to complete the intended workflow:
 
-- Render all `layout.log_sections` sequentially (currently only the first section is rendered).
+- Render all `layout.log_sections` sequentially in one output artifact (implemented for matplotlib).
 - Add real renderer primitives for `heading`, `comments`, and `tail` sections.
 - Allow per-section depth windows and per-section page/layout settings.
 - Add section-aware bindings (`binding.section`) in rendering, not only schema/validation.
@@ -130,9 +130,9 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Implement multi-section composition engine:
-  - render all `log_sections` in configured order
-  - support section breaks for continuous and paginated outputs
+- Extend multi-section composition engine:
+  - render heading/comments/tail blocks between log sections
+  - add section-specific break policies for continuous and paginated outputs
 - Implement section object rendering:
   - heading blocks
   - comment/notes blocks

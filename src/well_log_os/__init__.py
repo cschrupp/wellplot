@@ -2,6 +2,7 @@ from .layout import LayoutEngine
 from .logfile import (
     LogFileSpec,
     build_document_for_logfile,
+    build_documents_for_logfile,
     load_dataset_for_logfile,
     load_logfile,
     logfile_from_mapping,
@@ -64,6 +65,7 @@ __all__ = [
     "WellDataset",
     "ZoneSpec",
     "build_document_for_logfile",
+    "build_documents_for_logfile",
     "load_dataset_for_logfile",
     "load_logfile",
     "logfile_from_mapping",

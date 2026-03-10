@@ -242,6 +242,7 @@ class MatplotlibRenderer(Renderer):
         if base_height <= 0:
             return document
 
+        section_title_height = self._section_title_height_mm(document)
         required_height = float(base_height)
         for track in document.tracks:
             reserved = track.header.reserved_objects()
@@ -258,6 +259,9 @@ class MatplotlibRenderer(Renderer):
                 base_height * (effective_units / configured_units),
             )
 
+        if section_title_height > 0:
+            required_height += section_title_height
+
         if required_height <= base_height + 1e-9:
             return document
         return replace(
@@ -265,13 +269,121 @@ class MatplotlibRenderer(Renderer):
             page=replace(document.page, track_header_height_mm=required_height),
         )
 
+    def _active_section_title(self, document: LogDocument) -> tuple[str, str]:
+        metadata = document.metadata
+        if not isinstance(metadata, dict):
+            return "", ""
+        sections_data = metadata.get("layout_sections")
+        if not isinstance(sections_data, dict):
+            return "", ""
+
+        active = sections_data.get("active_section")
+        if isinstance(active, dict):
+            title = str(active.get("title", "")).strip()
+            subtitle = str(active.get("subtitle", "")).strip()
+            return title, subtitle
+
+        sections = sections_data.get("log_sections")
+        if isinstance(sections, list) and sections:
+            first = sections[0]
+            if isinstance(first, dict):
+                title = str(first.get("title", "")).strip()
+                subtitle = str(first.get("subtitle", "")).strip()
+                return title, subtitle
+        return "", ""
+
+    def _section_title_height_mm(self, document: LogDocument) -> float:
+        style = self._style_section("section_title")
+        if not bool(style.get("enabled", True)):
+            return 0.0
+        title, _ = self._active_section_title(document)
+        if not title:
+            return 0.0
+        return max(float(style.get("height_mm", 0.0)), 0.0)
+
+    def _draw_section_title_box(self, fig, document, page_layout) -> float:
+        if page_layout.page_number != 1 or not page_layout.track_header_top_frames:
+            return 0.0
+
+        section_height_mm = self._section_title_height_mm(document)
+        if section_height_mm <= 0:
+            return 0.0
+
+        header_frame = page_layout.track_header_top_frames[0].frame
+        section_height_mm = min(section_height_mm, max(header_frame.height_mm - 0.2, 0.0))
+        if section_height_mm <= 0:
+            return 0.0
+
+        section_style = self._style_section("section_title")
+        left_mm = min(frame.frame.x_mm for frame in page_layout.track_header_top_frames)
+        right_mm = max(
+            frame.frame.x_mm + frame.frame.width_mm for frame in page_layout.track_header_top_frames
+        )
+        width_mm = max(right_mm - left_mm, 0.0)
+        if width_mm <= 0:
+            return 0.0
+
+        box_frame = replace(
+            header_frame,
+            x_mm=left_mm,
+            width_mm=width_mm,
+            height_mm=section_height_mm,
+        )
+        ax = fig.add_axes(self._normalize_frame(page_layout.page, box_frame))
+        ax.set_facecolor(str(section_style["background_color"]))
+        ax.set_xticks([])
+        ax.set_yticks([])
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color(str(section_style["border_color"]))
+            spine.set_linewidth(float(section_style["border_linewidth"]))
+
+        title, subtitle = self._active_section_title(document)
+        ax.text(
+            0.5,
+            float(section_style["title_y"]),
+            title,
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=float(section_style["title_fontsize"]),
+            fontweight="bold",
+            color=str(section_style["title_color"]),
+            clip_on=True,
+        )
+        if subtitle:
+            ax.text(
+                0.5,
+                float(section_style["subtitle_y"]),
+                subtitle,
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=float(section_style["subtitle_fontsize"]),
+                color=str(section_style["subtitle_color"]),
+                clip_on=True,
+            )
+        return section_height_mm
+
     def _build_continuous_strip_document(self, document: LogDocument) -> LogDocument:
         if self.continuous_strip_page_height_mm is None:
             return document
+        return self._build_continuous_strip_document_with_height(
+            document,
+            self.continuous_strip_page_height_mm,
+        )
+
+    def _build_continuous_strip_document_with_height(
+        self,
+        document: LogDocument,
+        page_height_mm: float,
+    ) -> LogDocument:
+        if page_height_mm <= 0:
+            raise ValueError("Continuous strip page height must be positive.")
         strip_page = replace(
             document.page,
             continuous=False,
-            height_mm=self.continuous_strip_page_height_mm,
+            height_mm=page_height_mm,
             margin_top_mm=0.0,
             margin_bottom_mm=0.0,
             header_height_mm=0.0,
@@ -287,6 +399,27 @@ class MatplotlibRenderer(Renderer):
     def render(
         self,
         document: LogDocument,
+        dataset: WellDataset,
+        *,
+        output_path: str | Path | None = None,
+    ) -> RenderResult:
+        return self.render_documents((document,), dataset, output_path=output_path)
+
+    def render_documents(
+        self,
+        documents: tuple[LogDocument, ...] | list[LogDocument],
+        dataset: WellDataset,
+        *,
+        output_path: str | Path | None = None,
+    ) -> RenderResult:
+        normalized_documents = tuple(documents)
+        if not normalized_documents:
+            raise ValueError("render_documents requires at least one document.")
+        return self._render_documents(normalized_documents, dataset, output_path=output_path)
+
+    def _render_documents(
+        self,
+        documents: tuple[LogDocument, ...],
         dataset: WellDataset,
         *,
         output_path: str | Path | None = None,
@@ -309,23 +442,8 @@ class MatplotlibRenderer(Renderer):
                 "Matplotlib is required for static rendering. Install well-log-os[pdf]."
             ) from exc
 
-        render_document = document
-        draw_header = True
-        draw_track_header = True
-        draw_footer = True
-        if (
-            output is not None
-            and output.suffix.lower() == ".pdf"
-            and document.page.continuous
-            and self.continuous_strip_page_height_mm is not None
-        ):
-            render_document = self._build_continuous_strip_document(document)
-            draw_header = False
-            draw_footer = False
-
-        render_document = self._auto_adjust_track_header_height(render_document)
-        layouts = self.layout_engine.layout(render_document, dataset)
         figures = []
+        total_pages = 0
 
         # Keep PDF output crisp in standard viewers:
         # - Embed TrueType fonts instead of Type3 glyphs.
@@ -343,54 +461,105 @@ class MatplotlibRenderer(Renderer):
             if output is not None and output.suffix.lower() == ".pdf":
                 pdf = PdfPages(output)
             try:
-                for page_layout in layouts:
-                    fig = plt.figure(
-                        figsize=(
-                            page_layout.page.width_mm / 25.4,
-                            page_layout.page.height_mm / 25.4,
-                        ),
-                        dpi=self.dpi,
+                for source_document in documents:
+                    render_document = source_document
+                    draw_header = True
+                    draw_track_header = True
+                    draw_footer = True
+                    auto_multisection_strip = (
+                        output is not None
+                        and output.suffix.lower() == ".pdf"
+                        and len(documents) > 1
+                        and source_document.page.continuous
+                        and self.continuous_strip_page_height_mm is None
                     )
-                    if draw_header:
-                        self._draw_header(fig, render_document, dataset, page_layout)
-                    if draw_footer:
-                        self._draw_footer(fig, render_document, page_layout)
-                    if draw_track_header:
-                        for track_header in page_layout.track_header_top_frames:
-                            if (
-                                track_header.frame.width_mm <= 0
-                                or track_header.frame.height_mm <= 0
-                            ):
-                                continue
-                            frame = self._normalize_frame(page_layout.page, track_header.frame)
-                            ax = fig.add_axes(frame)
-                            self._draw_track_header(
-                                ax, track_header.track, render_document, dataset
-                            )
-                        for track_header in page_layout.track_header_bottom_frames:
-                            if (
-                                track_header.frame.width_mm <= 0
-                                or track_header.frame.height_mm <= 0
-                            ):
-                                continue
-                            frame = self._normalize_frame(page_layout.page, track_header.frame)
-                            ax = fig.add_axes(frame)
-                            self._draw_track_header(
-                                ax, track_header.track, render_document, dataset
-                            )
-                    for track_frame in page_layout.track_frames:
-                        if track_frame.frame.width_mm <= 0 or track_frame.frame.height_mm <= 0:
-                            continue
-                        frame = self._normalize_frame(page_layout.page, track_frame.frame)
-                        ax = fig.add_axes(frame)
-                        self._draw_track(
-                            ax, track_frame.track, render_document, dataset, page_layout
+                    if (
+                        output is not None
+                        and output.suffix.lower() == ".pdf"
+                        and source_document.page.continuous
+                        and (
+                            self.continuous_strip_page_height_mm is not None
+                            or auto_multisection_strip
                         )
-                    if pdf is not None:
-                        pdf.savefig(fig, dpi=self.dpi)
-                        plt.close(fig)
-                    else:
-                        figures.append(fig)
+                    ):
+                        strip_height_mm = (
+                            float(self.continuous_strip_page_height_mm)
+                            if self.continuous_strip_page_height_mm is not None
+                            else float(source_document.page.height_mm)
+                        )
+                        render_document = self._build_continuous_strip_document_with_height(
+                            source_document,
+                            strip_height_mm,
+                        )
+                        draw_header = False
+                        draw_footer = False
+
+                    render_document = self._auto_adjust_track_header_height(render_document)
+                    layouts = self.layout_engine.layout(render_document, dataset)
+
+                    for local_page_number, page_layout in enumerate(layouts, start=1):
+                        global_page_number = total_pages + local_page_number
+                        fig = plt.figure(
+                            figsize=(
+                                page_layout.page.width_mm / 25.4,
+                                page_layout.page.height_mm / 25.4,
+                            ),
+                            dpi=self.dpi,
+                        )
+                        if draw_header:
+                            self._draw_header(fig, render_document, dataset, page_layout)
+                        if draw_footer:
+                            self._draw_footer(
+                                fig,
+                                render_document,
+                                page_layout,
+                                page_number=global_page_number,
+                            )
+                        if draw_track_header:
+                            top_section_title_height_mm = self._draw_section_title_box(
+                                fig, render_document, page_layout
+                            )
+                            for track_header in page_layout.track_header_top_frames:
+                                header_frame = track_header.frame
+                                if top_section_title_height_mm > 0:
+                                    header_frame = replace(
+                                        header_frame,
+                                        y_mm=header_frame.y_mm + top_section_title_height_mm,
+                                        height_mm=(
+                                            header_frame.height_mm - top_section_title_height_mm
+                                        ),
+                                    )
+                                if header_frame.width_mm <= 0 or header_frame.height_mm <= 0:
+                                    continue
+                                frame = self._normalize_frame(page_layout.page, header_frame)
+                                ax = fig.add_axes(frame)
+                                self._draw_track_header(
+                                    ax, track_header.track, render_document, dataset
+                                )
+                            for track_header in page_layout.track_header_bottom_frames:
+                                header_frame = track_header.frame
+                                if header_frame.width_mm <= 0 or header_frame.height_mm <= 0:
+                                    continue
+                                frame = self._normalize_frame(page_layout.page, header_frame)
+                                ax = fig.add_axes(frame)
+                                self._draw_track_header(
+                                    ax, track_header.track, render_document, dataset
+                                )
+                        for track_frame in page_layout.track_frames:
+                            if track_frame.frame.width_mm <= 0 or track_frame.frame.height_mm <= 0:
+                                continue
+                            frame = self._normalize_frame(page_layout.page, track_frame.frame)
+                            ax = fig.add_axes(frame)
+                            self._draw_track(
+                                ax, track_frame.track, render_document, dataset, page_layout
+                            )
+                        if pdf is not None:
+                            pdf.savefig(fig, dpi=self.dpi)
+                            plt.close(fig)
+                        else:
+                            figures.append(fig)
+
+                    total_pages += len(layouts)
             finally:
                 if pdf is not None:
                     pdf.close()
@@ -398,7 +567,7 @@ class MatplotlibRenderer(Renderer):
         artifact = str(output) if output is not None else figures
         return RenderResult(
             backend="matplotlib",
-            page_count=len(layouts),
+            page_count=total_pages,
             artifact=artifact,
             output_path=output,
         )
@@ -447,7 +616,7 @@ class MatplotlibRenderer(Renderer):
                 fontsize=float(header_style["field_fontsize"]),
             )
 
-    def _draw_footer(self, fig, document, page_layout) -> None:
+    def _draw_footer(self, fig, document, page_layout, *, page_number: int | None = None) -> None:
         footer_style = self._style_section("footer")
         if not document.footer.lines:
             return
@@ -460,10 +629,11 @@ class MatplotlibRenderer(Renderer):
                 va="bottom",
                 fontsize=float(footer_style["line_fontsize"]),
             )
+        resolved_page_number = page_layout.page_number if page_number is None else page_number
         fig.text(
             float(footer_style["page_x"]),
             float(footer_style["page_y"]),
-            f"Page {page_layout.page_number}",
+            f"Page {resolved_page_number}",
             ha="right",
             va="bottom",
             fontsize=float(footer_style["page_fontsize"]),

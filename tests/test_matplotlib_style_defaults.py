@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import numpy as np
 
@@ -39,6 +41,8 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track_header"]["division_tick_count"], 5)
         self.assertEqual(renderer.style["track_header"]["title_align"], "left")
         self.assertEqual(renderer.style["track_header"]["title_x"], 0.03)
+        self.assertTrue(renderer.style["section_title"]["enabled"])
+        self.assertEqual(renderer.style["section_title"]["height_mm"], 6.0)
 
     def test_renderer_style_override_deep_merges(self) -> None:
         renderer = MatplotlibRenderer(
@@ -84,6 +88,36 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         renderer = MatplotlibRenderer()
         adjusted = renderer._auto_adjust_track_header_height(document)
         self.assertAlmostEqual(adjusted.page.track_header_height_mm, 22.0)
+
+    def test_renderer_reserves_section_title_band_in_track_header_height(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "section title",
+                "page": {"size": "A4", "track_header_height_mm": 8.0},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [{"kind": "curve", "channel": "A"}],
+                    }
+                ],
+                "metadata": {
+                    "layout_sections": {
+                        "active_section": {
+                            "id": "main",
+                            "title": "Main Section",
+                            "subtitle": "Optional Subtitle",
+                        }
+                    }
+                },
+            }
+        )
+        renderer = MatplotlibRenderer()
+        adjusted = renderer._auto_adjust_track_header_height(document)
+        self.assertAlmostEqual(adjusted.page.track_header_height_mm, 14.0)
 
     def test_curve_row_bounds_partition_slot(self) -> None:
         renderer = MatplotlibRenderer()
@@ -156,6 +190,33 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(right, "15000")
         self.assertEqual(renderer._curve_header_label(element), "")
         self.assertEqual(renderer._curve_header_color(element), "#111111")
+
+    def test_render_documents_auto_uses_strip_pages_for_multisection_pdf(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "multi",
+                "page": {"size": "A4", "continuous": True},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "depth_range": [1000.0, 1200.0],
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 20,
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        dataset = WellDataset(name="sample")
+
+        with TemporaryDirectory() as tmp_dir:
+            output = Path(tmp_dir) / "multisection.pdf"
+            result = renderer.render_documents((document, document), dataset, output_path=output)
+            self.assertTrue(output.exists())
+            # Without auto-strip this would be one continuous page per section (2 pages total).
+            self.assertGreater(result.page_count, 2)
 
 
 if __name__ == "__main__":
