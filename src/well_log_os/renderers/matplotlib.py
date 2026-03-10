@@ -570,12 +570,16 @@ class MatplotlibRenderer(Renderer):
             min_pt=float(track_header_style["title_min_pt"]),
             max_pt=float(track_header_style["title_max_pt"]),
         )
+        title_align = str(track_header_style.get("title_align", "left")).lower()
+        if title_align not in {"left", "center", "right"}:
+            title_align = "left"
+        title_x = float(track_header_style.get("title_x", track_header_style["text_x"]))
         ax.text(
-            float(track_header_style["text_x"]),
+            title_x,
             0.5 * (slot_top + slot_bottom),
             track.title,
             transform=ax.transAxes,
-            ha="left",
+            ha=title_align,
             va="center",
             fontsize=fontsize,
             fontweight="bold",

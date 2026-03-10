@@ -37,18 +37,26 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track"]["reference_label_x"], 0.5)
         self.assertEqual(renderer.style["track_header"]["paired_scale_text_offset_ratio"], 0.08)
         self.assertEqual(renderer.style["track_header"]["division_tick_count"], 5)
+        self.assertEqual(renderer.style["track_header"]["title_align"], "left")
+        self.assertEqual(renderer.style["track_header"]["title_x"], 0.03)
 
     def test_renderer_style_override_deep_merges(self) -> None:
         renderer = MatplotlibRenderer(
             style={
                 "track": {"frame_color": "#111111"},
-                "track_header": {"separator_linewidth": 0.5},
+                "track_header": {
+                    "separator_linewidth": 0.5,
+                    "title_align": "center",
+                    "title_x": 0.5,
+                },
             }
         )
         self.assertEqual(renderer.style["track"]["frame_color"], "#111111")
         self.assertEqual(renderer.style["track"]["frame_linewidth"], 0.8)
         self.assertEqual(renderer.style["track_header"]["separator_linewidth"], 0.5)
         self.assertEqual(renderer.style["track_header"]["background_color"], "#e8e8e8")
+        self.assertEqual(renderer.style["track_header"]["title_align"], "center")
+        self.assertEqual(renderer.style["track_header"]["title_x"], 0.5)
 
     def test_renderer_auto_adjusts_header_height_for_multicurve_legend(self) -> None:
         document = document_from_mapping(

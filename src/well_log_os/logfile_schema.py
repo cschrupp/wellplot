@@ -221,6 +221,8 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "legend_empty_max_pt": {"type": "number", "exclusiveMinimum": 0},
                 "legend_row_min_pt": {"type": "number", "exclusiveMinimum": 0},
                 "legend_row_max_pt": {"type": "number", "exclusiveMinimum": 0},
+                "title_x": {"type": "number"},
+                "title_align": {"type": "string", "enum": ["left", "center", "right"]},
                 "text_x": {"type": "number"},
                 "legend_line_start": {"type": "number"},
                 "legend_line_end": {"type": "number"},

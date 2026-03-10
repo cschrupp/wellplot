@@ -32,6 +32,8 @@ track_header:
   legend_empty_max_pt: 5.4
   legend_row_min_pt: 3.2
   legend_row_max_pt: 5.2
+  title_x: 0.03
+  title_align: left
   text_x: 0.03
   legend_line_start: 0.04
   legend_line_end: 0.14
