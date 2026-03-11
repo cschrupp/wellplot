@@ -459,6 +459,24 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.render_mode, "value_labels")
         self.assertEqual(curve.value_labels.step, 5.0)
 
+    def test_binding_can_enable_log_wrap(self) -> None:
+        payload = build_mapping()
+        payload["document"]["bindings"]["channels"][1]["scale"] = {
+            "kind": "log",
+            "min": 2,
+            "max": 200,
+        }
+        payload["document"]["bindings"]["channels"][1]["wrap"] = True
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[2].elements[0]
+        self.assertEqual(curve.scale.kind, ScaleKind.LOG)
+        self.assertTrue(curve.wrap)
+
     def test_logfile_parses_track_grid_scale_modes(self) -> None:
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["grid"] = {

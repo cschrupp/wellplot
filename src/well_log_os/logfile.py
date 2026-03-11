@@ -808,6 +808,7 @@ def _build_tracks_from_layout_bindings(
                 "label": str(binding.get("label", channel.mnemonic)),
                 "style": style,
                 "scale": scale,
+                "wrap": bool(binding.get("wrap", False)),
                 "render_mode": str(binding.get("render_mode", "line")),
                 "value_labels": deepcopy(
                     _ensure_mapping(

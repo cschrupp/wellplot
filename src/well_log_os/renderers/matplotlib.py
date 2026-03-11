@@ -1693,7 +1693,30 @@ class MatplotlibRenderer(Renderer):
         transformed = 0.5 + np.tan((unit - 0.5) * spread) / (2.0 * denominator)
         return np.clip(transformed, 0.0, 1.0)
 
-    def _normalize_curve_values(self, values: np.ndarray, scale) -> tuple[np.ndarray, np.ndarray]:
+    def _wrap_log_values(self, values: np.ndarray, scale) -> tuple[np.ndarray, np.ndarray]:
+        wrapped = np.full(values.shape, np.nan, dtype=float)
+        finite_positive = np.isfinite(values) & (values > 0)
+        if not np.any(finite_positive):
+            return wrapped, finite_positive
+
+        lower = min(scale.minimum, scale.maximum)
+        upper = max(scale.minimum, scale.maximum)
+        if lower <= 0 or upper <= 0 or np.isclose(lower, upper):
+            return wrapped, finite_positive & False
+
+        low = float(np.log(lower))
+        high = float(np.log(upper))
+        period = high - low
+        if np.isclose(period, 0.0):
+            return wrapped, finite_positive & False
+
+        wrapped_log = np.mod(np.log(values[finite_positive]) - low, period) + low
+        wrapped[finite_positive] = np.exp(wrapped_log)
+        return wrapped, finite_positive
+
+    def _normalize_curve_values(
+        self, values: np.ndarray, scale, *, wrap_log: bool = False
+    ) -> tuple[np.ndarray, np.ndarray]:
         mask = np.isfinite(values)
         normalized = np.full(values.shape, np.nan, dtype=float)
         if scale is None:
@@ -1714,9 +1737,16 @@ class MatplotlibRenderer(Renderer):
             positive_mask = mask & (values > 0)
             if not np.any(positive_mask):
                 return normalized, mask & False
+            source_values = values[positive_mask]
+            if wrap_log:
+                wrapped_values, wrapped_mask = self._wrap_log_values(values, scale)
+                if not np.any(wrapped_mask):
+                    return normalized, mask & False
+                positive_mask = wrapped_mask
+                source_values = wrapped_values[positive_mask]
             low = np.log(scale.minimum)
             high = np.log(scale.maximum)
-            scaled = (np.log(values[positive_mask]) - low) / (high - low)
+            scaled = (np.log(source_values) - low) / (high - low)
             if scale.reverse:
                 scaled = 1.0 - scaled
             normalized[positive_mask] = np.clip(scaled, 0.0, 1.0)
@@ -1757,7 +1787,11 @@ class MatplotlibRenderer(Renderer):
         scale = element.scale or track.x_scale
 
         if scale is not None and scale.kind == ScaleKind.TANGENTIAL:
-            normalized_values, value_mask = self._normalize_curve_values(values, scale)
+            normalized_values, value_mask = self._normalize_curve_values(
+                values,
+                scale,
+                wrap_log=element.wrap,
+            )
             if element.render_mode == "value_labels":
                 self._draw_curve_value_labels(
                     ax,
@@ -1784,7 +1818,11 @@ class MatplotlibRenderer(Renderer):
             return
 
         if independent_curve_scales:
-            normalized_values, value_mask = self._normalize_curve_values(values, scale)
+            normalized_values, value_mask = self._normalize_curve_values(
+                values,
+                scale,
+                wrap_log=element.wrap,
+            )
             if element.render_mode == "value_labels":
                 self._draw_curve_value_labels(
                     ax,
@@ -1813,12 +1851,36 @@ class MatplotlibRenderer(Renderer):
             xmin = scale.minimum
             xmax = scale.maximum
         if element.render_mode == "value_labels":
-            self._draw_curve_value_labels(ax, depth, values, element, scale, value_mask=None)
+            if scale is not None and scale.kind == ScaleKind.LOG and element.wrap:
+                wrapped_values, wrapped_mask = self._wrap_log_values(values, scale)
+                self._draw_curve_value_labels(
+                    ax,
+                    depth,
+                    wrapped_values,
+                    element,
+                    scale,
+                    text_values=values,
+                    value_mask=wrapped_mask,
+                )
+            else:
+                self._draw_curve_value_labels(
+                    ax,
+                    depth,
+                    values,
+                    element,
+                    scale,
+                    value_mask=None,
+                )
         elif scale is not None and scale.kind == ScaleKind.LOG:
             ax.set_xscale("log")
-            valid = values > 0
+            if element.wrap:
+                wrapped_values, valid = self._wrap_log_values(values, scale)
+                plot_values = wrapped_values
+            else:
+                valid = values > 0
+                plot_values = values
             ax.plot(
-                values[valid],
+                plot_values[valid],
                 depth[valid],
                 color=element.style.color,
                 linewidth=element.style.line_width,

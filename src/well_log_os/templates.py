@@ -514,6 +514,7 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
                     label=element_data.get("label"),
                     style=_build_style(element_data.get("style")),
                     scale=_build_scale(element_data.get("scale")),
+                    wrap=bool(element_data.get("wrap", False)),
                     render_mode=str(element_data.get("render_mode", "line")),
                     value_labels=_build_curve_value_labels(element_data.get("value_labels")),
                     header_display=_build_curve_header_display(element_data.get("header_display")),

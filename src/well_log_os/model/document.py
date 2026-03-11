@@ -270,11 +270,14 @@ class CurveElement:
     label: str | None = None
     style: StyleSpec = field(default_factory=StyleSpec)
     scale: ScaleSpec | None = None
+    wrap: bool = False
     render_mode: str = "line"
     value_labels: CurveValueLabelsSpec = field(default_factory=CurveValueLabelsSpec)
     header_display: CurveHeaderDisplaySpec = field(default_factory=CurveHeaderDisplaySpec)
 
     def __post_init__(self) -> None:
+        if not isinstance(self.wrap, bool):
+            raise ValueError("Curve wrap must be boolean.")
         mode = self.render_mode.strip().lower()
         if mode not in {"line", "value_labels"}:
             raise ValueError("Curve render_mode must be line or value_labels.")

@@ -66,6 +66,12 @@ class PlotlyRenderer(Renderer):
                         )
                     curve_scale = element.scale or track.x_scale
                     x_values = channel.masked_values()
+                    if (
+                        curve_scale is not None
+                        and curve_scale.kind == ScaleKind.LOG
+                        and element.wrap
+                    ):
+                        x_values = self._transform_log_wrap_values(x_values, curve_scale)
                     if curve_scale is not None and curve_scale.kind == ScaleKind.TANGENTIAL:
                         x_values = self._transform_tangential_values(x_values, curve_scale)
                     figure.add_trace(
@@ -147,3 +153,23 @@ class PlotlyRenderer(Renderer):
         unit = (values - scale.minimum) / (scale.maximum - scale.minimum)
         transformed = 0.5 + np.tan((unit - 0.5) * spread) / (2.0 * denominator)
         return np.clip(transformed, 0.0, 1.0)
+
+    def _transform_log_wrap_values(self, values, scale):
+        transformed = np.array(values, dtype=float, copy=True)
+        mask = np.isfinite(transformed) & (transformed > 0)
+        if not np.any(mask):
+            return transformed
+        lower = min(scale.minimum, scale.maximum)
+        upper = max(scale.minimum, scale.maximum)
+        if lower <= 0 or upper <= 0 or np.isclose(lower, upper):
+            transformed[mask] = np.nan
+            return transformed
+        low = float(np.log(lower))
+        high = float(np.log(upper))
+        period = high - low
+        if np.isclose(period, 0.0):
+            transformed[mask] = np.nan
+            return transformed
+        wrapped_log = np.mod(np.log(transformed[mask]) - low, period) + low
+        transformed[mask] = np.exp(wrapped_log)
+        return transformed

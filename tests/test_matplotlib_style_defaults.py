@@ -222,6 +222,18 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertLessEqual(float(np.nanmax(normalized[mask])), 1.0)
         self.assertTrue(np.all(np.diff(normalized[mask]) > 0))
 
+    def test_log_wrap_transforms_values_into_log_interval(self) -> None:
+        renderer = MatplotlibRenderer()
+        scale = ScaleSpec(kind=ScaleKind.LOG, minimum=2.0, maximum=200.0)
+        values = np.array([1.0, 2.0, 20.0, 200.0, 2000.0], dtype=float)
+        wrapped, mask = renderer._wrap_log_values(values, scale)
+        self.assertTrue(np.all(mask))
+        self.assertTrue(np.all(np.isfinite(wrapped[mask])))
+        self.assertGreaterEqual(float(np.nanmin(wrapped[mask])), 2.0)
+        self.assertLessEqual(float(np.nanmax(wrapped[mask])), 200.0)
+        self.assertAlmostEqual(float(wrapped[0]), 100.0, places=4)
+        self.assertAlmostEqual(float(wrapped[4]), 20.0, places=4)
+
     def test_log_grid_scale_mode_auto_uses_cycles_from_scale_bounds(self) -> None:
         document = document_from_mapping(
             {

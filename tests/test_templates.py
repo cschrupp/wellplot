@@ -63,6 +63,35 @@ class TemplateTests(unittest.TestCase):
         self.assertFalse(element.header_display.show_unit)
         self.assertTrue(element.header_display.show_limits)
         self.assertFalse(element.header_display.show_color)
+        self.assertFalse(element.wrap)
+
+    def test_curve_element_can_enable_log_wrap(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "wrapped log curve",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "rt",
+                        "title": "RT",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "RT",
+                                "scale": {"kind": "log", "min": 2, "max": 200},
+                                "wrap": True,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        self.assertTrue(element.wrap)
 
     def test_reference_track_can_define_layout_axis(self) -> None:
         document = document_from_mapping(

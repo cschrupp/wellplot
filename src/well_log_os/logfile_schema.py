@@ -244,6 +244,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "label": {"type": "string"},
                 "style": {"$ref": "#/$defs/stylePatch"},
                 "scale": {"$ref": "#/$defs/trackScale"},
+                "wrap": {"type": "boolean"},
                 "render_mode": {"type": "string", "enum": ["line", "value_labels"]},
                 "value_labels": {"$ref": "#/$defs/curveValueLabels"},
                 "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},

@@ -78,12 +78,13 @@ Implementable now (already in project):
 - Optional header `divisions` object for per-track scale ticks in a dedicated header line.
 - Value-label mode with step, number format, precision, alignment, font.
 - Header typography and frame styling through `render.matplotlib.style`.
+- Baseline log-curve wrap mode (`bindings.channels[*].wrap: true`) for repeat-style display.
 
 Near-term additions (next phases):
 
 - Points/symbol mode (`marker` type, size, optional color-by-variable).
 - Area-fill modes (left/right, baseline/fill rules).
-- Vertical thresholds and repeat/wrap display behavior.
+- Vertical thresholds and advanced repeat/wrap controls (count, offset, style).
 - Per-curve decimation/display optimization policy.
 - Per-curve number formatting for header limits (separate from label mode).
 

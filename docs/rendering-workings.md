@@ -235,3 +235,19 @@ grid:
 
 See [examples/log_scale_options.log.yaml](../examples/log_scale_options.log.yaml) for a
 real-data 4-track comparison (`0-100` linear, `2-200` log, `2-2000` log, and tangential).
+
+Curve-level log wrap is available in bindings with:
+
+```yaml
+document:
+  bindings:
+    channels:
+      - channel: RT
+        track_id: rt_wrap
+        kind: curve
+        scale: { kind: log, min: 2, max: 200 }
+        wrap: true
+```
+
+`wrap: true` folds positive values into the configured log interval and is useful for
+repeat/wrap-style resistivity visualization.

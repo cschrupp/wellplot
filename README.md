@@ -75,6 +75,8 @@ uv run ruff check .
 
 See [examples/triple_combo.yaml](examples/triple_combo.yaml).
 For scale/grid behavior examples, see [examples/log_scale_options.log.yaml](examples/log_scale_options.log.yaml).
+For resistivity-style scales and wrapped log demo, see
+[examples/resistivity_scale_conventions.log.yaml](examples/resistivity_scale_conventions.log.yaml).
 
 ## Template + Savefile Model
 
@@ -103,6 +105,7 @@ Behavior:
   `grid.vertical.main.spacing_mode: scale` and `grid.vertical.secondary.spacing_mode: scale`.
   This adapts cycles and spacing for ranges like `2->200` vs `2->2000`, including non-decade starts.
 - Use `spacing_mode: count` when you want fixed/manual line density independent of curve bounds.
+- Curves support `wrap: true` (log scale) to fold values into the configured log interval.
 - Multiple curves per track are supported by assigning multiple bindings to the same `track_id`.
 - Section placeholders are first-class in YAML:
   - `document.layout.heading`
