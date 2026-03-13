@@ -523,6 +523,7 @@ class LogFileTests(unittest.TestCase):
                 "fill": {
                     "kind": "between_curves",
                     "other_channel": "RT",
+                    "label": "Gas Effect",
                     "color": "#22c55e",
                     "alpha": 0.25,
                     "crossover": {
@@ -550,6 +551,7 @@ class LogFileTests(unittest.TestCase):
         assert curve.fill is not None
         self.assertEqual(curve.fill.kind, CurveFillKind.BETWEEN_CURVES)
         self.assertEqual(curve.fill.other_channel, "RT")
+        self.assertEqual(curve.fill.label, "Gas Effect")
         self.assertEqual(curve.fill.color, "#22c55e")
         self.assertTrue(curve.fill.crossover.enabled)
         self.assertEqual(curve.fill.crossover.left_color, "#22c55e")

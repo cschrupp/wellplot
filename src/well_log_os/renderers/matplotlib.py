@@ -248,8 +248,21 @@ class MatplotlibRenderer(Renderer):
     def _curve_count(self, track) -> int:
         return sum(1 for element in track.elements if isinstance(element, CurveElement))
 
+    def _fill_header_elements(self, track) -> list[CurveElement]:
+        return [
+            element
+            for element in track.elements
+            if isinstance(element, CurveElement) and element.fill is not None
+        ]
+
+    def _fill_header_count(self, track) -> int:
+        return len(self._fill_header_elements(track))
+
     def _document_curve_row_capacity(self, document: LogDocument) -> int:
         return max((self._curve_count(track) for track in document.tracks), default=0)
+
+    def _document_fill_row_capacity(self, document: LogDocument) -> int:
+        return max((self._fill_header_count(track) for track in document.tracks), default=0)
 
     def _header_property_group_capacity(self, document: LogDocument) -> int:
         return max(1, self._document_curve_row_capacity(document))
@@ -260,11 +273,21 @@ class MatplotlibRenderer(Renderer):
             return 0
         return max(count, self._header_property_group_capacity(document))
 
+    def _fill_header_row_count(self, document: LogDocument, track) -> int:
+        capacity = self._document_fill_row_capacity(document)
+        if capacity <= 0:
+            return 0
+        return max(self._fill_header_count(track), capacity)
+
     def _effective_header_line_units(self, track, header_item) -> int:
         if not header_item.enabled or not header_item.reserve_space:
             return header_item.line_units
-        if header_item.kind in {TrackHeaderObjectKind.LEGEND, TrackHeaderObjectKind.SCALE}:
+        if header_item.kind == TrackHeaderObjectKind.SCALE:
             return max(header_item.line_units, self._curve_count(track))
+        if header_item.kind == TrackHeaderObjectKind.LEGEND:
+            return max(header_item.line_units, self._curve_count(track)) + self._fill_header_count(
+                track
+            )
         return header_item.line_units
 
     def _auto_adjust_track_header_height(self, document: LogDocument) -> LogDocument:
@@ -1459,6 +1482,24 @@ class MatplotlibRenderer(Renderer):
             return 0.7
         return max(0.7, element.style.line_width)
 
+    def _curve_fill_header_label(self, element: CurveElement) -> str:
+        assert element.fill is not None
+        if element.fill.label is not None:
+            return element.fill.label
+        if (
+            element.fill.kind == CurveFillKind.BETWEEN_CURVES
+            and element.fill.other_channel is not None
+        ):
+            return f"{element.channel} / {element.fill.other_channel}"
+        if (
+            element.fill.kind == CurveFillKind.BETWEEN_INSTANCES
+            and element.fill.other_element_id is not None
+        ):
+            target = element.fill.other_element_id
+            source = element.id or element.channel
+            return f"{source} / {target}"
+        return "Fill"
+
     def _header_division_scale(
         self, track, dataset: WellDataset
     ) -> tuple[float, float, ScaleKind] | None:
@@ -1912,10 +1953,13 @@ class MatplotlibRenderer(Renderer):
             return
 
         row_count = self._curve_header_row_count(document, track)
-        rows = self._curve_row_bounds(slot_top, slot_bottom, row_count * 2)
+        fill_row_count = self._fill_header_row_count(document, track)
+        rows = self._curve_row_bounds(slot_top, slot_bottom, row_count * 2 + fill_row_count)
+        curve_rows = rows[: row_count * 2]
+        fill_rows = rows[row_count * 2 :]
         for curve_index, element in enumerate(curves):
-            name_top, name_bottom = rows[curve_index * 2]
-            scale_top, scale_bottom = rows[curve_index * 2 + 1]
+            name_top, name_bottom = curve_rows[curve_index * 2]
+            scale_top, scale_bottom = curve_rows[curve_index * 2 + 1]
             row_color = self._curve_header_color(element)
 
             name_fontsize = self._slot_font_size(
@@ -1989,6 +2033,100 @@ class MatplotlibRenderer(Renderer):
                 fontsize=scale_fontsize,
                 color=row_color,
                 clip_on=True,
+            )
+
+        if not fill_rows:
+            return
+
+        from matplotlib.patches import Rectangle
+
+        separator_color = str(track_header_style["separator_color"])
+        separator_linewidth = float(track_header_style["separator_linewidth"])
+        fill_hatch = str(track_header_style.get("fill_hatch", ""))
+        fill_row_font_min = float(track_header_style.get("fill_row_min_pt", 3.3))
+        fill_row_font_max = float(track_header_style.get("fill_row_max_pt", 5.1))
+        fill_text_color = str(track_header_style.get("fill_text_color", "#222222"))
+        label_box_facecolor = str(track_header_style.get("fill_label_box_facecolor", "#ffffff"))
+        label_box_edgecolor = str(track_header_style.get("fill_label_box_edgecolor", "#666666"))
+        label_box_linewidth = float(track_header_style.get("fill_label_box_linewidth", 0.35))
+        label_box_pad = float(track_header_style.get("fill_label_box_pad", 0.16))
+        fill_elements = self._fill_header_elements(track)
+        independent_curve_scales = self._uses_independent_curve_scales(track)
+        for element, (row_top, row_bottom) in zip(fill_elements, fill_rows, strict=False):
+            assert element.fill is not None
+            segments = self._curve_fill_header_segments(
+                track,
+                element,
+                document,
+                dataset,
+                independent_curve_scales=independent_curve_scales,
+            )
+            for left_fraction, right_fraction, fill_color, fill_alpha in segments:
+                ax.add_patch(
+                    Rectangle(
+                        (left_fraction, row_bottom),
+                        max(0.0, right_fraction - left_fraction),
+                        row_top - row_bottom,
+                        transform=ax.transAxes,
+                        facecolor=fill_color,
+                        edgecolor="none",
+                        hatch=fill_hatch,
+                        alpha=fill_alpha,
+                        zorder=0.2,
+                    )
+                )
+
+            ax.plot(
+                [0.0, 1.0],
+                [row_top, row_top],
+                transform=ax.transAxes,
+                color=separator_color,
+                linewidth=separator_linewidth,
+            )
+            ax.plot(
+                [0.0, 1.0],
+                [row_bottom, row_bottom],
+                transform=ax.transAxes,
+                color=separator_color,
+                linewidth=separator_linewidth,
+            )
+
+            fontsize = self._slot_font_size(
+                ax,
+                row_top,
+                row_bottom,
+                min_pt=fill_row_font_min,
+                max_pt=fill_row_font_max,
+            )
+            label = self._curve_fill_header_label(element)
+            available_px = max(ax.bbox.width * 0.76, 1.0)
+            approx_char_px = max(
+                fontsize * float(track_header_style["legend_char_width_ratio"]),
+                1.0,
+            )
+            max_chars = max(
+                int(track_header_style["legend_min_chars"]),
+                int(available_px / approx_char_px),
+            )
+            if len(label) > max_chars:
+                label = f"{label[: max_chars - 3]}..."
+            ax.text(
+                0.5,
+                0.5 * (row_top + row_bottom),
+                label,
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=fontsize,
+                color=fill_text_color,
+                bbox={
+                    "boxstyle": f"square,pad={label_box_pad}",
+                    "facecolor": label_box_facecolor,
+                    "edgecolor": label_box_edgecolor,
+                    "linewidth": label_box_linewidth,
+                },
+                clip_on=True,
+                zorder=0.5,
             )
             ax.text(
                 float(track_header_style["scale_unit_x"]),
@@ -2710,22 +2848,14 @@ class MatplotlibRenderer(Renderer):
             return element.fill.alpha
         return element.style.fill_alpha
 
-    def _draw_curve_fill(
+    def _resolve_curve_fill_target(
         self,
-        ax,
         track,
         element: CurveElement,
-        document,
-        dataset,
         *,
         independent_curve_scales: bool,
-    ) -> None:
-        if element.fill is None:
-            return
-        if element.wrap:
-            raise TemplateValidationError(
-                f"Curve fill for {element.channel!r} does not support wrapped curves yet."
-            )
+    ) -> CurveElement:
+        assert element.fill is not None
         if element.fill.kind == CurveFillKind.BETWEEN_CURVES:
             assert element.fill.other_channel is not None
             candidates = self._find_track_curves(
@@ -2753,8 +2883,8 @@ class MatplotlibRenderer(Renderer):
                     f"Curve fill between {element.channel!r} and {element.fill.other_channel!r} "
                     "requires matching effective scales."
                 )
-            other = compatible[0]
-        elif element.fill.kind == CurveFillKind.BETWEEN_INSTANCES:
+            return compatible[0]
+        if element.fill.kind == CurveFillKind.BETWEEN_INSTANCES:
             assert element.fill.other_element_id is not None
             other = self._find_track_curve_by_id(
                 track,
@@ -2766,10 +2896,109 @@ class MatplotlibRenderer(Renderer):
                     f"Curve fill for {element.channel!r} references missing curve id "
                     f"{element.fill.other_element_id!r} in track {track.id!r}."
                 )
-        else:
+            return other
+        raise TemplateValidationError(
+            f"Curve fill kind {element.fill.kind!s} is not implemented yet."
+        )
+
+    def _curve_fill_header_segments(
+        self,
+        track,
+        element: CurveElement,
+        document,
+        dataset,
+        *,
+        independent_curve_scales: bool,
+    ) -> list[tuple[float, float, str, float]]:
+        assert element.fill is not None
+        other = self._resolve_curve_fill_target(
+            track,
+            element,
+            independent_curve_scales=independent_curve_scales,
+        )
+        if other.wrap:
             raise TemplateValidationError(
-                f"Curve fill kind {element.fill.kind!s} is not implemented yet."
+                f"Curve fill for {element.channel!r} cannot target wrapped curve "
+                f"{other.channel!r} yet."
             )
+
+        primary_data = self._curve_plot_data(
+            track,
+            element,
+            document,
+            dataset,
+            independent_curve_scales=independent_curve_scales,
+        )
+        secondary_data = self._curve_plot_data(
+            track,
+            other,
+            document,
+            dataset,
+            independent_curve_scales=independent_curve_scales,
+        )
+        secondary_values = self._align_curve_fill_values(
+            primary_data.depth,
+            primary_data.valid_mask,
+            secondary_data,
+        )
+        valid_mask = (
+            primary_data.valid_mask
+            & np.isfinite(primary_data.plot_values)
+            & np.isfinite(secondary_values)
+        )
+        if not np.any(valid_mask):
+            return []
+
+        fill_color = self._resolved_curve_fill_color(element)
+        fill_alpha = self._resolved_curve_fill_alpha(element)
+        if not element.fill.crossover.enabled:
+            return [(0.0, 1.0, fill_color, fill_alpha)]
+
+        left_mask = valid_mask & (primary_data.plot_values < secondary_values)
+        right_mask = valid_mask & (primary_data.plot_values > secondary_values)
+        left_count = int(np.count_nonzero(left_mask))
+        right_count = int(np.count_nonzero(right_mask))
+        left_color = element.fill.crossover.left_color or fill_color
+        right_color = element.fill.crossover.right_color or fill_color
+        crossover_alpha = (
+            element.fill.crossover.alpha
+            if element.fill.crossover.alpha is not None
+            else fill_alpha
+        )
+        if left_count > 0 and right_count > 0:
+            total = left_count + right_count
+            left_fraction = left_count / total
+            return [
+                (0.0, left_fraction, left_color, crossover_alpha),
+                (left_fraction, 1.0, right_color, crossover_alpha),
+            ]
+        if left_count > 0:
+            return [(0.0, 1.0, left_color, crossover_alpha)]
+        if right_count > 0:
+            return [(0.0, 1.0, right_color, crossover_alpha)]
+        return [(0.0, 1.0, fill_color, fill_alpha)]
+
+    def _draw_curve_fill(
+        self,
+        ax,
+        track,
+        element: CurveElement,
+        document,
+        dataset,
+        *,
+        independent_curve_scales: bool,
+    ) -> None:
+        if element.fill is None:
+            return
+        if element.wrap:
+            raise TemplateValidationError(
+                f"Curve fill for {element.channel!r} does not support wrapped curves yet."
+            )
+        other = self._resolve_curve_fill_target(
+            track,
+            element,
+            independent_curve_scales=independent_curve_scales,
+        )
         if other.wrap:
             raise TemplateValidationError(
                 f"Curve fill for {element.channel!r} cannot target wrapped curve "

@@ -115,6 +115,7 @@ class TemplateTests(unittest.TestCase):
                                 "fill": {
                                     "kind": "between_curves",
                                     "other_channel": "DPHI",
+                                    "label": "Gas Effect",
                                     "color": "#22c55e",
                                     "alpha": 0.3,
                                     "crossover": {
@@ -139,6 +140,7 @@ class TemplateTests(unittest.TestCase):
         assert element.fill is not None
         self.assertEqual(element.fill.kind, CurveFillKind.BETWEEN_CURVES)
         self.assertEqual(element.fill.other_channel, "DPHI")
+        self.assertEqual(element.fill.label, "Gas Effect")
         self.assertEqual(element.fill.color, "#22c55e")
         self.assertAlmostEqual(element.fill.alpha or 0.0, 0.3)
         self.assertTrue(element.fill.crossover.enabled)

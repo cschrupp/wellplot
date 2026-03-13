@@ -404,6 +404,11 @@ def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
         if not other_element_id:
             raise TemplateValidationError(f"{context}.other_element_id must be non-empty.")
         payload["other_element_id"] = other_element_id
+    if "label" in fill:
+        label = str(fill["label"]).strip()
+        if not label:
+            raise TemplateValidationError(f"{context}.label must be non-empty.")
+        payload["label"] = label
     if "color" in fill:
         color = str(fill["color"]).strip()
         if not color:

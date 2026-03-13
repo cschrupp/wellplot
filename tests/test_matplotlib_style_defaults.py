@@ -46,6 +46,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track"]["reference_label_align"], "center")
         self.assertEqual(renderer.style["track"]["reference_label_x"], 0.5)
         self.assertEqual(renderer.style["track_header"]["paired_scale_text_offset_ratio"], 0.08)
+        self.assertEqual(renderer.style["track_header"]["fill_hatch"], "")
         self.assertEqual(renderer.style["track_header"]["division_tick_count"], 5)
         self.assertEqual(renderer.style["track_header"]["title_align"], "left")
         self.assertEqual(renderer.style["track_header"]["title_x"], 0.03)
@@ -203,6 +204,46 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer._header_property_group_capacity(document), 4)
         self.assertEqual(renderer._curve_header_row_count(document, document.tracks[0]), 4)
         self.assertEqual(renderer._curve_header_row_count(document, document.tracks[1]), 4)
+
+    def test_fill_header_row_count_uses_document_wide_capacity(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "uniform fill rows",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "filled",
+                        "title": "Filled",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "A",
+                                "fill": {
+                                    "kind": "between_curves",
+                                    "other_channel": "B",
+                                    "label": "Gas Effect",
+                                },
+                            },
+                            {"kind": "curve", "channel": "B"},
+                        ],
+                    },
+                    {
+                        "id": "plain",
+                        "title": "Plain",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [{"kind": "curve", "channel": "C"}],
+                    },
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        self.assertEqual(renderer._document_fill_row_capacity(document), 1)
+        self.assertEqual(renderer._fill_header_row_count(document, document.tracks[0]), 1)
+        self.assertEqual(renderer._fill_header_row_count(document, document.tracks[1]), 1)
 
     def test_raster_header_triplet_uses_combined_scale_legend_span(self) -> None:
         depth = np.array([1000.0, 1001.0, 1002.0])
@@ -499,6 +540,60 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
                 independent_curve_scales=True,
             )
             self.assertEqual(len(ax.collections), 1)
+        finally:
+            plt.close(fig)
+
+    def test_track_header_draws_fill_indicator_row(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "fill header row",
+                "page": {"size": "A4", "track_header_height_mm": 12.0},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "crossover",
+                        "title": "Track 3",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "A",
+                                "label": "Density",
+                                "scale": {"kind": "linear", "min": 1.7, "max": 2.7},
+                                "fill": {
+                                    "kind": "between_curves",
+                                    "other_channel": "B",
+                                    "label": "Gas Effect",
+                                    "color": "#f2bf16",
+                                },
+                            },
+                            {
+                                "kind": "curve",
+                                "channel": "B",
+                                "label": "Neutron",
+                                "scale": {"kind": "linear", "min": 1.7, "max": 2.7},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset = WellDataset(name="header fill")
+        dataset.add_channel(
+            ScalarChannel("A", depth, "m", "g/cm3", values=np.array([2.1, 2.2, 2.3]))
+        )
+        dataset.add_channel(
+            ScalarChannel("B", depth, "m", "g/cm3", values=np.array([2.0, 2.15, 2.35]))
+        )
+
+        renderer = MatplotlibRenderer()
+        fig, ax = plt.subplots()
+        try:
+            renderer._draw_track_header(ax, document.tracks[0], document, dataset)
+            self.assertGreaterEqual(len(ax.patches), 1)
+            self.assertIn("Gas Effect", {text.get_text() for text in ax.texts})
         finally:
             plt.close(fig)
 

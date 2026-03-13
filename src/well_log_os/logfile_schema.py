@@ -670,6 +670,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "kind": {"type": "string", "enum": ["between_curves", "between_instances"]},
                 "other_channel": {"type": "string", "minLength": 1},
                 "other_element_id": {"type": "string", "minLength": 1},
+                "label": {"type": "string", "minLength": 1},
                 "color": {"type": "string", "minLength": 1},
                 "alpha": {"type": "number", "minimum": 0, "maximum": 1},
                 "crossover": {"$ref": "#/$defs/curveFillCrossover"},

@@ -198,6 +198,7 @@ document:
         fill:
           kind: between_instances
           other_element_id: cbl_0_10
+          label: Scale Effect
           color: "#d1d5db"
           alpha: 0.3
           crossover:

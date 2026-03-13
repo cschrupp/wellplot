@@ -58,6 +58,15 @@ track_header:
   scale_unit_x: 0.5
   scale_right_x: 0.98
   paired_scale_text_offset_ratio: 0.08
+  fill_row_min_pt: 3.3
+  fill_row_max_pt: 5.1
+  fill_hatch: ""
+  fill_min_alpha: 0.65
+  fill_text_color: "#222222"
+  fill_label_box_facecolor: "#ffffff"
+  fill_label_box_edgecolor: "#666666"
+  fill_label_box_linewidth: 0.35
+  fill_label_box_pad: 0.16
   division_tick_count: 5
   division_tick_length_ratio: 0.2
   division_tick_linewidth: 0.6

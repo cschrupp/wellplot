@@ -608,6 +608,7 @@ def _build_curve_fill(data: Any) -> CurveFillSpec | None:
             kind=kind,
             other_channel=other_channel,
             other_element_id=other_element_id,
+            label=str(fill_data["label"]).strip() if fill_data.get("label") is not None else None,
             color=str(fill_data["color"]).strip() if fill_data.get("color") is not None else None,
             alpha=float(fill_data["alpha"]) if fill_data.get("alpha") is not None else None,
             crossover=crossover,

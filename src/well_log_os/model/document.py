@@ -310,6 +310,7 @@ class CurveFillSpec:
     kind: CurveFillKind
     other_channel: str | None = None
     other_element_id: str | None = None
+    label: str | None = None
     color: str | None = None
     alpha: float | None = None
     crossover: CurveFillCrossoverSpec = field(default_factory=CurveFillCrossoverSpec)
@@ -333,6 +334,8 @@ class CurveFillSpec:
                 raise ValueError("Curve fill between_instances requires other_element_id.")
             if self.other_channel is not None:
                 raise ValueError("Curve fill between_instances does not accept other_channel.")
+        if self.label is not None and not str(self.label).strip():
+            raise ValueError("Curve fill label must be non-empty when provided.")
         if self.color is not None and not str(self.color).strip():
             raise ValueError("Curve fill color must be non-empty when provided.")
         if self.alpha is not None and (self.alpha < 0 or self.alpha > 1):
