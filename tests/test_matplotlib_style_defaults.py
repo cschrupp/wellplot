@@ -289,13 +289,85 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         element = track.elements[0]
         channel = dataset.get_channel("VDL")
         assert isinstance(channel, RasterChannel)
-        mode = renderer._resolve_raster_normalization(element, target="waveform")
-        normalized = renderer._normalize_raster_values(channel.values, mode)
+        _, normalized = renderer._prepare_raster_display_data(
+            channel.depth,
+            channel.values,
+            element,
+            target="waveform",
+        )
         self.assertAlmostEqual(float(np.nanmax(np.abs(normalized[0]))), 1.0)
         self.assertAlmostEqual(float(np.nanmax(np.abs(normalized[1]))), 1.0)
         self.assertAlmostEqual(float(np.nanmax(np.abs(normalized[2]))), 1.0)
         limits = renderer._resolve_raster_color_limits(normalized, element)
-        self.assertEqual(limits, (-1.0, 1.0))
+        assert limits is not None
+        self.assertAlmostEqual(abs(float(limits[0])), abs(float(limits[1])), places=6)
+        self.assertGreater(float(limits[1]), 0.9)
+
+    def test_vdl_raster_display_sorts_depth_and_removes_trace_bias(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "vdl sorting",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "vdl",
+                        "title": "VDL",
+                        "kind": "array",
+                        "width_mm": 40,
+                        "elements": [
+                            {
+                                "kind": "raster",
+                                "channel": "VDL",
+                                "profile": "vdl",
+                                "normalization": "none",
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1002.0, 1001.0, 1000.0])
+        values = np.array(
+            [
+                [11.0, 12.0, 13.0],
+                [6.0, 7.0, 8.0],
+                [1.0, 2.0, 3.0],
+            ],
+            dtype=float,
+        )
+        dataset = WellDataset(name="vdl")
+        dataset.add_channel(
+            RasterChannel(
+                "VDL",
+                depth,
+                "m",
+                "amp",
+                values=values,
+                sample_axis=np.array([200.0, 700.0, 1200.0], dtype=float),
+            )
+        )
+        renderer = MatplotlibRenderer()
+        element = document.tracks[0].elements[0]
+        channel = dataset.get_channel("VDL")
+        assert isinstance(channel, RasterChannel)
+        prepared_depth, prepared_values = renderer._prepare_raster_display_data(
+            channel.depth,
+            channel.values,
+            element,
+            target="raster",
+        )
+        np.testing.assert_array_equal(prepared_depth, np.array([1000.0, 1001.0, 1002.0]))
+        np.testing.assert_allclose(
+            prepared_values,
+            np.array(
+                [
+                    [-1.0, 0.0, 1.0],
+                    [-1.0, 0.0, 1.0],
+                    [-1.0, 0.0, 1.0],
+                ]
+            ),
+        )
 
     def test_vdl_profile_uses_split_auto_normalization_modes(self) -> None:
         document = document_from_mapping(

@@ -1037,6 +1037,28 @@ class MatplotlibRenderer(Renderer):
         safe_denominators = np.where(valid, denominators, 1.0)
         return normalized / safe_denominators
 
+    def _prepare_raster_display_data(
+        self,
+        depth: np.ndarray,
+        values: np.ndarray,
+        element: RasterElement,
+        *,
+        target: str,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        ordered_depth = np.asarray(depth, dtype=float)
+        ordered_values = np.asarray(values, dtype=float)
+        order = np.argsort(ordered_depth, kind="mergesort")
+        ordered_depth = ordered_depth[order]
+        ordered_values = ordered_values[order, :]
+
+        if element.profile == RasterProfileKind.VDL:
+            masked = np.ma.masked_invalid(ordered_values)
+            medians = np.ma.median(masked, axis=1).filled(0.0)
+            ordered_values = ordered_values - medians[:, None]
+
+        normalization = self._resolve_raster_normalization(element, target=target)
+        return ordered_depth, self._normalize_raster_values(ordered_values, normalization)
+
     def _resolve_raster_color_limits(
         self,
         values: np.ndarray,
@@ -1049,25 +1071,21 @@ class MatplotlibRenderer(Renderer):
         if finite.size < 2:
             return None
 
+        if element.profile == RasterProfileKind.VDL:
+            if element.clip_percentiles is not None:
+                _, high = element.clip_percentiles
+                clip = float(np.nanpercentile(np.abs(finite), high))
+            else:
+                clip = float(np.nanpercentile(np.abs(finite), 99.0))
+            if not np.isfinite(clip) or np.isclose(clip, 0.0):
+                clip = float(np.nanmax(np.abs(finite)))
+            if not np.isfinite(clip) or np.isclose(clip, 0.0):
+                clip = 1.0
+            return -clip, clip
+
         if element.clip_percentiles is not None:
             low, high = element.clip_percentiles
             lower, upper = np.nanpercentile(finite, [low, high])
-            if np.isclose(lower, upper):
-                lower = float(np.nanmin(finite))
-                upper = float(np.nanmax(finite))
-            return float(lower), float(upper)
-
-        if element.profile == RasterProfileKind.VDL:
-            normalization = self._resolve_raster_normalization(
-                element,
-                target="raster",
-            )
-            if normalization in {
-                RasterNormalizationKind.TRACE_MAXABS,
-                RasterNormalizationKind.GLOBAL_MAXABS,
-            }:
-                return -1.0, 1.0
-            lower, upper = np.nanpercentile(finite, [2.0, 98.0])
             if np.isclose(lower, upper):
                 lower = float(np.nanmin(finite))
                 upper = float(np.nanmax(finite))
@@ -1386,8 +1404,12 @@ class MatplotlibRenderer(Renderer):
         bar_top = min(slot_top, bar_center + 0.5 * bar_height)
         label_y = slot_bottom + slot_height * float(raster_style["header_colorbar_label_y_ratio"])
 
-        raster_mode = self._resolve_raster_normalization(element, target="raster")
-        normalized_values = self._normalize_raster_values(channel.values, raster_mode)
+        _, normalized_values = self._prepare_raster_display_data(
+            channel.depth,
+            channel.values,
+            element,
+            target="raster",
+        )
         limits = self._resolve_raster_color_limits(normalized_values, element)
         if limits is None:
             finite = normalized_values[np.isfinite(normalized_values)]
@@ -2565,16 +2587,26 @@ class MatplotlibRenderer(Renderer):
         channel = dataset.get_channel(element.channel)
         if not isinstance(channel, RasterChannel):
             raise TypeError(f"Raster element {element.channel} requires a raster channel.")
-        depth = channel.depth_in(document.depth_axis.unit, self.registry)
         axis_min, axis_max, _ = self._raster_axis_limits(track, element, channel)
-        waveform_mode = self._resolve_raster_normalization(element, target="waveform")
-        waveform_values = self._normalize_raster_values(channel.values, waveform_mode)
+        depth_source = channel.depth_in(document.depth_axis.unit, self.registry)
+        raster_depth, raster_values = self._prepare_raster_display_data(
+            depth_source,
+            channel.values,
+            element,
+            target="raster",
+        )
+        waveform_depth, waveform_values = self._prepare_raster_display_data(
+            depth_source,
+            channel.values,
+            element,
+            target="waveform",
+        )
         x_axis = np.linspace(axis_min, axis_max, waveform_values.shape[1], dtype=float)
         extent = [
             axis_min,
             axis_max,
-            float(depth[-1]),
-            float(depth[0]),
+            float(np.nanmax(raster_depth)),
+            float(np.nanmin(raster_depth)),
         ]
         image_kwargs = {
             "aspect": "auto",
@@ -2586,12 +2618,19 @@ class MatplotlibRenderer(Renderer):
         show_raster = element.show_raster and element.profile != RasterProfileKind.WAVEFORM
         image = None
         if show_raster:
-            raster_mode = self._resolve_raster_normalization(element, target="raster")
-            raster_values = self._normalize_raster_values(channel.values, raster_mode)
             resolved_limits = self._resolve_raster_color_limits(raster_values, element)
             if resolved_limits is not None:
-                image_kwargs["vmin"], image_kwargs["vmax"] = resolved_limits
-            image = ax.imshow(raster_values.T, alpha=element.raster_alpha, **image_kwargs)
+                if element.profile == RasterProfileKind.VDL:
+                    import matplotlib.colors as mcolors
+
+                    image_kwargs["norm"] = mcolors.TwoSlopeNorm(
+                        vmin=resolved_limits[0],
+                        vcenter=0.0,
+                        vmax=resolved_limits[1],
+                    )
+                else:
+                    image_kwargs["vmin"], image_kwargs["vmax"] = resolved_limits
+            image = ax.imshow(raster_values, alpha=element.raster_alpha, **image_kwargs)
         if (
             image is not None
             and element.colorbar_enabled
@@ -2600,7 +2639,7 @@ class MatplotlibRenderer(Renderer):
             self._draw_raster_colorbar(ax, image, element, channel)
         self._draw_raster_waveforms(
             ax,
-            depth=depth,
+            depth=waveform_depth,
             x_axis=x_axis,
             values=waveform_values,
             waveform=element.waveform,

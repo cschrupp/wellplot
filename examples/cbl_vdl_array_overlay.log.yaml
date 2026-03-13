@@ -1,9 +1,9 @@
 template:
   path: ../templates/wireline_base.template.yaml
 version: 1
-name: CBL VDL Array MVP
+name: CBL VDL Array Overlay
 render:
-  output_path: ../workspace/renders/CBL_VDL_array_mvp.pdf
+  output_path: ../workspace/renders/CBL_VDL_array_overlay.pdf
   dpi: 300
   continuous_strip_page_height_mm: 297
 document:
@@ -13,8 +13,8 @@ document:
     comments: []
     log_sections:
       - id: main
-        title: CBL VDL Array MVP
-        subtitle: Array lane with colorbar and sample-axis labels
+        title: CBL VDL Array Overlay
+        subtitle: Variable-density display with waveform overlay
         data:
           source_path: ../workspace/data/CBL_Main.dlis
           source_format: dlis
@@ -103,12 +103,12 @@ document:
           max: 1200
           ticks: 7
         waveform:
-          enabled: false
-          stride: 5
-          amplitude_scale: 0.35
-          color: "#5b3f8c"
-          line_width: 0.22
-          fill: true
+          enabled: true
+          stride: 6
+          amplitude_scale: 0.28
+          color: "#28406a"
+          line_width: 0.16
+          fill: false
           positive_fill_color: "#000000"
           negative_fill_color: "#ffffff"
           invert_fill_polarity: true
