@@ -10,6 +10,7 @@ import yaml
 from .errors import TemplateValidationError
 from .model import (
     CurveElement,
+    CurveFillBaselineSpec,
     CurveFillCrossoverSpec,
     CurveFillKind,
     CurveFillSpec,
@@ -567,6 +568,7 @@ def _build_curve_fill(data: Any) -> CurveFillSpec | None:
 
     other_channel: str | None = None
     other_element_id: str | None = None
+    baseline: CurveFillBaselineSpec | None = None
     if kind == CurveFillKind.BETWEEN_CURVES:
         other_channel = str(fill_data.get("other_channel", "")).strip()
         if not other_channel:
@@ -575,6 +577,36 @@ def _build_curve_fill(data: Any) -> CurveFillSpec | None:
         other_element_id = str(fill_data.get("other_element_id", "")).strip()
         if not other_element_id:
             raise TemplateValidationError("curve.fill.other_element_id must be non-empty.")
+    elif kind == CurveFillKind.BASELINE_SPLIT:
+        baseline_data = _ensure_mapping(
+            fill_data.get("baseline"),
+            context="curve.fill.baseline",
+        )
+        try:
+            baseline = CurveFillBaselineSpec(
+                value=float(baseline_data["value"]),
+                lower_color=(
+                    str(baseline_data["lower_color"]).strip()
+                    if baseline_data.get("lower_color") is not None
+                    else None
+                ),
+                upper_color=(
+                    str(baseline_data["upper_color"]).strip()
+                    if baseline_data.get("upper_color") is not None
+                    else None
+                ),
+                line_color=(
+                    str(baseline_data["line_color"]).strip()
+                    if baseline_data.get("line_color") is not None
+                    else None
+                ),
+                line_width=float(baseline_data.get("line_width", 0.6)),
+                line_style=str(baseline_data.get("line_style", "--")).strip(),
+            )
+        except KeyError as exc:
+            raise TemplateValidationError("curve.fill.baseline.value is required.") from exc
+        except (TypeError, ValueError) as exc:
+            raise TemplateValidationError("Invalid curve.fill.baseline configuration.") from exc
 
     crossover_data = fill_data.get("crossover")
     if crossover_data is None:
@@ -608,6 +640,7 @@ def _build_curve_fill(data: Any) -> CurveFillSpec | None:
             kind=kind,
             other_channel=other_channel,
             other_element_id=other_element_id,
+            baseline=baseline,
             label=str(fill_data["label"]).strip() if fill_data.get("label") is not None else None,
             color=str(fill_data["color"]).strip() if fill_data.get("color") is not None else None,
             alpha=float(fill_data["alpha"]) if fill_data.get("alpha") is not None else None,

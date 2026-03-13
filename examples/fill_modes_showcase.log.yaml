@@ -1,0 +1,218 @@
+template:
+  path: ../templates/wireline_base.template.yaml
+version: 1
+name: Fill Modes Showcase
+render:
+  output_path: ../workspace/renders/fill_modes_showcase.pdf
+  dpi: 300
+  continuous_strip_page_height_mm: 297
+document:
+  depth_range:
+    - 70
+    - 210
+  page:
+    margin_left_mm: 0
+    margin_right_mm: 8
+    margin_top_mm: 0
+    margin_bottom_mm: 0
+    track_gap_mm: 0
+    header_height_mm: 0
+    track_header_height_mm: 28
+    footer_height_mm: 0
+  layout:
+    heading:
+      enabled: false
+    comments: []
+    log_sections:
+      - id: main
+        title: Fill Modes Showcase
+        subtitle: Lower-limit, upper-limit, and baseline-split fills
+        data:
+          source_path: ../workspace/data/CBL_Main.dlis
+          source_format: dlis
+        tracks:
+          - id: depth
+            title: ""
+            kind: reference
+            width_mm: 14
+            position: 1
+            reference:
+              axis: depth
+              define_layout: true
+              unit: ft
+              scale_ratio: 240
+              major_step: 10
+              secondary_grid:
+                display: true
+                line_count: 5
+              header:
+                display_unit: true
+                display_scale: true
+                display_annotations: false
+              number_format:
+                format: automatic
+                precision: 0
+            track_header:
+              objects:
+                - kind: title
+                  enabled: false
+                  reserve_space: false
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: false
+                  reserve_space: false
+                - kind: divisions
+                  enabled: false
+                  reserve_space: false
+          - id: lower_fill
+            title: ""
+            kind: normal
+            width_mm: 42
+            position: 2
+            grid:
+              vertical:
+                main:
+                  scale: linear
+                  line_count: 4
+                  spacing_mode: count
+                secondary:
+                  scale: linear
+                  line_count: 5
+                  spacing_mode: count
+            track_header:
+              objects:
+                - kind: title
+                  enabled: false
+                  reserve_space: false
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: true
+                  line_units: 2
+                - kind: divisions
+                  enabled: false
+                  reserve_space: false
+          - id: upper_fill
+            title: ""
+            kind: normal
+            width_mm: 42
+            position: 3
+            grid:
+              vertical:
+                main:
+                  scale: linear
+                  line_count: 4
+                  spacing_mode: count
+                secondary:
+                  scale: linear
+                  line_count: 5
+                  spacing_mode: count
+            track_header:
+              objects:
+                - kind: title
+                  enabled: false
+                  reserve_space: false
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: true
+                  line_units: 2
+                - kind: divisions
+                  enabled: false
+                  reserve_space: false
+          - id: baseline_fill
+            title: ""
+            kind: normal
+            width_mm: 42
+            position: 4
+            grid:
+              vertical:
+                main:
+                  scale: linear
+                  line_count: 4
+                  spacing_mode: count
+                secondary:
+                  scale: linear
+                  line_count: 5
+                  spacing_mode: count
+            track_header:
+              objects:
+                - kind: title
+                  enabled: false
+                  reserve_space: false
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: true
+                  line_units: 2
+                - kind: divisions
+                  enabled: false
+                  reserve_space: false
+    tail:
+      enabled: false
+  bindings:
+    on_missing: skip
+    channels:
+      - section: main
+        channel: ECGR_STGC
+        track_id: lower_fill
+        kind: curve
+        label: Gamma Ray (ECGR_STGC) QTGC-B
+        style:
+          color: "#17bf22"
+          line_width: 0.85
+        scale:
+          kind: linear
+          min: 0
+          max: 150
+        fill:
+          kind: to_lower_limit
+          label: To Lower Limit
+          color: "#8fd19e"
+          alpha: 0.35
+      - section: main
+        channel: ECGR_STGC
+        track_id: upper_fill
+        kind: curve
+        label: Gamma Ray (ECGR_STGC) QTGC-B
+        style:
+          color: "#17bf22"
+          line_width: 0.85
+        scale:
+          kind: linear
+          min: 0
+          max: 150
+        fill:
+          kind: to_upper_limit
+          label: To Upper Limit
+          color: "#f2bf16"
+          alpha: 0.35
+      - section: main
+        channel: TT
+        track_id: baseline_fill
+        kind: curve
+        label: Transit Time for CBL (TT) QSLT-B
+        style:
+          color: "#1238ff"
+          line_width: 0.8
+        scale:
+          kind: linear
+          min: 200
+          max: 400
+          reverse: true
+        fill:
+          kind: baseline_split
+          label: Baseline 300 us
+          alpha: 0.35
+          baseline:
+            value: 300
+            lower_color: "#1f9d55"
+            upper_color: "#ef4444"
+            line_color: "#111111"
+            line_width: 0.6
+            line_style: "--"

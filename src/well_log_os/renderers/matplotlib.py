@@ -75,6 +75,13 @@ class _CurvePlotData:
     scale: Any
 
 
+@dataclass(slots=True)
+class _CurveFillRenderData:
+    primary: _CurvePlotData
+    secondary_values: np.ndarray
+    valid_mask: np.ndarray
+
+
 class MatplotlibRenderer(Renderer):
     def __init__(
         self,
@@ -1498,6 +1505,12 @@ class MatplotlibRenderer(Renderer):
             target = element.fill.other_element_id
             source = element.id or element.channel
             return f"{source} / {target}"
+        if element.fill.kind == CurveFillKind.TO_LOWER_LIMIT:
+            return "Lower Limit Fill"
+        if element.fill.kind == CurveFillKind.TO_UPPER_LIMIT:
+            return "Upper Limit Fill"
+        if element.fill.kind == CurveFillKind.BASELINE_SPLIT:
+            return "Baseline Fill"
         return "Fill"
 
     def _header_division_scale(
@@ -2074,6 +2087,25 @@ class MatplotlibRenderer(Renderer):
                         alpha=fill_alpha,
                         zorder=0.2,
                     )
+                )
+
+            marker_x = self._curve_fill_header_marker_x(
+                track,
+                element,
+                dataset,
+            )
+            if marker_x is not None:
+                line_color, line_width, line_style = self._resolved_curve_fill_baseline_line_style(
+                    element
+                )
+                ax.plot(
+                    [marker_x, marker_x],
+                    [row_bottom, row_top],
+                    transform=ax.transAxes,
+                    color=line_color,
+                    linewidth=line_width,
+                    linestyle=line_style,
+                    zorder=0.35,
                 )
 
             ax.plot(
@@ -2848,6 +2880,63 @@ class MatplotlibRenderer(Renderer):
             return element.fill.alpha
         return element.style.fill_alpha
 
+    def _resolved_curve_fill_baseline_colors(self, element: CurveElement) -> tuple[str, str]:
+        assert element.fill is not None
+        assert element.fill.baseline is not None
+        fallback = self._resolved_curve_fill_color(element)
+        lower_color = element.fill.baseline.lower_color or fallback
+        upper_color = element.fill.baseline.upper_color or fallback
+        return lower_color, upper_color
+
+    def _resolved_curve_fill_baseline_line_style(
+        self,
+        element: CurveElement,
+    ) -> tuple[str, float, str]:
+        assert element.fill is not None
+        assert element.fill.baseline is not None
+        line_color = element.fill.baseline.line_color or element.style.color
+        return (
+            line_color,
+            element.fill.baseline.line_width,
+            element.fill.baseline.line_style,
+        )
+
+    def _curve_fill_display_bounds(
+        self,
+        track,
+        element: CurveElement,
+        dataset: WellDataset,
+    ) -> tuple[float, float]:
+        scale = element.scale or track.x_scale
+        if scale is not None:
+            return float(scale.minimum), float(scale.maximum)
+        channel = dataset.get_channel(element.channel)
+        if isinstance(channel, ScalarChannel):
+            finite = channel.masked_values()
+            finite = finite[np.isfinite(finite)]
+            if finite.size >= 1:
+                return float(np.nanmin(finite)), float(np.nanmax(finite))
+        return 0.0, 1.0
+
+    def _curve_fill_plot_coordinate(
+        self,
+        raw_value: float,
+        scale,
+        *,
+        independent_curve_scales: bool,
+    ) -> float:
+        if scale is None:
+            return float(raw_value)
+        if independent_curve_scales or scale.kind == ScaleKind.TANGENTIAL:
+            normalized, mask = self._normalize_curve_values(
+                np.asarray([raw_value], dtype=float),
+                scale,
+            )
+            if not np.any(mask):
+                return float("nan")
+            return float(normalized[0])
+        return float(raw_value)
+
     def _resolve_curve_fill_target(
         self,
         track,
@@ -2901,6 +2990,137 @@ class MatplotlibRenderer(Renderer):
             f"Curve fill kind {element.fill.kind!s} is not implemented yet."
         )
 
+    def _prepare_curve_fill_data(
+        self,
+        track,
+        element: CurveElement,
+        document,
+        dataset,
+        *,
+        independent_curve_scales: bool,
+    ) -> _CurveFillRenderData:
+        assert element.fill is not None
+        if element.wrap:
+            raise TemplateValidationError(
+                f"Curve fill for {element.channel!r} does not support wrapped curves yet."
+            )
+
+        primary_data = self._curve_plot_data(
+            track,
+            element,
+            document,
+            dataset,
+            independent_curve_scales=independent_curve_scales,
+        )
+
+        if element.fill.kind in {
+            CurveFillKind.BETWEEN_CURVES,
+            CurveFillKind.BETWEEN_INSTANCES,
+        }:
+            other = self._resolve_curve_fill_target(
+                track,
+                element,
+                independent_curve_scales=independent_curve_scales,
+            )
+            if other.wrap:
+                raise TemplateValidationError(
+                    f"Curve fill for {element.channel!r} cannot target wrapped curve "
+                    f"{other.channel!r} yet."
+                )
+            secondary_data = self._curve_plot_data(
+                track,
+                other,
+                document,
+                dataset,
+                independent_curve_scales=independent_curve_scales,
+            )
+            secondary_values = self._align_curve_fill_values(
+                primary_data.depth,
+                primary_data.valid_mask,
+                secondary_data,
+            )
+        elif element.fill.kind in {CurveFillKind.TO_LOWER_LIMIT, CurveFillKind.TO_UPPER_LIMIT}:
+            lower_bound, upper_bound = self._curve_fill_display_bounds(track, element, dataset)
+            target_raw = (
+                lower_bound
+                if element.fill.kind == CurveFillKind.TO_LOWER_LIMIT
+                else upper_bound
+            )
+            target_plot = self._curve_fill_plot_coordinate(
+                target_raw,
+                primary_data.scale,
+                independent_curve_scales=independent_curve_scales,
+            )
+            secondary_values = np.full(primary_data.plot_values.shape, target_plot, dtype=float)
+        elif element.fill.kind == CurveFillKind.BASELINE_SPLIT:
+            assert element.fill.baseline is not None
+            target_plot = self._curve_fill_plot_coordinate(
+                element.fill.baseline.value,
+                primary_data.scale,
+                independent_curve_scales=independent_curve_scales,
+            )
+            secondary_values = np.full(primary_data.plot_values.shape, target_plot, dtype=float)
+        else:
+            raise TemplateValidationError(
+                f"Curve fill kind {element.fill.kind!s} is not implemented yet."
+            )
+
+        valid_mask = (
+            primary_data.valid_mask
+            & np.isfinite(primary_data.plot_values)
+            & np.isfinite(secondary_values)
+        )
+        return _CurveFillRenderData(primary_data, secondary_values, valid_mask)
+
+    def _curve_fill_header_segments_from_masks(
+        self,
+        primary_count: int,
+        secondary_count: int,
+        *,
+        primary_color: str,
+        secondary_color: str,
+        alpha: float,
+        fallback_color: str,
+        fallback_alpha: float,
+    ) -> list[tuple[float, float, str, float]]:
+        if primary_count > 0 and secondary_count > 0:
+            total = primary_count + secondary_count
+            primary_fraction = primary_count / total
+            return [
+                (0.0, primary_fraction, primary_color, alpha),
+                (primary_fraction, 1.0, secondary_color, alpha),
+            ]
+        if primary_count > 0:
+            return [(0.0, 1.0, primary_color, alpha)]
+        if secondary_count > 0:
+            return [(0.0, 1.0, secondary_color, alpha)]
+        return [(0.0, 1.0, fallback_color, fallback_alpha)]
+
+    def _curve_fill_header_marker_x(
+        self,
+        track,
+        element: CurveElement,
+        dataset,
+    ) -> float | None:
+        if element.fill is None or element.fill.kind != CurveFillKind.BASELINE_SPLIT:
+            return None
+        assert element.fill.baseline is not None
+        scale = element.scale or track.x_scale
+        if scale is not None:
+            marker_x = self._curve_fill_plot_coordinate(
+                element.fill.baseline.value,
+                scale,
+                independent_curve_scales=True,
+            )
+            if np.isfinite(marker_x):
+                return float(marker_x)
+            return None
+        lower_bound, upper_bound = self._curve_fill_display_bounds(track, element, dataset)
+        if np.isclose(lower_bound, upper_bound):
+            return 0.5
+        fraction = (element.fill.baseline.value - lower_bound) / (upper_bound - lower_bound)
+        return float(np.clip(fraction, 0.0, 1.0))
+
     def _curve_fill_header_segments(
         self,
         track,
@@ -2911,53 +3131,49 @@ class MatplotlibRenderer(Renderer):
         independent_curve_scales: bool,
     ) -> list[tuple[float, float, str, float]]:
         assert element.fill is not None
-        other = self._resolve_curve_fill_target(
-            track,
-            element,
-            independent_curve_scales=independent_curve_scales,
-        )
-        if other.wrap:
-            raise TemplateValidationError(
-                f"Curve fill for {element.channel!r} cannot target wrapped curve "
-                f"{other.channel!r} yet."
-            )
-
-        primary_data = self._curve_plot_data(
+        fill_data = self._prepare_curve_fill_data(
             track,
             element,
             document,
             dataset,
             independent_curve_scales=independent_curve_scales,
         )
-        secondary_data = self._curve_plot_data(
-            track,
-            other,
-            document,
-            dataset,
-            independent_curve_scales=independent_curve_scales,
-        )
-        secondary_values = self._align_curve_fill_values(
-            primary_data.depth,
-            primary_data.valid_mask,
-            secondary_data,
-        )
-        valid_mask = (
-            primary_data.valid_mask
-            & np.isfinite(primary_data.plot_values)
-            & np.isfinite(secondary_values)
-        )
+        primary_data = fill_data.primary
+        secondary_values = fill_data.secondary_values
+        valid_mask = fill_data.valid_mask
         if not np.any(valid_mask):
             return []
 
         fill_color = self._resolved_curve_fill_color(element)
         fill_alpha = self._resolved_curve_fill_alpha(element)
+        if element.fill.kind in {CurveFillKind.TO_LOWER_LIMIT, CurveFillKind.TO_UPPER_LIMIT}:
+            return [(0.0, 1.0, fill_color, fill_alpha)]
+
+        if element.fill.kind == CurveFillKind.BASELINE_SPLIT:
+            assert element.fill.baseline is not None
+            lower_color, upper_color = self._resolved_curve_fill_baseline_colors(element)
+            marker_x = self._curve_fill_header_marker_x(track, element, dataset)
+            if marker_x is None:
+                marker_x = 0.5
+            marker_x = float(np.clip(marker_x, 0.0, 1.0))
+            scale = element.scale or track.x_scale
+            reverse = bool(scale.reverse) if scale is not None else False
+            left_color = upper_color if reverse else lower_color
+            right_color = lower_color if reverse else upper_color
+            segments: list[tuple[float, float, str, float]] = []
+            if marker_x > 0.0:
+                segments.append((0.0, marker_x, left_color, fill_alpha))
+            if marker_x < 1.0:
+                segments.append((marker_x, 1.0, right_color, fill_alpha))
+            if segments:
+                return segments
+            return [(0.0, 1.0, fill_color, fill_alpha)]
+
         if not element.fill.crossover.enabled:
             return [(0.0, 1.0, fill_color, fill_alpha)]
 
         left_mask = valid_mask & (primary_data.plot_values < secondary_values)
         right_mask = valid_mask & (primary_data.plot_values > secondary_values)
-        left_count = int(np.count_nonzero(left_mask))
-        right_count = int(np.count_nonzero(right_mask))
         left_color = element.fill.crossover.left_color or fill_color
         right_color = element.fill.crossover.right_color or fill_color
         crossover_alpha = (
@@ -2965,18 +3181,15 @@ class MatplotlibRenderer(Renderer):
             if element.fill.crossover.alpha is not None
             else fill_alpha
         )
-        if left_count > 0 and right_count > 0:
-            total = left_count + right_count
-            left_fraction = left_count / total
-            return [
-                (0.0, left_fraction, left_color, crossover_alpha),
-                (left_fraction, 1.0, right_color, crossover_alpha),
-            ]
-        if left_count > 0:
-            return [(0.0, 1.0, left_color, crossover_alpha)]
-        if right_count > 0:
-            return [(0.0, 1.0, right_color, crossover_alpha)]
-        return [(0.0, 1.0, fill_color, fill_alpha)]
+        return self._curve_fill_header_segments_from_masks(
+            int(np.count_nonzero(left_mask)),
+            int(np.count_nonzero(right_mask)),
+            primary_color=left_color,
+            secondary_color=right_color,
+            alpha=crossover_alpha,
+            fallback_color=fill_color,
+            fallback_alpha=fill_alpha,
+        )
 
     def _draw_curve_fill(
         self,
@@ -2990,49 +3203,61 @@ class MatplotlibRenderer(Renderer):
     ) -> None:
         if element.fill is None:
             return
-        if element.wrap:
-            raise TemplateValidationError(
-                f"Curve fill for {element.channel!r} does not support wrapped curves yet."
-            )
-        other = self._resolve_curve_fill_target(
-            track,
-            element,
-            independent_curve_scales=independent_curve_scales,
-        )
-        if other.wrap:
-            raise TemplateValidationError(
-                f"Curve fill for {element.channel!r} cannot target wrapped curve "
-                f"{other.channel!r} yet."
-            )
-
-        primary_data = self._curve_plot_data(
+        fill_data = self._prepare_curve_fill_data(
             track,
             element,
             document,
             dataset,
             independent_curve_scales=independent_curve_scales,
         )
-        secondary_data = self._curve_plot_data(
-            track,
-            other,
-            document,
-            dataset,
-            independent_curve_scales=independent_curve_scales,
-        )
-        secondary_values = self._align_curve_fill_values(
-            primary_data.depth,
-            primary_data.valid_mask,
-            secondary_data,
-        )
-        valid_mask = (
-            primary_data.valid_mask
-            & np.isfinite(primary_data.plot_values)
-            & np.isfinite(secondary_values)
-        )
+        primary_data = fill_data.primary
+        secondary_values = fill_data.secondary_values
+        valid_mask = fill_data.valid_mask
         if not np.any(valid_mask):
             return
 
         alpha = self._resolved_curve_fill_alpha(element)
+        if element.fill.kind == CurveFillKind.BASELINE_SPLIT:
+            assert element.fill.baseline is not None
+            lower_color, upper_color = self._resolved_curve_fill_baseline_colors(element)
+            lower_mask = valid_mask & (primary_data.raw_values < element.fill.baseline.value)
+            upper_mask = valid_mask & (primary_data.raw_values > element.fill.baseline.value)
+            if np.any(lower_mask):
+                ax.fill_betweenx(
+                    primary_data.depth,
+                    primary_data.plot_values,
+                    secondary_values,
+                    where=lower_mask,
+                    facecolor=lower_color,
+                    alpha=alpha,
+                    linewidth=0.0,
+                    interpolate=True,
+                )
+            if np.any(upper_mask):
+                ax.fill_betweenx(
+                    primary_data.depth,
+                    primary_data.plot_values,
+                    secondary_values,
+                    where=upper_mask,
+                    facecolor=upper_color,
+                    alpha=alpha,
+                    linewidth=0.0,
+                    interpolate=True,
+                )
+            baseline_values = secondary_values[valid_mask]
+            if baseline_values.size > 0:
+                line_color, line_width, line_style = self._resolved_curve_fill_baseline_line_style(
+                    element
+                )
+                ax.axvline(
+                    float(baseline_values[0]),
+                    color=line_color,
+                    linewidth=line_width,
+                    linestyle=line_style,
+                    zorder=0.35,
+                )
+            return
+
         if element.fill.crossover.enabled:
             left_color = element.fill.crossover.left_color or self._resolved_curve_fill_color(
                 element

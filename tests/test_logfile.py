@@ -601,6 +601,85 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.kind, CurveFillKind.BETWEEN_INSTANCES)
         self.assertEqual(curve.fill.other_element_id, "cbl_0_10")
 
+    def test_binding_can_parse_limit_fill(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"] = [
+            {
+                "id": "gr_fill",
+                "title": "GR",
+                "kind": "normal",
+                "width_mm": 28,
+                "position": 1,
+            }
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {
+                "channel": "GR",
+                "track_id": "gr_fill",
+                "kind": "curve",
+                "fill": {
+                    "kind": "to_upper_limit",
+                    "label": "Sand Fill",
+                    "color": "#f59e0b",
+                },
+            }
+        ]
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[0].elements[0]
+        assert curve.fill is not None
+        self.assertEqual(curve.fill.kind, CurveFillKind.TO_UPPER_LIMIT)
+        self.assertEqual(curve.fill.label, "Sand Fill")
+        self.assertEqual(curve.fill.color, "#f59e0b")
+
+    def test_binding_can_parse_baseline_split_fill(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"] = [
+            {
+                "id": "porosity",
+                "title": "Porosity",
+                "kind": "normal",
+                "width_mm": 28,
+                "position": 1,
+            }
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {
+                "channel": "GR",
+                "track_id": "porosity",
+                "kind": "curve",
+                "fill": {
+                    "kind": "baseline_split",
+                    "label": "Gas Effect",
+                    "alpha": 0.3,
+                    "baseline": {
+                        "value": 70,
+                        "lower_color": "#22c55e",
+                        "upper_color": "#ef4444",
+                        "line_color": "#111111",
+                        "line_width": 0.5,
+                    },
+                },
+            }
+        ]
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[0].elements[0]
+        assert curve.fill is not None
+        self.assertEqual(curve.fill.kind, CurveFillKind.BASELINE_SPLIT)
+        assert curve.fill.baseline is not None
+        self.assertAlmostEqual(curve.fill.baseline.value, 70.0)
+        self.assertEqual(curve.fill.baseline.lower_color, "#22c55e")
+        self.assertEqual(curve.fill.baseline.upper_color, "#ef4444")
+
     def test_raster_binding_parses_array_display_options(self) -> None:
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][2]["kind"] = "array"

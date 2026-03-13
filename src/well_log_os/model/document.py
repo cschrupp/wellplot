@@ -85,6 +85,9 @@ class RasterColorbarPosition(StrEnum):
 class CurveFillKind(StrEnum):
     BETWEEN_CURVES = "between_curves"
     BETWEEN_INSTANCES = "between_instances"
+    TO_LOWER_LIMIT = "to_lower_limit"
+    TO_UPPER_LIMIT = "to_upper_limit"
+    BASELINE_SPLIT = "baseline_split"
 
 
 @dataclass(slots=True)
@@ -306,10 +309,33 @@ class CurveFillCrossoverSpec:
 
 
 @dataclass(slots=True)
+class CurveFillBaselineSpec:
+    value: float
+    lower_color: str | None = None
+    upper_color: str | None = None
+    line_color: str | None = None
+    line_width: float = 0.6
+    line_style: str = "--"
+
+    def __post_init__(self) -> None:
+        if self.lower_color is not None and not str(self.lower_color).strip():
+            raise ValueError("Curve fill baseline lower_color must be non-empty when provided.")
+        if self.upper_color is not None and not str(self.upper_color).strip():
+            raise ValueError("Curve fill baseline upper_color must be non-empty when provided.")
+        if self.line_color is not None and not str(self.line_color).strip():
+            raise ValueError("Curve fill baseline line_color must be non-empty when provided.")
+        if self.line_width <= 0:
+            raise ValueError("Curve fill baseline line_width must be positive.")
+        if not str(self.line_style).strip():
+            raise ValueError("Curve fill baseline line_style must be non-empty.")
+
+
+@dataclass(slots=True)
 class CurveFillSpec:
     kind: CurveFillKind
     other_channel: str | None = None
     other_element_id: str | None = None
+    baseline: CurveFillBaselineSpec | None = None
     label: str | None = None
     color: str | None = None
     alpha: float | None = None
@@ -329,17 +355,37 @@ class CurveFillSpec:
                 raise ValueError("Curve fill between_curves requires other_channel.")
             if self.other_element_id is not None:
                 raise ValueError("Curve fill between_curves does not accept other_element_id.")
+            if self.baseline is not None:
+                raise ValueError("Curve fill between_curves does not accept baseline.")
         if self.kind == CurveFillKind.BETWEEN_INSTANCES:
             if self.other_element_id is None:
                 raise ValueError("Curve fill between_instances requires other_element_id.")
             if self.other_channel is not None:
                 raise ValueError("Curve fill between_instances does not accept other_channel.")
+            if self.baseline is not None:
+                raise ValueError("Curve fill between_instances does not accept baseline.")
+        if self.kind in {CurveFillKind.TO_LOWER_LIMIT, CurveFillKind.TO_UPPER_LIMIT}:
+            if self.other_channel is not None or self.other_element_id is not None:
+                raise ValueError("Curve limit fills do not accept other targets.")
+            if self.baseline is not None:
+                raise ValueError("Curve limit fills do not accept baseline.")
+        if self.kind == CurveFillKind.BASELINE_SPLIT:
+            if self.baseline is None:
+                raise ValueError("Curve fill baseline_split requires baseline.")
+            if self.other_channel is not None or self.other_element_id is not None:
+                raise ValueError("Curve fill baseline_split does not accept other targets.")
         if self.label is not None and not str(self.label).strip():
             raise ValueError("Curve fill label must be non-empty when provided.")
         if self.color is not None and not str(self.color).strip():
             raise ValueError("Curve fill color must be non-empty when provided.")
         if self.alpha is not None and (self.alpha < 0 or self.alpha > 1):
             raise ValueError("Curve fill alpha must be between 0 and 1.")
+        if (
+            self.kind
+            not in {CurveFillKind.BETWEEN_CURVES, CurveFillKind.BETWEEN_INSTANCES}
+            and self.crossover.enabled
+        ):
+            raise ValueError("Curve fill crossover is only supported for between-curve fills.")
 
 
 @dataclass(slots=True)

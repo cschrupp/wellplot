@@ -388,9 +388,16 @@ def _parse_binding_wrap(value: Any, *, context: str) -> tuple[bool, str | None]:
 def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
     fill = _ensure_mapping(value, context=context)
     kind = str(fill.get("kind", "")).strip().lower()
-    if kind not in {"between_curves", "between_instances"}:
+    if kind not in {
+        "between_curves",
+        "between_instances",
+        "to_lower_limit",
+        "to_upper_limit",
+        "baseline_split",
+    }:
         raise TemplateValidationError(
-            f"{context}.kind must be between_curves or between_instances."
+            f"{context}.kind must be between_curves, between_instances, to_lower_limit, "
+            "to_upper_limit, or baseline_split."
         )
 
     payload: dict[str, Any] = {"kind": kind}
@@ -399,11 +406,31 @@ def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
         if not other_channel:
             raise TemplateValidationError(f"{context}.other_channel must be non-empty.")
         payload["other_channel"] = other_channel
-    else:
+    elif kind == "between_instances":
         other_element_id = str(fill.get("other_element_id", "")).strip()
         if not other_element_id:
             raise TemplateValidationError(f"{context}.other_element_id must be non-empty.")
         payload["other_element_id"] = other_element_id
+    elif kind == "baseline_split":
+        baseline = _ensure_mapping(fill.get("baseline"), context=f"{context}.baseline")
+        if "value" not in baseline:
+            raise TemplateValidationError(f"{context}.baseline.value is required.")
+        baseline_payload: dict[str, Any] = {"value": float(baseline["value"])}
+        for key in ("lower_color", "upper_color", "line_color", "line_style"):
+            if key not in baseline:
+                continue
+            text = str(baseline[key]).strip()
+            if not text:
+                raise TemplateValidationError(f"{context}.baseline.{key} must be non-empty.")
+            baseline_payload[key] = text
+        if "line_width" in baseline:
+            line_width = float(baseline["line_width"])
+            if line_width <= 0:
+                raise TemplateValidationError(
+                    f"{context}.baseline.line_width must be positive."
+                )
+            baseline_payload["line_width"] = line_width
+        payload["baseline"] = baseline_payload
     if "label" in fill:
         label = str(fill["label"]).strip()
         if not label:
@@ -441,6 +468,10 @@ def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
                     f"{context}.crossover.alpha must be between 0 and 1."
                 )
             crossover_payload["alpha"] = alpha
+        if kind not in {"between_curves", "between_instances"} and crossover_payload["enabled"]:
+            raise TemplateValidationError(
+                f"{context}.crossover is only supported for between_curves and between_instances."
+            )
         payload["crossover"] = crossover_payload
     return payload
 

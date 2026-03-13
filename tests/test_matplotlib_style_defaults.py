@@ -826,6 +826,214 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         finally:
             plt.close(fig)
 
+    def test_to_lower_limit_fill_adds_single_collection(self) -> None:
+        depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
+        dataset = WellDataset(name="lower limit fill")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([20, 40, 60, 80]))
+        )
+        document = document_from_mapping(
+            {
+                "name": "lower limit fill",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 100},
+                                "fill": {
+                                    "kind": "to_lower_limit",
+                                    "color": "#22c55e",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        fig, ax = plt.subplots()
+        try:
+            renderer._draw_curve(
+                ax,
+                document.tracks[0],
+                document.tracks[0].elements[0],
+                document,
+                dataset,
+                independent_curve_scales=False,
+            )
+            self.assertEqual(len(ax.collections), 1)
+        finally:
+            plt.close(fig)
+
+    def test_baseline_split_fill_adds_two_collections_and_baseline(self) -> None:
+        depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
+        dataset = WellDataset(name="baseline split")
+        dataset.add_channel(
+            ScalarChannel("NPHI", depth, "m", "ft3/ft3", values=np.array([0.05, 0.20, 0.10, 0.25]))
+        )
+        document = document_from_mapping(
+            {
+                "name": "baseline split fill",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "nphi",
+                        "title": "NPHI",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "NPHI",
+                                "scale": {"kind": "linear", "min": 0.0, "max": 0.45},
+                                "fill": {
+                                    "kind": "baseline_split",
+                                    "alpha": 0.3,
+                                    "baseline": {
+                                        "value": 0.15,
+                                        "lower_color": "#22c55e",
+                                        "upper_color": "#ef4444",
+                                        "line_color": "#111111",
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        fig, ax = plt.subplots()
+        try:
+            renderer._draw_curve(
+                ax,
+                document.tracks[0],
+                document.tracks[0].elements[0],
+                document,
+                dataset,
+                independent_curve_scales=False,
+            )
+            self.assertEqual(len(ax.collections), 2)
+            self.assertEqual(len(ax.lines), 2)
+        finally:
+            plt.close(fig)
+
+    def test_baseline_split_header_draws_indicator_and_label(self) -> None:
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset = WellDataset(name="baseline header")
+        dataset.add_channel(
+            ScalarChannel("NPHI", depth, "m", "ft3/ft3", values=np.array([0.05, 0.20, 0.10]))
+        )
+        document = document_from_mapping(
+            {
+                "name": "baseline header",
+                "page": {"size": "A4", "track_header_height_mm": 12.0},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "nphi",
+                        "title": "NPHI",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "NPHI",
+                                "scale": {"kind": "linear", "min": 0.0, "max": 0.45},
+                                "fill": {
+                                    "kind": "baseline_split",
+                                    "label": "Gas Effect",
+                                    "baseline": {
+                                        "value": 0.15,
+                                        "lower_color": "#22c55e",
+                                        "upper_color": "#ef4444",
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        fig, ax = plt.subplots()
+        try:
+            renderer._draw_track_header(ax, document.tracks[0], document, dataset)
+            self.assertIn("Gas Effect", {text.get_text() for text in ax.texts})
+            self.assertGreaterEqual(len(ax.patches), 1)
+        finally:
+            plt.close(fig)
+
+    def test_baseline_split_header_uses_baseline_position_and_reverse_orientation(self) -> None:
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset = WellDataset(name="baseline orientation")
+        dataset.add_channel(
+            ScalarChannel("TT", depth, "m", "us", values=np.array([280.0, 320.0, 295.0]))
+        )
+        document = document_from_mapping(
+            {
+                "name": "baseline orientation",
+                "page": {"size": "A4", "track_header_height_mm": 12.0},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "tt",
+                        "title": "TT",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "TT",
+                                "scale": {
+                                    "kind": "linear",
+                                    "min": 200,
+                                    "max": 400,
+                                    "reverse": True,
+                                },
+                                "fill": {
+                                    "kind": "baseline_split",
+                                    "baseline": {
+                                        "value": 300,
+                                        "lower_color": "#22c55e",
+                                        "upper_color": "#ef4444",
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        segments = renderer._curve_fill_header_segments(
+            document.tracks[0],
+            document.tracks[0].elements[0],
+            document,
+            dataset,
+            independent_curve_scales=False,
+        )
+        self.assertEqual(len(segments), 2)
+        self.assertAlmostEqual(segments[0][0], 0.0)
+        self.assertAlmostEqual(segments[0][1], 0.5)
+        self.assertEqual(segments[0][2], "#ef4444")
+        self.assertAlmostEqual(segments[1][0], 0.5)
+        self.assertAlmostEqual(segments[1][1], 1.0)
+        self.assertEqual(segments[1][2], "#22c55e")
+
     def test_vdl_raster_profile_normalizes_trace_amplitude(self) -> None:
         document = document_from_mapping(
             {

@@ -662,14 +662,37 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "alpha": {"type": "number", "minimum": 0, "maximum": 1},
             },
         },
+        "curveFillBaseline": {
+            "type": "object",
+            "required": ["value"],
+            "additionalProperties": False,
+            "properties": {
+                "value": {"type": "number"},
+                "lower_color": {"type": "string", "minLength": 1},
+                "upper_color": {"type": "string", "minLength": 1},
+                "line_color": {"type": "string", "minLength": 1},
+                "line_width": {"type": "number", "exclusiveMinimum": 0},
+                "line_style": {"type": "string", "minLength": 1},
+            },
+        },
         "curveFill": {
             "type": "object",
             "required": ["kind"],
             "additionalProperties": False,
             "properties": {
-                "kind": {"type": "string", "enum": ["between_curves", "between_instances"]},
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "between_curves",
+                        "between_instances",
+                        "to_lower_limit",
+                        "to_upper_limit",
+                        "baseline_split",
+                    ],
+                },
                 "other_channel": {"type": "string", "minLength": 1},
                 "other_element_id": {"type": "string", "minLength": 1},
+                "baseline": {"$ref": "#/$defs/curveFillBaseline"},
                 "label": {"type": "string", "minLength": 1},
                 "color": {"type": "string", "minLength": 1},
                 "alpha": {"type": "number", "minimum": 0, "maximum": 1},
@@ -683,7 +706,12 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                     },
                     "then": {
                         "required": ["other_channel"],
-                        "not": {"required": ["other_element_id"]},
+                        "not": {
+                            "anyOf": [
+                                {"required": ["other_element_id"]},
+                                {"required": ["baseline"]},
+                            ]
+                        },
                     },
                 },
                 {
@@ -693,7 +721,44 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                     },
                     "then": {
                         "required": ["other_element_id"],
-                        "not": {"required": ["other_channel"]},
+                        "not": {
+                            "anyOf": [
+                                {"required": ["other_channel"]},
+                                {"required": ["baseline"]},
+                            ]
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["kind"],
+                        "properties": {"kind": {"const": "baseline_split"}},
+                    },
+                    "then": {
+                        "required": ["baseline"],
+                        "not": {
+                            "anyOf": [
+                                {"required": ["other_channel"]},
+                                {"required": ["other_element_id"]},
+                            ]
+                        },
+                    },
+                },
+                {
+                    "if": {
+                        "required": ["kind"],
+                        "properties": {
+                            "kind": {"enum": ["to_lower_limit", "to_upper_limit"]}
+                        },
+                    },
+                    "then": {
+                        "not": {
+                            "anyOf": [
+                                {"required": ["other_channel"]},
+                                {"required": ["other_element_id"]},
+                                {"required": ["baseline"]},
+                            ]
+                        },
                     },
                 },
             ],

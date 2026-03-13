@@ -189,6 +189,85 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.fill.kind, CurveFillKind.BETWEEN_INSTANCES)
         self.assertEqual(element.fill.other_element_id, "cbl_0_10")
 
+    def test_curve_element_can_parse_limit_fill(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve limit fill",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "curve",
+                        "title": "Curve",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "fill": {
+                                    "kind": "to_lower_limit",
+                                    "label": "Shale Fill",
+                                    "color": "#22c55e",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        assert element.fill is not None
+        self.assertEqual(element.fill.kind, CurveFillKind.TO_LOWER_LIMIT)
+        self.assertEqual(element.fill.label, "Shale Fill")
+        self.assertEqual(element.fill.color, "#22c55e")
+
+    def test_curve_element_can_parse_baseline_split_fill(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "baseline split fill",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "curve",
+                        "title": "Curve",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "NPHI",
+                                "fill": {
+                                    "kind": "baseline_split",
+                                    "label": "Gas Effect",
+                                    "alpha": 0.35,
+                                    "baseline": {
+                                        "value": 0.15,
+                                        "lower_color": "#22c55e",
+                                        "upper_color": "#ef4444",
+                                        "line_color": "#222222",
+                                        "line_width": 0.7,
+                                        "line_style": ":",
+                                    },
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        assert element.fill is not None
+        self.assertEqual(element.fill.kind, CurveFillKind.BASELINE_SPLIT)
+        assert element.fill.baseline is not None
+        self.assertAlmostEqual(element.fill.baseline.value, 0.15)
+        self.assertEqual(element.fill.baseline.lower_color, "#22c55e")
+        self.assertEqual(element.fill.baseline.upper_color, "#ef4444")
+        self.assertEqual(element.fill.baseline.line_color, "#222222")
+
     def test_reference_track_can_define_layout_axis(self) -> None:
         document = document_from_mapping(
             {
