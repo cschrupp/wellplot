@@ -163,6 +163,40 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(pair[1], 2)
         self.assertGreater(pair[2], pair[3])
 
+    def test_curve_header_row_count_uses_document_wide_capacity(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "uniform header rows",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {"kind": "curve", "channel": "A"},
+                            {"kind": "curve", "channel": "B"},
+                            {"kind": "curve", "channel": "C"},
+                            {"kind": "curve", "channel": "D"},
+                        ],
+                    },
+                    {
+                        "id": "single",
+                        "title": "Single",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [{"kind": "curve", "channel": "E"}],
+                    },
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        self.assertEqual(renderer._document_curve_row_capacity(document), 4)
+        self.assertEqual(renderer._curve_header_row_count(document, document.tracks[0]), 4)
+        self.assertEqual(renderer._curve_header_row_count(document, document.tracks[1]), 4)
+
     def test_curve_header_display_controls_scale_text_and_color(self) -> None:
         depth = np.array([1000.0, 1001.0, 1002.0])
         dataset = WellDataset(name="sample")

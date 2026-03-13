@@ -237,6 +237,15 @@ class MatplotlibRenderer(Renderer):
     def _curve_count(self, track) -> int:
         return sum(1 for element in track.elements if isinstance(element, CurveElement))
 
+    def _document_curve_row_capacity(self, document: LogDocument) -> int:
+        return max((self._curve_count(track) for track in document.tracks), default=0)
+
+    def _curve_header_row_count(self, document: LogDocument, track) -> int:
+        count = self._curve_count(track)
+        if count <= 0:
+            return 0
+        return max(count, self._document_curve_row_capacity(document))
+
     def _effective_header_line_units(self, track, header_item) -> int:
         if not header_item.enabled or not header_item.reserve_space:
             return header_item.line_units
@@ -681,6 +690,7 @@ class MatplotlibRenderer(Renderer):
                 self._draw_track_header_curve_pairs(
                     ax,
                     track,
+                    document,
                     dataset,
                     paired_slot[2],
                     paired_slot[3],
@@ -691,7 +701,7 @@ class MatplotlibRenderer(Renderer):
             elif item.kind == TrackHeaderObjectKind.SCALE:
                 self._draw_track_header_scale(ax, track, document, dataset, slot_top, slot_bottom)
             elif item.kind == TrackHeaderObjectKind.LEGEND:
-                self._draw_track_header_legend(ax, track, dataset, slot_top, slot_bottom)
+                self._draw_track_header_legend(ax, track, document, dataset, slot_top, slot_bottom)
             elif item.kind == TrackHeaderObjectKind.DIVISIONS:
                 self._draw_track_header_divisions(ax, track, dataset, slot_top, slot_bottom)
 
@@ -1651,6 +1661,7 @@ class MatplotlibRenderer(Renderer):
         self,
         ax,
         track,
+        document,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -1712,7 +1723,7 @@ class MatplotlibRenderer(Renderer):
             )
             return
 
-        row_count = len(curves)
+        row_count = self._curve_header_row_count(document, track)
         rows = self._curve_row_bounds(slot_top, slot_bottom, row_count)
         for element, (_, row_bottom) in zip(curves, rows, strict=False):
             row_color = self._curve_header_color(element)
@@ -1764,6 +1775,7 @@ class MatplotlibRenderer(Renderer):
         self,
         ax,
         track,
+        document,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -1773,7 +1785,8 @@ class MatplotlibRenderer(Renderer):
         if not curves:
             return
 
-        rows = self._curve_row_bounds(slot_top, slot_bottom, len(curves) * 2)
+        row_count = self._curve_header_row_count(document, track)
+        rows = self._curve_row_bounds(slot_top, slot_bottom, row_count * 2)
         for curve_index, element in enumerate(curves):
             name_top, name_bottom = rows[curve_index * 2]
             scale_top, scale_bottom = rows[curve_index * 2 + 1]
