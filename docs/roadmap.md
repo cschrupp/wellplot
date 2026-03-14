@@ -140,6 +140,20 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
+- Add in-track curve labels/callouts as first-class display objects:
+  - depth-linked labels attached to curves
+  - leader lines / arrows from label to curve position
+  - per-label text, color, font, anchor side, and offset controls
+  - collision-handling rules so labels remain readable in dense intervals
+- Expand reference/depth tracks so they can host curve overlays cleanly:
+  - scalar curve overlays inside the reference track body
+  - reference-track-specific overlay styles for slim curves, ticks, and event traces
+  - compatibility rules for depth/time reference units versus overlaid curve units
+  - examples where the depth track carries indicators or auxiliary curves
+- Implement first `annotation` track objects:
+  - depth-linked text labels
+  - arrows/glyph markers
+  - reserved-space/no-overlap policies
 - Extend multi-section composition engine:
   - render heading/comments/tail blocks between log sections
   - add section-specific break policies for continuous and paginated outputs
@@ -170,10 +184,6 @@ Longer-term / UI-centric:
 - Implement explicit `array` track options beyond raster baseline:
   - array-specific legends and advanced colorbar placement
   - per-track colormap presets
-- Implement first `annotation` track objects:
-  - depth-linked text labels
-  - arrows/glyph markers
-  - reserved-space/no-overlap policies
 - Add reference-track focused examples:
   - depth-reference with curve overlay
   - time-reference sample

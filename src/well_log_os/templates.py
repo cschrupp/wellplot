@@ -9,6 +9,7 @@ import yaml
 
 from .errors import TemplateValidationError
 from .model import (
+    CurveCalloutSpec,
     CurveElement,
     CurveFillBaselineSpec,
     CurveFillCrossoverSpec,
@@ -556,6 +557,81 @@ def _build_curve_header_display(data: Any) -> CurveHeaderDisplaySpec:
     )
 
 
+def _build_curve_callouts(data: Any) -> tuple[CurveCalloutSpec, ...]:
+    if data is None:
+        return ()
+    callout_items = _ensure_sequence(data, context="curve.callouts")
+    callouts: list[CurveCalloutSpec] = []
+    for index, item in enumerate(callout_items):
+        callout_data = _ensure_mapping(item, context=f"curve.callouts[{index}]")
+        try:
+            callouts.append(
+                CurveCalloutSpec(
+                    depth=float(callout_data["depth"]),
+                    label=(
+                        str(callout_data["label"]).strip()
+                        if callout_data.get("label") is not None
+                        else None
+                    ),
+                    side=str(callout_data.get("side", "auto")),
+                    placement=str(callout_data.get("placement", "inline")),
+                    text_x=(
+                        float(callout_data["text_x"])
+                        if callout_data.get("text_x") is not None
+                        else None
+                    ),
+                    depth_offset=(
+                        float(callout_data["depth_offset"])
+                        if callout_data.get("depth_offset") is not None
+                        else None
+                    ),
+                    distance_from_top=(
+                        float(callout_data["distance_from_top"])
+                        if callout_data.get("distance_from_top") is not None
+                        else None
+                    ),
+                    distance_from_bottom=(
+                        float(callout_data["distance_from_bottom"])
+                        if callout_data.get("distance_from_bottom") is not None
+                        else None
+                    ),
+                    every=(
+                        float(callout_data["every"])
+                        if callout_data.get("every") is not None
+                        else None
+                    ),
+                    color=(
+                        str(callout_data["color"]).strip()
+                        if callout_data.get("color") is not None
+                        else None
+                    ),
+                    font_size=(
+                        float(callout_data["font_size"])
+                        if callout_data.get("font_size") is not None
+                        else None
+                    ),
+                    font_weight=str(callout_data.get("font_weight", "bold")),
+                    font_style=str(callout_data.get("font_style", "normal")),
+                    arrow=bool(callout_data.get("arrow", True)),
+                    arrow_style=(
+                        str(callout_data["arrow_style"]).strip()
+                        if callout_data.get("arrow_style") is not None
+                        else None
+                    ),
+                    arrow_linewidth=(
+                        float(callout_data["arrow_linewidth"])
+                        if callout_data.get("arrow_linewidth") is not None
+                        else None
+                    ),
+                )
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise TemplateValidationError(
+                f"Invalid curve.callouts[{index}] configuration."
+            ) from exc
+    return tuple(callouts)
+
+
 def _build_curve_fill(data: Any) -> CurveFillSpec | None:
     if data is None:
         return None
@@ -804,6 +880,7 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
                     render_mode=str(element_data.get("render_mode", "line")),
                     value_labels=_build_curve_value_labels(element_data.get("value_labels")),
                     header_display=_build_curve_header_display(element_data.get("header_display")),
+                    callouts=_build_curve_callouts(element_data.get("callouts")),
                     fill=_build_curve_fill(element_data.get("fill")),
                 )
             )

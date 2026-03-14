@@ -104,6 +104,22 @@ grid:
   depth_minor_color: "#b6b6b6"
   depth_minor_linewidth: 0.3
   depth_minor_alpha: 0.9
+curve_callouts:
+  left_text_x: 0.1
+  right_text_x: 0.82
+  lane_count: 3
+  lane_step_x: 0.08
+  edge_padding_px: 8.0
+  curve_buffer_px: 5.0
+  default_depth_offset_steps: -1.0
+  top_distance_steps: 1.5
+  bottom_distance_steps: 1.5
+  min_vertical_gap_steps: 1.6
+  font_size: 8.8
+  font_weight: bold
+  font_style: normal
+  arrow_style: "-|>"
+  arrow_linewidth: 0.7
 markers:
   callout_anchor_x: 0.03
   callout_text_x: 0.7

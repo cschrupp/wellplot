@@ -480,6 +480,37 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.render_mode, "value_labels")
         self.assertEqual(curve.value_labels.step, 5.0)
 
+    def test_binding_can_parse_curve_callouts(self) -> None:
+        payload = build_mapping()
+        payload["document"]["bindings"]["channels"][0]["callouts"] = [
+            {
+                "depth": 1005,
+                "label": "GR Sand",
+                "side": "right",
+                "placement": "bottom",
+                "text_x": 0.78,
+                "depth_offset": -2,
+                "distance_from_top": 1.0,
+                "distance_from_bottom": 2.0,
+                "every": 4,
+            }
+        ]
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[0].elements[0]
+        self.assertEqual(len(curve.callouts), 1)
+        self.assertEqual(curve.callouts[0].label, "GR Sand")
+        self.assertEqual(curve.callouts[0].side, "right")
+        self.assertEqual(curve.callouts[0].placement, "bottom")
+        self.assertAlmostEqual(curve.callouts[0].text_x or 0.0, 0.78)
+        self.assertAlmostEqual(curve.callouts[0].distance_from_top or 0.0, 1.0)
+        self.assertAlmostEqual(curve.callouts[0].distance_from_bottom or 0.0, 2.0)
+        self.assertAlmostEqual(curve.callouts[0].every or 0.0, 4.0)
+
     def test_binding_can_enable_log_wrap(self) -> None:
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][1]["scale"] = {

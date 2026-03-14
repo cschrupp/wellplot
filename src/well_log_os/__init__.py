@@ -11,6 +11,7 @@ from .logfile import (
 from .logfile_schema import get_logfile_json_schema, validate_logfile_mapping
 from .model import (
     ArrayChannel,
+    CurveCalloutSpec,
     CurveElement,
     CurveFillBaselineSpec,
     CurveFillCrossoverSpec,
@@ -47,6 +48,7 @@ from .templates import document_from_mapping, load_document
 
 __all__ = [
     "ArrayChannel",
+    "CurveCalloutSpec",
     "CurveElement",
     "CurveFillBaselineSpec",
     "CurveFillCrossoverSpec",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import os
 from copy import deepcopy
 from dataclasses import dataclass, replace
@@ -80,6 +81,27 @@ class _CurveFillRenderData:
     primary: _CurvePlotData
     secondary_values: np.ndarray
     valid_mask: np.ndarray
+
+
+@dataclass(slots=True)
+class _CurveCalloutRenderRecord:
+    label: str
+    side: str
+    allow_side_flip: bool
+    curve_key: int
+    anchor_x: float
+    anchor_y: float
+    text_x: float
+    desired_text_y: float
+    color: str
+    font_size: float
+    font_weight: str
+    font_style: str
+    arrow: bool
+    arrow_style: str
+    arrow_linewidth: float
+    placed_side: str | None = None
+    text_y: float | None = None
 
 
 class MatplotlibRenderer(Renderer):
@@ -2524,6 +2546,14 @@ class MatplotlibRenderer(Renderer):
                 window,
                 major_step=major_step,
             )
+            self._draw_curve_callouts(
+                ax,
+                track,
+                document,
+                dataset,
+                window,
+                independent_curve_scales=False,
+            )
             self._draw_marker_callouts(ax, document, window)
             return
 
@@ -2566,6 +2596,14 @@ class MatplotlibRenderer(Renderer):
             labelbottom=show_sample_axis,
         )
         ax.tick_params(axis="y", length=0, labelleft=False)
+        self._draw_curve_callouts(
+            ax,
+            track,
+            document,
+            dataset,
+            window,
+            independent_curve_scales=independent_curve_scales,
+        )
 
     def _uses_independent_curve_scales(self, track) -> bool:
         if self._is_reference_track(track) or self._is_annotation_track(track):
@@ -3522,6 +3560,740 @@ class MatplotlibRenderer(Renderer):
             if labels.font_family:
                 kwargs["fontfamily"] = labels.font_family
             ax.text(x_value, y_value, text, **kwargs)
+
+    def _curve_callout_depth_step(self, document: LogDocument) -> float:
+        if document.depth_axis.minor_step > 0:
+            return float(document.depth_axis.minor_step)
+        if document.depth_axis.major_step > 0:
+            return float(document.depth_axis.major_step) / 5.0
+        return 1.0
+
+    def _interpolate_curve_x_at_depth(
+        self,
+        plot_data: _CurvePlotData,
+        *,
+        depth_value: float,
+    ) -> float | None:
+        mask = plot_data.valid_mask & np.isfinite(plot_data.plot_values)
+        if not np.any(mask):
+            return None
+        source_depth = plot_data.depth[mask]
+        source_values = plot_data.plot_values[mask]
+        order = np.argsort(source_depth, kind="mergesort")
+        source_depth = source_depth[order]
+        source_values = source_values[order]
+        unique_depth, unique_indices = np.unique(source_depth, return_index=True)
+        if unique_depth.size == 0:
+            return None
+        if depth_value < unique_depth[0] or depth_value > unique_depth[-1]:
+            return None
+        unique_values = source_values[unique_indices]
+        interpolated = float(
+            np.interp(depth_value, unique_depth, unique_values, left=np.nan, right=np.nan)
+        )
+        if not np.isfinite(interpolated):
+            return None
+        return interpolated
+
+    def _curve_callout_fraction(
+        self,
+        plot_value: float,
+        plot_data: _CurvePlotData,
+        *,
+        independent_curve_scales: bool,
+    ) -> float:
+        if independent_curve_scales or (
+            plot_data.scale is not None and plot_data.scale.kind == ScaleKind.TANGENTIAL
+        ):
+            return float(np.clip(plot_value, 0.0, 1.0))
+        if plot_data.scale is not None:
+            normalized, mask = self._normalize_curve_values(
+                np.asarray([plot_value], dtype=float),
+                plot_data.scale,
+            )
+            if np.any(mask):
+                return float(np.clip(normalized[0], 0.0, 1.0))
+        finite = plot_data.plot_values[plot_data.valid_mask & np.isfinite(plot_data.plot_values)]
+        if finite.size < 2 or np.isclose(float(np.nanmin(finite)), float(np.nanmax(finite))):
+            return 0.5
+        fraction = (plot_value - float(np.nanmin(finite))) / (
+            float(np.nanmax(finite)) - float(np.nanmin(finite))
+        )
+        return float(np.clip(fraction, 0.0, 1.0))
+
+    def _curve_callout_label(self, element: CurveElement, callout) -> str:
+        if callout.label is not None:
+            return callout.label
+        return element.label or element.channel
+
+    def _curve_callout_window_bounds(self, window) -> tuple[float, float]:
+        start = float(window.start)
+        stop = float(window.stop)
+        return (start, stop) if start <= stop else (stop, start)
+
+    def _curve_callout_default_top_distance(
+        self,
+        document: LogDocument,
+        callout_style: dict[str, Any],
+    ) -> float:
+        return self._curve_callout_depth_step(document) * float(callout_style["top_distance_steps"])
+
+    def _curve_callout_default_bottom_distance(
+        self,
+        document: LogDocument,
+        callout_style: dict[str, Any],
+    ) -> float:
+        return self._curve_callout_depth_step(document) * float(
+            callout_style["bottom_distance_steps"]
+        )
+
+    def _expanded_curve_callout_anchors(
+        self,
+        document: LogDocument,
+        callout,
+        callout_style: dict[str, Any],
+        window,
+        *,
+        section_start: float,
+        section_stop: float,
+    ) -> list[float]:
+        visible_lower, visible_upper = self._curve_callout_window_bounds(window)
+        section_lower, section_upper = (
+            (section_start, section_stop)
+            if section_start <= section_stop
+            else (section_stop, section_start)
+        )
+        base_depth = float(callout.depth)
+        if callout.every is None:
+            if base_depth < visible_lower or base_depth > visible_upper:
+                return []
+            return [base_depth]
+
+        every = float(callout.every)
+        if callout.placement == "top":
+            start_depth = section_lower + (
+                callout.distance_from_top
+                if callout.distance_from_top is not None
+                else self._curve_callout_default_top_distance(document, callout_style)
+            )
+            return [
+                float(depth_value)
+                for depth_value in np.arange(start_depth, section_upper + 0.5 * every, every)
+                if visible_lower <= depth_value <= visible_upper
+            ]
+        if callout.placement == "bottom":
+            start_depth = section_upper - (
+                callout.distance_from_bottom
+                if callout.distance_from_bottom is not None
+                else self._curve_callout_default_bottom_distance(document, callout_style)
+            )
+            return [
+                float(depth_value)
+                for depth_value in np.arange(start_depth, section_lower - 0.5 * every, -every)
+                if visible_lower <= depth_value <= visible_upper
+            ]
+        if callout.placement == "top_and_bottom":
+            top_start = section_lower + (
+                callout.distance_from_top
+                if callout.distance_from_top is not None
+                else self._curve_callout_default_top_distance(document, callout_style)
+            )
+            bottom_start = section_upper - (
+                callout.distance_from_bottom
+                if callout.distance_from_bottom is not None
+                else self._curve_callout_default_bottom_distance(document, callout_style)
+            )
+            anchor_values = {
+                round(float(depth_value), 9)
+                for depth_value in np.arange(top_start, section_upper + 0.5 * every, every)
+                if visible_lower <= depth_value <= visible_upper
+            }
+            anchor_values.update(
+                round(float(depth_value), 9)
+                for depth_value in np.arange(bottom_start, section_lower - 0.5 * every, -every)
+                if visible_lower <= depth_value <= visible_upper
+            )
+            return [float(depth_value) for depth_value in sorted(anchor_values)]
+
+        first_index = math.floor((section_lower - base_depth) / every)
+        anchors: list[float] = []
+        while True:
+            depth_value = base_depth + first_index * every
+            if depth_value > section_upper:
+                break
+            if visible_lower <= depth_value <= visible_upper:
+                anchors.append(float(depth_value))
+            first_index += 1
+        return anchors
+
+    def _curve_callout_target_y(
+        self,
+        *,
+        callout,
+        anchor_depth: float,
+        default_offset: float,
+    ) -> float:
+        return float(
+            anchor_depth
+            + (
+                callout.depth_offset
+                if callout.depth_offset is not None
+                else 0.0
+                if callout.every is not None and callout.placement != "inline"
+                else default_offset
+            )
+        )
+
+    def _curve_callout_records(
+        self,
+        track,
+        document: LogDocument,
+        dataset: WellDataset,
+        window,
+        *,
+        independent_curve_scales: bool,
+    ) -> list[_CurveCalloutRenderRecord]:
+        callout_style = self._style_section("curve_callouts")
+        default_offset = self._curve_callout_depth_step(document) * float(
+            callout_style["default_depth_offset_steps"]
+        )
+        section_start, section_stop = document.resolve_depth_range(dataset, self.registry)
+        records: list[_CurveCalloutRenderRecord] = []
+        for element in self._curve_elements(track):
+            if not element.callouts:
+                continue
+            plot_data = self._curve_plot_data(
+                track,
+                element,
+                document,
+                dataset,
+                independent_curve_scales=independent_curve_scales,
+            )
+            for callout in element.callouts:
+                for anchor_depth in self._expanded_curve_callout_anchors(
+                    document,
+                    callout,
+                    callout_style,
+                    window,
+                    section_start=float(section_start),
+                    section_stop=float(section_stop),
+                ):
+                    anchor_x = self._interpolate_curve_x_at_depth(
+                        plot_data,
+                        depth_value=anchor_depth,
+                    )
+                    if anchor_x is None:
+                        continue
+                    fraction = self._curve_callout_fraction(
+                        anchor_x,
+                        plot_data,
+                        independent_curve_scales=independent_curve_scales,
+                    )
+                    side = callout.side
+                    if side == "auto":
+                        side = "right" if fraction <= 0.5 else "left"
+                    text_x = (
+                        callout.text_x
+                        if callout.text_x is not None
+                        else float(callout_style["right_text_x"])
+                        if side == "right"
+                        else float(callout_style["left_text_x"])
+                    )
+                    records.append(
+                        _CurveCalloutRenderRecord(
+                            label=self._curve_callout_label(element, callout),
+                            side=side,
+                            allow_side_flip=callout.side == "auto" and callout.text_x is None,
+                            curve_key=id(element),
+                            anchor_x=float(anchor_x),
+                            anchor_y=float(anchor_depth),
+                            text_x=float(text_x),
+                            desired_text_y=self._curve_callout_target_y(
+                                callout=callout,
+                                anchor_depth=float(anchor_depth),
+                                default_offset=default_offset,
+                            ),
+                            color=callout.color or element.style.color,
+                            font_size=(
+                                callout.font_size
+                                if callout.font_size is not None
+                                else float(callout_style["font_size"])
+                            ),
+                            font_weight=callout.font_weight,
+                            font_style=callout.font_style,
+                            arrow=callout.arrow,
+                            arrow_style=callout.arrow_style or str(callout_style["arrow_style"]),
+                            arrow_linewidth=(
+                                callout.arrow_linewidth
+                                if callout.arrow_linewidth is not None
+                                else float(callout_style["arrow_linewidth"])
+                            ),
+                        )
+                    )
+        return records
+
+    def _curve_callout_horizontal_alignment(self, side: str) -> str:
+        return "left" if side == "right" else "right"
+
+    def _curve_callout_arrow_relpos(self, side: str) -> tuple[float, float]:
+        return (0.0, 0.5) if side == "right" else (1.0, 0.5)
+
+    def _curve_callout_text_kwargs(
+        self,
+        record: _CurveCalloutRenderRecord,
+        *,
+        side: str,
+    ) -> dict[str, Any]:
+        return {
+            "fontsize": record.font_size,
+            "color": record.color,
+            "fontweight": record.font_weight,
+            "fontstyle": record.font_style,
+            "ha": self._curve_callout_horizontal_alignment(side),
+            "va": "center",
+            "zorder": 4.2,
+        }
+
+    def _curve_callout_candidate_sides(
+        self,
+        record: _CurveCalloutRenderRecord,
+    ) -> list[str]:
+        sides = [record.side]
+        if record.allow_side_flip:
+            alternate = "left" if record.side == "right" else "right"
+            sides.append(alternate)
+        return sides
+
+    def _curve_callout_candidate_x_positions(
+        self,
+        record: _CurveCalloutRenderRecord,
+        side: str,
+        callout_style: dict[str, Any],
+    ) -> list[float]:
+        if side == record.side:
+            base = record.text_x
+        else:
+            base_key = "right_text_x" if side == "right" else "left_text_x"
+            base = float(callout_style[base_key])
+        lane_count = max(int(callout_style["lane_count"]), 1)
+        lane_step = float(callout_style["lane_step_x"])
+        candidates: list[float] = []
+        for index in range(lane_count):
+            offset = lane_step * index
+            value = base - offset if side == "right" else base + offset
+            value = float(np.clip(value, 0.0, 1.0))
+            if any(np.isclose(value, current, atol=1e-6) for current in candidates):
+                continue
+            candidates.append(value)
+        return candidates
+
+    def _curve_callout_candidate_y_positions(
+        self,
+        record: _CurveCalloutRenderRecord,
+        *,
+        lower: float,
+        upper: float,
+        min_gap: float,
+    ) -> list[float]:
+        offsets = [0.0]
+        for index in range(1, 4):
+            offsets.extend((-index * min_gap, index * min_gap))
+        candidates: list[float] = []
+        for offset in offsets:
+            value = float(np.clip(record.desired_text_y + offset, lower, upper))
+            if any(np.isclose(value, current, atol=1e-6) for current in candidates):
+                continue
+            candidates.append(value)
+        return candidates
+
+    def _curve_callout_renderer(self, ax):
+        canvas = ax.figure.canvas
+        get_renderer = getattr(canvas, "get_renderer", None)
+        if get_renderer is None:
+            canvas.draw()
+            get_renderer = canvas.get_renderer
+        renderer = get_renderer()
+        if renderer is None:
+            canvas.draw()
+            renderer = get_renderer()
+        return renderer
+
+    def _measure_curve_callout_bbox(
+        self,
+        ax,
+        *,
+        renderer,
+        label: str,
+        text_x: float,
+        text_y: float,
+        transform,
+        fontsize: float,
+        color: str,
+        fontweight: str,
+        fontstyle: str,
+        horizontal_alignment: str,
+    ):
+        text = ax.text(
+            text_x,
+            text_y,
+            label,
+            transform=transform,
+            fontsize=fontsize,
+            color=color,
+            fontweight=fontweight,
+            fontstyle=fontstyle,
+            ha=horizontal_alignment,
+            va="center",
+            alpha=0.0,
+        )
+        try:
+            return text.get_window_extent(renderer=renderer)
+        finally:
+            text.remove()
+
+    def _adjust_curve_callout_x_to_fit(
+        self,
+        *,
+        text_x: float,
+        bbox,
+        axes_bbox,
+        padding_px: float,
+    ) -> float:
+        shift_px = 0.0
+        if bbox.x0 < axes_bbox.x0 + padding_px:
+            shift_px = (axes_bbox.x0 + padding_px) - bbox.x0
+        elif bbox.x1 > axes_bbox.x1 - padding_px:
+            shift_px = (axes_bbox.x1 - padding_px) - bbox.x1
+        if np.isclose(shift_px, 0.0):
+            return text_x
+        width_px = max(float(axes_bbox.width), 1.0)
+        return float(np.clip(text_x + shift_px / width_px, 0.0, 1.0))
+
+    def _adjust_curve_callout_y_to_fit(
+        self,
+        *,
+        text_x: float,
+        text_y: float,
+        bbox,
+        axes_bbox,
+        padding_px: float,
+        transform,
+    ) -> float:
+        shift_px = 0.0
+        if bbox.y0 < axes_bbox.y0 + padding_px:
+            shift_px = (axes_bbox.y0 + padding_px) - bbox.y0
+        elif bbox.y1 > axes_bbox.y1 - padding_px:
+            shift_px = (axes_bbox.y1 - padding_px) - bbox.y1
+        if np.isclose(shift_px, 0.0):
+            return text_y
+        display_x, display_y = transform.transform((text_x, text_y))
+        _, adjusted_y = transform.inverted().transform((display_x, display_y + shift_px))
+        return float(adjusted_y)
+
+    def _curve_display_point_sets(
+        self,
+        ax,
+        track,
+        document: LogDocument,
+        dataset: WellDataset,
+        *,
+        independent_curve_scales: bool,
+    ) -> dict[int, np.ndarray]:
+        point_sets: dict[int, np.ndarray] = {}
+        for element in self._curve_elements(track):
+            plot_data = self._curve_plot_data(
+                track,
+                element,
+                document,
+                dataset,
+                independent_curve_scales=independent_curve_scales,
+            )
+            mask = plot_data.valid_mask & np.isfinite(plot_data.plot_values)
+            if not np.any(mask):
+                continue
+            points = np.column_stack((plot_data.plot_values[mask], plot_data.depth[mask]))
+            point_sets[id(element)] = ax.transData.transform(points)
+        return point_sets
+
+    def _count_curve_points_in_bbox(
+        self,
+        points: np.ndarray,
+        bbox,
+        *,
+        padding_px: float,
+    ) -> int:
+        if points.size == 0:
+            return 0
+        x0 = bbox.x0 - padding_px
+        x1 = bbox.x1 + padding_px
+        y0 = bbox.y0 - padding_px
+        y1 = bbox.y1 + padding_px
+        inside = (
+            (points[:, 0] >= x0)
+            & (points[:, 0] <= x1)
+            & (points[:, 1] >= y0)
+            & (points[:, 1] <= y1)
+        )
+        return int(np.count_nonzero(inside))
+
+    def _curve_callout_penalty(
+        self,
+        *,
+        ax,
+        record: _CurveCalloutRenderRecord,
+        side: str,
+        text_x: float,
+        text_y: float,
+        bbox,
+        text_transform,
+        point_sets: dict[int, np.ndarray],
+        curve_buffer_px: float,
+    ) -> float:
+        own_points = point_sets.get(record.curve_key, np.empty((0, 2)))
+        own_overlap = self._count_curve_points_in_bbox(
+            own_points,
+            bbox,
+            padding_px=curve_buffer_px,
+        )
+        other_overlap = sum(
+            self._count_curve_points_in_bbox(points, bbox, padding_px=curve_buffer_px)
+            for key, points in point_sets.items()
+            if key != record.curve_key
+        )
+        anchor_display = ax.transData.transform((record.anchor_x, record.anchor_y))
+        text_display = text_transform.transform((text_x, text_y))
+        leader_length = float(
+            np.hypot(text_display[0] - anchor_display[0], text_display[1] - anchor_display[1])
+        )
+        side_flip_penalty = 0.0 if side == record.side else 50.0
+        depth_shift = abs(text_y - record.desired_text_y)
+        return (
+            own_overlap * 25.0
+            + other_overlap * 6.0
+            + leader_length * 0.01
+            + depth_shift * 0.5
+            + side_flip_penalty
+        )
+
+    def _place_curve_callouts(
+        self,
+        ax,
+        track,
+        document: LogDocument,
+        dataset: WellDataset,
+        window,
+        *,
+        independent_curve_scales: bool,
+    ) -> list[_CurveCalloutRenderRecord]:
+        records = self._curve_callout_records(
+            track,
+            document,
+            dataset,
+            window,
+            independent_curve_scales=independent_curve_scales,
+        )
+        if not records:
+            return []
+
+        from matplotlib.transforms import blended_transform_factory
+
+        callout_style = self._style_section("curve_callouts")
+        min_gap = self._curve_callout_depth_step(document) * float(
+            callout_style["min_vertical_gap_steps"]
+        )
+        lower = float(window.start) + 0.5 * min_gap
+        upper = float(window.stop) - 0.5 * min_gap
+        if lower > upper:
+            lower = float(window.start)
+            upper = float(window.stop)
+        renderer = self._curve_callout_renderer(ax)
+        text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        edge_padding_px = float(callout_style["edge_padding_px"])
+        curve_buffer_px = float(callout_style["curve_buffer_px"])
+        point_sets = self._curve_display_point_sets(
+            ax,
+            track,
+            document,
+            dataset,
+            independent_curve_scales=independent_curve_scales,
+        )
+        placed_bboxes = []
+        ordered = sorted(
+            records,
+            key=lambda record: (
+                record.allow_side_flip,
+                -len(record.label),
+                record.desired_text_y,
+            ),
+        )
+        for record in ordered:
+            best: tuple[float, str, float, float] | None = None
+            for side in self._curve_callout_candidate_sides(record):
+                horizontal_alignment = self._curve_callout_horizontal_alignment(side)
+                for candidate_x in self._curve_callout_candidate_x_positions(
+                    record,
+                    side,
+                    callout_style,
+                ):
+                    for candidate_y in self._curve_callout_candidate_y_positions(
+                        record,
+                        lower=lower,
+                        upper=upper,
+                        min_gap=min_gap,
+                    ):
+                        bbox = self._measure_curve_callout_bbox(
+                            ax,
+                            renderer=renderer,
+                            label=record.label,
+                            text_x=candidate_x,
+                            text_y=candidate_y,
+                            transform=text_transform,
+                            fontsize=record.font_size,
+                            color=record.color,
+                            fontweight=record.font_weight,
+                            fontstyle=record.font_style,
+                            horizontal_alignment=horizontal_alignment,
+                        )
+                        adjusted_x = self._adjust_curve_callout_x_to_fit(
+                            text_x=candidate_x,
+                            bbox=bbox,
+                            axes_bbox=axes_bbox,
+                            padding_px=edge_padding_px,
+                        )
+                        if not np.isclose(adjusted_x, candidate_x):
+                            adjusted_candidate_x = adjusted_x
+                            bbox = self._measure_curve_callout_bbox(
+                                ax,
+                                renderer=renderer,
+                                label=record.label,
+                                text_x=adjusted_candidate_x,
+                                text_y=candidate_y,
+                                transform=text_transform,
+                                fontsize=record.font_size,
+                                color=record.color,
+                                fontweight=record.font_weight,
+                                fontstyle=record.font_style,
+                                horizontal_alignment=horizontal_alignment,
+                            )
+                        else:
+                            adjusted_candidate_x = candidate_x
+                        candidate_y = self._adjust_curve_callout_y_to_fit(
+                            text_x=adjusted_candidate_x,
+                            text_y=candidate_y,
+                            bbox=bbox,
+                            axes_bbox=axes_bbox,
+                            padding_px=edge_padding_px,
+                            transform=text_transform,
+                        )
+                        if not np.isclose(candidate_y, record.desired_text_y):
+                            bbox = self._measure_curve_callout_bbox(
+                                ax,
+                                renderer=renderer,
+                                label=record.label,
+                                text_x=adjusted_candidate_x,
+                                text_y=candidate_y,
+                                transform=text_transform,
+                                fontsize=record.font_size,
+                                color=record.color,
+                                fontweight=record.font_weight,
+                                fontstyle=record.font_style,
+                                horizontal_alignment=horizontal_alignment,
+                            )
+                        if (
+                            bbox.x0 < axes_bbox.x0 + edge_padding_px
+                            or bbox.x1 > axes_bbox.x1 - edge_padding_px
+                            or bbox.y0 < axes_bbox.y0 + edge_padding_px
+                            or bbox.y1 > axes_bbox.y1 - edge_padding_px
+                        ):
+                            continue
+                        if any(bbox.overlaps(other) for other in placed_bboxes):
+                            continue
+                        penalty = self._curve_callout_penalty(
+                            ax=ax,
+                            record=record,
+                            side=side,
+                            text_x=adjusted_candidate_x,
+                            text_y=candidate_y,
+                            bbox=bbox,
+                            text_transform=text_transform,
+                            point_sets=point_sets,
+                            curve_buffer_px=curve_buffer_px,
+                        )
+                        if best is None or penalty < best[0]:
+                            best = (penalty, side, adjusted_candidate_x, candidate_y)
+            if best is None:
+                continue
+            _, placed_side, placed_x, placed_y = best
+            record.placed_side = placed_side
+            record.text_x = placed_x
+            record.text_y = placed_y
+            horizontal_alignment = self._curve_callout_horizontal_alignment(placed_side)
+            placed_bbox = self._measure_curve_callout_bbox(
+                ax,
+                renderer=renderer,
+                label=record.label,
+                text_x=placed_x,
+                text_y=placed_y,
+                transform=text_transform,
+                fontsize=record.font_size,
+                color=record.color,
+                fontweight=record.font_weight,
+                fontstyle=record.font_style,
+                horizontal_alignment=horizontal_alignment,
+            )
+            placed_bboxes.append(placed_bbox)
+        return ordered
+
+    def _draw_curve_callouts(
+        self,
+        ax,
+        track,
+        document: LogDocument,
+        dataset: WellDataset,
+        window,
+        *,
+        independent_curve_scales: bool,
+    ) -> None:
+        records = self._place_curve_callouts(
+            ax,
+            track,
+            document,
+            dataset,
+            window,
+            independent_curve_scales=independent_curve_scales,
+        )
+        if not records:
+            return
+
+        from matplotlib.transforms import blended_transform_factory
+
+        text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+        for record in records:
+            if record.text_y is None:
+                continue
+            placed_side = record.placed_side or record.side
+            text_kwargs = self._curve_callout_text_kwargs(record, side=placed_side)
+            arrowprops = None
+            if record.arrow:
+                arrowprops = {
+                    "arrowstyle": record.arrow_style,
+                    "color": record.color,
+                    "lw": record.arrow_linewidth,
+                    "shrinkA": 0,
+                    "shrinkB": 0,
+                    "relpos": self._curve_callout_arrow_relpos(placed_side),
+                }
+            ax.annotate(
+                record.label,
+                xy=(record.anchor_x, record.anchor_y),
+                xycoords=ax.transData,
+                xytext=(record.text_x, record.text_y),
+                textcoords=text_transform,
+                **text_kwargs,
+                arrowprops=arrowprops,
+                annotation_clip=True,
+            )
 
     def _draw_raster(self, ax, track, element, document, dataset) -> None:
         channel = dataset.get_channel(element.channel)

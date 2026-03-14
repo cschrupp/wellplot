@@ -293,6 +293,60 @@ class CurveHeaderDisplaySpec:
 
 
 @dataclass(slots=True)
+class CurveCalloutSpec:
+    depth: float
+    label: str | None = None
+    side: str = "auto"
+    placement: str = "inline"
+    text_x: float | None = None
+    depth_offset: float | None = None
+    distance_from_top: float | None = None
+    distance_from_bottom: float | None = None
+    every: float | None = None
+    color: str | None = None
+    font_size: float | None = None
+    font_weight: str = "bold"
+    font_style: str = "normal"
+    arrow: bool = True
+    arrow_style: str | None = None
+    arrow_linewidth: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.label is not None and not str(self.label).strip():
+            raise ValueError("Curve callout label must be non-empty when provided.")
+        side = self.side.strip().lower()
+        if side not in {"auto", "left", "right"}:
+            raise ValueError("Curve callout side must be auto, left, or right.")
+        self.side = side
+        placement = self.placement.strip().lower()
+        if placement not in {"inline", "top", "bottom", "top_and_bottom"}:
+            raise ValueError(
+                "Curve callout placement must be inline, top, bottom, or top_and_bottom."
+            )
+        self.placement = placement
+        if self.text_x is not None and (self.text_x < 0 or self.text_x > 1):
+            raise ValueError("Curve callout text_x must be between 0 and 1.")
+        if self.distance_from_top is not None and self.distance_from_top < 0:
+            raise ValueError("Curve callout distance_from_top must be non-negative.")
+        if self.distance_from_bottom is not None and self.distance_from_bottom < 0:
+            raise ValueError("Curve callout distance_from_bottom must be non-negative.")
+        if self.every is not None and self.every <= 0:
+            raise ValueError("Curve callout every must be positive when provided.")
+        if self.color is not None and not str(self.color).strip():
+            raise ValueError("Curve callout color must be non-empty when provided.")
+        if self.font_size is not None and self.font_size <= 0:
+            raise ValueError("Curve callout font_size must be positive when provided.")
+        if not str(self.font_weight).strip():
+            raise ValueError("Curve callout font_weight must be non-empty.")
+        if not str(self.font_style).strip():
+            raise ValueError("Curve callout font_style must be non-empty.")
+        if self.arrow_style is not None and not str(self.arrow_style).strip():
+            raise ValueError("Curve callout arrow_style must be non-empty when provided.")
+        if self.arrow_linewidth is not None and self.arrow_linewidth <= 0:
+            raise ValueError("Curve callout arrow_linewidth must be positive when provided.")
+
+
+@dataclass(slots=True)
 class CurveFillCrossoverSpec:
     enabled: bool = False
     left_color: str | None = None
@@ -400,6 +454,7 @@ class CurveElement:
     render_mode: str = "line"
     value_labels: CurveValueLabelsSpec = field(default_factory=CurveValueLabelsSpec)
     header_display: CurveHeaderDisplaySpec = field(default_factory=CurveHeaderDisplaySpec)
+    callouts: tuple[CurveCalloutSpec, ...] = ()
     fill: CurveFillSpec | None = None
 
     def __post_init__(self) -> None:

@@ -37,6 +37,9 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         style = _load_default_mpl_style(DEFAULT_MPL_STYLE_PATH)
         self.assertEqual(style["track"]["frame_color"], "#2f2f2f")
         self.assertEqual(style["markers"]["callout_arrow_style"], "-|>")
+        self.assertEqual(style["curve_callouts"]["right_text_x"], 0.82)
+        self.assertEqual(style["curve_callouts"]["lane_count"], 3)
+        self.assertEqual(style["curve_callouts"]["top_distance_steps"], 1.5)
 
     def test_renderer_uses_yaml_defaults(self) -> None:
         renderer = MatplotlibRenderer()
@@ -55,6 +58,9 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["raster"]["colorbar_width_ratio"], 0.06)
         self.assertEqual(renderer.style["raster"]["sample_axis_tick_labelsize"], 5.0)
         self.assertEqual(renderer.style["raster"]["header_colorbar_bar_height_ratio"], 0.26)
+        self.assertEqual(renderer.style["curve_callouts"]["left_text_x"], 0.1)
+        self.assertEqual(renderer.style["curve_callouts"]["edge_padding_px"], 8.0)
+        self.assertEqual(renderer.style["curve_callouts"]["bottom_distance_steps"], 1.5)
 
     def test_renderer_style_override_deep_merges(self) -> None:
         renderer = MatplotlibRenderer(
@@ -486,6 +492,319 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertFalse(wrapped_mask[3])
         self.assertAlmostEqual(float(wrapped[0]), 100.0, places=4)
         self.assertAlmostEqual(float(wrapped[4]), 20.0, places=4)
+
+    def test_curve_callouts_draw_text_annotations(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve callouts",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "callouts": [
+                                    {"depth": 1005, "label": "GR Sand"},
+                                    {"depth": 1010, "label": "GR Shale", "side": "left"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1005.0, 1010.0, 1015.0], dtype=float)
+        dataset = WellDataset(name="curve callouts")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([20, 35, 110, 90]))
+        )
+
+        renderer = MatplotlibRenderer()
+        fig, ax = plt.subplots()
+        try:
+            window = type("Window", (), {"start": 1000.0, "stop": 1015.0})()
+            renderer._draw_curve(
+                ax,
+                document.tracks[0],
+                document.tracks[0].elements[0],
+                document,
+                dataset,
+                independent_curve_scales=False,
+            )
+            renderer._draw_curve_callouts(
+                ax,
+                document.tracks[0],
+                document,
+                dataset,
+                window,
+                independent_curve_scales=False,
+            )
+            labels = {text.get_text() for text in ax.texts}
+            self.assertIn("GR Sand", labels)
+            self.assertIn("GR Shale", labels)
+        finally:
+            plt.close(fig)
+
+    def test_curve_callout_auto_side_uses_curve_position(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve callout auto side",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "callouts": [
+                                    {"depth": 1005, "label": "Low GR"},
+                                    {"depth": 1010, "label": "High GR"},
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1005.0, 1010.0, 1015.0], dtype=float)
+        dataset = WellDataset(name="curve callout auto side")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([15, 25, 125, 130]))
+        )
+
+        renderer = MatplotlibRenderer()
+        window = type("Window", (), {"start": 1000.0, "stop": 1015.0})()
+        records = renderer._curve_callout_records(
+            document.tracks[0],
+            document,
+            dataset,
+            window,
+            independent_curve_scales=False,
+        )
+        by_label = {record.label: record for record in records}
+        self.assertEqual(by_label["Low GR"].side, "right")
+        self.assertEqual(by_label["High GR"].side, "left")
+
+    def test_curve_callout_arrow_relpos_uses_side_center(self) -> None:
+        renderer = MatplotlibRenderer()
+        self.assertEqual(renderer._curve_callout_arrow_relpos("right"), (0.0, 0.5))
+        self.assertEqual(renderer._curve_callout_arrow_relpos("left"), (1.0, 0.5))
+
+    def test_curve_callout_top_and_bottom_expands_repeated_records(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve callout repeated bands",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "callouts": [
+                                    {
+                                        "depth": 1000,
+                                        "label": "GR",
+                                        "placement": "top_and_bottom",
+                                        "distance_from_top": 1,
+                                        "distance_from_bottom": 2,
+                                        "every": 5,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1005.0, 1010.0, 1015.0], dtype=float)
+        dataset = WellDataset(name="curve callout repeated bands")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([15, 25, 125, 130]))
+        )
+
+        renderer = MatplotlibRenderer()
+        window = type("Window", (), {"start": 1000.0, "stop": 1015.0})()
+        records = renderer._curve_callout_records(
+            document.tracks[0],
+            document,
+            dataset,
+            window,
+            independent_curve_scales=False,
+        )
+        self.assertEqual(len(records), 6)
+        self.assertEqual(
+            [record.anchor_y for record in records],
+            [1001.0, 1003.0, 1006.0, 1008.0, 1011.0, 1013.0],
+        )
+        self.assertEqual(
+            [record.desired_text_y for record in records],
+            [1001.0, 1003.0, 1006.0, 1008.0, 1011.0, 1013.0],
+        )
+
+    def test_curve_callout_repetition_uses_section_depth_range_not_page_window(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve callout section repetition",
+                "page": {"size": "A4"},
+                "depth_range": [1000.0, 1100.0],
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "callouts": [
+                                    {
+                                        "depth": 0,
+                                        "label": "GR",
+                                        "placement": "top",
+                                        "distance_from_top": 5,
+                                        "every": 30,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1020.0, 1040.0, 1060.0, 1080.0, 1100.0], dtype=float)
+        dataset = WellDataset(name="curve callout section repetition")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([15, 25, 125, 130, 95, 80]))
+        )
+
+        renderer = MatplotlibRenderer()
+        window = type("Window", (), {"start": 1020.0, "stop": 1040.0})()
+        records = renderer._curve_callout_records(
+            document.tracks[0],
+            document,
+            dataset,
+            window,
+            independent_curve_scales=False,
+        )
+        self.assertEqual([record.anchor_y for record in records], [1035.0])
+        self.assertEqual([record.desired_text_y for record in records], [1035.0])
+
+    def test_curve_callout_text_stays_within_track_edges(self) -> None:
+        long_label = "Curve Label Near Edge"
+        document = document_from_mapping(
+            {
+                "name": "curve callout edge avoidance",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 10, "minor_step": 2},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "callouts": [
+                                    {
+                                        "depth": 1006,
+                                        "label": long_label,
+                                        "side": "left",
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        depth = np.array([1000.0, 1005.0, 1010.0, 1015.0], dtype=float)
+        dataset = WellDataset(name="curve callout edge avoidance")
+        dataset.add_channel(
+            ScalarChannel("GR", depth, "m", "gAPI", values=np.array([5, 8, 12, 18]))
+        )
+
+        renderer = MatplotlibRenderer(
+            style={
+                "curve_callouts": {
+                    "left_text_x": 0.0,
+                    "lane_count": 1,
+                }
+            }
+        )
+        fig, ax = plt.subplots(figsize=(2.5, 6.0))
+        try:
+            window = type("Window", (), {"start": 1000.0, "stop": 1015.0})()
+            renderer._draw_curve(
+                ax,
+                document.tracks[0],
+                document.tracks[0].elements[0],
+                document,
+                dataset,
+                independent_curve_scales=False,
+            )
+            records = renderer._place_curve_callouts(
+                ax,
+                document.tracks[0],
+                document,
+                dataset,
+                window,
+                independent_curve_scales=False,
+            )
+            fig.canvas.draw()
+            self.assertTrue(any(record.text_y is not None for record in records))
+            placed = next(record for record in records if record.label == long_label)
+            from matplotlib.transforms import blended_transform_factory
+
+            text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+            text_bbox = renderer._measure_curve_callout_bbox(
+                ax,
+                renderer=fig.canvas.get_renderer(),
+                label=placed.label,
+                text_x=placed.text_x,
+                text_y=placed.text_y,
+                transform=text_transform,
+                fontsize=placed.font_size,
+                color=placed.color,
+                fontweight=placed.font_weight,
+                fontstyle=placed.font_style,
+                horizontal_alignment=renderer._curve_callout_horizontal_alignment(
+                    placed.placed_side or placed.side
+                ),
+            )
+            axes_bbox = ax.get_window_extent(renderer=fig.canvas.get_renderer())
+            padding_px = float(renderer.style["curve_callouts"]["edge_padding_px"])
+            self.assertGreaterEqual(text_bbox.x0, axes_bbox.x0 + padding_px - 0.5)
+            self.assertLessEqual(text_bbox.x1, axes_bbox.x1 - padding_px + 0.5)
+            self.assertGreaterEqual(text_bbox.y0, axes_bbox.y0 + padding_px - 0.5)
+            self.assertLessEqual(text_bbox.y1, axes_bbox.y1 - padding_px + 0.5)
+        finally:
+            plt.close(fig)
 
     def test_between_curves_fill_adds_single_collection(self) -> None:
         document = document_from_mapping(

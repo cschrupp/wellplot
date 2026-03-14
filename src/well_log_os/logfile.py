@@ -476,6 +476,110 @@ def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
     return payload
 
 
+def _parse_binding_curve_callouts(value: Any, *, context: str) -> list[dict[str, Any]]:
+    callout_items = _ensure_sequence(value, context=context)
+    payload: list[dict[str, Any]] = []
+    for index, item in enumerate(callout_items):
+        callout = _ensure_mapping(item, context=f"{context}[{index}]")
+        if "depth" not in callout:
+            raise TemplateValidationError(f"{context}[{index}].depth is required.")
+        item_payload: dict[str, Any] = {"depth": float(callout["depth"])}
+        if "label" in callout:
+            label = str(callout["label"]).strip()
+            if not label:
+                raise TemplateValidationError(f"{context}[{index}].label must be non-empty.")
+            item_payload["label"] = label
+        if "side" in callout:
+            side = str(callout["side"]).strip().lower()
+            if side not in {"auto", "left", "right"}:
+                raise TemplateValidationError(
+                    f"{context}[{index}].side must be auto, left, or right."
+                )
+            item_payload["side"] = side
+        if "placement" in callout:
+            placement = str(callout["placement"]).strip().lower()
+            if placement not in {"inline", "top", "bottom", "top_and_bottom"}:
+                raise TemplateValidationError(
+                    f"{context}[{index}].placement must be inline, top, bottom, "
+                    "or top_and_bottom."
+                )
+            item_payload["placement"] = placement
+        if "text_x" in callout:
+            text_x = float(callout["text_x"])
+            if text_x < 0 or text_x > 1:
+                raise TemplateValidationError(
+                    f"{context}[{index}].text_x must be between 0 and 1."
+                )
+            item_payload["text_x"] = text_x
+        if "depth_offset" in callout:
+            item_payload["depth_offset"] = float(callout["depth_offset"])
+        if "distance_from_top" in callout:
+            distance_from_top = float(callout["distance_from_top"])
+            if distance_from_top < 0:
+                raise TemplateValidationError(
+                    f"{context}[{index}].distance_from_top must be non-negative."
+                )
+            item_payload["distance_from_top"] = distance_from_top
+        if "distance_from_bottom" in callout:
+            distance_from_bottom = float(callout["distance_from_bottom"])
+            if distance_from_bottom < 0:
+                raise TemplateValidationError(
+                    f"{context}[{index}].distance_from_bottom must be non-negative."
+                )
+            item_payload["distance_from_bottom"] = distance_from_bottom
+        if "every" in callout:
+            every = float(callout["every"])
+            if every <= 0:
+                raise TemplateValidationError(
+                    f"{context}[{index}].every must be positive."
+                )
+            item_payload["every"] = every
+        if "color" in callout:
+            color = str(callout["color"]).strip()
+            if not color:
+                raise TemplateValidationError(f"{context}[{index}].color must be non-empty.")
+            item_payload["color"] = color
+        if "font_size" in callout:
+            font_size = float(callout["font_size"])
+            if font_size <= 0:
+                raise TemplateValidationError(
+                    f"{context}[{index}].font_size must be positive."
+                )
+            item_payload["font_size"] = font_size
+        if "font_weight" in callout:
+            font_weight = str(callout["font_weight"]).strip()
+            if not font_weight:
+                raise TemplateValidationError(
+                    f"{context}[{index}].font_weight must be non-empty."
+                )
+            item_payload["font_weight"] = font_weight
+        if "font_style" in callout:
+            font_style = str(callout["font_style"]).strip()
+            if not font_style:
+                raise TemplateValidationError(
+                    f"{context}[{index}].font_style must be non-empty."
+                )
+            item_payload["font_style"] = font_style
+        if "arrow" in callout:
+            item_payload["arrow"] = bool(callout["arrow"])
+        if "arrow_style" in callout:
+            arrow_style = str(callout["arrow_style"]).strip()
+            if not arrow_style:
+                raise TemplateValidationError(
+                    f"{context}[{index}].arrow_style must be non-empty."
+                )
+            item_payload["arrow_style"] = arrow_style
+        if "arrow_linewidth" in callout:
+            arrow_linewidth = float(callout["arrow_linewidth"])
+            if arrow_linewidth <= 0:
+                raise TemplateValidationError(
+                    f"{context}[{index}].arrow_linewidth must be positive."
+                )
+            item_payload["arrow_linewidth"] = arrow_linewidth
+        payload.append(item_payload)
+    return payload
+
+
 def _parse_binding_raster_colorbar(
     value: Any, *, context: str
 ) -> tuple[bool, str | None, str]:
@@ -1152,6 +1256,13 @@ def _build_tracks_from_layout_bindings(
             }
             if "id" in binding:
                 element["id"] = str(binding["id"]).strip()
+            if "callouts" in binding:
+                element["callouts"] = deepcopy(
+                    _parse_binding_curve_callouts(
+                        binding["callouts"],
+                        context=f"{binding_context}.callouts",
+                    )
+                )
             if "fill" in binding:
                 element["fill"] = deepcopy(
                     _parse_binding_curve_fill(binding["fill"], context=f"{binding_context}.fill")

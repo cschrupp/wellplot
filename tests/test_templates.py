@@ -66,6 +66,54 @@ class TemplateTests(unittest.TestCase):
         self.assertFalse(element.header_display.show_color)
         self.assertFalse(element.wrap)
 
+    def test_curve_element_can_parse_callouts(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve callouts",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "gr",
+                        "title": "GR",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "callouts": [
+                                    {
+                                        "depth": 1005,
+                                        "label": "GR Sand",
+                                        "side": "right",
+                                        "placement": "top",
+                                        "text_x": 0.76,
+                                        "depth_offset": -2,
+                                        "distance_from_top": 1.5,
+                                        "distance_from_bottom": 2.5,
+                                        "every": 5,
+                                        "font_size": 7.2,
+                                        "arrow": True,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        self.assertEqual(len(element.callouts), 1)
+        self.assertEqual(element.callouts[0].label, "GR Sand")
+        self.assertEqual(element.callouts[0].side, "right")
+        self.assertEqual(element.callouts[0].placement, "top")
+        self.assertAlmostEqual(element.callouts[0].text_x or 0.0, 0.76)
+        self.assertAlmostEqual(element.callouts[0].distance_from_top or 0.0, 1.5)
+        self.assertAlmostEqual(element.callouts[0].distance_from_bottom or 0.0, 2.5)
+        self.assertAlmostEqual(element.callouts[0].every or 0.0, 5.0)
+
     def test_curve_element_can_enable_log_wrap(self) -> None:
         document = document_from_mapping(
             {
