@@ -1,6 +1,6 @@
 # well_log_os Roadmap
 
-Last updated: 2026-03-12
+Last updated: 2026-03-14
 
 ## Scope Summary
 
@@ -28,6 +28,16 @@ Decision history is tracked in `docs/decision-log.md`.
   - continuous single-page PDF
   - depth grid + markers/zones
   - structured track header object slots
+  - fixed-height curve and array property groups in track headers
+  - curve-owned fills:
+    - `between_curves`
+    - `between_instances`
+    - `to_lower_limit`
+    - `to_upper_limit`
+    - `baseline_split`
+  - track-header fill indicators that reflect actual fill semantics
+  - in-track curve callouts with edge avoidance and curve-aware placement
+  - section-relative repeated callouts from top/bottom anchors
   - array-lane raster controls (`colorbar`, `sample_axis`, waveform overlay)
   - waveform-only array rendering profile
   - VDL density rendering with grayscale amplitude mapping
@@ -63,7 +73,7 @@ Compared against `workspace/renders/CBL_log_example.Pdf`, the current renderer i
 
 - Cover/disclaimer/contents pages and report-style front matter.
 - Parameter-table sections (channel processing, depth zone, tool control).
-- Advanced per-depth callouts/labels/arrows and event glyphs.
+- Dedicated annotation tracks, event glyphs, and richer non-curve callout lanes.
 - Composite lane logic with custom legend/table blocks.
 - Multi-page report composition mode (in addition to continuous strip mode).
 - Richer visual theming and table/border styles for commercial-style output.
@@ -84,14 +94,23 @@ Implementable now (already in project):
 - Header typography and frame styling through `render.matplotlib.style`.
 - Baseline curve-wrap mode with per-segment color
   (`bindings.channels[*].wrap.enabled`, `bindings.channels[*].wrap.color`) for repeat-style display.
+- Curve fill modes:
+  - `between_curves`
+  - `between_instances`
+  - `to_lower_limit`
+  - `to_upper_limit`
+  - `baseline_split`
+- Track-header fill indicators that preview the rendered fill behavior.
+- In-track curve callouts with section-relative repetition from top/bottom anchors.
 
 Near-term additions (next phases):
 
 - Points/symbol mode (`marker` type, size, optional color-by-variable).
-- Area-fill modes (left/right, baseline/fill rules).
 - Vertical thresholds and advanced repeat/wrap controls (count, offset, style).
 - Per-curve decimation/display optimization policy.
 - Per-curve number formatting for header limits (separate from label mode).
+- Per-callout priority/required rules for dense tracks.
+- Page-relative callout repetition mode, if needed alongside the current section-relative mode.
 
 Longer-term / UI-centric:
 
@@ -140,16 +159,15 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Add in-track curve labels/callouts as first-class display objects:
-  - depth-linked labels attached to curves
-  - leader lines / arrows from label to curve position
-  - per-label text, color, font, anchor side, and offset controls
-  - collision-handling rules so labels remain readable in dense intervals
 - Expand reference/depth tracks so they can host curve overlays cleanly:
   - scalar curve overlays inside the reference track body
   - reference-track-specific overlay styles for slim curves, ticks, and event traces
   - compatibility rules for depth/time reference units versus overlaid curve units
   - examples where the depth track carries indicators or auxiliary curves
+- Reuse the callout machinery in reference/depth tracks:
+  - curve labels attached to reference-track overlays
+  - depth-column-safe placement rules
+  - optional dedicated callout lanes inside reference tracks
 - Implement first `annotation` track objects:
   - depth-linked text labels
   - arrows/glyph markers
@@ -190,7 +208,7 @@ Longer-term / UI-centric:
   - mixed reference + array + normal layout
 - Add image-track template examples for CBL/VDL with curve overlays.
 - Introduce report-section primitives (cover, disclaimer, contents, parameter tables).
-- Add annotation primitives for callouts/arrows and depth-linked labels.
+- Add annotation-track primitives beyond curve-owned callouts/arrows and depth-linked labels.
 - Add a paginated report mode for mixed pages + log strips.
 - Add style tokens/themes for branded tables, headers, and borders.
 - Add a schema reference page for YAML keys (especially `track_header.objects`).

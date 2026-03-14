@@ -68,8 +68,10 @@ Each section is rendered in sequence into the same output artifact (matplotlib b
 - `section_title`
 - `track_header`
 - `track`
+- `curve_callouts`
 - `grid`
 - `markers`
+- `raster`
 
 Each section can override only the values you care about.
 
@@ -80,6 +82,16 @@ Reference-track number/tick controls live under `render.matplotlib.style.track`,
 - `reference_label_x`, `reference_label_align`
 - `reference_label_fontsize`, `reference_label_color`
 - `reference_label_fontfamily`, `reference_label_fontweight`, `reference_label_fontstyle`
+
+Curve-callout placement defaults live under `render.matplotlib.style.curve_callouts`, including:
+- `left_text_x`, `right_text_x`
+- `lane_count`, `lane_step_x`
+- `edge_padding_px`, `curve_buffer_px`
+- `default_depth_offset_steps`
+- `top_distance_steps`, `bottom_distance_steps`
+- `min_vertical_gap_steps`
+- `font_size`, `font_weight`, `font_style`
+- `arrow_style`, `arrow_linewidth`
 
 Example:
 
@@ -174,6 +186,9 @@ Track-header legend space auto-fits to curve count:
 - track-header title alignment is configurable with `render.matplotlib.style.track_header.title_align` and `title_x`.
 - optional `track_header.divisions` object renders header tick values in its own reserved line.
 - top x-axis labels are hidden in the plot area so scale/division text stays inside header slots.
+- curve property groups keep a fixed vertical quota across tracks; short tracks do not stretch their
+  header rows to fill the whole band.
+- array-track property groups follow the same fixed-height behavior as curve headers.
 - each `layout.log_sections[*]` may define:
   - `title` (required to render the section banner)
   - `subtitle` (optional)
@@ -255,7 +270,112 @@ Wrapping applies to curves in `reference`, `normal`, and `array` tracks.
 It folds out-of-range curve values into the configured scale interval and can
 render wrapped sections in a separate color (`wrap.color`).
 
-## 11) Array Display Options
+## 11) Curve Fill Modes
+
+Curve fills are configured on individual curve bindings with `fill`.
+
+Supported kinds:
+
+- `between_curves`
+  - fills between two channels in the same track
+  - requires scale compatibility between the two rendered curves
+- `between_instances`
+  - fills between two specific rendered curve instances
+  - target is resolved with `fill.other_element_id`
+  - intended for cases like the same channel rendered twice with different scales
+- `to_lower_limit`
+  - fills from the curve to the lower bound of the active scale
+- `to_upper_limit`
+  - fills from the curve to the upper bound of the active scale
+- `baseline_split`
+  - draws a vertical baseline at `fill.baseline.value`
+  - fills one side with `lower_color` and the other with `upper_color`
+
+Important semantics:
+
+- lower/upper limit fills are tied to scale bounds, not to screen left/right
+- reversed axes still use the correct data meaning
+- `between_curves` and `between_instances` optionally support `crossover`
+- wrapped curves are not yet a general fill target
+
+Example:
+
+```yaml
+document:
+  bindings:
+    channels:
+      - channel: TT
+        track_id: baseline_fill
+        kind: curve
+        scale: { kind: linear, min: 200, max: 400, reverse: true }
+        fill:
+          kind: baseline_split
+          label: Baseline 300 us
+          alpha: 0.35
+          baseline:
+            value: 300
+            lower_color: "#1f9d55"
+            upper_color: "#ef4444"
+            line_color: "#111111"
+            line_width: 0.6
+            line_style: "--"
+```
+
+Track headers mirror fill behavior:
+
+- fill preview rows are rendered in the header when a curve fill is present
+- crossover fills preview the active left/right colors
+- baseline fills preview the correct split position and orientation for the active scale
+
+## 12) Curve Callouts
+
+Curve callouts are configured on curve bindings with `callouts`.
+
+Each callout can control:
+
+- `depth`
+- `label`
+- `side`: `auto`, `left`, `right`
+- `placement`: `inline`, `top`, `bottom`, `top_and_bottom`
+- `text_x`
+- `depth_offset`
+- `distance_from_top`
+- `distance_from_bottom`
+- `every`
+- text and arrow styling
+
+Current placement model:
+
+- labels render inline in the track body at the chosen/generated depth
+- `top`, `bottom`, and `top_and_bottom` are section-relative depth generators
+- `distance_from_top` / `distance_from_bottom` are interpreted in the current section index units
+  (depth or time), not in physical units like mm
+- `every` repeats from the section top/bottom anchors, not from each paginated page window
+- edge overflow is a hard constraint
+- label-label overlap is rejected
+- curve overlap is treated as a soft penalty during candidate placement
+
+Example:
+
+```yaml
+document:
+  bindings:
+    channels:
+      - channel: CBL
+        track_id: cbl
+        kind: curve
+        callouts:
+          - depth: 672
+            label: CBL
+            placement: top_and_bottom
+            distance_from_top: 500
+            distance_from_bottom: 500
+            every: 1000
+            side: right
+            text_x: 0.83
+```
+
+## 13) Array Display Options
 
 Raster bindings in array tracks support:
 

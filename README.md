@@ -18,6 +18,9 @@ This repository currently contains the current MVP baseline:
 - optional LAS and DLIS ingestion adapters
 - DLIS VDL/WF1-style array support with derived micro-time sample axes
 - printable VDL density and waveform array rendering
+- scale-aware curve fills, including crossover, limit, and baseline modes
+- track-header fill indicators that mirror the actual plotted fill behavior
+- in-track curve callouts with section-relative repetition and collision avoidance
 
 ## Architecture
 
@@ -84,6 +87,12 @@ For VDL density, waveform overlay, and feet-based comparison examples, see:
 - [examples/cbl_vdl_array_overlay.log.yaml](examples/cbl_vdl_array_overlay.log.yaml)
 - [examples/cbl_comparison_feet.log.yaml](examples/cbl_comparison_feet.log.yaml)
 - [examples/cbl_comparison_feet_full.log.yaml](examples/cbl_comparison_feet_full.log.yaml)
+For fill and callout examples, see:
+- [examples/fill_modes_showcase.log.yaml](examples/fill_modes_showcase.log.yaml)
+- [examples/cbl_feature_showcase_full.log.yaml](examples/cbl_feature_showcase_full.log.yaml)
+- [examples/curve_callouts_showcase.log.yaml](examples/curve_callouts_showcase.log.yaml)
+- [examples/curve_callout_bands_showcase.log.yaml](examples/curve_callout_bands_showcase.log.yaml)
+- [examples/curve_callout_bands_full.log.yaml](examples/curve_callout_bands_full.log.yaml)
 
 ## Template + Savefile Model
 
@@ -115,6 +124,25 @@ Behavior:
 - Curves support wrapping across curve-capable tracks (`reference`, `normal`, `array`):
   - `wrap: true` to enable with default curve color.
   - `wrap: { enabled: true, color: "#ef4444" }` to color wrapped segments explicitly.
+- Curves support first-class fills:
+  - `between_curves` for same-scale curve-vs-curve fills
+  - `between_instances` for fills between specific rendered curve instances
+  - `to_lower_limit` and `to_upper_limit` for fills to the active scale bounds
+  - `baseline_split` for two-color fills around a vertical baseline
+- Lower/upper limit fills are tied to the active scale bounds, not to the physical left/right side
+  of the screen. Reversed scales still behave correctly.
+- When you need a fill between two rendered copies of the same channel, assign explicit element ids:
+  - `id: cbl_0_100`
+  - `fill.other_element_id: cbl_0_10`
+- Track headers render fill indicators that follow the same semantics as the plotted fill, including
+  crossover splits and baseline orientation.
+- Curves support in-track callouts via `callouts`:
+  - inline labels at explicit depths
+  - repeated labels from section `top`, `bottom`, or `top_and_bottom`
+  - side, text position, font, arrow, and offset controls
+  - hard edge avoidance, label-label avoidance, and soft curve-overlap avoidance
+- Callout repetition is section-relative. `top`, `bottom`, and `top_and_bottom` generate repeated
+  depths from the log section bounds, then render each label inline at those generated depths.
 - Raster bindings support display controls:
   - `profile` (`generic`, `vdl`, or `waveform`)
   - `normalization` (`auto`, `none`, `trace_maxabs`, `global_maxabs`)
@@ -173,6 +201,57 @@ document:
           stride: 6
           amplitude_scale: 0.28
           line_width: 0.16
+```
+
+Example instance-targeted fill between two rendered copies of the same channel:
+
+```yaml
+document:
+  bindings:
+    channels:
+      - section: main
+        channel: CBL
+        track_id: cbl_fill
+        kind: curve
+        id: cbl_0_100
+        scale: { kind: linear, min: 0, max: 100 }
+        fill:
+          kind: between_instances
+          other_element_id: cbl_0_10
+          label: Scale Effect
+          crossover:
+            enabled: true
+            left_color: "#1f9d55"
+            right_color: "#d64545"
+      - section: main
+        channel: CBL
+        track_id: cbl_fill
+        kind: curve
+        id: cbl_0_10
+        scale: { kind: linear, min: 0, max: 10 }
+```
+
+Example curve callout with section-relative repetition:
+
+```yaml
+document:
+  bindings:
+    channels:
+      - section: main
+        channel: CBL
+        track_id: cbl
+        kind: curve
+        scale: { kind: linear, min: 0, max: 100 }
+        callouts:
+          - depth: 672
+            label: CBL
+            placement: top_and_bottom
+            distance_from_top: 500
+            distance_from_bottom: 500
+            every: 1000
+            side: right
+            text_x: 0.83
+            font_size: 10.5
 ```
 
 ```yaml

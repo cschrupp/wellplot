@@ -1,6 +1,6 @@
 # well_log_os Decision Log
 
-Last updated: 2026-03-12
+Last updated: 2026-03-14
 
 ## Purpose
 
@@ -45,6 +45,9 @@ This file records project decisions that should remain stable unless explicitly 
   - `line_units` to control relative vertical allocation
 - Raster sample axes may be auto-derived from source metadata, but must remain user-overridable in
   logfile YAML for vendor-parity tuning.
+- Curve fills are first-class curve-owned objects, not ad-hoc renderer flags.
+- Instance-targeted fills identify rendered curve instances by `id` / `other_element_id`, not by
+  aliasing or duplicate channel names.
 
 ## Rendering Decisions
 
@@ -58,6 +61,13 @@ This file records project decisions that should remain stable unless explicitly 
   - `waveform` for wiggle/signature-style display without mandatory raster background
 - Selected array sample-axis windows crop the underlying data to the requested interval; they do
   not relabel the full stored waveform width.
+- Curve fill semantics are data-space semantics:
+  - `to_lower_limit` / `to_upper_limit` refer to active scale bounds, not fixed screen sides
+  - `baseline_split` is resolved against a data-value baseline
+- Track headers may render preview indicators for the actual fill semantics shown in the track body.
+- Curve callouts are curve-owned display objects.
+- Repeated callouts from `top`, `bottom`, and `top_and_bottom` are generated relative to the full
+  log section bounds and rendered inline at those generated depths.
 
 ## Tooling and Process Decisions
 
