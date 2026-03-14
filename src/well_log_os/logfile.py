@@ -156,6 +156,60 @@ def _validate_reference_track(reference: dict[str, Any], *, context: str) -> Non
                 f"{context}.number_format.precision must be non-negative."
             )
 
+    events_data = reference.get("events")
+    if events_data is not None:
+        events = _ensure_sequence(events_data, context=f"{context}.events")
+        for index, item in enumerate(events):
+            event = _ensure_mapping(item, context=f"{context}.events[{index}]")
+            if "depth" not in event:
+                raise TemplateValidationError(f"{context}.events[{index}].depth is required.")
+            if "line_width" in event and float(event["line_width"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.events[{index}].line_width must be positive."
+                )
+            if "tick_length_ratio" in event and float(event["tick_length_ratio"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.events[{index}].tick_length_ratio must be positive."
+                )
+            if ("lane_start" in event) != ("lane_end" in event):
+                raise TemplateValidationError(
+                    f"{context}.events[{index}].lane_start and lane_end must be set together."
+                )
+            if "lane_start" in event and "lane_end" in event:
+                lane_start = float(event["lane_start"])
+                lane_end = float(event["lane_end"])
+                if not 0.0 <= lane_start < lane_end <= 1.0:
+                    raise TemplateValidationError(
+                        f"{context}.events[{index}].lane_start/lane_end must satisfy "
+                        "0 <= lane_start < lane_end <= 1."
+                    )
+            if "tick_side" in event:
+                side = str(event["tick_side"]).strip().lower()
+                if side not in {"left", "right", "both"}:
+                    raise TemplateValidationError(
+                        f"{context}.events[{index}].tick_side must be left, right, or both."
+                    )
+            if "text_side" in event:
+                text_side = str(event["text_side"]).strip().lower()
+                if text_side not in {"auto", "left", "right"}:
+                    raise TemplateValidationError(
+                        f"{context}.events[{index}].text_side must be auto, left, or right."
+                    )
+            if "text_x" in event:
+                text_x = float(event["text_x"])
+                if text_x < 0 or text_x > 1:
+                    raise TemplateValidationError(
+                        f"{context}.events[{index}].text_x must be between 0 and 1."
+                    )
+            if "font_size" in event and float(event["font_size"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.events[{index}].font_size must be positive."
+                )
+            if "arrow_linewidth" in event and float(event["arrow_linewidth"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.events[{index}].arrow_linewidth must be positive."
+                )
+
 
 def _validate_layout_track(track: dict[str, Any], *, context: str) -> None:
     _ = str(track["id"])
@@ -577,6 +631,40 @@ def _parse_binding_curve_callouts(value: Any, *, context: str) -> list[dict[str,
                 )
             item_payload["arrow_linewidth"] = arrow_linewidth
         payload.append(item_payload)
+    return payload
+
+
+def _parse_binding_reference_overlay(value: Any, *, context: str) -> dict[str, Any]:
+    overlay = _ensure_mapping(value, context=context)
+    payload: dict[str, Any] = {}
+    if "mode" in overlay:
+        mode = str(overlay["mode"]).strip().lower()
+        if mode not in {"curve", "indicator", "ticks"}:
+            raise TemplateValidationError(f"{context}.mode must be curve, indicator, or ticks.")
+        payload["mode"] = mode
+    if ("lane_start" in overlay) != ("lane_end" in overlay):
+        raise TemplateValidationError(f"{context}.lane_start and lane_end must be set together.")
+    if "lane_start" in overlay:
+        lane_start = float(overlay["lane_start"])
+        lane_end = float(overlay["lane_end"])
+        if not 0.0 <= lane_start < lane_end <= 1.0:
+            raise TemplateValidationError(
+                f"{context}.lane_start and lane_end must satisfy 0 <= start < end <= 1."
+            )
+        payload["lane_start"] = lane_start
+        payload["lane_end"] = lane_end
+    if "tick_side" in overlay:
+        tick_side = str(overlay["tick_side"]).strip().lower()
+        if tick_side not in {"left", "right", "both"}:
+            raise TemplateValidationError(f"{context}.tick_side must be left, right, or both.")
+        payload["tick_side"] = tick_side
+    if "tick_length_ratio" in overlay:
+        tick_length_ratio = float(overlay["tick_length_ratio"])
+        if tick_length_ratio <= 0:
+            raise TemplateValidationError(f"{context}.tick_length_ratio must be positive.")
+        payload["tick_length_ratio"] = tick_length_ratio
+    if "threshold" in overlay:
+        payload["threshold"] = float(overlay["threshold"])
     return payload
 
 
@@ -1261,6 +1349,13 @@ def _build_tracks_from_layout_bindings(
                     _parse_binding_curve_callouts(
                         binding["callouts"],
                         context=f"{binding_context}.callouts",
+                    )
+                )
+            if "reference_overlay" in binding:
+                element["reference_overlay"] = deepcopy(
+                    _parse_binding_reference_overlay(
+                        binding["reference_overlay"],
+                        context=f"{binding_context}.reference_overlay",
                     )
                 )
             if "fill" in binding:

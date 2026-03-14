@@ -21,6 +21,8 @@ This repository currently contains the current MVP baseline:
 - scale-aware curve fills, including crossover, limit, and baseline modes
 - track-header fill indicators that mirror the actual plotted fill behavior
 - in-track curve callouts with section-relative repetition and collision avoidance
+- reference-track scalar overlay modes (`curve`, `indicator`, `ticks`)
+- reference-track event objects for local markers such as casing foot or readings start
 
 ## Architecture
 
@@ -32,6 +34,8 @@ The package separates three layers:
 Track types are explicit: `reference`, `normal`, `array`, and `annotation`
 (with compatibility aliases `depth`, `curve`, `image`).
 Array tracks can host raster data and scalar overlays, while normal/reference tracks do not accept raster elements.
+Reference tracks can host scalar overlay curves and local reference events while still defining the
+layout axis.
 Set `page.continuous: true` in templates to render a single continuous-depth PDF page.
 Set `page.track_header_height_mm` to reserve a dedicated per-track header band.
 Track headers now support explicit object slots (`title`, `scale`, `legend`) with `enabled`,
@@ -93,6 +97,7 @@ For fill and callout examples, see:
 - [examples/curve_callouts_showcase.log.yaml](examples/curve_callouts_showcase.log.yaml)
 - [examples/curve_callout_bands_showcase.log.yaml](examples/curve_callout_bands_showcase.log.yaml)
 - [examples/curve_callout_bands_full.log.yaml](examples/curve_callout_bands_full.log.yaml)
+- [examples/reference_track_overlays.log.yaml](examples/reference_track_overlays.log.yaml)
 
 ## Template + Savefile Model
 
@@ -141,6 +146,14 @@ Behavior:
   - repeated labels from section `top`, `bottom`, or `top_and_bottom`
   - side, text position, font, arrow, and offset controls
   - hard edge avoidance, label-label avoidance, and soft curve-overlap avoidance
+- Reference-track curve overlays support `reference_overlay`:
+  - `mode: curve` for slim normalized overlay curves
+  - `mode: indicator` for narrow indicator lanes
+  - `mode: ticks` for thresholded event-tick rendering from scalar channels
+- Reference-track headers can now keep the reference scale row while rendering overlay properties in
+  the legend slot when `track_header.legend.enabled: true`.
+- Reference tracks support local event objects under `reference.events` for one-off markers such as
+  casing shoe, readings start, or tool-state transitions.
 - Callout repetition is section-relative. `top`, `bottom`, and `top_and_bottom` generate repeated
   depths from the log section bounds, then render each label inline at those generated depths.
 - Raster bindings support display controls:
@@ -252,6 +265,65 @@ document:
             side: right
             text_x: 0.83
             font_size: 10.5
+```
+
+Example reference-track overlays and local events:
+
+```yaml
+document:
+  layout:
+    log_sections:
+      - id: main
+        tracks:
+          - id: depth_overlay
+            kind: reference
+            width_mm: 20
+            reference:
+              axis: depth
+              define_layout: true
+              unit: ft
+              scale_ratio: 240
+              events:
+                - depth: 678
+                  label: Casing Foot
+                  tick_side: right
+                  text_side: left
+                  text_x: 0.72
+            track_header:
+              objects:
+                - kind: scale
+                  enabled: true
+                  line_units: 1
+                - kind: legend
+                  enabled: true
+                  line_units: 6
+  bindings:
+    channels:
+      - section: main
+        channel: TT
+        track_id: depth_overlay
+        kind: curve
+        reference_overlay:
+          mode: curve
+          lane_start: 0.06
+          lane_end: 0.24
+      - section: main
+        channel: TENS
+        track_id: depth_overlay
+        kind: curve
+        reference_overlay:
+          mode: indicator
+          lane_start: 0.78
+          lane_end: 0.94
+      - section: main
+        channel: CBL
+        track_id: depth_overlay
+        kind: curve
+        reference_overlay:
+          mode: ticks
+          tick_side: left
+          tick_length_ratio: 0.08
+          threshold: 100
 ```
 
 ```yaml

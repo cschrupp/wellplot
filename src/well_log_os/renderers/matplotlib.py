@@ -28,6 +28,10 @@ from ..model import (
     RasterNormalizationKind,
     RasterProfileKind,
     RasterWaveformSpec,
+    ReferenceCurveOverlayMode,
+    ReferenceCurveOverlaySpec,
+    ReferenceCurveTickSide,
+    ReferenceEventSpec,
     ReferenceTrackSpec,
     ScalarChannel,
     ScaleKind,
@@ -74,6 +78,7 @@ class _CurvePlotData:
     valid_mask: np.ndarray
     wrapped_mask: np.ndarray
     scale: Any
+    x_is_fractional: bool = False
 
 
 @dataclass(slots=True)
@@ -167,6 +172,68 @@ class MatplotlibRenderer(Renderer):
         else:
             minor_step = document.depth_axis.minor_step
         return major_step, minor_step, reference.secondary_grid_display
+
+    def _resolved_reference_overlay(
+        self,
+        track,
+        element: CurveElement,
+    ) -> ReferenceCurveOverlaySpec | None:
+        if not self._is_reference_track(track):
+            return None
+        if element.reference_overlay is not None:
+            return element.reference_overlay
+        return ReferenceCurveOverlaySpec()
+
+    def _reference_overlay_lane(
+        self,
+        overlay: ReferenceCurveOverlaySpec,
+    ) -> tuple[float, float]:
+        if overlay.lane_start is not None and overlay.lane_end is not None:
+            return float(overlay.lane_start), float(overlay.lane_end)
+        track_style = self._style_section("track")
+        if overlay.mode == ReferenceCurveOverlayMode.INDICATOR:
+            return (
+                float(track_style["reference_overlay_indicator_lane_start"]),
+                float(track_style["reference_overlay_indicator_lane_end"]),
+            )
+        return (
+            float(track_style["reference_overlay_curve_lane_start"]),
+            float(track_style["reference_overlay_curve_lane_end"]),
+        )
+
+    def _reference_overlay_tick_length_ratio(
+        self,
+        overlay: ReferenceCurveOverlaySpec,
+    ) -> float:
+        if overlay.tick_length_ratio is not None:
+            return float(overlay.tick_length_ratio)
+        return float(self._style_section("track")["reference_overlay_tick_length_ratio"])
+
+    def _reference_overlay_threshold(
+        self,
+        overlay: ReferenceCurveOverlaySpec,
+    ) -> float:
+        if overlay.threshold is not None:
+            return float(overlay.threshold)
+        return float(self._style_section("track")["reference_overlay_threshold"])
+
+    def _reference_event_tick_length_ratio(self, event: ReferenceEventSpec) -> float:
+        if event.tick_length_ratio is not None:
+            return float(event.tick_length_ratio)
+        return float(self._style_section("track")["reference_overlay_tick_length_ratio"])
+
+    def _reference_event_segments(
+        self,
+        event: ReferenceEventSpec,
+    ) -> tuple[tuple[float, float], ...]:
+        if event.lane_start is not None and event.lane_end is not None:
+            return ((float(event.lane_start), float(event.lane_end)),)
+        tick_length = self._reference_event_tick_length_ratio(event)
+        if event.tick_side == ReferenceCurveTickSide.LEFT:
+            return ((0.0, tick_length),)
+        if event.tick_side == ReferenceCurveTickSide.RIGHT:
+            return ((1.0 - tick_length, 1.0),)
+        return ((0.0, tick_length), (1.0 - tick_length, 1.0))
 
     def _format_reference_value(self, value: float, reference: ReferenceTrackSpec) -> str:
         precision = reference.precision
@@ -277,6 +344,14 @@ class MatplotlibRenderer(Renderer):
     def _curve_count(self, track) -> int:
         return sum(1 for element in track.elements if isinstance(element, CurveElement))
 
+    def _reference_event_elements(self, track) -> tuple[ReferenceEventSpec, ...]:
+        if not self._is_reference_track(track):
+            return ()
+        reference = track.reference
+        if reference is None:
+            return ()
+        return tuple(reference.events)
+
     def _fill_header_elements(self, track) -> list[CurveElement]:
         return [
             element
@@ -312,8 +387,12 @@ class MatplotlibRenderer(Renderer):
         if not header_item.enabled or not header_item.reserve_space:
             return header_item.line_units
         if header_item.kind == TrackHeaderObjectKind.SCALE:
+            if self._is_reference_track(track):
+                return header_item.line_units
             return max(header_item.line_units, self._curve_count(track))
         if header_item.kind == TrackHeaderObjectKind.LEGEND:
+            if self._is_reference_track(track) and self._curve_count(track) > 0:
+                return max(header_item.line_units, self._curve_count(track) * 2)
             return max(header_item.line_units, self._curve_count(track)) + self._fill_header_count(
                 track
             )
@@ -790,6 +869,8 @@ class MatplotlibRenderer(Renderer):
                 self._draw_track_header_divisions(ax, track, dataset, slot_top, slot_bottom)
 
     def _curve_header_pair_slot(self, track, slots) -> tuple[int, int, float, float] | None:
+        if self._is_reference_track(track):
+            return None
         if self._curve_count(track) <= 0:
             return None
         scale_index = None
@@ -1870,6 +1951,16 @@ class MatplotlibRenderer(Renderer):
     ) -> None:
         track_header_style = self._style_section("track_header")
         curves = self._curve_elements(track)
+        if self._is_reference_track(track) and curves:
+            self._draw_track_header_curve_pairs(
+                ax,
+                track,
+                document,
+                dataset,
+                slot_top,
+                slot_bottom,
+            )
+            return
         if not curves:
             rasters = self._raster_elements(track)
             if rasters:
@@ -2524,8 +2615,8 @@ class MatplotlibRenderer(Renderer):
                         self._draw_curve(ax, track, element, document, dataset)
                     elif isinstance(element, RasterElement):
                         self._draw_raster(ax, track, element, document, dataset)
-                self._configure_x_axis(ax, track)
-                self._apply_scale(ax, track)
+                ax.set_xlim(0.0, 1.0)
+                ax.set_xticks([])
                 self._draw_vertical_grid_lines(ax, track, window, dataset)
                 ax.tick_params(
                     axis="x",
@@ -2546,6 +2637,7 @@ class MatplotlibRenderer(Renderer):
                 window,
                 major_step=major_step,
             )
+            self._draw_reference_events(ax, track, window)
             self._draw_curve_callouts(
                 ax,
                 track,
@@ -2554,6 +2646,7 @@ class MatplotlibRenderer(Renderer):
                 window,
                 independent_curve_scales=False,
             )
+            self._draw_reference_event_callouts(ax, track, document, window)
             self._draw_marker_callouts(ax, document, window)
             return
 
@@ -2798,6 +2891,66 @@ class MatplotlibRenderer(Renderer):
 
         if element.wrap and scale is not None:
             plot_values, valid_mask, wrapped_mask = self._wrap_curve_values(values, scale)
+
+        reference_overlay = self._resolved_reference_overlay(track, element)
+        if reference_overlay is not None:
+            if reference_overlay.mode in {
+                ReferenceCurveOverlayMode.CURVE,
+                ReferenceCurveOverlayMode.INDICATOR,
+            }:
+                lane_start, lane_end = self._reference_overlay_lane(reference_overlay)
+                normalized = np.full(plot_values.shape, np.nan, dtype=float)
+                if scale is not None:
+                    normalized, normalized_mask = self._normalize_curve_values(plot_values, scale)
+                    valid_mask &= normalized_mask
+                else:
+                    finite_mask = np.isfinite(plot_values)
+                    finite = plot_values[finite_mask]
+                    if finite.size >= 2 and not np.isclose(
+                        float(np.nanmin(finite)),
+                        float(np.nanmax(finite)),
+                    ):
+                        normalized[finite_mask] = (
+                            plot_values[finite_mask] - float(np.nanmin(finite))
+                        ) / (float(np.nanmax(finite)) - float(np.nanmin(finite)))
+                        valid_mask &= finite_mask
+                    elif finite.size >= 1:
+                        normalized[finite_mask] = 0.5
+                        valid_mask &= finite_mask
+                    else:
+                        valid_mask &= finite_mask
+                plot_values = lane_start + normalized * (lane_end - lane_start)
+                wrapped_mask &= valid_mask
+                return _CurvePlotData(
+                    depth,
+                    values,
+                    plot_values,
+                    valid_mask,
+                    wrapped_mask,
+                    scale,
+                    x_is_fractional=True,
+                )
+            if reference_overlay.mode == ReferenceCurveOverlayMode.TICKS:
+                tick_side = reference_overlay.tick_side
+                if tick_side == ReferenceCurveTickSide.LEFT:
+                    anchor_x = 0.0
+                elif tick_side == ReferenceCurveTickSide.RIGHT:
+                    anchor_x = 1.0
+                else:
+                    anchor_x = 0.5
+                threshold = self._reference_overlay_threshold(reference_overlay)
+                active_mask = valid_mask & (np.abs(values) > threshold)
+                plot_values = np.full(values.shape, anchor_x, dtype=float)
+                wrapped_mask &= active_mask
+                return _CurvePlotData(
+                    depth,
+                    values,
+                    plot_values,
+                    active_mask,
+                    wrapped_mask,
+                    scale,
+                    x_is_fractional=True,
+                )
 
         if scale is not None and scale.kind == ScaleKind.TANGENTIAL:
             plot_values, normalized_mask = self._normalize_curve_values(plot_values, scale)
@@ -3249,6 +3402,10 @@ class MatplotlibRenderer(Renderer):
     ) -> None:
         if element.fill is None:
             return
+        if self._is_reference_track(track):
+            raise TemplateValidationError(
+                f"Curve fills are not supported in reference track overlays ({track.id!r}) yet."
+            )
         fill_data = self._prepare_curve_fill_data(
             track,
             element,
@@ -3389,6 +3546,129 @@ class MatplotlibRenderer(Renderer):
             alpha=element.style.opacity,
         )
 
+    def _draw_reference_curve_ticks(
+        self,
+        ax,
+        *,
+        depth: np.ndarray,
+        valid_mask: np.ndarray,
+        overlay: ReferenceCurveOverlaySpec,
+        element: CurveElement,
+    ) -> None:
+        if not np.any(valid_mask):
+            return
+        tick_length = self._reference_overlay_tick_length_ratio(overlay)
+        if overlay.tick_side in {ReferenceCurveTickSide.LEFT, ReferenceCurveTickSide.BOTH}:
+            ax.hlines(
+                depth[valid_mask],
+                0.0,
+                tick_length,
+                colors=element.style.color,
+                linewidth=element.style.line_width,
+                linestyles=element.style.line_style,
+                alpha=element.style.opacity,
+            )
+        if overlay.tick_side in {ReferenceCurveTickSide.RIGHT, ReferenceCurveTickSide.BOTH}:
+            ax.hlines(
+                depth[valid_mask],
+                1.0 - tick_length,
+                1.0,
+                colors=element.style.color,
+                linewidth=element.style.line_width,
+                linestyles=element.style.line_style,
+                alpha=element.style.opacity,
+            )
+
+    def _draw_reference_events(self, ax, track, window) -> None:
+        from matplotlib.transforms import blended_transform_factory
+
+        events = self._reference_event_elements(track)
+        if not events:
+            return
+        transform = blended_transform_factory(ax.transAxes, ax.transData)
+        for event in events:
+            if event.depth < window.start or event.depth > window.stop:
+                continue
+            for left_fraction, right_fraction in self._reference_event_segments(event):
+                ax.plot(
+                    [left_fraction, right_fraction],
+                    [event.depth, event.depth],
+                    transform=transform,
+                    color=event.color,
+                    linewidth=event.line_width,
+                    linestyle=event.line_style,
+                    clip_on=True,
+                    zorder=3.6,
+                )
+
+    def _draw_reference_event_callouts(self, ax, track, document: LogDocument, window) -> None:
+        from matplotlib.transforms import blended_transform_factory
+
+        events = self._reference_event_elements(track)
+        if not events:
+            return
+        callout_style = self._style_section("curve_callouts")
+        text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+        default_offset = self._curve_callout_depth_step(document) * float(
+            callout_style["default_depth_offset_steps"]
+        )
+        for event in events:
+            if event.depth < window.start or event.depth > window.stop or not event.label:
+                continue
+            segments = self._reference_event_segments(event)
+            segment_left = min(left for left, _ in segments)
+            segment_right = max(right for _, right in segments)
+            segment_center = 0.5 * (segment_left + segment_right)
+            text_side = event.text_side
+            if text_side == "auto":
+                text_side = "right" if segment_center <= 0.5 else "left"
+            anchor_x = segment_right if text_side == "right" else segment_left
+            text_x = (
+                event.text_x
+                if event.text_x is not None
+                else float(callout_style["right_text_x"])
+                if text_side == "right"
+                else float(callout_style["left_text_x"])
+            )
+            text_y = event.depth + (
+                event.depth_offset if event.depth_offset is not None else default_offset
+            )
+            ax.annotate(
+                event.label,
+                xy=(anchor_x, event.depth),
+                xycoords=text_transform,
+                xytext=(float(text_x), float(text_y)),
+                textcoords=text_transform,
+                fontsize=(
+                    event.font_size
+                    if event.font_size is not None
+                    else float(callout_style["font_size"])
+                ),
+                color=event.color,
+                fontweight=event.font_weight,
+                fontstyle=event.font_style,
+                ha=self._curve_callout_horizontal_alignment(text_side),
+                va="center",
+                zorder=4.2,
+                arrowprops=(
+                    {
+                        "arrowstyle": event.arrow_style or str(callout_style["arrow_style"]),
+                        "color": event.color,
+                        "lw": (
+                            event.arrow_linewidth
+                            if event.arrow_linewidth is not None
+                            else float(callout_style["arrow_linewidth"])
+                        ),
+                        "shrinkA": 0,
+                        "shrinkB": 0,
+                        "relpos": self._curve_callout_arrow_relpos(text_side),
+                    }
+                    if event.arrow
+                    else None
+                ),
+                annotation_clip=True,
+            )
+
     def _draw_curve(
         self,
         ax,
@@ -3409,6 +3689,7 @@ class MatplotlibRenderer(Renderer):
         depth = plot_data.depth
         values = plot_data.raw_values
         scale = plot_data.scale
+        reference_overlay = self._resolved_reference_overlay(track, element)
 
         if element.render_mode == "line":
             self._draw_curve_fill(
@@ -3419,6 +3700,19 @@ class MatplotlibRenderer(Renderer):
                 dataset,
                 independent_curve_scales=independent_curve_scales,
             )
+
+        if (
+            reference_overlay is not None
+            and reference_overlay.mode == ReferenceCurveOverlayMode.TICKS
+        ):
+            self._draw_reference_curve_ticks(
+                ax,
+                depth=depth,
+                valid_mask=plot_data.valid_mask,
+                overlay=reference_overlay,
+                element=element,
+            )
+            return
 
         if scale is not None and scale.kind == ScaleKind.TANGENTIAL:
             if element.render_mode == "value_labels":
@@ -3610,6 +3904,8 @@ class MatplotlibRenderer(Renderer):
         *,
         independent_curve_scales: bool,
     ) -> float:
+        if plot_data.x_is_fractional:
+            return float(np.clip(plot_value, 0.0, 1.0))
         if independent_curve_scales or (
             plot_data.scale is not None and plot_data.scale.kind == ScaleKind.TANGENTIAL
         ):

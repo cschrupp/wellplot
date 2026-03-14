@@ -24,7 +24,7 @@ from well_log_os import (
     document_from_mapping,
 )
 from well_log_os.errors import TemplateValidationError
-from well_log_os.layout import LayoutEngine
+from well_log_os.layout import DepthWindow, LayoutEngine
 from well_log_os.renderers.matplotlib import (
     DEFAULT_MPL_STYLE_PATH,
     MatplotlibRenderer,
@@ -314,6 +314,272 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer._document_fill_row_capacity(document), 1)
         self.assertEqual(renderer._fill_header_row_count(document, document.tracks[0]), 1)
         self.assertEqual(renderer._fill_header_row_count(document, document.tracks[1]), 1)
+
+    def test_reference_overlay_curve_plot_data_uses_lane_fractions(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference overlay lane fractions",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "A",
+                                "scale": {"kind": "linear", "min": 0, "max": 100},
+                                "reference_overlay": {
+                                    "mode": "indicator",
+                                    "lane_start": 0.7,
+                                    "lane_end": 0.9,
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        dataset = WellDataset(name="reference overlay lane fractions")
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset.add_channel(
+            ScalarChannel("A", depth, "m", "u", values=np.array([0.0, 50.0, 100.0], dtype=float))
+        )
+        plot_data = renderer._curve_plot_data(
+            document.tracks[0],
+            document.tracks[0].elements[0],
+            document,
+            dataset,
+            independent_curve_scales=False,
+        )
+        self.assertTrue(plot_data.x_is_fractional)
+        np.testing.assert_allclose(plot_data.plot_values, np.array([0.7, 0.8, 0.9]))
+
+    def test_reference_overlay_ticks_draw_edge_markers(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference overlay ticks",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "A",
+                                "reference_overlay": {
+                                    "mode": "ticks",
+                                    "tick_side": "right",
+                                    "tick_length_ratio": 0.15,
+                                    "threshold": 0.5,
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        dataset = WellDataset(name="reference overlay ticks")
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset.add_channel(
+            ScalarChannel("A", depth, "m", "u", values=np.array([0.0, 1.0, 0.0], dtype=float))
+        )
+        fig = plt.figure(figsize=(2, 4), dpi=100)
+        try:
+            ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+            renderer._draw_curve(
+                ax,
+                document.tracks[0],
+                document.tracks[0].elements[0],
+                document,
+                dataset,
+            )
+            self.assertEqual(len(ax.collections), 1)
+        finally:
+            plt.close(fig)
+
+    def test_reference_overlay_curve_callouts_reuse_fractional_track_space(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference overlay callouts",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "A",
+                                "scale": {"kind": "linear", "min": 0, "max": 100},
+                                "reference_overlay": {
+                                    "mode": "curve",
+                                    "lane_start": 0.08,
+                                    "lane_end": 0.24,
+                                },
+                                "callouts": [
+                                    {
+                                        "depth": 1001.0,
+                                        "label": "A1",
+                                        "side": "right",
+                                        "text_x": 0.30,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        dataset = WellDataset(name="reference overlay callouts")
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset.add_channel(
+            ScalarChannel("A", depth, "m", "u", values=np.array([20.0, 50.0, 80.0], dtype=float))
+        )
+        fig = plt.figure(figsize=(2, 4), dpi=100)
+        try:
+            ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+            ax.set_xlim(0.0, 1.0)
+            ax.set_ylim(1002.0, 1000.0)
+            renderer._draw_curve_callouts(
+                ax,
+                document.tracks[0],
+                document,
+                dataset,
+                DepthWindow(page_number=1, start=1000.0, stop=1002.0, unit="m"),
+                independent_curve_scales=False,
+            )
+            labels = [text for text in ax.texts if text.get_text() == "A1"]
+            self.assertEqual(len(labels), 1)
+            label = labels[0]
+            self.assertGreater(label.xy[0], 0.08)
+            self.assertLess(label.xy[0], 0.24)
+        finally:
+            plt.close(fig)
+
+    def test_reference_track_header_keeps_scale_row_and_draws_overlay_properties(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference header properties",
+                "page": {"size": "A4", "track_header_height_mm": 12.0},
+                "depth": {"unit": "ft", "scale": "1:240"},
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "reference": {"define_layout": True, "unit": "ft", "scale_ratio": 240},
+                        "track_header": {
+                            "objects": [
+                                {
+                                    "kind": "title",
+                                    "enabled": False,
+                                    "reserve_space": False,
+                                },
+                                {"kind": "scale", "enabled": True, "line_units": 1},
+                                {"kind": "legend", "enabled": True, "line_units": 4},
+                            ]
+                        },
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "TT",
+                                "label": "Transit Time",
+                                "style": {"color": "#1238ff"},
+                                "scale": {
+                                    "kind": "linear",
+                                    "min": 200,
+                                    "max": 400,
+                                    "reverse": True,
+                                },
+                                "reference_overlay": {"mode": "curve"},
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        dataset = WellDataset(name="reference header properties")
+        depth = np.array([1000.0, 1001.0], dtype=float)
+        dataset.add_channel(ScalarChannel("TT", depth, "ft", "us", values=np.array([250.0, 260.0])))
+        renderer = MatplotlibRenderer()
+        fig = plt.figure(figsize=(2.2, 2.0), dpi=100)
+        try:
+            ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+            renderer._draw_track_header(ax, document.tracks[0], document, dataset)
+            text_values = [text.get_text() for text in ax.texts]
+            self.assertIn("ft 1:240", text_values)
+            self.assertIn("Transit Time", text_values)
+            self.assertIn("400", text_values)
+            self.assertIn("us", text_values)
+            self.assertIn("200", text_values)
+        finally:
+            plt.close(fig)
+
+    def test_reference_events_draw_track_segments_and_callouts(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference events",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200", "major_step": 1, "minor_step": 0.2},
+                "tracks": [
+                    {
+                        "id": "depth",
+                        "title": "Depth",
+                        "kind": "reference",
+                        "width_mm": 16,
+                        "reference": {
+                            "events": [
+                                {
+                                    "depth": 1001.0,
+                                    "label": "Casing Foot",
+                                    "tick_side": "right",
+                                    "tick_length_ratio": 0.16,
+                                    "text_side": "left",
+                                    "text_x": 0.72,
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
+        renderer = MatplotlibRenderer()
+        fig = plt.figure(figsize=(2, 4), dpi=100)
+        try:
+            ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+            ax.set_xlim(0.0, 1.0)
+            ax.set_ylim(1002.0, 1000.0)
+            renderer._draw_reference_events(
+                ax,
+                document.tracks[0],
+                DepthWindow(page_number=1, start=1000.0, stop=1002.0, unit="m"),
+            )
+            renderer._draw_reference_event_callouts(
+                ax,
+                document.tracks[0],
+                document,
+                DepthWindow(page_number=1, start=1000.0, stop=1002.0, unit="m"),
+            )
+            self.assertGreaterEqual(len(ax.lines), 1)
+            labels = [text for text in ax.texts if text.get_text() == "Casing Foot"]
+            self.assertEqual(len(labels), 1)
+        finally:
+            plt.close(fig)
 
     def test_raster_header_triplet_uses_combined_scale_legend_span(self) -> None:
         depth = np.array([1000.0, 1001.0, 1002.0])

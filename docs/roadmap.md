@@ -38,6 +38,9 @@ Decision history is tracked in `docs/decision-log.md`.
   - track-header fill indicators that reflect actual fill semantics
   - in-track curve callouts with edge avoidance and curve-aware placement
   - section-relative repeated callouts from top/bottom anchors
+  - reference-track scalar overlay modes (`curve`, `indicator`, `ticks`)
+  - reference-track-local event objects for non-channel markers
+  - reference-track headers that keep the layout scale row while exposing overlay properties
   - array-lane raster controls (`colorbar`, `sample_axis`, waveform overlay)
   - waveform-only array rendering profile
   - VDL density rendering with grayscale amplitude mapping
@@ -131,7 +134,6 @@ Longer-term / UI-centric:
 
 - Improve default typography and spacing for print fidelity.
 - Add richer depth column behavior (interval labels, optional callout lanes).
-- Add dedicated data-driven tick primitives for reference tracks (major/minor + event ticks).
 - Add configurable reference-value placement/alignment policies inside track (left/center/right, collision handling).
 - Improve raster controls (color limits, interpolation presets, palettes).
 - Add explicit micro-time calibration helpers/presets for VDL sample-axis tuning.
@@ -159,15 +161,13 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Expand reference/depth tracks so they can host curve overlays cleanly:
-  - scalar curve overlays inside the reference track body
-  - reference-track-specific overlay styles for slim curves, ticks, and event traces
-  - compatibility rules for depth/time reference units versus overlaid curve units
-  - examples where the depth track carries indicators or auxiliary curves
-- Reuse the callout machinery in reference/depth tracks:
-  - curve labels attached to reference-track overlays
-  - depth-column-safe placement rules
-  - optional dedicated callout lanes inside reference tracks
+- Document and expand reference/depth track usage:
+  - reference-track overlay YAML examples
+  - full-length reference overlay example
+  - compatibility notes for depth/time reference units versus overlaid curve units
+- Improve reference-track local event handling:
+  - optional collision-aware placement for event labels versus curve callouts
+  - optional header summaries for local reference events
 - Implement first `annotation` track objects:
   - depth-linked text labels
   - arrows/glyph markers
@@ -195,10 +195,6 @@ Longer-term / UI-centric:
   - values orientation modes
   - appearance block (track/header bg colors, font settings)
   - print/layout width semantics
-- Add data-driven ticks on reference tracks:
-  - ticks from selected channels/events
-  - formatting and filtering rules
-  - optional header summaries
 - Implement explicit `array` track options beyond raster baseline:
   - array-specific legends and advanced colorbar placement
   - per-track colormap presets

@@ -35,6 +35,10 @@ from .model import (
     RasterProfileKind,
     RasterWaveformSpec,
     ReferenceAxisKind,
+    ReferenceCurveOverlayMode,
+    ReferenceCurveOverlaySpec,
+    ReferenceCurveTickSide,
+    ReferenceEventSpec,
     ReferenceTrackSpec,
     ScaleKind,
     ScaleSpec,
@@ -511,9 +515,62 @@ def _build_reference_track(data: Any) -> ReferenceTrackSpec:
             number_format=number_format,
             precision=int(number_format_data.get("precision", 2)),
             values_orientation=str(ref_data.get("values_orientation", "horizontal")),
+            events=_build_reference_events(ref_data.get("events")),
         )
     except (TypeError, ValueError) as exc:
         raise TemplateValidationError("Invalid reference track configuration.") from exc
+
+
+def _build_reference_events(data: Any) -> tuple[ReferenceEventSpec, ...]:
+    if data is None:
+        return ()
+    events_data = _ensure_sequence(data, context="track.reference.events")
+    events: list[ReferenceEventSpec] = []
+    for index, item in enumerate(events_data):
+        event_data = _ensure_mapping(item, context=f"track.reference.events[{index}]")
+        side_text = str(event_data.get("tick_side", "right")).strip().lower()
+        try:
+            events.append(
+                ReferenceEventSpec(
+                    depth=float(event_data["depth"]),
+                    label=str(event_data.get("label", "")),
+                    color=str(event_data.get("color", "#222222")),
+                    line_style=str(event_data.get("line_style", "-")),
+                    line_width=float(event_data.get("line_width", 0.7)),
+                    tick_side=ReferenceCurveTickSide(side_text),
+                    tick_length_ratio=(
+                        float(event_data["tick_length_ratio"])
+                        if "tick_length_ratio" in event_data
+                        else None
+                    ),
+                    lane_start=(
+                        float(event_data["lane_start"]) if "lane_start" in event_data else None
+                    ),
+                    lane_end=(float(event_data["lane_end"]) if "lane_end" in event_data else None),
+                    text_side=str(event_data.get("text_side", "auto")),
+                    text_x=(float(event_data["text_x"]) if "text_x" in event_data else None),
+                    depth_offset=(
+                        float(event_data["depth_offset"]) if "depth_offset" in event_data else None
+                    ),
+                    font_size=(
+                        float(event_data["font_size"]) if "font_size" in event_data else None
+                    ),
+                    font_weight=str(event_data.get("font_weight", "bold")),
+                    font_style=str(event_data.get("font_style", "normal")),
+                    arrow=bool(event_data.get("arrow", True)),
+                    arrow_style=event_data.get("arrow_style"),
+                    arrow_linewidth=(
+                        float(event_data["arrow_linewidth"])
+                        if "arrow_linewidth" in event_data
+                        else None
+                    ),
+                )
+            )
+        except (TypeError, ValueError) as exc:
+            raise TemplateValidationError(
+                f"Invalid track.reference.events[{index}] configuration."
+            ) from exc
+    return tuple(events)
 
 
 def _build_curve_value_labels(data: Any) -> CurveValueLabelsSpec:
@@ -555,6 +612,41 @@ def _build_curve_header_display(data: Any) -> CurveHeaderDisplaySpec:
         show_limits=bool(display_data.get("show_limits", True)),
         show_color=bool(display_data.get("show_color", True)),
     )
+
+
+def _build_reference_curve_overlay(data: Any) -> ReferenceCurveOverlaySpec | None:
+    if data is None:
+        return None
+    overlay_data = _ensure_mapping(data, context="curve.reference_overlay")
+    mode_text = str(overlay_data.get("mode", "curve")).strip().lower()
+    side_text = str(overlay_data.get("tick_side", "both")).strip().lower()
+    try:
+        return ReferenceCurveOverlaySpec(
+            mode=ReferenceCurveOverlayMode(mode_text),
+            lane_start=(
+                float(overlay_data["lane_start"])
+                if overlay_data.get("lane_start") is not None
+                else None
+            ),
+            lane_end=(
+                float(overlay_data["lane_end"])
+                if overlay_data.get("lane_end") is not None
+                else None
+            ),
+            tick_side=ReferenceCurveTickSide(side_text),
+            tick_length_ratio=(
+                float(overlay_data["tick_length_ratio"])
+                if overlay_data.get("tick_length_ratio") is not None
+                else None
+            ),
+            threshold=(
+                float(overlay_data["threshold"])
+                if overlay_data.get("threshold") is not None
+                else None
+            ),
+        )
+    except (TypeError, ValueError) as exc:
+        raise TemplateValidationError("Invalid curve.reference_overlay configuration.") from exc
 
 
 def _build_curve_callouts(data: Any) -> tuple[CurveCalloutSpec, ...]:
@@ -875,6 +967,9 @@ def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
                     label=element_data.get("label"),
                     style=_build_style(element_data.get("style")),
                     scale=_build_scale(element_data.get("scale")),
+                    reference_overlay=_build_reference_curve_overlay(
+                        element_data.get("reference_overlay")
+                    ),
                     wrap=wrap_enabled,
                     wrap_color=wrap_color,
                     render_mode=str(element_data.get("render_mode", "line")),

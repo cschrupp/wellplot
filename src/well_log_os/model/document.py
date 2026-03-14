@@ -90,6 +90,18 @@ class CurveFillKind(StrEnum):
     BASELINE_SPLIT = "baseline_split"
 
 
+class ReferenceCurveOverlayMode(StrEnum):
+    CURVE = "curve"
+    INDICATOR = "indicator"
+    TICKS = "ticks"
+
+
+class ReferenceCurveTickSide(StrEnum):
+    LEFT = "left"
+    RIGHT = "right"
+    BOTH = "both"
+
+
 @dataclass(slots=True)
 class StyleSpec:
     color: str = "black"
@@ -195,6 +207,7 @@ class ReferenceTrackSpec:
     number_format: NumberFormatKind = NumberFormatKind.AUTOMATIC
     precision: int = 2
     values_orientation: str = "horizontal"
+    events: tuple[ReferenceEventSpec, ...] = ()
 
     def __post_init__(self) -> None:
         if self.scale_ratio is not None and self.scale_ratio <= 0:
@@ -290,6 +303,90 @@ class CurveHeaderDisplaySpec:
     show_unit: bool = True
     show_limits: bool = True
     show_color: bool = True
+
+
+@dataclass(slots=True)
+class ReferenceCurveOverlaySpec:
+    mode: ReferenceCurveOverlayMode = ReferenceCurveOverlayMode.CURVE
+    lane_start: float | None = None
+    lane_end: float | None = None
+    tick_side: ReferenceCurveTickSide = ReferenceCurveTickSide.BOTH
+    tick_length_ratio: float | None = None
+    threshold: float | None = None
+
+    def __post_init__(self) -> None:
+        if (self.lane_start is None) != (self.lane_end is None):
+            raise ValueError(
+                "Reference curve overlay lane_start and lane_end must be set together."
+            )
+        if self.lane_start is not None and self.lane_end is not None:
+            if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
+                raise ValueError(
+                    "Reference curve overlay lane_start/lane_end must satisfy "
+                    "0 <= lane_start < lane_end <= 1."
+                )
+        if self.tick_length_ratio is not None and self.tick_length_ratio <= 0:
+            raise ValueError(
+                "Reference curve overlay tick_length_ratio must be positive when provided."
+            )
+
+
+@dataclass(slots=True)
+class ReferenceEventSpec:
+    depth: float
+    label: str = ""
+    color: str = "#222222"
+    line_style: str = "-"
+    line_width: float = 0.7
+    tick_side: ReferenceCurveTickSide = ReferenceCurveTickSide.RIGHT
+    tick_length_ratio: float | None = None
+    lane_start: float | None = None
+    lane_end: float | None = None
+    text_side: str = "auto"
+    text_x: float | None = None
+    depth_offset: float | None = None
+    font_size: float | None = None
+    font_weight: str = "bold"
+    font_style: str = "normal"
+    arrow: bool = True
+    arrow_style: str | None = None
+    arrow_linewidth: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.label and not str(self.label).strip():
+            raise ValueError("Reference event label must be non-empty when provided.")
+        if not str(self.color).strip():
+            raise ValueError("Reference event color must be non-empty.")
+        if not str(self.line_style).strip():
+            raise ValueError("Reference event line_style must be non-empty.")
+        if self.line_width <= 0:
+            raise ValueError("Reference event line_width must be positive.")
+        if self.tick_length_ratio is not None and self.tick_length_ratio <= 0:
+            raise ValueError("Reference event tick_length_ratio must be positive when provided.")
+        if (self.lane_start is None) != (self.lane_end is None):
+            raise ValueError("Reference event lane_start and lane_end must be set together.")
+        if self.lane_start is not None and self.lane_end is not None:
+            if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
+                raise ValueError(
+                    "Reference event lane_start/lane_end must satisfy "
+                    "0 <= lane_start < lane_end <= 1."
+                )
+        side = self.text_side.strip().lower()
+        if side not in {"auto", "left", "right"}:
+            raise ValueError("Reference event text_side must be auto, left, or right.")
+        self.text_side = side
+        if self.text_x is not None and not 0.0 <= self.text_x <= 1.0:
+            raise ValueError("Reference event text_x must be between 0 and 1.")
+        if self.font_size is not None and self.font_size <= 0:
+            raise ValueError("Reference event font_size must be positive when provided.")
+        if not str(self.font_weight).strip():
+            raise ValueError("Reference event font_weight must be non-empty.")
+        if not str(self.font_style).strip():
+            raise ValueError("Reference event font_style must be non-empty.")
+        if self.arrow_style is not None and not str(self.arrow_style).strip():
+            raise ValueError("Reference event arrow_style must be non-empty when provided.")
+        if self.arrow_linewidth is not None and self.arrow_linewidth <= 0:
+            raise ValueError("Reference event arrow_linewidth must be positive when provided.")
 
 
 @dataclass(slots=True)
@@ -449,6 +546,7 @@ class CurveElement:
     label: str | None = None
     style: StyleSpec = field(default_factory=StyleSpec)
     scale: ScaleSpec | None = None
+    reference_overlay: ReferenceCurveOverlaySpec | None = None
     wrap: bool = False
     wrap_color: str | None = None
     render_mode: str = "line"
@@ -705,6 +803,25 @@ class TrackSpec:
                 raise ValueError(
                     f"Normal track {self.id} cannot contain raster elements. "
                     "Use an array track instead."
+                )
+            invalid_reference_overlays = [
+                element
+                for element in self.elements
+                if isinstance(element, CurveElement) and element.reference_overlay is not None
+            ]
+            if invalid_reference_overlays:
+                raise ValueError(
+                    f"Normal track {self.id} cannot use reference curve overlays."
+                )
+        if self.kind == TrackKind.ARRAY:
+            invalid_reference_overlays = [
+                element
+                for element in self.elements
+                if isinstance(element, CurveElement) and element.reference_overlay is not None
+            ]
+            if invalid_reference_overlays:
+                raise ValueError(
+                    f"Array track {self.id} cannot use reference curve overlays."
                 )
         if self.kind == TrackKind.ANNOTATION and self.elements:
             raise ValueError(

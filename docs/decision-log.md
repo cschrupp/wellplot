@@ -48,6 +48,10 @@ This file records project decisions that should remain stable unless explicitly 
 - Curve fills are first-class curve-owned objects, not ad-hoc renderer flags.
 - Instance-targeted fills identify rendered curve instances by `id` / `other_element_id`, not by
   aliasing or duplicate channel names.
+- Reference-track scalar overlays are first-class curve display modes (`curve`, `indicator`,
+  `ticks`), not accidental reuse of generic x-axis behavior.
+- Reference-track local events are track-owned layout objects under `reference.events`, not channel
+  bindings and not global document markers.
 
 ## Rendering Decisions
 
@@ -68,6 +72,8 @@ This file records project decisions that should remain stable unless explicitly 
 - Curve callouts are curve-owned display objects.
 - Repeated callouts from `top`, `bottom`, and `top_and_bottom` are generated relative to the full
   log section bounds and rendered inline at those generated depths.
+- Reference-track headers keep their own scale/unit row and use the legend slot for overlay
+  properties when legends are enabled.
 
 ## Tooling and Process Decisions
 

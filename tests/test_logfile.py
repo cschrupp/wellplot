@@ -511,6 +511,69 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(curve.callouts[0].distance_from_bottom or 0.0, 2.0)
         self.assertAlmostEqual(curve.callouts[0].every or 0.0, 4.0)
 
+    def test_binding_can_parse_reference_curve_overlay(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"][0]["kind"] = "reference"
+        payload["document"]["layout"]["log_sections"][0]["tracks"][0]["reference"] = {
+            "define_layout": True,
+            "unit": "m",
+            "scale_ratio": 200,
+        }
+        payload["document"]["bindings"]["channels"][0]["reference_overlay"] = {
+            "mode": "ticks",
+            "tick_side": "right",
+            "tick_length_ratio": 0.18,
+            "threshold": 5.0,
+        }
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        curve = document.tracks[0].elements[0]
+        self.assertIsNotNone(curve.reference_overlay)
+        assert curve.reference_overlay is not None
+        self.assertEqual(curve.reference_overlay.mode, "ticks")
+        self.assertEqual(curve.reference_overlay.tick_side, "right")
+        self.assertAlmostEqual(curve.reference_overlay.tick_length_ratio or 0.0, 0.18)
+        self.assertAlmostEqual(curve.reference_overlay.threshold or 0.0, 5.0)
+
+    def test_reference_track_can_parse_reference_events(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"][0]["kind"] = "reference"
+        payload["document"]["layout"]["log_sections"][0]["tracks"][0]["reference"] = {
+            "define_layout": True,
+            "unit": "m",
+            "scale_ratio": 200,
+            "events": [
+                {
+                    "depth": 1002.0,
+                    "label": "Readings Start",
+                    "tick_side": "right",
+                    "tick_length_ratio": 0.16,
+                    "text_side": "left",
+                    "text_x": 0.72,
+                }
+            ],
+        }
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        reference = document.tracks[0].reference
+        assert reference is not None
+        self.assertEqual(len(reference.events), 1)
+        event = reference.events[0]
+        self.assertAlmostEqual(event.depth, 1002.0)
+        self.assertEqual(event.label, "Readings Start")
+        self.assertEqual(event.tick_side, "right")
+        self.assertAlmostEqual(event.tick_length_ratio or 0.0, 0.16)
+        self.assertEqual(event.text_side, "left")
+        self.assertAlmostEqual(event.text_x or 0.0, 0.72)
+
     def test_binding_can_enable_log_wrap(self) -> None:
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][1]["scale"] = {

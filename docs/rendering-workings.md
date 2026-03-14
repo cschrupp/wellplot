@@ -82,6 +82,9 @@ Reference-track number/tick controls live under `render.matplotlib.style.track`,
 - `reference_label_x`, `reference_label_align`
 - `reference_label_fontsize`, `reference_label_color`
 - `reference_label_fontfamily`, `reference_label_fontweight`, `reference_label_fontstyle`
+- `reference_overlay_curve_lane_start`, `reference_overlay_curve_lane_end`
+- `reference_overlay_indicator_lane_start`, `reference_overlay_indicator_lane_end`
+- `reference_overlay_tick_length_ratio`, `reference_overlay_threshold`
 
 Curve-callout placement defaults live under `render.matplotlib.style.curve_callouts`, including:
 - `left_text_x`, `right_text_x`
@@ -168,6 +171,13 @@ A `reference` track is not only visual: it can define the layout reference axis.
   - `reference.header.display_unit`
   - `reference.header.display_scale`
   - `reference.header.display_annotations`
+- Reference tracks can host scalar overlay curves via `reference_overlay` on curve bindings:
+  - `curve`: normalized slim curve inside a configured lane
+  - `indicator`: narrow indicator trace inside a configured lane
+  - `ticks`: thresholded edge ticks driven by scalar values
+- Reference tracks can also host local non-channel events under `reference.events`.
+- When `track_header.legend.enabled: true`, a reference-track header keeps the reference scale row
+  and uses the legend slot for overlay curve properties (name + scale/unit rows).
 
 ## 9) Multi-Curve Track Bindings
 
@@ -189,6 +199,8 @@ Track-header legend space auto-fits to curve count:
 - curve property groups keep a fixed vertical quota across tracks; short tracks do not stretch their
   header rows to fill the whole band.
 - array-track property groups follow the same fixed-height behavior as curve headers.
+- reference-track overlay properties stay inside the legend slot; the scale slot remains reserved
+  for the reference axis text (for example `ft 1:240`).
 - each `layout.log_sections[*]` may define:
   - `title` (required to render the section banner)
   - `subtitle` (optional)
@@ -374,6 +386,24 @@ document:
             side: right
             text_x: 0.83
 ```
+
+Reference-track events are configured separately under `tracks[*].reference.events`.
+They are layout-local marker objects, not dataset channel bindings.
+
+Supported event fields:
+
+- `depth`
+- `label`
+- `color`, `line_style`, `line_width`
+- `tick_side` (`left`, `right`, `both`)
+- `tick_length_ratio`
+- optional explicit `lane_start` / `lane_end`
+- `text_side`, `text_x`, `depth_offset`
+- `font_size`, `font_weight`, `font_style`
+- `arrow`, `arrow_style`, `arrow_linewidth`
+
+Event markers render only inside the reference track and are intended for one-off milestones such
+as casing foot, readings start/stop, tool-state transitions, and manually curated depth flags.
 
 ## 13) Array Display Options
 

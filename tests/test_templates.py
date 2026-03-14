@@ -364,6 +364,86 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(document.tracks[0].kind, TrackKind.REFERENCE)
         self.assertIsInstance(document.tracks[0].elements[0], CurveElement)
 
+    def test_reference_track_can_parse_reference_curve_overlay(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference overlay config",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "ref",
+                        "title": "Reference",
+                        "kind": "reference",
+                        "width_mm": 20,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "CBL",
+                                "reference_overlay": {
+                                    "mode": "indicator",
+                                    "lane_start": 0.7,
+                                    "lane_end": 0.9,
+                                    "tick_side": "right",
+                                    "tick_length_ratio": 0.15,
+                                    "threshold": 1.5,
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        element = document.tracks[0].elements[0]
+        self.assertIsInstance(element, CurveElement)
+        self.assertIsNotNone(element.reference_overlay)
+        assert element.reference_overlay is not None
+        self.assertEqual(element.reference_overlay.mode, "indicator")
+        self.assertAlmostEqual(element.reference_overlay.lane_start or 0.0, 0.7)
+        self.assertAlmostEqual(element.reference_overlay.lane_end or 0.0, 0.9)
+        self.assertEqual(element.reference_overlay.tick_side, "right")
+        self.assertAlmostEqual(element.reference_overlay.tick_length_ratio or 0.0, 0.15)
+        self.assertAlmostEqual(element.reference_overlay.threshold or 0.0, 1.5)
+
+    def test_reference_track_can_parse_reference_events(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "reference events",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "ref",
+                        "title": "Reference",
+                        "kind": "reference",
+                        "width_mm": 20,
+                        "reference": {
+                            "events": [
+                                {
+                                    "depth": 1001.5,
+                                    "label": "Casing Foot",
+                                    "tick_side": "left",
+                                    "tick_length_ratio": 0.14,
+                                    "text_side": "right",
+                                    "text_x": 0.3,
+                                }
+                            ]
+                        },
+                    }
+                ],
+            }
+        )
+        reference = document.tracks[0].reference
+        assert reference is not None
+        self.assertEqual(len(reference.events), 1)
+        event = reference.events[0]
+        self.assertAlmostEqual(event.depth, 1001.5)
+        self.assertEqual(event.label, "Casing Foot")
+        self.assertEqual(event.tick_side, "left")
+        self.assertAlmostEqual(event.tick_length_ratio or 0.0, 0.14)
+        self.assertEqual(event.text_side, "right")
+        self.assertAlmostEqual(event.text_x or 0.0, 0.3)
+
     def test_image_track_accepts_raster_and_curve_overlay(self) -> None:
         document = document_from_mapping(
             {

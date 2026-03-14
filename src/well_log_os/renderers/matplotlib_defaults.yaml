@@ -95,6 +95,12 @@ track:
   reference_label_fontfamily: null
   reference_label_fontweight: normal
   reference_label_fontstyle: normal
+  reference_overlay_curve_lane_start: 0.08
+  reference_overlay_curve_lane_end: 0.92
+  reference_overlay_indicator_lane_start: 0.72
+  reference_overlay_indicator_lane_end: 0.92
+  reference_overlay_tick_length_ratio: 0.12
+  reference_overlay_threshold: 0.0
 grid:
   x_major_linewidth: 0.45
   x_minor_linewidth: 0.35

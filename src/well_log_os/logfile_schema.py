@@ -247,6 +247,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "scale": {"$ref": "#/$defs/trackScale"},
                 "wrap": {"$ref": "#/$defs/curveWrap"},
                 "fill": {"$ref": "#/$defs/curveFill"},
+                "reference_overlay": {"$ref": "#/$defs/referenceCurveOverlay"},
                 "render_mode": {"type": "string", "enum": ["line", "value_labels"]},
                 "value_labels": {"$ref": "#/$defs/curveValueLabels"},
                 "header_display": {"$ref": "#/$defs/curveHeaderDisplay"},
@@ -422,6 +423,31 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "reference_label_fontfamily": {"type": ["string", "null"]},
                 "reference_label_fontweight": {"type": "string"},
                 "reference_label_fontstyle": {"type": "string"},
+                "reference_overlay_curve_lane_start": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                },
+                "reference_overlay_curve_lane_end": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                },
+                "reference_overlay_indicator_lane_start": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                },
+                "reference_overlay_indicator_lane_end": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                },
+                "reference_overlay_tick_length_ratio": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                },
+                "reference_overlay_threshold": {"type": "number"},
             },
         },
         "matplotlibStyleCurveCallouts": {
@@ -508,6 +534,10 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "secondary_grid": {"$ref": "#/$defs/referenceTrackSecondaryGrid"},
                 "header": {"$ref": "#/$defs/referenceTrackHeader"},
                 "number_format": {"$ref": "#/$defs/referenceTrackNumberFormat"},
+                "events": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/referenceTrackEvent"},
+                },
             },
         },
         "referenceTrackSecondaryGrid": {
@@ -537,6 +567,65 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 },
                 "precision": {"type": "integer", "minimum": 0},
             },
+        },
+        "referenceCurveOverlay": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "mode": {"type": "string", "enum": ["curve", "indicator", "ticks"]},
+                "lane_start": {"type": "number", "minimum": 0, "maximum": 1},
+                "lane_end": {"type": "number", "minimum": 0, "maximum": 1},
+                "tick_side": {"type": "string", "enum": ["left", "right", "both"]},
+                "tick_length_ratio": {"type": "number", "exclusiveMinimum": 0},
+                "threshold": {"type": "number"},
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "anyOf": [
+                            {"required": ["lane_start"]},
+                            {"required": ["lane_end"]},
+                        ]
+                    },
+                    "then": {"required": ["lane_start", "lane_end"]},
+                }
+            ],
+        },
+        "referenceTrackEvent": {
+            "type": "object",
+            "required": ["depth"],
+            "additionalProperties": False,
+            "properties": {
+                "depth": {"type": "number"},
+                "label": {"type": "string"},
+                "color": {"type": "string", "minLength": 1},
+                "line_style": {"type": "string"},
+                "line_width": {"type": "number", "exclusiveMinimum": 0},
+                "tick_side": {"type": "string", "enum": ["left", "right", "both"]},
+                "tick_length_ratio": {"type": "number", "exclusiveMinimum": 0},
+                "lane_start": {"type": "number", "minimum": 0, "maximum": 1},
+                "lane_end": {"type": "number", "minimum": 0, "maximum": 1},
+                "text_side": {"type": "string", "enum": ["auto", "left", "right"]},
+                "text_x": {"type": "number", "minimum": 0, "maximum": 1},
+                "depth_offset": {"type": "number"},
+                "font_size": {"type": "number", "exclusiveMinimum": 0},
+                "font_weight": {"type": "string"},
+                "font_style": {"type": "string"},
+                "arrow": {"type": "boolean"},
+                "arrow_style": {"type": "string"},
+                "arrow_linewidth": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "allOf": [
+                {
+                    "if": {
+                        "anyOf": [
+                            {"required": ["lane_start"]},
+                            {"required": ["lane_end"]},
+                        ]
+                    },
+                    "then": {"required": ["lane_start", "lane_end"]},
+                }
+            ],
         },
         "style": {
             "type": "object",
