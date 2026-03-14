@@ -177,6 +177,69 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(pair[1], 2)
         self.assertGreater(pair[2], pair[3])
 
+    def test_curve_header_pairs_draw_full_scale_triplets_without_fill_rows(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "curve pair scale triplets",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "GR",
+                                "label": "Gamma Ray",
+                                "scale": {"kind": "linear", "min": 0, "max": 150},
+                                "style": {"color": "#17bf22"},
+                            },
+                            {
+                                "kind": "curve",
+                                "channel": "TT",
+                                "label": "Transit Time",
+                                "scale": {
+                                    "kind": "linear",
+                                    "min": 200,
+                                    "max": 400,
+                                    "reverse": True,
+                                },
+                                "style": {"color": "#1238ff"},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        dataset = WellDataset(name="curve pair scale triplets")
+        depth = np.array([1000.0, 1001.0], dtype=float)
+        dataset.add_channel(ScalarChannel("GR", depth, "m", "gAPI", values=np.array([10.0, 20.0])))
+        dataset.add_channel(ScalarChannel("TT", depth, "m", "us", values=np.array([250.0, 260.0])))
+
+        renderer = MatplotlibRenderer()
+        fig = plt.figure(figsize=(4, 2), dpi=100)
+        try:
+            ax = fig.add_axes([0.0, 0.0, 1.0, 1.0])
+            renderer._draw_track_header_curve_pairs(
+                ax,
+                document.tracks[0],
+                document,
+                dataset,
+                0.95,
+                0.10,
+            )
+            text_values = [text.get_text() for text in ax.texts]
+            self.assertIn("150", text_values)
+            self.assertIn("gAPI", text_values)
+            self.assertIn("400", text_values)
+            self.assertIn("200", text_values)
+            self.assertIn("us", text_values)
+        finally:
+            plt.close(fig)
+
     def test_curve_header_row_count_uses_document_wide_capacity(self) -> None:
         document = document_from_mapping(
             {

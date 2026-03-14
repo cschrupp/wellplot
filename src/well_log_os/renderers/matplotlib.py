@@ -2069,6 +2069,28 @@ class MatplotlibRenderer(Renderer):
                 color=row_color,
                 clip_on=True,
             )
+            ax.text(
+                float(track_header_style["scale_unit_x"]),
+                y_center,
+                unit_text,
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=scale_fontsize,
+                color=row_color,
+                clip_on=True,
+            )
+            ax.text(
+                float(track_header_style["scale_right_x"]),
+                y_center,
+                right_value,
+                transform=ax.transAxes,
+                ha="right",
+                va="center",
+                fontsize=scale_fontsize,
+                color=row_color,
+                clip_on=True,
+            )
 
         if not fill_rows:
             return
@@ -2181,28 +2203,6 @@ class MatplotlibRenderer(Renderer):
                 },
                 clip_on=True,
                 zorder=0.5,
-            )
-            ax.text(
-                float(track_header_style["scale_unit_x"]),
-                y_center,
-                unit_text,
-                transform=ax.transAxes,
-                ha="center",
-                va="center",
-                fontsize=scale_fontsize,
-                color=row_color,
-                clip_on=True,
-            )
-            ax.text(
-                float(track_header_style["scale_right_x"]),
-                y_center,
-                right_value,
-                transform=ax.transAxes,
-                ha="right",
-                va="center",
-                fontsize=scale_fontsize,
-                color=row_color,
-                clip_on=True,
             )
 
     def _grid_zorder(self, mode: GridDisplayMode) -> float:
