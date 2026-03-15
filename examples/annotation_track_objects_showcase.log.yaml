@@ -1,0 +1,236 @@
+template:
+  path: ../templates/wireline_base.template.yaml
+version: 1
+name: Annotation Track Objects Showcase
+render:
+  output_path: ../workspace/renders/annotation_track_objects_showcase.pdf
+  dpi: 300
+  continuous_strip_page_height_mm: 297
+document:
+  depth_range:
+    - 670
+    - 720
+  page:
+    margin_left_mm: 0
+    margin_right_mm: 8
+    margin_top_mm: 0
+    margin_bottom_mm: 0
+    track_gap_mm: 0
+    header_height_mm: 0
+    track_header_height_mm: 16
+    footer_height_mm: 0
+  layout:
+    heading:
+      enabled: false
+    comments: []
+    log_sections:
+      - id: main
+        title: Annotation Track Objects Showcase
+        subtitle: Interval blocks, notes, markers, arrows, and glyphs in one annotation lane
+        data:
+          source_path: ../workspace/data/CBL_Main_REV1.las
+          source_format: las
+        tracks:
+          - id: depth
+            title: Depth
+            kind: reference
+            width_mm: 16
+            position: 1
+            reference:
+              axis: depth
+              define_layout: true
+              unit: ft
+              scale_ratio: 240
+              major_step: 10
+              secondary_grid:
+                display: true
+                line_count: 5
+          - id: gr
+            title: GR
+            kind: normal
+            width_mm: 28
+            position: 2
+            grid:
+              vertical:
+                main:
+                  line_count: 4
+                  scale: linear
+                secondary:
+                  line_count: 4
+                  scale: linear
+          - id: ann
+            title: Lithofacies / Annotations
+            kind: annotation
+            width_mm: 50
+            position: 3
+            track_header:
+              objects:
+                - kind: title
+                  enabled: true
+                  line_units: 1
+                - kind: scale
+                  enabled: false
+                  reserve_space: false
+                - kind: legend
+                  enabled: false
+                  reserve_space: false
+                - kind: divisions
+                  enabled: false
+                  reserve_space: false
+            annotations:
+              - kind: interval
+                top: 670
+                base: 688
+                text: shale
+                lane_start: 0.0
+                lane_end: 0.26
+                fill_color: "#2047a3"
+                border_color: "#1a1a1a"
+                text_color: "#ffffff"
+                text_orientation: vertical
+                font_size: 8.2
+                font_weight: bold
+              - kind: text
+                top: 670
+                base: 688
+                text: |
+                  Dark shale with
+                  moderate GR and
+                  limited clean streaks.
+                lane_start: 0.24
+                lane_end: 0.72
+                background_color: "#dbe7ff"
+                border_color: "#2047a3"
+                border_linewidth: 0.5
+                wrap: true
+                font_size: 6.7
+              - kind: interval
+                top: 688
+                base: 700
+                text: sand
+                lane_start: 0.0
+                lane_end: 0.26
+                fill_color: "#ffe21a"
+                border_color: "#1a1a1a"
+                text_color: "#111111"
+                text_orientation: horizontal
+                font_size: 7.6
+                font_weight: bold
+              - kind: text
+                top: 688
+                base: 700
+                text: |
+                  Clean sand package with
+                  lower GR response and
+                  sharper boundaries.
+                lane_start: 0.24
+                lane_end: 0.72
+                background_color: "#fff6cc"
+                border_color: "#8a6d00"
+                border_linewidth: 0.5
+                wrap: true
+                font_size: 6.7
+              - kind: interval
+                top: 700
+                base: 720
+                text: shale
+                lane_start: 0.0
+                lane_end: 0.26
+                fill_color: "#2047a3"
+                border_color: "#1a1a1a"
+                text_color: "#ffffff"
+                text_orientation: vertical
+                font_size: 8.2
+                font_weight: bold
+              - kind: text
+                top: 700
+                base: 720
+                text: |
+                  Laminated shale interval.
+                  Suitable for longer
+                  formatted zone notes.
+                lane_start: 0.24
+                lane_end: 0.72
+                background_color: "#dbe7ff"
+                border_color: "#2047a3"
+                border_linewidth: 0.5
+                wrap: true
+                font_size: 6.5
+              - kind: marker
+                depth: 680.5
+                x: 0.08
+                shape: triangle_right
+                size: 56
+                color: "#b45309"
+                fill_color: "#f59e0b"
+                edge_color: "#7c2d12"
+                label: Readings Start
+                priority: 150
+                label_mode: dedicated_lane
+                label_lane_start: 0.76
+                label_lane_end: 0.98
+              - kind: marker
+                depth: 691.0
+                x: 0.08
+                shape: plus
+                size: 56
+                color: "#0f766e"
+                label: Tool Free
+                priority: 90
+                label_mode: dedicated_lane
+                label_lane_start: 0.76
+                label_lane_end: 0.98
+              - kind: marker
+                depth: 708.0
+                x: 0.08
+                shape: diamond
+                size: 42
+                color: "#0f172a"
+                fill_color: "#e2e8f0"
+                edge_color: "#0f172a"
+                label: Casing Foot
+                priority: 130
+                label_mode: dedicated_lane
+                label_lane_start: 0.76
+                label_lane_end: 0.98
+              - kind: arrow
+                start_depth: 696.0
+                end_depth: 694.5
+                start_x: 0.84
+                end_x: 0.18
+                color: "#7c3aed"
+                line_width: 0.8
+                arrow_style: -|>
+                label: Cleaner
+                label_depth: 696.0
+                priority: 70
+                label_mode: dedicated_lane
+                label_lane_start: 0.76
+                label_lane_end: 0.98
+              - kind: glyph
+                depth: 715.0
+                glyph: CF
+                lane_start: 0.02
+                lane_end: 0.22
+                color: "#111111"
+                background_color: "#ffffff"
+                border_color: "#111111"
+                border_linewidth: 0.5
+                font_size: 8.2
+    tail:
+      enabled: false
+  bindings:
+    on_missing: skip
+    channels:
+      - section: main
+        channel: GR_STGC
+        track_id: gr
+        kind: curve
+        label: Gamma Ray (GR_STGC)
+        style:
+          color: "#17bf22"
+          line_width: 0.85
+        scale:
+          kind: linear
+          min: 0
+          max: 150

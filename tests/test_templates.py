@@ -4,7 +4,10 @@ import unittest
 
 from well_log_os.errors import TemplateValidationError
 from well_log_os.model import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     CurveElement,
     CurveFillKind,
@@ -693,6 +696,58 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(track.annotations[0].text, "shale")
         self.assertIsInstance(track.annotations[1], AnnotationTextSpec)
         self.assertEqual(track.annotations[1].text, "Detailed zone description")
+
+    def test_annotation_track_can_parse_marker_arrow_and_glyph_objects(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "annotation extra objects",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "ann",
+                        "title": "Annotations",
+                        "kind": "annotation",
+                        "width_mm": 20,
+                        "annotations": [
+                            {
+                                "kind": "marker",
+                                "depth": 1005,
+                                "x": 0.2,
+                                "shape": "triangle_right",
+                                "label": "Casing Foot",
+                                "priority": 150,
+                                "label_mode": "dedicated_lane",
+                                "label_lane_start": 0.75,
+                                "label_lane_end": 0.95,
+                            },
+                            {
+                                "kind": "arrow",
+                                "start_depth": 1008,
+                                "end_depth": 1012,
+                                "start_x": 0.75,
+                                "end_x": 0.35,
+                                "label": "Flow",
+                            },
+                            {
+                                "kind": "glyph",
+                                "depth": 1014,
+                                "glyph": "CF",
+                                "lane_start": 0.0,
+                                "lane_end": 0.3,
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        track = document.tracks[0]
+        self.assertEqual(len(track.annotations), 3)
+        self.assertIsInstance(track.annotations[0], AnnotationMarkerSpec)
+        self.assertEqual(track.annotations[0].priority, 150)
+        self.assertEqual(track.annotations[0].label_mode.value, "dedicated_lane")
+        self.assertIsInstance(track.annotations[1], AnnotationArrowSpec)
+        self.assertIsInstance(track.annotations[2], AnnotationGlyphSpec)
 
     def test_non_annotation_track_rejects_annotation_objects(self) -> None:
         with self.assertRaises(ValueError):

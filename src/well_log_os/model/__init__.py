@@ -1,7 +1,11 @@
 from .channels import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel
 from .dataset import WellDataset
 from .document import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationLabelMode,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     CurveCalloutSpec,
     CurveElement,
@@ -47,7 +51,11 @@ from .document import (
 
 __all__ = [
     "ArrayChannel",
+    "AnnotationArrowSpec",
+    "AnnotationGlyphSpec",
     "AnnotationIntervalSpec",
+    "AnnotationLabelMode",
+    "AnnotationMarkerSpec",
     "AnnotationTextSpec",
     "BaseChannel",
     "CurveCalloutSpec",

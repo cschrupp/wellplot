@@ -14,7 +14,11 @@ import yaml
 from ..errors import DependencyUnavailableError, TemplateValidationError
 from ..layout import LayoutEngine
 from ..model import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationLabelMode,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     CurveElement,
     CurveFillKind,
@@ -110,6 +114,33 @@ class _CurveCalloutRenderRecord:
     arrow_linewidth: float
     placed_side: str | None = None
     text_y: float | None = None
+
+
+@dataclass(slots=True)
+class _AnnotationLabelRecord:
+    label: str
+    anchor_x: float
+    anchor_y: float
+    preferred_x: float
+    preferred_y: float
+    color: str
+    font_size: float
+    font_weight: str
+    font_style: str
+    priority: int
+    arrow: bool
+    arrow_style: str
+    arrow_linewidth: float
+    rotation: float = 0.0
+    label_mode: AnnotationLabelMode = AnnotationLabelMode.FREE
+    label_lane_start: float | None = None
+    label_lane_end: float | None = None
+    side: str | None = None
+    allow_side_flip: bool = False
+    placed_side: str | None = None
+    text_x: float | None = None
+    text_y: float | None = None
+    display_label: str | None = None
 
 
 class MatplotlibRenderer(Renderer):
@@ -1686,6 +1717,51 @@ class MatplotlibRenderer(Renderer):
                     last_line = f"{last_line}..."
                 lines[last_index] = last_line
         return "\n".join(lines[:max_lines])
+
+    def _wrap_annotation_label_text(
+        self,
+        ax,
+        *,
+        text: str,
+        available_width_ratio: float,
+        font_size_pt: float,
+        max_lines: int = 2,
+    ) -> str:
+        if not text:
+            return ""
+        max_chars = self._header_char_budget(
+            ax,
+            available_width_ratio=max(available_width_ratio, 0.01),
+            font_size_pt=font_size_pt,
+            char_width_ratio=0.62,
+            min_chars=1,
+        )
+        wrapper = textwrap.TextWrapper(
+            width=max_chars,
+            break_long_words=False,
+            break_on_hyphens=False,
+        )
+        force_wrapper = textwrap.TextWrapper(
+            width=max_chars,
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
+        lines = wrapper.wrap(text) or force_wrapper.wrap(text)
+        if not lines:
+            return text
+        if len(lines) <= max_lines:
+            return "\n".join(lines)
+        kept = lines[:max_lines]
+        last_line = kept[-1].rstrip()
+        if max_chars <= 3:
+            kept[-1] = last_line[:max_chars]
+        else:
+            if len(last_line) > max_chars - 3:
+                last_line = last_line[: max_chars - 3].rstrip()
+            if not last_line.endswith("..."):
+                last_line = f"{last_line}..."
+            kept[-1] = last_line
+        return "\n".join(kept)
 
     def _format_curve_header_label(
         self,
@@ -3856,6 +3932,21 @@ class MatplotlibRenderer(Renderer):
             y = 0.5 * (top + base)
         return x, y
 
+    def _annotation_marker_symbol(self, shape: str) -> str:
+        return {
+            "circle": "o",
+            "square": "s",
+            "diamond": "D",
+            "triangle_up": "^",
+            "triangle_down": "v",
+            "triangle_left": "<",
+            "triangle_right": ">",
+            "x": "x",
+            "plus": "+",
+            "bar_horizontal": "_",
+            "bar_vertical": "|",
+        }[shape]
+
     def _draw_annotation_interval(self, ax, annotation: AnnotationIntervalSpec, window) -> None:
         visible = self._annotation_visible_interval(annotation.top, annotation.base, window)
         if visible is None:
@@ -4020,12 +4111,651 @@ class MatplotlibRenderer(Renderer):
             zorder=1.7,
         )
 
+    def _draw_annotation_marker_shape(self, ax, annotation: AnnotationMarkerSpec, window) -> None:
+        from matplotlib.transforms import blended_transform_factory
+
+        if annotation.depth < window.start or annotation.depth > window.stop:
+            return
+        transform = blended_transform_factory(ax.transAxes, ax.transData)
+        symbol = self._annotation_marker_symbol(annotation.shape)
+        edge_color = annotation.edge_color or annotation.color
+        if annotation.shape in {"x", "plus", "bar_horizontal", "bar_vertical"}:
+            ax.scatter(
+                [annotation.x],
+                [annotation.depth],
+                transform=transform,
+                marker=symbol,
+                s=annotation.size,
+                c=[edge_color],
+                linewidths=annotation.line_width,
+                zorder=1.85,
+                clip_on=True,
+            )
+        else:
+            ax.scatter(
+                [annotation.x],
+                [annotation.depth],
+                transform=transform,
+                marker=symbol,
+                s=annotation.size,
+                facecolors=annotation.fill_color or annotation.color,
+                edgecolors=edge_color,
+                linewidths=annotation.line_width,
+                zorder=1.85,
+                clip_on=True,
+            )
+    def _annotation_marker_label_record(
+        self,
+        annotation: AnnotationMarkerSpec,
+        callout_style: dict[str, Any],
+    ) -> _AnnotationLabelRecord | None:
+        if not annotation.label or annotation.label_mode == AnnotationLabelMode.NONE:
+            return None
+        text_side = annotation.text_side
+        if text_side == "auto":
+            text_side = "right" if annotation.x <= 0.5 else "left"
+        text_x = (
+            float(annotation.text_x)
+            if annotation.text_x is not None
+            else float(callout_style["right_text_x"])
+            if text_side == "right"
+            else float(callout_style["left_text_x"])
+        )
+        text_y = annotation.depth + (
+            float(annotation.depth_offset) if annotation.depth_offset is not None else 0.0
+        )
+        label_side: str | None
+        preferred_x: float
+        if annotation.label_mode == AnnotationLabelMode.DEDICATED_LANE:
+            lane_start = float(annotation.label_lane_start)
+            lane_end = float(annotation.label_lane_end)
+            preferred_x = float(
+                np.clip(
+                    text_x,
+                    lane_start,
+                    lane_end,
+                )
+            )
+            lane_center = 0.5 * (lane_start + lane_end)
+            if lane_center > annotation.x:
+                label_side = "right"
+                if annotation.text_x is None:
+                    preferred_x = lane_start
+            elif lane_center < annotation.x:
+                label_side = "left"
+                if annotation.text_x is None:
+                    preferred_x = lane_end
+            else:
+                label_side = None
+                if annotation.text_x is None:
+                    preferred_x = lane_center
+        else:
+            label_side = text_side
+            preferred_x = float(text_x)
+        return _AnnotationLabelRecord(
+            label=annotation.label,
+            anchor_x=float(annotation.x),
+            anchor_y=float(annotation.depth),
+            preferred_x=preferred_x,
+            preferred_y=float(text_y),
+            color=annotation.color,
+            font_size=(
+                annotation.font_size
+                if annotation.font_size is not None
+                else float(callout_style["font_size"])
+            ),
+            font_weight=annotation.font_weight,
+            font_style=annotation.font_style,
+            priority=annotation.priority,
+            arrow=annotation.arrow,
+            arrow_style=annotation.arrow_style or str(callout_style["arrow_style"]),
+            arrow_linewidth=(
+                annotation.arrow_linewidth
+                if annotation.arrow_linewidth is not None
+                else float(callout_style["arrow_linewidth"])
+            ),
+            rotation=0.0,
+            label_mode=annotation.label_mode,
+            label_lane_start=annotation.label_lane_start,
+            label_lane_end=annotation.label_lane_end,
+            side=label_side,
+            allow_side_flip=(
+                annotation.label_mode == AnnotationLabelMode.FREE
+                and annotation.text_side == "auto"
+                and annotation.text_x is None
+            ),
+        )
+
+    def _draw_annotation_arrow_line(self, ax, annotation: AnnotationArrowSpec, window) -> None:
+        from matplotlib.transforms import blended_transform_factory
+
+        interval_top = min(annotation.start_depth, annotation.end_depth)
+        interval_base = max(annotation.start_depth, annotation.end_depth)
+        if interval_base < window.start or interval_top > window.stop:
+            return
+        transform = blended_transform_factory(ax.transAxes, ax.transData)
+        ax.annotate(
+            "",
+            xy=(annotation.end_x, annotation.end_depth),
+            xycoords=transform,
+            xytext=(annotation.start_x, annotation.start_depth),
+            textcoords=transform,
+            zorder=1.82,
+            arrowprops={
+                "arrowstyle": annotation.arrow_style,
+                "color": annotation.color,
+                "lw": annotation.line_width,
+                "linestyle": annotation.line_style,
+                "shrinkA": 0,
+                "shrinkB": 0,
+            },
+            annotation_clip=True,
+        )
+    def _annotation_arrow_label_record(
+        self,
+        annotation: AnnotationArrowSpec,
+    ) -> _AnnotationLabelRecord | None:
+        if not annotation.label or annotation.label_mode == AnnotationLabelMode.NONE:
+            return None
+        label_y = (
+            annotation.label_depth
+            if annotation.label_depth is not None
+            else 0.5 * (annotation.start_depth + annotation.end_depth)
+        )
+        label_x = (
+            annotation.label_x
+            if annotation.label_x is not None
+            else 0.5 * (annotation.start_x + annotation.end_x)
+        )
+        label_side: str | None
+        preferred_x: float
+        if annotation.label_mode == AnnotationLabelMode.DEDICATED_LANE:
+            lane_start = float(annotation.label_lane_start)
+            lane_end = float(annotation.label_lane_end)
+            preferred_x = float(np.clip(label_x, lane_start, lane_end))
+            lane_center = 0.5 * (lane_start + lane_end)
+            if lane_center > annotation.end_x:
+                label_side = "right"
+                if annotation.label_x is None:
+                    preferred_x = lane_start
+            elif lane_center < annotation.end_x:
+                label_side = "left"
+                if annotation.label_x is None:
+                    preferred_x = lane_end
+            else:
+                label_side = None
+                if annotation.label_x is None:
+                    preferred_x = lane_center
+        else:
+            label_side = None
+            preferred_x = float(label_x)
+        return _AnnotationLabelRecord(
+            label=annotation.label,
+            anchor_x=float(annotation.end_x),
+            anchor_y=float(annotation.end_depth),
+            preferred_x=preferred_x,
+            preferred_y=float(label_y),
+            color=annotation.color,
+            font_size=annotation.font_size,
+            font_weight=annotation.font_weight,
+            font_style=annotation.font_style,
+            priority=annotation.priority,
+            arrow=False,
+            arrow_style=annotation.arrow_style,
+            arrow_linewidth=annotation.line_width,
+            rotation=annotation.text_rotation,
+            label_mode=annotation.label_mode,
+            label_lane_start=annotation.label_lane_start,
+            label_lane_end=annotation.label_lane_end,
+            side=label_side,
+        )
+
+    def _draw_annotation_glyph(self, ax, annotation: AnnotationGlyphSpec, window) -> None:
+        from matplotlib.patches import Rectangle
+
+        if annotation.depth is not None:
+            if annotation.depth < window.start or annotation.depth > window.stop:
+                return
+            x, y = self._annotation_box_anchor(
+                lane_start=annotation.lane_start,
+                lane_end=annotation.lane_end,
+                top=annotation.depth,
+                base=annotation.depth,
+                padding=annotation.padding,
+                horizontal_alignment=annotation.horizontal_alignment,
+                vertical_alignment="center",
+            )
+            bbox = (
+                {
+                    "facecolor": annotation.background_color or "none",
+                    "edgecolor": annotation.border_color or "none",
+                    "linewidth": annotation.border_linewidth or 0.6,
+                    "boxstyle": f"square,pad={annotation.padding}",
+                }
+                if annotation.background_color is not None or annotation.border_color is not None
+                else None
+            )
+            vertical_alignment = "center"
+        else:
+            assert annotation.top is not None and annotation.base is not None
+            visible = self._annotation_visible_interval(annotation.top, annotation.base, window)
+            if visible is None:
+                return
+            top, base = visible
+            if annotation.background_color is not None or annotation.border_color is not None:
+                rect = Rectangle(
+                    (annotation.lane_start, top),
+                    annotation.lane_end - annotation.lane_start,
+                    base - top,
+                    facecolor=annotation.background_color or "none",
+                    edgecolor=annotation.border_color or "none",
+                    linewidth=annotation.border_linewidth or 0.6,
+                    linestyle="-",
+                    zorder=1.25,
+                    clip_on=True,
+                )
+                ax.add_patch(rect)
+            x, y = self._annotation_box_anchor(
+                lane_start=annotation.lane_start,
+                lane_end=annotation.lane_end,
+                top=top,
+                base=base,
+                padding=annotation.padding,
+                horizontal_alignment=annotation.horizontal_alignment,
+                vertical_alignment=annotation.vertical_alignment,
+            )
+            bbox = None
+            vertical_alignment = annotation.vertical_alignment
+        ax.text(
+            x,
+            y,
+            annotation.glyph,
+            transform=ax.transData,
+            ha=annotation.horizontal_alignment,
+            va=vertical_alignment,
+            fontsize=annotation.font_size,
+            fontweight=annotation.font_weight,
+            fontstyle=annotation.font_style,
+            color=annotation.color,
+            rotation=annotation.rotation,
+            rotation_mode="anchor",
+            multialignment=annotation.horizontal_alignment,
+            bbox=bbox,
+            clip_on=True,
+            zorder=1.75,
+        )
+
+    def _annotation_obstacle_bboxes(self, ax, renderer) -> list[Any]:
+        bboxes: list[Any] = []
+        for artist in list(ax.patches) + list(ax.texts):
+            try:
+                bbox = artist.get_window_extent(renderer=renderer)
+            except Exception:
+                continue
+            if bbox.width <= 0 or bbox.height <= 0:
+                continue
+            bboxes.append(bbox)
+        return bboxes
+
+    def _annotation_label_candidate_x_positions(
+        self,
+        record: _AnnotationLabelRecord,
+        callout_style: dict[str, Any],
+    ) -> list[tuple[str | None, float]]:
+        if (
+            record.label_mode == AnnotationLabelMode.DEDICATED_LANE
+            and record.label_lane_start is not None
+            and record.label_lane_end is not None
+        ):
+            lane_count = max(int(callout_style["lane_count"]), 1)
+            lane_step = float(callout_style["lane_step_x"])
+            center = float(
+                np.clip(
+                    record.preferred_x,
+                    record.label_lane_start,
+                    record.label_lane_end,
+                )
+            )
+            candidates: list[tuple[str | None, float]] = []
+            offsets = [0.0]
+            for index in range(1, lane_count):
+                if record.side == "right":
+                    offsets.append(index * lane_step)
+                elif record.side == "left":
+                    offsets.append(-index * lane_step)
+                else:
+                    offsets.extend((-index * lane_step, index * lane_step))
+            for offset in offsets:
+                value = float(
+                    np.clip(
+                        center + offset,
+                        record.label_lane_start,
+                        record.label_lane_end,
+                    )
+                )
+                if any(np.isclose(value, placed_x, atol=1e-6) for _, placed_x in candidates):
+                    continue
+                candidates.append((record.side, value))
+            return candidates
+        lane_count = max(int(callout_style["lane_count"]), 1)
+        lane_step = float(callout_style["lane_step_x"])
+        candidates: list[tuple[str | None, float]] = []
+        if record.side is not None:
+            sides = [record.side]
+            if record.allow_side_flip:
+                sides.append("left" if record.side == "right" else "right")
+            for side in sides:
+                base = (
+                    record.preferred_x
+                    if side == record.side
+                    else float(callout_style["right_text_x"])
+                    if side == "right"
+                    else float(callout_style["left_text_x"])
+                )
+                for index in range(lane_count):
+                    offset = lane_step * index
+                    value = base - offset if side == "right" else base + offset
+                    value = float(np.clip(value, 0.0, 1.0))
+                    candidate = (side, value)
+                    if any(
+                        placed_side == side and np.isclose(value, placed_x, atol=1e-6)
+                        for placed_side, placed_x in candidates
+                    ):
+                        continue
+                    candidates.append(candidate)
+            return candidates
+        offsets = [0.0]
+        for index in range(1, lane_count):
+            offsets.extend((-index * lane_step, index * lane_step))
+        for offset in offsets:
+            value = float(np.clip(record.preferred_x + offset, 0.0, 1.0))
+            candidate = (None, value)
+            if any(np.isclose(value, placed_x, atol=1e-6) for _, placed_x in candidates):
+                continue
+            candidates.append(candidate)
+        return candidates
+
+    def _annotation_label_candidate_y_positions(
+        self,
+        record: _AnnotationLabelRecord,
+        *,
+        lower: float,
+        upper: float,
+        min_gap: float,
+    ) -> list[float]:
+        offsets = [0.0]
+        search_steps = 6 if record.label_mode == AnnotationLabelMode.DEDICATED_LANE else 3
+        for index in range(1, search_steps + 1):
+            offsets.extend((-index * min_gap, index * min_gap))
+        candidates: list[float] = []
+        for offset in offsets:
+            value = float(np.clip(record.preferred_y + offset, lower, upper))
+            if any(np.isclose(value, current, atol=1e-6) for current in candidates):
+                continue
+            candidates.append(value)
+        return candidates
+
+    def _annotation_label_horizontal_alignment(self, side: str | None) -> str:
+        if side is None:
+            return "center"
+        return self._curve_callout_horizontal_alignment(side)
+
+    def _annotation_label_penalty(
+        self,
+        *,
+        ax,
+        record: _AnnotationLabelRecord,
+        side: str | None,
+        text_x: float,
+        text_y: float,
+        text_transform,
+    ) -> float:
+        anchor_display = text_transform.transform((record.anchor_x, record.anchor_y))
+        text_display = text_transform.transform((text_x, text_y))
+        leader_length = float(
+            np.hypot(text_display[0] - anchor_display[0], text_display[1] - anchor_display[1])
+        )
+        side_flip_penalty = 0.0
+        if record.side is not None and side is not None and side != record.side:
+            side_flip_penalty = 50.0
+        depth_shift = abs(text_y - record.preferred_y)
+        lateral_shift = abs(text_x - record.preferred_x)
+        return leader_length * 0.01 + depth_shift * 0.5 + lateral_shift * 25.0 + side_flip_penalty
+
+    def _place_annotation_label_records(
+        self,
+        ax,
+        records: list[_AnnotationLabelRecord],
+        window,
+    ) -> list[_AnnotationLabelRecord]:
+        if not records:
+            return []
+
+        from matplotlib.transforms import blended_transform_factory
+
+        callout_style = self._style_section("curve_callouts")
+        min_gap = max(
+            float(window.stop - window.start) * 0.012,
+            float(callout_style["min_vertical_gap_steps"]),
+        )
+        lower = float(window.start) + 0.5 * min_gap
+        upper = float(window.stop) - 0.5 * min_gap
+        if lower > upper:
+            lower = float(window.start)
+            upper = float(window.stop)
+        renderer = self._curve_callout_renderer(ax)
+        text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+        axes_bbox = ax.get_window_extent(renderer=renderer)
+        edge_padding_px = float(callout_style["edge_padding_px"])
+        obstacle_bboxes = self._annotation_obstacle_bboxes(ax, renderer)
+        placed_bboxes: list[Any] = []
+        ordered = sorted(
+            records,
+            key=lambda record: (
+                -record.priority,
+                -len(record.label),
+                record.preferred_y,
+            ),
+        )
+        for record in ordered:
+            label_text = record.label
+            if (
+                record.label_mode == AnnotationLabelMode.DEDICATED_LANE
+                and record.label_lane_start is not None
+                and record.label_lane_end is not None
+            ):
+                available_width_ratio = max(record.label_lane_end - record.label_lane_start, 0.01)
+                padding_ratio = min(
+                    edge_padding_px / max(axes_bbox.width, 1.0),
+                    available_width_ratio * 0.25,
+                )
+                label_text = self._wrap_annotation_label_text(
+                    ax,
+                    text=record.label,
+                    available_width_ratio=max(available_width_ratio - 2.0 * padding_ratio, 0.01),
+                    font_size_pt=record.font_size,
+                    max_lines=2,
+                )
+            record.display_label = label_text
+            best: tuple[float, str | None, float, float] | None = None
+            for side, candidate_x in self._annotation_label_candidate_x_positions(
+                record,
+                callout_style,
+            ):
+                alignment = self._annotation_label_horizontal_alignment(side)
+                for candidate_y in self._annotation_label_candidate_y_positions(
+                    record,
+                    lower=lower,
+                    upper=upper,
+                    min_gap=min_gap,
+                ):
+                    bbox = self._measure_curve_callout_bbox(
+                        ax,
+                        renderer=renderer,
+                        label=record.display_label or record.label,
+                        text_x=candidate_x,
+                        text_y=candidate_y,
+                        transform=text_transform,
+                        fontsize=record.font_size,
+                        color=record.color,
+                        fontweight=record.font_weight,
+                        fontstyle=record.font_style,
+                        horizontal_alignment=alignment,
+                    )
+                    adjusted_x = self._adjust_curve_callout_x_to_fit(
+                        text_x=candidate_x,
+                        bbox=bbox,
+                        axes_bbox=axes_bbox,
+                        padding_px=edge_padding_px,
+                    )
+                    if not np.isclose(adjusted_x, candidate_x):
+                        candidate_x = adjusted_x
+                        bbox = self._measure_curve_callout_bbox(
+                            ax,
+                            renderer=renderer,
+                            label=record.display_label or record.label,
+                            text_x=candidate_x,
+                            text_y=candidate_y,
+                            transform=text_transform,
+                            fontsize=record.font_size,
+                            color=record.color,
+                            fontweight=record.font_weight,
+                            fontstyle=record.font_style,
+                            horizontal_alignment=alignment,
+                        )
+                    candidate_y = self._adjust_curve_callout_y_to_fit(
+                        text_x=candidate_x,
+                        text_y=candidate_y,
+                        bbox=bbox,
+                        axes_bbox=axes_bbox,
+                        padding_px=edge_padding_px,
+                        transform=text_transform,
+                    )
+                    if not np.isclose(candidate_y, record.preferred_y):
+                        bbox = self._measure_curve_callout_bbox(
+                            ax,
+                            renderer=renderer,
+                            label=record.display_label or record.label,
+                            text_x=candidate_x,
+                            text_y=candidate_y,
+                            transform=text_transform,
+                            fontsize=record.font_size,
+                            color=record.color,
+                            fontweight=record.font_weight,
+                            fontstyle=record.font_style,
+                            horizontal_alignment=alignment,
+                        )
+                    if (
+                        bbox.x0 < axes_bbox.x0 + edge_padding_px
+                        or bbox.x1 > axes_bbox.x1 - edge_padding_px
+                        or bbox.y0 < axes_bbox.y0 + edge_padding_px
+                        or bbox.y1 > axes_bbox.y1 - edge_padding_px
+                    ):
+                        continue
+                    if any(bbox.overlaps(other) for other in obstacle_bboxes):
+                        continue
+                    if any(bbox.overlaps(other) for other in placed_bboxes):
+                        continue
+                    penalty = self._annotation_label_penalty(
+                        ax=ax,
+                        record=record,
+                        side=side,
+                        text_x=candidate_x,
+                        text_y=candidate_y,
+                        text_transform=text_transform,
+                    )
+                    if best is None or penalty < best[0]:
+                        best = (penalty, side, candidate_x, candidate_y)
+            if best is None:
+                continue
+            _, placed_side, placed_x, placed_y = best
+            record.placed_side = placed_side
+            record.text_x = placed_x
+            record.text_y = placed_y
+            alignment = self._annotation_label_horizontal_alignment(placed_side)
+            placed_bboxes.append(
+                self._measure_curve_callout_bbox(
+                    ax,
+                    renderer=renderer,
+                    label=record.display_label or record.label,
+                    text_x=placed_x,
+                    text_y=placed_y,
+                    transform=text_transform,
+                    fontsize=record.font_size,
+                    color=record.color,
+                    fontweight=record.font_weight,
+                    fontstyle=record.font_style,
+                    horizontal_alignment=alignment,
+                )
+            )
+        return ordered
+
+    def _draw_annotation_label_records(self, ax, records: list[_AnnotationLabelRecord]) -> None:
+        if not records:
+            return
+        from matplotlib.transforms import blended_transform_factory
+
+        text_transform = blended_transform_factory(ax.transAxes, ax.transData)
+        for record in records:
+            if record.text_x is None or record.text_y is None:
+                continue
+            side = record.placed_side
+            ax.annotate(
+                record.display_label or record.label,
+                xy=(record.anchor_x, record.anchor_y),
+                xycoords=text_transform,
+                xytext=(record.text_x, record.text_y),
+                textcoords=text_transform,
+                fontsize=record.font_size,
+                color=record.color,
+                fontweight=record.font_weight,
+                fontstyle=record.font_style,
+                rotation=record.rotation,
+                ha=self._annotation_label_horizontal_alignment(side),
+                va="center",
+                zorder=1.95,
+                arrowprops=(
+                    {
+                        "arrowstyle": record.arrow_style,
+                        "color": record.color,
+                        "lw": record.arrow_linewidth,
+                        "shrinkA": 0,
+                        "shrinkB": 0,
+                        "relpos": (0.5, 0.5)
+                        if side is None
+                        else self._curve_callout_arrow_relpos(side),
+                    }
+                    if record.arrow
+                    else None
+                ),
+                annotation_clip=True,
+            )
+
     def _draw_annotation_objects(self, ax, track, window) -> None:
+        label_records: list[_AnnotationLabelRecord] = []
         for annotation in track.annotations:
             if isinstance(annotation, AnnotationIntervalSpec):
                 self._draw_annotation_interval(ax, annotation, window)
             elif isinstance(annotation, AnnotationTextSpec):
                 self._draw_annotation_text(ax, annotation, window)
+            elif isinstance(annotation, AnnotationMarkerSpec):
+                self._draw_annotation_marker_shape(ax, annotation, window)
+                record = self._annotation_marker_label_record(
+                    annotation,
+                    self._style_section("curve_callouts"),
+                )
+                if record is not None:
+                    label_records.append(record)
+            elif isinstance(annotation, AnnotationArrowSpec):
+                self._draw_annotation_arrow_line(ax, annotation, window)
+                record = self._annotation_arrow_label_record(annotation)
+                if record is not None:
+                    if window.start <= record.preferred_y <= window.stop:
+                        label_records.append(record)
+            elif isinstance(annotation, AnnotationGlyphSpec):
+                self._draw_annotation_glyph(ax, annotation, window)
+        placed_labels = self._place_annotation_label_records(ax, label_records, window)
+        self._draw_annotation_label_records(ax, placed_labels)
 
     def _draw_curve(
         self,

@@ -10,7 +10,11 @@ from .logfile import (
 )
 from .logfile_schema import get_logfile_json_schema, validate_logfile_mapping
 from .model import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationLabelMode,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     ArrayChannel,
     CurveCalloutSpec,
@@ -54,7 +58,11 @@ from .templates import document_from_mapping, load_document
 
 __all__ = [
     "ArrayChannel",
+    "AnnotationArrowSpec",
+    "AnnotationGlyphSpec",
     "AnnotationIntervalSpec",
+    "AnnotationLabelMode",
+    "AnnotationMarkerSpec",
     "AnnotationTextSpec",
     "CurveCalloutSpec",
     "CurveElement",

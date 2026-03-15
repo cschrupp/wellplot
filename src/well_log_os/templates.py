@@ -9,7 +9,11 @@ import yaml
 
 from .errors import TemplateValidationError
 from .model import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationLabelMode,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     CurveCalloutSpec,
     CurveElement,
@@ -941,12 +945,27 @@ def _build_zones(data: Any) -> tuple[ZoneSpec, ...]:
     return tuple(zones)
 
 
-def _build_annotation_objects(data: Any) -> tuple[AnnotationIntervalSpec | AnnotationTextSpec, ...]:
+def _build_annotation_objects(
+    data: Any,
+) -> tuple[
+    AnnotationIntervalSpec
+    | AnnotationTextSpec
+    | AnnotationMarkerSpec
+    | AnnotationArrowSpec
+    | AnnotationGlyphSpec,
+    ...
+]:
     if data is None:
         return ()
 
     annotation_items = _ensure_sequence(data, context="annotations")
-    annotations: list[AnnotationIntervalSpec | AnnotationTextSpec] = []
+    annotations: list[
+        AnnotationIntervalSpec
+        | AnnotationTextSpec
+        | AnnotationMarkerSpec
+        | AnnotationArrowSpec
+        | AnnotationGlyphSpec
+    ] = []
     for index, item in enumerate(annotation_items):
         annotation_data = _ensure_mapping(item, context=f"annotations[{index}]")
         kind = str(annotation_data.get("kind", "text")).strip().lower()
@@ -1032,6 +1051,166 @@ def _build_annotation_objects(data: Any) -> tuple[AnnotationIntervalSpec | Annot
                         font_size=float(annotation_data.get("font_size", 7.0)),
                         font_weight=str(annotation_data.get("font_weight", "normal")),
                         font_style=str(annotation_data.get("font_style", "normal")),
+                        padding=float(annotation_data.get("padding", 0.02)),
+                    )
+                )
+                continue
+            if kind == "marker":
+                annotations.append(
+                    AnnotationMarkerSpec(
+                        depth=float(annotation_data["depth"]),
+                        x=float(annotation_data.get("x", 0.5)),
+                        shape=str(annotation_data.get("shape", "circle")),
+                        size=float(annotation_data.get("size", 32.0)),
+                        color=str(annotation_data.get("color", "#111111")),
+                        fill_color=(
+                            str(annotation_data["fill_color"])
+                            if annotation_data.get("fill_color") is not None
+                            else None
+                        ),
+                        edge_color=(
+                            str(annotation_data["edge_color"])
+                            if annotation_data.get("edge_color") is not None
+                            else None
+                        ),
+                        line_width=float(annotation_data.get("line_width", 0.8)),
+                        label=str(annotation_data.get("label", "")),
+                        text_side=str(annotation_data.get("text_side", "auto")),
+                        text_x=(
+                            float(annotation_data["text_x"])
+                            if annotation_data.get("text_x") is not None
+                            else None
+                        ),
+                        depth_offset=(
+                            float(annotation_data["depth_offset"])
+                            if annotation_data.get("depth_offset") is not None
+                            else None
+                        ),
+                        font_size=(
+                            float(annotation_data["font_size"])
+                            if annotation_data.get("font_size") is not None
+                            else None
+                        ),
+                        font_weight=str(annotation_data.get("font_weight", "bold")),
+                        font_style=str(annotation_data.get("font_style", "normal")),
+                        arrow=bool(annotation_data.get("arrow", True)),
+                        arrow_style=(
+                            str(annotation_data["arrow_style"])
+                            if annotation_data.get("arrow_style") is not None
+                            else None
+                        ),
+                        arrow_linewidth=(
+                            float(annotation_data["arrow_linewidth"])
+                            if annotation_data.get("arrow_linewidth") is not None
+                            else None
+                        ),
+                        priority=int(annotation_data.get("priority", 100)),
+                        label_mode=AnnotationLabelMode(
+                            str(annotation_data.get("label_mode", "free")).strip().lower()
+                        ),
+                        label_lane_start=(
+                            float(annotation_data["label_lane_start"])
+                            if annotation_data.get("label_lane_start") is not None
+                            else None
+                        ),
+                        label_lane_end=(
+                            float(annotation_data["label_lane_end"])
+                            if annotation_data.get("label_lane_end") is not None
+                            else None
+                        ),
+                    )
+                )
+                continue
+            if kind == "arrow":
+                annotations.append(
+                    AnnotationArrowSpec(
+                        start_depth=float(annotation_data["start_depth"]),
+                        end_depth=float(annotation_data["end_depth"]),
+                        start_x=float(annotation_data["start_x"]),
+                        end_x=float(annotation_data["end_x"]),
+                        color=str(annotation_data.get("color", "#222222")),
+                        line_width=float(annotation_data.get("line_width", 0.8)),
+                        line_style=str(annotation_data.get("line_style", "-")),
+                        arrow_style=str(annotation_data.get("arrow_style", "-|>")),
+                        label=str(annotation_data.get("label", "")),
+                        label_x=(
+                            float(annotation_data["label_x"])
+                            if annotation_data.get("label_x") is not None
+                            else None
+                        ),
+                        label_depth=(
+                            float(annotation_data["label_depth"])
+                            if annotation_data.get("label_depth") is not None
+                            else None
+                        ),
+                        font_size=float(annotation_data.get("font_size", 7.0)),
+                        font_weight=str(annotation_data.get("font_weight", "bold")),
+                        font_style=str(annotation_data.get("font_style", "normal")),
+                        text_rotation=float(annotation_data.get("text_rotation", 0.0)),
+                        priority=int(annotation_data.get("priority", 100)),
+                        label_mode=AnnotationLabelMode(
+                            str(annotation_data.get("label_mode", "free")).strip().lower()
+                        ),
+                        label_lane_start=(
+                            float(annotation_data["label_lane_start"])
+                            if annotation_data.get("label_lane_start") is not None
+                            else None
+                        ),
+                        label_lane_end=(
+                            float(annotation_data["label_lane_end"])
+                            if annotation_data.get("label_lane_end") is not None
+                            else None
+                        ),
+                    )
+                )
+                continue
+            if kind == "glyph":
+                annotations.append(
+                    AnnotationGlyphSpec(
+                        glyph=str(annotation_data["glyph"]),
+                        depth=(
+                            float(annotation_data["depth"])
+                            if annotation_data.get("depth") is not None
+                            else None
+                        ),
+                        top=(
+                            float(annotation_data["top"])
+                            if annotation_data.get("top") is not None
+                            else None
+                        ),
+                        base=(
+                            float(annotation_data["base"])
+                            if annotation_data.get("base") is not None
+                            else None
+                        ),
+                        lane_start=float(annotation_data.get("lane_start", 0.0)),
+                        lane_end=float(annotation_data.get("lane_end", 1.0)),
+                        color=str(annotation_data.get("color", "#111111")),
+                        background_color=(
+                            str(annotation_data["background_color"])
+                            if annotation_data.get("background_color") is not None
+                            else None
+                        ),
+                        border_color=(
+                            str(annotation_data["border_color"])
+                            if annotation_data.get("border_color") is not None
+                            else None
+                        ),
+                        border_linewidth=(
+                            float(annotation_data["border_linewidth"])
+                            if annotation_data.get("border_linewidth") is not None
+                            else None
+                        ),
+                        font_size=float(annotation_data.get("font_size", 9.0)),
+                        font_weight=str(annotation_data.get("font_weight", "bold")),
+                        font_style=str(annotation_data.get("font_style", "normal")),
+                        rotation=float(annotation_data.get("rotation", 0.0)),
+                        horizontal_alignment=str(
+                            annotation_data.get("horizontal_alignment", "center")
+                        ),
+                        vertical_alignment=str(
+                            annotation_data.get("vertical_alignment", "center")
+                        ),
                         padding=float(annotation_data.get("padding", 0.02)),
                     )
                 )

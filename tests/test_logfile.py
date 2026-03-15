@@ -17,7 +17,10 @@ from well_log_os.logfile import (
     logfile_from_mapping,
 )
 from well_log_os.model import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
     AnnotationIntervalSpec,
+    AnnotationMarkerSpec,
     AnnotationTextSpec,
     CurveFillKind,
     GridScaleKind,
@@ -981,6 +984,57 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(len(track.annotations), 2)
         self.assertIsInstance(track.annotations[0], AnnotationIntervalSpec)
         self.assertIsInstance(track.annotations[1], AnnotationTextSpec)
+
+    def test_layout_can_parse_annotation_marker_arrow_and_glyph_objects(self) -> None:
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"].append(
+            {
+                "id": "ann",
+                "title": "Annotations",
+                "kind": "annotation",
+                "width_mm": 18,
+                "position": 4,
+                "annotations": [
+                    {
+                        "kind": "marker",
+                        "depth": 1005,
+                        "x": 0.2,
+                        "shape": "triangle_right",
+                        "label": "Casing Foot",
+                        "priority": 150,
+                        "label_mode": "dedicated_lane",
+                        "label_lane_start": 0.75,
+                        "label_lane_end": 0.95,
+                    },
+                    {
+                        "kind": "arrow",
+                        "start_depth": 1008,
+                        "end_depth": 1011,
+                        "start_x": 0.8,
+                        "end_x": 0.35,
+                        "label": "Flow",
+                    },
+                    {
+                        "kind": "glyph",
+                        "depth": 1014,
+                        "glyph": "CF",
+                    },
+                ],
+            }
+        )
+        spec = logfile_from_mapping(payload)
+        document = build_document_for_logfile(
+            spec,
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        track = document.tracks[3]
+        self.assertEqual(len(track.annotations), 3)
+        self.assertIsInstance(track.annotations[0], AnnotationMarkerSpec)
+        self.assertEqual(track.annotations[0].priority, 150)
+        self.assertEqual(track.annotations[0].label_mode.value, "dedicated_lane")
+        self.assertIsInstance(track.annotations[1], AnnotationArrowSpec)
+        self.assertIsInstance(track.annotations[2], AnnotationGlyphSpec)
 
     def test_non_annotation_track_rejects_annotation_objects_in_logfile(self) -> None:
         payload = build_mapping()

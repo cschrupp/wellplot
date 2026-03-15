@@ -263,6 +263,141 @@ def _validate_layout_track(track: dict[str, Any], *, context: str) -> None:
                     raise TemplateValidationError(
                         f"{context}.annotations[{index}].base must be greater than top."
                     )
+            elif kind_text == "marker":
+                _ = float(annotation["depth"])
+                if "x" in annotation:
+                    x = float(annotation["x"])
+                    if x < 0 or x > 1:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}].x must be between 0 and 1."
+                        )
+                if "text_x" in annotation:
+                    text_x = float(annotation["text_x"])
+                    if text_x < 0 or text_x > 1:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}].text_x must be between 0 and 1."
+                        )
+                if "size" in annotation and float(annotation["size"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].size must be positive."
+                    )
+                if "line_width" in annotation and float(annotation["line_width"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].line_width must be positive."
+                    )
+                if "font_size" in annotation and float(annotation["font_size"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].font_size must be positive."
+                    )
+                if "arrow_linewidth" in annotation and float(annotation["arrow_linewidth"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].arrow_linewidth must be positive."
+                    )
+                label_mode = str(annotation.get("label_mode", "free")).strip().lower()
+                if label_mode not in {"none", "free", "dedicated_lane"}:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].label_mode is invalid."
+                    )
+                has_lane_start = annotation.get("label_lane_start") is not None
+                has_lane_end = annotation.get("label_lane_end") is not None
+                if has_lane_start != has_lane_end:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] label_lane_start and "
+                        "label_lane_end must be set together."
+                    )
+                if has_lane_start:
+                    lane_start = float(annotation["label_lane_start"])
+                    lane_end = float(annotation["label_lane_end"])
+                    if not 0.0 <= lane_start < lane_end <= 1.0:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}] label_lane_start/label_lane_end "
+                            "must satisfy 0 <= start < end <= 1."
+                        )
+                if label_mode == "dedicated_lane" and not has_lane_start:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] dedicated_lane mode requires "
+                        "label_lane_start and label_lane_end."
+                    )
+                if label_mode != "dedicated_lane" and has_lane_start:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] label_lane_start/label_lane_end are "
+                        "only valid when label_mode=dedicated_lane."
+                    )
+            elif kind_text == "arrow":
+                _ = float(annotation["start_depth"])
+                _ = float(annotation["end_depth"])
+                for key in ("start_x", "end_x"):
+                    value = float(annotation[key])
+                    if value < 0 or value > 1:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}].{key} must be between 0 and 1."
+                        )
+                if "label_x" in annotation:
+                    label_x = float(annotation["label_x"])
+                    if label_x < 0 or label_x > 1:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}].label_x must be between 0 and 1."
+                        )
+                if "line_width" in annotation and float(annotation["line_width"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].line_width must be positive."
+                    )
+                if "font_size" in annotation and float(annotation["font_size"]) <= 0:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].font_size must be positive."
+                    )
+                label_mode = str(annotation.get("label_mode", "free")).strip().lower()
+                if label_mode not in {"none", "free", "dedicated_lane"}:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].label_mode is invalid."
+                    )
+                has_lane_start = annotation.get("label_lane_start") is not None
+                has_lane_end = annotation.get("label_lane_end") is not None
+                if has_lane_start != has_lane_end:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] label_lane_start and "
+                        "label_lane_end must be set together."
+                    )
+                if has_lane_start:
+                    lane_start = float(annotation["label_lane_start"])
+                    lane_end = float(annotation["label_lane_end"])
+                    if not 0.0 <= lane_start < lane_end <= 1.0:
+                        raise TemplateValidationError(
+                            f"{context}.annotations[{index}] label_lane_start/label_lane_end "
+                            "must satisfy 0 <= start < end <= 1."
+                        )
+                if label_mode == "dedicated_lane" and not has_lane_start:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] dedicated_lane mode requires "
+                        "label_lane_start and label_lane_end."
+                    )
+                if label_mode != "dedicated_lane" and has_lane_start:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] label_lane_start/label_lane_end are "
+                        "only valid when label_mode=dedicated_lane."
+                    )
+            elif kind_text == "glyph":
+                if not str(annotation.get("glyph", "")).strip():
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].glyph must be non-empty."
+                    )
+                has_depth = annotation.get("depth") is not None
+                has_top = annotation.get("top") is not None
+                has_base = annotation.get("base") is not None
+                if has_depth == (has_top or has_base):
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] glyph annotations must define either "
+                        "depth or both top/base."
+                    )
+                if has_top != has_base:
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}] glyph annotations must set "
+                        "top and base together."
+                    )
+                if has_top and float(annotation["base"]) <= float(annotation["top"]):
+                    raise TemplateValidationError(
+                        f"{context}.annotations[{index}].base must be greater than top."
+                    )
             else:
                 raise TemplateValidationError(
                     f"{context}.annotations[{index}].kind {kind_text!r} is invalid."

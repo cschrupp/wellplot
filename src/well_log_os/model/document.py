@@ -102,6 +102,27 @@ class ReferenceCurveTickSide(StrEnum):
     BOTH = "both"
 
 
+class AnnotationLabelMode(StrEnum):
+    NONE = "none"
+    FREE = "free"
+    DEDICATED_LANE = "dedicated_lane"
+
+
+_ANNOTATION_MARKER_SHAPES = {
+    "circle",
+    "square",
+    "diamond",
+    "triangle_up",
+    "triangle_down",
+    "triangle_left",
+    "triangle_right",
+    "x",
+    "plus",
+    "bar_horizontal",
+    "bar_vertical",
+}
+
+
 @dataclass(slots=True)
 class AnnotationIntervalSpec:
     top: float
@@ -227,6 +248,218 @@ class AnnotationTextSpec:
             raise ValueError("Annotation text font_size must be positive.")
         if self.padding < 0:
             raise ValueError("Annotation text padding must be non-negative.")
+
+
+@dataclass(slots=True)
+class AnnotationMarkerSpec:
+    depth: float
+    x: float = 0.5
+    shape: str = "circle"
+    size: float = 32.0
+    color: str = "#111111"
+    fill_color: str | None = None
+    edge_color: str | None = None
+    line_width: float = 0.8
+    label: str = ""
+    text_side: str = "auto"
+    text_x: float | None = None
+    depth_offset: float | None = None
+    font_size: float | None = None
+    font_weight: str = "bold"
+    font_style: str = "normal"
+    arrow: bool = True
+    arrow_style: str | None = None
+    arrow_linewidth: float | None = None
+    priority: int = 100
+    label_mode: AnnotationLabelMode = AnnotationLabelMode.FREE
+    label_lane_start: float | None = None
+    label_lane_end: float | None = None
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.x <= 1.0:
+            raise ValueError("Annotation marker x must be between 0 and 1.")
+        shape = self.shape.strip().lower()
+        if shape not in _ANNOTATION_MARKER_SHAPES:
+            raise ValueError(
+                "Annotation marker shape must be one of "
+                f"{sorted(_ANNOTATION_MARKER_SHAPES)!r}."
+            )
+        self.shape = shape
+        if self.size <= 0:
+            raise ValueError("Annotation marker size must be positive.")
+        if not str(self.color).strip():
+            raise ValueError("Annotation marker color must be non-empty.")
+        if self.fill_color is not None and not str(self.fill_color).strip():
+            raise ValueError("Annotation marker fill_color must be non-empty when provided.")
+        if self.edge_color is not None and not str(self.edge_color).strip():
+            raise ValueError("Annotation marker edge_color must be non-empty when provided.")
+        if self.line_width <= 0:
+            raise ValueError("Annotation marker line_width must be positive.")
+        if self.label and not str(self.label).strip():
+            raise ValueError("Annotation marker label must be non-empty when provided.")
+        side = self.text_side.strip().lower()
+        if side not in {"auto", "left", "right"}:
+            raise ValueError("Annotation marker text_side must be auto, left, or right.")
+        self.text_side = side
+        if self.text_x is not None and not 0.0 <= self.text_x <= 1.0:
+            raise ValueError("Annotation marker text_x must be between 0 and 1.")
+        if self.font_size is not None and self.font_size <= 0:
+            raise ValueError("Annotation marker font_size must be positive when provided.")
+        if not str(self.font_weight).strip():
+            raise ValueError("Annotation marker font_weight must be non-empty.")
+        if not str(self.font_style).strip():
+            raise ValueError("Annotation marker font_style must be non-empty.")
+        if self.arrow_style is not None and not str(self.arrow_style).strip():
+            raise ValueError("Annotation marker arrow_style must be non-empty when provided.")
+        if self.arrow_linewidth is not None and self.arrow_linewidth <= 0:
+            raise ValueError("Annotation marker arrow_linewidth must be positive when provided.")
+        if (self.label_lane_start is None) != (self.label_lane_end is None):
+            raise ValueError(
+                "Annotation marker label_lane_start and label_lane_end must be set together."
+            )
+        if self.label_lane_start is not None and self.label_lane_end is not None:
+            if not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0:
+                raise ValueError(
+                    "Annotation marker label_lane_start/label_lane_end must satisfy "
+                    "0 <= start < end <= 1."
+                )
+        if self.label_mode == AnnotationLabelMode.DEDICATED_LANE:
+            if self.label_lane_start is None or self.label_lane_end is None:
+                raise ValueError(
+                    "Annotation marker dedicated_lane mode requires "
+                    "label_lane_start and label_lane_end."
+                )
+        elif self.label_lane_start is not None or self.label_lane_end is not None:
+            raise ValueError(
+                "Annotation marker label_lane_start/label_lane_end are only valid when "
+                "label_mode=dedicated_lane."
+            )
+
+
+@dataclass(slots=True)
+class AnnotationArrowSpec:
+    start_depth: float
+    end_depth: float
+    start_x: float
+    end_x: float
+    color: str = "#222222"
+    line_width: float = 0.8
+    line_style: str = "-"
+    arrow_style: str = "-|>"
+    label: str = ""
+    label_x: float | None = None
+    label_depth: float | None = None
+    font_size: float = 7.0
+    font_weight: str = "bold"
+    font_style: str = "normal"
+    text_rotation: float = 0.0
+    priority: int = 100
+    label_mode: AnnotationLabelMode = AnnotationLabelMode.FREE
+    label_lane_start: float | None = None
+    label_lane_end: float | None = None
+
+    def __post_init__(self) -> None:
+        for name, value in (("start_x", self.start_x), ("end_x", self.end_x)):
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"Annotation arrow {name} must be between 0 and 1.")
+        if not str(self.color).strip():
+            raise ValueError("Annotation arrow color must be non-empty.")
+        if self.line_width <= 0:
+            raise ValueError("Annotation arrow line_width must be positive.")
+        if not str(self.line_style).strip():
+            raise ValueError("Annotation arrow line_style must be non-empty.")
+        if not str(self.arrow_style).strip():
+            raise ValueError("Annotation arrow arrow_style must be non-empty.")
+        if self.label and not str(self.label).strip():
+            raise ValueError("Annotation arrow label must be non-empty when provided.")
+        if self.label_x is not None and not 0.0 <= self.label_x <= 1.0:
+            raise ValueError("Annotation arrow label_x must be between 0 and 1.")
+        if self.font_size <= 0:
+            raise ValueError("Annotation arrow font_size must be positive.")
+        if not str(self.font_weight).strip():
+            raise ValueError("Annotation arrow font_weight must be non-empty.")
+        if not str(self.font_style).strip():
+            raise ValueError("Annotation arrow font_style must be non-empty.")
+        if (self.label_lane_start is None) != (self.label_lane_end is None):
+            raise ValueError(
+                "Annotation arrow label_lane_start and label_lane_end must be set together."
+            )
+        if self.label_lane_start is not None and self.label_lane_end is not None:
+            if not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0:
+                raise ValueError(
+                    "Annotation arrow label_lane_start/label_lane_end must satisfy "
+                    "0 <= start < end <= 1."
+                )
+        if self.label_mode == AnnotationLabelMode.DEDICATED_LANE:
+            if self.label_lane_start is None or self.label_lane_end is None:
+                raise ValueError(
+                    "Annotation arrow dedicated_lane mode requires "
+                    "label_lane_start and label_lane_end."
+                )
+        elif self.label_lane_start is not None or self.label_lane_end is not None:
+            raise ValueError(
+                "Annotation arrow label_lane_start/label_lane_end are only valid when "
+                "label_mode=dedicated_lane."
+            )
+
+
+@dataclass(slots=True)
+class AnnotationGlyphSpec:
+    glyph: str
+    depth: float | None = None
+    top: float | None = None
+    base: float | None = None
+    lane_start: float = 0.0
+    lane_end: float = 1.0
+    color: str = "#111111"
+    background_color: str | None = None
+    border_color: str | None = None
+    border_linewidth: float | None = None
+    font_size: float = 9.0
+    font_weight: str = "bold"
+    font_style: str = "normal"
+    rotation: float = 0.0
+    horizontal_alignment: str = "center"
+    vertical_alignment: str = "center"
+    padding: float = 0.02
+
+    def __post_init__(self) -> None:
+        if not str(self.glyph).strip():
+            raise ValueError("Annotation glyph must be non-empty.")
+        if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
+            raise ValueError(
+                "Annotation glyph lane_start/lane_end must satisfy 0 <= start < end <= 1."
+            )
+        if not str(self.color).strip():
+            raise ValueError("Annotation glyph color must be non-empty.")
+        if self.background_color is not None and not str(self.background_color).strip():
+            raise ValueError("Annotation glyph background_color must be non-empty when provided.")
+        if self.border_color is not None and not str(self.border_color).strip():
+            raise ValueError("Annotation glyph border_color must be non-empty when provided.")
+        if self.border_linewidth is not None and self.border_linewidth <= 0:
+            raise ValueError("Annotation glyph border_linewidth must be positive when provided.")
+        has_depth = self.depth is not None
+        has_interval = self.top is not None or self.base is not None
+        if has_depth == has_interval:
+            raise ValueError(
+                "Annotation glyph must define either depth or both top/base interval bounds."
+            )
+        if (self.top is None) != (self.base is None):
+            raise ValueError("Annotation glyph top and base must be set together.")
+        if self.top is not None and self.base is not None and self.base <= self.top:
+            raise ValueError("Annotation glyph base must be greater than top.")
+        if self.horizontal_alignment not in {"left", "center", "right"}:
+            raise ValueError(
+                "Annotation glyph horizontal_alignment must be left, center, or right."
+            )
+        if self.vertical_alignment not in {"top", "center", "bottom"}:
+            raise ValueError(
+                "Annotation glyph vertical_alignment must be top, center, or bottom."
+            )
+        if self.font_size <= 0:
+            raise ValueError("Annotation glyph font_size must be positive.")
+        if self.padding < 0:
+            raise ValueError("Annotation glyph padding must be non-negative.")
 
 
 @dataclass(slots=True)
@@ -788,7 +1021,13 @@ class RasterElement:
 
 
 TrackElement = CurveElement | RasterElement
-AnnotationObject = AnnotationIntervalSpec | AnnotationTextSpec
+AnnotationObject = (
+    AnnotationIntervalSpec
+    | AnnotationTextSpec
+    | AnnotationMarkerSpec
+    | AnnotationArrowSpec
+    | AnnotationGlyphSpec
+)
 
 
 @dataclass(slots=True)

@@ -2126,6 +2126,104 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(any("Detailed" in value for value in text_values))
         self.assertTrue(any("note" in value for value in text_values))
 
+    def test_annotation_track_renders_marker_arrow_and_glyph_objects(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "annotation markers",
+                "page": {"size": "A4", "continuous": True},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "depth_range": [1000.0, 1020.0],
+                "tracks": [
+                    {
+                        "id": "ann",
+                        "title": "Annotations",
+                        "kind": "annotation",
+                        "width_mm": 20,
+                        "annotations": [
+                            {
+                                "kind": "marker",
+                                "depth": 1005,
+                                "x": 0.18,
+                                "shape": "triangle_right",
+                                "label": "Casing Foot",
+                            },
+                            {
+                                "kind": "arrow",
+                                "start_depth": 1008,
+                                "end_depth": 1012,
+                                "start_x": 0.8,
+                                "end_x": 0.35,
+                                "label": "Flow",
+                            },
+                            {
+                                "kind": "glyph",
+                                "depth": 1014,
+                                "glyph": "CF",
+                                "lane_start": 0.0,
+                                "lane_end": 0.3,
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        dataset = WellDataset(name="annotation-extra")
+        renderer = MatplotlibRenderer()
+        page_layout = renderer.layout_engine.layout(document, dataset)[0]
+        fig, ax = plt.subplots(figsize=(2.0, 6.0))
+        try:
+            renderer._draw_track(ax, document.tracks[0], document, dataset, page_layout)
+            text_values = [text.get_text() for text in ax.texts]
+            collection_count = len(ax.collections)
+        finally:
+            plt.close(fig)
+
+        self.assertGreater(collection_count, 0)
+        self.assertTrue(any("Casing Foot" in value for value in text_values))
+        self.assertTrue(any("Flow" in value for value in text_values))
+        self.assertTrue(any("CF" in value for value in text_values))
+
+    def test_annotation_track_wraps_dedicated_lane_labels(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "annotation lane label wrap",
+                "page": {"size": "A4", "continuous": True},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "depth_range": [1000.0, 1020.0],
+                "tracks": [
+                    {
+                        "id": "ann",
+                        "title": "Annotations",
+                        "kind": "annotation",
+                        "width_mm": 24,
+                        "annotations": [
+                            {
+                                "kind": "marker",
+                                "depth": 1005,
+                                "x": 0.1,
+                                "shape": "triangle_right",
+                                "label": "Readings Start",
+                                "label_mode": "dedicated_lane",
+                                "label_lane_start": 0.72,
+                                "label_lane_end": 0.96,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        dataset = WellDataset(name="annotation-lane-label-wrap")
+        renderer = MatplotlibRenderer()
+        page_layout = renderer.layout_engine.layout(document, dataset)[0]
+        fig, ax = plt.subplots(figsize=(2.0, 6.0))
+        try:
+            renderer._draw_track(ax, document.tracks[0], document, dataset, page_layout)
+            text_values = [text.get_text() for text in ax.texts]
+        finally:
+            plt.close(fig)
+
+        self.assertTrue(any("Readings\nStart" in value for value in text_values))
+
     def test_array_plot_sample_axis_is_suppressed_when_bottom_header_exists(self) -> None:
         document = document_from_mapping(
             {
