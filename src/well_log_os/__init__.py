@@ -1,3 +1,4 @@
+from .api import DatasetBuilder, create_dataset
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
 from .logfile import (
@@ -75,6 +76,7 @@ __all__ = [
     "AnnotationMarkerSpec",
     "AnnotationTextSpec",
     "CurveCalloutSpec",
+    "DatasetBuilder",
     "DatasetValidationError",
     "CurveElement",
     "CurveFillBaselineSpec",
@@ -132,6 +134,7 @@ __all__ = [
     "render_from_logfile",
     "document_from_mapping",
     "load_document",
+    "create_dataset",
 ]
 
 __version__ = "0.1.0"
