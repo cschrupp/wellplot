@@ -53,7 +53,7 @@ Track assembly is track-first:
 In layout/bindings mode, section placeholders are available:
 
 - `document.layout.heading`
-- `document.layout.comments`
+- `document.layout.remarks`
 - `document.layout.log_sections`
 - `document.layout.tail`
 
@@ -63,8 +63,10 @@ Current report-section behavior:
 
 - `heading` is implemented as a portrait first page with rotated cover/detail content in the top
   half of the page.
+- `remarks` is implemented as a page-level notes block in the lower half of the first page.
 - `tail` is implemented as a compact summary block driven by the same shared report object.
-- `comments` still exists in YAML as the next report-composition target, but is not rendered yet.
+- `remarks` is intended for disclaimers, acquisition notes, summary remarks, or similar text that
+  should appear before the log body.
 
 ## 3) Matplotlib Style Sections
 
@@ -110,12 +112,14 @@ Implemented report capabilities:
 - general key/value fields
 - service titles
 - open-hole / cased-hole detail tables
+- remarks blocks
 - fixed tail summary subset
 
 Report-structure rules:
 
 - The first page remains portrait.
 - The full heading content is rotated inside the top half of that page.
+- `remarks` occupies the lower half of the first page and is not rotated.
 - `tail` is not a second data model. It is a compact view of the same report data.
 - The full heading chooses exactly one detail table:
   - `detail.kind: open_hole`
@@ -143,6 +147,19 @@ Detail-table authoring:
 - `columns[].cells`: split an individual value column into subcells
 - `divider_left_visible` / `divider_right_visible`: keep the split but hide a sub-divider when
   a separator like `@` should not look boxed in
+
+Remarks authoring:
+
+- `layout.remarks` is a list of note blocks.
+- Each block accepts:
+  - `title`
+  - `text` or `lines`
+  - `alignment`
+  - `font_size`
+  - `title_font_size`
+  - `background_color`
+  - `border`
+- Use `lines` when you want explicit line breaks. Use `text` when wrapping can be automatic.
 
 Example:
 
@@ -196,6 +213,12 @@ document:
                     divider_left_visible: false
                     divider_right_visible: false
                   - C
+    remarks:
+      - title: Remarks
+        lines:
+          - First report-page note.
+          - Second report-page note.
+        alignment: left
     tail:
       enabled: true
 ```

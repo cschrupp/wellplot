@@ -10,7 +10,7 @@ document:
   layout:
     heading:
       enabled: true
-    comments: []
+    remarks: []
     log_sections:
       - id: main
         title: CBL VDL Array Extreme Contrast

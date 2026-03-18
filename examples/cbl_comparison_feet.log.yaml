@@ -22,7 +22,7 @@ document:
   layout:
     heading:
       enabled: false
-    comments: []
+    remarks: []
     log_sections:
       - id: main
         title: TIME_1900 - Time Marked every 60.00 (s)

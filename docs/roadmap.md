@@ -53,7 +53,7 @@ Decision history is tracked in `docs/decision-log.md`.
 - YAML template/savefile inheritance is implemented for reusable log designs.
 - Section placeholders exist in YAML for report composition:
   - `layout.heading`
-  - `layout.comments`
+  - `layout.remarks`
   - `layout.log_sections`
   - `layout.tail`
 - Data source routing is section-first with optional root fallback:
@@ -65,8 +65,7 @@ Decision history is tracked in `docs/decision-log.md`.
 Needed next to complete the intended workflow:
 
 - Render all `layout.log_sections` sequentially in one output artifact (implemented for matplotlib).
-- Expand report composition beyond the existing `heading` and `tail` blocks by implementing
-  `layout.comments`.
+- Refine report composition beyond the current `heading` / `remarks` / `tail` baseline.
 - Allow per-section depth windows and per-section page/layout settings.
 - Add section-aware bindings (`binding.section`) in rendering, not only schema/validation.
 - Add track-level default element properties to reduce binding repetition (style/scale/header display).
@@ -78,7 +77,7 @@ Needed next to complete the intended workflow:
 Compared against `workspace/renders/CBL_log_example.Pdf`, the current renderer is missing:
 
 - Cover/disclaimer/contents pages and report-style front matter.
-- Comments/notes blocks for the unused lower half of the first report page.
+- Richer remarks/notes layouts for the lower half of the first report page.
 - Parameter-table sections (channel processing, depth zone, tool control).
 - Advanced annotation packing for very dense tracks beyond the current dedicated-label-lane model.
 - Composite lane logic with custom legend/table blocks.
@@ -178,7 +177,7 @@ Longer-term / UI-centric:
   - optional multi-lane event-label examples
   - collision-aware placement notes in the schema reference
 - Extend multi-section composition engine:
-  - render heading/comments/tail blocks between log sections
+  - render heading/remarks/tail blocks between log sections
   - add section-specific break policies for continuous and paginated outputs
 - Implement section object rendering:
   - heading blocks
@@ -193,7 +192,7 @@ Longer-term / UI-centric:
   - strict validation mode for missing channels/empty tracks
 - Add end-to-end examples using the new model:
   - single-section CBL
-  - multi-section report with comments
+  - multi-section report with remarks
   - mixed section layouts (reference + array + normal)
 - Complete reference-track properties from parity screenshots:
   - header orientation/alignment controls

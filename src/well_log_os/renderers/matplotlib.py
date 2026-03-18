@@ -697,6 +697,18 @@ class MatplotlibRenderer(Renderer):
                             float(self.style["report"]["heading_frame_height"]),
                         ),
                     )
+                    remarks = self._report_remarks(report_document)
+                    if remarks:
+                        self._draw_report_remarks_section(
+                            report_fig,
+                            remarks,
+                            frame=(
+                                float(self.style["report"]["remarks_frame_x"]),
+                                float(self.style["report"]["remarks_frame_y"]),
+                                float(self.style["report"]["remarks_frame_width"]),
+                                float(self.style["report"]["remarks_frame_height"]),
+                            ),
+                        )
                     if pdf is not None:
                         pdf.savefig(report_fig, dpi=self.dpi)
                         plt.close(report_fig)
@@ -1077,6 +1089,18 @@ class MatplotlibRenderer(Renderer):
         for field in report.general_fields:
             resolved[field.key] = self._resolve_report_value(field.value, dataset).strip()
         return resolved
+
+    def _report_remarks(self, document: LogDocument) -> list[dict[str, Any]]:
+        metadata = getattr(document, "metadata", None)
+        if not isinstance(metadata, dict):
+            return []
+        layout_sections = metadata.get("layout_sections")
+        if not isinstance(layout_sections, dict):
+            return []
+        remarks = layout_sections.get("remarks")
+        if not isinstance(remarks, list):
+            return []
+        return [item for item in remarks if isinstance(item, dict)]
 
     def _report_location_lines(self, value: str) -> tuple[str, str, str]:
         text = value.strip()
@@ -2059,6 +2083,120 @@ class MatplotlibRenderer(Renderer):
                 transform=transform,
                 text_rotation=text_rotation,
             )
+
+    def _draw_report_remarks_section(
+        self,
+        fig,
+        remarks: list[dict[str, Any]],
+        *,
+        frame: tuple[float, float, float, float] | None = None,
+    ) -> None:
+        from matplotlib.patches import Rectangle
+
+        if not remarks:
+            return
+
+        ax = fig.add_axes([0, 0, 1, 1] if frame is None else list(frame))
+        ax.set_axis_off()
+        report_style = self._style_section("report")
+        ax.add_patch(
+            Rectangle(
+                (0.0, 0.0),
+                1.0,
+                1.0,
+                facecolor="none",
+                edgecolor=str(report_style["border_color"]),
+                linewidth=float(report_style["border_linewidth"]),
+                transform=ax.transAxes,
+                zorder=0.1,
+            )
+        )
+
+        gap = 0.02
+        block_height = (1.0 - gap * max(len(remarks) - 1, 0)) / max(len(remarks), 1)
+        current_top = 1.0
+        for index, remark in enumerate(remarks):
+            block_bottom = current_top - block_height
+            if index:
+                ax.plot(
+                    [0.0, 1.0],
+                    [current_top, current_top],
+                    transform=ax.transAxes,
+                    color="#6b6b6b",
+                    lw=0.35,
+                )
+            x0 = 0.02
+            y0 = block_bottom + 0.02
+            width = 0.96
+            height = max(block_height - 0.04, 0.05)
+            if bool(remark.get("border", True)):
+                ax.add_patch(
+                    Rectangle(
+                        (x0, y0),
+                        width,
+                        height,
+                        facecolor=str(remark.get("background_color", "#ffffff")),
+                        edgecolor=str(report_style["border_color"]),
+                        linewidth=float(report_style["border_linewidth"]) * 0.75,
+                        transform=ax.transAxes,
+                        zorder=0.12,
+                    )
+                )
+            title = str(remark.get("title", "")).strip()
+            alignment = str(remark.get("alignment", "left")).strip().lower()
+            if alignment not in {"left", "center", "right"}:
+                alignment = "left"
+            text_x = (
+                x0 + 0.02
+                if alignment == "left"
+                else (x0 + 0.5 * width if alignment == "center" else x0 + width - 0.02)
+            )
+            title_font = float(
+                remark.get("title_font_size", report_style["remarks_title_fontsize"])
+            )
+            text_font = float(remark.get("font_size", report_style["remarks_text_fontsize"]))
+            title_height = 0.0
+            if title:
+                title_height = min(0.22 * height, 0.11)
+                ax.text(
+                    text_x,
+                    y0 + height - 0.02,
+                    title,
+                    transform=ax.transAxes,
+                    ha=alignment,
+                    va="top",
+                    fontsize=title_font,
+                    fontweight="bold",
+                    color="#111111",
+                    clip_on=True,
+                )
+            text_value = str(remark.get("text", "")).strip()
+            if not text_value:
+                lines = remark.get("lines")
+                if isinstance(lines, list):
+                    text_value = "\n".join(str(item) for item in lines if str(item).strip())
+            available_top = y0 + height - 0.03 - title_height
+            available_height_ratio = max(available_top - (y0 + 0.03), 0.03)
+            wrapped_text = self._wrap_box_text(
+                ax,
+                text=text_value,
+                available_width_ratio=width - 0.08,
+                available_height_ratio=available_height_ratio,
+                font_size_pt=text_font,
+                wrap_enabled=True,
+            )
+            ax.text(
+                text_x,
+                available_top,
+                wrapped_text,
+                transform=ax.transAxes,
+                ha=alignment,
+                va="top",
+                fontsize=text_font,
+                color="#111111",
+                clip_on=True,
+            )
+            current_top = block_bottom - gap
 
     def _draw_header(self, fig, document, dataset, page_layout) -> None:
         header_style = self._style_section("header")

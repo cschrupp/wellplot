@@ -2056,6 +2056,16 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
                         "tail_enabled": True,
                     }
                 },
+                "metadata": {
+                    "layout_sections": {
+                        "remarks": [
+                            {
+                                "title": "Remarks",
+                                "text": "Detailed acquisition remarks for the first page.",
+                            }
+                        ]
+                    }
+                },
                 "tracks": [
                     {
                         "id": "depth",
@@ -2106,6 +2116,9 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             self.assertAlmostEqual(tail_bounds[1], 0.0, places=3)
             self.assertAlmostEqual(tail_bounds[3], 0.22, places=3)
             self.assertTrue(any("University of Utah" in value for value in heading_texts))
+            self.assertTrue(
+                any("Detailed acquisition remarks" in value for value in heading_texts)
+            )
             self.assertTrue(any("Cement Bond Log" in value for value in heading_texts))
             self.assertTrue(any("Variable Density Log" in value for value in tail_texts))
             self.assertTrue(any("Forge 78B-32" in value for value in tail_texts))

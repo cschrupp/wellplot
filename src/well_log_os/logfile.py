@@ -422,10 +422,35 @@ def _validate_layout_track(track: dict[str, Any], *, context: str) -> None:
 def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
     if "heading" in layout:
         _ = _ensure_mapping(layout["heading"], context=f"{context}.heading")
-    if "comments" in layout:
-        comments = _ensure_sequence(layout["comments"], context=f"{context}.comments")
-        for index, item in enumerate(comments):
-            _ = _ensure_mapping(item, context=f"{context}.comments[{index}]")
+    if "remarks" in layout:
+        remarks = _ensure_sequence(layout["remarks"], context=f"{context}.remarks")
+        for index, item in enumerate(remarks):
+            remark = _ensure_mapping(item, context=f"{context}.remarks[{index}]")
+            has_text = isinstance(remark.get("text"), str) and bool(str(remark.get("text")).strip())
+            lines = remark.get("lines")
+            has_lines = isinstance(lines, list) and len(lines) > 0
+            if not has_text and not has_lines:
+                raise TemplateValidationError(
+                    f"{context}.remarks[{index}] must define text or lines."
+                )
+            if "alignment" in remark:
+                alignment = str(remark["alignment"]).strip().lower()
+                if alignment not in {"left", "center", "right"}:
+                    raise TemplateValidationError(
+                        f"{context}.remarks[{index}].alignment must be left, center, or right."
+                    )
+            if "font_size" in remark and float(remark["font_size"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.remarks[{index}].font_size must be positive."
+                )
+            if "title_font_size" in remark and float(remark["title_font_size"]) <= 0:
+                raise TemplateValidationError(
+                    f"{context}.remarks[{index}].title_font_size must be positive."
+                )
+            if "border" in remark and not isinstance(remark["border"], bool):
+                raise TemplateValidationError(
+                    f"{context}.remarks[{index}].border must be boolean."
+                )
     if "tail" in layout:
         _ = _ensure_mapping(layout["tail"], context=f"{context}.tail")
 
@@ -1177,6 +1202,26 @@ def _resolve_text_tokens(document: dict[str, Any], dataset: WellDataset, source_
                                 if isinstance(cells, list):
                                     for index, item in enumerate(cells):
                                         cells[index] = _format_report_cell(item)
+
+    metadata = document.get("metadata")
+    if isinstance(metadata, dict):
+        layout_sections = metadata.get("layout_sections")
+        if isinstance(layout_sections, dict):
+            remarks = layout_sections.get("remarks")
+            if isinstance(remarks, list):
+                for remark in remarks:
+                    if not isinstance(remark, dict):
+                        continue
+                    if isinstance(remark.get("title"), str):
+                        remark["title"] = _safe_format(remark["title"], tokens)
+                    if isinstance(remark.get("text"), str):
+                        remark["text"] = _safe_format(remark["text"], tokens)
+                    lines = remark.get("lines")
+                    if isinstance(lines, list):
+                        remark["lines"] = [
+                            _safe_format(item, tokens) if isinstance(item, str) else item
+                            for item in lines
+                        ]
     footer = document.get("footer")
     if isinstance(footer, dict):
         lines = footer.get("lines")
@@ -1808,7 +1853,7 @@ def _apply_layout_section_placeholders(document: dict[str, Any]) -> None:
         }
     metadata["layout_sections"] = {
         "heading": deepcopy(layout.get("heading", {})),
-        "comments": deepcopy(layout.get("comments", [])),
+        "remarks": deepcopy(layout.get("remarks", [])),
         "log_sections": deepcopy(log_sections),
         "tail": deepcopy(layout.get("tail", {})),
         "active_section": active_section,

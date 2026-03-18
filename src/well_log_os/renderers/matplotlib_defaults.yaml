@@ -17,6 +17,10 @@ report:
   heading_frame_y: 0.5
   heading_frame_width: 1.0
   heading_frame_height: 0.5
+  remarks_frame_x: 0.0
+  remarks_frame_y: 0.0
+  remarks_frame_width: 1.0
+  remarks_frame_height: 0.5
   tail_frame_x: 0.0
   tail_frame_y: 0.0
   tail_frame_width: 1.0
@@ -33,6 +37,8 @@ report:
   detail_header_fontsize: 12.0
   detail_label_fontsize: 8.5
   detail_value_fontsize: 8.5
+  remarks_title_fontsize: 12.0
+  remarks_text_fontsize: 9.0
   tail_service_fontsize: 20.0
   tail_label_fontsize: 13.0
   tail_value_fontsize: 17.0

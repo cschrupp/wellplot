@@ -204,7 +204,12 @@ document:
             values:
               - ""
               - ""
-    comments: []
+    remarks:
+      - title: Remarks
+        lines:
+          - Cased-hole demo remarks placeholder.
+          - Use this section for summary notes, disclaimers, or acquisition remarks.
+        alignment: left
     log_sections:
       - id: main
         title: TIME_1900 - Time Marked every 60.00 (s)

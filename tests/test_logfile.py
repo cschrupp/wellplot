@@ -51,7 +51,7 @@ def build_mapping() -> dict:
             "zones": [],
             "layout": {
                 "heading": {"enabled": True},
-                "comments": [],
+                "remarks": [],
                 "log_sections": [
                     {
                         "id": "main",
@@ -1113,7 +1113,7 @@ class LogFileTests(unittest.TestCase):
                 "zones": [],
                 "layout": {
                     "heading": {"enabled": True},
-                    "comments": [],
+                    "remarks": [],
                     "log_sections": [
                         {
                             "id": "main",

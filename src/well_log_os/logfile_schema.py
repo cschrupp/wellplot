@@ -164,9 +164,9 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
             "additionalProperties": False,
             "properties": {
                 "heading": {"$ref": "#/$defs/reportBlock"},
-                "comments": {
+                "remarks": {
                     "type": "array",
-                    "items": {"type": "object"},
+                    "items": {"$ref": "#/$defs/reportRemark"},
                 },
                 "tail": {"$ref": "#/$defs/reportTail"},
                 "log_sections": {
@@ -175,6 +175,28 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                     "items": {"$ref": "#/$defs/layoutLogSection"},
                 },
             },
+        },
+        "reportRemark": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "text": {"type": "string", "minLength": 1},
+                "lines": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string"},
+                },
+                "alignment": {"type": "string", "enum": ["left", "center", "right"]},
+                "font_size": {"type": "number", "exclusiveMinimum": 0},
+                "title_font_size": {"type": "number", "exclusiveMinimum": 0},
+                "background_color": {"type": "string", "minLength": 1},
+                "border": {"type": "boolean"},
+            },
+            "anyOf": [
+                {"required": ["text"]},
+                {"required": ["lines"]},
+            ],
+            "additionalProperties": False,
         },
         "reportValue": {
             "anyOf": [
@@ -526,6 +548,10 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "heading_frame_y": {"type": "number", "minimum": 0, "maximum": 1},
                 "heading_frame_width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
                 "heading_frame_height": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+                "remarks_frame_x": {"type": "number", "minimum": 0, "maximum": 1},
+                "remarks_frame_y": {"type": "number", "minimum": 0, "maximum": 1},
+                "remarks_frame_width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+                "remarks_frame_height": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
                 "tail_frame_x": {"type": "number", "minimum": 0, "maximum": 1},
                 "tail_frame_y": {"type": "number", "minimum": 0, "maximum": 1},
                 "tail_frame_width": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
@@ -542,6 +568,8 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "detail_header_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "detail_label_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "detail_value_fontsize": {"type": "number", "exclusiveMinimum": 0},
+                "remarks_title_fontsize": {"type": "number", "exclusiveMinimum": 0},
+                "remarks_text_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "tail_service_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "tail_label_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "tail_value_fontsize": {"type": "number", "exclusiveMinimum": 0},

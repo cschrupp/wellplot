@@ -191,12 +191,14 @@ Behavior:
 - Multiple curves per track are supported by assigning multiple bindings to the same `track_id`.
 - Section placeholders are first-class in YAML:
   - `document.layout.heading`
-  - `document.layout.comments`
+  - `document.layout.remarks`
   - `document.layout.log_sections`
   - `document.layout.tail`
 - Report heading and tail blocks are rendered from the shared report object:
   - `heading` renders the full cover/detail block
   - `tail` reuses the same data in a compact summary block
+- `document.layout.remarks` renders page-level notes/remarks in the lower half of the first page
+  and is intended for disclaimers, acquisition notes, or other summary text.
 - `header.report.service_titles` accepts either plain strings or styled objects:
   - `value`
   - `font_size`
@@ -278,6 +280,7 @@ Report page authoring rules:
 - `heading` renders the full cover/detail block.
 - `tail` is only a toggle (`document.layout.tail.enabled`) and reuses the same report data in a
   compact summary block.
+- `document.layout.remarks` is a separate first-page report section for free-form notes.
 - The full heading selects exactly one detail table:
   - `detail.kind: open_hole`
   - `detail.kind: cased_hole`
@@ -326,6 +329,12 @@ document:
             values:
               - ""
               - ""
+    remarks:
+      - title: Remarks
+        lines:
+          - Summary note line 1.
+          - Summary note line 2.
+        alignment: left
     tail:
       enabled: true
 ```

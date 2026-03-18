@@ -60,6 +60,7 @@ This file records project decisions that should remain stable unless explicitly 
   - `heading` is the full cover/detail page
   - `tail` is a compact summary view of the same data
   - `tail` is enabled by layout toggle, not by duplicating another report model
+- Page-level notes under the heading use `layout.remarks`, not a generic comments bucket.
 - Report detail tables are fixed-row, fixed-column structures:
   - one selected detail kind per report (`open_hole` or `cased_hole`)
   - empty cells stay empty and rows do not collapse
@@ -102,6 +103,11 @@ This file records project decisions that should remain stable unless explicitly 
   - `italic`
   - `alignment`
   - the same title formatting applies to both the heading and the tail
+- Remarks blocks are rendered as first-page report sections and accept simple structured text:
+  - `title`
+  - `text` or `lines`
+  - alignment and font sizing
+  - optional local background/border styling
 
 ## Tooling and Process Decisions
 

@@ -22,7 +22,7 @@ document:
   layout:
     heading:
       enabled: false
-    comments: []
+    remarks: []
     log_sections:
       - id: main
         title: Annotation Track Objects Showcase
