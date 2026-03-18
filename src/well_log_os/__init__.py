@@ -1,3 +1,4 @@
+from .errors import DatasetValidationError
 from .layout import LayoutEngine
 from .logfile import (
     LogFileSpec,
@@ -74,6 +75,7 @@ __all__ = [
     "AnnotationMarkerSpec",
     "AnnotationTextSpec",
     "CurveCalloutSpec",
+    "DatasetValidationError",
     "CurveElement",
     "CurveFillBaselineSpec",
     "CurveFillCrossoverSpec",

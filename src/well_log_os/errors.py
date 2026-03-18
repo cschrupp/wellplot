@@ -16,3 +16,7 @@ class TemplateValidationError(WellLogOSError):
 
 class LayoutError(WellLogOSError):
     """Raised when a document cannot be placed on the requested page."""
+
+
+class DatasetValidationError(WellLogOSError):
+    """Raised when a dataset or channel violates the normalized data contract."""

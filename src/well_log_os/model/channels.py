@@ -5,6 +5,7 @@ from typing import Any
 
 import numpy as np
 
+from ..errors import DatasetValidationError
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 
 ChannelMetadata = dict[str, Any]
@@ -32,11 +33,7 @@ class BaseChannel:
 
     def __post_init__(self) -> None:
         self.depth = _as_float_array(self.depth, name="depth", ndim=1)
-        diffs = np.diff(self.depth)
-        monotonic_up = np.all(diffs >= 0)
-        monotonic_down = np.all(diffs <= 0)
-        if not (monotonic_up or monotonic_down):
-            raise ValueError(f"Depth for {self.mnemonic} must be monotonic.")
+        self.validate()
 
     @property
     def depth_min(self) -> float:
@@ -51,25 +48,51 @@ class BaseChannel:
             return self.depth.copy()
         return np.asarray([registry.convert(value, self.depth_unit, unit) for value in self.depth])
 
+    def validate(self) -> None:
+        if not str(self.mnemonic).strip():
+            raise DatasetValidationError("Channel mnemonic cannot be empty.")
+        if not str(self.depth_unit).strip():
+            raise DatasetValidationError(f"Channel {self.mnemonic} must declare a depth unit.")
+        depth = np.asarray(self.depth, dtype=float)
+        if depth.ndim != 1:
+            raise DatasetValidationError(
+                f"Channel {self.mnemonic} depth axis must be 1D, got shape {depth.shape}."
+            )
+        if depth.size == 0:
+            raise DatasetValidationError(f"Channel {self.mnemonic} depth axis cannot be empty.")
+        diffs = np.diff(depth)
+        monotonic_up = np.all(diffs >= 0)
+        monotonic_down = np.all(diffs <= 0)
+        if not (monotonic_up or monotonic_down):
+            raise DatasetValidationError(f"Depth for {self.mnemonic} must be monotonic.")
+
 
 @dataclass(slots=True)
 class ScalarChannel(BaseChannel):
     values: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
 
     def __post_init__(self) -> None:
-        BaseChannel.__post_init__(self)
         self.values = _as_float_array(self.values, name="values", ndim=1)
-        if self.values.shape[0] != self.depth.shape[0]:
-            raise ValueError(
-                f"Scalar channel {self.mnemonic} depth/value length mismatch: "
-                f"{self.depth.shape[0]} vs {self.values.shape[0]}."
-            )
+        BaseChannel.__post_init__(self)
 
     def masked_values(self) -> np.ndarray:
         masked = self.values.astype(float, copy=True)
         if self.null_value is not None:
             masked[np.isclose(masked, self.null_value, equal_nan=False)] = np.nan
         return masked
+
+    def validate(self) -> None:
+        BaseChannel.validate(self)
+        values = np.asarray(self.values, dtype=float)
+        if values.ndim != 1:
+            raise DatasetValidationError(
+                f"Scalar channel {self.mnemonic} values must be 1D, got shape {values.shape}."
+            )
+        if values.shape[0] != np.asarray(self.depth, dtype=float).shape[0]:
+            raise DatasetValidationError(
+                f"Scalar channel {self.mnemonic} depth/value length mismatch: "
+                f"{np.asarray(self.depth, dtype=float).shape[0]} vs {values.shape[0]}."
+            )
 
 
 @dataclass(slots=True)
@@ -80,13 +103,30 @@ class ArrayChannel(BaseChannel):
     sample_label: str = "sample"
 
     def __post_init__(self) -> None:
-        BaseChannel.__post_init__(self)
         self.values = _as_float_array(self.values, name="values", ndim=2)
         self.sample_axis = _as_float_array(self.sample_axis, name="sample_axis", ndim=1)
-        if self.values.shape[0] != self.depth.shape[0]:
-            raise ValueError(f"Array channel {self.mnemonic} must have one row per depth sample.")
-        if self.values.shape[1] != self.sample_axis.shape[0]:
-            raise ValueError(
+        BaseChannel.__post_init__(self)
+
+    def validate(self) -> None:
+        BaseChannel.validate(self)
+        values = np.asarray(self.values, dtype=float)
+        sample_axis = np.asarray(self.sample_axis, dtype=float)
+        depth = np.asarray(self.depth, dtype=float)
+        if values.ndim != 2:
+            raise DatasetValidationError(
+                f"Array channel {self.mnemonic} values must be 2D, got shape {values.shape}."
+            )
+        if sample_axis.ndim != 1:
+            raise DatasetValidationError(
+                f"Array channel {self.mnemonic} sample axis must be 1D, "
+                f"got shape {sample_axis.shape}."
+            )
+        if values.shape[0] != depth.shape[0]:
+            raise DatasetValidationError(
+                f"Array channel {self.mnemonic} must have one row per depth sample."
+            )
+        if values.shape[1] != sample_axis.shape[0]:
+            raise DatasetValidationError(
                 f"Array channel {self.mnemonic} sample axis length must match column count."
             )
 
