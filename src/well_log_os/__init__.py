@@ -6,6 +6,9 @@ from .api import (
     build_documents,
     create_dataset,
     render_report,
+    render_section,
+    render_track,
+    render_window,
 )
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
@@ -145,6 +148,9 @@ __all__ = [
     "validate_logfile_mapping",
     "render_from_logfile",
     "render_report",
+    "render_section",
+    "render_track",
+    "render_window",
     "document_from_mapping",
     "load_document",
     "create_dataset",

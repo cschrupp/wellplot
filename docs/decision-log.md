@@ -85,6 +85,11 @@ This file records project decisions that should remain stable unless explicitly 
 - Pandas support remains optional:
   - `add_series(...)` / `add_dataframe(...)` are available when pandas is installed
   - pandas should not become a hard runtime dependency for users who stay in YAML/numpy flows
+- Partial renders operate on filtered views of the same programmatic report spec:
+  - section, track, and depth/time window scopes are implemented by filtering the
+    `ProgrammaticLogSpec` before document build
+  - partial scopes suppress heading/remarks/tail by default because notebook previews should focus
+    on log content, not report packet pages
 
 ## Rendering Decisions
 

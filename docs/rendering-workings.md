@@ -91,6 +91,10 @@ Current implemented bridge:
 - `LogBuilder` builds layout/binding specs in Python and validates them through the same logfile
   conversion path used by YAML
 - `render_report(...)` calls the same backend renderers used by `render_from_logfile(...)`
+- partial helpers filter the same programmatic report before build/render:
+  - `render_section(...)`
+  - `render_track(...)`
+  - `render_window(...)`
 - when `output_path` is omitted, Matplotlib renders return figure objects suitable for notebook
   display
 

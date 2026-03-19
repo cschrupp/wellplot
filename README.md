@@ -104,6 +104,10 @@ Currently implemented:
 - pandas `Series` / `DataFrame` adapters on top of the dataset ingestion API
 - in-memory layout composition with `LogBuilder`
 - rendering through the project layout with `render_report(...)`
+- partial renders with:
+  - `render_section(...)`
+  - `render_track(...)`
+  - `render_window(...)`
 - notebook-friendly usage via returned Matplotlib figures when no `output_path` is provided
 
 Current public modules:
@@ -116,9 +120,9 @@ Current examples:
 - [examples/notebooks/api_dataset_ingest_demo.ipynb](examples/notebooks/api_dataset_ingest_demo.ipynb)
 - [examples/api_layout_render_demo.py](examples/api_layout_render_demo.py)
 - [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
+- [examples/api_partial_render_demo.py](examples/api_partial_render_demo.py)
 
 Still planned:
-- partial renders for section/track/window scopes
 - notebook-friendly byte outputs such as PNG/SVG
 - YAML round-trip helpers and serialization API
 

@@ -110,10 +110,11 @@ Status:
   - dataset-ingestion API
   - pandas/Series/DataFrame adapters
   - in-memory composition/render bridge
+  - partial render API for section/track/window scopes
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - partial render API
   - notebook byte outputs
+  - notebook partial-render examples
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

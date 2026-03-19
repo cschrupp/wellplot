@@ -6,7 +6,14 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import LogBuilder, create_dataset, render_report
+from well_log_os import (
+    LogBuilder,
+    create_dataset,
+    render_report,
+    render_section,
+    render_track,
+    render_window,
+)
 from well_log_os.api import build_documents
 
 
@@ -150,6 +157,53 @@ def _build_report():
     return builder.build()
 
 
+def _build_report_with_heading():
+    dataset = _build_dataset("main")
+    builder = LogBuilder(name="Programmatic report demo")
+    builder.set_render(backend="matplotlib", output_path="api_layout_render_demo.pdf", dpi=140)
+    builder.set_page(
+        size="A4",
+        orientation="portrait",
+        header_height_mm=0,
+        footer_height_mm=0,
+        track_header_height_mm=18,
+        track_gap_mm=0,
+    )
+    builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+    builder.set_depth_range(8200, 8460)
+    builder.set_heading(
+        provider_name="Company",
+        general_fields=[
+            {"key": "well", "label": "Well", "value": "API Demo 1"},
+            {"key": "field", "label": "Field", "value": "Notebook"},
+        ],
+        service_titles=["Cement Bond Log"],
+        tail_enabled=True,
+    )
+    builder.set_remarks([{"title": "Remarks", "text": "Notebook preview"}])
+    section = builder.add_section(
+        "main",
+        dataset=dataset,
+        title="Main",
+        source_name="main.memory",
+    )
+    section.add_track(
+        id="depth",
+        title="",
+        kind="reference",
+        width_mm=16,
+        reference={"axis": "depth", "define_layout": True, "unit": "ft"},
+    )
+    section.add_track(id="combo", title="", kind="normal", width_mm=35)
+    section.add_curve(
+        channel="GR",
+        track_id="combo",
+        label="Gamma Ray",
+        scale={"kind": "linear", "min": 0, "max": 150},
+    )
+    return builder.build()
+
+
 class ApiRenderTests(unittest.TestCase):
     def test_build_documents_from_programmatic_builder(self) -> None:
         report = _build_report()
@@ -225,6 +279,106 @@ class ApiRenderTests(unittest.TestCase):
             self.assertEqual(result.output_path, output_path.resolve())
             self.assertTrue(output_path.exists())
             self.assertGreater(output_path.stat().st_size, 0)
+
+    def test_build_documents_can_filter_tracks_within_section(self) -> None:
+        report = _build_report()
+
+        documents = build_documents(
+            report,
+            track_ids_by_section={"main": ["vdl"]},
+            include_report_pages=False,
+        )
+
+        self.assertEqual(len(documents), 1)
+        self.assertEqual([track.id for track in documents[0].tracks], ["vdl"])
+
+    def test_build_documents_can_override_depth_range_for_window(self) -> None:
+        report = _build_report()
+
+        documents = build_documents(
+            report,
+            depth_range=(8300.0, 8400.0),
+            depth_range_unit="ft",
+            include_report_pages=False,
+        )
+
+        self.assertEqual(len(documents), 1)
+        self.assertEqual(documents[0].depth_range, (8300.0, 8400.0))
+
+    def test_build_documents_can_suppress_report_pages_for_partial_scopes(self) -> None:
+        report = _build_report_with_heading()
+
+        full_documents = build_documents(report)
+        partial_documents = build_documents(report, include_report_pages=False)
+
+        self.assertIsNotNone(full_documents[0].header.report)
+        self.assertIsNone(partial_documents[0].header.report)
+
+    def test_render_section_returns_selected_section_only(self) -> None:
+        builder = LogBuilder(name="Multisection programmatic layout")
+        builder.set_render(backend="matplotlib", output_path="filtered.pdf", dpi=120)
+        builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
+        builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+        builder.set_depth_range(8200, 8460)
+
+        main = builder.add_section(
+            "main",
+            dataset=_build_dataset("main"),
+            source_name="main.memory",
+        )
+        repeat = builder.add_section(
+            "repeat",
+            dataset=_build_dataset("repeat", phase=0.6),
+            source_name="repeat.memory",
+        )
+        for section in (main, repeat):
+            section.add_track(
+                id="depth",
+                title="",
+                kind="reference",
+                width_mm=16,
+                reference={"axis": "depth", "define_layout": True, "unit": "ft"},
+            )
+            section.add_track(id="combo", title="", kind="normal", width_mm=35)
+            section.add_curve(
+                channel="GR",
+                track_id="combo",
+                label="Gamma Ray",
+                scale={"kind": "linear", "min": 0, "max": 150},
+            )
+
+        report = builder.build()
+        result = render_section(report, section_id="repeat")
+
+        self.assertEqual(result.backend, "matplotlib")
+        self.assertGreater(result.page_count, 0)
+        self.assertIsInstance(result.artifact, list)
+        self.assertEqual(len(result.artifact), result.page_count)
+        for figure in result.artifact:
+            figure.clf()
+
+    def test_render_track_and_window_return_figures(self) -> None:
+        report = _build_report()
+
+        track_result = render_track(report, section_id="main", track_ids="vdl")
+        self.assertEqual(track_result.backend, "matplotlib")
+        self.assertGreater(track_result.page_count, 0)
+        self.assertIsInstance(track_result.artifact, list)
+        self.assertEqual(len(track_result.artifact), track_result.page_count)
+        for figure in track_result.artifact:
+            figure.clf()
+
+        window_result = render_window(
+            report,
+            depth_range=(8300.0, 8400.0),
+            depth_range_unit="ft",
+        )
+        self.assertEqual(window_result.backend, "matplotlib")
+        self.assertEqual(window_result.page_count, 1)
+        self.assertIsInstance(window_result.artifact, list)
+        self.assertEqual(len(window_result.artifact), 1)
+        for figure in window_result.artifact:
+            figure.clf()
 
 
 if __name__ == "__main__":

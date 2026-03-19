@@ -454,6 +454,21 @@ Acceptance:
 
 - users can inspect a processed interval without generating the full report
 
+Status:
+
+- implemented
+- current surface:
+  - `build_documents(..., section_ids=..., track_ids_by_section=..., depth_range=...)`
+  - `render_section(...)`
+  - `render_track(...)`
+  - `render_window(...)`
+- important behavior:
+  - partial renders filter the same `ProgrammaticLogSpec`
+  - report heading/remarks/tail are suppressed by default for partial scopes
+  - track filtering happens before document build, not inside Matplotlib
+- reference example:
+  - [examples/api_partial_render_demo.py](/home/user/projects/well_log_os/examples/api_partial_render_demo.py)
+
 ### Phase 10. Add notebook-friendly outputs
 
 Goal: zero-friction inline use in Jupyter.
