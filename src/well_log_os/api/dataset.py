@@ -111,6 +111,60 @@ class DatasetBuilder:
         )
         return self
 
+    def add_series(
+        self,
+        *,
+        series: Any,
+        index_unit: str,
+        mnemonic: str | None = None,
+        index: Any | None = None,
+        value_unit: str | None = None,
+        description: str = "",
+        null_value: float | None = None,
+        source: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+        replace: bool = True,
+    ) -> DatasetBuilder:
+        self._dataset.add_series(
+            series=series,
+            index_unit=index_unit,
+            mnemonic=mnemonic,
+            index=index,
+            value_unit=value_unit,
+            description=description,
+            null_value=null_value,
+            source=source,
+            metadata=dict(metadata or {}),
+            replace=replace,
+        )
+        return self
+
+    def add_dataframe(
+        self,
+        frame: Any,
+        *,
+        index_unit: str,
+        index_column: str | None = None,
+        use_index: bool = False,
+        curves: Mapping[str, Mapping[str, Any]] | None = None,
+        skip_columns: list[str] | None = None,
+        replace: bool = True,
+        source: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
+    ) -> DatasetBuilder:
+        self._dataset.add_dataframe(
+            frame,
+            index_unit=index_unit,
+            index_column=index_column,
+            use_index=use_index,
+            curves=curves,
+            skip_columns=skip_columns,
+            replace=replace,
+            source=source,
+            metadata=dict(metadata or {}),
+        )
+        return self
+
     def add_raster(
         self,
         *,

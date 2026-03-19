@@ -1232,6 +1232,7 @@ all = [
     { name = "dlisio" },
     { name = "lasio" },
     { name = "matplotlib" },
+    { name = "pandas" },
     { name = "pint" },
     { name = "plotly" },
     { name = "welly" },
@@ -1245,6 +1246,9 @@ interactive = [
 las = [
     { name = "lasio" },
     { name = "welly" },
+]
+pandas = [
+    { name = "pandas" },
 ]
 pdf = [
     { name = "matplotlib" },
@@ -1270,6 +1274,8 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.8" },
     { name = "matplotlib", marker = "extra == 'pdf'", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "pandas", marker = "extra == 'all'", specifier = ">=2.2" },
+    { name = "pandas", marker = "extra == 'pandas'", specifier = ">=2.2" },
     { name = "pint", marker = "extra == 'all'", specifier = ">=0.24" },
     { name = "pint", marker = "extra == 'units'", specifier = ">=0.24" },
     { name = "plotly", marker = "extra == 'all'", specifier = ">=5.18" },
@@ -1278,7 +1284,7 @@ requires-dist = [
     { name = "welly", marker = "extra == 'all'", specifier = ">=0.5.2" },
     { name = "welly", marker = "extra == 'las'", specifier = ">=0.5.2" },
 ]
-provides-extras = ["las", "dlis", "pdf", "interactive", "units", "all"]
+provides-extras = ["las", "dlis", "pdf", "interactive", "pandas", "units", "all"]
 
 [package.metadata.requires-dev]
 dev = [

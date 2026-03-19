@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import unittest
 
 import numpy as np
@@ -13,6 +14,10 @@ from well_log_os import (
     WellDataset,
     create_dataset,
 )
+
+HAS_PANDAS = importlib.util.find_spec("pandas") is not None
+if HAS_PANDAS:
+    import pandas as pd
 
 
 class DatasetApiTests(unittest.TestCase):
@@ -199,6 +204,111 @@ class DatasetApiTests(unittest.TestCase):
         self.assertIn("VDL", dataset.channels)
         self.assertEqual(dataset.well_metadata["WELL"], "Example-1")
         self.assertEqual(dataset.provenance["source"], "notebook")
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_add_series_uses_series_index_by_default(self) -> None:
+        dataset = create_dataset("processed")
+        series = pd.Series([45.0, 50.0, 55.0], index=[1000.0, 1000.5, 1001.0], name="GR")
+
+        channel = dataset.add_series(
+            series=series,
+            index_unit="ft",
+            value_unit="gAPI",
+            description="Gamma ray",
+        )
+
+        self.assertIsInstance(channel, ScalarChannel)
+        self.assertEqual(channel.mnemonic, "GR")
+        np.testing.assert_allclose(channel.depth, [1000.0, 1000.5, 1001.0])
+        np.testing.assert_allclose(channel.values, [45.0, 50.0, 55.0])
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_add_series_requires_mnemonic_when_series_name_missing(self) -> None:
+        dataset = create_dataset("processed")
+        series = pd.Series([1.0, 2.0], index=[1000.0, 1001.0])
+
+        with self.assertRaises(DatasetValidationError):
+            dataset.add_series(series=series, index_unit="ft")
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_add_dataframe_uses_named_index_column(self) -> None:
+        dataset = create_dataset("processed")
+        frame = pd.DataFrame(
+            {
+                "DEPTH": [1000.0, 1000.5, 1001.0],
+                "GR": [45.0, 50.0, 55.0],
+                "PHIE": [0.12, 0.18, 0.2],
+            }
+        )
+
+        channels = dataset.add_dataframe(
+            frame,
+            index_column="DEPTH",
+            index_unit="ft",
+            curves={
+                "GR": {"value_unit": "gAPI"},
+                "PHIE": {"value_unit": "v/v", "description": "Effective porosity"},
+            },
+        )
+
+        self.assertEqual([channel.mnemonic for channel in channels], ["GR", "PHIE"])
+        np.testing.assert_allclose(dataset.get_channel("GR").depth, [1000.0, 1000.5, 1001.0])
+        self.assertEqual(dataset.get_channel("PHIE").description, "Effective porosity")
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_add_dataframe_can_use_dataframe_index(self) -> None:
+        dataset = create_dataset("processed")
+        frame = pd.DataFrame({"GR": [45.0, 50.0], "CBL": [10.0, 12.0]}, index=[1000.0, 1001.0])
+
+        dataset.add_dataframe(
+            frame,
+            use_index=True,
+            index_unit="ft",
+            curves={
+                "GR": {"value_unit": "gAPI"},
+                "CBL": {"value_unit": "mV", "mnemonic": "CBL_RAW"},
+            },
+        )
+
+        self.assertIn("GR", dataset.channels)
+        self.assertIn("CBL_RAW", dataset.channels)
+        np.testing.assert_allclose(dataset.get_channel("CBL_RAW").depth, [1000.0, 1001.0])
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_add_dataframe_requires_explicit_index_selection(self) -> None:
+        dataset = create_dataset("processed")
+        frame = pd.DataFrame({"DEPTH": [1000.0, 1001.0], "GR": [45.0, 50.0]})
+
+        with self.assertRaises(DatasetValidationError):
+            dataset.add_dataframe(frame, index_unit="ft")
+
+        with self.assertRaises(DatasetValidationError):
+            dataset.add_dataframe(frame, index_unit="ft", use_index=True, index_column="DEPTH")
+
+    @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
+    def test_dataset_builder_supports_series_and_dataframe_ingestion(self) -> None:
+        series = pd.Series([45.0, 50.0], index=[1000.0, 1001.0], name="GR")
+        frame = pd.DataFrame(
+            {
+                "DEPTH": [1000.0, 1001.0],
+                "PHIE": [0.12, 0.18],
+            }
+        )
+
+        dataset = (
+            DatasetBuilder(name="processed")
+            .add_series(series=series, index_unit="ft", value_unit="gAPI")
+            .add_dataframe(
+                frame,
+                index_column="DEPTH",
+                index_unit="ft",
+                curves={"PHIE": {"value_unit": "v/v"}},
+            )
+            .build()
+        )
+
+        self.assertIn("GR", dataset.channels)
+        self.assertIn("PHIE", dataset.channels)
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 
 from well_log_os import DatasetBuilder, create_dataset
 
@@ -27,6 +28,14 @@ def main() -> None:
         wave.append(trace)
     wave = np.asarray(wave, dtype=float)
 
+    raw_frame = pd.DataFrame(
+        {
+            "DEPTH": depth_ft,
+            "GR": gr,
+            "CBL": cbl,
+            "TT": tt,
+        }
+    )
     raw = create_dataset(
         "synthetic_raw",
         well_metadata={
@@ -35,29 +44,21 @@ def main() -> None:
         },
         provenance={"source": "synthetic-demo"},
     )
-    raw.add_curve(
-        mnemonic="GR",
-        values=gr,
-        index=depth_ft,
+    raw.add_dataframe(
+        raw_frame,
+        index_column="DEPTH",
         index_unit="ft",
-        value_unit="gAPI",
-        description="Gamma ray",
+        curves={
+            "GR": {"value_unit": "gAPI", "description": "Gamma ray"},
+            "CBL": {"value_unit": "mV", "description": "CBL amplitude"},
+            "TT": {"value_unit": "us", "description": "Transit time"},
+        },
     )
-    raw.add_curve(
-        mnemonic="CBL",
-        values=cbl,
+
+    cbl_norm_series = pd.Series(
+        np.clip(cbl / 40.0, 0.0, 1.0),
         index=depth_ft,
-        index_unit="ft",
-        value_unit="mV",
-        description="CBL amplitude",
-    )
-    raw.add_curve(
-        mnemonic="TT",
-        values=tt,
-        index=depth_ft,
-        index_unit="ft",
-        value_unit="us",
-        description="Transit time",
+        name="CBL_NORM",
     )
 
     processed = (
@@ -65,10 +66,8 @@ def main() -> None:
             name="processed",
             provenance={"source": "derived-in-notebook"},
         )
-        .add_curve(
-            mnemonic="CBL_NORM",
-            values=np.clip(cbl / 40.0, 0.0, 1.0),
-            index=depth_ft,
+        .add_series(
+            series=cbl_norm_series,
             index_unit="ft",
             value_unit="fraction",
             description="Normalized CBL amplitude",

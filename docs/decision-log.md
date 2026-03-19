@@ -82,6 +82,9 @@ This file records project decisions that should remain stable unless explicitly 
   - the in-memory composition/render bridge moved ahead of pandas adapters
   - reason: notebook workflows are not useful until in-memory datasets can use the actual log
     layout renderer instead of ad-hoc plotting
+- Pandas support remains optional:
+  - `add_series(...)` / `add_dataframe(...)` are available when pandas is installed
+  - pandas should not become a hard runtime dependency for users who stay in YAML/numpy flows
 
 ## Rendering Decisions
 

@@ -70,6 +70,12 @@ Install with optional LAS ingestion and PDF output:
 uv sync --extra las --extra pdf --extra units
 ```
 
+Install with optional pandas dataset adapters:
+
+```bash
+uv sync --extra pandas
+```
+
 With all optional backends:
 
 ```bash
@@ -95,6 +101,7 @@ The programmatic API phase is now underway.
 
 Currently implemented:
 - dataset ingestion into `WellDataset`
+- pandas `Series` / `DataFrame` adapters on top of the dataset ingestion API
 - in-memory layout composition with `LogBuilder`
 - rendering through the project layout with `render_report(...)`
 - notebook-friendly usage via returned Matplotlib figures when no `output_path` is provided
@@ -111,7 +118,6 @@ Current examples:
 - [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
 
 Still planned:
-- pandas/Series/DataFrame adapters
 - partial renders for section/track/window scopes
 - notebook-friendly byte outputs such as PNG/SVG
 - YAML round-trip helpers and serialization API

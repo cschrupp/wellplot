@@ -267,6 +267,18 @@ Acceptance:
 
 - a researcher can compute new curves in pandas and add them to a dataset in one step
 
+Status:
+
+- implemented
+- current surface:
+  - `WellDataset.add_series(...)`
+  - `WellDataset.add_dataframe(...)`
+  - `DatasetBuilder.add_series(...)`
+  - `DatasetBuilder.add_dataframe(...)`
+- reference example:
+  - [examples/api_dataset_ingest_demo.py](/home/user/projects/well_log_os/examples/api_dataset_ingest_demo.py)
+  - [examples/notebooks/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_dataset_ingest_demo.ipynb)
+
 ### Phase 5. Add validation and alignment helpers
 
 Goal: make computed-channel ingestion safe.

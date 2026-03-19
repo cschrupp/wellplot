@@ -41,6 +41,9 @@ pdf = [
 interactive = [
   "plotly>=5.18",
 ]
+pandas = [
+  "pandas>=2.2",
+]
 units = [
   "pint>=0.24",
 ]
@@ -50,6 +53,7 @@ all = [
   "dlisio>=1.0",
   "matplotlib>=3.8",
   "plotly>=5.18",
+  "pandas>=2.2",
   "pint>=0.24",
 ]
 

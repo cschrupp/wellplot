@@ -108,10 +108,10 @@ Status:
 
 - implemented:
   - dataset-ingestion API
+  - pandas/Series/DataFrame adapters
   - in-memory composition/render bridge
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - pandas/Series/DataFrame adapters
   - partial render API
   - notebook byte outputs
 

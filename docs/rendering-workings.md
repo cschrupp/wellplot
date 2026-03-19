@@ -86,6 +86,8 @@ Planned implications:
 Current implemented bridge:
 
 - `DatasetBuilder` / `create_dataset(...)` build validated in-memory datasets
+- `WellDataset.add_series(...)` / `add_dataframe(...)` ingest pandas results when pandas is
+  installed
 - `LogBuilder` builds layout/binding specs in Python and validates them through the same logfile
   conversion path used by YAML
 - `render_report(...)` calls the same backend renderers used by `render_from_logfile(...)`
