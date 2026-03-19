@@ -9,12 +9,18 @@ import numpy as np
 from well_log_os import (
     LogBuilder,
     create_dataset,
+    render_png_bytes,
     render_report,
     render_section,
+    render_section_png,
+    render_svg_bytes,
     render_track,
+    render_track_png,
     render_window,
+    render_window_png,
 )
 from well_log_os.api import build_documents
+from well_log_os.errors import TemplateValidationError
 
 
 def _build_dataset(name: str, *, phase: float = 0.0):
@@ -379,6 +385,49 @@ class ApiRenderTests(unittest.TestCase):
         self.assertEqual(len(window_result.artifact), 1)
         for figure in window_result.artifact:
             figure.clf()
+
+    def test_render_png_and_svg_bytes_return_image_payloads(self) -> None:
+        report = _build_report()
+
+        png_bytes = render_png_bytes(report, page_index=0, dpi=120)
+        svg_bytes = render_svg_bytes(report, page_index=0)
+
+        self.assertIsInstance(png_bytes, bytes)
+        self.assertGreater(len(png_bytes), 0)
+        self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
+
+        self.assertIsInstance(svg_bytes, bytes)
+        self.assertGreater(len(svg_bytes), 0)
+        self.assertIn(b"<svg", svg_bytes)
+
+    def test_scoped_png_helpers_return_bytes(self) -> None:
+        report = _build_report()
+
+        section_png = render_section_png(report, section_id="main", page_index=0, dpi=120)
+        track_png = render_track_png(
+            report,
+            section_id="main",
+            track_ids="vdl",
+            page_index=0,
+            dpi=120,
+        )
+        window_png = render_window_png(
+            report,
+            depth_range=(8300.0, 8400.0),
+            depth_range_unit="ft",
+            page_index=0,
+            dpi=120,
+        )
+
+        for payload in (section_png, track_png, window_png):
+            self.assertIsInstance(payload, bytes)
+            self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    def test_render_png_bytes_rejects_invalid_page_index(self) -> None:
+        report = _build_report()
+
+        with self.assertRaisesRegex(TemplateValidationError, "page_index"):
+            render_png_bytes(report, page_index=99)
 
 
 if __name__ == "__main__":

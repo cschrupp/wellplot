@@ -64,7 +64,7 @@ section_title:
   subtitle_y: 0.27
 track_header:
   background_color: "#e8e8e8"
-  separator_color: "#9a9a9a"
+  separator_color: "#e8e8e8"
   separator_linewidth: 0.35
   slot_top: 0.97
   slot_bottom: 0.03

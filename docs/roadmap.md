@@ -111,10 +111,11 @@ Status:
   - pandas/Series/DataFrame adapters
   - in-memory composition/render bridge
   - partial render API for section/track/window scopes
+  - notebook byte outputs for PNG/SVG previews
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - notebook byte outputs
-  - notebook partial-render examples
+  - YAML round-trip helpers
+  - higher-level serialization API
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

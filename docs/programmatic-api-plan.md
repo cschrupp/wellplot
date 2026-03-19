@@ -492,6 +492,22 @@ Acceptance:
 
 - notebook users can render inline without temporary files
 
+Status:
+
+- implemented
+- current surface:
+  - `render_png_bytes(...)`
+  - `render_svg_bytes(...)`
+  - `render_section_png(...)`
+  - `render_track_png(...)`
+  - `render_window_png(...)`
+- important behavior:
+  - byte helpers render through the same matplotlib path as `render_report(...)`
+  - selected page is exported from the in-memory figure list
+  - figures are closed after conversion to avoid notebook-side leaks
+- reference example:
+  - [examples/api_notebook_bytes_demo.py](/home/user/projects/well_log_os/examples/api_notebook_bytes_demo.py)
+
 ### Phase 11. Add tests
 
 New test groups:

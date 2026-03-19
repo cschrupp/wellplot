@@ -108,7 +108,13 @@ Currently implemented:
   - `render_section(...)`
   - `render_track(...)`
   - `render_window(...)`
-- notebook-friendly usage via returned Matplotlib figures when no `output_path` is provided
+- notebook-friendly outputs:
+  - returned Matplotlib figures when no `output_path` is provided
+  - `render_png_bytes(...)`
+  - `render_svg_bytes(...)`
+  - `render_section_png(...)`
+  - `render_track_png(...)`
+  - `render_window_png(...)`
 
 Current public modules:
 - `well_log_os.api.dataset`
@@ -121,9 +127,9 @@ Current examples:
 - [examples/api_layout_render_demo.py](examples/api_layout_render_demo.py)
 - [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
 - [examples/api_partial_render_demo.py](examples/api_partial_render_demo.py)
+- [examples/api_notebook_bytes_demo.py](examples/api_notebook_bytes_demo.py)
 
 Still planned:
-- notebook-friendly byte outputs such as PNG/SVG
 - YAML round-trip helpers and serialization API
 
 The guiding rule is:

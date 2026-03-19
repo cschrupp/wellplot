@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -342,10 +343,161 @@ def render_window(
     )
 
 
+def _result_figure_bytes(
+    result: RenderResult,
+    *,
+    image_format: str,
+    page_index: int = 0,
+    dpi: int | None = None,
+) -> bytes:
+    if result.backend != "matplotlib":
+        raise TemplateValidationError(
+            f"{image_format.upper()} byte output currently requires the matplotlib backend."
+        )
+    figures = result.artifact
+    if not isinstance(figures, list) or not figures:
+        raise TemplateValidationError(
+            f"{image_format.upper()} byte output requires in-memory matplotlib figures."
+        )
+    if page_index < 0 or page_index >= len(figures):
+        raise TemplateValidationError(
+            f"Requested page_index {page_index} is out of range for {len(figures)} rendered pages."
+        )
+
+    buffer = BytesIO()
+    try:
+        save_kwargs: dict[str, Any] = {"format": image_format}
+        if dpi is not None and image_format.lower() == "png":
+            save_kwargs["dpi"] = dpi
+        figures[page_index].savefig(buffer, **save_kwargs)
+        return buffer.getvalue()
+    finally:
+        buffer.close()
+        try:
+            import matplotlib.pyplot as plt
+
+            for figure in figures:
+                plt.close(figure)
+        except Exception:
+            for figure in figures:
+                clf = getattr(figure, "clf", None)
+                if callable(clf):
+                    clf()
+
+
+def render_png_bytes(
+    report: ProgrammaticLogSpec,
+    *,
+    page_index: int = 0,
+    dpi: int | None = None,
+    section_ids: list[str] | tuple[str, ...] | None = None,
+    track_ids_by_section: dict[str, list[str] | tuple[str, ...]] | None = None,
+    depth_range: tuple[float, float] | None = None,
+    depth_range_unit: str | None = None,
+    include_report_pages: bool = True,
+) -> bytes:
+    result = render_report(
+        report,
+        output_path=None,
+        section_ids=section_ids,
+        track_ids_by_section=track_ids_by_section,
+        depth_range=depth_range,
+        depth_range_unit=depth_range_unit,
+        include_report_pages=include_report_pages,
+    )
+    return _result_figure_bytes(result, image_format="png", page_index=page_index, dpi=dpi)
+
+
+def render_svg_bytes(
+    report: ProgrammaticLogSpec,
+    *,
+    page_index: int = 0,
+    section_ids: list[str] | tuple[str, ...] | None = None,
+    track_ids_by_section: dict[str, list[str] | tuple[str, ...]] | None = None,
+    depth_range: tuple[float, float] | None = None,
+    depth_range_unit: str | None = None,
+    include_report_pages: bool = True,
+) -> bytes:
+    result = render_report(
+        report,
+        output_path=None,
+        section_ids=section_ids,
+        track_ids_by_section=track_ids_by_section,
+        depth_range=depth_range,
+        depth_range_unit=depth_range_unit,
+        include_report_pages=include_report_pages,
+    )
+    return _result_figure_bytes(result, image_format="svg", page_index=page_index)
+
+
+def render_section_png(
+    report: ProgrammaticLogSpec,
+    *,
+    section_id: str,
+    page_index: int = 0,
+    dpi: int | None = None,
+) -> bytes:
+    return render_png_bytes(
+        report,
+        page_index=page_index,
+        dpi=dpi,
+        section_ids=[section_id],
+        include_report_pages=False,
+    )
+
+
+def render_track_png(
+    report: ProgrammaticLogSpec,
+    *,
+    section_id: str,
+    track_ids: str | list[str] | tuple[str, ...],
+    page_index: int = 0,
+    dpi: int | None = None,
+    depth_range: tuple[float, float] | None = None,
+    depth_range_unit: str | None = None,
+) -> bytes:
+    track_selection = _normalize_track_selection(section_id, track_ids)
+    return render_png_bytes(
+        report,
+        page_index=page_index,
+        dpi=dpi,
+        section_ids=[section_id],
+        track_ids_by_section=track_selection,
+        depth_range=depth_range,
+        depth_range_unit=depth_range_unit,
+        include_report_pages=False,
+    )
+
+
+def render_window_png(
+    report: ProgrammaticLogSpec,
+    *,
+    depth_range: tuple[float, float],
+    depth_range_unit: str | None = None,
+    page_index: int = 0,
+    dpi: int | None = None,
+    section_ids: list[str] | tuple[str, ...] | None = None,
+) -> bytes:
+    return render_png_bytes(
+        report,
+        page_index=page_index,
+        dpi=dpi,
+        section_ids=section_ids,
+        depth_range=depth_range,
+        depth_range_unit=depth_range_unit,
+        include_report_pages=False,
+    )
+
+
 __all__ = [
     "build_documents",
+    "render_png_bytes",
     "render_section",
+    "render_section_png",
+    "render_svg_bytes",
     "render_track",
+    "render_track_png",
     "render_window",
+    "render_window_png",
     "render_report",
 ]

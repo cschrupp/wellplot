@@ -90,6 +90,11 @@ This file records project decisions that should remain stable unless explicitly 
     `ProgrammaticLogSpec` before document build
   - partial scopes suppress heading/remarks/tail by default because notebook previews should focus
     on log content, not report packet pages
+- Notebook byte outputs are thin wrappers over the matplotlib figure path:
+  - render in memory first
+  - export selected page to PNG/SVG bytes
+  - close figures after conversion
+  - do not create a second rendering backend just for notebooks
 
 ## Rendering Decisions
 

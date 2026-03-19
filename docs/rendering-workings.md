@@ -97,6 +97,10 @@ Current implemented bridge:
   - `render_window(...)`
 - when `output_path` is omitted, Matplotlib renders return figure objects suitable for notebook
   display
+- notebook byte helpers convert those in-memory figures into:
+  - `PNG` via `render_png_bytes(...)`
+  - `SVG` via `render_svg_bytes(...)`
+  - scoped PNG helpers for section/track/window previews
 
 Planned public modules:
 
