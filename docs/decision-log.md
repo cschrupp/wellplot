@@ -77,6 +77,11 @@ This file records project decisions that should remain stable unless explicitly 
   - document building
   - rendering
   - serialization
+- Delivery order was adjusted after the first notebook ingestion demo:
+  - dataset ingestion came first
+  - the in-memory composition/render bridge moved ahead of pandas adapters
+  - reason: notebook workflows are not useful until in-memory datasets can use the actual log
+    layout renderer instead of ad-hoc plotting
 
 ## Rendering Decisions
 

@@ -83,6 +83,15 @@ Planned implications:
 - dataset-ingestion helpers will convert numpy/pandas results into validated channel objects
 - partial render helpers will operate on filtered views of the same document model
 
+Current implemented bridge:
+
+- `DatasetBuilder` / `create_dataset(...)` build validated in-memory datasets
+- `LogBuilder` builds layout/binding specs in Python and validates them through the same logfile
+  conversion path used by YAML
+- `render_report(...)` calls the same backend renderers used by `render_from_logfile(...)`
+- when `output_path` is omitted, Matplotlib renders return figure objects suitable for notebook
+  display
+
 Planned public modules:
 
 - `well_log_os.api.dataset`

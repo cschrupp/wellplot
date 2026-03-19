@@ -89,25 +89,38 @@ uv run ruff format .
 uv run ruff check .
 ```
 
-## Planned Programmatic API
+## Programmatic API
 
-The next milestone is a programmatic API aimed at research and notebook workflows.
+The programmatic API phase is now underway.
 
-Planned capabilities:
-- ingest computed scalar and array channels from numpy/pandas into `WellDataset`
-- build `LogDocument` objects directly in Python
-- render full reports or partial scopes such as one section, one track, or one depth/time window
-- emit notebook-friendly outputs such as PNG bytes
-- serialize programmatically built documents back to YAML
+Currently implemented:
+- dataset ingestion into `WellDataset`
+- in-memory layout composition with `LogBuilder`
+- rendering through the project layout with `render_report(...)`
+- notebook-friendly usage via returned Matplotlib figures when no `output_path` is provided
+
+Current public modules:
+- `well_log_os.api.dataset`
+- `well_log_os.api.builder`
+- `well_log_os.api.render`
+
+Current examples:
+- [examples/api_dataset_ingest_demo.py](examples/api_dataset_ingest_demo.py)
+- [examples/notebooks/api_dataset_ingest_demo.ipynb](examples/notebooks/api_dataset_ingest_demo.ipynb)
+- [examples/api_layout_render_demo.py](examples/api_layout_render_demo.py)
+- [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
+
+Still planned:
+- pandas/Series/DataFrame adapters
+- partial renders for section/track/window scopes
+- notebook-friendly byte outputs such as PNG/SVG
+- YAML round-trip helpers and serialization API
 
 The guiding rule is:
 - YAML remains a first-class saved format
 - the in-memory model becomes the canonical authoring surface
 
-Planned public modules:
-- `well_log_os.api.dataset`
-- `well_log_os.api.builder`
-- `well_log_os.api.render`
+Planned next public module:
 - `well_log_os.api.serialize`
 
 The full implementation checklist lives in

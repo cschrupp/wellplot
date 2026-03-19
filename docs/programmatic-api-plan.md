@@ -77,8 +77,8 @@ Responsibilities:
 Implement in this order:
 
 1. dataset ingestion API
-2. programmatic document builder
-3. full-document render API
+2. in-memory composition/render bridge
+3. pandas/numpy adapters
 4. partial render API
 5. notebook-friendly outputs
 6. YAML round-trip helpers
@@ -179,7 +179,60 @@ Acceptance:
 
 - users can create valid internal datasets entirely from computed arrays
 
-### Phase 3. Add pandas/numpy adapters
+Status:
+
+- implemented
+- public surface:
+  - `create_dataset(...)`
+  - `DatasetBuilder`
+  - dataset methods on `WellDataset`:
+    - `add_curve(...)`
+    - `add_array(...)`
+    - `add_raster(...)`
+    - `add_or_replace_channel(...)`
+    - `merge(...)`
+- reference example:
+  - [examples/api_dataset_ingest_demo.py](/home/user/projects/well_log_os/examples/api_dataset_ingest_demo.py)
+  - [examples/notebooks/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_dataset_ingest_demo.ipynb)
+
+### Phase 3. Add the in-memory composition/render bridge
+
+Goal: let in-memory datasets use the existing well-log layout pipeline directly.
+
+New modules:
+
+- `src/well_log_os/api/builder.py`
+- `src/well_log_os/api/render.py`
+
+Public surface:
+
+- `LogBuilder`
+- `SectionBuilder`
+- `ProgrammaticLogSpec`
+- `build_documents(...)`
+- `render_report(...)`
+
+Responsibilities:
+
+- build the same layout/binding structure the YAML flow uses
+- keep datasets in memory instead of forcing `data.source_path`
+- render through the current Matplotlib/Plotly backends
+- support notebook use by returning figures when no `output_path` is provided
+
+Acceptance:
+
+- a user can build a `reference` + `normal` + `array` layout in Python
+- the same renderer stack used by YAML can render it
+- multisection builds can still filter by selected section ids
+
+Status:
+
+- implemented for full-document rendering
+- reference example:
+  - [examples/api_layout_render_demo.py](/home/user/projects/well_log_os/examples/api_layout_render_demo.py)
+  - [examples/notebooks/api_layout_render_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_layout_render_demo.ipynb)
+
+### Phase 4. Add pandas/numpy adapters
 
 Goal: support common notebook workflows directly.
 
@@ -214,7 +267,7 @@ Acceptance:
 
 - a researcher can compute new curves in pandas and add them to a dataset in one step
 
-### Phase 4. Add validation and alignment helpers
+### Phase 5. Add validation and alignment helpers
 
 Goal: make computed-channel ingestion safe.
 
@@ -249,7 +302,7 @@ Acceptance:
 
 - invalid computed data is rejected early and clearly
 
-### Phase 5. Add serialization helpers
+### Phase 6. Add serialization helpers
 
 Goal: make YAML a round-trip format, not the only authoring path.
 

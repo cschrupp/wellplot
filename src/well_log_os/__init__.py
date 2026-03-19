@@ -1,4 +1,12 @@
-from .api import DatasetBuilder, create_dataset
+from .api import (
+    DatasetBuilder,
+    LogBuilder,
+    ProgrammaticLogSpec,
+    SectionBuilder,
+    build_documents,
+    create_dataset,
+    render_report,
+)
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
 from .logfile import (
@@ -78,6 +86,8 @@ __all__ = [
     "CurveCalloutSpec",
     "DatasetBuilder",
     "DatasetValidationError",
+    "LogBuilder",
+    "ProgrammaticLogSpec",
     "CurveElement",
     "CurveFillBaselineSpec",
     "CurveFillCrossoverSpec",
@@ -123,6 +133,8 @@ __all__ = [
     "TrackSpec",
     "WellDataset",
     "ZoneSpec",
+    "SectionBuilder",
+    "build_documents",
     "build_document_for_logfile",
     "build_documents_for_logfile",
     "load_datasets_for_logfile",
@@ -132,6 +144,7 @@ __all__ = [
     "get_logfile_json_schema",
     "validate_logfile_mapping",
     "render_from_logfile",
+    "render_report",
     "document_from_mapping",
     "load_document",
     "create_dataset",

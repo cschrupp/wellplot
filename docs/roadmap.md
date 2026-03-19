@@ -93,18 +93,27 @@ Planned public modules:
 Planned delivery order:
 
 1. dataset-ingestion API
-2. pandas/numpy adapters
-3. validation and alignment helpers
-4. programmatic document builder
-5. in-memory dataset-backed sections
-6. full render API
-7. partial render API
-8. notebook-friendly outputs
-9. examples and tests
+2. in-memory composition/render bridge
+3. pandas/numpy adapters
+4. validation and alignment helpers
+5. partial render API
+6. notebook-friendly outputs
+7. examples and tests
 
 Detailed checklist:
 
 - [docs/programmatic-api-plan.md](programmatic-api-plan.md)
+
+Status:
+
+- implemented:
+  - dataset-ingestion API
+  - in-memory composition/render bridge
+  - initial notebook examples for both dataset ingestion and layout rendering
+- next:
+  - pandas/Series/DataFrame adapters
+  - partial render API
+  - notebook byte outputs
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
@@ -201,8 +210,8 @@ Longer-term / UI-centric:
 
 - Begin the programmatic API phase:
   - dataset-ingestion API for computed channels
+  - in-memory composition/render bridge using the existing layout pipeline
   - pandas/numpy adapters
-  - programmatic document builder
   - partial render API for section/track/window scopes
   - notebook-friendly output helpers
   - YAML round-trip support for builder-created documents
