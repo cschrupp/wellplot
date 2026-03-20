@@ -115,11 +115,17 @@ Currently implemented:
   - `render_section_png(...)`
   - `render_track_png(...)`
   - `render_window_png(...)`
+- serialization helpers:
+  - `document_to_dict(...)` / `document_from_dict(...)`
+  - `document_to_yaml(...)` / `document_from_yaml(...)`
+  - `report_to_dict(...)` / `report_from_dict(...)`
+  - `report_to_yaml(...)` / `report_from_yaml(...)`
 
 Current public modules:
 - `well_log_os.api.dataset`
 - `well_log_os.api.builder`
 - `well_log_os.api.render`
+- `well_log_os.api.serialize`
 
 Current examples:
 - [examples/api_dataset_ingest_demo.py](examples/api_dataset_ingest_demo.py)
@@ -128,9 +134,16 @@ Current examples:
 - [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
 - [examples/api_partial_render_demo.py](examples/api_partial_render_demo.py)
 - [examples/api_notebook_bytes_demo.py](examples/api_notebook_bytes_demo.py)
+- [examples/api_serialize_demo.py](examples/api_serialize_demo.py)
 
 Still planned:
-- YAML round-trip helpers and serialization API
+- higher-level serialization conveniences
+
+Important current boundary:
+- `document_*` helpers round-trip the normalized `LogDocument` template shape
+- `report_*` helpers round-trip logfile/programmatic layout mappings
+- in-memory dataset contents are not embedded into YAML; YAML persists layout/report structure,
+  while datasets remain separate Python objects or file-backed sources
 
 The guiding rule is:
 - YAML remains a first-class saved format

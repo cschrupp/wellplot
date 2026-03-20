@@ -5,6 +5,10 @@ from .api import (
     SectionBuilder,
     build_documents,
     create_dataset,
+    document_from_dict,
+    document_from_yaml,
+    document_to_dict,
+    document_to_yaml,
     render_png_bytes,
     render_report,
     render_section,
@@ -14,6 +18,10 @@ from .api import (
     render_track_png,
     render_window,
     render_window_png,
+    report_from_dict,
+    report_from_yaml,
+    report_to_dict,
+    report_to_yaml,
 )
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
@@ -145,6 +153,10 @@ __all__ = [
     "build_documents",
     "build_document_for_logfile",
     "build_documents_for_logfile",
+    "document_from_dict",
+    "document_from_yaml",
+    "document_to_dict",
+    "document_to_yaml",
     "load_datasets_for_logfile",
     "load_dataset_for_logfile",
     "load_logfile",
@@ -152,6 +164,10 @@ __all__ = [
     "get_logfile_json_schema",
     "validate_logfile_mapping",
     "render_from_logfile",
+    "report_from_dict",
+    "report_from_yaml",
+    "report_to_dict",
+    "report_to_yaml",
     "render_png_bytes",
     "render_report",
     "render_section",
@@ -161,9 +177,9 @@ __all__ = [
     "render_track_png",
     "render_window",
     "render_window_png",
+    "create_dataset",
     "document_from_mapping",
     "load_document",
-    "create_dataset",
 ]
 
 __version__ = "0.1.0"

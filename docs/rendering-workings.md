@@ -101,12 +101,23 @@ Current implemented bridge:
   - `PNG` via `render_png_bytes(...)`
   - `SVG` via `render_svg_bytes(...)`
   - scoped PNG helpers for section/track/window previews
+- serialization helpers now cover both normalized template documents and logfile/programmatic
+  report mappings:
+  - `document_to_dict(...)` / `document_to_yaml(...)`
+  - `report_to_dict(...)` / `report_to_yaml(...)`
+- `document_*` helpers emit the normalized template shape:
+  - explicit page dimensions
+  - `depth` instead of `depth_axis`
+  - nested `track_header`, `grid`, `reference`, and report blocks
+- `report_*` helpers preserve logfile/programmatic layout structure, but they do not serialize
+  in-memory `WellDataset` channel contents
 
 Planned public modules:
 
 - `well_log_os.api.dataset`
 - `well_log_os.api.builder`
 - `well_log_os.api.render`
+- `well_log_os.api.serialize`
 - `well_log_os.api.serialize`
 
 See [programmatic-api-plan.md](programmatic-api-plan.md) for the concrete implementation checklist.

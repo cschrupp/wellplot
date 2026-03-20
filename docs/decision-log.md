@@ -23,6 +23,10 @@ This file records project decisions that should remain stable unless explicitly 
 - Templates are YAML-driven and define page geometry, depth behavior, tracks, and annotations.
 - The next public API phase should keep YAML as serialization while promoting the in-memory model
   to the canonical authoring surface for Python users.
+- Serialization is split into two surfaces:
+  - `document_*` helpers for normalized `LogDocument` template mappings
+  - `report_*` helpers for logfile/programmatic layout mappings
+- In-memory datasets are not serialized into YAML; only layout/report structure is persisted.
 
 ## Data Model Decisions
 
@@ -95,6 +99,10 @@ This file records project decisions that should remain stable unless explicitly 
   - export selected page to PNG/SVG bytes
   - close figures after conversion
   - do not create a second rendering backend just for notebooks
+- YAML round-trip helpers follow the same rule:
+  - reuse the existing template/logfile validators on load
+  - emit stable normalized mappings on save
+  - do not try to snapshot notebook in-memory datasets into YAML
 
 ## Rendering Decisions
 

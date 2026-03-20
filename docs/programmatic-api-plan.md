@@ -338,6 +338,12 @@ Requirements:
 Acceptance:
 
 - Python-built documents can be saved as YAML and loaded back
+- current implementation is split into:
+  - `document_*` helpers for normalized `LogDocument` template mappings
+  - `report_*` helpers for logfile/programmatic layout mappings
+- important boundary:
+  - in-memory `WellDataset` contents are not embedded in YAML
+  - YAML persists layout/report structure and file-backed source references when present
 
 ### Phase 6. Add a programmatic document builder
 

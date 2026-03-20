@@ -12,6 +12,16 @@ from .render import (
     render_window,
     render_window_png,
 )
+from .serialize import (
+    document_from_dict,
+    document_from_yaml,
+    document_to_dict,
+    document_to_yaml,
+    report_from_dict,
+    report_from_yaml,
+    report_to_dict,
+    report_to_yaml,
+)
 
 __all__ = [
     "DatasetBuilder",
@@ -20,6 +30,14 @@ __all__ = [
     "SectionBuilder",
     "build_documents",
     "create_dataset",
+    "document_from_dict",
+    "document_from_yaml",
+    "document_to_dict",
+    "document_to_yaml",
+    "report_from_dict",
+    "report_from_yaml",
+    "report_to_dict",
+    "report_to_yaml",
     "render_png_bytes",
     "render_report",
     "render_section",

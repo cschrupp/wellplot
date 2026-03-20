@@ -112,10 +112,11 @@ Status:
   - in-memory composition/render bridge
   - partial render API for section/track/window scopes
   - notebook byte outputs for PNG/SVG previews
+  - YAML round-trip helpers for `LogDocument` and report mappings
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - YAML round-trip helpers
   - higher-level serialization API
+  - dataset merge/update conveniences beyond the current ingestion methods
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
