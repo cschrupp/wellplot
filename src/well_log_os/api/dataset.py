@@ -217,6 +217,42 @@ class DatasetBuilder:
         )
         return self
 
+    def sort_index(
+        self,
+        *,
+        ascending: bool = True,
+        channels: list[str] | None = None,
+    ) -> DatasetBuilder:
+        self._dataset.sort_index(ascending=ascending, channels=channels)
+        return self
+
+    def convert_index_unit(
+        self,
+        unit: str,
+        *,
+        channels: list[str] | None = None,
+    ) -> DatasetBuilder:
+        self._dataset.convert_index_unit(unit, channels=channels)
+        return self
+
+    def reindex_to(
+        self,
+        *,
+        channel: str | None = None,
+        index: Any | None = None,
+        index_unit: str | None = None,
+        method: str = "linear",
+        channels: list[str] | None = None,
+    ) -> DatasetBuilder:
+        self._dataset.reindex_to(
+            channel=channel,
+            index=index,
+            index_unit=index_unit,
+            method=method,
+            channels=channels,
+        )
+        return self
+
 
 __all__ = [
     "ArrayChannel",

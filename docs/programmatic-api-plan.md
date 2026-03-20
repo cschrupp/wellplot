@@ -1,6 +1,6 @@
 # Programmatic API Plan
 
-Last updated: 2026-03-18
+Last updated: 2026-03-20
 
 ## Goal
 
@@ -13,6 +13,33 @@ Add a programmatic API so users can:
 
 This phase is intentionally separate from interactive-viewer work. The immediate target is a clean
 Python API over the current data model and renderers.
+
+## Current Status
+
+Implemented:
+
+- dataset ingestion into `WellDataset`
+- pandas `Series` / `DataFrame` adapters
+- programmatic layout composition with `LogBuilder`
+- full and partial renders through the existing layout renderer
+- notebook byte outputs (`PNG` / `SVG`)
+- dataset alignment helpers:
+  - `sort_index(...)`
+  - `convert_index_unit(...)`
+  - `reindex_to(...)`
+- YAML serialization helpers:
+  - `document_*`
+  - `report_*`
+  - `save_document(...)` / `load_document_yaml(...)`
+  - `save_report(...)` / `load_report(...)`
+- persisted section source references for builder-created reports
+
+Still open:
+
+- dataset merge/update conveniences beyond the current ingestion API
+- provenance-aware collision handling for merged computed channels
+- richer end-to-end examples that combine ingestion, alignment, composition, rendering, and
+  serialization in one workflow
 
 ## Design Principles
 
@@ -334,6 +361,7 @@ Requirements:
 - work from in-memory model objects
 - preserve report/layout structure
 - support saving builder-created documents as YAML
+- expose simple convenience wrappers for common file-based workflows
 
 Acceptance:
 
@@ -341,6 +369,11 @@ Acceptance:
 - current implementation is split into:
   - `document_*` helpers for normalized `LogDocument` template mappings
   - `report_*` helpers for logfile/programmatic layout mappings
+- convenience wrappers sit on top of those same surfaces:
+  - `save_document(...)` / `load_document_yaml(...)`
+  - `save_report(...)` / `load_report(...)`
+- builder-created reports can persist known file-backed section sources through
+  `data.source_path` / `data.source_format`
 - important boundary:
   - in-memory `WellDataset` contents are not embedded in YAML
   - YAML persists layout/report structure and file-backed source references when present
@@ -414,6 +447,9 @@ builder.add_section("repeat", dataset=ds_repeat)
 Acceptance:
 
 - full report render works without temporary input files
+- when a builder-created section also has a known file-backed source, that source may be persisted
+  explicitly through `data.source_path` / `data.source_format` for reloadability without
+  serializing in-memory channel contents
 
 ### Phase 8. Add render API
 

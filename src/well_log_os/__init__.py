@@ -9,6 +9,8 @@ from .api import (
     document_from_yaml,
     document_to_dict,
     document_to_yaml,
+    load_document_yaml,
+    load_report,
     render_png_bytes,
     render_report,
     render_section,
@@ -22,6 +24,8 @@ from .api import (
     report_from_yaml,
     report_to_dict,
     report_to_yaml,
+    save_document,
+    save_report,
 )
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
@@ -157,9 +161,11 @@ __all__ = [
     "document_from_yaml",
     "document_to_dict",
     "document_to_yaml",
+    "load_document_yaml",
     "load_datasets_for_logfile",
     "load_dataset_for_logfile",
     "load_logfile",
+    "load_report",
     "logfile_from_mapping",
     "get_logfile_json_schema",
     "validate_logfile_mapping",
@@ -168,6 +174,8 @@ __all__ = [
     "report_from_yaml",
     "report_to_dict",
     "report_to_yaml",
+    "save_document",
+    "save_report",
     "render_png_bytes",
     "render_report",
     "render_section",

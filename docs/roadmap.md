@@ -109,14 +109,26 @@ Status:
 - implemented:
   - dataset-ingestion API
   - pandas/Series/DataFrame adapters
+  - dataset alignment helpers:
+    - `sort_index(...)`
+    - `convert_index_unit(...)`
+    - `reindex_to(...)`
   - in-memory composition/render bridge
   - partial render API for section/track/window scopes
   - notebook byte outputs for PNG/SVG previews
   - YAML round-trip helpers for `LogDocument` and report mappings
+  - serialization convenience wrappers:
+    - `save_document(...)` / `load_document_yaml(...)`
+    - `save_report(...)` / `load_report(...)`
+  - builder/report persistence helpers:
+    - `LogBuilder.save_yaml(...)`
+    - `ProgrammaticLogSpec.to_yaml(...)`
+    - persisted section `source_path` / `source_format`
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - higher-level serialization API
   - dataset merge/update conveniences beyond the current ingestion methods
+  - provenance-aware collision handling for merged computed channels
+  - richer examples that combine ingestion, alignment, composition, and serialization in one flow
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

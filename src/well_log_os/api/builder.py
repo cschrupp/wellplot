@@ -25,6 +25,11 @@ class ProgrammaticLogSpec:
     def to_mapping(self) -> dict[str, Any]:
         return deepcopy(self.mapping)
 
+    def to_yaml(self, destination: str | Path | None = None) -> str | None:
+        from .serialize import report_to_yaml
+
+        return report_to_yaml(self, destination)
+
     def build_documents(self) -> tuple[LogDocument, ...]:
         return build_documents_for_logfile(
             self.spec,
@@ -301,6 +306,11 @@ class LogBuilder:
         self._mapping["document"]["bindings"]["on_missing"] = str(mode)
         return self
 
+    def save_yaml(self, destination: str | Path | None = None) -> str | None:
+        from .serialize import report_to_yaml
+
+        return report_to_yaml(self, destination)
+
     def add_section(
         self,
         section_id: str,
@@ -309,6 +319,8 @@ class LogBuilder:
         title: str = "",
         subtitle: str = "",
         source_name: str | Path | None = None,
+        source_path: str | Path | None = None,
+        source_format: str = "auto",
     ) -> SectionBuilder:
         normalized_id = str(section_id).strip()
         if not normalized_id:
@@ -322,13 +334,25 @@ class LogBuilder:
             "subtitle": subtitle,
             "tracks": [],
         }
+        if source_path is not None:
+            source_path_text = str(source_path).strip()
+            if not source_path_text:
+                raise TemplateValidationError("Section source_path must be non-empty when set.")
+            section["data"] = {
+                "source_path": source_path_text,
+                "source_format": str(source_format).strip().lower() or "auto",
+            }
         self._mapping["document"]["layout"]["log_sections"].append(section)
         self._section_map[normalized_id] = section
         self._datasets_by_section[normalized_id] = dataset
         path_text = (
-            str(source_name).strip()
-            if source_name is not None
-            else f"{normalized_id}.memory"
+            str(source_path).strip()
+            if source_path is not None
+            else (
+                str(source_name).strip()
+                if source_name is not None
+                else f"{normalized_id}.memory"
+            )
         )
         self._source_paths_by_section[normalized_id] = Path(path_text)
         return SectionBuilder(self, normalized_id)

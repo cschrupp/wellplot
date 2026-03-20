@@ -173,6 +173,103 @@ class DatasetApiTests(unittest.TestCase):
         with self.assertRaises(DatasetValidationError):
             left.merge(right, replace=False)
 
+    def test_dataset_sort_index_reorders_scalar_and_raster_channels(self) -> None:
+        dataset = create_dataset("processed")
+        dataset.add_curve(
+            mnemonic="GR",
+            values=[45.0, 50.0, 55.0],
+            index=[1002.0, 1001.0, 1000.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        dataset.add_raster(
+            mnemonic="VDL",
+            values=[[3.0, 30.0], [2.0, 20.0], [1.0, 10.0]],
+            index=[1002.0, 1001.0, 1000.0],
+            index_unit="ft",
+            sample_axis=[200.0, 300.0],
+            sample_unit="us",
+            value_unit="amplitude",
+        )
+
+        dataset.sort_index()
+
+        np.testing.assert_allclose(dataset.get_channel("GR").depth, [1000.0, 1001.0, 1002.0])
+        np.testing.assert_allclose(dataset.get_channel("GR").values, [55.0, 50.0, 45.0])
+        np.testing.assert_allclose(
+            dataset.get_channel("VDL").values,
+            [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]],
+        )
+
+    def test_dataset_convert_index_unit_updates_all_channels(self) -> None:
+        dataset = create_dataset("processed")
+        dataset.add_curve(
+            mnemonic="GR",
+            values=[45.0, 50.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+
+        dataset.convert_index_unit("m")
+
+        channel = dataset.get_channel("GR")
+        self.assertEqual(channel.depth_unit, "m")
+        np.testing.assert_allclose(channel.depth, [304.8, 305.1048])
+
+    def test_dataset_reindex_to_channel_resamples_scalar_and_array(self) -> None:
+        dataset = create_dataset("processed")
+        dataset.add_curve(
+            mnemonic="BASE",
+            values=[10.0, 20.0, 30.0],
+            index=[1000.0, 1001.0, 1002.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        dataset.add_curve(
+            mnemonic="MID",
+            values=[100.0, 200.0],
+            index=[1000.0, 1002.0],
+            index_unit="ft",
+            value_unit="mV",
+        )
+        dataset.add_raster(
+            mnemonic="WF",
+            values=[[1.0, 10.0], [3.0, 30.0]],
+            index=[1000.0, 1002.0],
+            index_unit="ft",
+            sample_axis=[200.0, 300.0],
+            sample_unit="us",
+            value_unit="amplitude",
+        )
+
+        dataset.reindex_to(channel="BASE", channels=["MID", "WF"])
+
+        np.testing.assert_allclose(dataset.get_channel("MID").depth, [1000.0, 1001.0, 1002.0])
+        np.testing.assert_allclose(dataset.get_channel("MID").values, [100.0, 150.0, 200.0])
+        np.testing.assert_allclose(
+            dataset.get_channel("WF").values,
+            [[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]],
+        )
+
+    def test_dataset_builder_exposes_alignment_helpers(self) -> None:
+        dataset = (
+            DatasetBuilder(name="processed")
+            .add_curve(
+                mnemonic="GR",
+                values=[45.0, 50.0],
+                index=[1001.0, 1000.0],
+                index_unit="ft",
+                value_unit="gAPI",
+            )
+            .sort_index()
+            .convert_index_unit("m")
+            .build()
+        )
+
+        self.assertEqual(dataset.get_channel("GR").depth_unit, "m")
+        np.testing.assert_allclose(dataset.get_channel("GR").depth, [304.8, 305.1048])
+
     def test_dataset_builder_supports_fluent_ingestion(self) -> None:
         dataset = (
             DatasetBuilder(

@@ -6,8 +6,8 @@ from well_log_os import (
     LogBuilder,
     build_documents,
     create_dataset,
-    document_to_yaml,
-    report_to_yaml,
+    save_document,
+    save_report,
 )
 
 
@@ -29,7 +29,13 @@ def build_report(dataset):
     builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
     builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
     builder.set_depth_range(8200, 8220)
-    section = builder.add_section("main", dataset=dataset, title="Main")
+    section = builder.add_section(
+        "main",
+        dataset=dataset,
+        title="Main",
+        source_path="workspace/data/demo.las",
+        source_format="las",
+    )
     section.add_track(
         id="depth",
         title="",
@@ -55,8 +61,8 @@ def main() -> None:
     report_yaml_path = Path("workspace/renders/api_serialize_report.yaml")
     document_yaml_path = Path("workspace/renders/api_serialize_document.yaml")
 
-    report_to_yaml(report, report_yaml_path)
-    document_to_yaml(documents[0], document_yaml_path)
+    save_report(report, report_yaml_path)
+    save_document(documents[0], document_yaml_path)
 
     print("Saved report YAML:", report_yaml_path)
     print("Saved document YAML:", document_yaml_path)

@@ -721,10 +721,18 @@ def document_to_yaml(
     return _write_yaml(document_to_dict(document), destination)
 
 
+def save_document(document: LogDocument, destination: str | Path | TextIO) -> str | None:
+    return document_to_yaml(document, destination)
+
+
 def document_from_yaml(source: str | Path | TextIO) -> LogDocument:
     if hasattr(source, "read"):
         return document_from_dict(_read_yaml_mapping(source))
     return load_document(source)
+
+
+def load_document_yaml(source: str | Path | TextIO) -> LogDocument:
+    return document_from_yaml(source)
 
 
 def _logfile_spec_to_mapping(spec: LogFileSpec) -> dict[str, Any]:
@@ -779,10 +787,21 @@ def report_to_yaml(
     return _write_yaml(report_to_dict(report), destination)
 
 
+def save_report(
+    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
+    destination: str | Path | TextIO,
+) -> str | None:
+    return report_to_yaml(report, destination)
+
+
 def report_from_yaml(source: str | Path | TextIO) -> LogFileSpec:
     if hasattr(source, "read"):
         return report_from_dict(_read_yaml_mapping(source))
     return load_logfile(source)
+
+
+def load_report(source: str | Path | TextIO) -> LogFileSpec:
+    return report_from_yaml(source)
 
 
 __all__ = [
@@ -790,8 +809,12 @@ __all__ = [
     "document_from_yaml",
     "document_to_dict",
     "document_to_yaml",
+    "load_document_yaml",
+    "load_report",
     "report_from_dict",
     "report_from_yaml",
     "report_to_dict",
     "report_to_yaml",
+    "save_document",
+    "save_report",
 ]

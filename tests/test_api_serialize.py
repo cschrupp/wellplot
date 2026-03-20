@@ -13,10 +13,14 @@ from well_log_os import (
     document_from_yaml,
     document_to_dict,
     document_to_yaml,
+    load_document_yaml,
+    load_report,
     report_from_dict,
     report_from_yaml,
     report_to_dict,
     report_to_yaml,
+    save_document,
+    save_report,
 )
 
 
@@ -175,6 +179,59 @@ class ApiSerializeTests(unittest.TestCase):
             report_to_yaml(report, path)
             from_path = report_from_yaml(path)
         self.assertEqual(from_path.render_output_path, "serialize.pdf")
+
+    def test_save_and_load_convenience_wrappers_delegate_to_yaml_helpers(self) -> None:
+        document = _build_document()
+        report = _build_report()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            document_path = Path(tmpdir) / "document.yaml"
+            report_path = Path(tmpdir) / "report.yaml"
+
+            save_document(document, document_path)
+            save_report(report, report_path)
+
+            loaded_document = load_document_yaml(document_path)
+            loaded_report = load_report(report_path)
+
+        self.assertEqual(loaded_document.name, document.name)
+        self.assertEqual(loaded_report.name, "Serialize Report")
+
+    def test_builder_save_yaml_and_section_source_path_persistence(self) -> None:
+        dataset = create_dataset("source-persist")
+        dataset.add_curve(
+            mnemonic="GR",
+            values=[45.0, 50.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        builder = LogBuilder(name="Source Persist Demo")
+        builder.set_render(backend="matplotlib", output_path="persist.pdf", dpi=120)
+        builder.set_page(size="A4", orientation="portrait")
+        builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+        builder.add_section(
+            "main",
+            dataset=dataset,
+            title="Main",
+            source_path="workspace/data/demo.las",
+            source_format="las",
+        ).add_track(
+            id="depth",
+            title="",
+            kind="reference",
+            width_mm=16,
+            reference={"axis": "depth", "define_layout": True, "unit": "ft"},
+        )
+
+        mapping = report_to_dict(builder)
+        yaml_text = builder.save_yaml()
+
+        self.assertEqual(
+            mapping["document"]["layout"]["log_sections"][0]["data"],
+            {"source_path": "workspace/data/demo.las", "source_format": "las"},
+        )
+        self.assertIn("workspace/data/demo.las", yaml_text)
 
 
 if __name__ == "__main__":

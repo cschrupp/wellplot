@@ -102,6 +102,10 @@ The programmatic API phase is now underway.
 Currently implemented:
 - dataset ingestion into `WellDataset`
 - pandas `Series` / `DataFrame` adapters on top of the dataset ingestion API
+- dataset alignment and normalization helpers:
+  - `sort_index(...)`
+  - `convert_index_unit(...)`
+  - `reindex_to(...)`
 - in-memory layout composition with `LogBuilder`
 - rendering through the project layout with `render_report(...)`
 - partial renders with:
@@ -120,6 +124,12 @@ Currently implemented:
   - `document_to_yaml(...)` / `document_from_yaml(...)`
   - `report_to_dict(...)` / `report_from_dict(...)`
   - `report_to_yaml(...)` / `report_from_yaml(...)`
+  - `save_document(...)` / `load_document_yaml(...)`
+  - `save_report(...)` / `load_report(...)`
+- builder/report persistence helpers:
+  - `LogBuilder.save_yaml(...)`
+  - `ProgrammaticLogSpec.to_yaml(...)`
+  - `LogBuilder.add_section(..., source_path=..., source_format=...)`
 
 Current public modules:
 - `well_log_os.api.dataset`
@@ -130,27 +140,24 @@ Current public modules:
 Current examples:
 - [examples/api_dataset_ingest_demo.py](examples/api_dataset_ingest_demo.py)
 - [examples/notebooks/api_dataset_ingest_demo.ipynb](examples/notebooks/api_dataset_ingest_demo.ipynb)
+- [examples/api_dataset_alignment_demo.py](examples/api_dataset_alignment_demo.py)
 - [examples/api_layout_render_demo.py](examples/api_layout_render_demo.py)
 - [examples/notebooks/api_layout_render_demo.ipynb](examples/notebooks/api_layout_render_demo.ipynb)
 - [examples/api_partial_render_demo.py](examples/api_partial_render_demo.py)
 - [examples/api_notebook_bytes_demo.py](examples/api_notebook_bytes_demo.py)
 - [examples/api_serialize_demo.py](examples/api_serialize_demo.py)
 
-Still planned:
-- higher-level serialization conveniences
-
 Important current boundary:
 - `document_*` helpers round-trip the normalized `LogDocument` template shape
 - `report_*` helpers round-trip logfile/programmatic layout mappings
-- in-memory dataset contents are not embedded into YAML; YAML persists layout/report structure,
-  while datasets remain separate Python objects or file-backed sources
+- `save_*` / `load_*` convenience wrappers delegate to those same normalized surfaces
+- in-memory dataset contents are not embedded into YAML; YAML persists layout/report structure
+  and optional section source references, while datasets remain separate Python objects or
+  file-backed sources
 
 The guiding rule is:
 - YAML remains a first-class saved format
 - the in-memory model becomes the canonical authoring surface
-
-Planned next public module:
-- `well_log_os.api.serialize`
 
 The full implementation checklist lives in
 [docs/programmatic-api-plan.md](docs/programmatic-api-plan.md).

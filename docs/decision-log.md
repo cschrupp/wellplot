@@ -1,6 +1,6 @@
 # well_log_os Decision Log
 
-Last updated: 2026-03-18
+Last updated: 2026-03-20
 
 ## Purpose
 
@@ -103,6 +103,18 @@ This file records project decisions that should remain stable unless explicitly 
   - reuse the existing template/logfile validators on load
   - emit stable normalized mappings on save
   - do not try to snapshot notebook in-memory datasets into YAML
+- Serialization convenience wrappers should remain thin:
+  - `save_document(...)` / `load_document_yaml(...)`
+  - `save_report(...)` / `load_report(...)`
+  - do not introduce a second serialization path with different semantics
+- Programmatic section sources should be persisted explicitly when known:
+  - builder-created reports may store `data.source_path` and `data.source_format`
+  - in-memory datasets still remain outside serialized YAML contents
+- Dataset alignment is an explicit user-directed operation:
+  - `sort_index(...)` for axis normalization
+  - `convert_index_unit(...)` for unit harmonization
+  - `reindex_to(...)` for interpolation/regridding
+  - the library should not silently align channels during ingestion
 
 ## Rendering Decisions
 

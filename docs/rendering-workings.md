@@ -105,6 +105,18 @@ Current implemented bridge:
   report mappings:
   - `document_to_dict(...)` / `document_to_yaml(...)`
   - `report_to_dict(...)` / `report_to_yaml(...)`
+- convenience wrappers exist on top of the same surfaces:
+  - `save_document(...)` / `load_document_yaml(...)`
+  - `save_report(...)` / `load_report(...)`
+- programmatic report specs can persist themselves without going through raw helper calls:
+  - `LogBuilder.save_yaml(...)`
+  - `ProgrammaticLogSpec.to_yaml(...)`
+- section source references can be persisted in builder-created reports:
+  - `LogBuilder.add_section(..., source_path=..., source_format=...)`
+- dataset utilities now expose explicit alignment/normalization operations before composition:
+  - `sort_index(...)`
+  - `convert_index_unit(...)`
+  - `reindex_to(...)`
 - `document_*` helpers emit the normalized template shape:
   - explicit page dimensions
   - `depth` instead of `depth_axis`
@@ -112,12 +124,11 @@ Current implemented bridge:
 - `report_*` helpers preserve logfile/programmatic layout structure, but they do not serialize
   in-memory `WellDataset` channel contents
 
-Planned public modules:
+Current public modules:
 
 - `well_log_os.api.dataset`
 - `well_log_os.api.builder`
 - `well_log_os.api.render`
-- `well_log_os.api.serialize`
 - `well_log_os.api.serialize`
 
 See [programmatic-api-plan.md](programmatic-api-plan.md) for the concrete implementation checklist.

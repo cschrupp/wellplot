@@ -5,6 +5,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from ..errors import DatasetValidationError
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 from .channels import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel
@@ -19,6 +21,127 @@ def _require_pandas() -> Any:
             "Install the optional pandas dependency to use add_series/add_dataframe."
         ) from exc
     return pd
+
+
+def _normalized_mnemonics(
+    dataset: WellDataset,
+    channels: Iterable[str] | None,
+) -> list[str]:
+    if channels is None:
+        return list(dataset.channels)
+    selected = [str(mnemonic).strip() for mnemonic in channels]
+    missing = [mnemonic for mnemonic in selected if mnemonic not in dataset.channels]
+    if missing:
+        joined = ", ".join(repr(mnemonic) for mnemonic in missing)
+        raise DatasetValidationError(f"Dataset is missing requested channels: {joined}.")
+    return selected
+
+
+def _sorted_channel(channel: BaseChannel, *, ascending: bool) -> BaseChannel:
+    updated = deepcopy(channel)
+    order = np.argsort(updated.depth)
+    if not ascending:
+        order = order[::-1]
+    updated.depth = np.asarray(updated.depth, dtype=float)[order]
+    if isinstance(updated, ScalarChannel):
+        updated.values = np.asarray(updated.values, dtype=float)[order]
+    else:
+        updated.values = np.asarray(updated.values, dtype=float)[order, :]
+    updated.validate()
+    return updated
+
+
+def _convert_channel_index_unit(
+    channel: BaseChannel,
+    *,
+    unit: str,
+    registry: SimpleUnitRegistry,
+) -> BaseChannel:
+    updated = deepcopy(channel)
+    updated.depth = channel.depth_in(unit, registry)
+    updated.depth_unit = unit
+    updated.validate()
+    return updated
+
+
+def _deduplicate_sorted_axis(
+    axis: np.ndarray,
+    values: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    unique_axis, indices = np.unique(axis, return_index=True)
+    if values.ndim == 1:
+        return unique_axis, values[indices]
+    return unique_axis, values[indices, :]
+
+
+def _reindex_scalar_values(
+    source_index: np.ndarray,
+    values: np.ndarray,
+    target_index: np.ndarray,
+    *,
+    method: str,
+) -> np.ndarray:
+    valid = np.isfinite(source_index) & np.isfinite(values)
+    index = source_index[valid]
+    data = values[valid]
+    if index.size == 0:
+        return np.full(target_index.shape, np.nan, dtype=float)
+    index, data = _deduplicate_sorted_axis(index, data)
+    if index.size == 1:
+        result = np.full(target_index.shape, np.nan, dtype=float)
+        result[np.isclose(target_index, index[0])] = data[0]
+        return result
+    if method == "linear":
+        return np.interp(target_index, index, data, left=np.nan, right=np.nan)
+    if method == "nearest":
+        result = np.full(target_index.shape, np.nan, dtype=float)
+        insertion = np.searchsorted(index, target_index)
+        left = np.clip(insertion - 1, 0, index.size - 1)
+        right = np.clip(insertion, 0, index.size - 1)
+        choose_right = np.abs(index[right] - target_index) < np.abs(target_index - index[left])
+        nearest = np.where(choose_right, right, left)
+        in_bounds = (target_index >= index[0]) & (target_index <= index[-1])
+        result[in_bounds] = data[nearest[in_bounds]]
+        return result
+    raise DatasetValidationError("reindex_to method must be linear or nearest.")
+
+
+def _reindex_channel(
+    channel: BaseChannel,
+    *,
+    target_index: np.ndarray,
+    target_unit: str,
+    method: str,
+    registry: SimpleUnitRegistry,
+) -> BaseChannel:
+    source_index = channel.depth_in(target_unit, registry)
+    order = np.argsort(source_index)
+    source_index = source_index[order]
+    updated = deepcopy(channel)
+    updated.depth = np.asarray(target_index, dtype=float)
+    updated.depth_unit = target_unit
+    if isinstance(updated, ScalarChannel):
+        values = updated.masked_values()[order]
+        updated.values = _reindex_scalar_values(
+            source_index,
+            values,
+            target_index,
+            method=method,
+        )
+    else:
+        values = np.asarray(updated.values, dtype=float)[order, :]
+        columns = [
+            _reindex_scalar_values(
+                source_index,
+                values[:, column_index],
+                target_index,
+                method=method,
+            )
+            for column_index in range(values.shape[1])
+        ]
+        updated.values = np.column_stack(columns)
+    updated.validate()
+    return updated
 
 
 @dataclass(slots=True)
@@ -259,6 +382,86 @@ class WellDataset:
             self.well_metadata.update(other.well_metadata)
         if merge_provenance:
             self.provenance.update(other.provenance)
+        return self
+
+    def sort_index(
+        self,
+        *,
+        ascending: bool = True,
+        channels: Iterable[str] | None = None,
+    ) -> WellDataset:
+        for mnemonic in _normalized_mnemonics(self, channels):
+            self.channels[mnemonic] = _sorted_channel(self.channels[mnemonic], ascending=ascending)
+        return self
+
+    def convert_index_unit(
+        self,
+        unit: str,
+        *,
+        channels: Iterable[str] | None = None,
+        registry: SimpleUnitRegistry = DEFAULT_UNITS,
+    ) -> WellDataset:
+        normalized_unit = str(unit).strip()
+        if not normalized_unit:
+            raise DatasetValidationError("convert_index_unit requires a non-empty target unit.")
+        for mnemonic in _normalized_mnemonics(self, channels):
+            self.channels[mnemonic] = _convert_channel_index_unit(
+                self.channels[mnemonic],
+                unit=normalized_unit,
+                registry=registry,
+            )
+        return self
+
+    def reindex_to(
+        self,
+        *,
+        channel: str | None = None,
+        index: Any | None = None,
+        index_unit: str | None = None,
+        method: str = "linear",
+        channels: Iterable[str] | None = None,
+        registry: SimpleUnitRegistry = DEFAULT_UNITS,
+    ) -> WellDataset:
+        normalized_method = str(method).strip().lower()
+        if normalized_method not in {"linear", "nearest"}:
+            raise DatasetValidationError("reindex_to method must be linear or nearest.")
+
+        if (channel is None) == (index is None):
+            raise DatasetValidationError(
+                "reindex_to requires exactly one of channel or index."
+            )
+        if channel is not None and index_unit is not None:
+            raise DatasetValidationError(
+                "reindex_to does not accept index_unit when channel is used as the target axis."
+            )
+
+        if channel is not None:
+            target_channel_name = str(channel).strip()
+            if target_channel_name not in self.channels:
+                raise DatasetValidationError(
+                    f"Dataset is missing target channel {target_channel_name!r}."
+                )
+            target_channel = self.channels[target_channel_name]
+            target_index = np.asarray(target_channel.depth, dtype=float).copy()
+            target_unit = target_channel.depth_unit
+        else:
+            target_unit = str(index_unit or "").strip()
+            if not target_unit:
+                raise DatasetValidationError(
+                    "reindex_to with an explicit index requires index_unit."
+                )
+            target_index = np.asarray(index, dtype=float)
+            if target_index.ndim != 1 or target_index.size == 0:
+                raise DatasetValidationError("reindex_to index must be a non-empty 1D array.")
+
+        for mnemonic in _normalized_mnemonics(self, channels):
+            self.channels[mnemonic] = _reindex_channel(
+                self.channels[mnemonic],
+                target_index=target_index,
+                target_unit=target_unit,
+                method=normalized_method,
+                registry=registry,
+            )
         return self
 
     def get_channel(self, mnemonic: str) -> BaseChannel:
