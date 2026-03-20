@@ -117,6 +117,10 @@ Current implemented bridge:
   - `sort_index(...)`
   - `convert_index_unit(...)`
   - `reindex_to(...)`
+- dataset update helpers now support safer computed-channel workflows:
+  - `rename_channel(...)`
+  - `merge(..., collision=\"error|replace|rename|skip\")`
+  - merge operations append `merge_history` entries to dataset provenance
 - `document_*` helpers emit the normalized template shape:
   - explicit page dimensions
   - `depth` instead of `depth_axis`

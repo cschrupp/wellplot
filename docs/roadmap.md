@@ -113,6 +113,10 @@ Status:
     - `sort_index(...)`
     - `convert_index_unit(...)`
     - `reindex_to(...)`
+  - dataset merge/update conveniences:
+    - `rename_channel(...)`
+    - `merge(..., collision="error|replace|rename|skip")`
+    - provenance `merge_history`
   - in-memory composition/render bridge
   - partial render API for section/track/window scopes
   - notebook byte outputs for PNG/SVG previews
@@ -126,9 +130,8 @@ Status:
     - persisted section `source_path` / `source_format`
   - initial notebook examples for both dataset ingestion and layout rendering
 - next:
-  - dataset merge/update conveniences beyond the current ingestion methods
-  - provenance-aware collision handling for merged computed channels
   - richer examples that combine ingestion, alignment, composition, and serialization in one flow
+  - dataset provenance/collision polish beyond the current merge-history baseline
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

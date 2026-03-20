@@ -37,6 +37,48 @@ def _normalized_mnemonics(
     return selected
 
 
+def _normalized_collision_policy(
+    *,
+    replace: bool,
+    collision: str | None,
+) -> str:
+    if collision is None:
+        return "replace" if replace else "error"
+    normalized = str(collision).strip().lower()
+    if normalized not in {"error", "replace", "rename", "skip"}:
+        raise DatasetValidationError(
+            "merge collision must be one of: error, replace, rename, skip."
+        )
+    if replace and normalized != "replace":
+        raise DatasetValidationError(
+            "merge replace=True cannot be combined with collision policies other than replace."
+        )
+    return normalized
+
+
+def _resolved_renamed_mnemonic(
+    dataset: WellDataset,
+    *,
+    mnemonic: str,
+    source_dataset: str,
+    rename_template: str,
+) -> str:
+    template = str(rename_template).strip()
+    if not template:
+        raise DatasetValidationError("merge rename_template must be non-empty.")
+    base = template.format(mnemonic=mnemonic, dataset=source_dataset).strip()
+    if not base:
+        raise DatasetValidationError("merge rename_template produced an empty mnemonic.")
+    if base not in dataset.channels:
+        return base
+    counter = 2
+    while True:
+        candidate = f"{base}_{counter}"
+        if candidate not in dataset.channels:
+            return candidate
+        counter += 1
+
+
 def _sorted_channel(channel: BaseChannel, *, ascending: bool) -> BaseChannel:
     updated = deepcopy(channel)
     order = np.argsort(updated.depth)
@@ -144,6 +186,25 @@ def _reindex_channel(
     return updated
 
 
+def _merged_channel_copy(
+    channel: BaseChannel,
+    *,
+    source_dataset: str,
+    final_mnemonic: str,
+    collision_policy: str,
+) -> BaseChannel:
+    updated = deepcopy(channel)
+    updated.metadata = dict(updated.metadata)
+    updated.metadata["merged_from_dataset"] = source_dataset
+    updated.metadata["merged_from_channel"] = channel.mnemonic
+    updated.metadata["merge_collision_policy"] = collision_policy
+    if final_mnemonic != channel.mnemonic:
+        updated.metadata["original_mnemonic"] = channel.mnemonic
+    updated.mnemonic = final_mnemonic
+    updated.validate()
+    return updated
+
+
 @dataclass(slots=True)
 class WellDataset:
     name: str
@@ -165,6 +226,23 @@ class WellDataset:
 
     def add_or_replace_channel(self, channel: BaseChannel) -> BaseChannel:
         return self.add_channel(channel, replace=True)
+
+    def rename_channel(self, mnemonic: str, new_mnemonic: str) -> BaseChannel:
+        current = str(mnemonic).strip()
+        updated_name = str(new_mnemonic).strip()
+        if not current or not updated_name:
+            raise DatasetValidationError("rename_channel requires non-empty mnemonics.")
+        if current not in self.channels:
+            raise DatasetValidationError(f"Dataset {self.name!r} is missing channel {current!r}.")
+        if updated_name in self.channels and updated_name != current:
+            raise DatasetValidationError(
+                f"Dataset {self.name!r} already has a channel named {updated_name!r}."
+            )
+        channel = self.channels.pop(current)
+        channel.mnemonic = updated_name
+        channel.validate()
+        self.channels[updated_name] = channel
+        return channel
 
     def add_curve(
         self,
@@ -372,16 +450,54 @@ class WellDataset:
         other: WellDataset,
         *,
         replace: bool = False,
+        collision: str | None = None,
+        rename_template: str = "{mnemonic}_{dataset}",
         merge_well_metadata: bool = False,
         merge_provenance: bool = False,
     ) -> WellDataset:
         other.validate()
+        collision_policy = _normalized_collision_policy(replace=replace, collision=collision)
+        history_entry: dict[str, Any] = {
+            "dataset": other.name,
+            "collision": collision_policy,
+            "added": [],
+            "replaced": [],
+            "renamed": {},
+            "skipped": [],
+        }
         for channel in other.channels.values():
-            self.add_channel(deepcopy(channel), replace=replace)
+            final_mnemonic = channel.mnemonic
+            if final_mnemonic in self.channels:
+                if collision_policy == "error":
+                    raise DatasetValidationError(
+                        f"Dataset {self.name!r} already has a channel named {final_mnemonic!r}."
+                    )
+                if collision_policy == "skip":
+                    history_entry["skipped"].append(final_mnemonic)
+                    continue
+                if collision_policy == "rename":
+                    final_mnemonic = _resolved_renamed_mnemonic(
+                        self,
+                        mnemonic=channel.mnemonic,
+                        source_dataset=other.name,
+                        rename_template=rename_template,
+                    )
+                    history_entry["renamed"][channel.mnemonic] = final_mnemonic
+                elif collision_policy == "replace":
+                    history_entry["replaced"].append(final_mnemonic)
+            merged = _merged_channel_copy(
+                channel,
+                source_dataset=other.name,
+                final_mnemonic=final_mnemonic,
+                collision_policy=collision_policy,
+            )
+            self.add_channel(merged, replace=collision_policy == "replace")
+            history_entry["added"].append(final_mnemonic)
         if merge_well_metadata:
             self.well_metadata.update(other.well_metadata)
         if merge_provenance:
             self.provenance.update(other.provenance)
+        self.provenance.setdefault("merge_history", []).append(history_entry)
         return self
 
     def sort_index(

@@ -115,6 +115,11 @@ This file records project decisions that should remain stable unless explicitly 
   - `convert_index_unit(...)` for unit harmonization
   - `reindex_to(...)` for interpolation/regridding
   - the library should not silently align channels during ingestion
+- Dataset merge/update behavior should be explicit and inspectable:
+  - channel renames use `rename_channel(...)`
+  - merge collisions use named policies (`error`, `replace`, `rename`, `skip`)
+  - merge operations append a structured entry to `dataset.provenance["merge_history"]`
+  - merged channel copies annotate their own metadata with source dataset/channel information
 
 ## Rendering Decisions
 

@@ -49,6 +49,10 @@ class DatasetBuilder:
         self._dataset.add_or_replace_channel(channel)
         return self
 
+    def rename_channel(self, mnemonic: str, new_mnemonic: str) -> DatasetBuilder:
+        self._dataset.rename_channel(mnemonic, new_mnemonic)
+        return self
+
     def add_curve(
         self,
         *,
@@ -206,12 +210,16 @@ class DatasetBuilder:
         other: WellDataset,
         *,
         replace: bool = False,
+        collision: str | None = None,
+        rename_template: str = "{mnemonic}_{dataset}",
         merge_well_metadata: bool = False,
         merge_provenance: bool = False,
     ) -> DatasetBuilder:
         self._dataset.merge(
             other,
             replace=replace,
+            collision=collision,
+            rename_template=rename_template,
             merge_well_metadata=merge_well_metadata,
             merge_provenance=merge_provenance,
         )

@@ -27,6 +27,10 @@ Implemented:
   - `sort_index(...)`
   - `convert_index_unit(...)`
   - `reindex_to(...)`
+- dataset merge/update conveniences:
+  - `rename_channel(...)`
+  - `merge(..., collision="error|replace|rename|skip")`
+  - provenance `merge_history`
 - YAML serialization helpers:
   - `document_*`
   - `report_*`
@@ -36,10 +40,9 @@ Implemented:
 
 Still open:
 
-- dataset merge/update conveniences beyond the current ingestion API
-- provenance-aware collision handling for merged computed channels
 - richer end-to-end examples that combine ingestion, alignment, composition, rendering, and
   serialization in one workflow
+- provenance/collision polish beyond the current merge-history baseline
 
 ## Design Principles
 
@@ -331,6 +334,8 @@ Explicit transforms:
 - `convert_index_unit(...)`
 - `reindex_to(...)`
 - `validate()`
+- `rename_channel(...)`
+- `merge(..., collision="error|replace|rename|skip")`
 
 Important rule:
 
@@ -340,6 +345,7 @@ Important rule:
 Acceptance:
 
 - invalid computed data is rejected early and clearly
+- merged computed channels can be kept, skipped, or renamed without silent collisions
 
 ### Phase 6. Add serialization helpers
 

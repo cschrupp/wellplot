@@ -126,6 +126,22 @@ class DatasetApiTests(unittest.TestCase):
 
         np.testing.assert_allclose(dataset.get_channel("GR").values, [99.0, 100.0])
 
+    def test_dataset_rename_channel_updates_lookup_key_and_mnemonic(self) -> None:
+        dataset = create_dataset("processed")
+        dataset.add_curve(
+            mnemonic="GR",
+            values=[10.0, 11.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+
+        channel = dataset.rename_channel("GR", "GR_PROC")
+
+        self.assertIs(dataset.get_channel("GR_PROC"), channel)
+        self.assertEqual(channel.mnemonic, "GR_PROC")
+        self.assertNotIn("GR", dataset.channels)
+
     def test_dataset_merge_copies_channels_and_can_merge_metadata(self) -> None:
         source = create_dataset(
             "source",
@@ -151,6 +167,7 @@ class DatasetApiTests(unittest.TestCase):
         np.testing.assert_allclose(target.get_channel("GR").values, [10.0, 11.0])
         self.assertEqual(target.well_metadata["FIELD"], "North")
         self.assertEqual(target.provenance["source"], "processed")
+        self.assertEqual(target.provenance["merge_history"][0]["dataset"], "source")
 
     def test_dataset_merge_rejects_duplicate_channel_without_replace(self) -> None:
         left = create_dataset("left")
@@ -172,6 +189,94 @@ class DatasetApiTests(unittest.TestCase):
 
         with self.assertRaises(DatasetValidationError):
             left.merge(right, replace=False)
+
+    def test_dataset_merge_can_rename_conflicting_channels_and_record_history(self) -> None:
+        left = create_dataset("left")
+        left.add_curve(
+            mnemonic="GR",
+            values=[10.0, 11.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        right = create_dataset("processed")
+        right.add_curve(
+            mnemonic="GR",
+            values=[20.0, 21.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+
+        left.merge(right, collision="rename")
+
+        renamed = left.get_channel("GR_processed")
+        np.testing.assert_allclose(renamed.values, [20.0, 21.0])
+        self.assertEqual(renamed.metadata["merged_from_dataset"], "processed")
+        self.assertEqual(renamed.metadata["original_mnemonic"], "GR")
+        self.assertEqual(
+            left.provenance["merge_history"][0]["renamed"],
+            {"GR": "GR_processed"},
+        )
+
+    def test_dataset_merge_can_skip_conflicting_channels(self) -> None:
+        left = create_dataset("left")
+        left.add_curve(
+            mnemonic="GR",
+            values=[10.0, 11.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        right = create_dataset("right")
+        right.add_curve(
+            mnemonic="GR",
+            values=[20.0, 21.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        right.add_curve(
+            mnemonic="CBL",
+            values=[30.0, 31.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="mV",
+        )
+
+        left.merge(right, collision="skip")
+
+        np.testing.assert_allclose(left.get_channel("GR").values, [10.0, 11.0])
+        np.testing.assert_allclose(left.get_channel("CBL").values, [30.0, 31.0])
+        self.assertEqual(left.provenance["merge_history"][0]["skipped"], ["GR"])
+
+    def test_dataset_builder_merge_supports_collision_policy_and_rename(self) -> None:
+        left = create_dataset("left")
+        left.add_curve(
+            mnemonic="GR",
+            values=[10.0, 11.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        right = create_dataset("qc")
+        right.add_curve(
+            mnemonic="GR",
+            values=[20.0, 21.0],
+            index=[1000.0, 1001.0],
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+
+        dataset = (
+            DatasetBuilder(name="processed")
+            .merge(left)
+            .merge(right, collision="rename", rename_template="{mnemonic}_{dataset}")
+            .build()
+        )
+
+        self.assertIn("GR", dataset.channels)
+        self.assertIn("GR_qc", dataset.channels)
 
     def test_dataset_sort_index_reorders_scalar_and_raster_channels(self) -> None:
         dataset = create_dataset("processed")
