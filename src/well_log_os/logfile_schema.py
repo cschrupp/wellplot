@@ -67,6 +67,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "height_mm": {"type": "number", "exclusiveMinimum": 0},
                 "orientation": {"type": "string", "enum": ["portrait", "landscape"]},
                 "continuous": {"type": "boolean"},
+                "bottom_track_header_enabled": {"type": "boolean"},
                 "margin_left_mm": {"type": "number"},
                 "margin_right_mm": {"type": "number"},
                 "margin_top_mm": {"type": "number"},

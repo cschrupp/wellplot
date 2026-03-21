@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from well_log_os import (
+    DatasetBuilder,
     LogBuilder,
     create_dataset,
     render_png_bytes,
@@ -18,6 +19,7 @@ from well_log_os import (
     render_track_png,
     render_window,
     render_window_png,
+    save_report,
 )
 from well_log_os.api import build_documents
 from well_log_os.errors import TemplateValidationError
@@ -385,6 +387,148 @@ class ApiRenderTests(unittest.TestCase):
         self.assertEqual(len(window_result.artifact), 1)
         for figure in window_result.artifact:
             figure.clf()
+
+    def test_end_to_end_workflow_can_align_merge_render_and_serialize(self) -> None:
+        raw = create_dataset(
+            "raw",
+            well_metadata={"WELL": "API Demo 1", "FIELD": "Notebook Field", "COMPANY": "Company"},
+            provenance={"source": "raw"},
+        )
+        depth_ft = np.array([8200.0, 8210.0, 8220.0, 8230.0, 8240.0], dtype=float)
+        raw.add_curve(
+            mnemonic="GR",
+            values=[70.0, 72.0, 75.0, 78.0, 76.0],
+            index=depth_ft,
+            index_unit="ft",
+            value_unit="gAPI",
+        )
+        raw.add_curve(
+            mnemonic="CBL",
+            values=[18.0, 20.0, 23.0, 25.0, 24.0],
+            index=depth_ft,
+            index_unit="ft",
+            value_unit="mV",
+        )
+        raw.add_raster(
+            mnemonic="VDL_SYN",
+            values=np.asarray(
+                [
+                    [0.1, 0.2, 0.3],
+                    [0.2, 0.3, 0.4],
+                    [0.3, 0.4, 0.5],
+                    [0.4, 0.3, 0.2],
+                    [0.3, 0.2, 0.1],
+                ],
+                dtype=float,
+            ),
+            index=depth_ft,
+            index_unit="ft",
+            sample_axis=[200.0, 400.0, 600.0],
+            sample_unit="us",
+            value_unit="amplitude",
+        )
+        processed = (
+            DatasetBuilder(name="processed", provenance={"source": "notebook"})
+            .add_curve(
+                mnemonic="GR",
+                values=[71.0, 77.0, 75.0],
+                index=[8200.0 * 0.3048, 8220.0 * 0.3048, 8240.0 * 0.3048],
+                index_unit="m",
+                value_unit="gAPI",
+                source="rolling-average",
+            )
+            .add_curve(
+                mnemonic="CBL_FILT",
+                values=[19.0, 24.0, 23.5],
+                index=[8200.0 * 0.3048, 8220.0 * 0.3048, 8240.0 * 0.3048],
+                index_unit="m",
+                value_unit="mV",
+                source="rolling-average",
+            )
+            .convert_index_unit("ft")
+            .reindex_to(index=depth_ft, index_unit="ft")
+            .build()
+        )
+        working = (
+            DatasetBuilder(name="working")
+            .merge(raw, merge_well_metadata=True, merge_provenance=True)
+            .merge(processed, collision="rename", rename_template="{mnemonic}_proc")
+            .build()
+        )
+
+        builder = LogBuilder(name="End-to-End Workflow")
+        builder.set_render(backend="matplotlib", output_path="workflow.pdf", dpi=120)
+        builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
+        builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+        builder.set_depth_range(8200, 8240)
+        builder.set_heading(
+            provider_name="Company",
+            general_fields=[{"key": "well", "label": "Well", "value": "API Demo 1"}],
+            service_titles=["Workflow Demo"],
+            tail_enabled=True,
+        )
+        builder.set_remarks([{"title": "Remarks", "text": "Combined workflow"}])
+        section = builder.add_section("main", dataset=working, title="Main")
+        section.add_track(
+            id="depth",
+            title="",
+            kind="reference",
+            width_mm=16,
+            reference={"axis": "depth", "define_layout": True, "unit": "ft"},
+        )
+        section.add_track(id="gr", title="", kind="normal", width_mm=24)
+        section.add_track(id="cbl", title="", kind="normal", width_mm=24)
+        section.add_track(id="vdl", title="", kind="array", width_mm=28)
+        section.add_curve(
+            channel="GR",
+            track_id="gr",
+            label="Gamma Ray",
+            scale={"kind": "linear", "min": 0, "max": 150},
+        )
+        section.add_curve(
+            channel="GR_proc",
+            track_id="gr",
+            label="Gamma Ray Proc",
+            scale={"kind": "linear", "min": 0, "max": 150},
+        )
+        section.add_curve(
+            channel="CBL",
+            track_id="cbl",
+            label="CBL",
+            scale={"kind": "linear", "min": 0, "max": 40},
+        )
+        section.add_curve(
+            channel="CBL_FILT",
+            track_id="cbl",
+            label="CBL Filt",
+            scale={"kind": "linear", "min": 0, "max": 40},
+        )
+        section.add_raster(
+            channel="VDL_SYN",
+            track_id="vdl",
+            label="VDL",
+            profile="vdl",
+            sample_axis={"enabled": True, "unit": "us", "min": 200, "max": 600},
+        )
+        report = builder.build()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            pdf_path = Path(tmpdir) / "workflow.pdf"
+            yaml_path = Path(tmpdir) / "workflow.yaml"
+            result = render_report(report, output_path=pdf_path)
+            png_bytes = render_window_png(report, depth_range=(8210, 8230), depth_range_unit="ft")
+            save_report(report, yaml_path)
+
+            self.assertTrue(pdf_path.exists())
+            self.assertTrue(yaml_path.exists())
+            self.assertGreater(len(png_bytes), 100)
+
+        self.assertEqual(result.page_count, 3)
+        self.assertIn("GR_proc", working.channels)
+        self.assertEqual(
+            working.provenance["merge_history"][-1]["renamed"],
+            {"GR": "GR_proc"},
+        )
 
     def test_render_png_and_svg_bytes_return_image_payloads(self) -> None:
         report = _build_report()

@@ -651,6 +651,7 @@ def _serialize_page(page: PageSpec) -> dict[str, Any]:
         "width_mm": page.width_mm,
         "height_mm": page.height_mm,
         "continuous": page.continuous,
+        "bottom_track_header_enabled": page.bottom_track_header_enabled,
         "margin_left_mm": page.margin_left_mm,
         "margin_right_mm": page.margin_right_mm,
         "margin_top_mm": page.margin_top_mm,

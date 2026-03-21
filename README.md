@@ -142,6 +142,7 @@ Current public modules:
 - `well_log_os.api.serialize`
 
 Current examples:
+- [examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py)
 - [examples/api_dataset_ingest_demo.py](examples/api_dataset_ingest_demo.py)
 - [examples/notebooks/api_dataset_ingest_demo.ipynb](examples/notebooks/api_dataset_ingest_demo.ipynb)
 - [examples/api_dataset_alignment_demo.py](examples/api_dataset_alignment_demo.py)
@@ -163,6 +164,11 @@ Important current boundary:
 The guiding rule is:
 - YAML remains a first-class saved format
 - the in-memory model becomes the canonical authoring surface
+
+If you want one script that exercises the whole workflow, start with
+[examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py). It ingests raw curves,
+computes secondary channels, aligns and merges them, renders a full report plus a window preview,
+and serializes the report YAML from the same Python session.
 
 The full implementation checklist lives in
 [docs/programmatic-api-plan.md](docs/programmatic-api-plan.md).

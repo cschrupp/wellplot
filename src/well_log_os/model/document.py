@@ -1244,6 +1244,7 @@ class PageSpec:
     width_mm: float
     height_mm: float
     continuous: bool = False
+    bottom_track_header_enabled: bool = True
     margin_left_mm: float = 0.0
     margin_right_mm: float = 10.0
     margin_top_mm: float = 10.0

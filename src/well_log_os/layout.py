@@ -333,7 +333,7 @@ class LayoutEngine:
                 page,
                 depth_span / units_per_mm,
                 reserve_top_track_header=True,
-                reserve_bottom_track_header=True,
+                reserve_bottom_track_header=page.bottom_track_header_enabled,
             )
             windows = (
                 DepthWindow(
@@ -350,7 +350,9 @@ class LayoutEngine:
         for index, window in enumerate(windows):
             reserve_top_track_header = index == 0 and page.track_header_height_mm > 0
             reserve_bottom_track_header = (
-                index == len(windows) - 1 and page.track_header_height_mm > 0
+                page.bottom_track_header_enabled
+                and index == len(windows) - 1
+                and page.track_header_height_mm > 0
             )
             track_frames = self._track_frames_for_page(
                 document,

@@ -129,9 +129,11 @@ Status:
     - `ProgrammaticLogSpec.to_yaml(...)`
     - persisted section `source_path` / `source_format`
   - initial notebook examples for both dataset ingestion and layout rendering
+  - coherent end-to-end workflow example:
+    - [examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py)
 - next:
-  - richer examples that combine ingestion, alignment, composition, and serialization in one flow
   - dataset provenance/collision polish beyond the current merge-history baseline
+  - notebook-first end-to-end demo parity if we want `.ipynb` coverage for the full workflow
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

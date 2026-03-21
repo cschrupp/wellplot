@@ -215,6 +215,59 @@ class LayoutTests(unittest.TestCase):
             self.assertEqual(len(middle.track_header_top_frames), 0)
             self.assertEqual(len(middle.track_header_bottom_frames), 0)
 
+    def test_continuous_layout_can_disable_bottom_track_headers(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "continuous headers",
+                "page": {
+                    "size": "A4",
+                    "continuous": True,
+                    "bottom_track_header_enabled": False,
+                    "header_height_mm": 0,
+                    "footer_height_mm": 0,
+                    "track_header_height_mm": 9,
+                },
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16},
+                    {"id": "gr", "title": "GR", "kind": "curve", "width_mm": 25, "elements": []},
+                ],
+            }
+        )
+
+        layouts = LayoutEngine().layout(document, self.build_dataset())
+
+        self.assertEqual(len(layouts), 1)
+        page_layout = layouts[0]
+        self.assertEqual(len(page_layout.track_header_top_frames), len(page_layout.track_frames))
+        self.assertEqual(len(page_layout.track_header_bottom_frames), 0)
+
+    def test_continuous_layout_keeps_bottom_track_headers_by_default(self) -> None:
+        document = document_from_mapping(
+            {
+                "name": "continuous headers default",
+                "page": {
+                    "size": "A4",
+                    "continuous": True,
+                    "header_height_mm": 0,
+                    "footer_height_mm": 0,
+                    "track_header_height_mm": 9,
+                },
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {"id": "depth", "title": "Depth", "kind": "depth", "width_mm": 16},
+                    {"id": "gr", "title": "GR", "kind": "curve", "width_mm": 25, "elements": []},
+                ],
+            }
+        )
+
+        layouts = LayoutEngine().layout(document, self.build_dataset())
+
+        self.assertEqual(len(layouts), 1)
+        page_layout = layouts[0]
+        self.assertEqual(len(page_layout.track_header_top_frames), len(page_layout.track_frames))
+        self.assertEqual(len(page_layout.track_header_bottom_frames), len(page_layout.track_frames))
+
 
 if __name__ == "__main__":
     unittest.main()

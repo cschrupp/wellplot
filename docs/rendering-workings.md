@@ -121,6 +121,9 @@ Current implemented bridge:
   - `rename_channel(...)`
   - `merge(..., collision=\"error|replace|rename|skip\")`
   - merge operations append `merge_history` entries to dataset provenance
+- the current reference workflow example is:
+  - [examples/api_end_to_end_demo.py](/home/user/projects/well_log_os/examples/api_end_to_end_demo.py)
+  - it covers ingestion, alignment, merge, full render, partial PNG export, and YAML save
 - `document_*` helpers emit the normalized template shape:
   - explicit page dimensions
   - `depth` instead of `depth_axis`

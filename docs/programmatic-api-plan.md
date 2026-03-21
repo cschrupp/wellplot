@@ -40,9 +40,8 @@ Implemented:
 
 Still open:
 
-- richer end-to-end examples that combine ingestion, alignment, composition, rendering, and
-  serialization in one workflow
 - provenance/collision polish beyond the current merge-history baseline
+- notebook-first end-to-end examples if we decide to keep parity with the `.py` workflow demos
 
 ## Design Principles
 
