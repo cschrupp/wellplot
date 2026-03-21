@@ -33,6 +33,66 @@ The package separates three layers:
 - `LogDocument`: page, depth, track, and annotation specifications
 - renderers: backend-specific drawing implementations that consume the same document
 
+### Workflow
+
+```mermaid
+flowchart LR
+    subgraph Inputs
+        LAS[LAS / DLIS files]
+        PD[pandas / numpy results]
+        YAML[YAML templates / savefiles]
+    end
+
+    subgraph DataLayer[Data layer]
+        DS[WellDataset]
+        OPS[alignment / merge / validation]
+    end
+
+    subgraph Compose[Composition layer]
+        BLD[LogBuilder]
+        DOC[ProgrammaticLogSpec / LogDocument]
+    end
+
+    subgraph Render[Render layer]
+        FULL[render_report]
+        PART[render_section / render_track / render_window]
+        BYTES[render_png_bytes / render_svg_bytes]
+    end
+
+    subgraph Outputs
+        PDF[PDF report]
+        IMG[PNG / SVG / notebook image]
+        SAVE[report/document YAML]
+    end
+
+    LAS --> DS
+    PD --> DS
+    DS --> OPS
+    OPS --> DS
+
+    YAML --> DOC
+    DS --> BLD
+    BLD --> DOC
+    DOC --> FULL
+    DOC --> PART
+    DOC --> BYTES
+    DS --> FULL
+    DS --> PART
+    DS --> BYTES
+
+    FULL --> PDF
+    PART --> PDF
+    BYTES --> IMG
+    DOC --> SAVE
+```
+
+The intended workflow is:
+- ingest or compute channels into `WellDataset`
+- validate, align, and merge the dataset as needed
+- compose the layout with YAML or `LogBuilder`
+- render a full report or a partial view
+- optionally serialize the layout back to YAML
+
 The next development phase adds two public API surfaces on top of those layers:
 - dataset ingestion for computed numpy/pandas results
 - programmatic composition/rendering so users can build logs without hand-authoring YAML
@@ -172,6 +232,9 @@ and serializes the report YAML from the same Python session.
 
 The full implementation checklist lives in
 [docs/programmatic-api-plan.md](docs/programmatic-api-plan.md).
+
+For a user-facing workflow explanation, see
+[docs/library-workflow.md](docs/library-workflow.md).
 
 ## Example Template
 
@@ -609,6 +672,8 @@ vendor-generated logs.
 - [docs/decision-log.md](docs/decision-log.md): agreed architectural and product decisions.
 - [docs/roadmap.md](docs/roadmap.md): phased development plan and near-term priorities.
 - [docs/rendering-workings.md](docs/rendering-workings.md): rendering flow and style-resolution model.
+- [docs/library-workflow.md](docs/library-workflow.md): user-facing workflow of the library from
+  data ingestion through rendering and YAML persistence.
 - [docs/programmatic-api-plan.md](docs/programmatic-api-plan.md): concrete checklist for dataset
   ingestion, programmatic composition, partial renders, and notebook outputs.
 
