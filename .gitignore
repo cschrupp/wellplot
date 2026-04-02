@@ -11,6 +11,7 @@ workspace/
 # Build artifacts
 build/
 dist/
+/site/
 *.egg-info/
 
 # Windows ADS metadata files copied from NTFS

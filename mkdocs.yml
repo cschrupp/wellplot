@@ -1,0 +1,56 @@
+site_name: well_log_os
+site_description: User documentation for well_log_os
+site_url: https://cschrupp.github.io/well_log_os/
+repo_url: https://github.com/cschrupp/well_log_os
+repo_name: cschrupp/well_log_os
+docs_dir: docs/site
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+
+extra_javascript:
+  - https://unpkg.com/mermaid@10/dist/mermaid.min.js
+  - js/mermaid-init.js
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Installation: installation.md
+  - Concepts: concepts.md
+  - Workflows:
+      - YAML Workflow: workflows/yaml-workflow.md
+      - Python API Workflow: workflows/python-api.md
+      - Rendering: workflows/rendering.md
+      - Report Pages: workflows/report-pages.md
+  - Guides:
+      - Datasets: guides/datasets.md
+      - Examples: guides/examples.md
+  - Reference: reference/index.md
