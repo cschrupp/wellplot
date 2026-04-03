@@ -1,19 +1,64 @@
 # Getting Started
 
-The simplest way to understand `well_log_os` is to separate it into three concerns:
+`well_log_os` has two primary workflows:
 
-1. `WellDataset`: normalized input data
-2. `LogDocument` / `LogBuilder`: layout and report composition
-3. render functions: full or partial outputs
+- **YAML workflow**: good when the layout itself is a maintained artifact
+- **Python API workflow**: good when the log is part of a notebook, script, or automated pipeline
 
-## Typical flow
+Both workflows converge on the same architecture:
 
-1. Load LAS or DLIS, or ingest computed data from `numpy`/`pandas`.
-2. Normalize and validate that data into a `WellDataset`.
-3. Build a layout with YAML or `LogBuilder`.
-4. Render a PDF report, a partial view, or notebook bytes.
+1. normalize data into `WellDataset`
+2. define the layout as a document/report
+3. render full or partial outputs
 
-## Quick pointers
+## Current status
 
-- Use [YAML Workflow](workflows/yaml-workflow.md) if you want saved, editable layout files.
-- Use [Python API Workflow](workflows/python-api.md) if you want notebook- or pipeline-driven log generation.
+The project is still in the transition from application/repo workflow to publishable library.
+
+That means this site should currently be read as:
+
+- a guide to the implemented workflow
+- a guide to the intended public architecture
+- not yet a final API stability promise
+
+## Choose a workflow
+
+Use the YAML workflow when you want:
+
+- reusable templates and savefiles
+- operator-editable job definitions
+- report layouts stored as versioned assets
+
+Use the Python API when you want:
+
+- computed channels from `numpy` / `pandas`
+- notebook-driven analysis
+- automated report generation
+- partial renders during research
+
+## Minimal path
+
+The shortest path into the library is:
+
+1. install the package and optional extras you need
+2. choose YAML or Python API authoring
+3. render a single example
+4. adapt that example to your own data
+
+## Start with examples
+
+Recommended first examples:
+
+- YAML/report example: `examples/cbl_job_demo.log.yaml`
+- Python API example: `examples/api_end_to_end_demo.py`
+- Dataset ingestion example: `examples/api_dataset_ingest_demo.py`
+- Partial rendering example: `examples/api_partial_render_demo.py`
+
+## Basic mental model
+
+Keep these concerns separate:
+
+- `WellDataset` owns normalized data, axes, and units
+- `LogBuilder` / `LogDocument` own layout and report structure
+- render helpers own output generation
+- YAML is serialization, not the only authoring path

@@ -1,14 +1,32 @@
 # Concepts
 
-## Dataset
+## Dataset layer
 
-`WellDataset` is the normalized data container. It holds scalar, array, and raster channels with explicit index axes and units.
+`WellDataset` is the normalized data container.
 
-## Composition
+It can hold:
 
-Layout composition is independent from data ingestion.
+- scalar channels
+- array channels
+- raster channels
 
-Main objects:
+Every channel must carry explicit axis information and units. The renderer should not guess whether a channel is depth-based, time-based, metric, or imperial.
+
+Typical dataset operations:
+
+- ingest from LAS / DLIS
+- add computed channels from `numpy` / `pandas`
+- validate channel shapes and axes
+- sort indices
+- convert index units
+- reindex to another basis
+- merge datasets with explicit collision policies
+
+## Composition layer
+
+Layout composition is separate from data ingestion.
+
+Main composition objects:
 
 - `LogBuilder`
 - `ProgrammaticLogSpec`
@@ -18,27 +36,41 @@ Main objects:
 - bindings
 - report pages (`heading`, `remarks`, `tail`)
 
-## Rendering
+This separation is deliberate: research code should not need to care about page geometry until the point of composition.
 
-The same logical layout can be rendered as:
+## Track types
 
-- a full PDF report
-- a selected section
-- a selected track
-- a bounded window
-- PNG / SVG bytes for notebook use
+Current track families:
 
-## YAML vs Python
+- `reference`
+- `normal`
+- `array`
+- `annotation`
 
-Use YAML when you want:
+They have different responsibilities:
 
-- persistent saved layouts
-- templated job configs
-- easy hand-editing
+- `reference` defines the layout axis and can host overlay curves/events
+- `normal` hosts scalar curves and fills
+- `array` hosts raster/VDL-style displays
+- `annotation` hosts intervals, text, markers, arrows, and glyphs
 
-Use Python when you want:
+## Rendering layer
 
-- programmatic channel generation
-- notebook-driven analysis
-- automated report generation
-- direct control over partial renders
+The render layer supports both report-style and notebook-style outputs.
+
+Available scopes:
+
+- full report
+- section
+- track
+- depth/time window
+- PNG / SVG bytes for notebooks
+
+## Serialization
+
+YAML remains a first-class saved format.
+
+Important rule:
+
+- YAML serializes layout/report structure
+- in-memory dataset contents remain separate Python objects unless they originate from file-backed section sources

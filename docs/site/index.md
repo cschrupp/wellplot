@@ -1,11 +1,23 @@
 # well_log_os
 
-`well_log_os` is a Python library for building printable well-log layouts from LAS, DLIS, and in-memory scientific data.
+`well_log_os` is evolving into a Python library for building printable well-log layouts from LAS, DLIS, and in-memory scientific data.
 
 It is designed for two equally important workflows:
 
 - declarative log authoring with YAML templates/savefiles
 - programmatic log authoring from Python, including notebooks and research pipelines
+
+## Documentation Status
+
+This site is currently a **preview documentation set** for the future library.
+
+It documents:
+
+- the stable architectural direction
+- the current implemented workflows
+- the public surfaces that are already usable
+
+It does **not** yet claim that every API surface is finalized or publish-ready.
 
 ## Library Workflow
 
