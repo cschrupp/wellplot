@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""DLIS ingestion normalization tests."""
+
 from __future__ import annotations
 
 import types
@@ -130,7 +132,10 @@ def _frame_curves(depth: np.ndarray, cbl: np.ndarray, vdl: np.ndarray | None = N
 
 
 class DLISIOTests(unittest.TestCase):
+    """Verify DLIS sources normalize into scalar and raster channels."""
+
     def test_load_dlis_normalizes_scalar_and_raster_channels(self) -> None:
+        """Prefer the richest frame and normalize depth-scaled channels."""
         depth_a = np.asarray([1200.0, 1080.0, 960.0], dtype=float)
         depth_b = np.asarray([1200.0, 1140.0, 1080.0, 1020.0, 960.0], dtype=float)
         cbl_a = np.asarray([10.0, 20.0, 30.0], dtype=float)
@@ -179,6 +184,7 @@ class DLISIOTests(unittest.TestCase):
         self.assertEqual(dataset.provenance["frames_processed"], 2)
 
     def test_load_dlis_derives_micro_time_sample_axis_for_raster_channels(self) -> None:
+        """Derive raster sample axes from MICRO_TIME metadata when available."""
         depth = np.asarray([1200.0, 1140.0, 1080.0], dtype=float)
         cbl = np.asarray([11.0, 21.0, 31.0], dtype=float)
         vdl = np.linspace(-1.0, 1.0, depth.size * 4).reshape(depth.size, 4)

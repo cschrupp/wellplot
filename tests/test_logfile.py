@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Logfile parsing and document assembly tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -51,6 +53,7 @@ from well_log_os.model import (
 
 
 def build_mapping() -> dict:
+    """Return a representative logfile mapping used across parsing tests."""
     return {
         "version": 1,
         "name": "Test Logfile",
@@ -132,7 +135,10 @@ def build_mapping() -> dict:
 
 
 class LogFileTests(unittest.TestCase):
+    """Verify logfile mappings resolve into datasets and documents."""
+
     def build_dataset(self) -> WellDataset:
+        """Create a dataset containing scalar and raster channels."""
         depth = np.linspace(1000.0, 1020.0, 50)
         sample_axis = np.linspace(0.0, 360.0, 36)
         raster_values = np.sin(depth[:, None] / 8.0) * np.cos(np.deg2rad(sample_axis))[None, :]
@@ -160,6 +166,7 @@ class LogFileTests(unittest.TestCase):
         return dataset
 
     def build_dataset_gr_only(self) -> WellDataset:
+        """Create a dataset containing only the GR channel."""
         depth = np.linspace(1000.0, 1020.0, 50)
         dataset = WellDataset(name="main", well_metadata={"WELL": "MAIN-1"})
         dataset.add_channel(
@@ -168,6 +175,7 @@ class LogFileTests(unittest.TestCase):
         return dataset
 
     def build_dataset_rt_only(self) -> WellDataset:
+        """Create a dataset containing only the RT channel."""
         depth = np.linspace(1000.0, 1020.0, 50)
         dataset = WellDataset(name="repeat", well_metadata={"WELL": "REPEAT-1"})
         dataset.add_channel(
@@ -176,6 +184,7 @@ class LogFileTests(unittest.TestCase):
         return dataset
 
     def test_logfile_builds_document_from_layout_bindings(self) -> None:
+        """Build one document from a logfile layout and channel bindings."""
         spec = logfile_from_mapping(build_mapping())
         self.assertIsNone(spec.render_continuous_strip_page_height_mm)
         document = build_document_for_logfile(
@@ -198,6 +207,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(active_section["subtitle"], "Service Interval")
 
     def test_logfile_builds_multisection_documents(self) -> None:
+        """Build one document per configured logfile section."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"] = [
             {
@@ -262,6 +272,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(documents[1].tracks[1].elements[0].channel, "RT")
 
     def test_logfile_requires_section_for_ambiguous_track_id_bindings(self) -> None:
+        """Require explicit sections when track identifiers are ambiguous."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"] = [
             {
@@ -291,6 +302,7 @@ class LogFileTests(unittest.TestCase):
             )
 
     def test_multisection_build_uses_section_specific_datasets(self) -> None:
+        """Use the matching dataset and source path for each logfile section."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"] = [
             {
@@ -331,6 +343,7 @@ class LogFileTests(unittest.TestCase):
 
     @patch("well_log_os.logfile.load_las")
     def test_load_datasets_for_logfile_supports_section_data_overrides(self, mock_load_las) -> None:
+        """Allow sections to override the top-level data source configuration."""
         payload = build_mapping()
         payload["data"] = {"source_path": "main.las", "source_format": "las"}
         payload["document"]["layout"]["log_sections"] = [
@@ -368,6 +381,7 @@ class LogFileTests(unittest.TestCase):
 
     @patch("well_log_os.logfile.load_las")
     def test_load_datasets_for_logfile_supports_section_first_sources(self, mock_load_las) -> None:
+        """Load datasets when every section defines its own source first."""
         payload = build_mapping()
         payload.pop("data")
         payload["document"]["layout"]["log_sections"] = [
@@ -405,6 +419,7 @@ class LogFileTests(unittest.TestCase):
         )
 
     def test_missing_data_sources_raise_when_root_data_absent(self) -> None:
+        """Raise when no root or section-specific data source is configured."""
         payload = build_mapping()
         payload.pop("data")
         spec = logfile_from_mapping(payload)
@@ -412,18 +427,21 @@ class LogFileTests(unittest.TestCase):
             load_datasets_for_logfile(spec)
 
     def test_invalid_logfile_configuration_raises(self) -> None:
+        """Raise for invalid binding configurations in logfile mappings."""
         payload = build_mapping()
         del payload["document"]["bindings"]["channels"][0]["track_id"]
         with self.assertRaises(TemplateValidationError):
             logfile_from_mapping(payload)
 
     def test_layout_and_bindings_are_required(self) -> None:
+        """Require both layout and bindings sections in logfile documents."""
         payload = build_mapping()
         del payload["document"]["layout"]
         with self.assertRaises(TemplateValidationError):
             logfile_from_mapping(payload)
 
     def test_schema_error_reports_invalid_dpi_path(self) -> None:
+        """Report the schema path when validation fails on render DPI."""
         payload = build_mapping()
         payload["render"]["dpi"] = 0
         with self.assertRaises(TemplateValidationError) as ctx:
@@ -431,12 +449,14 @@ class LogFileTests(unittest.TestCase):
         self.assertIn("$.render.dpi", str(ctx.exception))
 
     def test_logfile_parses_continuous_strip_page_height(self) -> None:
+        """Parse continuous strip page height from the render section."""
         payload = build_mapping()
         payload["render"]["continuous_strip_page_height_mm"] = 279.4
         spec = logfile_from_mapping(payload)
         self.assertEqual(spec.render_continuous_strip_page_height_mm, 279.4)
 
     def test_logfile_parses_matplotlib_style_overrides(self) -> None:
+        """Parse nested matplotlib style overrides from logfile YAML."""
         payload = build_mapping()
         payload["render"]["matplotlib"] = {
             "style": {
@@ -457,6 +477,7 @@ class LogFileTests(unittest.TestCase):
         )
 
     def test_reference_track_config_controls_layout_axis(self) -> None:
+        """Let reference-track settings override the document depth axis."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][1]["reference"] = {
             "define_layout": True,
@@ -478,6 +499,7 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(document.depth_axis.minor_step, 10.0)
 
     def test_track_positions_allow_reordering_in_layout(self) -> None:
+        """Order tracks according to their explicit position fields."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["position"] = 2
         payload["document"]["layout"]["log_sections"][0]["tracks"][1]["position"] = 1
@@ -491,6 +513,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(document.tracks[1].id, "gr")
 
     def test_binding_can_render_curve_values_as_labels(self) -> None:
+        """Parse value-label rendering configuration from channel bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][0]["render_mode"] = "value_labels"
         payload["document"]["bindings"]["channels"][0]["value_labels"] = {
@@ -510,6 +533,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.value_labels.step, 5.0)
 
     def test_binding_can_parse_curve_callouts(self) -> None:
+        """Parse curve callout settings from logfile bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][0]["callouts"] = [
             {
@@ -541,6 +565,7 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(curve.callouts[0].every or 0.0, 4.0)
 
     def test_binding_can_parse_reference_curve_overlay(self) -> None:
+        """Parse reference-track overlay settings from channel bindings."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["kind"] = "reference"
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["reference"] = {
@@ -569,6 +594,7 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(curve.reference_overlay.threshold or 0.0, 5.0)
 
     def test_reference_track_can_parse_reference_events(self) -> None:
+        """Parse event markers configured on reference tracks in logfile YAML."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["kind"] = "reference"
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["reference"] = {
@@ -604,6 +630,7 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(event.text_x or 0.0, 0.72)
 
     def test_binding_can_enable_log_wrap(self) -> None:
+        """Enable logarithmic wrap rendering from logfile bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][1]["scale"] = {
             "kind": "log",
@@ -626,6 +653,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.wrap_color, "#ff5500")
 
     def test_binding_can_parse_between_curves_fill(self) -> None:
+        """Parse fills between two bound curves in the same track."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"] = [
             {
@@ -681,6 +709,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.crossover.right_color, "#ef4444")
 
     def test_binding_can_parse_between_instances_fill(self) -> None:
+        """Parse fills between two bound instances of the same channel."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"] = [
             {
@@ -725,6 +754,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.other_element_id, "cbl_0_10")
 
     def test_binding_can_parse_limit_fill(self) -> None:
+        """Parse limit fills from logfile channel bindings."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"] = [
             {
@@ -760,6 +790,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.color, "#f59e0b")
 
     def test_binding_can_parse_baseline_split_fill(self) -> None:
+        """Parse baseline split fills from logfile channel bindings."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"] = [
             {
@@ -804,6 +835,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.baseline.upper_color, "#ef4444")
 
     def test_raster_binding_parses_array_display_options(self) -> None:
+        """Parse raster display, waveform, and colorbar options from bindings."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][2]["kind"] = "array"
         payload["document"]["bindings"]["channels"] = [
@@ -883,6 +915,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(raster.color_limits, (-1.0, 1.0))
 
     def test_waveform_profile_defaults_to_waveform_only_mode(self) -> None:
+        """Default waveform raster profiles to waveform-only output."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][2]["kind"] = "array"
         payload["document"]["bindings"]["channels"] = [
@@ -905,6 +938,7 @@ class LogFileTests(unittest.TestCase):
         self.assertTrue(raster.waveform.enabled)
 
     def test_logfile_parses_track_grid_scale_modes(self) -> None:
+        """Parse track grid scale modes from logfile layouts."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["grid"] = {
             "vertical": {
@@ -923,6 +957,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(grid.vertical_secondary_scale, GridScaleKind.TANGENTIAL)
 
     def test_logfile_parses_tangential_curve_scale_kind(self) -> None:
+        """Parse tangential curve scales from logfile bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][0]["scale"] = {
             "kind": "tangential",
@@ -939,6 +974,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.scale.kind, ScaleKind.TANGENTIAL)
 
     def test_binding_can_configure_curve_header_display(self) -> None:
+        """Parse curve header visibility options from channel bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][0]["header_display"] = {
             "show_name": False,
@@ -960,6 +996,7 @@ class LogFileTests(unittest.TestCase):
         self.assertFalse(curve.header_display.wrap_name)
 
     def test_binding_can_enable_curve_header_name_wrap(self) -> None:
+        """Parse curve-header name wrapping from channel bindings."""
         payload = build_mapping()
         payload["document"]["bindings"]["channels"][0]["header_display"] = {
             "wrap_name": True,
@@ -974,6 +1011,7 @@ class LogFileTests(unittest.TestCase):
         self.assertTrue(curve.header_display.wrap_name)
 
     def test_layout_can_parse_annotation_track_objects(self) -> None:
+        """Parse annotation tracks containing interval and text objects."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"].append(
             {
@@ -1010,6 +1048,7 @@ class LogFileTests(unittest.TestCase):
         self.assertIsInstance(track.annotations[1], AnnotationTextSpec)
 
     def test_layout_can_parse_annotation_marker_arrow_and_glyph_objects(self) -> None:
+        """Parse marker, arrow, and glyph annotation objects in logfile layouts."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"].append(
             {
@@ -1061,6 +1100,7 @@ class LogFileTests(unittest.TestCase):
         self.assertIsInstance(track.annotations[2], AnnotationGlyphSpec)
 
     def test_non_annotation_track_rejects_annotation_objects_in_logfile(self) -> None:
+        """Reject annotation objects attached to non-annotation logfile tracks."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"][0]["annotations"] = [
             {"kind": "text", "depth": 1000, "text": "bad"}
@@ -1069,6 +1109,7 @@ class LogFileTests(unittest.TestCase):
             logfile_from_mapping(payload)
 
     def test_bindings_can_group_multiple_curves_in_one_track(self) -> None:
+        """Allow multiple bound curves to share a single track."""
         payload = build_mapping()
         payload["document"]["layout"]["log_sections"][0]["tracks"] = [
             {
@@ -1107,6 +1148,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(combo.elements[1].channel, "RT")
 
     def test_page_spacing_fields_are_supported_in_logfile_yaml(self) -> None:
+        """Parse page margin and track gap settings from logfile YAML."""
         payload = build_mapping()
         payload["document"]["page"]["margin_left_mm"] = 2.5
         payload["document"]["page"]["track_gap_mm"] = 1.25
@@ -1120,6 +1162,7 @@ class LogFileTests(unittest.TestCase):
         self.assertAlmostEqual(document.page.track_gap_mm, 1.25)
 
     def test_load_logfile_merges_template_yaml_with_savefile_overrides(self) -> None:
+        """Merge inherited template YAML with savefile overrides when loading."""
         template_payload = {
             "render": {"backend": "matplotlib", "output_path": "base.pdf", "dpi": 300},
             "document": {
@@ -1221,6 +1264,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(spec.document["bindings"]["channels"][0]["track_id"], "combo")
 
     def test_layout_heading_builds_shared_report_block_and_tail_toggle(self) -> None:
+        """Build a shared report block from heading data and tail settings."""
         mapping = build_mapping()
         mapping["document"]["layout"]["heading"] = {
             "enabled": True,

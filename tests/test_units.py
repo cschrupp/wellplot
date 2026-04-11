@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Unit conversion registry tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -26,11 +28,15 @@ from well_log_os.units import DEFAULT_UNITS
 
 
 class UnitRegistryTests(unittest.TestCase):
+    """Verify supported and unsupported unit conversions."""
+
     def test_length_conversion_ft_to_m(self) -> None:
+        """Convert feet to meters using the default unit registry."""
         converted = DEFAULT_UNITS.convert(100.0, "ft", "m")
         self.assertAlmostEqual(converted, 30.48, places=6)
 
     def test_unknown_conversion_raises(self) -> None:
+        """Raise when converting between unsupported unit families."""
         with self.assertRaises(UnitConversionError):
             DEFAULT_UNITS.convert(1.0, "gAPI", "m")
 

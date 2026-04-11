@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""CLI validation command tests."""
+
 from __future__ import annotations
 
 import io
@@ -30,8 +32,11 @@ from well_log_os.errors import TemplateValidationError
 
 
 class CLITests(unittest.TestCase):
+    """Verify the CLI validation command behavior."""
+
     @patch("well_log_os.cli.load_logfile")
     def test_validate_command_success(self, mock_load_logfile) -> None:
+        """Return success when the logfile validates cleanly."""
         stdout = io.StringIO()
         stderr = io.StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
@@ -44,6 +49,7 @@ class CLITests(unittest.TestCase):
 
     @patch("well_log_os.cli.load_logfile")
     def test_validate_command_schema_error(self, mock_load_logfile) -> None:
+        """Return failure when validation raises a template error."""
         mock_load_logfile.side_effect = TemplateValidationError("bad schema")
         stdout = io.StringIO()
         stderr = io.StringIO()

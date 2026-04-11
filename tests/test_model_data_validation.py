@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Dataset and channel validation tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -33,7 +35,10 @@ from well_log_os import (
 
 
 class ModelValidationTests(unittest.TestCase):
+    """Verify normalized dataset validation rules."""
+
     def test_scalar_channel_rejects_empty_mnemonic(self) -> None:
+        """Reject scalar channels without a mnemonic."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         values = np.array([10.0, 11.0], dtype=float)
 
@@ -41,6 +46,7 @@ class ModelValidationTests(unittest.TestCase):
             ScalarChannel("", depth, "ft", "gAPI", values=values)
 
     def test_scalar_channel_rejects_missing_depth_unit(self) -> None:
+        """Reject scalar channels without a declared index unit."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         values = np.array([10.0, 11.0], dtype=float)
 
@@ -48,6 +54,7 @@ class ModelValidationTests(unittest.TestCase):
             ScalarChannel("GR", depth, "", "gAPI", values=values)
 
     def test_scalar_channel_validate_catches_post_init_length_drift(self) -> None:
+        """Fail validation when scalar values drift away from depth length."""
         depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
         channel = ScalarChannel("GR", depth, "ft", "gAPI", values=np.array([10.0, 11.0, 12.0]))
         channel.values = np.array([10.0, 11.0], dtype=float)
@@ -56,6 +63,7 @@ class ModelValidationTests(unittest.TestCase):
             channel.validate()
 
     def test_array_channel_validate_catches_sample_axis_drift(self) -> None:
+        """Fail validation when raster sample axes no longer match samples."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         channel = RasterChannel(
             "VDL",
@@ -72,11 +80,13 @@ class ModelValidationTests(unittest.TestCase):
             channel.validate()
 
     def test_empty_dataset_is_valid(self) -> None:
+        """Allow empty datasets to pass validation."""
         dataset = WellDataset(name="empty")
         dataset.validate()
         self.assertEqual(dataset.channels, {})
 
     def test_dataset_validate_catches_channel_key_mismatch(self) -> None:
+        """Fail validation when channel storage keys do not match mnemonics."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         channel = ScalarChannel("GR", depth, "ft", "gAPI", values=np.array([10.0, 11.0]))
         dataset = WellDataset(name="sample")
@@ -86,6 +96,7 @@ class ModelValidationTests(unittest.TestCase):
             dataset.validate()
 
     def test_add_channel_validates_before_insert(self) -> None:
+        """Reject invalid channels before inserting them into the dataset."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         channel = ScalarChannel("GR", depth, "ft", "gAPI", values=np.array([10.0, 11.0]))
         channel.values = np.array([10.0], dtype=float)
@@ -97,6 +108,7 @@ class ModelValidationTests(unittest.TestCase):
         self.assertEqual(dataset.channels, {})
 
     def test_dataset_validate_revalidates_existing_channels(self) -> None:
+        """Revalidate already-added channels when dataset validation runs."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         channel = ScalarChannel("GR", depth, "ft", "gAPI", values=np.array([10.0, 11.0]))
         dataset = WellDataset(name="sample")
@@ -107,6 +119,7 @@ class ModelValidationTests(unittest.TestCase):
             dataset.validate()
 
     def test_array_channel_validation_accepts_raster_contract(self) -> None:
+        """Accept array channels that satisfy the raster data contract."""
         depth = np.array([1000.0, 1001.0], dtype=float)
         channel = ArrayChannel(
             "WF",

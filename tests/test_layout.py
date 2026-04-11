@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Layout engine pagination and frame geometry tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -28,7 +30,10 @@ from well_log_os.errors import LayoutError
 
 
 class LayoutTests(unittest.TestCase):
+    """Verify page layout and pagination behavior."""
+
     def build_dataset(self) -> WellDataset:
+        """Create a small synthetic dataset used across layout tests."""
         depth = np.linspace(1000.0, 1105.0, 300)
         dataset = WellDataset(name="synthetic")
         dataset.add_channel(
@@ -37,6 +42,7 @@ class LayoutTests(unittest.TestCase):
         return dataset
 
     def test_layout_paginates_depth_range(self) -> None:
+        """Paginate layouts when the document depth exceeds one page."""
         document = document_from_mapping(
             {
                 "name": "paginate",
@@ -60,6 +66,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(layout[0].track_frames[1].track.id, "gr")
 
     def test_pagination_keeps_constant_depth_scale_on_last_page(self) -> None:
+        """Keep the configured depth scale on first, middle, and last pages."""
         document = document_from_mapping(
             {
                 "name": "constant scale",
@@ -101,6 +108,7 @@ class LayoutTests(unittest.TestCase):
         self.assertAlmostEqual(windows[-1].stop - windows[-1].start, span_last, places=6)
 
     def test_default_page_spacing_starts_tracks_at_page_origin(self) -> None:
+        """Start tracks at the page origin when no margins or gaps are set."""
         document = document_from_mapping(
             {
                 "name": "defaults",
@@ -117,6 +125,7 @@ class LayoutTests(unittest.TestCase):
         self.assertAlmostEqual(frame_gr.frame.x_mm, 16.0)
 
     def test_page_spacing_is_configurable_from_yaml(self) -> None:
+        """Honor left margins and track gaps parsed from template YAML."""
         document = document_from_mapping(
             {
                 "name": "spacing config",
@@ -137,6 +146,7 @@ class LayoutTests(unittest.TestCase):
         self.assertAlmostEqual(frame_gr.frame.x_mm, 21.5)
 
     def test_track_width_overflow_raises(self) -> None:
+        """Raise when requested track widths exceed the usable page width."""
         document = document_from_mapping(
             {
                 "name": "overflow",
@@ -153,6 +163,7 @@ class LayoutTests(unittest.TestCase):
             LayoutEngine().track_frames(document)
 
     def test_continuous_mode_produces_single_tall_page(self) -> None:
+        """Collapse continuous layouts into one tall strip page."""
         document = document_from_mapping(
             {
                 "name": "continuous",
@@ -178,6 +189,7 @@ class LayoutTests(unittest.TestCase):
         self.assertAlmostEqual(layout[0].depth_window.stop, 1105.0, places=3)
 
     def test_track_header_frames_align_with_track_frames(self) -> None:
+        """Align top track header frames with their corresponding track frames."""
         document = document_from_mapping(
             {
                 "name": "headers",
@@ -209,6 +221,7 @@ class LayoutTests(unittest.TestCase):
         )
 
     def test_track_headers_only_render_on_layout_start_and_end(self) -> None:
+        """Render track headers only on the first and last paginated pages."""
         document = document_from_mapping(
             {
                 "name": "headers once",
@@ -235,6 +248,7 @@ class LayoutTests(unittest.TestCase):
             self.assertEqual(len(middle.track_header_bottom_frames), 0)
 
     def test_continuous_layout_can_disable_bottom_track_headers(self) -> None:
+        """Allow continuous layouts to suppress bottom track headers."""
         document = document_from_mapping(
             {
                 "name": "continuous headers",
@@ -262,6 +276,7 @@ class LayoutTests(unittest.TestCase):
         self.assertEqual(len(page_layout.track_header_bottom_frames), 0)
 
     def test_continuous_layout_keeps_bottom_track_headers_by_default(self) -> None:
+        """Keep bottom track headers enabled by default in continuous mode."""
         document = document_from_mapping(
             {
                 "name": "continuous headers default",

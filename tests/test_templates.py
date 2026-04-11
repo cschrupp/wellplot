@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Template parsing and document-building tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -43,7 +45,10 @@ from well_log_os.templates import document_from_mapping
 
 
 class TemplateTests(unittest.TestCase):
+    """Verify template mappings convert into the expected document model."""
+
     def test_curve_element_can_use_value_labels_mode(self) -> None:
+        """Parse curve value-label rendering configuration."""
         document = document_from_mapping(
             {
                 "name": "value labels",
@@ -92,6 +97,7 @@ class TemplateTests(unittest.TestCase):
         self.assertFalse(element.wrap)
 
     def test_curve_element_can_enable_header_name_wrap(self) -> None:
+        """Enable wrapping for long curve names in track headers."""
         document = document_from_mapping(
             {
                 "name": "header name wrap",
@@ -120,6 +126,7 @@ class TemplateTests(unittest.TestCase):
         self.assertTrue(element.header_display.wrap_name)
 
     def test_curve_element_can_parse_callouts(self) -> None:
+        """Parse curve callout placement and repetition settings."""
         document = document_from_mapping(
             {
                 "name": "curve callouts",
@@ -168,6 +175,7 @@ class TemplateTests(unittest.TestCase):
         self.assertAlmostEqual(element.callouts[0].every or 0.0, 5.0)
 
     def test_document_can_parse_report_block(self) -> None:
+        """Parse heading report blocks with service titles and detail rows."""
         document = document_from_mapping(
             {
                 "name": "report block",
@@ -249,6 +257,7 @@ class TemplateTests(unittest.TestCase):
         self.assertTrue(document.header.report.tail_enabled)
 
     def test_curve_element_can_enable_log_wrap(self) -> None:
+        """Enable wrap rendering for logarithmic curve scales."""
         document = document_from_mapping(
             {
                 "name": "wrapped log curve",
@@ -278,6 +287,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.wrap_color, "#ff5500")
 
     def test_curve_element_can_parse_between_curves_fill(self) -> None:
+        """Parse between-curves fill configuration and crossover colors."""
         document = document_from_mapping(
             {
                 "name": "curve fill",
@@ -330,6 +340,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.fill.crossover.right_color, "#ef4444")
 
     def test_curve_element_can_parse_between_instances_fill(self) -> None:
+        """Parse fills between two scaled instances of the same channel."""
         document = document_from_mapping(
             {
                 "name": "curve instance fill",
@@ -372,6 +383,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.fill.other_element_id, "cbl_0_10")
 
     def test_curve_element_can_parse_limit_fill(self) -> None:
+        """Parse fills from a curve to a track limit."""
         document = document_from_mapping(
             {
                 "name": "curve limit fill",
@@ -406,6 +418,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.fill.color, "#22c55e")
 
     def test_curve_element_can_parse_baseline_split_fill(self) -> None:
+        """Parse split fills around a vertical baseline."""
         document = document_from_mapping(
             {
                 "name": "baseline split fill",
@@ -451,6 +464,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.fill.baseline.line_color, "#222222")
 
     def test_reference_track_can_define_layout_axis(self) -> None:
+        """Allow reference tracks to redefine the document depth axis."""
         document = document_from_mapping(
             {
                 "name": "reference axis",
@@ -479,6 +493,7 @@ class TemplateTests(unittest.TestCase):
         self.assertAlmostEqual(document.depth_axis.minor_step, 10.0)
 
     def test_reference_track_accepts_curve_overlay(self) -> None:
+        """Allow scalar curves to be overlaid inside reference tracks."""
         document = document_from_mapping(
             {
                 "name": "reference overlay",
@@ -499,6 +514,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIsInstance(document.tracks[0].elements[0], CurveElement)
 
     def test_reference_track_can_parse_reference_curve_overlay(self) -> None:
+        """Parse overlay styling for curves inside reference tracks."""
         document = document_from_mapping(
             {
                 "name": "reference overlay config",
@@ -540,6 +556,7 @@ class TemplateTests(unittest.TestCase):
         self.assertAlmostEqual(element.reference_overlay.threshold or 0.0, 1.5)
 
     def test_reference_track_can_parse_reference_events(self) -> None:
+        """Parse event markers configured on reference tracks."""
         document = document_from_mapping(
             {
                 "name": "reference events",
@@ -579,6 +596,7 @@ class TemplateTests(unittest.TestCase):
         self.assertAlmostEqual(event.text_x or 0.0, 0.3)
 
     def test_image_track_accepts_raster_and_curve_overlay(self) -> None:
+        """Accept raster elements and scalar overlays in image tracks."""
         document = document_from_mapping(
             {
                 "name": "image overlay",
@@ -671,6 +689,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIsInstance(image_track.elements[1], CurveElement)
 
     def test_waveform_profile_defaults_to_waveform_only_mode(self) -> None:
+        """Default waveform profiles to waveform-only display mode."""
         document = document_from_mapping(
             {
                 "name": "waveform profile",
@@ -700,6 +719,7 @@ class TemplateTests(unittest.TestCase):
         self.assertTrue(element.waveform.enabled)
 
     def test_curve_track_rejects_raster_elements(self) -> None:
+        """Reject raster elements inside scalar curve tracks."""
         with self.assertRaises(ValueError):
             document_from_mapping(
                 {
@@ -719,6 +739,7 @@ class TemplateTests(unittest.TestCase):
             )
 
     def test_invalid_element_kind_raises_template_error(self) -> None:
+        """Raise a template error for unsupported element kinds."""
         with self.assertRaises(TemplateValidationError):
             document_from_mapping(
                 {
@@ -738,6 +759,7 @@ class TemplateTests(unittest.TestCase):
             )
 
     def test_markers_and_zones_parse_from_template(self) -> None:
+        """Parse document-wide markers and zones from template mappings."""
         document = document_from_mapping(
             {
                 "name": "annotations",
@@ -757,6 +779,7 @@ class TemplateTests(unittest.TestCase):
         self.assertAlmostEqual(document.zones[0].base, 1012.0)
 
     def test_annotation_track_can_parse_interval_and_text_objects(self) -> None:
+        """Parse interval and text objects inside annotation tracks."""
         document = document_from_mapping(
             {
                 "name": "annotation objects",
@@ -798,6 +821,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(track.annotations[1].text, "Detailed zone description")
 
     def test_annotation_track_can_parse_marker_arrow_and_glyph_objects(self) -> None:
+        """Parse marker, arrow, and glyph annotation objects."""
         document = document_from_mapping(
             {
                 "name": "annotation extra objects",
@@ -850,6 +874,7 @@ class TemplateTests(unittest.TestCase):
         self.assertIsInstance(track.annotations[2], AnnotationGlyphSpec)
 
     def test_non_annotation_track_rejects_annotation_objects(self) -> None:
+        """Reject annotation objects placed on non-annotation tracks."""
         with self.assertRaises(ValueError):
             document_from_mapping(
                 {
@@ -869,6 +894,7 @@ class TemplateTests(unittest.TestCase):
             )
 
     def test_invalid_markers_or_zones_raise_template_error(self) -> None:
+        """Raise template errors for invalid marker or zone definitions."""
         with self.assertRaises(TemplateValidationError):
             document_from_mapping(
                 {
@@ -891,6 +917,7 @@ class TemplateTests(unittest.TestCase):
             )
 
     def test_track_header_objects_parse_with_reserved_space(self) -> None:
+        """Parse explicit track-header object reservations and line units."""
         document = document_from_mapping(
             {
                 "name": "header objects",
@@ -930,6 +957,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(objects[3].kind, TrackHeaderObjectKind.DIVISIONS)
 
     def test_track_grid_parses_vertical_and_horizontal_properties(self) -> None:
+        """Parse horizontal and vertical grid display settings."""
         document = document_from_mapping(
             {
                 "name": "grid options",
@@ -986,6 +1014,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(grid.vertical_secondary_spacing_mode, GridSpacingMode.COUNT)
 
     def test_curve_scale_parses_tangential_alias(self) -> None:
+        """Accept the tangential scale alias when building curve scales."""
         document = document_from_mapping(
             {
                 "name": "tangential curve",
@@ -1014,6 +1043,7 @@ class TemplateTests(unittest.TestCase):
         self.assertEqual(element.scale.kind, ScaleKind.TANGENTIAL)
 
     def test_invalid_track_header_configuration_raises_template_error(self) -> None:
+        """Reject duplicate track-header object kinds in one track."""
         with self.assertRaises(TemplateValidationError):
             document_from_mapping(
                 {

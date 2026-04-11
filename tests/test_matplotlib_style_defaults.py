@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Matplotlib renderer style and rendering tests."""
+
 from __future__ import annotations
 
 import unittest
@@ -52,7 +54,10 @@ from well_log_os.renderers.matplotlib import (
 
 
 class MatplotlibStyleDefaultsTests(unittest.TestCase):
+    """Verify matplotlib renderer defaults and rendering behavior."""
+
     def test_defaults_yaml_exists_and_loads(self) -> None:
+        """Verify defaults yaml exists and loads."""
         self.assertTrue(DEFAULT_MPL_STYLE_PATH.is_file())
         style = _load_default_mpl_style(DEFAULT_MPL_STYLE_PATH)
         self.assertEqual(style["track"]["frame_color"], "#2f2f2f")
@@ -62,6 +67,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(style["curve_callouts"]["top_distance_steps"], 1.5)
 
     def test_renderer_uses_yaml_defaults(self) -> None:
+        """Verify renderer uses yaml defaults."""
         renderer = MatplotlibRenderer()
         self.assertEqual(renderer.style["track"]["frame_linewidth"], 0.8)
         self.assertEqual(renderer.style["grid"]["depth_major_alpha"], 0.9)
@@ -83,6 +89,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["curve_callouts"]["bottom_distance_steps"], 1.5)
 
     def test_renderer_style_override_deep_merges(self) -> None:
+        """Verify renderer style override deep merges."""
         renderer = MatplotlibRenderer(
             style={
                 "track": {"frame_color": "#111111"},
@@ -101,6 +108,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track_header"]["title_x"], 0.5)
 
     def test_renderer_auto_adjusts_header_height_for_multicurve_legend(self) -> None:
+        """Verify renderer auto adjusts header height for multicurve legend."""
         document = document_from_mapping(
             {
                 "name": "multicurve",
@@ -128,6 +136,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertAlmostEqual(adjusted.page.track_header_height_mm, 22.0)
 
     def test_renderer_reserves_section_title_band_in_track_header_height(self) -> None:
+        """Verify renderer reserves section title band in track header height."""
         document = document_from_mapping(
             {
                 "name": "section title",
@@ -158,6 +167,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertAlmostEqual(adjusted.page.track_header_height_mm, 14.0)
 
     def test_curve_row_bounds_partition_slot(self) -> None:
+        """Verify curve row bounds partition slot."""
         renderer = MatplotlibRenderer()
         rows = renderer._curve_row_bounds(0.9, 0.3, 3)
         self.assertEqual(len(rows), 3)
@@ -167,6 +177,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertAlmostEqual(rows[1][1], rows[2][0])
 
     def test_curve_header_pair_slot_joins_legend_and_scale_slots(self) -> None:
+        """Verify curve header pair slot joins legend and scale slots."""
         document = document_from_mapping(
             {
                 "name": "pair slot",
@@ -197,6 +208,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertGreater(pair[2], pair[3])
 
     def test_curve_header_pairs_draw_full_scale_triplets_without_fill_rows(self) -> None:
+        """Verify curve header pairs draw full scale triplets without fill rows."""
         document = document_from_mapping(
             {
                 "name": "curve pair scale triplets",
@@ -260,6 +272,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_curve_header_row_count_uses_document_wide_capacity(self) -> None:
+        """Verify curve header row count uses document wide capacity."""
         document = document_from_mapping(
             {
                 "name": "uniform header rows",
@@ -295,6 +308,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer._curve_header_row_count(document, document.tracks[1]), 4)
 
     def test_fill_header_row_count_uses_document_wide_capacity(self) -> None:
+        """Verify fill header row count uses document wide capacity."""
         document = document_from_mapping(
             {
                 "name": "uniform fill rows",
@@ -335,6 +349,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer._fill_header_row_count(document, document.tracks[1]), 1)
 
     def test_reference_overlay_curve_plot_data_uses_lane_fractions(self) -> None:
+        """Verify reference overlay curve plot data uses lane fractions."""
         document = document_from_mapping(
             {
                 "name": "reference overlay lane fractions",
@@ -379,6 +394,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         np.testing.assert_allclose(plot_data.plot_values, np.array([0.7, 0.8, 0.9]))
 
     def test_reference_overlay_ticks_draw_edge_markers(self) -> None:
+        """Verify reference overlay ticks draw edge markers."""
         document = document_from_mapping(
             {
                 "name": "reference overlay ticks",
@@ -427,6 +443,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_reference_overlay_curve_callouts_reuse_fractional_track_space(self) -> None:
+        """Verify reference overlay curve callouts reuse fractional track space."""
         document = document_from_mapping(
             {
                 "name": "reference overlay callouts",
@@ -490,6 +507,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_reference_track_header_keeps_scale_row_and_draws_overlay_properties(self) -> None:
+        """Verify reference track header keeps scale row and draws overlay properties."""
         document = document_from_mapping(
             {
                 "name": "reference header properties",
@@ -550,6 +568,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_reference_events_draw_track_segments_and_callouts(self) -> None:
+        """Verify reference events draw track segments and callouts."""
         document = document_from_mapping(
             {
                 "name": "reference events",
@@ -601,6 +620,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_raster_header_triplet_uses_combined_scale_legend_span(self) -> None:
+        """Verify raster header triplet uses combined scale legend span."""
         depth = np.array([1000.0, 1001.0, 1002.0])
         samples = np.array([200.0, 700.0, 1200.0])
         values = np.array(
@@ -668,6 +688,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertGreater(triplet[2], triplet[3])
 
     def test_raster_header_uses_curve_property_group_capacity(self) -> None:
+        """Verify raster header uses curve property group capacity."""
         document = document_from_mapping(
             {
                 "name": "uniform raster header groups",
@@ -724,6 +745,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(len(rows), 12)
 
     def test_vdl_header_colorbar_uses_min_amplitude_max_labels(self) -> None:
+        """Verify vdl header colorbar uses min amplitude max labels."""
         renderer = MatplotlibRenderer()
         element = document_from_mapping(
             {
@@ -766,6 +788,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(right, "Max")
 
     def test_curve_header_display_controls_scale_text_and_color(self) -> None:
+        """Verify curve header display controls scale text and color."""
         depth = np.array([1000.0, 1001.0, 1002.0])
         dataset = WellDataset(name="sample")
         dataset.add_channel(
@@ -799,6 +822,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer._curve_header_color(element), "#111111")
 
     def test_curve_header_name_wrap_is_optional(self) -> None:
+        """Verify curve header name wrap is optional."""
         renderer = MatplotlibRenderer()
         wrapped = renderer._format_curve_header_label(
             CurveElement(
@@ -823,6 +847,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(truncated.endswith("..."))
 
     def test_header_char_budget_converts_points_to_pixels(self) -> None:
+        """Verify header char budget converts points to pixels."""
         renderer = MatplotlibRenderer(dpi=300)
         fig, ax = plt.subplots(figsize=(1.0, 1.0), dpi=300)
         try:
@@ -839,6 +864,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertGreaterEqual(budget, 4)
 
     def test_grid_segment_positions_support_scale_modes(self) -> None:
+        """Verify grid segment positions support scale modes."""
         renderer = MatplotlibRenderer()
         linear = renderer._grid_segment_positions(4, GridScaleKind.LINEAR)
         logarithmic = renderer._grid_segment_positions(4, GridScaleKind.LOGARITHMIC)
@@ -857,6 +883,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertFalse(np.allclose(linear, tangential))
 
     def test_normalize_curve_values_supports_tangential_scale(self) -> None:
+        """Verify normalize curve values supports tangential scale."""
         renderer = MatplotlibRenderer()
         values = np.array([0.0, 25.0, 50.0, 100.0, 150.0], dtype=float)
         normalized, mask = renderer._normalize_curve_values(
@@ -869,6 +896,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(np.all(np.diff(normalized[mask]) > 0))
 
     def test_log_wrap_transforms_values_into_log_interval(self) -> None:
+        """Verify log wrap transforms values into log interval."""
         renderer = MatplotlibRenderer()
         scale = ScaleSpec(kind=ScaleKind.LOG, minimum=2.0, maximum=200.0)
         values = np.array([1.0, 2.0, 20.0, 200.0, 2000.0], dtype=float)
@@ -883,6 +911,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertAlmostEqual(float(wrapped[4]), 20.0, places=4)
 
     def test_curve_callouts_draw_text_annotations(self) -> None:
+        """Verify curve callouts draw text annotations."""
         document = document_from_mapping(
             {
                 "name": "curve callouts",
@@ -942,6 +971,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_curve_callout_auto_side_uses_curve_position(self) -> None:
+        """Verify curve callout auto side uses curve position."""
         document = document_from_mapping(
             {
                 "name": "curve callout auto side",
@@ -988,11 +1018,13 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(by_label["High GR"].side, "left")
 
     def test_curve_callout_arrow_relpos_uses_side_center(self) -> None:
+        """Verify curve callout arrow relpos uses side center."""
         renderer = MatplotlibRenderer()
         self.assertEqual(renderer._curve_callout_arrow_relpos("right"), (0.0, 0.5))
         self.assertEqual(renderer._curve_callout_arrow_relpos("left"), (1.0, 0.5))
 
     def test_curve_callout_top_and_bottom_expands_repeated_records(self) -> None:
+        """Verify curve callout top and bottom expands repeated records."""
         document = document_from_mapping(
             {
                 "name": "curve callout repeated bands",
@@ -1051,6 +1083,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         )
 
     def test_curve_callout_repetition_uses_section_depth_range_not_page_window(self) -> None:
+        """Verify curve callout repetition uses section depth range not page window."""
         document = document_from_mapping(
             {
                 "name": "curve callout section repetition",
@@ -1102,6 +1135,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual([record.desired_text_y for record in records], [1035.0])
 
     def test_curve_callout_text_stays_within_track_edges(self) -> None:
+        """Verify curve callout text stays within track edges."""
         long_label = "Curve Label Near Edge"
         document = document_from_mapping(
             {
@@ -1196,6 +1230,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_between_curves_fill_adds_single_collection(self) -> None:
+        """Verify between curves fill adds single collection."""
         document = document_from_mapping(
             {
                 "name": "between curves fill",
@@ -1252,6 +1287,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_track_header_draws_fill_indicator_row(self) -> None:
+        """Verify track header draws fill indicator row."""
         document = document_from_mapping(
             {
                 "name": "fill header row",
@@ -1306,6 +1342,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_between_curves_crossover_fill_adds_two_collections(self) -> None:
+        """Verify between curves crossover fill adds two collections."""
         document = document_from_mapping(
             {
                 "name": "between curves crossover",
@@ -1366,6 +1403,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_between_curves_fill_rejects_mismatched_scales(self) -> None:
+        """Verify between curves fill rejects mismatched scales."""
         depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
         dataset = WellDataset(name="mismatch")
         dataset.add_channel(ScalarChannel("A", depth, "m", "pu", values=np.array([10, 20, 30])))
@@ -1418,6 +1456,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_between_curves_fill_selects_matching_scale_for_duplicate_target_channel(self) -> None:
+        """Verify between curves fill selects matching scale for duplicate target channel."""
         depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
         dataset = WellDataset(name="duplicate target")
         dataset.add_channel(ScalarChannel("A", depth, "m", "mV", values=np.array([2, 4, 6, 8])))
@@ -1481,6 +1520,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_between_instances_fill_supports_same_channel_with_different_scales(self) -> None:
+        """Verify between instances fill supports same channel with different scales."""
         depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
         dataset = WellDataset(name="same channel instances")
         dataset.add_channel(ScalarChannel("CBL", depth, "m", "mV", values=np.array([2, 4, 6, 8])))
@@ -1535,6 +1575,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_to_lower_limit_fill_adds_single_collection(self) -> None:
+        """Verify to lower limit fill adds single collection."""
         depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
         dataset = WellDataset(name="lower limit fill")
         dataset.add_channel(
@@ -1583,6 +1624,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_baseline_split_fill_adds_two_collections_and_baseline(self) -> None:
+        """Verify baseline split fill adds two collections and baseline."""
         depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
         dataset = WellDataset(name="baseline split")
         dataset.add_channel(
@@ -1638,6 +1680,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_baseline_split_header_draws_indicator_and_label(self) -> None:
+        """Verify baseline split header draws indicator and label."""
         depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
         dataset = WellDataset(name="baseline header")
         dataset.add_channel(
@@ -1685,6 +1728,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             plt.close(fig)
 
     def test_baseline_split_header_uses_baseline_position_and_reverse_orientation(self) -> None:
+        """Verify baseline split header uses baseline position and reverse orientation."""
         depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
         dataset = WellDataset(name="baseline orientation")
         dataset.add_channel(
@@ -1743,6 +1787,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(segments[1][2], "#22c55e")
 
     def test_vdl_raster_profile_normalizes_trace_amplitude(self) -> None:
+        """Verify vdl raster profile normalizes trace amplitude."""
         document = document_from_mapping(
             {
                 "name": "vdl profile",
@@ -1806,6 +1851,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertGreater(float(limits[1]), 0.9)
 
     def test_vdl_raster_display_sorts_depth_and_removes_trace_bias(self) -> None:
+        """Verify vdl raster display sorts depth and removes trace bias."""
         document = document_from_mapping(
             {
                 "name": "vdl sorting",
@@ -1872,6 +1918,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         )
 
     def test_raster_window_crops_to_selected_sample_axis_range(self) -> None:
+        """Verify raster window crops to selected sample axis range."""
         document = document_from_mapping(
             {
                 "name": "vdl crop",
@@ -1926,6 +1973,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         np.testing.assert_array_equal(clipped_values[0], np.arange(16, 117, dtype=float))
 
     def test_vdl_profile_uses_split_auto_normalization_modes(self) -> None:
+        """Verify vdl profile uses split auto normalization modes."""
         document = document_from_mapping(
             {
                 "name": "vdl profile split",
@@ -1962,6 +2010,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         )
 
     def test_log_grid_scale_mode_auto_uses_cycles_from_scale_bounds(self) -> None:
+        """Verify log grid scale mode auto uses cycles from scale bounds."""
         document = document_from_mapping(
             {
                 "name": "log cycles",
@@ -2002,6 +2051,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertGreater(len(secondary_lines), 3)
 
     def test_render_documents_auto_uses_strip_pages_for_multisection_pdf(self) -> None:
+        """Verify render documents auto uses strip pages for multisection pdf."""
         document = document_from_mapping(
             {
                 "name": "multi",
@@ -2029,6 +2079,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             self.assertGreater(result.page_count, 2)
 
     def test_render_documents_adds_heading_and_tail_report_pages(self) -> None:
+        """Verify render documents adds heading and tail report pages."""
         document = document_from_mapping(
             {
                 "name": "report pages",
@@ -2156,6 +2207,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
                 plt.close(figure)
 
     def test_render_array_track_with_colorbar_and_sample_axis(self) -> None:
+        """Verify render array track with colorbar and sample axis."""
         document = document_from_mapping(
             {
                 "name": "array track",
@@ -2212,6 +2264,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             self.assertEqual(result.page_count, 1)
 
     def test_annotation_track_renders_interval_and_text_objects(self) -> None:
+        """Verify annotation track renders interval and text objects."""
         document = document_from_mapping(
             {
                 "name": "annotation track",
@@ -2273,6 +2326,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(any("note" in value for value in text_values))
 
     def test_annotation_track_renders_marker_arrow_and_glyph_objects(self) -> None:
+        """Verify annotation track renders marker arrow and glyph objects."""
         document = document_from_mapping(
             {
                 "name": "annotation markers",
@@ -2330,6 +2384,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(any("CF" in value for value in text_values))
 
     def test_annotation_track_wraps_dedicated_lane_labels(self) -> None:
+        """Verify annotation track wraps dedicated lane labels."""
         document = document_from_mapping(
             {
                 "name": "annotation lane label wrap",
@@ -2371,6 +2426,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertTrue(any("Readings\nStart" in value for value in text_values))
 
     def test_array_plot_sample_axis_is_suppressed_when_bottom_header_exists(self) -> None:
+        """Verify array plot sample axis is suppressed when bottom header exists."""
         document = document_from_mapping(
             {
                 "name": "array footer header suppression",
@@ -2403,6 +2459,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertFalse(renderer._should_draw_array_plot_sample_axis(layouts[-1], track))
 
     def test_waveform_selection_is_consistent_across_windows(self) -> None:
+        """Verify waveform selection is consistent across windows."""
         document = document_from_mapping(
             {
                 "name": "waveform selection",
@@ -2453,6 +2510,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         np.testing.assert_array_equal(second_window, expected_second)
 
     def test_waveform_selection_anchors_from_top_depth_for_descending_index(self) -> None:
+        """Verify waveform selection anchors from top depth for descending index."""
         document = document_from_mapping(
             {
                 "name": "waveform descending",

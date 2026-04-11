@@ -121,5 +121,3 @@ convention = "pep257"
 [tool.ruff.lint.per-file-ignores]
 "examples/*.py" = ["D"]
 "examples/**/*.py" = ["D"]
-"tests/*.py" = ["D"]
-"tests/**/*.py" = ["D"]

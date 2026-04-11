@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Programmatic rendering API tests."""
+
 from __future__ import annotations
 
 import tempfile
@@ -232,7 +234,10 @@ def _build_report_with_heading():
 
 
 class ApiRenderTests(unittest.TestCase):
+    """Verify scoped rendering helpers and programmatic report building."""
+
     def test_build_documents_from_programmatic_builder(self) -> None:
+        """Build a document list from a programmatic report builder."""
         report = _build_report()
 
         documents = build_documents(report)
@@ -242,6 +247,7 @@ class ApiRenderTests(unittest.TestCase):
         self.assertEqual([track.id for track in documents[0].tracks], ["depth", "combo", "vdl"])
 
     def test_render_report_without_output_path_returns_figures(self) -> None:
+        """Return in-memory figures when no output path is provided."""
         report = _build_report()
 
         result = render_report(report)
@@ -255,6 +261,7 @@ class ApiRenderTests(unittest.TestCase):
             figure.clf()
 
     def test_render_report_can_filter_to_selected_sections(self) -> None:
+        """Restrict document building to an explicit subset of sections."""
         builder = LogBuilder(name="Multisection programmatic layout")
         builder.set_render(backend="matplotlib", output_path="filtered.pdf", dpi=120)
         builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
@@ -297,6 +304,7 @@ class ApiRenderTests(unittest.TestCase):
         )
 
     def test_render_report_writes_pdf_when_output_path_is_provided(self) -> None:
+        """Write a PDF artifact when an explicit output path is supplied."""
         report = _build_report()
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -308,6 +316,7 @@ class ApiRenderTests(unittest.TestCase):
             self.assertGreater(output_path.stat().st_size, 0)
 
     def test_build_documents_can_filter_tracks_within_section(self) -> None:
+        """Restrict built documents to selected tracks within a section."""
         report = _build_report()
 
         documents = build_documents(
@@ -320,6 +329,7 @@ class ApiRenderTests(unittest.TestCase):
         self.assertEqual([track.id for track in documents[0].tracks], ["vdl"])
 
     def test_build_documents_can_override_depth_range_for_window(self) -> None:
+        """Override the report depth window at build time."""
         report = _build_report()
 
         documents = build_documents(
@@ -333,6 +343,7 @@ class ApiRenderTests(unittest.TestCase):
         self.assertEqual(documents[0].depth_range, (8300.0, 8400.0))
 
     def test_build_documents_can_suppress_report_pages_for_partial_scopes(self) -> None:
+        """Omit heading and tail pages for partial document scopes."""
         report = _build_report_with_heading()
 
         full_documents = build_documents(report)
@@ -342,6 +353,7 @@ class ApiRenderTests(unittest.TestCase):
         self.assertIsNone(partial_documents[0].header.report)
 
     def test_render_section_returns_selected_section_only(self) -> None:
+        """Render only the requested section in a multisection report."""
         builder = LogBuilder(name="Multisection programmatic layout")
         builder.set_render(backend="matplotlib", output_path="filtered.pdf", dpi=120)
         builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
@@ -385,6 +397,7 @@ class ApiRenderTests(unittest.TestCase):
             figure.clf()
 
     def test_render_track_and_window_return_figures(self) -> None:
+        """Render scoped track and depth-window selections as figures."""
         report = _build_report()
 
         track_result = render_track(report, section_id="main", track_ids="vdl")
@@ -408,6 +421,7 @@ class ApiRenderTests(unittest.TestCase):
             figure.clf()
 
     def test_end_to_end_workflow_can_align_merge_render_and_serialize(self) -> None:
+        """Exercise dataset alignment, merging, rendering, and serialization together."""
         raw = create_dataset(
             "raw",
             well_metadata={"WELL": "API Demo 1", "FIELD": "Notebook Field", "COMPANY": "Company"},
@@ -550,6 +564,7 @@ class ApiRenderTests(unittest.TestCase):
         )
 
     def test_render_png_and_svg_bytes_return_image_payloads(self) -> None:
+        """Return PNG and SVG byte payloads for rendered pages."""
         report = _build_report()
 
         png_bytes = render_png_bytes(report, page_index=0, dpi=120)
@@ -564,6 +579,7 @@ class ApiRenderTests(unittest.TestCase):
         self.assertIn(b"<svg", svg_bytes)
 
     def test_scoped_png_helpers_return_bytes(self) -> None:
+        """Return PNG byte payloads for scoped section, track, and window renders."""
         report = _build_report()
 
         section_png = render_section_png(report, section_id="main", page_index=0, dpi=120)
@@ -587,6 +603,7 @@ class ApiRenderTests(unittest.TestCase):
             self.assertTrue(payload.startswith(b"\x89PNG\r\n\x1a\n"))
 
     def test_render_png_bytes_rejects_invalid_page_index(self) -> None:
+        """Reject page indices outside the rendered page range."""
         report = _build_report()
 
         with self.assertRaisesRegex(TemplateValidationError, "page_index"):

@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Programmatic dataset API tests."""
+
 from __future__ import annotations
 
 import importlib.util
@@ -40,7 +42,10 @@ if HAS_PANDAS:
 
 
 class DatasetApiTests(unittest.TestCase):
+    """Verify dataset construction, alignment, and merge helpers."""
+
     def test_create_dataset_copies_metadata_and_provenance(self) -> None:
+        """Create datasets with copied metadata and provenance mappings."""
         well_metadata = {"WELL": "Example-1"}
         provenance = {"source": "notebook"}
 
@@ -58,6 +63,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertIsNot(dataset.provenance, provenance)
 
     def test_dataset_add_curve_uses_index_contract(self) -> None:
+        """Add scalar curves using the shared index contract."""
         dataset = create_dataset("processed")
 
         channel = dataset.add_curve(
@@ -77,6 +83,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertEqual(channel.value_unit, "v/v")
 
     def test_dataset_add_array_and_raster_create_expected_channel_types(self) -> None:
+        """Add array and raster channels with the expected concrete types."""
         dataset = create_dataset("processed")
 
         array_channel = dataset.add_array(
@@ -105,6 +112,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertEqual(raster_channel.colormap, "gray_r")
 
     def test_dataset_add_channel_can_reject_duplicates(self) -> None:
+        """Reject duplicate channel mnemonics when replacement is disabled."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="GR",
@@ -125,6 +133,7 @@ class DatasetApiTests(unittest.TestCase):
             )
 
     def test_dataset_add_or_replace_channel_overwrites_existing(self) -> None:
+        """Replace an existing channel when add-or-replace is used."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="GR",
@@ -146,6 +155,7 @@ class DatasetApiTests(unittest.TestCase):
         np.testing.assert_allclose(dataset.get_channel("GR").values, [99.0, 100.0])
 
     def test_dataset_rename_channel_updates_lookup_key_and_mnemonic(self) -> None:
+        """Rename a channel and keep the lookup table in sync."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="GR",
@@ -162,6 +172,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertNotIn("GR", dataset.channels)
 
     def test_dataset_merge_copies_channels_and_can_merge_metadata(self) -> None:
+        """Copy merged channels and optionally merge metadata and provenance."""
         source = create_dataset(
             "source",
             well_metadata={"FIELD": "North"},
@@ -189,6 +200,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertEqual(target.provenance["merge_history"][0]["dataset"], "source")
 
     def test_dataset_merge_rejects_duplicate_channel_without_replace(self) -> None:
+        """Reject merges that would overwrite channels without permission."""
         left = create_dataset("left")
         left.add_curve(
             mnemonic="GR",
@@ -210,6 +222,7 @@ class DatasetApiTests(unittest.TestCase):
             left.merge(right, replace=False)
 
     def test_dataset_merge_can_rename_conflicting_channels_and_record_history(self) -> None:
+        """Rename conflicting channels during merges and record the history."""
         left = create_dataset("left")
         left.add_curve(
             mnemonic="GR",
@@ -239,6 +252,7 @@ class DatasetApiTests(unittest.TestCase):
         )
 
     def test_dataset_merge_can_skip_conflicting_channels(self) -> None:
+        """Skip conflicting channels during merges when requested."""
         left = create_dataset("left")
         left.add_curve(
             mnemonic="GR",
@@ -270,6 +284,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertEqual(left.provenance["merge_history"][0]["skipped"], ["GR"])
 
     def test_dataset_builder_merge_supports_collision_policy_and_rename(self) -> None:
+        """Expose merge collision policies through the dataset builder."""
         left = create_dataset("left")
         left.add_curve(
             mnemonic="GR",
@@ -298,6 +313,7 @@ class DatasetApiTests(unittest.TestCase):
         self.assertIn("GR_qc", dataset.channels)
 
     def test_dataset_sort_index_reorders_scalar_and_raster_channels(self) -> None:
+        """Sort dataset indices and reorder scalar and raster channels together."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="GR",
@@ -326,6 +342,7 @@ class DatasetApiTests(unittest.TestCase):
         )
 
     def test_dataset_convert_index_unit_updates_all_channels(self) -> None:
+        """Convert the shared index unit across all channels in a dataset."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="GR",
@@ -342,6 +359,7 @@ class DatasetApiTests(unittest.TestCase):
         np.testing.assert_allclose(channel.depth, [304.8, 305.1048])
 
     def test_dataset_reindex_to_channel_resamples_scalar_and_array(self) -> None:
+        """Reindex selected channels onto another channel's index."""
         dataset = create_dataset("processed")
         dataset.add_curve(
             mnemonic="BASE",
@@ -377,6 +395,7 @@ class DatasetApiTests(unittest.TestCase):
         )
 
     def test_dataset_builder_exposes_alignment_helpers(self) -> None:
+        """Expose sorting and unit-conversion helpers through the builder."""
         dataset = (
             DatasetBuilder(name="processed")
             .add_curve(
@@ -395,6 +414,7 @@ class DatasetApiTests(unittest.TestCase):
         np.testing.assert_allclose(dataset.get_channel("GR").depth, [304.8, 305.1048])
 
     def test_dataset_builder_supports_fluent_ingestion(self) -> None:
+        """Support fluent scalar and raster ingestion through the builder API."""
         dataset = (
             DatasetBuilder(
                 name="processed",
@@ -428,6 +448,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_add_series_uses_series_index_by_default(self) -> None:
+        """Use the pandas Series index as the dataset index by default."""
         dataset = create_dataset("processed")
         series = pd.Series([45.0, 50.0, 55.0], index=[1000.0, 1000.5, 1001.0], name="GR")
 
@@ -445,6 +466,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_add_series_requires_mnemonic_when_series_name_missing(self) -> None:
+        """Require an explicit mnemonic when a Series has no name."""
         dataset = create_dataset("processed")
         series = pd.Series([1.0, 2.0], index=[1000.0, 1001.0])
 
@@ -453,6 +475,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_add_dataframe_uses_named_index_column(self) -> None:
+        """Use an explicit dataframe column as the dataset index."""
         dataset = create_dataset("processed")
         frame = pd.DataFrame(
             {
@@ -478,6 +501,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_add_dataframe_can_use_dataframe_index(self) -> None:
+        """Use the dataframe index directly when requested."""
         dataset = create_dataset("processed")
         frame = pd.DataFrame({"GR": [45.0, 50.0], "CBL": [10.0, 12.0]}, index=[1000.0, 1001.0])
 
@@ -497,6 +521,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_add_dataframe_requires_explicit_index_selection(self) -> None:
+        """Reject dataframe ingestion without an unambiguous index selection."""
         dataset = create_dataset("processed")
         frame = pd.DataFrame({"DEPTH": [1000.0, 1001.0], "GR": [45.0, 50.0]})
 
@@ -508,6 +533,7 @@ class DatasetApiTests(unittest.TestCase):
 
     @unittest.skipUnless(HAS_PANDAS, "pandas is not installed")
     def test_dataset_builder_supports_series_and_dataframe_ingestion(self) -> None:
+        """Ingest pandas Series and DataFrames through the dataset builder."""
         series = pd.Series([45.0, 50.0], index=[1000.0, 1001.0], name="GR")
         frame = pd.DataFrame(
             {

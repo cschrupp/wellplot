@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Rendering pipeline integration tests with mocked dependencies."""
+
 from __future__ import annotations
 
 import unittest
@@ -30,6 +32,8 @@ from well_log_os.renderers.base import RenderResult
 
 
 class PipelineTests(unittest.TestCase):
+    """Verify the top-level logfile rendering pipeline."""
+
     @patch("well_log_os.pipeline.MatplotlibRenderer")
     @patch("well_log_os.pipeline.build_documents_for_logfile")
     @patch("well_log_os.pipeline.load_datasets_for_logfile")
@@ -41,6 +45,7 @@ class PipelineTests(unittest.TestCase):
         mock_build_documents,
         mock_renderer_class,
     ) -> None:
+        """Use the matplotlib renderer with the resolved master dataset."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",
@@ -83,6 +88,7 @@ class PipelineTests(unittest.TestCase):
         mock_build_documents,
         mock_renderer_class,
     ) -> None:
+        """Forward continuous strip height to the matplotlib renderer."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",
@@ -125,6 +131,7 @@ class PipelineTests(unittest.TestCase):
         mock_build_documents,
         mock_renderer_class,
     ) -> None:
+        """Forward matplotlib style overrides to the renderer constructor."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",
@@ -165,6 +172,7 @@ class PipelineTests(unittest.TestCase):
         mock_load_datasets,
         mock_build_documents,
     ) -> None:
+        """Reject render backends outside the supported set."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",
@@ -195,6 +203,7 @@ class PipelineTests(unittest.TestCase):
         mock_build_documents,
         mock_renderer_class,
     ) -> None:
+        """Render every built section document with its matching dataset."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",
@@ -243,6 +252,7 @@ class PipelineTests(unittest.TestCase):
         mock_load_datasets,
         mock_build_documents,
     ) -> None:
+        """Reject multisection Plotly output until that backend supports it."""
         spec = LogFileSpec(
             name="test",
             data_source_path="input.las",

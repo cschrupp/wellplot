@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""API serialization and round-trip coverage tests."""
+
 from __future__ import annotations
 
 import tempfile
@@ -139,7 +141,10 @@ def _build_report():
 
 
 class ApiSerializeTests(unittest.TestCase):
+    """Verify document and report serialization helpers."""
+
     def test_document_dict_round_trip_uses_template_keys(self) -> None:
+        """Round-trip document mappings through the public dict helpers."""
         document = _build_document()
 
         mapping = document_to_dict(document)
@@ -153,6 +158,7 @@ class ApiSerializeTests(unittest.TestCase):
         self.assertEqual([track.id for track in rebuilt.tracks], ["depth", "combo"])
 
     def test_document_yaml_round_trip_supports_string_and_path(self) -> None:
+        """Round-trip document YAML through streams and filesystem paths."""
         document = _build_document()
 
         yaml_text = document_to_yaml(document)
@@ -169,6 +175,7 @@ class ApiSerializeTests(unittest.TestCase):
         self.assertEqual(from_path.depth_range, document.depth_range)
 
     def test_report_dict_round_trip_supports_programmatic_spec(self) -> None:
+        """Round-trip programmatic report specs through dict helpers."""
         report = _build_report()
 
         mapping = report_to_dict(report)
@@ -184,6 +191,7 @@ class ApiSerializeTests(unittest.TestCase):
         )
 
     def test_report_yaml_round_trip_supports_stream_and_path(self) -> None:
+        """Round-trip report YAML through streams and filesystem paths."""
         report = _build_report()
 
         yaml_text = report_to_yaml(report)
@@ -200,6 +208,7 @@ class ApiSerializeTests(unittest.TestCase):
         self.assertEqual(from_path.render_output_path, "serialize.pdf")
 
     def test_save_and_load_convenience_wrappers_delegate_to_yaml_helpers(self) -> None:
+        """Persist and reload documents and reports via convenience wrappers."""
         document = _build_document()
         report = _build_report()
 
@@ -217,6 +226,7 @@ class ApiSerializeTests(unittest.TestCase):
         self.assertEqual(loaded_report.name, "Serialize Report")
 
     def test_builder_save_yaml_and_section_source_path_persistence(self) -> None:
+        """Preserve section source-path metadata in serialized report output."""
         dataset = create_dataset("source-persist")
         dataset.add_curve(
             mnemonic="GR",
