@@ -28,7 +28,7 @@ import textwrap
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import yaml
@@ -69,12 +69,24 @@ from ..model import (
     ReportValueSpec,
     ScalarChannel,
     ScaleKind,
+    ScaleSpec,
     TrackHeaderObjectKind,
+    TrackHeaderObjectSpec,
     TrackKind,
+    TrackSpec,
     WellDataset,
 )
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 from .base import Renderer, RenderResult
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.backend_bases import RendererBase
+    from matplotlib.figure import Figure
+    from matplotlib.transforms import Bbox, Transform
+
+    from ..layout import DepthWindow, Frame, PageLayout
+    from ..model import PageSpec
 
 DEFAULT_MPL_STYLE_PATH = Path(__file__).with_name("matplotlib_defaults.yaml")
 
@@ -111,7 +123,7 @@ class _CurvePlotData:
     plot_values: np.ndarray
     valid_mask: np.ndarray
     wrapped_mask: np.ndarray
-    scale: Any
+    scale: ScaleSpec | None
     x_is_fractional: bool = False
 
 
@@ -197,22 +209,22 @@ class MatplotlibRenderer(Renderer):
         values = self.style.get(section, {})
         return values if isinstance(values, dict) else {}
 
-    def _style_value(self, section: str, key: str) -> Any:
+    def _style_value(self, section: str, key: str) -> object:
         return self._style_section(section)[key]
 
-    def _is_reference_track(self, track) -> bool:
+    def _is_reference_track(self, track: TrackSpec) -> bool:
         return track.kind == TrackKind.REFERENCE
 
-    def _is_annotation_track(self, track) -> bool:
+    def _is_annotation_track(self, track: TrackSpec) -> bool:
         return track.kind == TrackKind.ANNOTATION
 
-    def _reference_spec(self, track) -> ReferenceTrackSpec:
+    def _reference_spec(self, track: TrackSpec) -> ReferenceTrackSpec:
         reference = track.reference
         if reference is None:
             return ReferenceTrackSpec()
         return reference
 
-    def _reference_scale_text(self, track, document) -> str:
+    def _reference_scale_text(self, track: TrackSpec, document: LogDocument) -> str:
         reference = self._reference_spec(track)
         parts: list[str] = []
         if reference.display_unit_in_header:
@@ -225,7 +237,11 @@ class MatplotlibRenderer(Renderer):
             return "Reference"
         return " ".join(parts)
 
-    def _resolve_reference_steps(self, track, document) -> tuple[float, float, bool]:
+    def _resolve_reference_steps(
+        self,
+        track: TrackSpec,
+        document: LogDocument,
+    ) -> tuple[float, float, bool]:
         reference = self._reference_spec(track)
         major_step = reference.major_step or document.depth_axis.major_step
         if reference.minor_step is not None:
@@ -238,7 +254,7 @@ class MatplotlibRenderer(Renderer):
 
     def _resolved_reference_overlay(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
     ) -> ReferenceCurveOverlaySpec | None:
         if not self._is_reference_track(track):
@@ -317,7 +333,13 @@ class MatplotlibRenderer(Renderer):
         return f"{value:.{precision}g}"
 
     def _draw_reference_values_inside(
-        self, ax, track, document, window, *, major_step: float
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
+        window: DepthWindow,
+        *,
+        major_step: float,
     ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
@@ -361,8 +383,8 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_reference_edge_ticks(
         self,
-        ax,
-        window,
+        ax: Axes,
+        window: DepthWindow,
         *,
         major_step: float,
         minor_step: float,
@@ -404,10 +426,10 @@ class MatplotlibRenderer(Renderer):
         if draw_minor and minor_step > 0:
             _draw_ticks_for_step(minor_step, minor_len)
 
-    def _curve_count(self, track) -> int:
+    def _curve_count(self, track: TrackSpec) -> int:
         return sum(1 for element in track.elements if isinstance(element, CurveElement))
 
-    def _reference_event_elements(self, track) -> tuple[ReferenceEventSpec, ...]:
+    def _reference_event_elements(self, track: TrackSpec) -> tuple[ReferenceEventSpec, ...]:
         if not self._is_reference_track(track):
             return ()
         reference = track.reference
@@ -415,14 +437,14 @@ class MatplotlibRenderer(Renderer):
             return ()
         return tuple(reference.events)
 
-    def _fill_header_elements(self, track) -> list[CurveElement]:
+    def _fill_header_elements(self, track: TrackSpec) -> list[CurveElement]:
         return [
             element
             for element in track.elements
             if isinstance(element, CurveElement) and element.fill is not None
         ]
 
-    def _fill_header_count(self, track) -> int:
+    def _fill_header_count(self, track: TrackSpec) -> int:
         return len(self._fill_header_elements(track))
 
     def _document_curve_row_capacity(self, document: LogDocument) -> int:
@@ -434,19 +456,23 @@ class MatplotlibRenderer(Renderer):
     def _header_property_group_capacity(self, document: LogDocument) -> int:
         return max(1, self._document_curve_row_capacity(document))
 
-    def _curve_header_row_count(self, document: LogDocument, track) -> int:
+    def _curve_header_row_count(self, document: LogDocument, track: TrackSpec) -> int:
         count = self._curve_count(track)
         if count <= 0:
             return 0
         return max(count, self._header_property_group_capacity(document))
 
-    def _fill_header_row_count(self, document: LogDocument, track) -> int:
+    def _fill_header_row_count(self, document: LogDocument, track: TrackSpec) -> int:
         capacity = self._document_fill_row_capacity(document)
         if capacity <= 0:
             return 0
         return max(self._fill_header_count(track), capacity)
 
-    def _effective_header_line_units(self, track, header_item) -> int:
+    def _effective_header_line_units(
+        self,
+        track: TrackSpec,
+        header_item: TrackHeaderObjectSpec,
+    ) -> int:
         if not header_item.enabled or not header_item.reserve_space:
             return header_item.line_units
         if header_item.kind == TrackHeaderObjectKind.SCALE:
@@ -525,7 +551,12 @@ class MatplotlibRenderer(Renderer):
             return 0.0
         return max(float(style.get("height_mm", 0.0)), 0.0)
 
-    def _draw_section_title_box(self, fig, document, page_layout) -> float:
+    def _draw_section_title_box(
+        self,
+        fig: Figure,
+        document: LogDocument,
+        page_layout: PageLayout,
+    ) -> float:
         if page_layout.page_number != 1 or not page_layout.track_header_top_frames:
             return 0.0
 
@@ -883,17 +914,17 @@ class MatplotlibRenderer(Renderer):
             output_path=output,
         )
 
-    def _normalize_frame(self, page, frame) -> list[float]:
+    def _normalize_frame(self, page: PageSpec, frame: Frame) -> list[float]:
         left = frame.x_mm / page.width_mm
         bottom = 1.0 - (frame.y_mm + frame.height_mm) / page.height_mm
         width = frame.width_mm / page.width_mm
         height = frame.height_mm / page.height_mm
         return [left, bottom, width, height]
 
-    def _report_page_size_inches(self, page) -> tuple[float, float]:
+    def _report_page_size_inches(self, page: PageSpec) -> tuple[float, float]:
         return float(page.width_mm) / 25.4, float(page.height_mm) / 25.4
 
-    def _report_page_transform(self, ax, *, rotated: bool):
+    def _report_page_transform(self, ax: Axes, *, rotated: bool) -> Transform:
         if not rotated:
             return ax.transAxes
         from matplotlib.transforms import Affine2D
@@ -954,20 +985,20 @@ class MatplotlibRenderer(Renderer):
 
     def _measure_report_text_bbox(
         self,
-        ax,
+        ax: Axes,
         *,
-        renderer,
+        renderer: RendererBase,
         text: str,
         text_x: float,
         text_y: float,
-        transform,
+        transform: Transform,
         fontsize: float,
         fontweight: str,
         fontstyle: str,
         horizontal_alignment: str,
         vertical_alignment: str,
         rotation: float,
-    ):
+    ) -> Bbox:
         artist = ax.text(
             text_x,
             text_y,
@@ -989,12 +1020,12 @@ class MatplotlibRenderer(Renderer):
 
     def _fit_report_text_fontsize(
         self,
-        ax,
+        ax: Axes,
         *,
         text: str,
         text_x: float,
         text_y: float,
-        transform,
+        transform: Transform,
         base_fontsize: float,
         available_width_ratio: float,
         available_height_ratio: float,
@@ -1042,14 +1073,14 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_service_title_lines(
         self,
-        ax,
+        ax: Axes,
         titles: list[tuple[ReportServiceTitleSpec, str]],
         *,
         box: tuple[float, float, float, float],
         row_step: float,
         start_y: float,
         fallback_fontsize: float,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         if not titles:
@@ -1144,7 +1175,7 @@ class MatplotlibRenderer(Renderer):
             )
         return (text, "", "")
 
-    def _draw_report_outer_frame(self, ax, report_style: dict[str, Any]) -> None:
+    def _draw_report_outer_frame(self, ax: Axes, report_style: dict[str, Any]) -> None:
         from matplotlib.patches import Rectangle
 
         ax.add_patch(
@@ -1162,12 +1193,12 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_cover_section(
         self,
-        ax,
+        ax: Axes,
         report: ReportBlockSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         from matplotlib.patches import Rectangle
@@ -1520,13 +1551,13 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_summary_band(
         self,
-        ax,
+        ax: Axes,
         report: ReportBlockSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
         compact: bool,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         from matplotlib.patches import Rectangle
@@ -1609,12 +1640,12 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_tail_section(
         self,
-        ax,
+        ax: Axes,
         report: ReportBlockSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         from matplotlib.patches import Rectangle
@@ -1775,12 +1806,12 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_general_fields(
         self,
-        ax,
+        ax: Axes,
         report: ReportBlockSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         from matplotlib.patches import Rectangle
@@ -1850,13 +1881,13 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_service_titles(
         self,
-        ax,
+        ax: Axes,
         report: ReportBlockSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
         compact: bool,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         titles = self._report_service_titles(report, dataset)
@@ -1895,12 +1926,12 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_detail_table(
         self,
-        ax,
+        ax: Axes,
         detail: ReportDetailSpec,
         dataset: WellDataset,
         report_style: dict[str, Any],
         *,
-        transform,
+        transform: Transform,
         text_rotation: float,
     ) -> None:
         from matplotlib.patches import Rectangle
@@ -2067,7 +2098,7 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_page(
         self,
-        fig,
+        fig: Figure,
         report: ReportBlockSpec,
         dataset: WellDataset,
         *,
@@ -2111,7 +2142,7 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_report_remarks_section(
         self,
-        fig,
+        fig: Figure,
         remarks: list[dict[str, Any]],
         *,
         frame: tuple[float, float, float, float] | None = None,
@@ -2223,7 +2254,13 @@ class MatplotlibRenderer(Renderer):
             )
             current_top = block_bottom - gap
 
-    def _draw_header(self, fig, document, dataset, page_layout) -> None:
+    def _draw_header(
+        self,
+        fig: Figure,
+        document: LogDocument,
+        dataset: WellDataset,
+        page_layout: PageLayout,
+    ) -> None:
         header_style = self._style_section("header")
         header = document.header
         if header.title:
@@ -2260,7 +2297,14 @@ class MatplotlibRenderer(Renderer):
                 fontsize=float(header_style["field_fontsize"]),
             )
 
-    def _draw_footer(self, fig, document, page_layout, *, page_number: int | None = None) -> None:
+    def _draw_footer(
+        self,
+        fig: Figure,
+        document: LogDocument,
+        page_layout: PageLayout,
+        *,
+        page_number: int | None = None,
+    ) -> None:
         footer_style = self._style_section("footer")
         if not document.footer.lines:
             return
@@ -2283,7 +2327,13 @@ class MatplotlibRenderer(Renderer):
             fontsize=float(footer_style["page_fontsize"]),
         )
 
-    def _draw_track_header(self, ax, track, document, dataset) -> None:
+    def _draw_track_header(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
+        dataset: WellDataset,
+    ) -> None:
         track_header_style = self._style_section("track_header")
         ax.set_facecolor(str(track_header_style["background_color"]))
         ax.set_xticks([])
@@ -2341,7 +2391,11 @@ class MatplotlibRenderer(Renderer):
             elif item.kind == TrackHeaderObjectKind.DIVISIONS:
                 self._draw_track_header_divisions(ax, track, dataset, slot_top, slot_bottom)
 
-    def _curve_header_pair_slot(self, track, slots) -> tuple[int, int, float, float] | None:
+    def _curve_header_pair_slot(
+        self,
+        track: TrackSpec,
+        slots: tuple[tuple[TrackHeaderObjectSpec, float, float], ...],
+    ) -> tuple[int, int, float, float] | None:
         if self._is_reference_track(track):
             return None
         if self._curve_count(track) <= 0:
@@ -2367,8 +2421,8 @@ class MatplotlibRenderer(Renderer):
 
     def _raster_header_triplet_slot(
         self,
-        track,
-        slots,
+        track: TrackSpec,
+        slots: tuple[tuple[TrackHeaderObjectSpec, float, float], ...],
         dataset: WellDataset,
     ) -> tuple[int, int, float, float] | None:
         if self._curve_count(track) > 0:
@@ -2401,7 +2455,10 @@ class MatplotlibRenderer(Renderer):
         bottom = slots[last][2]
         return first, last, top, bottom
 
-    def _track_header_slots(self, track) -> tuple[tuple[object, float, float], ...]:
+    def _track_header_slots(
+        self,
+        track: TrackSpec,
+    ) -> tuple[tuple[TrackHeaderObjectSpec, float, float], ...]:
         reserved = track.header.reserved_objects()
         if not reserved:
             return ()
@@ -2421,7 +2478,7 @@ class MatplotlibRenderer(Renderer):
 
     def _slot_font_size(
         self,
-        ax,
+        ax: Axes,
         slot_top: float,
         slot_bottom: float,
         *,
@@ -2432,7 +2489,13 @@ class MatplotlibRenderer(Renderer):
         scale_factor = float(self._style_value("track_header", "font_scale_factor"))
         return max(min_pt, min(max_pt, slot_height_px * scale_factor))
 
-    def _draw_track_header_title(self, ax, track, slot_top: float, slot_bottom: float) -> None:
+    def _draw_track_header_title(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        slot_top: float,
+        slot_bottom: float,
+    ) -> None:
         track_header_style = self._style_section("track_header")
         fontsize = self._slot_font_size(
             ax,
@@ -2459,10 +2522,10 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_scale(
         self,
-        ax,
-        track,
-        document,
-        dataset,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
+        dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
     ) -> None:
