@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Core document, track, and report specification types for well_log_os."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -31,6 +33,8 @@ from .dataset import WellDataset
 
 
 class TrackKind(StrEnum):
+    """Supported track categories in a log layout."""
+
     REFERENCE = "reference"
     NORMAL = "normal"
     ARRAY = "array"
@@ -42,29 +46,39 @@ class TrackKind(StrEnum):
 
 
 class ScaleKind(StrEnum):
+    """Supported numeric scale transforms for scalar tracks."""
+
     LINEAR = "linear"
     LOG = "log"
     TANGENTIAL = "tangential"
 
 
 class GridScaleKind(StrEnum):
+    """Scale transforms available for vertical grid placement."""
+
     LINEAR = "linear"
     LOGARITHMIC = "logarithmic"
     TANGENTIAL = "tangential"
 
 
 class GridDisplayMode(StrEnum):
+    """Layer ordering options for track grids."""
+
     BELOW = "below"
     ABOVE = "above"
     NONE = "none"
 
 
 class GridSpacingMode(StrEnum):
+    """Strategies for spacing vertical grid lines."""
+
     COUNT = "count"
     SCALE = "scale"
 
 
 class TrackHeaderObjectKind(StrEnum):
+    """Logical rows available in a track header."""
+
     TITLE = "title"
     SCALE = "scale"
     LEGEND = "legend"
@@ -72,11 +86,15 @@ class TrackHeaderObjectKind(StrEnum):
 
 
 class ReferenceAxisKind(StrEnum):
+    """Reference-axis kinds supported by reference tracks."""
+
     DEPTH = "depth"
     TIME = "time"
 
 
 class NumberFormatKind(StrEnum):
+    """Numeric label formatting modes."""
+
     AUTOMATIC = "automatic"
     FIXED = "fixed"
     SCIENTIFIC = "scientific"
@@ -84,12 +102,16 @@ class NumberFormatKind(StrEnum):
 
 
 class RasterProfileKind(StrEnum):
+    """Predefined raster rendering profiles."""
+
     GENERIC = "generic"
     VDL = "vdl"
     WAVEFORM = "waveform"
 
 
 class RasterNormalizationKind(StrEnum):
+    """Normalization modes for raster and waveform amplitudes."""
+
     AUTO = "auto"
     NONE = "none"
     TRACE_MAXABS = "trace_maxabs"
@@ -97,11 +119,15 @@ class RasterNormalizationKind(StrEnum):
 
 
 class RasterColorbarPosition(StrEnum):
+    """Supported positions for raster colorbars."""
+
     RIGHT = "right"
     HEADER = "header"
 
 
 class CurveFillKind(StrEnum):
+    """Supported fill semantics for curve rendering."""
+
     BETWEEN_CURVES = "between_curves"
     BETWEEN_INSTANCES = "between_instances"
     TO_LOWER_LIMIT = "to_lower_limit"
@@ -110,24 +136,32 @@ class CurveFillKind(StrEnum):
 
 
 class ReferenceCurveOverlayMode(StrEnum):
+    """Overlay styles supported inside reference tracks."""
+
     CURVE = "curve"
     INDICATOR = "indicator"
     TICKS = "ticks"
 
 
 class ReferenceCurveTickSide(StrEnum):
+    """Sides on which reference ticks can be drawn."""
+
     LEFT = "left"
     RIGHT = "right"
     BOTH = "both"
 
 
 class AnnotationLabelMode(StrEnum):
+    """Placement strategies for annotation labels."""
+
     NONE = "none"
     FREE = "free"
     DEDICATED_LANE = "dedicated_lane"
 
 
 class ReportDetailKind(StrEnum):
+    """Supported report-detail table templates."""
+
     OPEN_HOLE = "open_hole"
     CASED_HOLE = "cased_hole"
 
@@ -149,6 +183,8 @@ _ANNOTATION_MARKER_SHAPES = {
 
 @dataclass(slots=True)
 class AnnotationIntervalSpec:
+    """Filled interval annotation occupying one lane span."""
+
     top: float
     base: float
     text: str = ""
@@ -212,6 +248,8 @@ class AnnotationIntervalSpec:
 
 @dataclass(slots=True)
 class AnnotationTextSpec:
+    """Free text annotation positioned at a depth or interval."""
+
     text: str
     depth: float | None = None
     top: float | None = None
@@ -276,6 +314,8 @@ class AnnotationTextSpec:
 
 @dataclass(slots=True)
 class AnnotationMarkerSpec:
+    """Point marker annotation with an optional label."""
+
     depth: float
     x: float = 0.5
     shape: str = "circle"
@@ -365,6 +405,8 @@ class AnnotationMarkerSpec:
 
 @dataclass(slots=True)
 class AnnotationArrowSpec:
+    """Arrow annotation between two depth/x positions."""
+
     start_depth: float
     end_depth: float
     start_x: float
@@ -435,6 +477,8 @@ class AnnotationArrowSpec:
 
 @dataclass(slots=True)
 class AnnotationGlyphSpec:
+    """Glyph or symbol annotation at a depth or interval."""
+
     glyph: str
     depth: float | None = None
     top: float | None = None
@@ -494,6 +538,8 @@ class AnnotationGlyphSpec:
 
 @dataclass(slots=True)
 class StyleSpec:
+    """Line and fill styling shared by rendered elements."""
+
     color: str = "black"
     line_width: float = 0.8
     line_style: str = "-"
@@ -505,6 +551,8 @@ class StyleSpec:
 
 @dataclass(slots=True)
 class ScaleSpec:
+    """Numeric scale bounds and transform for a track element."""
+
     kind: ScaleKind = ScaleKind.LINEAR
     minimum: float = 0.0
     maximum: float = 1.0
@@ -519,6 +567,8 @@ class ScaleSpec:
 
 @dataclass(slots=True)
 class GridSpec:
+    """Grid configuration for one track."""
+
     major: bool = True
     minor: bool = True
     major_alpha: float = 0.35
@@ -583,6 +633,8 @@ class GridSpec:
 
 @dataclass(slots=True)
 class ReferenceTrackSpec:
+    """Reference-track axis and label configuration."""
+
     axis: ReferenceAxisKind = ReferenceAxisKind.DEPTH
     define_layout: bool = True
     unit: str | None = None
@@ -618,6 +670,8 @@ class ReferenceTrackSpec:
 
 @dataclass(slots=True, frozen=True)
 class TrackHeaderObjectSpec:
+    """One logical header row reservation within a track header."""
+
     kind: TrackHeaderObjectKind
     enabled: bool = True
     reserve_space: bool = True
@@ -644,6 +698,8 @@ def _default_track_header_objects() -> tuple[TrackHeaderObjectSpec, ...]:
 
 @dataclass(slots=True)
 class TrackHeaderSpec:
+    """Ordered set of header rows reserved for a track."""
+
     objects: tuple[TrackHeaderObjectSpec, ...] = field(
         default_factory=_default_track_header_objects
     )
@@ -656,11 +712,14 @@ class TrackHeaderSpec:
             raise ValueError("Track header object kinds must be unique per track.")
 
     def reserved_objects(self) -> tuple[TrackHeaderObjectSpec, ...]:
+        """Return header rows that reserve vertical space."""
         return tuple(item for item in self.objects if item.reserve_space)
 
 
 @dataclass(slots=True)
 class CurveValueLabelsSpec:
+    """Configuration for rendering curve values as in-track labels."""
+
     step: float = 5.0
     number_format: NumberFormatKind = NumberFormatKind.AUTOMATIC
     precision: int = 2
@@ -689,6 +748,8 @@ class CurveValueLabelsSpec:
 
 @dataclass(slots=True)
 class CurveHeaderDisplaySpec:
+    """Visibility controls for curve header properties."""
+
     show_name: bool = True
     show_unit: bool = True
     show_limits: bool = True
@@ -698,6 +759,8 @@ class CurveHeaderDisplaySpec:
 
 @dataclass(slots=True)
 class ReferenceCurveOverlaySpec:
+    """Display settings for a curve overlaid on a reference track."""
+
     mode: ReferenceCurveOverlayMode = ReferenceCurveOverlayMode.CURVE
     lane_start: float | None = None
     lane_end: float | None = None
@@ -727,6 +790,8 @@ class ReferenceCurveOverlaySpec:
 
 @dataclass(slots=True)
 class ReferenceEventSpec:
+    """Reference-track event marker and callout settings."""
+
     depth: float
     label: str = ""
     color: str = "#222222"
@@ -788,6 +853,8 @@ class ReferenceEventSpec:
 
 @dataclass(slots=True)
 class CurveCalloutSpec:
+    """In-track callout attached to a scalar curve."""
+
     depth: float
     label: str | None = None
     side: str = "auto"
@@ -842,6 +909,8 @@ class CurveCalloutSpec:
 
 @dataclass(slots=True)
 class CurveFillCrossoverSpec:
+    """Two-color crossover styling for between-curve fills."""
+
     enabled: bool = False
     left_color: str | None = None
     right_color: str | None = None
@@ -858,6 +927,8 @@ class CurveFillCrossoverSpec:
 
 @dataclass(slots=True)
 class CurveFillBaselineSpec:
+    """Baseline and split-color settings for baseline fills."""
+
     value: float
     lower_color: str | None = None
     upper_color: str | None = None
@@ -880,6 +951,8 @@ class CurveFillBaselineSpec:
 
 @dataclass(slots=True)
 class CurveFillSpec:
+    """Fill configuration attached to a curve."""
+
     kind: CurveFillKind
     other_channel: str | None = None
     other_element_id: str | None = None
@@ -938,6 +1011,8 @@ class CurveFillSpec:
 
 @dataclass(slots=True)
 class CurveElement:
+    """Scalar curve binding within a track."""
+
     channel: str
     id: str | None = None
     label: str | None = None
@@ -967,6 +1042,8 @@ class CurveElement:
 
 @dataclass(slots=True)
 class RasterWaveformSpec:
+    """Waveform overlay settings for raster tracks."""
+
     enabled: bool = False
     stride: int = 1
     amplitude_scale: float = 0.35
@@ -997,6 +1074,8 @@ class RasterWaveformSpec:
 
 @dataclass(slots=True)
 class RasterElement:
+    """Raster or array binding within a track."""
+
     channel: str
     label: str | None = None
     style: StyleSpec = field(default_factory=StyleSpec)
@@ -1068,6 +1147,8 @@ AnnotationObject = (
 
 @dataclass(slots=True)
 class HeaderField:
+    """Header field that resolves one dataset metadata value."""
+
     label: str
     source_key: str
     default: str = ""
@@ -1075,6 +1156,8 @@ class HeaderField:
 
 @dataclass(slots=True)
 class ReportValueSpec:
+    """Literal or dataset-backed value used in report pages."""
+
     value: str | None = None
     source_key: str | None = None
     default: str = ""
@@ -1091,6 +1174,8 @@ class ReportValueSpec:
 
 @dataclass(slots=True)
 class ReportFieldSpec:
+    """Labeled general field shown in heading or tail pages."""
+
     key: str
     label: str
     value: ReportValueSpec = field(default_factory=ReportValueSpec)
@@ -1106,6 +1191,8 @@ class ReportFieldSpec:
 
 @dataclass(slots=True)
 class ReportServiceTitleSpec:
+    """One service-title line in report heading and tail pages."""
+
     value: ReportValueSpec = field(default_factory=ReportValueSpec)
     font_size: float | None = None
     auto_adjust: bool = True
@@ -1130,6 +1217,8 @@ class ReportServiceTitleSpec:
 
 @dataclass(slots=True)
 class ReportDetailCellSpec:
+    """One detail-table cell in a report page."""
+
     value: ReportValueSpec = field(default_factory=ReportValueSpec)
     background_color: str | None = None
     text_color: str | None = None
@@ -1155,6 +1244,8 @@ class ReportDetailCellSpec:
 
 @dataclass(slots=True)
 class ReportDetailColumnSpec:
+    """One value column in a report detail row."""
+
     cells: tuple[ReportDetailCellSpec, ...]
 
     def __post_init__(self) -> None:
@@ -1166,6 +1257,8 @@ class ReportDetailColumnSpec:
 
 @dataclass(slots=True)
 class ReportDetailRowSpec:
+    """One row in a report detail table."""
+
     label_cells: tuple[ReportDetailCellSpec, ...]
     columns: tuple[ReportDetailColumnSpec, ...]
 
@@ -1182,6 +1275,8 @@ class ReportDetailRowSpec:
 
 @dataclass(slots=True)
 class ReportDetailSpec:
+    """Selected open-hole or cased-hole report detail table."""
+
     kind: ReportDetailKind
     title: str | None = None
     column_titles: tuple[str, ...] = ()
@@ -1216,6 +1311,8 @@ class ReportDetailSpec:
 
 @dataclass(slots=True)
 class ReportBlockSpec:
+    """Shared configuration for heading and tail report pages."""
+
     enabled: bool = True
     provider_name: str | None = None
     general_fields: tuple[ReportFieldSpec, ...] = ()
@@ -1232,6 +1329,8 @@ class ReportBlockSpec:
 
 @dataclass(slots=True)
 class HeaderSpec:
+    """Document header content rendered above the log body."""
+
     title: str | None = None
     subtitle: str | None = None
     fields: tuple[HeaderField, ...] = ()
@@ -1240,11 +1339,15 @@ class HeaderSpec:
 
 @dataclass(slots=True)
 class FooterSpec:
+    """Document footer content rendered below the log body."""
+
     lines: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
 class MarkerSpec:
+    """Depth marker rendered across the document body."""
+
     depth: float
     label: str
     color: str = "#666666"
@@ -1253,6 +1356,8 @@ class MarkerSpec:
 
 @dataclass(slots=True)
 class ZoneSpec:
+    """Named depth interval highlighted across tracks."""
+
     top: float
     base: float
     label: str
@@ -1272,6 +1377,8 @@ _PAGE_SIZES_MM = {
 
 @dataclass(slots=True)
 class PageSpec:
+    """Physical page geometry and layout margins."""
+
     width_mm: float
     height_mm: float
     continuous: bool = False
@@ -1287,6 +1394,7 @@ class PageSpec:
 
     @classmethod
     def from_name(cls, name: str, orientation: str = "portrait", **kwargs: Any) -> PageSpec:
+        """Build a page specification from a named paper size."""
         size_name = name.strip().upper()
         if size_name not in _PAGE_SIZES_MM:
             raise TemplateValidationError(f"Unsupported page size {name!r}.")
@@ -1297,14 +1405,17 @@ class PageSpec:
 
     @property
     def usable_width_mm(self) -> float:
+        """Return the horizontal space available for tracks."""
         return self.width_mm - self.margin_left_mm - self.margin_right_mm
 
     @property
     def plot_top_mm(self) -> float:
+        """Return the top offset of the main plotting area."""
         return self.margin_top_mm + self.header_height_mm + self.track_header_height_mm
 
     @property
     def plot_height_mm(self) -> float:
+        """Return the vertical size of the main plotting area."""
         return (
             self.height_mm
             - self.margin_top_mm
@@ -1317,6 +1428,8 @@ class PageSpec:
 
 @dataclass(slots=True)
 class DepthAxisSpec:
+    """Shared depth or time axis configuration for a document."""
+
     unit: str = "m"
     scale_ratio: int = 200
     major_step: float = 10.0
@@ -1331,6 +1444,8 @@ class DepthAxisSpec:
 
 @dataclass(slots=True)
 class TrackSpec:
+    """One rendered track in a log document."""
+
     id: str
     title: str
     kind: TrackKind
@@ -1399,6 +1514,8 @@ class TrackSpec:
 
 @dataclass(slots=True)
 class LogDocument:
+    """Fully resolved document ready for layout and rendering."""
+
     name: str
     page: PageSpec
     depth_axis: DepthAxisSpec
@@ -1419,6 +1536,7 @@ class LogDocument:
         dataset: WellDataset,
         registry: SimpleUnitRegistry = DEFAULT_UNITS,
     ) -> tuple[float, float]:
+        """Resolve the active top/base range in the document axis unit."""
         if self.depth_range is not None:
             top, base = self.depth_range
         else:

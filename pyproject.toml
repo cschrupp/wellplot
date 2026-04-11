@@ -128,7 +128,6 @@ convention = "pep257"
 "src/well_log_os/layout.py" = ["D"]
 "src/well_log_os/logfile.py" = ["D"]
 "src/well_log_os/logfile_schema.py" = ["D"]
-"src/well_log_os/model/document.py" = ["D"]
 "src/well_log_os/pipeline.py" = ["D"]
 "src/well_log_os/renderers/*.py" = ["D"]
 "src/well_log_os/templates.py" = ["D"]
