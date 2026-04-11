@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Command-line entry points for well_log_os."""
+
 from __future__ import annotations
 
 import argparse
@@ -30,6 +32,7 @@ from .pipeline import render_from_logfile
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the top-level command-line parser."""
     parser = argparse.ArgumentParser(
         prog="well-log-os", description="well_log_os command-line tools"
     )
@@ -51,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the command-line interface and return a process exit code."""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "render":

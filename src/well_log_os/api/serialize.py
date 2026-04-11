@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Serialization helpers for documents and programmatic reports."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -711,6 +713,7 @@ def _serialize_zone(zone: ZoneSpec) -> dict[str, Any]:
 
 
 def document_to_dict(document: LogDocument) -> dict[str, Any]:
+    """Convert a document object into a normalized mapping."""
     payload = {
         "name": document.name,
         "page": _serialize_page(document.page),
@@ -731,6 +734,7 @@ def document_to_dict(document: LogDocument) -> dict[str, Any]:
 
 
 def document_from_dict(data: Mapping[str, Any]) -> LogDocument:
+    """Build a document object from a validated mapping."""
     return document_from_mapping(dict(data))
 
 
@@ -738,20 +742,24 @@ def document_to_yaml(
     document: LogDocument,
     destination: str | Path | TextIO | None = None,
 ) -> str | None:
+    """Serialize a document object to YAML text or a destination."""
     return _write_yaml(document_to_dict(document), destination)
 
 
 def save_document(document: LogDocument, destination: str | Path | TextIO) -> str | None:
+    """Write a document object to YAML."""
     return document_to_yaml(document, destination)
 
 
 def document_from_yaml(source: str | Path | TextIO) -> LogDocument:
+    """Load a document object from YAML content or a YAML file."""
     if hasattr(source, "read"):
         return document_from_dict(_read_yaml_mapping(source))
     return load_document(source)
 
 
 def load_document_yaml(source: str | Path | TextIO) -> LogDocument:
+    """Compatibility wrapper for loading document YAML."""
     return document_from_yaml(source)
 
 
@@ -783,6 +791,7 @@ def _logfile_spec_to_mapping(spec: LogFileSpec) -> dict[str, Any]:
 def report_to_dict(
     report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
 ) -> dict[str, Any]:
+    """Convert a report-like object into a normalized logfile mapping."""
     if isinstance(report, ProgrammaticLogSpec):
         return report.to_mapping()
     if isinstance(report, LogBuilder):
@@ -797,6 +806,7 @@ def report_to_dict(
 
 
 def report_from_dict(data: Mapping[str, Any]) -> LogFileSpec:
+    """Build a logfile specification from a mapping."""
     return logfile_from_mapping(dict(data))
 
 
@@ -804,6 +814,7 @@ def report_to_yaml(
     report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
     destination: str | Path | TextIO | None = None,
 ) -> str | None:
+    """Serialize a report-like object to YAML text or a destination."""
     return _write_yaml(report_to_dict(report), destination)
 
 
@@ -811,16 +822,19 @@ def save_report(
     report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
     destination: str | Path | TextIO,
 ) -> str | None:
+    """Write a report mapping or object to YAML."""
     return report_to_yaml(report, destination)
 
 
 def report_from_yaml(source: str | Path | TextIO) -> LogFileSpec:
+    """Load a logfile specification from YAML content or a YAML file."""
     if hasattr(source, "read"):
         return report_from_dict(_read_yaml_mapping(source))
     return load_logfile(source)
 
 
 def load_report(source: str | Path | TextIO) -> LogFileSpec:
+    """Compatibility wrapper for loading report YAML."""
     return report_from_yaml(source)
 
 

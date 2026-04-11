@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Programmatic rendering helpers for reports and scoped subsets."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -231,6 +233,7 @@ def build_documents(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> tuple[LogDocument, ...]:
+    """Build render-ready documents for the selected report scope."""
     normalized_sections = _normalize_section_ids(section_ids)
     normalized_tracks = _normalize_track_selection(
         track_ids_by_section=track_ids_by_section,
@@ -259,6 +262,7 @@ def render_report(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> RenderResult:
+    """Render the selected report scope with the configured backend."""
     normalized_sections = _normalize_section_ids(section_ids)
     normalized_tracks = _normalize_track_selection(
         track_ids_by_section=track_ids_by_section,
@@ -315,6 +319,7 @@ def render_section(
     section_id: str,
     output_path: str | Path | None = None,
 ) -> RenderResult:
+    """Render a single log section without report pages."""
     return render_report(
         report,
         output_path=output_path,
@@ -332,6 +337,7 @@ def render_track(
     depth_range: tuple[float, float] | None = None,
     depth_range_unit: str | None = None,
 ) -> RenderResult:
+    """Render selected tracks from a section without report pages."""
     track_selection = _normalize_track_selection(section_id, track_ids)
     return render_report(
         report,
@@ -352,6 +358,7 @@ def render_window(
     output_path: str | Path | None = None,
     section_ids: list[str] | tuple[str, ...] | None = None,
 ) -> RenderResult:
+    """Render a depth- or time-windowed subset of the report."""
     return render_report(
         report,
         output_path=output_path,
@@ -415,6 +422,7 @@ def render_png_bytes(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> bytes:
+    """Render the selected scope and return one page as PNG bytes."""
     result = render_report(
         report,
         output_path=None,
@@ -437,6 +445,7 @@ def render_svg_bytes(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> bytes:
+    """Render the selected scope and return one page as SVG bytes."""
     result = render_report(
         report,
         output_path=None,
@@ -456,6 +465,7 @@ def render_section_png(
     page_index: int = 0,
     dpi: int | None = None,
 ) -> bytes:
+    """Render a single section and return the selected page as PNG bytes."""
     return render_png_bytes(
         report,
         page_index=page_index,
@@ -475,6 +485,7 @@ def render_track_png(
     depth_range: tuple[float, float] | None = None,
     depth_range_unit: str | None = None,
 ) -> bytes:
+    """Render selected tracks from one section and return PNG bytes."""
     track_selection = _normalize_track_selection(section_id, track_ids)
     return render_png_bytes(
         report,
@@ -497,6 +508,7 @@ def render_window_png(
     dpi: int | None = None,
     section_ids: list[str] | tuple[str, ...] | None = None,
 ) -> bytes:
+    """Render a depth or time window and return PNG bytes."""
     return render_png_bytes(
         report,
         page_index=page_index,

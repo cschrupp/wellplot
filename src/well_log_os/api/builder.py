@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Programmatic builders for reports, sections, and bindings."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -36,20 +38,25 @@ def _copy_if_present(target: dict[str, Any], key: str, value: Any) -> None:
 
 @dataclass(slots=True)
 class ProgrammaticLogSpec:
+    """Normalized in-memory report specification with attached datasets."""
+
     spec: LogFileSpec
     mapping: dict[str, Any]
     datasets_by_section: dict[str, WellDataset]
     source_paths_by_section: dict[str, Path]
 
     def to_mapping(self) -> dict[str, Any]:
+        """Return a deep-copied mapping representation of the report."""
         return deepcopy(self.mapping)
 
     def to_yaml(self, destination: str | Path | None = None) -> str | None:
+        """Serialize the report mapping to YAML."""
         from .serialize import report_to_yaml
 
         return report_to_yaml(self, destination)
 
     def build_documents(self) -> tuple[LogDocument, ...]:
+        """Build render-ready documents from the stored report specification."""
         return build_documents_for_logfile(
             self.spec,
             self.datasets_by_section,
@@ -58,12 +65,15 @@ class ProgrammaticLogSpec:
 
 
 class SectionBuilder:
+    """Fluent builder for one log section within a programmatic report."""
+
     def __init__(self, builder: LogBuilder, section_id: str) -> None:
         self._builder = builder
         self._section_id = section_id
 
     @property
     def section_id(self) -> str:
+        """Return the owning section identifier."""
         return self._section_id
 
     @property
@@ -84,6 +94,7 @@ class SectionBuilder:
         reference: dict[str, Any] | None = None,
         annotations: list[dict[str, Any]] | None = None,
     ) -> SectionBuilder:
+        """Add a track definition to the section."""
         track = {
             "id": id,
             "title": title,
@@ -135,6 +146,7 @@ class SectionBuilder:
         wrap: bool | dict[str, Any] | None = None,
         render_mode: str | None = None,
     ) -> SectionBuilder:
+        """Add a scalar curve binding to the section."""
         return self._add_binding(
             kind="curve",
             channel=channel,
@@ -172,6 +184,7 @@ class SectionBuilder:
         sample_axis: dict[str, Any] | bool | None = None,
         waveform: dict[str, Any] | None = None,
     ) -> SectionBuilder:
+        """Add a raster or array binding to the section."""
         return self._add_binding(
             kind="raster",
             channel=channel,
@@ -195,6 +208,8 @@ class SectionBuilder:
 
 
 class LogBuilder:
+    """Fluent builder for programmatic report composition."""
+
     def __init__(self, *, name: str) -> None:
         self._mapping: dict[str, Any] = {
             "version": 1,
@@ -237,6 +252,7 @@ class LogBuilder:
         continuous_strip_page_height_mm: float | None = None,
         matplotlib_style: dict[str, Any] | None = None,
     ) -> LogBuilder:
+        """Configure backend-specific render settings."""
         render = self._mapping["render"]
         render["backend"] = backend
         render["output_path"] = output_path
@@ -252,6 +268,7 @@ class LogBuilder:
         return self
 
     def set_page(self, **page: Any) -> LogBuilder:
+        """Replace the document page configuration."""
         self._mapping["document"]["page"] = deepcopy(page)
         return self
 
@@ -263,6 +280,7 @@ class LogBuilder:
         major_step: float,
         minor_step: float,
     ) -> LogBuilder:
+        """Configure the shared depth or time axis for the report."""
         self._mapping["document"]["depth"] = {
             "unit": unit,
             "scale": scale,
@@ -272,6 +290,7 @@ class LogBuilder:
         return self
 
     def set_depth_range(self, top: float, base: float) -> LogBuilder:
+        """Constrain the document to a top/base interval."""
         self._mapping["document"]["depth_range"] = [float(top), float(base)]
         return self
 
@@ -282,6 +301,7 @@ class LogBuilder:
         subtitle: str | None = None,
         fields: list[dict[str, Any]] | None = None,
     ) -> LogBuilder:
+        """Configure the standard document header block."""
         header = self._mapping["document"].setdefault("header", {})
         if title is not None:
             header["title"] = title
@@ -292,6 +312,7 @@ class LogBuilder:
         return self
 
     def set_footer(self, *, lines: list[str]) -> LogBuilder:
+        """Configure the simple footer lines block."""
         self._mapping["document"]["footer"] = {"lines": list(lines)}
         return self
 
@@ -305,6 +326,7 @@ class LogBuilder:
         detail: dict[str, Any] | None = None,
         tail_enabled: bool | None = None,
     ) -> LogBuilder:
+        """Configure report heading and tail content."""
         layout = self._mapping["document"]["layout"]
         heading = dict(layout.get("heading", {}))
         heading["enabled"] = bool(enabled)
@@ -318,14 +340,17 @@ class LogBuilder:
         return self
 
     def set_remarks(self, remarks: list[dict[str, Any]]) -> LogBuilder:
+        """Replace the remarks block rendered on the first report page."""
         self._mapping["document"]["layout"]["remarks"] = deepcopy(remarks)
         return self
 
     def set_on_missing(self, mode: str) -> LogBuilder:
+        """Set the binding behavior for missing channels."""
         self._mapping["document"]["bindings"]["on_missing"] = str(mode)
         return self
 
     def save_yaml(self, destination: str | Path | None = None) -> str | None:
+        """Serialize the current report mapping to YAML."""
         from .serialize import report_to_yaml
 
         return report_to_yaml(self, destination)
@@ -341,6 +366,7 @@ class LogBuilder:
         source_path: str | Path | None = None,
         source_format: str = "auto",
     ) -> SectionBuilder:
+        """Add a dataset-backed log section and return its section builder."""
         normalized_id = str(section_id).strip()
         if not normalized_id:
             raise TemplateValidationError("Section id must be non-empty.")
@@ -377,6 +403,7 @@ class LogBuilder:
         return SectionBuilder(self, normalized_id)
 
     def to_mapping(self) -> dict[str, Any]:
+        """Return the normalized YAML-style mapping for the report."""
         mapping = deepcopy(self._mapping)
         mapping["document"]["bindings"]["channels"] = deepcopy(self._bindings)
         return mapping
@@ -386,6 +413,7 @@ class LogBuilder:
         return self._mapping["document"]["bindings"]["channels"]
 
     def build(self) -> ProgrammaticLogSpec:
+        """Validate the builder state and return a render-ready report object."""
         mapping = self.to_mapping()
         spec = logfile_from_mapping(mapping)
         section_ids = {

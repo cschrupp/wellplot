@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Public package exports for well_log_os."""
+
 from .api import (
     DatasetBuilder,
     LogBuilder,

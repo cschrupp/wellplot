@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Dataset creation and ingestion helpers for programmatic workflows."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -31,6 +33,7 @@ def create_dataset(
     well_metadata: Mapping[str, Any] | None = None,
     provenance: Mapping[str, Any] | None = None,
 ) -> WellDataset:
+    """Create an empty dataset with optional metadata and provenance."""
     return WellDataset(
         name=name,
         well_metadata=dict(well_metadata or {}),
@@ -39,6 +42,8 @@ def create_dataset(
 
 
 class DatasetBuilder:
+    """Fluent builder for creating and enriching in-memory datasets."""
+
     def __init__(
         self,
         *,
@@ -54,21 +59,26 @@ class DatasetBuilder:
 
     @property
     def dataset(self) -> WellDataset:
+        """Expose the underlying dataset while the builder remains mutable."""
         return self._dataset
 
     def build(self) -> WellDataset:
+        """Validate and return the dataset."""
         self._dataset.validate()
         return self._dataset
 
     def add_channel(self, channel: BaseChannel, *, replace: bool = True) -> DatasetBuilder:
+        """Insert an already constructed channel object."""
         self._dataset.add_channel(channel, replace=replace)
         return self
 
     def add_or_replace_channel(self, channel: BaseChannel) -> DatasetBuilder:
+        """Insert a channel, replacing any channel with the same mnemonic."""
         self._dataset.add_or_replace_channel(channel)
         return self
 
     def rename_channel(self, mnemonic: str, new_mnemonic: str) -> DatasetBuilder:
+        """Rename an existing channel in the dataset."""
         self._dataset.rename_channel(mnemonic, new_mnemonic)
         return self
 
@@ -86,6 +96,7 @@ class DatasetBuilder:
         metadata: Mapping[str, Any] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
+        """Add a scalar curve from array-like values and index samples."""
         self._dataset.add_curve(
             mnemonic=mnemonic,
             values=values,
@@ -117,6 +128,7 @@ class DatasetBuilder:
         metadata: Mapping[str, Any] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
+        """Add a 2D array channel from values plus index and sample axes."""
         self._dataset.add_array(
             mnemonic=mnemonic,
             values=values,
@@ -148,6 +160,7 @@ class DatasetBuilder:
         metadata: Mapping[str, Any] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
+        """Add a scalar curve from a pandas-style series object."""
         self._dataset.add_series(
             series=series,
             index_unit=index_unit,
@@ -175,6 +188,7 @@ class DatasetBuilder:
         source: str | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> DatasetBuilder:
+        """Add multiple scalar curves from a pandas-style dataframe."""
         self._dataset.add_dataframe(
             frame,
             index_unit=index_unit,
@@ -206,6 +220,7 @@ class DatasetBuilder:
         colormap: str = "viridis",
         replace: bool = True,
     ) -> DatasetBuilder:
+        """Add a raster channel with colormap metadata."""
         self._dataset.add_raster(
             mnemonic=mnemonic,
             values=values,
@@ -234,6 +249,7 @@ class DatasetBuilder:
         merge_well_metadata: bool = False,
         merge_provenance: bool = False,
     ) -> DatasetBuilder:
+        """Merge another dataset using the selected collision policy."""
         self._dataset.merge(
             other,
             replace=replace,
@@ -250,6 +266,7 @@ class DatasetBuilder:
         ascending: bool = True,
         channels: list[str] | None = None,
     ) -> DatasetBuilder:
+        """Sort one or more channels by their reference axis."""
         self._dataset.sort_index(ascending=ascending, channels=channels)
         return self
 
@@ -259,6 +276,7 @@ class DatasetBuilder:
         *,
         channels: list[str] | None = None,
     ) -> DatasetBuilder:
+        """Convert one or more channel indices to another unit."""
         self._dataset.convert_index_unit(unit, channels=channels)
         return self
 
@@ -271,6 +289,7 @@ class DatasetBuilder:
         method: str = "linear",
         channels: list[str] | None = None,
     ) -> DatasetBuilder:
+        """Reindex selected channels to another channel or explicit axis."""
         self._dataset.reindex_to(
             channel=channel,
             index=index,

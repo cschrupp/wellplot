@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
 authors = [
-  {name = "well_log_os contributors"},
+  {name = "Carlos Schrupp"},
 ]
 dependencies = [
   "jsonschema>=4.23",
