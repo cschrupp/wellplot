@@ -1,6 +1,6 @@
 # well_log_os Roadmap
 
-Last updated: 2026-03-18
+Last updated: 2026-04-11
 
 ## Scope Summary
 
@@ -15,6 +15,11 @@ Decision history is tracked in `docs/decision-log.md`.
 ## Current Baseline
 
 - YAML templates define page, depth axis, tracks, styles, annotations.
+- The programmatic API is now available through:
+  - `well_log_os.api.dataset`
+  - `well_log_os.api.builder`
+  - `well_log_os.api.render`
+  - `well_log_os.api.serialize`
 - Logfile config is now track-first:
   - `document.layout.log_sections[*].tracks` defines layout
   - `document.bindings.channels[*]` assigns channels to tracks
@@ -56,6 +61,31 @@ Decision history is tracked in `docs/decision-log.md`.
   - `layout.remarks`
   - `layout.log_sections`
   - `layout.tail`
+- Programmatic dataset workflows now support:
+  - computed-channel ingestion from numpy lists/arrays
+  - pandas `Series` / `DataFrame` adapters
+  - index sorting, unit conversion, reindexing, and dataset merge helpers
+  - partial renders for section/track/window scopes
+  - notebook-friendly PNG/SVG byte rendering
+  - YAML round-trip helpers for normalized documents and report mappings
+- Report packets now include:
+  - shared heading/tail report blocks
+  - fixed-row `open_hole` and `cased_hole` detail tables
+  - first-page `remarks` sections
+- User documentation foundation is now in place:
+  - MkDocs + Material site scaffold under `docs/site`
+  - GitHub Pages deployment workflow under `.github/workflows/docs.yml`
+  - workflow-oriented guides for installation, concepts, datasets, examples, report pages,
+    rendering, and the Python API
+- Production hardening is underway:
+  - Apache-2.0 SPDX headers applied across source, tests, and examples
+  - `pydocstyle` rollout completed across `src/`, `tests/`, and `examples/`
+  - `ANN` enforcement enabled for `src/` with staged ignores for `tests/` and `examples/`
+  - package metadata now includes keywords, project URLs, SPDX license expression, and dynamic
+    version sourcing
+  - the top-level package and `well_log_os.api` public surfaces are covered by import-contract
+    tests
+  - local `uv build` validation succeeds for both sdist and wheel
 - Data source routing is section-first with optional root fallback:
   - `layout.log_sections[*].data.source_path`
   - `layout.log_sections[*].data.source_format`
@@ -72,39 +102,29 @@ Needed next to complete the intended workflow:
 - Add validation for unbound required tracks and optional strict mode for empty tracks.
 - Add CLI/report diagnostics that summarize section coverage and binding coverage.
 
-## Next Phase: Programmatic API and Dataset Ingestion (2026-03-18)
+## Completed Phase: Programmatic API and Dataset Ingestion (2026-04-11)
 
-This is now the active next phase after the current report/track MVP baseline.
+This phase is no longer planned work. It is now part of the project baseline.
 
-Core goals:
+Delivered goals:
 
-- allow researchers to add computed channels from numpy/pandas back into `WellDataset`
-- allow logs to be composed in Python without hand-authoring YAML
-- support full and partial renders for notebook workflows
-- keep YAML as serialization, not the only authoring surface
+- researchers can add computed channels from numpy/pandas back into `WellDataset`
+- logs can be composed in Python without hand-authoring YAML
+- full and partial renders are available for notebook workflows
+- YAML remains a first-class serialization format without being the only authoring surface
 
-Planned public modules:
+Delivered public modules:
 
 - `well_log_os.api.dataset`
 - `well_log_os.api.builder`
 - `well_log_os.api.render`
 - `well_log_os.api.serialize`
 
-Planned delivery order:
-
-1. dataset-ingestion API
-2. in-memory composition/render bridge
-3. pandas/numpy adapters
-4. validation and alignment helpers
-5. partial render API
-6. notebook-friendly outputs
-7. examples and tests
-
 Detailed checklist:
 
 - [docs/programmatic-api-plan.md](programmatic-api-plan.md)
 
-Status:
+Delivered status:
 
 - implemented:
   - dataset-ingestion API
@@ -128,12 +148,47 @@ Status:
     - `LogBuilder.save_yaml(...)`
     - `ProgrammaticLogSpec.to_yaml(...)`
     - persisted section `source_path` / `source_format`
-  - initial notebook examples for both dataset ingestion and layout rendering
+  - notebook examples for dataset ingestion and layout rendering
   - coherent end-to-end workflow example:
     - [examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py)
-- next:
+- remaining polish that now belongs to production hardening:
   - dataset provenance/collision polish beyond the current merge-history baseline
-  - notebook-first end-to-end demo parity if we want `.ipynb` coverage for the full workflow
+  - notebook-first end-to-end demo parity if we decide to maintain full `.ipynb` coverage
+
+## Current Phase: Production Readiness and Release Hardening (2026-04-11)
+
+This is now the active phase.
+
+Core goals:
+
+- turn the project into a clean publishable Python library
+- keep the public API stable and explicitly tested
+- publish user documentation on GitHub Pages
+- raise code quality with staged, enforceable linting and documentation rules
+
+Current status:
+
+- implemented:
+  - MkDocs + Material documentation scaffold
+  - GitHub Pages deployment workflow
+  - workflow-oriented user docs under `docs/site/`
+  - Apache-2.0 SPDX file headers across source, tests, and examples
+  - repo-wide `pydocstyle` rollout
+  - staged `ANN` rollout with enforcement in `src/`
+  - package metadata cleanup:
+    - SPDX license expression
+    - project URLs
+    - keywords
+    - dynamic version sourcing from package code
+  - public import-contract tests for `well_log_os` and `well_log_os.api`
+  - local wheel/sdist build verification with `uv build`
+- next:
+  - clean install smoke test from the built wheel
+  - CI matrix for lint, tests, build, and smoke import
+  - release workflow and TestPyPI rehearsal
+  - expand user docs reference pages beyond the current workflow-first skeleton
+  - continue staged `ANN` cleanup in `tests/` and `examples/`
+  - keep pruning stale comments and filling public API docstring gaps where they still exist
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
@@ -190,12 +245,12 @@ Longer-term / UI-centric:
 
 ## Development Plan
 
-### Phase A: Core Stabilization (current)
+### Phase A: Production Hardening (current)
 
-- Harden template schema validation.
-- Expand renderer regression tests (layout + header behavior).
-- Add more realistic template examples (triple combo, CBL-style strips).
-- Keep parity between model and docs.
+- Complete clean install smoke tests from built distributions.
+- Add CI coverage for lint, tests, build, and smoke import.
+- Keep package metadata, docs, and public exports aligned.
+- Continue staged lint/docstring tightening where signal remains high.
 
 ### Phase B: Rendering Quality
 
@@ -222,62 +277,31 @@ Longer-term / UI-centric:
 
 ### Phase E: Packaging and Ecosystem
 
-- Improve docs with API examples and cookbook-style templates.
+- Publish the package through a rehearsed TestPyPI/PyPI flow.
+- Expand docs with API reference and cookbook-style templates.
 - Publish contributor guide and architecture notes.
 - Prepare roadmap for web service/UI packaging.
 
 ## Immediate Next Tasks
 
-- Begin the programmatic API phase:
-  - dataset-ingestion API for computed channels
-  - in-memory composition/render bridge using the existing layout pipeline
-  - pandas/numpy adapters
-  - partial render API for section/track/window scopes
-  - notebook-friendly output helpers
-  - YAML round-trip support for builder-created documents
-- Document and expand reference/depth track usage:
-  - reference-track overlay YAML examples
-  - full-length reference overlay example
-  - compatibility notes for depth/time reference units versus overlaid curve units
-- Improve reference-track local event handling:
-  - optional collision-aware placement for event labels versus curve callouts
-  - optional header summaries for local reference events
-- Polish annotation-track examples and contracts:
-  - clearer dedicated-lane examples for dense lithofacies/event tracks
-  - optional multi-lane event-label examples
-  - collision-aware placement notes in the schema reference
-- Extend multi-section composition engine:
-  - render heading/remarks/tail blocks between log sections
-  - add section-specific break policies for continuous and paginated outputs
-- Implement section object rendering:
-  - heading blocks
-  - comment/notes blocks
-  - tail blocks
-- Add per-section layout contracts:
-  - optional `depth_range` per section
-  - optional section-specific track-header height and spacing
-- Add binding ergonomics:
-  - track defaults (`curve_defaults` / `raster_defaults`)
-  - optional per-track binding templates
-  - strict validation mode for missing channels/empty tracks
-- Add end-to-end examples using the new model:
-  - single-section CBL
-  - multi-section report with remarks
-  - mixed section layouts (reference + array + normal)
-- Complete reference-track properties from parity screenshots:
-  - header orientation/alignment controls
-  - values orientation modes
-  - appearance block (track/header bg colors, font settings)
-  - print/layout width semantics
-- Implement explicit `array` track options beyond raster baseline:
-  - array-specific legends and advanced colorbar placement
-  - per-track colormap presets
-- Add reference-track focused examples:
-  - depth-reference with curve overlay
-  - time-reference sample
-  - mixed reference + array + normal layout
-- Add image-track template examples for CBL/VDL with curve overlays.
-- Introduce report-section primitives (cover, disclaimer, contents, parameter tables).
+- Complete release hardening:
+  - clean install smoke test from the built wheel
+  - CI matrix for lint, tests, build, and smoke import
+  - release workflow plus TestPyPI rehearsal
+- Expand user documentation from the current workflow-first baseline:
+  - Python API reference pages
+  - YAML/report-schema reference pages
+  - cookbook-style examples tied to real workflows
+- Continue staged code-quality tightening:
+  - remove `ANN` per-file ignores from `tests/` and `examples/` over time
+  - keep filling docstrings on stable public surfaces
+  - continue stale comment cleanup where refactors have moved the code
+- Revisit remaining rendering/model polish after the release baseline is secure:
+  - dataset provenance/collision refinements
+  - per-section layout overrides if needed
+  - track-level binding defaults and stricter empty-track validation
+  - additional reference/array examples where they improve the user docs rather than just
+    showcase isolated features
 - Add annotation-track polish beyond the current object baseline:
   - richer label-lane contracts
   - optional repacking rules for dense interval/text/glyph compositions
