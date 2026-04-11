@@ -4,13 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "well-log-os"
-version = "0.1.0"
 description = "Printable and interactive well-log display toolkit for LAS and DLIS data."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+dynamic = ["version"]
+license = "Apache-2.0"
 authors = [
   {name = "Carlos Schrupp"},
+]
+keywords = [
+  "well-log",
+  "petrophysics",
+  "las",
+  "dlis",
+  "visualization",
 ]
 dependencies = [
   "jsonschema>=4.23",
@@ -21,11 +28,16 @@ dependencies = [
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
   "Topic :: Scientific/Engineering",
 ]
+
+[project.urls]
+Homepage = "https://github.com/cschrupp/well-log-os"
+Documentation = "https://cschrupp.github.io/well-log-os/"
+Source = "https://github.com/cschrupp/well-log-os"
+Issues = "https://github.com/cschrupp/well-log-os/issues"
 
 [project.optional-dependencies]
 las = [
@@ -77,6 +89,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.dynamic]
+version = {attr = "well_log_os._version.__version__"}
+
 [tool.setuptools.package-data]
 "well_log_os.renderers" = ["*.yaml"]
 
@@ -96,6 +111,7 @@ line-ending = "lf"
 
 [tool.ruff.lint]
 select = [
+  "ANN",
   "B",
   "C4",
   "D",
@@ -111,6 +127,10 @@ ignore = [
   "D105",
   "D107",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"examples/**/*.py" = ["ANN"]
+"tests/**/*.py" = ["ANN"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["well_log_os"]

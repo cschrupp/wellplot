@@ -19,6 +19,7 @@
 
 """Public package exports for well_log_os."""
 
+from ._version import __version__
 from .api import (
     DatasetBuilder,
     LogBuilder,
@@ -117,6 +118,7 @@ from .pipeline import render_from_logfile
 from .templates import document_from_mapping, load_document
 
 __all__ = [
+    "__version__",
     "ArrayChannel",
     "AnnotationArrowSpec",
     "AnnotationGlyphSpec",
@@ -210,5 +212,3 @@ __all__ = [
     "document_from_mapping",
     "load_document",
 ]
-
-__version__ = "0.1.0"
