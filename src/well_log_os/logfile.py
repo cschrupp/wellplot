@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Logfile loading, validation, and multisection document assembly helpers."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -36,6 +38,8 @@ from .templates import document_from_mapping
 
 @dataclass(slots=True, frozen=True)
 class LogFileSpec:
+    """Normalized logfile configuration ready for dataset loading and rendering."""
+
     name: str
     data_source_path: str | None
     data_source_format: str
@@ -1034,6 +1038,7 @@ def _parse_binding_raster_waveform(
 
 
 def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
+    """Validate logfile YAML data and normalize it into a typed spec."""
     validate_logfile_mapping(data)
     root = _ensure_mapping(data, context="logfile")
     try:
@@ -1113,6 +1118,7 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
 
 
 def load_logfile(path: str | Path) -> LogFileSpec:
+    """Load a logfile YAML file, resolve templates, and return a typed spec."""
     file_path = Path(path).resolve()
     payload = _load_yaml_mapping(file_path, context="Log file")
     resolved_payload = _resolve_template_inheritance(payload, base_dir=file_path.parent)
@@ -1318,6 +1324,7 @@ def load_datasets_for_logfile(
     *,
     base_dir: Path | None = None,
 ) -> tuple[dict[str, WellDataset], dict[str, Path]]:
+    """Load and cache datasets for every layout section in a logfile spec."""
     section_sources = _section_data_sources_for_logfile(spec)
     cache: dict[tuple[Path, str], tuple[WellDataset, Path]] = {}
     datasets_by_section: dict[str, WellDataset] = {}
@@ -1349,6 +1356,7 @@ def load_datasets_for_logfile(
 def load_dataset_for_logfile(
     spec: LogFileSpec, *, base_dir: Path | None = None
 ) -> tuple[WellDataset, Path]:
+    """Load a single dataset when the logfile resolves to one unique source."""
     if spec.data_source_path is not None:
         return _load_dataset_from_source(
             spec.data_source_path,
@@ -1948,6 +1956,7 @@ def build_documents_for_logfile(
     *,
     source_path: Path | dict[str, Path],
 ) -> tuple[LogDocument, ...]:
+    """Build one resolved document per layout section in the logfile."""
     base_document = deepcopy(spec.document)
     if "name" not in base_document:
         base_document["name"] = spec.name
@@ -2001,5 +2010,6 @@ def build_document_for_logfile(
     *,
     source_path: Path,
 ) -> LogDocument:
+    """Build the first resolved document for single-section workflows."""
     documents = build_documents_for_logfile(spec, dataset, source_path=source_path)
     return documents[0]

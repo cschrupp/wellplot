@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""High-level rendering pipeline from logfile specification to output."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -32,6 +34,7 @@ def _resolve_output_path(
     configured_output: str,
     output_override: str | Path | None,
 ) -> Path:
+    """Resolve the final render output path relative to the logfile."""
     output_path = Path(output_override) if output_override is not None else Path(configured_output)
     if not output_path.is_absolute():
         output_path = (logfile_path.parent / output_path).resolve()
@@ -39,6 +42,7 @@ def _resolve_output_path(
 
 
 def _document_section_id(document) -> str:
+    """Return the active layout section identifier stored in document metadata."""
     metadata = getattr(document, "metadata", None)
     if isinstance(metadata, dict):
         layout_sections = metadata.get("layout_sections")
@@ -56,6 +60,7 @@ def render_from_logfile(
     *,
     output_path: str | Path | None = None,
 ) -> RenderResult:
+    """Load a logfile spec, resolve datasets, and render its configured output."""
     resolved_logfile = Path(logfile_path).resolve()
     spec = load_logfile(resolved_logfile)
     datasets_by_section, source_paths_by_section = load_datasets_for_logfile(

@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Plotly renderer for interactive scalar and raster log views."""
+
 from __future__ import annotations
 
 import math
@@ -43,6 +45,8 @@ from .base import Renderer, RenderResult
 
 
 class PlotlyRenderer(Renderer):
+    """Render a single document into a Plotly figure."""
+
     def __init__(self, registry: SimpleUnitRegistry = DEFAULT_UNITS) -> None:
         self.registry = registry
         self.layout_engine = LayoutEngine(registry)
@@ -54,6 +58,7 @@ class PlotlyRenderer(Renderer):
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
+        """Render a document into Plotly and optionally save HTML or JSON."""
         try:
             import plotly.graph_objects as go
             from plotly.subplots import make_subplots

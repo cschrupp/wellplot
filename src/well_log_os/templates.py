@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Template-to-document conversion helpers for programmatic and YAML layouts."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -1693,6 +1695,7 @@ def _resolve_depth_axis_from_reference_tracks(
 
 
 def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
+    """Build a validated document model from a template mapping."""
     root = _ensure_mapping(data, context="document")
     page_data = _ensure_mapping(root.get("page", {}), context="page")
     if "size" in page_data:
@@ -1762,6 +1765,7 @@ def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
 
 
 def load_document(path: str | Path) -> LogDocument:
+    """Load a YAML template file and convert it into a document model."""
     template_path = Path(path)
     with template_path.open("r", encoding="utf-8") as handle:
         payload = yaml.safe_load(handle) or {}

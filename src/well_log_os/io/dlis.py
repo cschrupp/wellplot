@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""DLIS ingestion helpers that normalize scalar and raster channels."""
+
 from __future__ import annotations
 
 import re
@@ -279,6 +281,7 @@ def _should_replace_channel(existing, candidate) -> bool:
 
 
 def load_dlis(path: str | Path):
+    """Load a DLIS file and normalize its first logical file into a dataset."""
     try:
         from dlisio import dlis
     except ImportError as exc:

@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""LAS ingestion helpers that normalize curves into a well_log_os dataset."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -30,6 +32,7 @@ _DEPTH_MNEMONICS = {"DEPT", "DEPTH", "MD", "TDEP"}
 
 
 def load_las(path: str | Path) -> WellDataset:
+    """Load a LAS file and normalize its scalar curves into a dataset."""
     try:
         import lasio
     except ImportError as exc:

@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Strict unit conversion helpers used by layout and dataset alignment."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -67,10 +69,12 @@ class SimpleUnitRegistry:
     """
 
     def normalize(self, unit: str | None) -> str:
+        """Return the canonical symbol for a known unit alias."""
         key = (unit or "").strip().lower()
         return _UNIT_ALIASES.get(key, (unit or "").strip())
 
     def convert(self, value: float, from_unit: str | None, to_unit: str | None) -> float:
+        """Convert a scalar value between supported units."""
         source = self.normalize(from_unit)
         target = self.normalize(to_unit)
         if source == target:
@@ -83,6 +87,7 @@ class SimpleUnitRegistry:
         )
 
     def ensure_compatible(self, from_unit: str | None, to_unit: str | None) -> None:
+        """Raise if two units cannot be converted by the registry."""
         self.convert(1.0, from_unit, to_unit)
 
 

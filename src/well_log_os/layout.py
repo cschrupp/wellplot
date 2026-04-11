@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Page layout engine for document pagination and track geometry."""
+
 from __future__ import annotations
 
 import math
@@ -29,6 +31,8 @@ from .units import DEFAULT_UNITS, SimpleUnitRegistry
 
 @dataclass(slots=True, frozen=True)
 class DepthWindow:
+    """Depth or time interval rendered on one output page."""
+
     page_number: int
     start: float
     stop: float
@@ -37,6 +41,8 @@ class DepthWindow:
 
 @dataclass(slots=True, frozen=True)
 class Frame:
+    """Rectangular drawing area in millimeters."""
+
     x_mm: float
     y_mm: float
     width_mm: float
@@ -45,12 +51,16 @@ class Frame:
 
 @dataclass(slots=True, frozen=True)
 class TrackFrame:
+    """Track binding paired with its page frame."""
+
     track: TrackSpec
     frame: Frame
 
 
 @dataclass(slots=True, frozen=True)
 class PageLayout:
+    """Resolved drawing geometry for one rendered page."""
+
     page_number: int
     page: PageSpec
     depth_window: DepthWindow
@@ -62,15 +72,19 @@ class PageLayout:
 
     @property
     def track_header_frames(self) -> tuple[TrackFrame, ...]:
-        # Backward compatibility: top header frames keep the original name.
+        """Return top header frames using the legacy property name."""
         return self.track_header_top_frames
 
 
 class LayoutEngine:
+    """Compute page windows and frames for a document."""
+
     def __init__(self, registry: SimpleUnitRegistry = DEFAULT_UNITS) -> None:
+        """Create a layout engine bound to a unit registry."""
         self.registry = registry
 
     def depth_units_per_mm(self, document: LogDocument) -> float:
+        """Return how many depth units fit in one rendered millimeter."""
         return self.registry.convert(
             float(document.depth_axis.scale_ratio),
             "mm",
@@ -84,6 +98,7 @@ class LayoutEngine:
         reserve_top_track_header: bool,
         reserve_bottom_track_header: bool,
     ) -> tuple[float, float]:
+        """Return the plot origin and height for one page geometry."""
         top_track_header = page.track_header_height_mm if reserve_top_track_header else 0.0
         bottom_track_header = page.track_header_height_mm if reserve_bottom_track_header else 0.0
         y_origin = page.margin_top_mm + page.header_height_mm + top_track_header
@@ -108,6 +123,7 @@ class LayoutEngine:
         reserve_top_track_header: bool,
         reserve_bottom_track_header: bool,
     ) -> float:
+        """Return the depth span that fits in the selected page geometry."""
         _, plot_height = self._plot_geometry(
             page,
             reserve_top_track_header=reserve_top_track_header,
@@ -116,7 +132,7 @@ class LayoutEngine:
         return self.depth_units_per_mm(document) * plot_height
 
     def depth_span_per_page(self, document: LogDocument) -> float:
-        # Default to the first-page geometry (top track header only).
+        """Return the default per-page depth span for paginated documents."""
         return self._depth_span_for_page(
             document,
             document.page,
@@ -125,6 +141,7 @@ class LayoutEngine:
         )
 
     def paginate(self, document: LogDocument, dataset: WellDataset) -> tuple[DepthWindow, ...]:
+        """Split a document depth range into per-page windows."""
         start, stop = document.resolve_depth_range(dataset, self.registry)
         total_span = stop - start
         page = document.page
@@ -231,6 +248,7 @@ class LayoutEngine:
         return tuple(normalized)
 
     def track_frames(self, document: LogDocument) -> tuple[TrackFrame, ...]:
+        """Return track frames for the default first-page layout."""
         return self._track_frames_for_page(
             document,
             document.page,
@@ -246,6 +264,7 @@ class LayoutEngine:
         reserve_top_track_header: bool,
         reserve_bottom_track_header: bool,
     ) -> tuple[TrackFrame, ...]:
+        """Resolve horizontal frames for every track on one page."""
         y_origin, plot_height = self._plot_geometry(
             page,
             reserve_top_track_header=reserve_top_track_header,
@@ -282,6 +301,7 @@ class LayoutEngine:
         reserve_top_track_header: bool,
         reserve_bottom_track_header: bool,
     ) -> PageSpec:
+        """Return a page spec resized for continuous-strip rendering."""
         if plot_height_mm <= 0:
             raise LayoutError("Continuous mode requires a positive depth span.")
         top_track_header = page.track_header_height_mm if reserve_top_track_header else 0.0
@@ -300,6 +320,7 @@ class LayoutEngine:
     def _track_header_top_frames(
         self, page: PageSpec, track_frames: tuple[TrackFrame, ...]
     ) -> tuple[TrackFrame, ...]:
+        """Return top header frames aligned with each track."""
         if page.track_header_height_mm <= 0:
             return ()
         return tuple(
@@ -318,6 +339,7 @@ class LayoutEngine:
     def _track_header_bottom_frames(
         self, page: PageSpec, track_frames: tuple[TrackFrame, ...]
     ) -> tuple[TrackFrame, ...]:
+        """Return bottom header frames aligned with each track."""
         if page.track_header_height_mm <= 0:
             return ()
         y_mm = (
@@ -340,6 +362,7 @@ class LayoutEngine:
         )
 
     def layout(self, document: LogDocument, dataset: WellDataset) -> tuple[PageLayout, ...]:
+        """Build complete page layouts for the rendered document."""
         start, stop = document.resolve_depth_range(dataset, self.registry)
         page = document.page
 

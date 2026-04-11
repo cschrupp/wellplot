@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Matplotlib renderer for report-style well log pages and strip plots."""
+
 from __future__ import annotations
 
 import math
@@ -169,6 +171,8 @@ class _AnnotationLabelRecord:
 
 
 class MatplotlibRenderer(Renderer):
+    """Render documents into static Matplotlib figures and file artifacts."""
+
     def __init__(
         self,
         registry: SimpleUnitRegistry = DEFAULT_UNITS,
@@ -623,6 +627,7 @@ class MatplotlibRenderer(Renderer):
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
+        """Render one document by delegating to the multi-document pipeline."""
         return self.render_documents((document,), dataset, output_path=output_path)
 
     def render_documents(
@@ -632,6 +637,7 @@ class MatplotlibRenderer(Renderer):
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
+        """Render one or more documents and optionally write a combined artifact."""
         normalized_documents = tuple(documents)
         if not normalized_documents:
             raise ValueError("render_documents requires at least one document.")

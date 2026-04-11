@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""JSON Schema definition and validation helpers for logfile YAML mappings."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -1497,6 +1499,7 @@ def get_logfile_json_schema() -> dict[str, Any]:
 
 
 def _format_error_path(error_path: Any) -> str:
+    """Format a validator path into a compact dotted string."""
     path = "$"
     for part in error_path:
         if isinstance(part, int):

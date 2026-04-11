@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Shared renderer interfaces and render result payloads."""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -29,6 +31,8 @@ from ..model import LogDocument, WellDataset
 
 @dataclass(slots=True)
 class RenderResult:
+    """Summary of a completed render operation."""
+
     backend: str
     page_count: int
     artifact: Any | None = None
@@ -36,6 +40,8 @@ class RenderResult:
 
 
 class Renderer(ABC):
+    """Abstract renderer contract implemented by concrete backends."""
+
     @abstractmethod
     def render(
         self,
@@ -44,4 +50,5 @@ class Renderer(ABC):
         *,
         output_path: str | Path | None = None,
     ) -> RenderResult:
+        """Render one document and optionally persist the resulting artifact."""
         raise NotImplementedError

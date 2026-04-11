@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Project-specific exception hierarchy for well_log_os."""
+
 class WellLogOSError(Exception):
     """Base exception for well_log_os."""
 
