@@ -2694,10 +2694,10 @@ class MatplotlibRenderer(Renderer):
                     linestyle=self._curve_header_line_style(element),
                 )
 
-    def _curve_elements(self, track) -> list[CurveElement]:
+    def _curve_elements(self, track: TrackSpec) -> list[CurveElement]:
         return [element for element in track.elements if isinstance(element, CurveElement)]
 
-    def _raster_elements(self, track) -> list[RasterElement]:
+    def _raster_elements(self, track: TrackSpec) -> list[RasterElement]:
         return [element for element in track.elements if isinstance(element, RasterElement)]
 
     def _raster_header_label(self, element: RasterElement, channel: RasterChannel) -> str:
@@ -2710,7 +2710,7 @@ class MatplotlibRenderer(Renderer):
 
     def _raster_axis_limits(
         self,
-        track,
+        track: TrackSpec,
         element: RasterElement,
         channel: RasterChannel,
     ) -> tuple[float, float, str | None]:
@@ -2781,7 +2781,7 @@ class MatplotlibRenderer(Renderer):
 
     def _raster_scale_text_triplet(
         self,
-        track,
+        track: TrackSpec,
         element: RasterElement,
         channel: RasterChannel,
     ) -> tuple[str, str, str]:
@@ -2901,7 +2901,7 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_raster_waveforms(
         self,
-        ax,
+        ax: Axes,
         *,
         depth: np.ndarray,
         x_axis: np.ndarray,
@@ -3077,7 +3077,7 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_scale_text_triplet(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
         dataset: WellDataset,
     ) -> tuple[str, str, str]:
@@ -3120,7 +3120,7 @@ class MatplotlibRenderer(Renderer):
 
     def _header_char_budget(
         self,
-        ax,
+        ax: Axes,
         *,
         available_width_ratio: float,
         font_size_pt: float,
@@ -3134,7 +3134,7 @@ class MatplotlibRenderer(Renderer):
 
     def _text_line_budget(
         self,
-        ax,
+        ax: Axes,
         *,
         available_height_ratio: float,
         font_size_pt: float,
@@ -3147,7 +3147,7 @@ class MatplotlibRenderer(Renderer):
 
     def _wrap_box_text(
         self,
-        ax,
+        ax: Axes,
         *,
         text: str,
         available_width_ratio: float,
@@ -3222,7 +3222,7 @@ class MatplotlibRenderer(Renderer):
 
     def _wrap_annotation_label_text(
         self,
-        ax,
+        ax: Axes,
         *,
         text: str,
         available_width_ratio: float,
@@ -3337,7 +3337,9 @@ class MatplotlibRenderer(Renderer):
         return "Fill"
 
     def _header_division_scale(
-        self, track, dataset: WellDataset
+        self,
+        track: TrackSpec,
+        dataset: WellDataset,
     ) -> tuple[float, float, ScaleKind] | None:
         if self._uses_independent_curve_scales(track):
             return None
@@ -3364,7 +3366,7 @@ class MatplotlibRenderer(Renderer):
 
     def _header_raster_colorbar_target(
         self,
-        track,
+        track: TrackSpec,
         dataset: WellDataset,
     ) -> tuple[RasterElement, RasterChannel] | None:
         for element in self._raster_elements(track):
@@ -3381,8 +3383,8 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_raster_colorbar(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         element: RasterElement,
         channel: RasterChannel,
         slot_top: float,
@@ -3504,8 +3506,8 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_divisions(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -3618,9 +3620,9 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_raster_triplet(
         self,
-        ax,
-        track,
-        document,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -3662,9 +3664,9 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_legend(
         self,
-        ax,
-        track,
-        document,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -3789,9 +3791,9 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_track_header_curve_pairs(
         self,
-        ax,
-        track,
-        document,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
         dataset: WellDataset,
         slot_top: float,
         slot_bottom: float,
@@ -4039,7 +4041,7 @@ class MatplotlibRenderer(Renderer):
 
     def _log_scale_grid_fractions(
         self,
-        track,
+        track: TrackSpec,
         dataset: WellDataset,
     ) -> tuple[list[float], list[float]] | None:
         reference = self._header_division_scale(track, dataset)
@@ -4082,7 +4084,9 @@ class MatplotlibRenderer(Renderer):
         return _to_fractions(major_values), _to_fractions(minor_values)
 
     def _vertical_grid_fractions(
-        self, track, dataset: WellDataset
+        self,
+        track: TrackSpec,
+        dataset: WellDataset,
     ) -> tuple[list[float], list[float]]:
         main_points = self._grid_segment_positions(
             track.grid.vertical_main_line_count,
@@ -4129,7 +4133,13 @@ class MatplotlibRenderer(Renderer):
 
         return _dedupe(main_lines, blocked=[]), _dedupe(secondary_lines, blocked=main_lines)
 
-    def _draw_vertical_grid_lines(self, ax, track, window, dataset: WellDataset) -> None:
+    def _draw_vertical_grid_lines(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        window: DepthWindow,
+        dataset: WellDataset,
+    ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
         if track.grid.vertical_display == GridDisplayMode.NONE:
@@ -4190,9 +4200,9 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_horizontal_grid_lines(
         self,
-        ax,
-        track,
-        window,
+        ax: Axes,
+        track: TrackSpec,
+        window: DepthWindow,
         *,
         major_step: float,
         minor_step: float,
@@ -4277,7 +4287,14 @@ class MatplotlibRenderer(Renderer):
                     clip_on=True,
                 )
 
-    def _draw_track(self, ax, track, document, dataset, page_layout) -> None:
+    def _draw_track(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
+        dataset: WellDataset,
+        page_layout: PageLayout,
+    ) -> None:
         track_style = self._style_section("track")
         is_reference_track = self._is_reference_track(track)
         window = page_layout.depth_window
@@ -4424,20 +4441,24 @@ class MatplotlibRenderer(Renderer):
             independent_curve_scales=independent_curve_scales,
         )
 
-    def _uses_independent_curve_scales(self, track) -> bool:
+    def _uses_independent_curve_scales(self, track: TrackSpec) -> bool:
         if self._is_reference_track(track) or self._is_annotation_track(track):
             return False
         return self._curve_count(track) > 1
 
-    def _track_has_bottom_header_on_page(self, page_layout, track) -> bool:
+    def _track_has_bottom_header_on_page(self, page_layout: PageLayout, track: TrackSpec) -> bool:
         return any(frame.track is track for frame in page_layout.track_header_bottom_frames)
 
-    def _should_draw_array_plot_sample_axis(self, page_layout, track) -> bool:
+    def _should_draw_array_plot_sample_axis(
+        self,
+        page_layout: PageLayout,
+        track: TrackSpec,
+    ) -> bool:
         if track.kind != TrackKind.ARRAY:
             return False
         return not self._track_has_bottom_header_on_page(page_layout, track)
 
-    def _configure_independent_curve_axis(self, ax) -> None:
+    def _configure_independent_curve_axis(self, ax: Axes) -> None:
         import matplotlib.ticker as mticker
 
         ax.set_xscale("linear")
@@ -4445,7 +4466,12 @@ class MatplotlibRenderer(Renderer):
         ax.xaxis.set_major_locator(mticker.MultipleLocator(0.2))
         ax.xaxis.set_minor_locator(mticker.MultipleLocator(0.1))
 
-    def _draw_array_sample_axis(self, ax, track, dataset: WellDataset) -> bool:
+    def _draw_array_sample_axis(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        dataset: WellDataset,
+    ) -> bool:
         raster_elements = [
             element for element in track.elements if isinstance(element, RasterElement)
         ]
@@ -4489,7 +4515,11 @@ class MatplotlibRenderer(Renderer):
         )
         return True
 
-    def _tangential_transform_values(self, values: np.ndarray, scale) -> np.ndarray:
+    def _tangential_transform_values(
+        self,
+        values: np.ndarray,
+        scale: ScaleSpec,
+    ) -> np.ndarray:
         spread = float(self._style_section("track").get("tangential_spread", 1.2))
         spread = min(max(spread, 0.05), 2.6)
         denominator = np.tan(0.5 * spread)
@@ -4500,7 +4530,7 @@ class MatplotlibRenderer(Renderer):
     def _wrap_curve_values(
         self,
         values: np.ndarray,
-        scale,
+        scale: ScaleSpec,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         wrapped = np.array(values, dtype=float, copy=True)
         valid_mask = np.isfinite(wrapped)
@@ -4545,7 +4575,7 @@ class MatplotlibRenderer(Renderer):
     def _normalize_curve_values(
         self,
         values: np.ndarray,
-        scale,
+        scale: ScaleSpec | None,
     ) -> tuple[np.ndarray, np.ndarray]:
         mask = np.isfinite(values)
         normalized = np.full(values.shape, np.nan, dtype=float)
@@ -4594,10 +4624,10 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_plot_data(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
-        document,
-        dataset,
+        document: LogDocument,
+        dataset: WellDataset,
         *,
         independent_curve_scales: bool,
     ) -> _CurvePlotData:
@@ -4693,7 +4723,7 @@ class MatplotlibRenderer(Renderer):
 
         return _CurvePlotData(depth, values, plot_values, valid_mask, wrapped_mask, scale)
 
-    def _scales_match(self, first, second) -> bool:
+    def _scales_match(self, first: ScaleSpec | None, second: ScaleSpec | None) -> bool:
         if first is None and second is None:
             return True
         if (first is None) != (second is None):
@@ -4708,7 +4738,7 @@ class MatplotlibRenderer(Renderer):
 
     def _curves_share_fill_axis(
         self,
-        track,
+        track: TrackSpec,
         primary: CurveElement,
         secondary: CurveElement,
         *,
@@ -4722,7 +4752,7 @@ class MatplotlibRenderer(Renderer):
 
     def _find_track_curves(
         self,
-        track,
+        track: TrackSpec,
         channel_name: str,
         *,
         exclude: CurveElement,
@@ -4738,7 +4768,7 @@ class MatplotlibRenderer(Renderer):
 
     def _find_track_curve_by_id(
         self,
-        track,
+        track: TrackSpec,
         element_id: str,
         *,
         exclude: CurveElement,
@@ -4825,7 +4855,7 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_fill_display_bounds(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
         dataset: WellDataset,
     ) -> tuple[float, float]:
@@ -4843,7 +4873,7 @@ class MatplotlibRenderer(Renderer):
     def _curve_fill_plot_coordinate(
         self,
         raw_value: float,
-        scale,
+        scale: ScaleSpec | None,
         *,
         independent_curve_scales: bool,
     ) -> float:
@@ -4861,7 +4891,7 @@ class MatplotlibRenderer(Renderer):
 
     def _resolve_curve_fill_target(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
         *,
         independent_curve_scales: bool,
@@ -4914,10 +4944,10 @@ class MatplotlibRenderer(Renderer):
 
     def _prepare_curve_fill_data(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
-        document,
-        dataset,
+        document: LogDocument,
+        dataset: WellDataset,
         *,
         independent_curve_scales: bool,
     ) -> _CurveFillRenderData:
@@ -5020,9 +5050,9 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_fill_header_marker_x(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
-        dataset,
+        dataset: WellDataset,
     ) -> float | None:
         if element.fill is None or element.fill.kind != CurveFillKind.BASELINE_SPLIT:
             return None
@@ -5045,10 +5075,10 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_fill_header_segments(
         self,
-        track,
+        track: TrackSpec,
         element: CurveElement,
-        document,
-        dataset,
+        document: LogDocument,
+        dataset: WellDataset,
         *,
         independent_curve_scales: bool,
     ) -> list[tuple[float, float, str, float]]:
@@ -5115,11 +5145,11 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_curve_fill(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         element: CurveElement,
-        document,
-        dataset,
+        document: LogDocument,
+        dataset: WellDataset,
         *,
         independent_curve_scales: bool,
     ) -> None:
