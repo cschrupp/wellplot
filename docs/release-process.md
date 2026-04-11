@@ -59,7 +59,7 @@ Recommended setup:
 2. Create the project on PyPI.
 3. Configure trusted publishing on both indexes for:
    - owner: `cschrupp`
-   - repository: `well-log-os`
+   - repository: `wellplot`
    - workflow: `release.yml`
 4. Create GitHub environments:
    - `testpypi`

@@ -195,8 +195,6 @@ Current status:
   - expand user docs reference pages beyond the current workflow-first skeleton
   - continue staged `ANN` cleanup in `tests/` and `examples/`
   - keep pruning stale comments and filling public API docstring gaps where they still exist
-  - optionally align repository/docs URLs with the renamed package if we also rename the GitHub
-    repository later
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
@@ -316,8 +314,6 @@ Longer-term / UI-centric:
 - Tune default header `line_units` and font scaling against real CBL examples.
 - Add one more end-to-end sample with multiple image tracks + overlays.
 - Add savefile examples for VDL micro-time tuning against vendor outputs.
-- Optionally align repository naming and published docs URLs with `wellplot` if we decide to
-  rename the GitHub repository from `well-log-os`.
 
 ## Working Principles
 

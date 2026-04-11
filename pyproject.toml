@@ -34,10 +34,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/cschrupp/well-log-os"
-Documentation = "https://cschrupp.github.io/well-log-os/"
-Source = "https://github.com/cschrupp/well-log-os"
-Issues = "https://github.com/cschrupp/well-log-os/issues"
+Homepage = "https://github.com/cschrupp/wellplot"
+Documentation = "https://cschrupp.github.io/wellplot/"
+Source = "https://github.com/cschrupp/wellplot"
+Issues = "https://github.com/cschrupp/wellplot/issues"
 
 [project.optional-dependencies]
 las = [

@@ -1,8 +1,8 @@
 site_name: well_log_os
 site_description: User documentation for well_log_os
-site_url: https://cschrupp.github.io/well-log-os/
-repo_url: https://github.com/cschrupp/well-log-os
-repo_name: cschrupp/well-log-os
+site_url: https://cschrupp.github.io/wellplot/
+repo_url: https://github.com/cschrupp/wellplot
+repo_name: cschrupp/wellplot
 docs_dir: docs/site
 site_dir: site
 

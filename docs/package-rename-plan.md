@@ -9,9 +9,8 @@ Completed in the codebase on 2026-04-11:
 - Stage 1: Package Identity Switch
 - Stage 2: Public Surface Rewrite
 
-Still optional or pending:
+Still pending:
 
-- Stage 3: Repository and Docs Identity Cleanup
 - Stage 4: Post-Rename Release Rehearsal
 
 ## Decision Summary
@@ -23,7 +22,8 @@ Current state:
 - the published package identity in the codebase is now `wellplot`
 - the top-level Python import is now `wellplot`
 - the CLI entry point is now `wellplot`
-- repository URLs still point to the current GitHub repository name `well-log-os`
+- the GitHub repository name is now `wellplot`
+- package metadata and MkDocs config now point to `cschrupp/wellplot`
 
 Availability checks completed on 2026-04-11:
 
@@ -152,6 +152,8 @@ Validation:
 - docs deploy to the correct URL
 - release workflow references the right package and repository names
 
+Implemented on 2026-04-11 after the GitHub repository rename.
+
 ### Stage 4: Post-Rename Release Rehearsal
 
 Goal:
@@ -182,9 +184,7 @@ Validation:
 Recommended immediate sequence:
 
 1. run the first real TestPyPI rehearsal for `wellplot`
-2. decide whether to rename the GitHub repository from `well-log-os` to `wellplot`
-3. if the repository name changes, update project URLs and docs deployment paths
-4. resume the remaining production-readiness tasks
+2. resume the remaining production-readiness tasks
 
 This keeps the first public package rehearsal aligned with the final library name instead of creating
 avoidable cleanup after publication.
