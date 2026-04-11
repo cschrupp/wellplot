@@ -97,9 +97,12 @@ line-ending = "lf"
 [tool.ruff.lint]
 select = [
   "B",
+  "C4",
   "E",
   "F",
   "I",
+  "RET",
+  "SIM",
   "UP",
 ]
 

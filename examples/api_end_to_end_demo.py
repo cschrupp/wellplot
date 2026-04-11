@@ -53,7 +53,7 @@ def build_raw_dataset():
             + 0.25 * np.sin(sample_axis_us / 11.0 - phase * 1.5)
         )
 
-    dataset = (
+    return (
         DatasetBuilder(
             name="raw",
             well_metadata={
@@ -86,7 +86,6 @@ def build_raw_dataset():
         .sort_index()
         .build()
     )
-    return dataset
 
 
 def build_processed_dataset(raw):
@@ -98,7 +97,7 @@ def build_processed_dataset(raw):
     gr_proc = _smoothed(raw_gr)[::6]
     cbl_filt = _smoothed(raw_cbl, window=9)[::6]
 
-    dataset = (
+    return (
         DatasetBuilder(
             name="processed",
             provenance={"source": "notebook"},
@@ -125,13 +124,12 @@ def build_processed_dataset(raw):
         .reindex_to(index=raw_depth_ft, index_unit="ft")
         .build()
     )
-    return dataset
 
 
 def build_working_dataset():
     raw = build_raw_dataset()
     processed = build_processed_dataset(raw)
-    dataset = (
+    return (
         DatasetBuilder(name="working")
         .merge(raw, merge_well_metadata=True, merge_provenance=True)
         .merge(
@@ -141,7 +139,6 @@ def build_working_dataset():
         )
         .build()
     )
-    return dataset
 
 
 def build_report(dataset):

@@ -41,7 +41,7 @@ def build_aligned_dataset():
         ]
     )
 
-    dataset = (
+    return (
         DatasetBuilder(name="alignment-demo")
         .add_curve(
             mnemonic="GR",
@@ -71,7 +71,6 @@ def build_aligned_dataset():
         .convert_index_unit("m")
         .build()
     )
-    return dataset
 
 
 def build_report(dataset):

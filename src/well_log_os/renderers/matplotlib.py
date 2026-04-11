@@ -4411,10 +4411,7 @@ class MatplotlibRenderer(Renderer):
         label = target.sample_axis_label
         if not label:
             sample_label = str(channel.sample_label or "sample")
-            if axis_unit:
-                label = f"{sample_label} ({axis_unit})"
-            else:
-                label = sample_label
+            label = f"{sample_label} ({axis_unit})" if axis_unit else sample_label
         ax.set_xlabel(
             label,
             fontsize=float(raster_style["sample_axis_label_fontsize"]),
@@ -6182,9 +6179,8 @@ class MatplotlibRenderer(Renderer):
             elif isinstance(annotation, AnnotationArrowSpec):
                 self._draw_annotation_arrow_line(ax, annotation, window)
                 record = self._annotation_arrow_label_record(annotation)
-                if record is not None:
-                    if window.start <= record.preferred_y <= window.stop:
-                        label_records.append(record)
+                if record is not None and window.start <= record.preferred_y <= window.stop:
+                    label_records.append(record)
             elif isinstance(annotation, AnnotationGlyphSpec):
                 self._draw_annotation_glyph(ax, annotation, window)
         placed_labels = self._place_annotation_label_records(ax, label_records, window)
@@ -6345,10 +6341,7 @@ class MatplotlibRenderer(Renderer):
 
         valid_depth = depth[mask]
         valid_plot_values = values[mask]
-        if text_values is None:
-            valid_text_values = valid_plot_values
-        else:
-            valid_text_values = text_values[mask]
+        valid_text_values = valid_plot_values if text_values is None else text_values[mask]
         step = labels.step
         window_top = float(min(ax.get_ylim()))
         window_base = float(max(ax.get_ylim()))

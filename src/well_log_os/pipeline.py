@@ -87,7 +87,7 @@ def render_from_logfile(
             renderer_kwargs["style"] = matplotlib_style
         renderer = MatplotlibRenderer(**renderer_kwargs)
         return renderer.render_documents(documents, document_datasets, output_path=resolved_output)
-    elif spec.render_backend == "plotly":
+    if spec.render_backend == "plotly":
         if len(documents) > 1:
             raise TemplateValidationError(
                 "Plotly backend currently supports a single log section. "
@@ -95,8 +95,7 @@ def render_from_logfile(
             )
         renderer = PlotlyRenderer()
         return renderer.render(documents[0], document_datasets[0], output_path=resolved_output)
-    else:
-        raise TemplateValidationError(
-            f"Unsupported render backend {spec.render_backend!r}. "
-            "Supported backends: matplotlib, plotly."
-        )
+    raise TemplateValidationError(
+        f"Unsupported render backend {spec.render_backend!r}. "
+        "Supported backends: matplotlib, plotly."
+    )

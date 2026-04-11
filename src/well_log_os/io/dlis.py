@@ -77,10 +77,7 @@ def _parameter_float(parameter) -> float | None:
 
 def _micro_time_axis_from_axis(axis_obj, sample_count: int) -> tuple[np.ndarray, str | None] | None:
     coordinates = list(getattr(axis_obj, "coordinates", []) or [])
-    if coordinates:
-        start = float(coordinates[0])
-    else:
-        start = 0.0
+    start = float(coordinates[0]) if coordinates else 0.0
 
     spacing = getattr(axis_obj, "spacing", None)
     step: float | None = None
@@ -278,9 +275,7 @@ def _should_replace_channel(existing, candidate) -> bool:
         return True
     if candidate.depth.shape[0] < existing.depth.shape[0]:
         return False
-    if isinstance(existing, ScalarChannel) and isinstance(candidate, RasterChannel):
-        return True
-    return False
+    return isinstance(existing, ScalarChannel) and isinstance(candidate, RasterChannel)
 
 
 def load_dlis(path: str | Path):

@@ -139,9 +139,8 @@ def _validate_reference_track(reference: dict[str, Any], *, context: str) -> Non
             raise TemplateValidationError(f"{context}.axis must be either depth or time.")
     if "unit" in reference:
         _ = str(reference["unit"])
-    if "scale_ratio" in reference:
-        if int(reference["scale_ratio"]) <= 0:
-            raise TemplateValidationError(f"{context}.scale_ratio must be positive.")
+    if "scale_ratio" in reference and int(reference["scale_ratio"]) <= 0:
+        raise TemplateValidationError(f"{context}.scale_ratio must be positive.")
     if "major_step" in reference and float(reference["major_step"]) <= 0:
         raise TemplateValidationError(f"{context}.major_step must be positive.")
     if "minor_step" in reference and float(reference["minor_step"]) <= 0:
@@ -1358,7 +1357,7 @@ def load_dataset_for_logfile(
         )
 
     section_sources = _section_data_sources_for_logfile(spec)
-    unique_sources = {source for source in section_sources.values()}
+    unique_sources = set(section_sources.values())
     if len(unique_sources) != 1:
         raise TemplateValidationError(
             "This logfile defines section-specific data sources. "
@@ -1425,17 +1424,16 @@ def _build_scale(values: np.ndarray, scale_cfg: dict[str, Any] | None) -> dict[s
     if requested_kind not in {"auto", "linear", "log", "tangential"}:
         raise TemplateValidationError("Track scale kind must be auto, linear, log, or tangential.")
 
+    supports_log = lower > 0 and upper / max(lower, min_positive) >= ratio_threshold
     scale_kind = "linear"
     if requested_kind == "log":
         scale_kind = "log"
     elif requested_kind == "tangential":
         scale_kind = "tangential"
-    elif requested_kind == "auto":
-        if lower > 0 and upper / max(lower, min_positive) >= ratio_threshold:
-            scale_kind = "log"
-    if lower > 0 and upper / max(lower, min_positive) >= ratio_threshold:
-        if requested_kind != "linear":
-            scale_kind = "log"
+    elif requested_kind == "auto" and supports_log:
+        scale_kind = "log"
+    if supports_log and requested_kind != "linear":
+        scale_kind = "log"
     if scale_kind == "log":
         lower = max(lower, min_positive)
 
@@ -1960,7 +1958,7 @@ def build_documents_for_logfile(
     section_ids = [str(section["id"]) for section in sections]
 
     if isinstance(dataset, WellDataset):
-        datasets_by_section = {section_id: dataset for section_id in section_ids}
+        datasets_by_section = dict.fromkeys(section_ids, dataset)
     else:
         datasets_by_section = {}
         for section_id in section_ids:
@@ -1970,7 +1968,7 @@ def build_documents_for_logfile(
             datasets_by_section[section_id] = section_dataset
 
     if isinstance(source_path, Path):
-        source_paths_by_section = {section_id: source_path for section_id in section_ids}
+        source_paths_by_section = dict.fromkeys(section_ids, source_path)
     else:
         source_paths_by_section = {}
         for section_id in section_ids:

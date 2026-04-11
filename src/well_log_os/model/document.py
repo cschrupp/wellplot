@@ -341,12 +341,15 @@ class AnnotationMarkerSpec:
             raise ValueError(
                 "Annotation marker label_lane_start and label_lane_end must be set together."
             )
-        if self.label_lane_start is not None and self.label_lane_end is not None:
-            if not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0:
-                raise ValueError(
-                    "Annotation marker label_lane_start/label_lane_end must satisfy "
-                    "0 <= start < end <= 1."
-                )
+        if (
+            self.label_lane_start is not None
+            and self.label_lane_end is not None
+            and not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0
+        ):
+            raise ValueError(
+                "Annotation marker label_lane_start/label_lane_end must satisfy "
+                "0 <= start < end <= 1."
+            )
         if self.label_mode == AnnotationLabelMode.DEDICATED_LANE:
             if self.label_lane_start is None or self.label_lane_end is None:
                 raise ValueError(
@@ -408,12 +411,15 @@ class AnnotationArrowSpec:
             raise ValueError(
                 "Annotation arrow label_lane_start and label_lane_end must be set together."
             )
-        if self.label_lane_start is not None and self.label_lane_end is not None:
-            if not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0:
-                raise ValueError(
-                    "Annotation arrow label_lane_start/label_lane_end must satisfy "
-                    "0 <= start < end <= 1."
-                )
+        if (
+            self.label_lane_start is not None
+            and self.label_lane_end is not None
+            and not 0.0 <= self.label_lane_start < self.label_lane_end <= 1.0
+        ):
+            raise ValueError(
+                "Annotation arrow label_lane_start/label_lane_end must satisfy "
+                "0 <= start < end <= 1."
+            )
         if self.label_mode == AnnotationLabelMode.DEDICATED_LANE:
             if self.label_lane_start is None or self.label_lane_end is None:
                 raise ValueError(
@@ -704,12 +710,15 @@ class ReferenceCurveOverlaySpec:
             raise ValueError(
                 "Reference curve overlay lane_start and lane_end must be set together."
             )
-        if self.lane_start is not None and self.lane_end is not None:
-            if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
-                raise ValueError(
-                    "Reference curve overlay lane_start/lane_end must satisfy "
-                    "0 <= lane_start < lane_end <= 1."
-                )
+        if (
+            self.lane_start is not None
+            and self.lane_end is not None
+            and not 0.0 <= self.lane_start < self.lane_end <= 1.0
+        ):
+            raise ValueError(
+                "Reference curve overlay lane_start/lane_end must satisfy "
+                "0 <= lane_start < lane_end <= 1."
+            )
         if self.tick_length_ratio is not None and self.tick_length_ratio <= 0:
             raise ValueError(
                 "Reference curve overlay tick_length_ratio must be positive when provided."
@@ -750,12 +759,15 @@ class ReferenceEventSpec:
             raise ValueError("Reference event tick_length_ratio must be positive when provided.")
         if (self.lane_start is None) != (self.lane_end is None):
             raise ValueError("Reference event lane_start and lane_end must be set together.")
-        if self.lane_start is not None and self.lane_end is not None:
-            if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
-                raise ValueError(
-                    "Reference event lane_start/lane_end must satisfy "
-                    "0 <= lane_start < lane_end <= 1."
-                )
+        if (
+            self.lane_start is not None
+            and self.lane_end is not None
+            and not 0.0 <= self.lane_start < self.lane_end <= 1.0
+        ):
+            raise ValueError(
+                "Reference event lane_start/lane_end must satisfy "
+                "0 <= lane_start < lane_end <= 1."
+            )
         side = self.text_side.strip().lower()
         if side not in {"auto", "left", "right"}:
             raise ValueError("Reference event text_side must be auto, left, or right.")
