@@ -24,16 +24,16 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..errors import DatasetValidationError
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 from .channels import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel
 
 
-def _require_pandas() -> Any:
+def _require_pandas() -> object:
     try:
         import pandas as pd
     except ModuleNotFoundError as exc:
@@ -232,8 +232,8 @@ class WellDataset:
 
     name: str
     channels: dict[str, BaseChannel] = field(default_factory=dict)
-    well_metadata: dict[str, Any] = field(default_factory=dict)
-    provenance: dict[str, Any] = field(default_factory=dict)
+    well_metadata: dict[str, object] = field(default_factory=dict)
+    provenance: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.validate()
@@ -274,14 +274,14 @@ class WellDataset:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, object] | None = None,
         replace: bool = True,
     ) -> ScalarChannel:
         """Construct and insert a scalar channel from values plus an index."""
@@ -302,17 +302,17 @@ class WellDataset:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
-        sample_axis: Any,
+        sample_axis: ArrayLike,
         sample_unit: str | None = None,
         sample_label: str = "sample",
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, object] | None = None,
         replace: bool = True,
     ) -> ArrayChannel:
         """Construct and insert a 2D array channel."""
@@ -336,17 +336,17 @@ class WellDataset:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
-        sample_axis: Any,
+        sample_axis: ArrayLike,
         sample_unit: str | None = None,
         sample_label: str = "sample",
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, object] | None = None,
         colormap: str = "viridis",
         replace: bool = True,
     ) -> RasterChannel:
@@ -371,15 +371,15 @@ class WellDataset:
     def add_series(
         self,
         *,
-        series: Any,
+        series: object,
         index_unit: str,
         mnemonic: str | None = None,
-        index: Any | None = None,
+        index: ArrayLike | None = None,
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> ScalarChannel:
         """Ingest a pandas Series as a scalar channel."""
@@ -407,16 +407,16 @@ class WellDataset:
 
     def add_dataframe(
         self,
-        frame: Any,
+        frame: object,
         *,
         index_unit: str,
         index_column: str | None = None,
         use_index: bool = False,
-        curves: Mapping[str, Mapping[str, Any]] | None = None,
+        curves: Mapping[str, Mapping[str, object]] | None = None,
         skip_columns: Iterable[str] | None = None,
         replace: bool = True,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
     ) -> list[ScalarChannel]:
         """Ingest selected pandas DataFrame columns as scalar channels."""
         pd = _require_pandas()
@@ -489,7 +489,7 @@ class WellDataset:
         """Merge another dataset into this dataset using the selected collision policy."""
         other.validate()
         collision_policy = _normalized_collision_policy(replace=replace, collision=collision)
-        history_entry: dict[str, Any] = {
+        history_entry: dict[str, object] = {
             "dataset": other.name,
             "collision": collision_policy,
             "added": [],
@@ -566,7 +566,7 @@ class WellDataset:
         self,
         *,
         channel: str | None = None,
-        index: Any | None = None,
+        index: ArrayLike | None = None,
         index_unit: str | None = None,
         method: str = "linear",
         channels: Iterable[str] | None = None,
@@ -634,7 +634,7 @@ class WellDataset:
             maxs.append(registry.convert(channel.depth_max, channel.depth_unit, unit))
         return min(mins), max(maxs)
 
-    def header_value(self, key: str, default: Any = "") -> Any:
+    def header_value(self, key: str, default: object = "") -> object:
         """Return one well-metadata value for header/report population."""
         return self.well_metadata.get(key, default)
 

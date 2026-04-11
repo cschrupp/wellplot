@@ -1393,7 +1393,7 @@ class PageSpec:
     track_gap_mm: float = 0.0
 
     @classmethod
-    def from_name(cls, name: str, orientation: str = "portrait", **kwargs: Any) -> PageSpec:
+    def from_name(cls, name: str, orientation: str = "portrait", **kwargs: object) -> PageSpec:
         """Build a page specification from a named paper size."""
         size_name = name.strip().upper()
         if size_name not in _PAGE_SIZES_MM:

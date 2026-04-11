@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 
 from ..errors import DependencyUnavailableError
-from ..model import RasterChannel, ScalarChannel, WellDataset
+from ..model import BaseChannel, RasterChannel, ScalarChannel, WellDataset
 from ..units import DEFAULT_UNITS
 
 _DEPTH_MNEMONICS = {"DEPT", "DEPTH", "MD", "TDEP"}
@@ -60,14 +60,14 @@ def _normalize_value_unit(unit_raw: str | None) -> str | None:
     return text or None
 
 
-def _parameter_value(parameter) -> object | None:
+def _parameter_value(parameter: object) -> object | None:
     values = getattr(parameter, "values", None)
     if values is None or len(values) == 0:
         return None
     return values[0]
 
 
-def _parameter_float(parameter) -> float | None:
+def _parameter_float(parameter: object) -> float | None:
     value = _parameter_value(parameter)
     if value is None:
         return None
@@ -77,7 +77,9 @@ def _parameter_float(parameter) -> float | None:
         return None
 
 
-def _micro_time_axis_from_axis(axis_obj, sample_count: int) -> tuple[np.ndarray, str | None] | None:
+def _micro_time_axis_from_axis(
+    axis_obj: object, sample_count: int
+) -> tuple[np.ndarray, str | None] | None:
     coordinates = list(getattr(axis_obj, "coordinates", []) or [])
     start = float(coordinates[0]) if coordinates else 0.0
 
@@ -101,11 +103,11 @@ def _micro_time_axis_from_axis(axis_obj, sample_count: int) -> tuple[np.ndarray,
     return sample_axis, units
 
 
-def _micro_time_axis_from_tool(channel_obj, logical_file, sample_count: int) -> tuple[
-    np.ndarray | None,
-    str | None,
-    dict[str, object],
-]:
+def _micro_time_axis_from_tool(
+    channel_obj: object,
+    logical_file: object,
+    sample_count: int,
+) -> tuple[np.ndarray | None, str | None, dict[str, object]]:
     source_tool = getattr(channel_obj, "source", None)
     if source_tool is None or not hasattr(source_tool, "parameters"):
         return None, None, {}
@@ -150,8 +152,8 @@ def _micro_time_axis_from_tool(channel_obj, logical_file, sample_count: int) -> 
 
 
 def _derive_raster_sample_axis(
-    channel_obj,
-    logical_file,
+    channel_obj: object,
+    logical_file: object,
     values_2d: np.ndarray,
 ) -> tuple[np.ndarray, str | None, str, dict[str, object]]:
     sample_count = values_2d.shape[1]
@@ -177,7 +179,7 @@ def _derive_raster_sample_axis(
     return np.arange(sample_count, dtype=float), None, "sample", {}
 
 
-def _extract_well_metadata(logical_file) -> dict[str, str]:
+def _extract_well_metadata(logical_file: object) -> dict[str, str]:
     metadata: dict[str, str] = {}
     origins = getattr(logical_file, "origins", []) or []
     if not origins:
@@ -204,12 +206,12 @@ def _extract_well_metadata(logical_file) -> dict[str, str]:
 def _build_scalar_channel(
     *,
     channel_name: str,
-    channel_obj,
+    channel_obj: object,
     depth: np.ndarray,
     depth_unit: str,
     values: np.ndarray,
     source: str,
-):
+) -> ScalarChannel:
     return ScalarChannel(
         mnemonic=channel_name,
         depth=depth,
@@ -232,13 +234,13 @@ def _build_scalar_channel(
 def _build_raster_channel(
     *,
     channel_name: str,
-    channel_obj,
-    logical_file,
+    channel_obj: object,
+    logical_file: object,
     depth: np.ndarray,
     depth_unit: str,
     values: np.ndarray,
     source: str,
-):
+) -> RasterChannel:
     values_2d = np.asarray(values, dtype=float)
     if values_2d.ndim > 2:
         values_2d = values_2d.reshape(values_2d.shape[0], -1)
@@ -270,7 +272,7 @@ def _build_raster_channel(
     )
 
 
-def _should_replace_channel(existing, candidate) -> bool:
+def _should_replace_channel(existing: BaseChannel | None, candidate: BaseChannel) -> bool:
     if existing is None:
         return True
     if candidate.depth.shape[0] > existing.depth.shape[0]:
@@ -280,7 +282,7 @@ def _should_replace_channel(existing, candidate) -> bool:
     return isinstance(existing, ScalarChannel) and isinstance(candidate, RasterChannel)
 
 
-def load_dlis(path: str | Path):
+def load_dlis(path: str | Path) -> WellDataset:
     """Load a DLIS file and normalize its first logical file into a dataset."""
     try:
         from dlisio import dlis

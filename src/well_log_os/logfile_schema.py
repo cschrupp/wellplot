@@ -1498,7 +1498,7 @@ def get_logfile_json_schema() -> dict[str, Any]:
     return deepcopy(LOGFILE_JSON_SCHEMA)
 
 
-def _format_error_path(error_path: Any) -> str:
+def _format_error_path(error_path: object) -> str:
     """Format a validator path into a compact dotted string."""
     path = "$"
     for part in error_path:
@@ -1509,7 +1509,7 @@ def _format_error_path(error_path: Any) -> str:
     return path
 
 
-def validate_logfile_mapping(data: Any) -> None:
+def validate_logfile_mapping(data: object) -> None:
     """Validate logfile YAML mapping data against the JSON Schema."""
     errors = sorted(
         _LOGFILE_SCHEMA_VALIDATOR.iter_errors(data),

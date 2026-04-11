@@ -23,7 +23,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import yaml
@@ -88,7 +87,7 @@ from .model import (
 )
 
 
-def _ensure_mapping(value: Any, *, context: str) -> Mapping[str, Any]:
+def _ensure_mapping(value: object, *, context: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise TemplateValidationError(
             f"Expected a mapping for {context}, got {type(value).__name__}."
@@ -96,7 +95,7 @@ def _ensure_mapping(value: Any, *, context: str) -> Mapping[str, Any]:
     return value
 
 
-def _ensure_sequence(value: Any, *, context: str) -> Sequence[Any]:
+def _ensure_sequence(value: object, *, context: str) -> Sequence[object]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray, Mapping)):
         raise TemplateValidationError(
             f"Expected a sequence for {context}, got {type(value).__name__}."
@@ -104,7 +103,7 @@ def _ensure_sequence(value: Any, *, context: str) -> Sequence[Any]:
     return value
 
 
-def _build_style(data: Mapping[str, Any] | None) -> StyleSpec:
+def _build_style(data: Mapping[str, object] | None) -> StyleSpec:
     if not data:
         return StyleSpec()
     style_data = dict(data)
@@ -131,7 +130,7 @@ def _parse_scale_ratio(value: str | int | float | None) -> int:
     return int(float(text))
 
 
-def _build_scale(data: Mapping[str, Any] | None) -> ScaleSpec | None:
+def _build_scale(data: Mapping[str, object] | None) -> ScaleSpec | None:
     if not data:
         return None
     scale_data = dict(data)
@@ -150,7 +149,7 @@ def _build_scale(data: Mapping[str, Any] | None) -> ScaleSpec | None:
 
 
 def _parse_curve_wrap_config(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> tuple[bool, str | None]:
@@ -171,7 +170,7 @@ def _parse_curve_wrap_config(
 
 
 def _parse_raster_colorbar_config(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> tuple[bool, str | None, RasterColorbarPosition]:
@@ -195,7 +194,7 @@ def _parse_raster_colorbar_config(
 
 
 def _parse_raster_sample_axis_config(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> tuple[
@@ -261,7 +260,7 @@ def _parse_raster_sample_axis_config(
 
 
 def _parse_raster_waveform_config(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> RasterWaveformSpec:
@@ -293,7 +292,7 @@ def _parse_raster_waveform_config(
         raise TemplateValidationError(f"Invalid {context} configuration.") from exc
 
 
-def _parse_grid_scale_kind(value: Any, *, context: str) -> GridScaleKind:
+def _parse_grid_scale_kind(value: object, *, context: str) -> GridScaleKind:
     text = str(value or "linear").strip().lower()
     alias_map = {
         "linear": GridScaleKind.LINEAR,
@@ -312,7 +311,7 @@ def _parse_grid_scale_kind(value: Any, *, context: str) -> GridScaleKind:
 
 
 def _parse_grid_display_mode(
-    value: Any,
+    value: object,
     *,
     context: str,
     default: GridDisplayMode = GridDisplayMode.BELOW,
@@ -338,7 +337,7 @@ def _parse_grid_display_mode(
     return mode
 
 
-def _build_grid_spec(data: Any, *, context: str) -> GridSpec:
+def _build_grid_spec(data: object, *, context: str) -> GridSpec:
     grid_data = _ensure_mapping(data or {}, context=f"{context}.grid")
     horizontal_data = _ensure_mapping(
         grid_data.get("horizontal", {}),
@@ -365,7 +364,7 @@ def _build_grid_spec(data: Any, *, context: str) -> GridSpec:
         context=f"{context}.grid.vertical.secondary",
     )
 
-    def _parse_spacing_mode(value: Any, *, field_context: str) -> GridSpacingMode:
+    def _parse_spacing_mode(value: object, *, field_context: str) -> GridSpacingMode:
         text = str(value or "count").strip().lower()
         alias_map = {
             "count": GridSpacingMode.COUNT,
@@ -470,7 +469,7 @@ def _build_grid_spec(data: Any, *, context: str) -> GridSpec:
         raise TemplateValidationError("Invalid track grid configuration.") from exc
 
 
-def _parse_track_kind(raw_kind: Any) -> TrackKind:
+def _parse_track_kind(raw_kind: object) -> TrackKind:
     text = str(raw_kind or "normal").strip().lower()
     alias_map = {
         "reference": TrackKind.REFERENCE,
@@ -487,7 +486,7 @@ def _parse_track_kind(raw_kind: Any) -> TrackKind:
     return kind
 
 
-def _parse_raster_profile(value: Any, *, context: str) -> RasterProfileKind:
+def _parse_raster_profile(value: object, *, context: str) -> RasterProfileKind:
     text = str(value or "generic").strip().lower()
     try:
         return RasterProfileKind(text)
@@ -496,7 +495,7 @@ def _parse_raster_profile(value: Any, *, context: str) -> RasterProfileKind:
 
 
 def _parse_raster_normalization(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> RasterNormalizationKind:
@@ -509,7 +508,7 @@ def _parse_raster_normalization(
         ) from exc
 
 
-def _build_reference_track(data: Any) -> ReferenceTrackSpec:
+def _build_reference_track(data: object) -> ReferenceTrackSpec:
     if data is None:
         return ReferenceTrackSpec()
     ref_data = _ensure_mapping(data, context="track.reference")
@@ -557,7 +556,7 @@ def _build_reference_track(data: Any) -> ReferenceTrackSpec:
         raise TemplateValidationError("Invalid reference track configuration.") from exc
 
 
-def _build_reference_events(data: Any) -> tuple[ReferenceEventSpec, ...]:
+def _build_reference_events(data: object) -> tuple[ReferenceEventSpec, ...]:
     if data is None:
         return ()
     events_data = _ensure_sequence(data, context="track.reference.events")
@@ -609,7 +608,7 @@ def _build_reference_events(data: Any) -> tuple[ReferenceEventSpec, ...]:
     return tuple(events)
 
 
-def _build_curve_value_labels(data: Any) -> CurveValueLabelsSpec:
+def _build_curve_value_labels(data: object) -> CurveValueLabelsSpec:
     if data is None:
         return CurveValueLabelsSpec()
     label_data = _ensure_mapping(data, context="curve.value_labels")
@@ -638,7 +637,7 @@ def _build_curve_value_labels(data: Any) -> CurveValueLabelsSpec:
         raise TemplateValidationError("Invalid curve.value_labels configuration.") from exc
 
 
-def _build_curve_header_display(data: Any) -> CurveHeaderDisplaySpec:
+def _build_curve_header_display(data: object) -> CurveHeaderDisplaySpec:
     if data is None:
         return CurveHeaderDisplaySpec()
     display_data = _ensure_mapping(data, context="curve.header_display")
@@ -651,7 +650,7 @@ def _build_curve_header_display(data: Any) -> CurveHeaderDisplaySpec:
     )
 
 
-def _build_reference_curve_overlay(data: Any) -> ReferenceCurveOverlaySpec | None:
+def _build_reference_curve_overlay(data: object) -> ReferenceCurveOverlaySpec | None:
     if data is None:
         return None
     overlay_data = _ensure_mapping(data, context="curve.reference_overlay")
@@ -686,7 +685,7 @@ def _build_reference_curve_overlay(data: Any) -> ReferenceCurveOverlaySpec | Non
         raise TemplateValidationError("Invalid curve.reference_overlay configuration.") from exc
 
 
-def _build_curve_callouts(data: Any) -> tuple[CurveCalloutSpec, ...]:
+def _build_curve_callouts(data: object) -> tuple[CurveCalloutSpec, ...]:
     if data is None:
         return ()
     callout_items = _ensure_sequence(data, context="curve.callouts")
@@ -761,7 +760,7 @@ def _build_curve_callouts(data: Any) -> tuple[CurveCalloutSpec, ...]:
     return tuple(callouts)
 
 
-def _build_curve_fill(data: Any) -> CurveFillSpec | None:
+def _build_curve_fill(data: object) -> CurveFillSpec | None:
     if data is None:
         return None
     fill_data = _ensure_mapping(data, context="curve.fill")
@@ -855,7 +854,7 @@ def _build_curve_fill(data: Any) -> CurveFillSpec | None:
         raise TemplateValidationError("Invalid curve.fill configuration.") from exc
 
 
-def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
+def _build_header(data: Mapping[str, object] | None) -> HeaderSpec:
     if not data:
         return HeaderSpec()
     fields = tuple(
@@ -874,14 +873,14 @@ def _build_header(data: Mapping[str, Any] | None) -> HeaderSpec:
     )
 
 
-def _build_footer(data: Mapping[str, Any] | None) -> FooterSpec:
+def _build_footer(data: Mapping[str, object] | None) -> FooterSpec:
     if not data:
         return FooterSpec()
     lines = tuple(str(item) for item in data.get("lines", []))
     return FooterSpec(lines=lines)
 
 
-def _build_report_value(data: Any, *, context: str) -> ReportValueSpec:
+def _build_report_value(data: object, *, context: str) -> ReportValueSpec:
     if data is None:
         return ReportValueSpec()
     if isinstance(data, Mapping):
@@ -902,7 +901,7 @@ def _build_report_value(data: Any, *, context: str) -> ReportValueSpec:
         raise TemplateValidationError(f"Invalid {context} value.") from exc
 
 
-def _build_report_detail_cell(data: Any, *, context: str) -> ReportDetailCellSpec:
+def _build_report_detail_cell(data: object, *, context: str) -> ReportDetailCellSpec:
     value = _build_report_value(data, context=context)
     background_color: str | None = None
     text_color: str | None = None
@@ -933,7 +932,7 @@ def _build_report_detail_cell(data: Any, *, context: str) -> ReportDetailCellSpe
         raise TemplateValidationError(f"Invalid {context} configuration.") from exc
 
 
-def _build_report_service_title(data: Any, *, context: str) -> ReportServiceTitleSpec:
+def _build_report_service_title(data: object, *, context: str) -> ReportServiceTitleSpec:
     value = _build_report_value(data, context=context)
     font_size: float | None = None
     auto_adjust = True
@@ -964,7 +963,7 @@ def _build_report_service_title(data: Any, *, context: str) -> ReportServiceTitl
         raise TemplateValidationError(f"Invalid {context} configuration.") from exc
 
 
-def _build_report_block(data: Any) -> ReportBlockSpec | None:
+def _build_report_block(data: object) -> ReportBlockSpec | None:
     if data is None:
         return None
     report_data = _ensure_mapping(data, context="header.report")
@@ -1143,7 +1142,7 @@ def _build_report_block(data: Any) -> ReportBlockSpec | None:
         raise TemplateValidationError("Invalid header.report configuration.") from exc
 
 
-def _build_track_header(data: Any) -> TrackHeaderSpec:
+def _build_track_header(data: object) -> TrackHeaderSpec:
     if data is None:
         return TrackHeaderSpec()
     header_data = _ensure_mapping(data, context="track_header")
@@ -1193,7 +1192,7 @@ def _build_track_header(data: Any) -> TrackHeaderSpec:
     return TrackHeaderSpec(objects=ordered)
 
 
-def _build_markers(data: Any) -> tuple[MarkerSpec, ...]:
+def _build_markers(data: object) -> tuple[MarkerSpec, ...]:
     if data is None:
         return ()
 
@@ -1215,7 +1214,7 @@ def _build_markers(data: Any) -> tuple[MarkerSpec, ...]:
     return tuple(markers)
 
 
-def _build_zones(data: Any) -> tuple[ZoneSpec, ...]:
+def _build_zones(data: object) -> tuple[ZoneSpec, ...]:
     if data is None:
         return ()
 
@@ -1239,7 +1238,7 @@ def _build_zones(data: Any) -> tuple[ZoneSpec, ...]:
 
 
 def _build_annotation_objects(
-    data: Any,
+    data: object,
 ) -> tuple[
     AnnotationIntervalSpec
     | AnnotationTextSpec
@@ -1514,7 +1513,7 @@ def _build_annotation_objects(
     return tuple(annotations)
 
 
-def _build_track(track_data: Mapping[str, Any]) -> TrackSpec:
+def _build_track(track_data: Mapping[str, object]) -> TrackSpec:
     kind = _parse_track_kind(track_data.get("kind", "normal"))
     elements = []
     for item in track_data.get("elements", []):
@@ -1694,7 +1693,7 @@ def _resolve_depth_axis_from_reference_tracks(
     return depth_axis
 
 
-def document_from_mapping(data: Mapping[str, Any]) -> LogDocument:
+def document_from_mapping(data: Mapping[str, object]) -> LogDocument:
     """Build a validated document model from a template mapping."""
     root = _ensure_mapping(data, context="document")
     page_data = _ensure_mapping(root.get("page", {}), context="page")

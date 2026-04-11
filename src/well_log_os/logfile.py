@@ -51,7 +51,7 @@ class LogFileSpec:
     render_matplotlib: dict[str, Any] = field(default_factory=dict)
 
 
-def _ensure_mapping(value: Any, *, context: str) -> dict[str, Any]:
+def _ensure_mapping(value: object, *, context: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise TemplateValidationError(
             f"Expected a mapping for {context}, got {type(value).__name__}."
@@ -59,7 +59,7 @@ def _ensure_mapping(value: Any, *, context: str) -> dict[str, Any]:
     return value
 
 
-def _ensure_sequence(value: Any, *, context: str) -> list[Any]:
+def _ensure_sequence(value: object, *, context: str) -> list[Any]:
     if not isinstance(value, list):
         raise TemplateValidationError(
             f"Expected a sequence for {context}, got {type(value).__name__}."
@@ -67,14 +67,14 @@ def _ensure_sequence(value: Any, *, context: str) -> list[Any]:
     return value
 
 
-def _normalized_source_format(value: Any, *, context: str) -> str:
+def _normalized_source_format(value: object, *, context: str) -> str:
     source_format = str(value).strip().lower()
     if source_format not in {"auto", "las", "dlis"}:
         raise TemplateValidationError(f"{context} must be one of: auto, las, dlis.")
     return source_format
 
 
-def _deep_merge_config(base: Any, override: Any) -> Any:
+def _deep_merge_config(base: object, override: object) -> object:
     if isinstance(base, dict) and isinstance(override, dict):
         merged: dict[str, Any] = deepcopy(base)
         for key, value in override.items():
@@ -660,7 +660,7 @@ def _validate_document_bindings(
             )
 
 
-def _parse_binding_wrap(value: Any, *, context: str) -> tuple[bool, str | None]:
+def _parse_binding_wrap(value: object, *, context: str) -> tuple[bool, str | None]:
     if value is None:
         return False, None
     if isinstance(value, bool):
@@ -677,7 +677,7 @@ def _parse_binding_wrap(value: Any, *, context: str) -> tuple[bool, str | None]:
     return enabled, color_text
 
 
-def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
+def _parse_binding_curve_fill(value: object, *, context: str) -> dict[str, Any]:
     fill = _ensure_mapping(value, context=context)
     kind = str(fill.get("kind", "")).strip().lower()
     if kind not in {
@@ -768,7 +768,7 @@ def _parse_binding_curve_fill(value: Any, *, context: str) -> dict[str, Any]:
     return payload
 
 
-def _parse_binding_curve_callouts(value: Any, *, context: str) -> list[dict[str, Any]]:
+def _parse_binding_curve_callouts(value: object, *, context: str) -> list[dict[str, Any]]:
     callout_items = _ensure_sequence(value, context=context)
     payload: list[dict[str, Any]] = []
     for index, item in enumerate(callout_items):
@@ -872,7 +872,7 @@ def _parse_binding_curve_callouts(value: Any, *, context: str) -> list[dict[str,
     return payload
 
 
-def _parse_binding_reference_overlay(value: Any, *, context: str) -> dict[str, Any]:
+def _parse_binding_reference_overlay(value: object, *, context: str) -> dict[str, Any]:
     overlay = _ensure_mapping(value, context=context)
     payload: dict[str, Any] = {}
     if "mode" in overlay:
@@ -907,7 +907,7 @@ def _parse_binding_reference_overlay(value: Any, *, context: str) -> dict[str, A
 
 
 def _parse_binding_raster_colorbar(
-    value: Any, *, context: str
+    value: object, *, context: str
 ) -> tuple[bool, str | None, str]:
     if value is None:
         return False, None, "right"
@@ -929,7 +929,7 @@ def _parse_binding_raster_colorbar(
 
 
 def _parse_binding_raster_sample_axis(
-    value: Any, *, context: str
+    value: object, *, context: str
 ) -> tuple[
     bool,
     str | None,
@@ -984,7 +984,7 @@ def _parse_binding_raster_sample_axis(
 
 
 def _parse_binding_raster_waveform(
-    value: Any,
+    value: object,
     *,
     context: str,
 ) -> dict[str, Any]:
@@ -1194,7 +1194,7 @@ def _resolve_text_tokens(document: dict[str, Any], dataset: WellDataset, source_
                     ]
                 rows = detail.get("rows")
                 if isinstance(rows, list):
-                    def _format_report_cell(item: Any) -> Any:
+                    def _format_report_cell(item: object) -> object:
                         if isinstance(item, str):
                             return _safe_format(item, tokens)
                         if isinstance(item, dict):

@@ -37,7 +37,9 @@ from ..model import (
     RasterProfileKind,
     ScalarChannel,
     ScaleKind,
+    ScaleSpec,
     TrackKind,
+    TrackSpec,
     WellDataset,
 )
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
@@ -196,7 +198,7 @@ class PlotlyRenderer(Renderer):
             output_path=output,
         )
 
-    def _update_xaxis(self, figure, scale, *, row: int, col: int) -> None:
+    def _update_xaxis(self, figure: object, scale: ScaleSpec, *, row: int, col: int) -> None:
         if scale.kind == ScaleKind.LOG:
             lower = math.log10(scale.minimum)
             upper = math.log10(scale.maximum)
@@ -213,14 +215,16 @@ class PlotlyRenderer(Renderer):
         )
         figure.update_xaxes(type="linear", range=axis_range, row=row, col=col)
 
-    def _transform_tangential_values(self, values, scale):
+    def _transform_tangential_values(self, values: np.ndarray, scale: ScaleSpec) -> np.ndarray:
         spread = 1.2
         denominator = np.tan(0.5 * spread)
         unit = (values - scale.minimum) / (scale.maximum - scale.minimum)
         transformed = 0.5 + np.tan((unit - 0.5) * spread) / (2.0 * denominator)
         return np.clip(transformed, 0.0, 1.0)
 
-    def _transform_wrap_values(self, values, scale):
+    def _transform_wrap_values(
+        self, values: np.ndarray, scale: ScaleSpec
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         transformed = np.array(values, dtype=float, copy=True)
         valid_mask = np.isfinite(transformed)
         wrapped_mask = np.zeros(transformed.shape, dtype=bool)
@@ -258,13 +262,13 @@ class PlotlyRenderer(Renderer):
 
     def _add_curve_trace(
         self,
-        figure,
+        figure: object,
         *,
         row: int,
         col: int,
-        x_values,
-        y_values,
-        mask,
+        x_values: np.ndarray,
+        y_values: np.ndarray,
+        mask: np.ndarray,
         color: str,
         width: float,
         name: str,
@@ -291,7 +295,7 @@ class PlotlyRenderer(Renderer):
 
     def _raster_axis_limits(
         self,
-        track,
+        track: TrackSpec,
         element: RasterElement,
         channel: RasterChannel,
     ) -> tuple[float, float, str | None]:

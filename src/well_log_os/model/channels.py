@@ -22,17 +22,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
+from numpy.typing import ArrayLike
 
 from ..errors import DatasetValidationError
 from ..units import DEFAULT_UNITS, SimpleUnitRegistry
 
-ChannelMetadata = dict[str, Any]
+ChannelMetadata = dict[str, object]
 
 
-def _as_float_array(values: Any, *, name: str, ndim: int) -> np.ndarray:
+def _as_float_array(values: ArrayLike, *, name: str, ndim: int) -> np.ndarray:
     array = np.asarray(values, dtype=float)
     if array.ndim != ndim:
         raise ValueError(f"{name} must be a {ndim}D array, got shape {array.shape}.")
