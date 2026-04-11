@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Channel data structures used by the dataset layer."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -41,6 +43,8 @@ def _as_float_array(values: Any, *, name: str, ndim: int) -> np.ndarray:
 
 @dataclass(slots=True)
 class BaseChannel:
+    """Common metadata and reference-axis behavior shared by all channels."""
+
     mnemonic: str
     depth: np.ndarray
     depth_unit: str
@@ -56,18 +60,22 @@ class BaseChannel:
 
     @property
     def depth_min(self) -> float:
+        """Return the minimum reference-axis value."""
         return float(np.nanmin(self.depth))
 
     @property
     def depth_max(self) -> float:
+        """Return the maximum reference-axis value."""
         return float(np.nanmax(self.depth))
 
     def depth_in(self, unit: str, registry: SimpleUnitRegistry = DEFAULT_UNITS) -> np.ndarray:
+        """Return the reference axis converted to another unit."""
         if registry.normalize(self.depth_unit) == registry.normalize(unit):
             return self.depth.copy()
         return np.asarray([registry.convert(value, self.depth_unit, unit) for value in self.depth])
 
     def validate(self) -> None:
+        """Validate the shared channel contract."""
         if not str(self.mnemonic).strip():
             raise DatasetValidationError("Channel mnemonic cannot be empty.")
         if not str(self.depth_unit).strip():
@@ -88,6 +96,8 @@ class BaseChannel:
 
 @dataclass(slots=True)
 class ScalarChannel(BaseChannel):
+    """One-dimensional sampled channel aligned to a reference axis."""
+
     values: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
 
     def __post_init__(self) -> None:
@@ -95,12 +105,14 @@ class ScalarChannel(BaseChannel):
         BaseChannel.__post_init__(self)
 
     def masked_values(self) -> np.ndarray:
+        """Return a float copy with declared null values replaced by NaN."""
         masked = self.values.astype(float, copy=True)
         if self.null_value is not None:
             masked[np.isclose(masked, self.null_value, equal_nan=False)] = np.nan
         return masked
 
     def validate(self) -> None:
+        """Validate scalar-channel shape compatibility."""
         BaseChannel.validate(self)
         values = np.asarray(self.values, dtype=float)
         if values.ndim != 1:
@@ -116,6 +128,8 @@ class ScalarChannel(BaseChannel):
 
 @dataclass(slots=True)
 class ArrayChannel(BaseChannel):
+    """Two-dimensional channel with a secondary sample axis per reference sample."""
+
     values: np.ndarray = field(default_factory=lambda: np.empty((0, 0), dtype=float))
     sample_axis: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
     sample_unit: str | None = None
@@ -127,6 +141,7 @@ class ArrayChannel(BaseChannel):
         BaseChannel.__post_init__(self)
 
     def validate(self) -> None:
+        """Validate array-channel shape compatibility."""
         BaseChannel.validate(self)
         values = np.asarray(self.values, dtype=float)
         sample_axis = np.asarray(self.sample_axis, dtype=float)
@@ -152,4 +167,6 @@ class ArrayChannel(BaseChannel):
 
 @dataclass(slots=True)
 class RasterChannel(ArrayChannel):
+    """Array channel intended for raster-style rendering."""
+
     colormap: str = "viridis"

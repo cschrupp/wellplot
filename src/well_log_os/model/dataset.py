@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Dataset container and alignment helpers for log channels."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
@@ -226,6 +228,8 @@ def _merged_channel_copy(
 
 @dataclass(slots=True)
 class WellDataset:
+    """Collection of channels plus well metadata and provenance."""
+
     name: str
     channels: dict[str, BaseChannel] = field(default_factory=dict)
     well_metadata: dict[str, Any] = field(default_factory=dict)
@@ -235,6 +239,7 @@ class WellDataset:
         self.validate()
 
     def add_channel(self, channel: BaseChannel, *, replace: bool = True) -> BaseChannel:
+        """Insert a channel object into the dataset."""
         channel.validate()
         if not replace and channel.mnemonic in self.channels:
             raise DatasetValidationError(
@@ -244,9 +249,11 @@ class WellDataset:
         return channel
 
     def add_or_replace_channel(self, channel: BaseChannel) -> BaseChannel:
+        """Insert a channel, replacing any existing channel with the same mnemonic."""
         return self.add_channel(channel, replace=True)
 
     def rename_channel(self, mnemonic: str, new_mnemonic: str) -> BaseChannel:
+        """Rename an existing channel and update the internal lookup key."""
         current = str(mnemonic).strip()
         updated_name = str(new_mnemonic).strip()
         if not current or not updated_name:
@@ -277,6 +284,7 @@ class WellDataset:
         metadata: dict[str, Any] | None = None,
         replace: bool = True,
     ) -> ScalarChannel:
+        """Construct and insert a scalar channel from values plus an index."""
         channel = ScalarChannel(
             mnemonic=mnemonic,
             depth=index,
@@ -307,6 +315,7 @@ class WellDataset:
         metadata: dict[str, Any] | None = None,
         replace: bool = True,
     ) -> ArrayChannel:
+        """Construct and insert a 2D array channel."""
         channel = ArrayChannel(
             mnemonic=mnemonic,
             depth=index,
@@ -341,6 +350,7 @@ class WellDataset:
         colormap: str = "viridis",
         replace: bool = True,
     ) -> RasterChannel:
+        """Construct and insert a raster channel."""
         channel = RasterChannel(
             mnemonic=mnemonic,
             depth=index,
@@ -372,6 +382,7 @@ class WellDataset:
         metadata: Mapping[str, Any] | None = None,
         replace: bool = True,
     ) -> ScalarChannel:
+        """Ingest a pandas Series as a scalar channel."""
         pd = _require_pandas()
         if not isinstance(series, pd.Series):
             raise DatasetValidationError("add_series expects a pandas Series.")
@@ -407,6 +418,7 @@ class WellDataset:
         source: str | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> list[ScalarChannel]:
+        """Ingest selected pandas DataFrame columns as scalar channels."""
         pd = _require_pandas()
         if not isinstance(frame, pd.DataFrame):
             raise DatasetValidationError("add_dataframe expects a pandas DataFrame.")
@@ -474,6 +486,7 @@ class WellDataset:
         merge_well_metadata: bool = False,
         merge_provenance: bool = False,
     ) -> WellDataset:
+        """Merge another dataset into this dataset using the selected collision policy."""
         other.validate()
         collision_policy = _normalized_collision_policy(replace=replace, collision=collision)
         history_entry: dict[str, Any] = {
@@ -525,6 +538,7 @@ class WellDataset:
         ascending: bool = True,
         channels: Iterable[str] | None = None,
     ) -> WellDataset:
+        """Sort selected channels by their reference axis."""
         for mnemonic in _normalized_mnemonics(self, channels):
             self.channels[mnemonic] = _sorted_channel(self.channels[mnemonic], ascending=ascending)
         return self
@@ -536,6 +550,7 @@ class WellDataset:
         channels: Iterable[str] | None = None,
         registry: SimpleUnitRegistry = DEFAULT_UNITS,
     ) -> WellDataset:
+        """Convert selected channel indices to another unit."""
         normalized_unit = str(unit).strip()
         if not normalized_unit:
             raise DatasetValidationError("convert_index_unit requires a non-empty target unit.")
@@ -557,6 +572,7 @@ class WellDataset:
         channels: Iterable[str] | None = None,
         registry: SimpleUnitRegistry = DEFAULT_UNITS,
     ) -> WellDataset:
+        """Reindex selected channels to another channel or explicit axis."""
         normalized_method = str(method).strip().lower()
         if normalized_method not in {"linear", "nearest"}:
             raise DatasetValidationError("reindex_to method must be linear or nearest.")
@@ -600,6 +616,7 @@ class WellDataset:
         return self
 
     def get_channel(self, mnemonic: str) -> BaseChannel:
+        """Return a channel by mnemonic."""
         return self.channels[mnemonic]
 
     def depth_range(
@@ -607,6 +624,7 @@ class WellDataset:
         unit: str,
         registry: SimpleUnitRegistry = DEFAULT_UNITS,
     ) -> tuple[float, float]:
+        """Return the dataset top/base range in the requested unit."""
         if not self.channels:
             raise ValueError("Dataset has no channels.")
         mins = []
@@ -617,9 +635,11 @@ class WellDataset:
         return min(mins), max(maxs)
 
     def header_value(self, key: str, default: Any = "") -> Any:
+        """Return one well-metadata value for header/report population."""
         return self.well_metadata.get(key, default)
 
     def validate(self) -> None:
+        """Validate dataset identity and contained channels."""
         if not str(self.name).strip():
             raise DatasetValidationError("Dataset name cannot be empty.")
         for mnemonic, channel in self.channels.items():

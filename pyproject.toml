@@ -98,6 +98,7 @@ line-ending = "lf"
 select = [
   "B",
   "C4",
+  "D",
   "E",
   "F",
   "I",
@@ -105,6 +106,30 @@ select = [
   "SIM",
   "UP",
 ]
+ignore = [
+  "D104",
+  "D105",
+  "D107",
+]
 
 [tool.ruff.lint.isort]
 known-first-party = ["well_log_os"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.ruff.lint.per-file-ignores]
+"examples/*.py" = ["D"]
+"examples/**/*.py" = ["D"]
+"tests/*.py" = ["D"]
+"tests/**/*.py" = ["D"]
+"src/well_log_os/errors.py" = ["D"]
+"src/well_log_os/io/*.py" = ["D"]
+"src/well_log_os/layout.py" = ["D"]
+"src/well_log_os/logfile.py" = ["D"]
+"src/well_log_os/logfile_schema.py" = ["D"]
+"src/well_log_os/model/document.py" = ["D"]
+"src/well_log_os/pipeline.py" = ["D"]
+"src/well_log_os/renderers/*.py" = ["D"]
+"src/well_log_os/templates.py" = ["D"]
+"src/well_log_os/units.py" = ["D"]
