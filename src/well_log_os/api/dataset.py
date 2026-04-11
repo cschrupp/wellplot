@@ -21,8 +21,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Mapping, Sequence
+
+from numpy.typing import ArrayLike
 
 from ..model import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel, WellDataset
 
@@ -30,8 +31,8 @@ from ..model import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel, Wel
 def create_dataset(
     name: str,
     *,
-    well_metadata: Mapping[str, Any] | None = None,
-    provenance: Mapping[str, Any] | None = None,
+    well_metadata: Mapping[str, object] | None = None,
+    provenance: Mapping[str, object] | None = None,
 ) -> WellDataset:
     """Create an empty dataset with optional metadata and provenance."""
     return WellDataset(
@@ -48,8 +49,8 @@ class DatasetBuilder:
         self,
         *,
         name: str,
-        well_metadata: Mapping[str, Any] | None = None,
-        provenance: Mapping[str, Any] | None = None,
+        well_metadata: Mapping[str, object] | None = None,
+        provenance: Mapping[str, object] | None = None,
     ) -> None:
         self._dataset = create_dataset(
             name,
@@ -86,14 +87,14 @@ class DatasetBuilder:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
         """Add a scalar curve from array-like values and index samples."""
@@ -115,17 +116,17 @@ class DatasetBuilder:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
-        sample_axis: Any,
+        sample_axis: ArrayLike,
         sample_unit: str | None = None,
         sample_label: str = "sample",
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
         """Add a 2D array channel from values plus index and sample axes."""
@@ -149,15 +150,15 @@ class DatasetBuilder:
     def add_series(
         self,
         *,
-        series: Any,
+        series: object,
         index_unit: str,
         mnemonic: str | None = None,
-        index: Any | None = None,
+        index: ArrayLike | None = None,
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
         """Add a scalar curve from a pandas-style series object."""
@@ -177,16 +178,16 @@ class DatasetBuilder:
 
     def add_dataframe(
         self,
-        frame: Any,
+        frame: object,
         *,
         index_unit: str,
         index_column: str | None = None,
         use_index: bool = False,
-        curves: Mapping[str, Mapping[str, Any]] | None = None,
-        skip_columns: list[str] | None = None,
+        curves: Mapping[str, Mapping[str, object]] | None = None,
+        skip_columns: Sequence[str] | None = None,
         replace: bool = True,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
     ) -> DatasetBuilder:
         """Add multiple scalar curves from a pandas-style dataframe."""
         self._dataset.add_dataframe(
@@ -206,17 +207,17 @@ class DatasetBuilder:
         self,
         *,
         mnemonic: str,
-        values: Any,
-        index: Any,
+        values: ArrayLike,
+        index: ArrayLike,
         index_unit: str,
-        sample_axis: Any,
+        sample_axis: ArrayLike,
         sample_unit: str | None = None,
         sample_label: str = "sample",
         value_unit: str | None = None,
         description: str = "",
         null_value: float | None = None,
         source: str | None = None,
-        metadata: Mapping[str, Any] | None = None,
+        metadata: Mapping[str, object] | None = None,
         colormap: str = "viridis",
         replace: bool = True,
     ) -> DatasetBuilder:
@@ -284,7 +285,7 @@ class DatasetBuilder:
         self,
         *,
         channel: str | None = None,
-        index: Any | None = None,
+        index: ArrayLike | None = None,
         index_unit: str | None = None,
         method: str = "linear",
         channels: list[str] | None = None,

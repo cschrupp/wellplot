@@ -21,17 +21,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from ..errors import TemplateValidationError
 from ..logfile import LogFileSpec, build_documents_for_logfile, logfile_from_mapping
 from ..model import LogDocument, WellDataset
 
 
-def _copy_if_present(target: dict[str, Any], key: str, value: Any) -> None:
+def _copy_if_present(target: dict[str, object], key: str, value: object) -> None:
     if value is not None:
         target[key] = deepcopy(value)
 
@@ -41,11 +41,11 @@ class ProgrammaticLogSpec:
     """Normalized in-memory report specification with attached datasets."""
 
     spec: LogFileSpec
-    mapping: dict[str, Any]
+    mapping: dict[str, object]
     datasets_by_section: dict[str, WellDataset]
     source_paths_by_section: dict[str, Path]
 
-    def to_mapping(self) -> dict[str, Any]:
+    def to_mapping(self) -> dict[str, object]:
         """Return a deep-copied mapping representation of the report."""
         return deepcopy(self.mapping)
 
@@ -77,7 +77,7 @@ class SectionBuilder:
         return self._section_id
 
     @property
-    def _section(self) -> dict[str, Any]:
+    def _section(self) -> dict[str, object]:
         return self._builder._section_map[self._section_id]
 
     def add_track(
@@ -88,11 +88,11 @@ class SectionBuilder:
         kind: str,
         width_mm: float,
         position: int | None = None,
-        x_scale: dict[str, Any] | None = None,
-        grid: dict[str, Any] | None = None,
-        track_header: dict[str, Any] | None = None,
-        reference: dict[str, Any] | None = None,
-        annotations: list[dict[str, Any]] | None = None,
+        x_scale: Mapping[str, object] | None = None,
+        grid: Mapping[str, object] | None = None,
+        track_header: Mapping[str, object] | None = None,
+        reference: Mapping[str, object] | None = None,
+        annotations: Sequence[Mapping[str, object]] | None = None,
     ) -> SectionBuilder:
         """Add a track definition to the section."""
         track = {
@@ -116,7 +116,7 @@ class SectionBuilder:
         kind: str,
         channel: str,
         track_id: str,
-        options: dict[str, Any],
+        options: Mapping[str, object],
     ) -> SectionBuilder:
         binding = {
             "section": self._section_id,
@@ -136,14 +136,14 @@ class SectionBuilder:
         channel: str,
         track_id: str,
         label: str | None = None,
-        style: dict[str, Any] | None = None,
-        scale: dict[str, Any] | None = None,
-        header_display: dict[str, Any] | None = None,
-        callouts: list[dict[str, Any]] | None = None,
-        fill: dict[str, Any] | None = None,
-        reference_overlay: dict[str, Any] | None = None,
-        value_labels: dict[str, Any] | None = None,
-        wrap: bool | dict[str, Any] | None = None,
+        style: Mapping[str, object] | None = None,
+        scale: Mapping[str, object] | None = None,
+        header_display: Mapping[str, object] | None = None,
+        callouts: Sequence[Mapping[str, object]] | None = None,
+        fill: Mapping[str, object] | None = None,
+        reference_overlay: Mapping[str, object] | None = None,
+        value_labels: Mapping[str, object] | None = None,
+        wrap: bool | Mapping[str, object] | None = None,
         render_mode: str | None = None,
     ) -> SectionBuilder:
         """Add a scalar curve binding to the section."""
@@ -171,18 +171,18 @@ class SectionBuilder:
         channel: str,
         track_id: str,
         label: str | None = None,
-        style: dict[str, Any] | None = None,
+        style: Mapping[str, object] | None = None,
         profile: str | None = None,
         normalization: str | None = None,
         waveform_normalization: str | None = None,
-        clip_percentiles: list[float] | tuple[float, float] | None = None,
+        clip_percentiles: Sequence[float] | None = None,
         interpolation: str | None = None,
         show_raster: bool | None = None,
         raster_alpha: float | None = None,
-        color_limits: list[float] | tuple[float, float] | None = None,
-        colorbar: dict[str, Any] | bool | None = None,
-        sample_axis: dict[str, Any] | bool | None = None,
-        waveform: dict[str, Any] | None = None,
+        color_limits: Sequence[float] | None = None,
+        colorbar: Mapping[str, object] | bool | None = None,
+        sample_axis: Mapping[str, object] | bool | None = None,
+        waveform: Mapping[str, object] | None = None,
     ) -> SectionBuilder:
         """Add a raster or array binding to the section."""
         return self._add_binding(
@@ -211,7 +211,7 @@ class LogBuilder:
     """Fluent builder for programmatic report composition."""
 
     def __init__(self, *, name: str) -> None:
-        self._mapping: dict[str, Any] = {
+        self._mapping: dict[str, object] = {
             "version": 1,
             "name": name,
             "render": {
@@ -239,7 +239,7 @@ class LogBuilder:
                 },
             },
         }
-        self._section_map: dict[str, dict[str, Any]] = {}
+        self._section_map: dict[str, dict[str, object]] = {}
         self._datasets_by_section: dict[str, WellDataset] = {}
         self._source_paths_by_section: dict[str, Path] = {}
 
@@ -250,7 +250,7 @@ class LogBuilder:
         output_path: str = "programmatic_render.pdf",
         dpi: int = 300,
         continuous_strip_page_height_mm: float | None = None,
-        matplotlib_style: dict[str, Any] | None = None,
+        matplotlib_style: Mapping[str, object] | None = None,
     ) -> LogBuilder:
         """Configure backend-specific render settings."""
         render = self._mapping["render"]
@@ -267,7 +267,7 @@ class LogBuilder:
             render["matplotlib"] = {"style": deepcopy(matplotlib_style)}
         return self
 
-    def set_page(self, **page: Any) -> LogBuilder:
+    def set_page(self, **page: object) -> LogBuilder:
         """Replace the document page configuration."""
         self._mapping["document"]["page"] = deepcopy(page)
         return self
@@ -299,7 +299,7 @@ class LogBuilder:
         *,
         title: str | None = None,
         subtitle: str | None = None,
-        fields: list[dict[str, Any]] | None = None,
+        fields: Sequence[Mapping[str, object]] | None = None,
     ) -> LogBuilder:
         """Configure the standard document header block."""
         header = self._mapping["document"].setdefault("header", {})
@@ -321,9 +321,9 @@ class LogBuilder:
         *,
         enabled: bool = True,
         provider_name: str | None = None,
-        general_fields: list[dict[str, Any]] | None = None,
-        service_titles: list[dict[str, Any] | str] | None = None,
-        detail: dict[str, Any] | None = None,
+        general_fields: Sequence[Mapping[str, object]] | None = None,
+        service_titles: Sequence[Mapping[str, object] | str] | None = None,
+        detail: Mapping[str, object] | None = None,
         tail_enabled: bool | None = None,
     ) -> LogBuilder:
         """Configure report heading and tail content."""
@@ -339,7 +339,7 @@ class LogBuilder:
         layout["heading"] = heading
         return self
 
-    def set_remarks(self, remarks: list[dict[str, Any]]) -> LogBuilder:
+    def set_remarks(self, remarks: Sequence[Mapping[str, object]]) -> LogBuilder:
         """Replace the remarks block rendered on the first report page."""
         self._mapping["document"]["layout"]["remarks"] = deepcopy(remarks)
         return self
@@ -402,14 +402,14 @@ class LogBuilder:
         self._source_paths_by_section[normalized_id] = Path(path_text)
         return SectionBuilder(self, normalized_id)
 
-    def to_mapping(self) -> dict[str, Any]:
+    def to_mapping(self) -> dict[str, object]:
         """Return the normalized YAML-style mapping for the report."""
         mapping = deepcopy(self._mapping)
         mapping["document"]["bindings"]["channels"] = deepcopy(self._bindings)
         return mapping
 
     @property
-    def _bindings(self) -> list[dict[str, Any]]:
+    def _bindings(self) -> list[dict[str, object]]:
         return self._mapping["document"]["bindings"]["channels"]
 
     def build(self) -> ProgrammaticLogSpec:

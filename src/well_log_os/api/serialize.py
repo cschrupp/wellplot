@@ -24,7 +24,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, TextIO
+from typing import TextIO
 
 import yaml
 
@@ -72,12 +72,12 @@ from ..templates import document_from_mapping, load_document
 from .builder import LogBuilder, ProgrammaticLogSpec
 
 
-def _set_if_not_none(target: dict[str, Any], key: str, value: Any) -> None:
+def _set_if_not_none(target: dict[str, object], key: str, value: object) -> None:
     if value is not None:
         target[key] = value
 
 
-def _clean_mapping(value: Any) -> Any:
+def _clean_mapping(value: object) -> object:
     if isinstance(value, Mapping):
         return {key: _clean_mapping(item) for key, item in value.items() if item is not None}
     if isinstance(value, list):
@@ -85,7 +85,9 @@ def _clean_mapping(value: Any) -> Any:
     return value
 
 
-def _write_yaml(payload: Mapping[str, Any], destination: str | Path | TextIO | None) -> str | None:
+def _write_yaml(
+    payload: Mapping[str, object], destination: str | Path | TextIO | None
+) -> str | None:
     text = yaml.safe_dump(dict(payload), sort_keys=False)
     if destination is None:
         return text
@@ -96,7 +98,7 @@ def _write_yaml(payload: Mapping[str, Any], destination: str | Path | TextIO | N
     return None
 
 
-def _read_yaml_mapping(source: str | Path | TextIO) -> dict[str, Any]:
+def _read_yaml_mapping(source: str | Path | TextIO) -> dict[str, object]:
     if hasattr(source, "read"):
         payload = yaml.safe_load(source.read()) or {}
     else:
@@ -106,7 +108,7 @@ def _read_yaml_mapping(source: str | Path | TextIO) -> dict[str, Any]:
     return dict(payload)
 
 
-def _serialize_style(style: StyleSpec) -> dict[str, Any]:
+def _serialize_style(style: StyleSpec) -> dict[str, object]:
     return {
         "color": style.color,
         "line_width": style.line_width,
@@ -118,7 +120,7 @@ def _serialize_style(style: StyleSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_scale(scale: ScaleSpec) -> dict[str, Any]:
+def _serialize_scale(scale: ScaleSpec) -> dict[str, object]:
     return {
         "kind": scale.kind.value,
         "min": scale.minimum,
@@ -127,7 +129,7 @@ def _serialize_scale(scale: ScaleSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_grid(grid: GridSpec) -> dict[str, Any]:
+def _serialize_grid(grid: GridSpec) -> dict[str, object]:
     return {
         "major": grid.major,
         "minor": grid.minor,
@@ -172,7 +174,7 @@ def _serialize_grid(grid: GridSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_track_header(header: TrackHeaderSpec) -> dict[str, Any]:
+def _serialize_track_header(header: TrackHeaderSpec) -> dict[str, object]:
     return {
         "objects": [
             {
@@ -186,7 +188,7 @@ def _serialize_track_header(header: TrackHeaderSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_curve_value_labels(spec: CurveValueLabelsSpec) -> dict[str, Any]:
+def _serialize_curve_value_labels(spec: CurveValueLabelsSpec) -> dict[str, object]:
     return {
         "step": spec.step,
         "format": spec.number_format.value,
@@ -201,7 +203,7 @@ def _serialize_curve_value_labels(spec: CurveValueLabelsSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_curve_header_display(spec: CurveHeaderDisplaySpec) -> dict[str, Any]:
+def _serialize_curve_header_display(spec: CurveHeaderDisplaySpec) -> dict[str, object]:
     return {
         "show_name": spec.show_name,
         "show_unit": spec.show_unit,
@@ -211,7 +213,7 @@ def _serialize_curve_header_display(spec: CurveHeaderDisplaySpec) -> dict[str, A
     }
 
 
-def _serialize_reference_curve_overlay(spec: ReferenceCurveOverlaySpec) -> dict[str, Any]:
+def _serialize_reference_curve_overlay(spec: ReferenceCurveOverlaySpec) -> dict[str, object]:
     overlay = {
         "mode": spec.mode.value,
         "tick_side": spec.tick_side.value,
@@ -223,7 +225,7 @@ def _serialize_reference_curve_overlay(spec: ReferenceCurveOverlaySpec) -> dict[
     return overlay
 
 
-def _serialize_curve_callout(spec: CurveCalloutSpec) -> dict[str, Any]:
+def _serialize_curve_callout(spec: CurveCalloutSpec) -> dict[str, object]:
     callout = {
         "depth": spec.depth,
         "side": spec.side,
@@ -245,7 +247,7 @@ def _serialize_curve_callout(spec: CurveCalloutSpec) -> dict[str, Any]:
     return callout
 
 
-def _serialize_curve_fill(spec: CurveFillSpec) -> dict[str, Any]:
+def _serialize_curve_fill(spec: CurveFillSpec) -> dict[str, object]:
     fill = {
         "kind": spec.kind.value,
         "crossover": {
@@ -272,7 +274,7 @@ def _serialize_curve_fill(spec: CurveFillSpec) -> dict[str, Any]:
     return fill
 
 
-def _serialize_curve_element(element: CurveElement) -> dict[str, Any]:
+def _serialize_curve_element(element: CurveElement) -> dict[str, object]:
     curve = {
         "kind": "curve",
         "channel": element.channel,
@@ -298,7 +300,7 @@ def _serialize_curve_element(element: CurveElement) -> dict[str, Any]:
     return curve
 
 
-def _serialize_raster_waveform(spec: RasterWaveformSpec) -> dict[str, Any]:
+def _serialize_raster_waveform(spec: RasterWaveformSpec) -> dict[str, object]:
     waveform = {
         "enabled": spec.enabled,
         "stride": spec.stride,
@@ -314,7 +316,7 @@ def _serialize_raster_waveform(spec: RasterWaveformSpec) -> dict[str, Any]:
     return waveform
 
 
-def _serialize_raster_element(element: RasterElement) -> dict[str, Any]:
+def _serialize_raster_element(element: RasterElement) -> dict[str, object]:
     raster = {
         "kind": "raster",
         "channel": element.channel,
@@ -356,7 +358,7 @@ def _serialize_annotation_object(
     | AnnotationMarkerSpec
     | AnnotationArrowSpec
     | AnnotationGlyphSpec,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     if isinstance(item, AnnotationIntervalSpec):
         return {
             "kind": "interval",
@@ -477,7 +479,7 @@ def _serialize_annotation_object(
     return payload
 
 
-def _serialize_reference_event(spec: ReferenceEventSpec) -> dict[str, Any]:
+def _serialize_reference_event(spec: ReferenceEventSpec) -> dict[str, object]:
     payload = {
         "depth": spec.depth,
         "label": spec.label,
@@ -501,7 +503,7 @@ def _serialize_reference_event(spec: ReferenceEventSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_reference_track(reference: ReferenceTrackSpec) -> dict[str, Any]:
+def _serialize_reference_track(reference: ReferenceTrackSpec) -> dict[str, object]:
     payload = {
         "axis": reference.axis.value,
         "define_layout": reference.define_layout,
@@ -529,7 +531,7 @@ def _serialize_reference_track(reference: ReferenceTrackSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_track(track: TrackSpec) -> dict[str, Any]:
+def _serialize_track(track: TrackSpec) -> dict[str, object]:
     payload = {
         "id": track.id,
         "title": track.title,
@@ -555,7 +557,7 @@ def _serialize_track(track: TrackSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_header_field(field: HeaderField) -> dict[str, Any]:
+def _serialize_header_field(field: HeaderField) -> dict[str, object]:
     payload = {
         "label": field.label,
         "source_key": field.source_key,
@@ -565,8 +567,8 @@ def _serialize_header_field(field: HeaderField) -> dict[str, Any]:
     return payload
 
 
-def _serialize_report_value(value: ReportValueSpec) -> dict[str, Any]:
-    payload: dict[str, Any] = {}
+def _serialize_report_value(value: ReportValueSpec) -> dict[str, object]:
+    payload: dict[str, object] = {}
     _set_if_not_none(payload, "value", value.value)
     _set_if_not_none(payload, "source_key", value.source_key)
     if value.default != "":
@@ -574,7 +576,7 @@ def _serialize_report_value(value: ReportValueSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_report_field(field: ReportFieldSpec) -> dict[str, Any]:
+def _serialize_report_field(field: ReportFieldSpec) -> dict[str, object]:
     payload = {
         "key": field.key,
         "label": field.label,
@@ -585,7 +587,7 @@ def _serialize_report_field(field: ReportFieldSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_report_service_title(title: ReportServiceTitleSpec) -> dict[str, Any] | str:
+def _serialize_report_service_title(title: ReportServiceTitleSpec) -> dict[str, object] | str:
     value = _serialize_report_value(title.value)
     if (
         title.font_size is None
@@ -605,7 +607,7 @@ def _serialize_report_service_title(title: ReportServiceTitleSpec) -> dict[str, 
     return payload
 
 
-def _serialize_report_detail_cell(cell: ReportDetailCellSpec) -> dict[str, Any]:
+def _serialize_report_detail_cell(cell: ReportDetailCellSpec) -> dict[str, object]:
     payload = _serialize_report_value(cell.value)
     _set_if_not_none(payload, "background_color", cell.background_color)
     _set_if_not_none(payload, "text_color", cell.text_color)
@@ -617,18 +619,18 @@ def _serialize_report_detail_cell(cell: ReportDetailCellSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_report_detail_column(column: ReportDetailColumnSpec) -> dict[str, Any]:
+def _serialize_report_detail_column(column: ReportDetailColumnSpec) -> dict[str, object]:
     return {"cells": [_serialize_report_detail_cell(item) for item in column.cells]}
 
 
-def _serialize_report_detail_row(row: ReportDetailRowSpec) -> dict[str, Any]:
+def _serialize_report_detail_row(row: ReportDetailRowSpec) -> dict[str, object]:
     return {
         "label_cells": [_serialize_report_detail_cell(item) for item in row.label_cells],
         "columns": [_serialize_report_detail_column(item) for item in row.columns],
     }
 
 
-def _serialize_report_detail(detail: ReportDetailSpec) -> dict[str, Any]:
+def _serialize_report_detail(detail: ReportDetailSpec) -> dict[str, object]:
     payload = {
         "kind": detail.kind.value,
         "rows": [_serialize_report_detail_row(item) for item in detail.rows],
@@ -639,7 +641,7 @@ def _serialize_report_detail(detail: ReportDetailSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_report_block(report: ReportBlockSpec) -> dict[str, Any]:
+def _serialize_report_block(report: ReportBlockSpec) -> dict[str, object]:
     payload = {
         "enabled": report.enabled,
         "general_fields": [_serialize_report_field(item) for item in report.general_fields],
@@ -652,8 +654,8 @@ def _serialize_report_block(report: ReportBlockSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_header(header: HeaderSpec) -> dict[str, Any]:
-    payload: dict[str, Any] = {}
+def _serialize_header(header: HeaderSpec) -> dict[str, object]:
+    payload: dict[str, object] = {}
     _set_if_not_none(payload, "title", header.title)
     _set_if_not_none(payload, "subtitle", header.subtitle)
     if header.fields:
@@ -663,11 +665,11 @@ def _serialize_header(header: HeaderSpec) -> dict[str, Any]:
     return payload
 
 
-def _serialize_footer(footer: FooterSpec) -> dict[str, Any]:
+def _serialize_footer(footer: FooterSpec) -> dict[str, object]:
     return {"lines": list(footer.lines)}
 
 
-def _serialize_page(page: PageSpec) -> dict[str, Any]:
+def _serialize_page(page: PageSpec) -> dict[str, object]:
     return {
         "width_mm": page.width_mm,
         "height_mm": page.height_mm,
@@ -684,7 +686,7 @@ def _serialize_page(page: PageSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_depth_axis(depth_axis: DepthAxisSpec) -> dict[str, Any]:
+def _serialize_depth_axis(depth_axis: DepthAxisSpec) -> dict[str, object]:
     return {
         "unit": depth_axis.unit,
         "scale": depth_axis.scale_ratio,
@@ -693,7 +695,7 @@ def _serialize_depth_axis(depth_axis: DepthAxisSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_marker(marker: MarkerSpec) -> dict[str, Any]:
+def _serialize_marker(marker: MarkerSpec) -> dict[str, object]:
     return {
         "depth": marker.depth,
         "label": marker.label,
@@ -702,7 +704,7 @@ def _serialize_marker(marker: MarkerSpec) -> dict[str, Any]:
     }
 
 
-def _serialize_zone(zone: ZoneSpec) -> dict[str, Any]:
+def _serialize_zone(zone: ZoneSpec) -> dict[str, object]:
     return {
         "top": zone.top,
         "base": zone.base,
@@ -712,7 +714,7 @@ def _serialize_zone(zone: ZoneSpec) -> dict[str, Any]:
     }
 
 
-def document_to_dict(document: LogDocument) -> dict[str, Any]:
+def document_to_dict(document: LogDocument) -> dict[str, object]:
     """Convert a document object into a normalized mapping."""
     payload = {
         "name": document.name,
@@ -733,7 +735,7 @@ def document_to_dict(document: LogDocument) -> dict[str, Any]:
     return _clean_mapping(payload)
 
 
-def document_from_dict(data: Mapping[str, Any]) -> LogDocument:
+def document_from_dict(data: Mapping[str, object]) -> LogDocument:
     """Build a document object from a validated mapping."""
     return document_from_mapping(dict(data))
 
@@ -763,7 +765,7 @@ def load_document_yaml(source: str | Path | TextIO) -> LogDocument:
     return document_from_yaml(source)
 
 
-def _logfile_spec_to_mapping(spec: LogFileSpec) -> dict[str, Any]:
+def _logfile_spec_to_mapping(spec: LogFileSpec) -> dict[str, object]:
     payload = {
         "version": 1,
         "name": spec.name,
@@ -789,8 +791,8 @@ def _logfile_spec_to_mapping(spec: LogFileSpec) -> dict[str, Any]:
 
 
 def report_to_dict(
-    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
-) -> dict[str, Any]:
+    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, object],
+) -> dict[str, object]:
     """Convert a report-like object into a normalized logfile mapping."""
     if isinstance(report, ProgrammaticLogSpec):
         return report.to_mapping()
@@ -805,13 +807,13 @@ def report_to_dict(
     )
 
 
-def report_from_dict(data: Mapping[str, Any]) -> LogFileSpec:
+def report_from_dict(data: Mapping[str, object]) -> LogFileSpec:
     """Build a logfile specification from a mapping."""
     return logfile_from_mapping(dict(data))
 
 
 def report_to_yaml(
-    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
+    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, object],
     destination: str | Path | TextIO | None = None,
 ) -> str | None:
     """Serialize a report-like object to YAML text or a destination."""
@@ -819,7 +821,7 @@ def report_to_yaml(
 
 
 def save_report(
-    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, Any],
+    report: ProgrammaticLogSpec | LogBuilder | LogFileSpec | Mapping[str, object],
     destination: str | Path | TextIO,
 ) -> str | None:
     """Write a report mapping or object to YAML."""

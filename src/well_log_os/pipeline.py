@@ -25,6 +25,7 @@ from pathlib import Path
 
 from .errors import TemplateValidationError
 from .logfile import build_documents_for_logfile, load_datasets_for_logfile, load_logfile
+from .model import LogDocument
 from .renderers import MatplotlibRenderer, PlotlyRenderer
 from .renderers.base import RenderResult
 
@@ -41,7 +42,7 @@ def _resolve_output_path(
     return output_path
 
 
-def _document_section_id(document) -> str:
+def _document_section_id(document: LogDocument) -> str:
     """Return the active layout section identifier stored in document metadata."""
     metadata = getattr(document, "metadata", None)
     if isinstance(metadata, dict):
