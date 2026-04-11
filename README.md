@@ -148,6 +148,17 @@ Run tests:
 uv run python -m unittest discover -s tests -v
 ```
 
+Build and smoke-test the wheel:
+
+```bash
+uv build
+python -m venv .smoke-venv
+./.smoke-venv/bin/pip install --upgrade pip
+./.smoke-venv/bin/pip install dist/*.whl
+./.smoke-venv/bin/well-log-os --help
+MPLBACKEND=Agg ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py
+```
+
 Format and lint:
 
 ```bash

@@ -109,3 +109,40 @@ jobs:
           print("pint", pint.__version__)
           print(load_las, load_dlis, MatplotlibRenderer, PlotlyRenderer)
           PY
+
+  package:
+    name: Package Build and Wheel Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Create clean smoke-test environment
+        run: python -m venv .smoke-venv
+
+      - name: Install built wheel into clean environment
+        run: |
+          ./.smoke-venv/bin/pip install --upgrade pip
+          ./.smoke-venv/bin/pip install dist/*.whl
+
+      - name: Verify console entry point
+        run: ./.smoke-venv/bin/well-log-os --help
+
+      - name: Run installed-wheel smoke test
+        env:
+          MPLBACKEND: Agg
+        run: ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py

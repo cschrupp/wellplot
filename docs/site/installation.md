@@ -63,6 +63,19 @@ uv sync --group docs
 uv run mkdocs build --strict
 ```
 
+## Wheel smoke test
+
+To verify the built package installs and runs outside the editable development environment:
+
+```bash
+uv build
+python -m venv .smoke-venv
+./.smoke-venv/bin/pip install --upgrade pip
+./.smoke-venv/bin/pip install dist/*.whl
+./.smoke-venv/bin/well-log-os --help
+MPLBACKEND=Agg ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py
+```
+
 ## Python version
 
 The project currently targets Python `>=3.11`.

@@ -182,9 +182,9 @@ Current status:
     - dynamic version sourcing from package code
   - public import-contract tests for `well_log_os` and `well_log_os.api`
   - local wheel/sdist build verification with `uv build`
+  - clean install smoke testing from the built wheel
+  - CI coverage for lint, tests, extras, build, and installed-wheel smoke validation
 - next:
-  - clean install smoke test from the built wheel
-  - CI matrix for lint, tests, build, and smoke import
   - release workflow and TestPyPI rehearsal
   - expand user docs reference pages beyond the current workflow-first skeleton
   - continue staged `ANN` cleanup in `tests/` and `examples/`
@@ -247,8 +247,6 @@ Longer-term / UI-centric:
 
 ### Phase A: Production Hardening (current)
 
-- Complete clean install smoke tests from built distributions.
-- Add CI coverage for lint, tests, build, and smoke import.
 - Keep package metadata, docs, and public exports aligned.
 - Continue staged lint/docstring tightening where signal remains high.
 
@@ -285,8 +283,6 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete release hardening:
-  - clean install smoke test from the built wheel
-  - CI matrix for lint, tests, build, and smoke import
   - release workflow plus TestPyPI rehearsal
 - Expand user documentation from the current workflow-first baseline:
   - Python API reference pages
