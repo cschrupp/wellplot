@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Render the legacy synthetic triple-combo document example."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -28,6 +30,7 @@ from well_log_os.renderers import MatplotlibRenderer
 
 
 def build_dataset() -> WellDataset:
+    """Build the synthetic dataset used by the triple-combo example."""
     depth = np.linspace(1000.0, 1120.0, 600)
     azimuth = np.linspace(0.0, 360.0, 90)
     dataset = WellDataset(
@@ -77,6 +80,7 @@ def build_dataset() -> WellDataset:
 
 
 def main() -> None:
+    """Load the example document, render it, and print the PDF path."""
     document = load_document(Path(__file__).with_name("triple_combo.yaml"))
     dataset = build_dataset()
     renderer = MatplotlibRenderer()

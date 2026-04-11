@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Show byte-oriented rendering helpers for notebook-style workflows."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,6 +28,7 @@ from well_log_os import render_section_png, render_svg_bytes, render_window_png
 
 
 def main() -> None:
+    """Render PNG and SVG bytes and write them to the workspace render folder."""
     dataset = build_dataset()
     report = build_report(dataset)
 

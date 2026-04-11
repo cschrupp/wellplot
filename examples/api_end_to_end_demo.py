@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Run an end-to-end dataset, layout, and rendering workflow demo."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -34,12 +36,14 @@ from well_log_os import (
 
 
 def _smoothed(values: np.ndarray, window: int = 7) -> np.ndarray:
+    """Return a simple moving-average smoothing of a one-dimensional array."""
     kernel = np.ones(window, dtype=float) / float(window)
     padded = np.pad(values, (window // 2, window // 2), mode="edge")
     return np.convolve(padded, kernel, mode="valid")
 
 
 def build_raw_dataset():
+    """Build the raw synthetic dataset used by the end-to-end demo."""
     depth_ft_desc = np.linspace(8460.0, 8200.0, 131)
     sample_axis_us = np.linspace(200.0, 1200.0, 96)
     gr = 68.0 + 16.0 * np.sin((depth_ft_desc - 8200.0) / 20.0)
@@ -89,6 +93,7 @@ def build_raw_dataset():
 
 
 def build_processed_dataset(raw):
+    """Build processed channels derived from the raw dataset."""
     raw_depth_ft = raw.get_channel("GR").depth
     coarse_depth_ft = raw_depth_ft[::6]
     raw_gr = raw.get_channel("GR").values
@@ -127,6 +132,7 @@ def build_processed_dataset(raw):
 
 
 def build_working_dataset():
+    """Merge the raw and processed datasets into one working dataset."""
     raw = build_raw_dataset()
     processed = build_processed_dataset(raw)
     return (
@@ -142,6 +148,7 @@ def build_working_dataset():
 
 
 def build_report(dataset):
+    """Build the report layout used by the end-to-end API demo."""
     builder = LogBuilder(name="API End-to-End Demo")
     builder.set_render(
         backend="matplotlib",
@@ -230,6 +237,7 @@ def build_report(dataset):
 
 
 def main() -> None:
+    """Render the end-to-end demo outputs and print a short summary."""
     dataset = build_working_dataset()
     report = build_report(dataset)
 

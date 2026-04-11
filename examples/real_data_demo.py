@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Render a real log-file YAML example from the command line."""
+
 from __future__ import annotations
 
 import argparse
@@ -26,6 +28,7 @@ from well_log_os import render_from_logfile
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments for the real-data example."""
     parser = argparse.ArgumentParser(
         description="Render a well log from a log-file YAML configuration."
     )
@@ -40,6 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Render the requested YAML log configuration and print the result."""
     args = parse_args()
     logfile_path = args.logfile.resolve()
     result = render_from_logfile(logfile_path)

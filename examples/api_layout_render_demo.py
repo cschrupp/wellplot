@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Show programmatic report layout construction and rendering."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,6 +29,7 @@ from well_log_os import LogBuilder, create_dataset, render_report
 
 
 def build_dataset():
+    """Build the synthetic dataset used by the layout render demo."""
     depth_ft = np.linspace(8200.0, 8460.0, 261)
     sample_axis_us = np.linspace(200.0, 1200.0, 128)
 
@@ -77,6 +80,7 @@ def build_dataset():
 
 
 def build_report(dataset):
+    """Build the programmatic report for the synthetic layout dataset."""
     builder = LogBuilder(name="Programmatic Layout Demo")
     builder.set_render(
         backend="matplotlib",
@@ -182,6 +186,7 @@ def build_report(dataset):
 
 
 def main() -> None:
+    """Render the layout demo PDF and print the saved output path."""
     dataset = build_dataset()
     report = build_report(dataset)
     output_path = Path("workspace/renders/api_layout_render_demo.pdf")

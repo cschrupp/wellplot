@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Demonstrate dataset ingestion from dataframe and derived in-memory arrays."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,6 +31,7 @@ from well_log_os import DatasetBuilder, create_dataset
 
 
 def main() -> None:
+    """Create, merge, and preview a synthetic dataset ingestion workflow."""
     depth_ft = np.linspace(8200.0, 8460.0, 261)
     sample_axis_us = np.linspace(200.0, 1200.0, 128)
 

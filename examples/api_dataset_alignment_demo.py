@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Show dataset alignment and reindexing before rendering a report."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,6 +29,7 @@ from well_log_os import DatasetBuilder, LogBuilder, render_report
 
 
 def build_aligned_dataset():
+    """Build a dataset whose channels start on different sample grids."""
     depth_ft_desc = np.array([8460.0, 8440.0, 8420.0, 8400.0, 8380.0, 8360.0])
     gr_values = np.array([86.0, 78.0, 69.0, 62.0, 58.0, 55.0])
     cbl_depth_ft = np.array([8360.0, 8400.0, 8440.0, 8460.0])
@@ -74,6 +77,7 @@ def build_aligned_dataset():
 
 
 def build_report(dataset):
+    """Build a simple report that renders the aligned channels."""
     builder = LogBuilder(name="Dataset Alignment Demo")
     builder.set_render(
         backend="matplotlib",
@@ -120,6 +124,7 @@ def build_report(dataset):
 
 
 def main() -> None:
+    """Run the alignment demo and render the resulting PDF."""
     dataset = build_aligned_dataset()
     report = build_report(dataset)
     output_path = Path("workspace/renders/api_dataset_alignment_demo.pdf")

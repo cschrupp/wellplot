@@ -17,12 +17,15 @@
 #
 ###############################################################################
 
+"""Show dataset merge behavior and channel collision handling."""
+
 from __future__ import annotations
 
 from well_log_os import DatasetBuilder, create_dataset
 
 
 def build_raw_dataset():
+    """Build a small dataset that represents raw acquired channels."""
     dataset = create_dataset(
         "raw",
         well_metadata={"WELL": "API Demo 1"},
@@ -48,6 +51,7 @@ def build_raw_dataset():
 
 
 def build_processed_dataset():
+    """Build a derived dataset that overlaps with the raw mnemonics."""
     dataset = create_dataset(
         "qc",
         provenance={"source": "notebook"},
@@ -72,6 +76,7 @@ def build_processed_dataset():
 
 
 def main() -> None:
+    """Merge example datasets and print the resulting channel metadata."""
     merged = (
         DatasetBuilder(name="merged")
         .merge(build_raw_dataset(), merge_well_metadata=True, merge_provenance=True)

@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Show section, track, and window rendering from a full report definition."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -26,6 +28,7 @@ from well_log_os import render_section, render_track, render_window
 
 
 def main() -> None:
+    """Render partial outputs from a shared report definition."""
     dataset = build_dataset()
     report = build_report(dataset)
 

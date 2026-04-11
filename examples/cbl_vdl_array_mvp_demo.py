@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Render the legacy CBL and VDL array MVP example from a log YAML file."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -29,6 +31,7 @@ from well_log_os.renderers import MatplotlibRenderer
 
 
 def build_synthetic_dataset() -> WellDataset:
+    """Build a synthetic dataset that matches the CBL and VDL example YAML."""
     depth = np.linspace(1000.0, 1120.0, 700)
     azimuth = np.linspace(0.0, 360.0, 96)
     dataset = WellDataset(
@@ -69,6 +72,7 @@ def build_synthetic_dataset() -> WellDataset:
 
 
 def resolve_output(logfile_path: Path, configured_output: str) -> Path:
+    """Resolve the configured output path relative to the example log file."""
     output = Path(configured_output)
     if not output.is_absolute():
         output = (logfile_path.parent / output).resolve()
@@ -77,6 +81,7 @@ def resolve_output(logfile_path: Path, configured_output: str) -> Path:
 
 
 def main() -> None:
+    """Load the YAML example, render it, and print the output path."""
     logfile_path = Path(__file__).with_name("cbl_vdl_array_mvp.log.yaml").resolve()
     spec = load_logfile(logfile_path)
     dataset = build_synthetic_dataset()

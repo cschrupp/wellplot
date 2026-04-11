@@ -117,7 +117,3 @@ known-first-party = ["well_log_os"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"
-
-[tool.ruff.lint.per-file-ignores]
-"examples/*.py" = ["D"]
-"examples/**/*.py" = ["D"]

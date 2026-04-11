@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Show report and document serialization helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -31,6 +33,7 @@ from well_log_os import (
 
 
 def build_dataset():
+    """Build a minimal dataset for serialization examples."""
     dataset = create_dataset("serialize-demo")
     dataset.add_curve(
         mnemonic="GR",
@@ -43,6 +46,7 @@ def build_dataset():
 
 
 def build_report(dataset):
+    """Build a minimal report that can be serialized to YAML."""
     builder = LogBuilder(name="Serialize Demo")
     builder.set_render(backend="matplotlib", output_path="serialize_demo.pdf", dpi=120)
     builder.set_page(size="A4", orientation="portrait", header_height_mm=0, footer_height_mm=0)
@@ -73,6 +77,7 @@ def build_report(dataset):
 
 
 def main() -> None:
+    """Serialize the example report and document to YAML files."""
     dataset = build_dataset()
     report = build_report(dataset)
     documents = build_documents(report)
