@@ -42,6 +42,7 @@ from ..model import (
     AnnotationLabelMode,
     AnnotationMarkerSpec,
     AnnotationTextSpec,
+    CurveCalloutSpec,
     CurveElement,
     CurveFillKind,
     FooterSpec,
@@ -83,6 +84,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.backend_bases import RendererBase
     from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
     from matplotlib.transforms import Bbox, Transform
 
     from ..layout import DepthWindow, Frame, PageLayout
@@ -5265,12 +5267,12 @@ class MatplotlibRenderer(Renderer):
 
     def _plot_curve_with_wrap_segments(
         self,
-        ax,
+        ax: Axes,
         depth: np.ndarray,
         x_values: np.ndarray,
         valid_mask: np.ndarray,
         wrapped_mask: np.ndarray,
-        element,
+        element: CurveElement,
     ) -> None:
         base_mask = valid_mask & ~wrapped_mask
         if np.any(base_mask):
@@ -5301,7 +5303,7 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_reference_curve_ticks(
         self,
-        ax,
+        ax: Axes,
         *,
         depth: np.ndarray,
         valid_mask: np.ndarray,
@@ -5332,7 +5334,12 @@ class MatplotlibRenderer(Renderer):
                 alpha=element.style.opacity,
             )
 
-    def _draw_reference_events(self, ax, track, window) -> None:
+    def _draw_reference_events(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
         events = self._reference_event_elements(track)
@@ -5354,7 +5361,13 @@ class MatplotlibRenderer(Renderer):
                     zorder=3.6,
                 )
 
-    def _draw_reference_event_callouts(self, ax, track, document: LogDocument, window) -> None:
+    def _draw_reference_event_callouts(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        document: LogDocument,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
         events = self._reference_event_elements(track)
@@ -5426,7 +5439,7 @@ class MatplotlibRenderer(Renderer):
         self,
         top: float,
         base: float,
-        window,
+        window: DepthWindow,
     ) -> tuple[float, float] | None:
         if base < window.start or top > window.stop:
             return None
@@ -5476,7 +5489,12 @@ class MatplotlibRenderer(Renderer):
             "bar_vertical": "|",
         }[shape]
 
-    def _draw_annotation_interval(self, ax, annotation: AnnotationIntervalSpec, window) -> None:
+    def _draw_annotation_interval(
+        self,
+        ax: Axes,
+        annotation: AnnotationIntervalSpec,
+        window: DepthWindow,
+    ) -> None:
         visible = self._annotation_visible_interval(annotation.top, annotation.base, window)
         if visible is None:
             return
@@ -5542,7 +5560,12 @@ class MatplotlibRenderer(Renderer):
             zorder=1.6,
         )
 
-    def _draw_annotation_text(self, ax, annotation: AnnotationTextSpec, window) -> None:
+    def _draw_annotation_text(
+        self,
+        ax: Axes,
+        annotation: AnnotationTextSpec,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.patches import Rectangle
 
         if annotation.depth is not None:
@@ -5640,7 +5663,12 @@ class MatplotlibRenderer(Renderer):
             zorder=1.7,
         )
 
-    def _draw_annotation_marker_shape(self, ax, annotation: AnnotationMarkerSpec, window) -> None:
+    def _draw_annotation_marker_shape(
+        self,
+        ax: Axes,
+        annotation: AnnotationMarkerSpec,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
         if annotation.depth < window.start or annotation.depth > window.stop:
@@ -5755,7 +5783,12 @@ class MatplotlibRenderer(Renderer):
             ),
         )
 
-    def _draw_annotation_arrow_line(self, ax, annotation: AnnotationArrowSpec, window) -> None:
+    def _draw_annotation_arrow_line(
+        self,
+        ax: Axes,
+        annotation: AnnotationArrowSpec,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.transforms import blended_transform_factory
 
         interval_top = min(annotation.start_depth, annotation.end_depth)
@@ -5839,7 +5872,12 @@ class MatplotlibRenderer(Renderer):
             side=label_side,
         )
 
-    def _draw_annotation_glyph(self, ax, annotation: AnnotationGlyphSpec, window) -> None:
+    def _draw_annotation_glyph(
+        self,
+        ax: Axes,
+        annotation: AnnotationGlyphSpec,
+        window: DepthWindow,
+    ) -> None:
         from matplotlib.patches import Rectangle
 
         if annotation.depth is not None:
@@ -5914,8 +5952,8 @@ class MatplotlibRenderer(Renderer):
             zorder=1.75,
         )
 
-    def _annotation_obstacle_bboxes(self, ax, renderer) -> list[Any]:
-        bboxes: list[Any] = []
+    def _annotation_obstacle_bboxes(self, ax: Axes, renderer: RendererBase) -> list[Bbox]:
+        bboxes: list[Bbox] = []
         for artist in list(ax.patches) + list(ax.texts):
             try:
                 bbox = artist.get_window_extent(renderer=renderer)
@@ -6032,12 +6070,12 @@ class MatplotlibRenderer(Renderer):
     def _annotation_label_penalty(
         self,
         *,
-        ax,
+        ax: Axes,
         record: _AnnotationLabelRecord,
         side: str | None,
         text_x: float,
         text_y: float,
-        text_transform,
+        text_transform: Transform,
     ) -> float:
         anchor_display = text_transform.transform((record.anchor_x, record.anchor_y))
         text_display = text_transform.transform((text_x, text_y))
@@ -6053,9 +6091,9 @@ class MatplotlibRenderer(Renderer):
 
     def _place_annotation_label_records(
         self,
-        ax,
+        ax: Axes,
         records: list[_AnnotationLabelRecord],
-        window,
+        window: DepthWindow,
     ) -> list[_AnnotationLabelRecord]:
         if not records:
             return []
@@ -6077,7 +6115,7 @@ class MatplotlibRenderer(Renderer):
         axes_bbox = ax.get_window_extent(renderer=renderer)
         edge_padding_px = float(callout_style["edge_padding_px"])
         obstacle_bboxes = self._annotation_obstacle_bboxes(ax, renderer)
-        placed_bboxes: list[Any] = []
+        placed_bboxes: list[Bbox] = []
         ordered = sorted(
             records,
             key=lambda record: (
@@ -6219,7 +6257,11 @@ class MatplotlibRenderer(Renderer):
             )
         return ordered
 
-    def _draw_annotation_label_records(self, ax, records: list[_AnnotationLabelRecord]) -> None:
+    def _draw_annotation_label_records(
+        self,
+        ax: Axes,
+        records: list[_AnnotationLabelRecord],
+    ) -> None:
         if not records:
             return
         from matplotlib.transforms import blended_transform_factory
@@ -6260,7 +6302,12 @@ class MatplotlibRenderer(Renderer):
                 annotation_clip=True,
             )
 
-    def _draw_annotation_objects(self, ax, track, window) -> None:
+    def _draw_annotation_objects(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        window: DepthWindow,
+    ) -> None:
         label_records: list[_AnnotationLabelRecord] = []
         for annotation in track.annotations:
             if isinstance(annotation, AnnotationIntervalSpec):
@@ -6287,11 +6334,11 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_curve(
         self,
-        ax,
-        track,
-        element,
-        document,
-        dataset,
+        ax: Axes,
+        track: TrackSpec,
+        element: CurveElement,
+        document: LogDocument,
+        dataset: WellDataset,
         *,
         independent_curve_scales: bool = False,
     ) -> None:
@@ -6420,14 +6467,14 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_curve_value_labels(
         self,
-        ax,
-        depth,
-        values,
-        element,
-        scale,
+        ax: Axes,
+        depth: np.ndarray,
+        values: np.ndarray,
+        element: CurveElement,
+        scale: ScaleSpec | None,
         *,
-        text_values=None,
-        value_mask=None,
+        text_values: np.ndarray | None = None,
+        value_mask: np.ndarray | None = None,
     ) -> None:
         labels = element.value_labels
         mask = np.isfinite(depth) & np.isfinite(values)
@@ -6538,12 +6585,12 @@ class MatplotlibRenderer(Renderer):
         )
         return float(np.clip(fraction, 0.0, 1.0))
 
-    def _curve_callout_label(self, element: CurveElement, callout) -> str:
+    def _curve_callout_label(self, element: CurveElement, callout: CurveCalloutSpec) -> str:
         if callout.label is not None:
             return callout.label
         return element.label or element.channel
 
-    def _curve_callout_window_bounds(self, window) -> tuple[float, float]:
+    def _curve_callout_window_bounds(self, window: DepthWindow) -> tuple[float, float]:
         start = float(window.start)
         stop = float(window.stop)
         return (start, stop) if start <= stop else (stop, start)
@@ -6567,9 +6614,9 @@ class MatplotlibRenderer(Renderer):
     def _expanded_curve_callout_anchors(
         self,
         document: LogDocument,
-        callout,
+        callout: CurveCalloutSpec,
         callout_style: dict[str, Any],
-        window,
+        window: DepthWindow,
         *,
         section_start: float,
         section_stop: float,
@@ -6646,7 +6693,7 @@ class MatplotlibRenderer(Renderer):
     def _curve_callout_target_y(
         self,
         *,
-        callout,
+        callout: CurveCalloutSpec,
         anchor_depth: float,
         default_offset: float,
     ) -> float:
@@ -6663,10 +6710,10 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_callout_records(
         self,
-        track,
+        track: TrackSpec,
         document: LogDocument,
         dataset: WellDataset,
-        window,
+        window: DepthWindow,
         *,
         independent_curve_scales: bool,
     ) -> list[_CurveCalloutRenderRecord]:
@@ -6823,7 +6870,7 @@ class MatplotlibRenderer(Renderer):
             candidates.append(value)
         return candidates
 
-    def _curve_callout_renderer(self, ax):
+    def _curve_callout_renderer(self, ax: Axes) -> RendererBase:
         canvas = ax.figure.canvas
         get_renderer = getattr(canvas, "get_renderer", None)
         if get_renderer is None:
@@ -6837,19 +6884,19 @@ class MatplotlibRenderer(Renderer):
 
     def _measure_curve_callout_bbox(
         self,
-        ax,
+        ax: Axes,
         *,
-        renderer,
+        renderer: RendererBase,
         label: str,
         text_x: float,
         text_y: float,
-        transform,
+        transform: Transform,
         fontsize: float,
         color: str,
         fontweight: str,
         fontstyle: str,
         horizontal_alignment: str,
-    ):
+    ) -> Bbox:
         text = ax.text(
             text_x,
             text_y,
@@ -6872,8 +6919,8 @@ class MatplotlibRenderer(Renderer):
         self,
         *,
         text_x: float,
-        bbox,
-        axes_bbox,
+        bbox: Bbox,
+        axes_bbox: Bbox,
         padding_px: float,
     ) -> float:
         shift_px = 0.0
@@ -6891,10 +6938,10 @@ class MatplotlibRenderer(Renderer):
         *,
         text_x: float,
         text_y: float,
-        bbox,
-        axes_bbox,
+        bbox: Bbox,
+        axes_bbox: Bbox,
         padding_px: float,
-        transform,
+        transform: Transform,
     ) -> float:
         shift_px = 0.0
         if bbox.y0 < axes_bbox.y0 + padding_px:
@@ -6909,8 +6956,8 @@ class MatplotlibRenderer(Renderer):
 
     def _curve_display_point_sets(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         document: LogDocument,
         dataset: WellDataset,
         *,
@@ -6935,7 +6982,7 @@ class MatplotlibRenderer(Renderer):
     def _count_curve_points_in_bbox(
         self,
         points: np.ndarray,
-        bbox,
+        bbox: Bbox,
         *,
         padding_px: float,
     ) -> int:
@@ -6956,13 +7003,13 @@ class MatplotlibRenderer(Renderer):
     def _curve_callout_penalty(
         self,
         *,
-        ax,
+        ax: Axes,
         record: _CurveCalloutRenderRecord,
         side: str,
         text_x: float,
         text_y: float,
-        bbox,
-        text_transform,
+        bbox: Bbox,
+        text_transform: Transform,
         point_sets: dict[int, np.ndarray],
         curve_buffer_px: float,
     ) -> float:
@@ -6994,11 +7041,11 @@ class MatplotlibRenderer(Renderer):
 
     def _place_curve_callouts(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         document: LogDocument,
         dataset: WellDataset,
-        window,
+        window: DepthWindow,
         *,
         independent_curve_scales: bool,
     ) -> list[_CurveCalloutRenderRecord]:
@@ -7164,11 +7211,11 @@ class MatplotlibRenderer(Renderer):
 
     def _draw_curve_callouts(
         self,
-        ax,
-        track,
+        ax: Axes,
+        track: TrackSpec,
         document: LogDocument,
         dataset: WellDataset,
-        window,
+        window: DepthWindow,
         *,
         independent_curve_scales: bool,
     ) -> None:
@@ -7212,7 +7259,14 @@ class MatplotlibRenderer(Renderer):
                 annotation_clip=True,
             )
 
-    def _draw_raster(self, ax, track, element, document, dataset) -> None:
+    def _draw_raster(
+        self,
+        ax: Axes,
+        track: TrackSpec,
+        element: RasterElement,
+        document: LogDocument,
+        dataset: WellDataset,
+    ) -> None:
         channel = dataset.get_channel(element.channel)
         if not isinstance(channel, RasterChannel):
             raise TypeError(f"Raster element {element.channel} requires a raster channel.")
@@ -7292,7 +7346,13 @@ class MatplotlibRenderer(Renderer):
             else:
                 ax.set_xlim(track.x_scale.minimum, track.x_scale.maximum)
 
-    def _draw_raster_colorbar(self, ax, image, element, channel: RasterChannel) -> None:
+    def _draw_raster_colorbar(
+        self,
+        ax: Axes,
+        image: AxesImage,
+        element: RasterElement,
+        channel: RasterChannel,
+    ) -> None:
         from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
         raster_style = self._style_section("raster")
@@ -7327,7 +7387,7 @@ class MatplotlibRenderer(Renderer):
                 labelpad=1.5,
             )
 
-    def _apply_scale(self, ax, track) -> None:
+    def _apply_scale(self, ax: Axes, track: TrackSpec) -> None:
         if track.x_scale is None:
             return
         scale = track.x_scale
@@ -7352,8 +7412,8 @@ class MatplotlibRenderer(Renderer):
 
     def _configure_depth_axis(
         self,
-        ax,
-        document,
+        ax: Axes,
+        document: LogDocument,
         *,
         show_labels: bool,
         major_step: float | None = None,
@@ -7375,7 +7435,7 @@ class MatplotlibRenderer(Renderer):
         ax.tick_params(axis="y", which="major", length=0, labelleft=show_labels)
         ax.tick_params(axis="y", which="minor", length=0, labelleft=False)
 
-    def _configure_x_axis(self, ax, track) -> None:
+    def _configure_x_axis(self, ax: Axes, track: TrackSpec) -> None:
         import matplotlib.ticker as mticker
 
         if track.x_scale is not None and track.x_scale.kind == ScaleKind.LOG:
@@ -7391,7 +7451,7 @@ class MatplotlibRenderer(Renderer):
 
         ax.xaxis.set_minor_locator(mticker.AutoMinorLocator())
 
-    def _draw_depth_grid(self, ax, *, show_minor: bool = True) -> None:
+    def _draw_depth_grid(self, ax: Axes, *, show_minor: bool = True) -> None:
         grid_style = self._style_section("grid")
         ax.grid(
             True,
@@ -7412,13 +7472,18 @@ class MatplotlibRenderer(Renderer):
             alpha=float(grid_style["depth_minor_alpha"]),
         )
 
-    def _style_track_frame(self, ax) -> None:
+    def _style_track_frame(self, ax: Axes) -> None:
         track_style = self._style_section("track")
         for spine in ax.spines.values():
             spine.set_color(str(track_style["frame_color"]))
             spine.set_linewidth(float(track_style["frame_linewidth"]))
 
-    def _draw_marker_callouts(self, ax, document, window) -> None:
+    def _draw_marker_callouts(
+        self,
+        ax: Axes,
+        document: LogDocument,
+        window: DepthWindow,
+    ) -> None:
         if not document.markers:
             return
         from matplotlib.transforms import blended_transform_factory
