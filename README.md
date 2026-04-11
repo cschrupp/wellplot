@@ -247,6 +247,9 @@ The full implementation checklist lives in
 For a user-facing workflow explanation, see
 [docs/library-workflow.md](docs/library-workflow.md).
 
+For the package release workflow and TestPyPI/PyPI publishing process, see
+[docs/release-process.md](docs/release-process.md).
+
 ## Example Template
 
 See [examples/triple_combo.yaml](examples/triple_combo.yaml).

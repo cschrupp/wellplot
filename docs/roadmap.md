@@ -184,8 +184,9 @@ Current status:
   - local wheel/sdist build verification with `uv build`
   - clean install smoke testing from the built wheel
   - CI coverage for lint, tests, extras, build, and installed-wheel smoke validation
+  - manual release workflow with gated `verify-only`, `testpypi`, and `pypi` paths
 - next:
-  - release workflow and TestPyPI rehearsal
+  - first real TestPyPI rehearsal with repository-side trusted publishing
   - expand user docs reference pages beyond the current workflow-first skeleton
   - continue staged `ANN` cleanup in `tests/` and `examples/`
   - keep pruning stale comments and filling public API docstring gaps where they still exist
@@ -283,7 +284,7 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete release hardening:
-  - release workflow plus TestPyPI rehearsal
+  - first real TestPyPI rehearsal
 - Expand user documentation from the current workflow-first baseline:
   - Python API reference pages
   - YAML/report-schema reference pages

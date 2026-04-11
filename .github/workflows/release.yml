@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Choose whether to verify only, publish to TestPyPI, or publish to PyPI."
+        required: true
+        type: choice
+        default: verify-only
+        options:
+          - verify-only
+          - testpypi
+          - pypi
+      expected_version:
+        description: "Optional version guard, for example 0.1.0."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and Verify Release Artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Validate requested version
+        if: ${{ inputs.expected_version != '' }}
+        env:
+          EXPECTED_VERSION: ${{ inputs.expected_version }}
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          namespace = {}
+          exec(Path("src/well_log_os/_version.py").read_text(encoding="utf-8"), namespace)
+          version = namespace["__version__"]
+          expected = os.environ["EXPECTED_VERSION"].strip()
+          if version != expected:
+              raise SystemExit(
+                  f"Expected package version {expected!r}, but src/well_log_os/_version.py contains {version!r}."
+              )
+          print(f"Verified package version {version}.")
+          PY
+
+      - name: Build distributions
+        run: uv build
+
+      - name: Create clean release-test environment
+        run: python -m venv .release-venv
+
+      - name: Install built wheel into clean environment
+        run: |
+          ./.release-venv/bin/pip install --upgrade pip
+          ./.release-venv/bin/pip install dist/*.whl
+
+      - name: Verify console entry point
+        run: ./.release-venv/bin/well-log-os --help
+
+      - name: Run installed-wheel smoke test
+        env:
+          MPLBACKEND: Agg
+        run: ./.release-venv/bin/python scripts/smoke_installed_wheel.py
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    if: ${{ inputs.publish_target == 'testpypi' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build
+    if: ${{ inputs.publish_target == 'pypi' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
