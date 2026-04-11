@@ -53,12 +53,12 @@ jobs:
           from pathlib import Path
 
           namespace = {}
-          exec(Path("src/well_log_os/_version.py").read_text(encoding="utf-8"), namespace)
+          exec(Path("src/wellplot/_version.py").read_text(encoding="utf-8"), namespace)
           version = namespace["__version__"]
           expected = os.environ["EXPECTED_VERSION"].strip()
           if version != expected:
               raise SystemExit(
-                  f"Expected package version {expected!r}, but src/well_log_os/_version.py contains {version!r}."
+                  f"Expected package version {expected!r}, but src/wellplot/_version.py contains {version!r}."
               )
           print(f"Verified package version {version}.")
           PY
@@ -75,7 +75,7 @@ jobs:
           ./.release-venv/bin/pip install dist/*.whl
 
       - name: Verify console entry point
-        run: ./.release-venv/bin/well-log-os --help
+        run: ./.release-venv/bin/wellplot --help
 
       - name: Run installed-wheel smoke test
         env:

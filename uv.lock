@@ -1507,7 +1507,18 @@ wheels = [
 ]
 
 [[package]]
-name = "well-log-os"
+name = "wellpathpy"
+version = "0.5.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f3/cf/284e8d5231846cf981f5d53cdb921e252a23f409f42d423589ceef0ed0f0/wellpathpy-0.5.2-py2.py3-none-any.whl", hash = "sha256:c73e6d33bdf6e5c47f3c8ff93697222c9681025040a7d6e0d4d2cd54804e43f7", size = 76384, upload-time = "2025-02-08T09:17:25.775Z" },
+]
+
+[[package]]
+name = "wellplot"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
@@ -1589,17 +1600,6 @@ docs = [
     { name = "mkdocs", specifier = ">=1.6" },
     { name = "mkdocs-material", specifier = ">=9.5" },
     { name = "pymdown-extensions", specifier = ">=10.14" },
-]
-
-[[package]]
-name = "wellpathpy"
-version = "0.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-]
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/cf/284e8d5231846cf981f5d53cdb921e252a23f409f42d423589ceef0ed0f0/wellpathpy-0.5.2-py2.py3-none-any.whl", hash = "sha256:c73e6d33bdf6e5c47f3c8ff93697222c9681025040a7d6e0d4d2cd54804e43f7", size = 76384, upload-time = "2025-02-08T09:17:25.775Z" },
 ]
 
 [[package]]

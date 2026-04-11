@@ -1,4 +1,4 @@
-# well_log_os Decision Log
+# wellplot Decision Log
 
 Last updated: 2026-03-20
 

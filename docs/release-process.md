@@ -1,6 +1,6 @@
 # Release Process
 
-This document describes the current release workflow for `well_log_os`.
+This document describes the current release workflow for `wellplot`.
 
 The workflow is designed to be safe by default:
 
@@ -22,7 +22,7 @@ The manual workflow accepts:
    - `pypi`
 2. `expected_version`
    - optional version guard such as `0.1.0`
-   - if provided, the workflow checks it against `src/well_log_os/_version.py`
+   - if provided, the workflow checks it against `src/wellplot/_version.py`
 
 ## What the workflow does
 
@@ -34,7 +34,7 @@ The `build` job always runs first:
 4. runs `uv build`
 5. creates a clean virtual environment
 6. installs the built wheel into that clean environment
-7. verifies the `well-log-os` console entry point
+7. verifies the `wellplot` console entry point
 8. runs `scripts/smoke_installed_wheel.py`
 9. uploads the built artifacts for later publish jobs
 
@@ -74,17 +74,17 @@ Run the local validation path first:
 uv run ruff check .
 uv run python -m unittest discover -s tests -v
 uv build
-uv venv /tmp/well-log-os-release-check
-uv pip install --python /tmp/well-log-os-release-check/bin/python dist/*.whl
-/tmp/well-log-os-release-check/bin/well-log-os --help
-MPLBACKEND=Agg /tmp/well-log-os-release-check/bin/python scripts/smoke_installed_wheel.py
+uv venv /tmp/wellplot-release-check
+uv pip install --python /tmp/wellplot-release-check/bin/python dist/*.whl
+/tmp/wellplot-release-check/bin/wellplot --help
+MPLBACKEND=Agg /tmp/wellplot-release-check/bin/python scripts/smoke_installed_wheel.py
 ```
 
 ## TestPyPI rehearsal
 
 Recommended rehearsal sequence:
 
-1. Confirm the package version in `src/well_log_os/_version.py`.
+1. Confirm the package version in `src/wellplot/_version.py`.
 2. Run the local preflight checks.
 3. Trigger the `Release` workflow manually with:
    - `publish_target=testpypi`
@@ -94,11 +94,11 @@ Recommended rehearsal sequence:
 Example install command after a successful TestPyPI publish:
 
 ```bash
-python -m venv /tmp/well-log-os-testpypi
-/tmp/well-log-os-testpypi/bin/pip install \
+python -m venv /tmp/wellplot-testpypi
+/tmp/wellplot-testpypi/bin/pip install \
   --index-url https://test.pypi.org/simple/ \
   --extra-index-url https://pypi.org/simple/ \
-  well-log-os
+  wellplot
 ```
 
 ## PyPI release

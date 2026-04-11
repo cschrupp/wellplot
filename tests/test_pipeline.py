@@ -25,19 +25,19 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from well_log_os.errors import TemplateValidationError
-from well_log_os.logfile import LogFileSpec
-from well_log_os.pipeline import render_from_logfile
-from well_log_os.renderers.base import RenderResult
+from wellplot.errors import TemplateValidationError
+from wellplot.logfile import LogFileSpec
+from wellplot.pipeline import render_from_logfile
+from wellplot.renderers.base import RenderResult
 
 
 class PipelineTests(unittest.TestCase):
     """Verify the top-level logfile rendering pipeline."""
 
-    @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.MatplotlibRenderer")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_uses_master_matplotlib_loader(
         self,
         mock_load_logfile,
@@ -77,10 +77,10 @@ class PipelineTests(unittest.TestCase):
         called_output = renderer.render_documents.call_args.kwargs["output_path"]
         self.assertEqual(called_output, Path("/tmp/result.pdf"))
 
-    @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.MatplotlibRenderer")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_passes_continuous_strip_page_height(
         self,
         mock_load_logfile,
@@ -120,10 +120,10 @@ class PipelineTests(unittest.TestCase):
             continuous_strip_page_height_mm=280.0,
         )
 
-    @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.MatplotlibRenderer")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_passes_matplotlib_style(
         self,
         mock_load_logfile,
@@ -163,9 +163,9 @@ class PipelineTests(unittest.TestCase):
             style={"track": {"x_tick_labelsize": 7.2}},
         )
 
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_rejects_unknown_backend(
         self,
         mock_load_logfile,
@@ -192,10 +192,10 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(TemplateValidationError):
             render_from_logfile("/tmp/config.log.yaml")
 
-    @patch("well_log_os.pipeline.MatplotlibRenderer")
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.MatplotlibRenderer")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_renders_all_sections_with_matplotlib(
         self,
         mock_load_logfile,
@@ -243,9 +243,9 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(called_documents, (doc_main, doc_aux))
         self.assertEqual(called_datasets, (dataset_main, dataset_aux))
 
-    @patch("well_log_os.pipeline.build_documents_for_logfile")
-    @patch("well_log_os.pipeline.load_datasets_for_logfile")
-    @patch("well_log_os.pipeline.load_logfile")
+    @patch("wellplot.pipeline.build_documents_for_logfile")
+    @patch("wellplot.pipeline.load_datasets_for_logfile")
+    @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_rejects_multisection_plotly(
         self,
         mock_load_logfile,

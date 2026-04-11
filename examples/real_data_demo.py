@@ -24,7 +24,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from well_log_os import render_from_logfile
+from wellplot import render_from_logfile
 
 
 def parse_args() -> argparse.Namespace:

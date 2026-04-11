@@ -1,6 +1,6 @@
 # Getting Started
 
-`well_log_os` has two primary workflows:
+`wellplot` has two primary workflows:
 
 - **YAML workflow**: good when the layout itself is a maintained artifact
 - **Python API workflow**: good when the log is part of a notebook, script, or automated pipeline

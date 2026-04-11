@@ -25,8 +25,8 @@ import unittest
 
 import numpy as np
 
-from well_log_os import LayoutEngine, ScalarChannel, WellDataset, document_from_mapping
-from well_log_os.errors import LayoutError
+from wellplot import LayoutEngine, ScalarChannel, WellDataset, document_from_mapping
+from wellplot.errors import LayoutError
 
 
 class LayoutTests(unittest.TestCase):

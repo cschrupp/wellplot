@@ -1,6 +1,6 @@
-# well_log_os
+# wellplot
 
-`well_log_os` is evolving into a Python library for building printable well-log layouts from LAS, DLIS, and in-memory scientific data.
+`wellplot` is evolving into a Python library for building printable well-log layouts from LAS, DLIS, and in-memory scientific data.
 
 It is designed for two equally important workflows:
 

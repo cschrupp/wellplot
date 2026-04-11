@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""Core document, track, and report specification types for well_log_os."""
+"""Core document, track, and report specification types for wellplot."""
 
 from __future__ import annotations
 

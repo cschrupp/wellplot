@@ -27,8 +27,8 @@ from unittest.mock import patch
 
 import numpy as np
 
-from well_log_os.io.dlis import load_dlis
-from well_log_os.model import RasterChannel, ScalarChannel
+from wellplot.io.dlis import load_dlis
+from wellplot.model import RasterChannel, ScalarChannel
 
 
 class _FakeChannel:

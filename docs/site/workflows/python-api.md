@@ -21,10 +21,10 @@ It should be treated as:
 
 ## Main modules
 
-- `well_log_os.api.dataset`
-- `well_log_os.api.builder`
-- `well_log_os.api.render`
-- `well_log_os.api.serialize`
+- `wellplot.api.dataset`
+- `wellplot.api.builder`
+- `wellplot.api.render`
+- `wellplot.api.serialize`
 
 ## Typical flow
 
@@ -38,7 +38,7 @@ It should be treated as:
 ## Minimal example
 
 ```python
-from well_log_os import DatasetBuilder, LogBuilder, render_report
+from wellplot import DatasetBuilder, LogBuilder, render_report
 
 # Build data
 working = (

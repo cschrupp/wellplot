@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""LAS ingestion helpers that normalize curves into a well_log_os dataset."""
+"""LAS ingestion helpers that normalize curves into a wellplot dataset."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def load_las(path: str | Path) -> WellDataset:
         import lasio
     except ImportError as exc:
         raise DependencyUnavailableError(
-            "LAS ingestion requires lasio. Install well-log-os[las]."
+            "LAS ingestion requires lasio. Install wellplot[las]."
         ) from exc
 
     las_path = Path(path)

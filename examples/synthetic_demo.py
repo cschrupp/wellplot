@@ -25,8 +25,8 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import RasterChannel, ScalarChannel, WellDataset, load_document
-from well_log_os.renderers import MatplotlibRenderer
+from wellplot import RasterChannel, ScalarChannel, WellDataset, load_document
+from wellplot.renderers import MatplotlibRenderer
 
 
 def build_dataset() -> WellDataset:

@@ -30,7 +30,7 @@ from .errors import TemplateValidationError
 
 LOGFILE_JSON_SCHEMA: dict[str, Any] = {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "title": "well_log_os Logfile",
+    "title": "wellplot Logfile",
     "type": "object",
     "required": ["version", "name", "render", "document"],
     "additionalProperties": False,

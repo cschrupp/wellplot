@@ -29,15 +29,15 @@ from unittest.mock import patch
 import numpy as np
 import yaml
 
-from well_log_os.errors import TemplateValidationError
-from well_log_os.logfile import (
+from wellplot.errors import TemplateValidationError
+from wellplot.logfile import (
     build_document_for_logfile,
     build_documents_for_logfile,
     load_datasets_for_logfile,
     load_logfile,
     logfile_from_mapping,
 )
-from well_log_os.model import (
+from wellplot.model import (
     AnnotationArrowSpec,
     AnnotationGlyphSpec,
     AnnotationIntervalSpec,
@@ -341,7 +341,7 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(documents[0].header.subtitle, "main_run.las")
         self.assertEqual(documents[1].header.subtitle, "repeat_run.las")
 
-    @patch("well_log_os.logfile.load_las")
+    @patch("wellplot.logfile.load_las")
     def test_load_datasets_for_logfile_supports_section_data_overrides(self, mock_load_las) -> None:
         """Allow sections to override the top-level data source configuration."""
         payload = build_mapping()
@@ -379,7 +379,7 @@ class LogFileTests(unittest.TestCase):
             Path("/tmp/project/repeat.las").resolve(),
         )
 
-    @patch("well_log_os.logfile.load_las")
+    @patch("wellplot.logfile.load_las")
     def test_load_datasets_for_logfile_supports_section_first_sources(self, mock_load_las) -> None:
         """Load datasets when every section defines its own source first."""
         payload = build_mapping()

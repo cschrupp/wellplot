@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""Public programmatic API exports for well_log_os."""
+"""Public programmatic API exports for wellplot."""
 
 from .builder import LogBuilder, ProgrammaticLogSpec, SectionBuilder
 from .dataset import DatasetBuilder, create_dataset

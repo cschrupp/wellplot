@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from well_log_os import DatasetBuilder, create_dataset
+from wellplot import DatasetBuilder, create_dataset
 
 
 def main() -> None:

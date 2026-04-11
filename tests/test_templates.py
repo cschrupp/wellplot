@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import unittest
 
-from well_log_os.errors import TemplateValidationError
-from well_log_os.model import (
+from wellplot.errors import TemplateValidationError
+from wellplot.model import (
     AnnotationArrowSpec,
     AnnotationGlyphSpec,
     AnnotationIntervalSpec,
@@ -41,7 +41,7 @@ from well_log_os.model import (
     TrackHeaderObjectKind,
     TrackKind,
 )
-from well_log_os.templates import document_from_mapping
+from wellplot.templates import document_from_mapping
 
 
 class TemplateTests(unittest.TestCase):

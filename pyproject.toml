@@ -3,7 +3,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "well-log-os"
+name = "wellplot"
 description = "Printable and interactive well-log display toolkit for LAS and DLIS data."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -70,7 +70,7 @@ all = [
 ]
 
 [project.scripts]
-well-log-os = "well_log_os.cli:main"
+wellplot = "wellplot.cli:main"
 
 [dependency-groups]
 dev = [
@@ -90,10 +90,10 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "well_log_os._version.__version__"}
+version = {attr = "wellplot._version.__version__"}
 
 [tool.setuptools.package-data]
-"well_log_os.renderers" = ["*.yaml"]
+"wellplot.renderers" = ["*.yaml"]
 
 [tool.uv]
 default-groups = ["dev"]
@@ -133,7 +133,7 @@ ignore = [
 "tests/**/*.py" = ["ANN"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["well_log_os"]
+known-first-party = ["wellplot"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"

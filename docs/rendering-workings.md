@@ -1,6 +1,6 @@
 # Rendering Workings
 
-This document explains how `well_log_os` builds a final rendered log from:
+This document explains how `wellplot` builds a final rendered log from:
 - template defaults
 - savefile overrides
 - renderer defaults
@@ -10,7 +10,7 @@ This document explains how `well_log_os` builds a final rendered log from:
 At render time, configuration is resolved in this order:
 
 1. Built-in renderer defaults from:
-   - `src/well_log_os/renderers/matplotlib_defaults.yaml`
+   - `src/wellplot/renderers/matplotlib_defaults.yaml`
 2. Template values (`template.path` target YAML).
 3. Savefile values (job-specific YAML).
 
@@ -23,7 +23,7 @@ Where savefile/template style keys override only the keys they define.
 ## 2) Logfile Resolution Flow
 
 Pipeline entrypoint:
-- `render_from_logfile(...)` in `src/well_log_os/pipeline.py`
+- `render_from_logfile(...)` in `src/wellplot/pipeline.py`
 
 Flow:
 
@@ -133,10 +133,10 @@ Current implemented bridge:
 
 Current public modules:
 
-- `well_log_os.api.dataset`
-- `well_log_os.api.builder`
-- `well_log_os.api.render`
-- `well_log_os.api.serialize`
+- `wellplot.api.dataset`
+- `wellplot.api.builder`
+- `wellplot.api.render`
+- `wellplot.api.serialize`
 
 See [programmatic-api-plan.md](programmatic-api-plan.md) for the concrete implementation checklist.
 

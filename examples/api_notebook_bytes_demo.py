@@ -24,7 +24,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from api_layout_render_demo import build_dataset, build_report
-from well_log_os import render_section_png, render_svg_bytes, render_window_png
+from wellplot import render_section_png, render_svg_bytes, render_window_png
 
 
 def main() -> None:

@@ -26,7 +26,7 @@ import unittest
 from io import StringIO
 from pathlib import Path
 
-from well_log_os import (
+from wellplot import (
     LogBuilder,
     create_dataset,
     document_from_dict,

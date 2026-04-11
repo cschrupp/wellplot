@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the next major development phase for `well_log_os` after the initial rendering and programmatic API milestones.
+This document defines the next major development phase for `wellplot` after the initial rendering and programmatic API milestones.
 
 The goals of this phase are:
 
@@ -173,7 +173,7 @@ Recommended top-level sections:
 ### Minimum docs content for first release
 
 1. Overview and positioning
-- what `well_log_os` does
+- what `wellplot` does
 - supported data sources
 - static rendering vs programmatic rendering
 
@@ -248,7 +248,7 @@ Do **not** add headers to:
 Default header:
 
 ```python
-# Copyright (C) 2026 well_log_os contributors
+# Copyright (C) 2026 wellplot contributors
 # SPDX-License-Identifier: Apache-2.0
 ```
 
@@ -427,8 +427,8 @@ Turn the repository into a clean publishable Python library.
 
 ### Public API hardening
 
-1. define supported imports from `well_log_os`
-2. define supported imports from `well_log_os.api`
+1. define supported imports from `wellplot`
+2. define supported imports from `wellplot.api`
 3. avoid exposing unstable internals accidentally
 4. document deprecation policy before breaking changes
 

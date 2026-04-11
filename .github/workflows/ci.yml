@@ -98,8 +98,8 @@ jobs:
           import plotly
           import welly
 
-          from well_log_os.io import load_dlis, load_las
-          from well_log_os.renderers import MatplotlibRenderer, PlotlyRenderer
+          from wellplot.io import load_dlis, load_las
+          from wellplot.renderers import MatplotlibRenderer, PlotlyRenderer
 
           print("lasio", lasio.__version__)
           print("welly", welly.__version__)
@@ -140,7 +140,7 @@ jobs:
           ./.smoke-venv/bin/pip install dist/*.whl
 
       - name: Verify console entry point
-        run: ./.smoke-venv/bin/well-log-os --help
+        run: ./.smoke-venv/bin/wellplot --help
 
       - name: Run installed-wheel smoke test
         env:

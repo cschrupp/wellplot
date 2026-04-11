@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import unittest
 
-import well_log_os
-from well_log_os import api
-from well_log_os._version import __version__ as package_version
+import wellplot
+from wellplot import api
+from wellplot._version import __version__ as package_version
 
 
 class PublicApiTests(unittest.TestCase):
@@ -33,10 +33,10 @@ class PublicApiTests(unittest.TestCase):
 
     def test_package_version_is_single_sourced(self) -> None:
         """Expose the package version from the dedicated version module."""
-        self.assertEqual(well_log_os.__version__, package_version)
+        self.assertEqual(wellplot.__version__, package_version)
 
     def test_api_package_exports_expected_names(self) -> None:
-        """Keep the public ``well_log_os.api`` surface explicit and stable."""
+        """Keep the public ``wellplot.api`` surface explicit and stable."""
         expected = {
             "DatasetBuilder",
             "LogBuilder",
@@ -72,7 +72,7 @@ class PublicApiTests(unittest.TestCase):
             self.assertTrue(hasattr(api, name), name)
 
     def test_top_level_package_reexports_supported_api_surface(self) -> None:
-        """Expose the documented runtime helpers from ``well_log_os``."""
+        """Expose the documented runtime helpers from ``wellplot``."""
         expected = {
             "__version__",
             "ArrayChannel",
@@ -169,8 +169,8 @@ class PublicApiTests(unittest.TestCase):
             "validate_logfile_mapping",
         }
 
-        self.assertEqual(set(well_log_os.__all__), expected)
+        self.assertEqual(set(wellplot.__all__), expected)
         for name in expected:
-            self.assertTrue(hasattr(well_log_os, name), name)
+            self.assertTrue(hasattr(wellplot, name), name)
         for name in api.__all__:
-            self.assertIs(getattr(well_log_os, name), getattr(api, name), name)
+            self.assertIs(getattr(wellplot, name), getattr(api, name), name)

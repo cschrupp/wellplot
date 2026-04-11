@@ -27,7 +27,7 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import (
+from wellplot import (
     DatasetBuilder,
     LogBuilder,
     create_dataset,
@@ -42,8 +42,8 @@ from well_log_os import (
     render_window_png,
     save_report,
 )
-from well_log_os.api import build_documents
-from well_log_os.errors import TemplateValidationError
+from wellplot.api import build_documents
+from wellplot.errors import TemplateValidationError
 
 
 def _build_dataset(name: str, *, phase: float = 0.0):

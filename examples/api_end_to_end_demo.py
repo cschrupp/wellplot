@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from well_log_os import (
+from wellplot import (
     DatasetBuilder,
     LogBuilder,
     render_report,

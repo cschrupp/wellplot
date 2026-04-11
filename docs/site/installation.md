@@ -72,7 +72,7 @@ uv build
 python -m venv .smoke-venv
 ./.smoke-venv/bin/pip install --upgrade pip
 ./.smoke-venv/bin/pip install dist/*.whl
-./.smoke-venv/bin/well-log-os --help
+./.smoke-venv/bin/wellplot --help
 MPLBACKEND=Agg ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py
 ```
 

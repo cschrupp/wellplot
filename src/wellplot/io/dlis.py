@@ -288,7 +288,7 @@ def load_dlis(path: str | Path) -> WellDataset:
         from dlisio import dlis
     except ImportError as exc:
         raise DependencyUnavailableError(
-            "DLIS ingestion requires dlisio. Install well-log-os[dlis]."
+            "DLIS ingestion requires dlisio. Install wellplot[dlis]."
         ) from exc
 
     dlis_path = Path(path)

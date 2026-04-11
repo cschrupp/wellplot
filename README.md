@@ -1,6 +1,6 @@
-# well_log_os
+# wellplot
 
-`well_log_os` is an open-source Python toolkit for building printable and interactive well-log layouts from LAS and DLIS data.
+`wellplot` is an open-source Python toolkit for building printable and interactive well-log layouts from LAS and DLIS data.
 
 The project is intentionally renderer-first:
 - normalize subsurface data into typed channels
@@ -155,7 +155,7 @@ uv build
 python -m venv .smoke-venv
 ./.smoke-venv/bin/pip install --upgrade pip
 ./.smoke-venv/bin/pip install dist/*.whl
-./.smoke-venv/bin/well-log-os --help
+./.smoke-venv/bin/wellplot --help
 MPLBACKEND=Agg ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py
 ```
 
@@ -207,10 +207,10 @@ Currently implemented:
   - `LogBuilder.add_section(..., source_path=..., source_format=...)`
 
 Current public modules:
-- `well_log_os.api.dataset`
-- `well_log_os.api.builder`
-- `well_log_os.api.render`
-- `well_log_os.api.serialize`
+- `wellplot.api.dataset`
+- `wellplot.api.builder`
+- `wellplot.api.render`
+- `wellplot.api.serialize`
 
 Current examples:
 - [examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py)
@@ -278,7 +278,7 @@ overlays, thresholded CBL QC, VDL, and restrained interval annotations, see:
 
 ## Template + Savefile Model
 
-`well_log_os` now supports YAML template inheritance for logfile configs.
+`wellplot` now supports YAML template inheritance for logfile configs.
 
 - Put reusable layout defaults in template files, for example:
   - [templates/wireline_base.template.yaml](templates/wireline_base.template.yaml)
@@ -637,19 +637,19 @@ render:
 Use the master loader (single command for any log-file YAML):
 
 ```bash
-uv run python -m well_log_os.cli render examples/cbl_main.log.yaml
+uv run python -m wellplot.cli render examples/cbl_main.log.yaml
 ```
 
 Validate a log-file against the JSON Schema before rendering:
 
 ```bash
-uv run python -m well_log_os.cli validate examples/cbl_main.log.yaml
+uv run python -m wellplot.cli validate examples/cbl_main.log.yaml
 ```
 
 Optional output override:
 
 ```bash
-uv run python -m well_log_os.cli render examples/cbl_main.log.yaml -o out.pdf
+uv run python -m wellplot.cli render examples/cbl_main.log.yaml -o out.pdf
 ```
 
 Convenience wrapper:

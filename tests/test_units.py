@@ -23,8 +23,8 @@ from __future__ import annotations
 
 import unittest
 
-from well_log_os.errors import UnitConversionError
-from well_log_os.units import DEFAULT_UNITS
+from wellplot.errors import UnitConversionError
+from wellplot.units import DEFAULT_UNITS
 
 
 class UnitRegistryTests(unittest.TestCase):

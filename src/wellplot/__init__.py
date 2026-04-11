@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""Public package exports for well_log_os."""
+"""Public package exports for wellplot."""
 
 from ._version import __version__
 from .api import (

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from well_log_os import (
+from wellplot import (
     LogBuilder,
     build_documents,
     create_dataset,

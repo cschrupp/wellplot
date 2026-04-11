@@ -1,6 +1,6 @@
 # Library Workflow
 
-This page describes the intended end-to-end workflow of `well_log_os` as a library.
+This page describes the intended end-to-end workflow of `wellplot` as a library.
 
 ## Workflow Diagram
 

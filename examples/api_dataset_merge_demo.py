@@ -21,7 +21,7 @@
 
 from __future__ import annotations
 
-from well_log_os import DatasetBuilder, create_dataset
+from wellplot import DatasetBuilder, create_dataset
 
 
 def build_raw_dataset():

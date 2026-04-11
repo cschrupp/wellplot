@@ -1,4 +1,4 @@
-# well_log_os Roadmap
+# wellplot Roadmap
 
 Last updated: 2026-04-11
 
@@ -16,10 +16,10 @@ Decision history is tracked in `docs/decision-log.md`.
 
 - YAML templates define page, depth axis, tracks, styles, annotations.
 - The programmatic API is now available through:
-  - `well_log_os.api.dataset`
-  - `well_log_os.api.builder`
-  - `well_log_os.api.render`
-  - `well_log_os.api.serialize`
+  - `wellplot.api.dataset`
+  - `wellplot.api.builder`
+  - `wellplot.api.render`
+  - `wellplot.api.serialize`
 - Logfile config is now track-first:
   - `document.layout.log_sections[*].tracks` defines layout
   - `document.bindings.channels[*]` assigns channels to tracks
@@ -83,7 +83,7 @@ Decision history is tracked in `docs/decision-log.md`.
   - `ANN` enforcement enabled for `src/` with staged ignores for `tests/` and `examples/`
   - package metadata now includes keywords, project URLs, SPDX license expression, and dynamic
     version sourcing
-  - the top-level package and `well_log_os.api` public surfaces are covered by import-contract
+  - the top-level package and `wellplot.api` public surfaces are covered by import-contract
     tests
   - local `uv build` validation succeeds for both sdist and wheel
 - Data source routing is section-first with optional root fallback:
@@ -115,10 +115,10 @@ Delivered goals:
 
 Delivered public modules:
 
-- `well_log_os.api.dataset`
-- `well_log_os.api.builder`
-- `well_log_os.api.render`
-- `well_log_os.api.serialize`
+- `wellplot.api.dataset`
+- `wellplot.api.builder`
+- `wellplot.api.render`
+- `wellplot.api.serialize`
 
 Detailed checklist:
 
@@ -180,7 +180,12 @@ Current status:
     - project URLs
     - keywords
     - dynamic version sourcing from package code
-  - public import-contract tests for `well_log_os` and `well_log_os.api`
+  - package identity transition completed:
+    - source package renamed from `well_log_os` to `wellplot`
+    - distribution name is now `wellplot`
+    - console entry point is now `wellplot`
+    - imports, tests, examples, notebooks, and user docs were rewritten to the new public name
+  - public import-contract tests for `wellplot` and `wellplot.api`
   - local wheel/sdist build verification with `uv build`
   - clean install smoke testing from the built wheel
   - CI coverage for lint, tests, extras, build, and installed-wheel smoke validation
@@ -190,6 +195,8 @@ Current status:
   - expand user docs reference pages beyond the current workflow-first skeleton
   - continue staged `ANN` cleanup in `tests/` and `examples/`
   - keep pruning stale comments and filling public API docstring gaps where they still exist
+  - optionally align repository/docs URLs with the renamed package if we also rename the GitHub
+    repository later
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
@@ -284,7 +291,7 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete release hardening:
-  - first real TestPyPI rehearsal
+  - first real TestPyPI rehearsal for `wellplot`
 - Expand user documentation from the current workflow-first baseline:
   - Python API reference pages
   - YAML/report-schema reference pages
@@ -309,6 +316,8 @@ Longer-term / UI-centric:
 - Tune default header `line_units` and font scaling against real CBL examples.
 - Add one more end-to-end sample with multiple image tracks + overlays.
 - Add savefile examples for VDL micro-time tuning against vendor outputs.
+- Optionally align repository naming and published docs URLs with `wellplot` if we decide to
+  rename the GitHub repository from `well-log-os`.
 
 ## Working Principles
 

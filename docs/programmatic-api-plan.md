@@ -139,8 +139,8 @@ Tasks:
 
 Likely files:
 
-- [dataset.py](/home/user/projects/well_log_os/src/well_log_os/model/dataset.py)
-- [channels.py](/home/user/projects/well_log_os/src/well_log_os/model/channels.py)
+- [dataset.py](/home/user/projects/well_log_os/src/wellplot/model/dataset.py)
+- [channels.py](/home/user/projects/well_log_os/src/wellplot/model/channels.py)
 
 Acceptance:
 
@@ -152,7 +152,7 @@ Goal: let users add computed results back into a dataset cleanly.
 
 New module:
 
-- `src/well_log_os/api/dataset.py`
+- `src/wellplot/api/dataset.py`
 
 Public surface:
 
@@ -173,7 +173,7 @@ Recommended methods:
 Recommended API shape:
 
 ```python
-from well_log_os.api.dataset import DatasetBuilder
+from wellplot.api.dataset import DatasetBuilder
 
 ds = DatasetBuilder(name="processed").build()
 ds.add_curve(
@@ -230,8 +230,8 @@ Goal: let in-memory datasets use the existing well-log layout pipeline directly.
 
 New modules:
 
-- `src/well_log_os/api/builder.py`
-- `src/well_log_os/api/render.py`
+- `src/wellplot/api/builder.py`
+- `src/wellplot/api/render.py`
 
 Public surface:
 
@@ -352,7 +352,7 @@ Goal: make YAML a round-trip format, not the only authoring path.
 
 New module:
 
-- `src/well_log_os/api/serialize.py`
+- `src/wellplot/api/serialize.py`
 
 Functions:
 
@@ -389,7 +389,7 @@ Goal: let users compose logs in Python without writing YAML-shaped dicts.
 
 New module:
 
-- `src/well_log_os/api/builder.py`
+- `src/wellplot/api/builder.py`
 
 Public objects:
 
@@ -400,7 +400,7 @@ Public objects:
 Recommended usage:
 
 ```python
-from well_log_os.api import LogBuilder
+from wellplot.api import LogBuilder
 
 builder = LogBuilder(template="wireline_base")
 builder.set_depth_range(8290, 8460, unit="ft")
@@ -462,7 +462,7 @@ Goal: make rendering callable directly from Python.
 
 New module:
 
-- `src/well_log_os/api/render.py`
+- `src/wellplot/api/render.py`
 
 Public functions:
 
@@ -530,7 +530,7 @@ Notebook example:
 
 ```python
 from IPython.display import Image
-from well_log_os.api import render_section_png
+from wellplot.api import render_section_png
 
 Image(data=render_section_png(document, datasets, section_id="main"))
 ```
@@ -639,5 +639,5 @@ Useful references:
 - <https://code.agilescientific.com/welly/userguide/Wells.html>
 - <https://github.com/agilescientific/welly>
 
-We should borrow the ergonomics, not the looser validation model. `well_log_os` still needs
+We should borrow the ergonomics, not the looser validation model. `wellplot` still needs
 stricter basis/unit semantics because rendering depends on physical layout correctness.

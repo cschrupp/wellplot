@@ -704,7 +704,7 @@ class MatplotlibRenderer(Renderer):
             from matplotlib.backends.backend_pdf import PdfPages
         except ImportError as exc:
             raise DependencyUnavailableError(
-                "Matplotlib is required for static rendering. Install well-log-os[pdf]."
+                "Matplotlib is required for static rendering. Install wellplot[pdf]."
             ) from exc
 
         figures = []

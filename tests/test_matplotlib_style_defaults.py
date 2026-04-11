@@ -32,7 +32,7 @@ matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 
-from well_log_os import (
+from wellplot import (
     CurveElement,
     CurveHeaderDisplaySpec,
     GridScaleKind,
@@ -44,9 +44,9 @@ from well_log_os import (
     WellDataset,
     document_from_mapping,
 )
-from well_log_os.errors import TemplateValidationError
-from well_log_os.layout import DepthWindow, LayoutEngine
-from well_log_os.renderers.matplotlib import (
+from wellplot.errors import TemplateValidationError
+from wellplot.layout import DepthWindow, LayoutEngine
+from wellplot.renderers.matplotlib import (
     DEFAULT_MPL_STYLE_PATH,
     MatplotlibRenderer,
     _load_default_mpl_style,

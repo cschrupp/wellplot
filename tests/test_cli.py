@@ -27,14 +27,14 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from well_log_os.cli import main
-from well_log_os.errors import TemplateValidationError
+from wellplot.cli import main
+from wellplot.errors import TemplateValidationError
 
 
 class CLITests(unittest.TestCase):
     """Verify the CLI validation command behavior."""
 
-    @patch("well_log_os.cli.load_logfile")
+    @patch("wellplot.cli.load_logfile")
     def test_validate_command_success(self, mock_load_logfile) -> None:
         """Return success when the logfile validates cleanly."""
         stdout = io.StringIO()
@@ -47,7 +47,7 @@ class CLITests(unittest.TestCase):
         self.assertIn("Valid logfile", stdout.getvalue())
         self.assertEqual("", stderr.getvalue())
 
-    @patch("well_log_os.cli.load_logfile")
+    @patch("wellplot.cli.load_logfile")
     def test_validate_command_schema_error(self, mock_load_logfile) -> None:
         """Return failure when validation raises a template error."""
         mock_load_logfile.side_effect = TemplateValidationError("bad schema")

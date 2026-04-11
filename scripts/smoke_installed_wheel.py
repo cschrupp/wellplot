@@ -30,7 +30,7 @@ import numpy as np
 
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-from well_log_os import (  # noqa: E402
+from wellplot import (  # noqa: E402
     DatasetBuilder,
     LogBuilder,
     ProgrammaticLogSpec,
@@ -132,7 +132,7 @@ def main() -> int:
         if not png_bytes:
             raise RuntimeError("Installed wheel smoke render did not produce PNG bytes.")
 
-    print(f"Installed wheel smoke test passed for well_log_os {__version__}.")
+    print(f"Installed wheel smoke test passed for wellplot {__version__}.")
     return 0
 
 

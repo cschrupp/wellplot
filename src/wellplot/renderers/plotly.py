@@ -66,7 +66,7 @@ class PlotlyRenderer(Renderer):
             from plotly.subplots import make_subplots
         except ImportError as exc:
             raise DependencyUnavailableError(
-                "Plotly is required for interactive rendering. Install well-log-os[interactive]."
+                "Plotly is required for interactive rendering. Install wellplot[interactive]."
             ) from exc
 
         layouts = self.layout_engine.layout(document, dataset)

@@ -25,7 +25,7 @@ import unittest
 
 import numpy as np
 
-from well_log_os import (
+from wellplot import (
     ArrayChannel,
     DatasetValidationError,
     RasterChannel,

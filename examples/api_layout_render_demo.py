@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import LogBuilder, create_dataset, render_report
+from wellplot import LogBuilder, create_dataset, render_report
 
 
 def build_dataset():

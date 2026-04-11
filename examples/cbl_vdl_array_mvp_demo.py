@@ -25,9 +25,9 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import RasterChannel, ScalarChannel, WellDataset
-from well_log_os.logfile import build_documents_for_logfile, load_logfile
-from well_log_os.renderers import MatplotlibRenderer
+from wellplot import RasterChannel, ScalarChannel, WellDataset
+from wellplot.logfile import build_documents_for_logfile, load_logfile
+from wellplot.renderers import MatplotlibRenderer
 
 
 def build_synthetic_dataset() -> WellDataset:
@@ -39,7 +39,7 @@ def build_synthetic_dataset() -> WellDataset:
         well_metadata={
             "WELL": "SYN-CBL-1",
             "UWI": "00-000-ARRAY",
-            "COMP": "well_log_os",
+            "COMP": "wellplot",
         },
     )
     dataset.add_channel(

@@ -17,10 +17,10 @@
 #
 ###############################################################################
 
-"""Project-specific exception hierarchy for well_log_os."""
+"""Project-specific exception hierarchy for wellplot."""
 
 class WellLogOSError(Exception):
-    """Base exception for well_log_os."""
+    """Base exception for wellplot."""
 
 
 class DependencyUnavailableError(WellLogOSError):

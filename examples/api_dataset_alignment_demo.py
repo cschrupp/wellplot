@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 
-from well_log_os import DatasetBuilder, LogBuilder, render_report
+from wellplot import DatasetBuilder, LogBuilder, render_report
 
 
 def build_aligned_dataset():

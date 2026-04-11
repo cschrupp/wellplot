@@ -1,6 +1,6 @@
 # Report Pages
 
-`well_log_os` supports report-level composition, not just strip rendering.
+`wellplot` supports report-level composition, not just strip rendering.
 
 ## Current report blocks
 
