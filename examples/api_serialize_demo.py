@@ -25,6 +25,8 @@ from pathlib import Path
 
 from wellplot import (
     LogBuilder,
+    ProgrammaticLogSpec,
+    WellDataset,
     build_documents,
     create_dataset,
     save_document,
@@ -32,7 +34,7 @@ from wellplot import (
 )
 
 
-def build_dataset():
+def build_dataset() -> WellDataset:
     """Build a minimal dataset for serialization examples."""
     dataset = create_dataset("serialize-demo")
     dataset.add_curve(
@@ -45,7 +47,7 @@ def build_dataset():
     return dataset
 
 
-def build_report(dataset):
+def build_report(dataset: WellDataset) -> ProgrammaticLogSpec:
     """Build a minimal report that can be serialized to YAML."""
     builder = LogBuilder(name="Serialize Demo")
     builder.set_render(backend="matplotlib", output_path="serialize_demo.pdf", dpi=120)

@@ -21,10 +21,10 @@
 
 from __future__ import annotations
 
-from wellplot import DatasetBuilder, create_dataset
+from wellplot import DatasetBuilder, WellDataset, create_dataset
 
 
-def build_raw_dataset():
+def build_raw_dataset() -> WellDataset:
     """Build a small dataset that represents raw acquired channels."""
     dataset = create_dataset(
         "raw",
@@ -50,7 +50,7 @@ def build_raw_dataset():
     return dataset
 
 
-def build_processed_dataset():
+def build_processed_dataset() -> WellDataset:
     """Build a derived dataset that overlaps with the raw mnemonics."""
     dataset = create_dataset(
         "qc",

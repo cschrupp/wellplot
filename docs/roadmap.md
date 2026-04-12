@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-04-11
+Last updated: 2026-04-12
 
 ## Scope Summary
 
@@ -77,10 +77,14 @@ Decision history is tracked in `docs/decision-log.md`.
   - GitHub Pages deployment workflow under `.github/workflows/docs.yml`
   - workflow-oriented guides for installation, concepts, datasets, examples, report pages,
     rendering, and the Python API
+  - expanded reference pages for:
+    - Python API
+    - YAML logfile structure
+    - report pages
 - Production hardening is underway:
   - Apache-2.0 SPDX headers applied across source, tests, and examples
   - `pydocstyle` rollout completed across `src/`, `tests/`, and `examples/`
-  - `ANN` enforcement enabled for `src/` with staged ignores for `tests/` and `examples/`
+  - `ANN` enforcement now passes repo-wide across `src/`, `tests/`, and `examples/`
   - package metadata now includes keywords, project URLs, SPDX license expression, and dynamic
     version sourcing
   - the top-level package and `wellplot.api` public surfaces are covered by import-contract
@@ -172,9 +176,10 @@ Current status:
   - MkDocs + Material documentation scaffold
   - GitHub Pages deployment workflow
   - workflow-oriented user docs under `docs/site/`
+  - expanded user reference docs for the Python API, YAML logfile schema, and report pages
   - Apache-2.0 SPDX file headers across source, tests, and examples
   - repo-wide `pydocstyle` rollout
-  - staged `ANN` rollout with enforcement in `src/`
+  - repo-wide `ANN` rollout across `src/`, `tests/`, and `examples/`
   - package metadata cleanup:
     - SPDX license expression
     - project URLs
@@ -195,9 +200,9 @@ Current status:
     - fresh TestPyPI install in a clean virtual environment succeeded
     - `wellplot --help` and the installed-wheel smoke test both passed
 - next:
-  - expand user docs reference pages beyond the current workflow-first skeleton
-  - continue staged `ANN` cleanup in `tests/` and `examples/`
   - keep pruning stale comments and filling public API docstring gaps where they still exist
+  - keep expanding user docs depth while the public library surface stabilizes
+  - document the release/publish workflow on the user site once we want that exposed publicly
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

@@ -1,5 +1,5 @@
-site_name: well_log_os
-site_description: User documentation for well_log_os
+site_name: wellplot
+site_description: User documentation for wellplot
 site_url: https://cschrupp.github.io/wellplot/
 repo_url: https://github.com/cschrupp/wellplot
 repo_name: cschrupp/wellplot
@@ -53,4 +53,8 @@ nav:
   - Guides:
       - Datasets: guides/datasets.md
       - Examples: guides/examples.md
-  - Reference: reference/index.md
+  - Reference:
+      - Overview: reference/index.md
+      - Python API: reference/python-api.md
+      - YAML Logfile: reference/logfile-yaml.md
+      - Report Pages: reference/report-pages.md

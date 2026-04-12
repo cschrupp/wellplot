@@ -40,10 +40,10 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_uses_master_matplotlib_loader(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
-        mock_renderer_class,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
+        mock_renderer_class: Mock,
     ) -> None:
         """Use the matplotlib renderer with the resolved master dataset."""
         spec = LogFileSpec(
@@ -83,10 +83,10 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_passes_continuous_strip_page_height(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
-        mock_renderer_class,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
+        mock_renderer_class: Mock,
     ) -> None:
         """Forward continuous strip height to the matplotlib renderer."""
         spec = LogFileSpec(
@@ -126,10 +126,10 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_passes_matplotlib_style(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
-        mock_renderer_class,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
+        mock_renderer_class: Mock,
     ) -> None:
         """Forward matplotlib style overrides to the renderer constructor."""
         spec = LogFileSpec(
@@ -168,9 +168,9 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_rejects_unknown_backend(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
     ) -> None:
         """Reject render backends outside the supported set."""
         spec = LogFileSpec(
@@ -198,10 +198,10 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_renders_all_sections_with_matplotlib(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
-        mock_renderer_class,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
+        mock_renderer_class: Mock,
     ) -> None:
         """Render every built section document with its matching dataset."""
         spec = LogFileSpec(
@@ -248,9 +248,9 @@ class PipelineTests(unittest.TestCase):
     @patch("wellplot.pipeline.load_logfile")
     def test_render_from_logfile_rejects_multisection_plotly(
         self,
-        mock_load_logfile,
-        mock_load_datasets,
-        mock_build_documents,
+        mock_load_logfile: Mock,
+        mock_load_datasets: Mock,
+        mock_build_documents: Mock,
     ) -> None:
         """Reject multisection Plotly output until that backend supports it."""
         spec = LogFileSpec(

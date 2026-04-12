@@ -28,6 +28,8 @@ from pathlib import Path
 
 from wellplot import (
     LogBuilder,
+    LogDocument,
+    ProgrammaticLogSpec,
     create_dataset,
     document_from_dict,
     document_from_mapping,
@@ -45,7 +47,7 @@ from wellplot import (
 )
 
 
-def _build_document():
+def _build_document() -> LogDocument:
     return document_from_mapping(
         {
             "name": "serialize-demo",
@@ -102,7 +104,7 @@ def _build_document():
     )
 
 
-def _build_report():
+def _build_report() -> ProgrammaticLogSpec:
     dataset = create_dataset("serialize-main")
     dataset.add_curve(
         mnemonic="GR",

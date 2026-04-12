@@ -29,6 +29,8 @@ import pandas as pd
 from wellplot import (
     DatasetBuilder,
     LogBuilder,
+    ProgrammaticLogSpec,
+    WellDataset,
     render_report,
     render_window_png,
     save_report,
@@ -42,7 +44,7 @@ def _smoothed(values: np.ndarray, window: int = 7) -> np.ndarray:
     return np.convolve(padded, kernel, mode="valid")
 
 
-def build_raw_dataset():
+def build_raw_dataset() -> WellDataset:
     """Build the raw synthetic dataset used by the end-to-end demo."""
     depth_ft_desc = np.linspace(8460.0, 8200.0, 131)
     sample_axis_us = np.linspace(200.0, 1200.0, 96)
@@ -92,7 +94,7 @@ def build_raw_dataset():
     )
 
 
-def build_processed_dataset(raw):
+def build_processed_dataset(raw: WellDataset) -> WellDataset:
     """Build processed channels derived from the raw dataset."""
     raw_depth_ft = raw.get_channel("GR").depth
     coarse_depth_ft = raw_depth_ft[::6]
@@ -131,7 +133,7 @@ def build_processed_dataset(raw):
     )
 
 
-def build_working_dataset():
+def build_working_dataset() -> WellDataset:
     """Merge the raw and processed datasets into one working dataset."""
     raw = build_raw_dataset()
     processed = build_processed_dataset(raw)
@@ -147,7 +149,7 @@ def build_working_dataset():
     )
 
 
-def build_report(dataset):
+def build_report(dataset: WellDataset) -> ProgrammaticLogSpec:
     """Build the report layout used by the end-to-end API demo."""
     builder = LogBuilder(name="API End-to-End Demo")
     builder.set_render(

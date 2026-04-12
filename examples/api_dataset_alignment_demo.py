@@ -25,10 +25,10 @@ from pathlib import Path
 
 import numpy as np
 
-from wellplot import DatasetBuilder, LogBuilder, render_report
+from wellplot import DatasetBuilder, LogBuilder, ProgrammaticLogSpec, WellDataset, render_report
 
 
-def build_aligned_dataset():
+def build_aligned_dataset() -> WellDataset:
     """Build a dataset whose channels start on different sample grids."""
     depth_ft_desc = np.array([8460.0, 8440.0, 8420.0, 8400.0, 8380.0, 8360.0])
     gr_values = np.array([86.0, 78.0, 69.0, 62.0, 58.0, 55.0])
@@ -76,7 +76,7 @@ def build_aligned_dataset():
     )
 
 
-def build_report(dataset):
+def build_report(dataset: WellDataset) -> ProgrammaticLogSpec:
     """Build a simple report that renders the aligned channels."""
     builder = LogBuilder(name="Dataset Alignment Demo")
     builder.set_render(

@@ -1,34 +1,41 @@
 # Reference
 
-This user site currently focuses on task-oriented documentation first.
+This section is the stable lookup layer for `wellplot`.
 
-## Scope of this section today
+Use it when you already know what workflow you want and need the exact public
+surface, YAML shape, or report-page structure.
 
-The reference section is intentionally incomplete at this stage.
+## Reference map
 
-For now, the most stable reference material is:
+- [Python API](python-api.md)
+  - public package imports
+  - `wellplot.api` module surfaces
+  - dataset, builder, render, and serialization entry points
+- [YAML Logfile](logfile-yaml.md)
+  - top-level logfile structure
+  - section-first layout and binding model
+  - track kinds and binding kinds
+  - render, page, depth, and track-header keys
+- [Report Pages](report-pages.md)
+  - heading, remarks, and tail structure
+  - report block fields
+  - open-hole and cased-hole detail tables
 
-- architecture
-- workflow boundaries
-- implemented examples
-- internal design documents in the repository
+## Design boundary
 
-## Current internal reference documents
+The reference pages document the supported public surface and the normalized YAML
+shape used by the project today.
 
-For deeper implementation details already present in the repository, see:
+They do not attempt to document every internal helper in:
+
+- `wellplot.templates`
+- `wellplot.logfile`
+- `wellplot.renderers`
+
+For deeper implementation notes, use the repository documents:
 
 - `README.md`
 - `docs/rendering-workings.md`
 - `docs/programmatic-api-plan.md`
 - `docs/decision-log.md`
 - `docs/roadmap.md`
-- `docs/production-readiness-plan.md`
-
-## Planned expansion
-
-This reference section will later grow into:
-
-- page and track option references
-- YAML schema-oriented guides
-- Python API reference pages
-- release and contributor references

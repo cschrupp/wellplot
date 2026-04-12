@@ -25,10 +25,10 @@ from pathlib import Path
 
 import numpy as np
 
-from wellplot import LogBuilder, create_dataset, render_report
+from wellplot import LogBuilder, ProgrammaticLogSpec, WellDataset, create_dataset, render_report
 
 
-def build_dataset():
+def build_dataset() -> WellDataset:
     """Build the synthetic dataset used by the layout render demo."""
     depth_ft = np.linspace(8200.0, 8460.0, 261)
     sample_axis_us = np.linspace(200.0, 1200.0, 128)
@@ -79,7 +79,7 @@ def build_dataset():
     return dataset
 
 
-def build_report(dataset):
+def build_report(dataset: WellDataset) -> ProgrammaticLogSpec:
     """Build the programmatic report for the synthetic layout dataset."""
     builder = LogBuilder(name="Programmatic Layout Demo")
     builder.set_render(

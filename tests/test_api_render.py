@@ -30,6 +30,8 @@ import numpy as np
 from wellplot import (
     DatasetBuilder,
     LogBuilder,
+    ProgrammaticLogSpec,
+    WellDataset,
     create_dataset,
     render_png_bytes,
     render_report,
@@ -46,7 +48,7 @@ from wellplot.api import build_documents
 from wellplot.errors import TemplateValidationError
 
 
-def _build_dataset(name: str, *, phase: float = 0.0):
+def _build_dataset(name: str, *, phase: float = 0.0) -> WellDataset:
     depth_ft = np.linspace(8200.0, 8460.0, 261)
     sample_axis_us = np.linspace(200.0, 1200.0, 96)
     dataset = create_dataset(
@@ -87,7 +89,7 @@ def _build_dataset(name: str, *, phase: float = 0.0):
     return dataset
 
 
-def _build_report():
+def _build_report() -> ProgrammaticLogSpec:
     dataset = _build_dataset("main")
     builder = LogBuilder(name="Programmatic layout demo")
     builder.set_render(backend="matplotlib", output_path="api_layout_render_demo.pdf", dpi=140)
@@ -186,7 +188,7 @@ def _build_report():
     return builder.build()
 
 
-def _build_report_with_heading():
+def _build_report_with_heading() -> ProgrammaticLogSpec:
     dataset = _build_dataset("main")
     builder = LogBuilder(name="Programmatic report demo")
     builder.set_render(backend="matplotlib", output_path="api_layout_render_demo.pdf", dpi=140)

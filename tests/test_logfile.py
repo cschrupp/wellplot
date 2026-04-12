@@ -24,7 +24,7 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import yaml
@@ -342,7 +342,9 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(documents[1].header.subtitle, "repeat_run.las")
 
     @patch("wellplot.logfile.load_las")
-    def test_load_datasets_for_logfile_supports_section_data_overrides(self, mock_load_las) -> None:
+    def test_load_datasets_for_logfile_supports_section_data_overrides(
+        self, mock_load_las: Mock
+    ) -> None:
         """Allow sections to override the top-level data source configuration."""
         payload = build_mapping()
         payload["data"] = {"source_path": "main.las", "source_format": "las"}
@@ -380,7 +382,9 @@ class LogFileTests(unittest.TestCase):
         )
 
     @patch("wellplot.logfile.load_las")
-    def test_load_datasets_for_logfile_supports_section_first_sources(self, mock_load_las) -> None:
+    def test_load_datasets_for_logfile_supports_section_first_sources(
+        self, mock_load_las: Mock
+    ) -> None:
         """Load datasets when every section defines its own source first."""
         payload = build_mapping()
         payload.pop("data")
