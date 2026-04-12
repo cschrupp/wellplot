@@ -8,10 +8,10 @@ Completed in the codebase on 2026-04-11:
 
 - Stage 1: Package Identity Switch
 - Stage 2: Public Surface Rewrite
-
-Still pending:
-
+- Stage 3: Repository and Docs Identity Cleanup
 - Stage 4: Post-Rename Release Rehearsal
+
+No rename stages remain pending.
 
 ## Decision Summary
 
@@ -172,6 +172,8 @@ Validation:
 - `wellplot --help` works
 - notebook and API examples import `wellplot` successfully
 
+Implemented on 2026-04-11.
+
 ## Things Not To Do
 
 - do not keep `well_log_os` as a permanent parallel public API unless a real migration case appears
@@ -183,8 +185,8 @@ Validation:
 
 Recommended immediate sequence:
 
-1. run the first real TestPyPI rehearsal for `wellplot`
-2. resume the remaining production-readiness tasks
+1. resume the remaining production-readiness tasks
+2. prepare the first real PyPI release when release notes and versioning are ready
 
 This keeps the first public package rehearsal aligned with the final library name instead of creating
 avoidable cleanup after publication.

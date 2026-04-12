@@ -101,6 +101,12 @@ python -m venv /tmp/wellplot-testpypi
   wellplot
 ```
 
+Completed rehearsal status as of 2026-04-11:
+
+- the `Release` workflow successfully published `wellplot 0.1.0` to TestPyPI
+- a fresh install from TestPyPI succeeded in a clean virtual environment
+- `wellplot --help` and the installed-wheel smoke test both passed against the TestPyPI artifact
+
 ## PyPI release
 
 Only promote to PyPI after a successful TestPyPI rehearsal.
@@ -120,5 +126,6 @@ This repository now has:
 - CI coverage for build and installed-wheel smoke testing
 - a manual release workflow
 - a TestPyPI-first release path
+- a successful TestPyPI rehearsal for `wellplot 0.1.0`
 
-What remains is the first real TestPyPI rehearsal using repository-side trusted publishing.
+What remains is the first production PyPI release and ongoing workflow maintenance.

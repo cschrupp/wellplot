@@ -190,8 +190,11 @@ Current status:
   - clean install smoke testing from the built wheel
   - CI coverage for lint, tests, extras, build, and installed-wheel smoke validation
   - manual release workflow with gated `verify-only`, `testpypi`, and `pypi` paths
+  - first real TestPyPI rehearsal completed for `wellplot 0.1.0`:
+    - GitHub Actions publish to TestPyPI succeeded
+    - fresh TestPyPI install in a clean virtual environment succeeded
+    - `wellplot --help` and the installed-wheel smoke test both passed
 - next:
-  - first real TestPyPI rehearsal with repository-side trusted publishing
   - expand user docs reference pages beyond the current workflow-first skeleton
   - continue staged `ANN` cleanup in `tests/` and `examples/`
   - keep pruning stale comments and filling public API docstring gaps where they still exist
@@ -289,7 +292,9 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete release hardening:
-  - first real TestPyPI rehearsal for `wellplot`
+  - prepare the first real PyPI release after the successful TestPyPI rehearsal
+  - clean up remaining workflow maintenance noise such as the `actions/upload-artifact` Node 20
+    deprecation warning
 - Expand user documentation from the current workflow-first baseline:
   - Python API reference pages
   - YAML/report-schema reference pages
