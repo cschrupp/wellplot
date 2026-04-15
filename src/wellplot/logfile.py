@@ -492,6 +492,22 @@ def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
             _ = str(section["title"])
         if "subtitle" in section:
             _ = str(section["subtitle"])
+        if "depth_range" in section:
+            depth_range = _ensure_sequence(
+                section["depth_range"],
+                context=f"{context}.log_sections[{index}].depth_range",
+            )
+            if len(depth_range) != 2:
+                raise TemplateValidationError(
+                    f"{context}.log_sections[{index}].depth_range must contain two numeric values."
+                )
+            try:
+                float(depth_range[0])
+                float(depth_range[1])
+            except (TypeError, ValueError) as exc:
+                raise TemplateValidationError(
+                    f"{context}.log_sections[{index}].depth_range must contain numeric values."
+                ) from exc
         if "data" in section:
             section_data = _ensure_mapping(
                 section["data"],
@@ -1900,6 +1916,9 @@ def _set_active_layout_section(document: dict[str, Any], section: dict[str, Any]
         "title": str(section.get("title", "")),
         "subtitle": str(section.get("subtitle", "")),
     }
+    if "depth_range" in section:
+        depth_range = _ensure_sequence(section["depth_range"], context="active section depth_range")
+        layout_sections["active_section"]["depth_range"] = [float(depth_range[0]), float(depth_range[1])]
     metadata["layout_sections"] = layout_sections
     document["metadata"] = metadata
 
@@ -1997,6 +2016,12 @@ def build_documents_for_logfile(
             datasets_by_section[section_id],
             source_paths_by_section[section_id],
         )
+        if "depth_range" in section:
+            depth_range = _ensure_sequence(
+                section["depth_range"],
+                context=f"document.layout.log_sections[{section_id!r}].depth_range",
+            )
+            section_document["depth_range"] = [float(depth_range[0]), float(depth_range[1])]
         section_document["tracks"] = deepcopy(tracks_by_section[section_id])
         _set_active_layout_section(section_document, section)
         _apply_reference_layout_overrides(section_document)

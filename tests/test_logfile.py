@@ -209,10 +209,12 @@ class LogFileTests(unittest.TestCase):
     def test_logfile_builds_multisection_documents(self) -> None:
         """Build one document per configured logfile section."""
         payload = build_mapping()
+        payload["document"]["depth_range"] = [995.0, 1025.0]
         payload["document"]["layout"]["log_sections"] = [
             {
                 "id": "main",
                 "title": "Main Section",
+                "depth_range": [1000.0, 1010.0],
                 "tracks": [
                     {
                         "id": "depth_main",
@@ -266,10 +268,24 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(len(documents), 2)
         self.assertEqual(documents[0].metadata["layout_sections"]["active_section"]["id"], "main")
         self.assertEqual(documents[1].metadata["layout_sections"]["active_section"]["id"], "aux")
+        self.assertEqual(documents[0].depth_range, (1000.0, 1010.0))
+        self.assertEqual(documents[1].depth_range, (995.0, 1025.0))
+        self.assertEqual(
+            documents[0].metadata["layout_sections"]["active_section"]["depth_range"],
+            [1000.0, 1010.0],
+        )
         self.assertEqual([track.id for track in documents[0].tracks], ["depth_main", "gr_main"])
         self.assertEqual([track.id for track in documents[1].tracks], ["depth_aux", "rt_aux"])
         self.assertEqual(documents[0].tracks[1].elements[0].channel, "GR")
         self.assertEqual(documents[1].tracks[1].elements[0].channel, "RT")
+
+    def test_logfile_rejects_invalid_section_depth_range(self) -> None:
+        """Reject section depth ranges that do not define two numeric values."""
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["depth_range"] = [1000.0]
+
+        with self.assertRaises(TemplateValidationError):
+            logfile_from_mapping(payload)
 
     def test_logfile_requires_section_for_ambiguous_track_id_bindings(self) -> None:
         """Require explicit sections when track identifiers are ambiguous."""

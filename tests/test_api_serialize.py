@@ -124,7 +124,13 @@ def _build_report() -> ProgrammaticLogSpec:
         service_titles=["Gamma Ray"],
         tail_enabled=True,
     )
-    section = builder.add_section("main", dataset=dataset, title="Main", source_name="main.memory")
+    section = builder.add_section(
+        "main",
+        dataset=dataset,
+        title="Main",
+        depth_range=(8205, 8215),
+        source_name="main.memory",
+    )
     section.add_track(
         id="depth",
         title="",
@@ -190,6 +196,10 @@ class ApiSerializeTests(unittest.TestCase):
         self.assertEqual(
             [section["id"] for section in spec.document["layout"]["log_sections"]],
             ["main"],
+        )
+        self.assertEqual(
+            spec.document["layout"]["log_sections"][0]["depth_range"],
+            [8205.0, 8215.0],
         )
 
     def test_report_yaml_round_trip_supports_stream_and_path(self) -> None:

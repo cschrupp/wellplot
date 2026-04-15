@@ -385,6 +385,12 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "id": {"type": "string", "minLength": 1},
                 "title": {"type": "string"},
                 "subtitle": {"type": "string"},
+                "depth_range": {
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 2,
+                    "maxItems": 2,
+                },
                 "data": {"$ref": "#/$defs/dataSource"},
                 "tracks": {
                     "type": "array",

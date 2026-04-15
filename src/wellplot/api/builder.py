@@ -362,6 +362,7 @@ class LogBuilder:
         dataset: WellDataset,
         title: str = "",
         subtitle: str = "",
+        depth_range: tuple[float, float] | None = None,
         source_name: str | Path | None = None,
         source_path: str | Path | None = None,
         source_format: str = "auto",
@@ -379,6 +380,8 @@ class LogBuilder:
             "subtitle": subtitle,
             "tracks": [],
         }
+        if depth_range is not None:
+            section["depth_range"] = [float(depth_range[0]), float(depth_range[1])]
         if source_path is not None:
             source_path_text = str(source_path).strip()
             if not source_path_text:

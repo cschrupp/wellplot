@@ -1,0 +1,211 @@
+render:
+  backend: matplotlib
+  output_path: ../../../workspace/renders/cbl_log_example_placeholder.pdf
+  dpi: 180
+  continuous_strip_page_height_mm: 297
+  matplotlib:
+    style:
+      report:
+        summary_label_fontsize: 8.0
+        summary_value_fontsize: 10.5
+        provider_fontsize: 16.0
+        service_fontsize: 7.5
+        tail_service_fontsize: 7.5
+        field_label_fontsize: 7.0
+        field_value_fontsize: 7.8
+        detail_header_fontsize: 9.0
+        detail_label_fontsize: 6.4
+        detail_value_fontsize: 6.4
+        tail_frame_y: 0.74
+        tail_frame_height: 0.22
+      section_title:
+        height_mm: 8.0
+        title_fontsize: 9.0
+        subtitle_fontsize: 6.2
+        title_y: 0.7
+        subtitle_y: 0.2
+      track_header:
+        background_color: "#e8e8e8"
+        separator_color: "#5a5a5a"
+        separator_linewidth: 0.4
+      track:
+        x_tick_labelsize: 6.0
+      grid:
+        depth_major_linewidth: 0.65
+document:
+  depth_range:
+    - 100
+    - 8489
+  page:
+    size: A4
+    orientation: portrait
+    continuous: false
+    bottom_track_header_enabled: true
+    margin_left_mm: 0
+    margin_right_mm: 8
+    margin_top_mm: 0
+    margin_bottom_mm: 0
+    track_gap_mm: 0
+    header_height_mm: 0
+    track_header_height_mm: 30
+    footer_height_mm: 0
+  depth:
+    unit: ft
+    scale: 240
+    major_step: 10
+    minor_step: 2
+  layout:
+    heading:
+      enabled: true
+      provider_name: Company
+      general_fields:
+        - key: company
+          label: Company
+          value: University of Utah
+        - key: well
+          label: Well
+          value: Forge 78B-32
+        - key: field
+          label: Field
+          value: None
+        - key: county
+          label: County
+          value: Beaver
+        - key: country
+          label: Country
+          value: USA
+        - key: location
+          label: Location
+          value: "Lat: 38.500171 Long: -112.88221"
+        - key: logging_date
+          label: Logging Date
+          value: 06-Oct-2021
+        - key: run_number
+          label: Run Number
+          value: ONE
+        - key: scale
+          label: Scale
+          value: ft 1:240
+        - key: top_log_interval
+          label: Top Log Interval
+          value: 100.00 ft
+        - key: bottom_log_interval
+          label: Bottom Log Interval
+          value: 8489.00 ft
+        - key: fluid_type
+          label: Casing Fluid Type
+          value: Water
+      service_titles:
+        - value: Cement Bond Log
+          font_size: 16
+          auto_adjust: true
+          bold: true
+          alignment: left
+        - value: Variable Density Log
+          font_size: 15
+          auto_adjust: true
+          italic: true
+          alignment: center
+        - value: Gamma Ray - CCL
+          font_size: 14
+          auto_adjust: true
+          alignment: right
+      detail:
+        kind: cased_hole
+        title: Cased Hole
+        rows:
+          - label: Date
+            values:
+              - 06-Oct-2021
+              - ""
+          - label_cells:
+              - Run
+              - Direction
+            columns:
+              - cells:
+                  - ONE
+              - cells:
+                  - Up / Down
+          - label: Service Order
+            values:
+              - NRC 42-00090-03
+              - ""
+          - label: Driller Depth
+            columns:
+              - cells:
+                  - 8540.00
+                  - ft
+              - cells: [""]
+          - label: Logged Depth
+            columns:
+              - cells:
+                  - 8540.00
+                  - ft
+              - cells: [""]
+          - label: First Reading (Bottom)
+            columns:
+              - cells:
+                  - 8489.00
+                  - ft
+              - cells: [""]
+          - label: Last Reading
+            columns:
+              - cells:
+                  - 100.00
+                  - ft
+              - cells: [""]
+          - label: Start Time
+            columns:
+              - cells:
+                  - "12:32"
+                  - HS
+              - cells: [""]
+          - label: End Time
+            columns:
+              - cells:
+                  - "16:49"
+                  - HS
+              - cells: [""]
+          - label: Drill Time
+            columns:
+              - cells:
+                  - "4:16"
+                  - HS
+              - cells: [""]
+          - label: Fluid Density
+            values:
+              - 8.4 lbm/gal
+              - ""
+          - label: Fluid Level
+            columns:
+              - cells:
+                  - 8.00
+                  - ft
+              - cells: [""]
+          - label: Maximum Deviation
+            values:
+              - 0 deg
+              - ""
+          - label_cells:
+              - Equipment No.
+              - Base
+            columns:
+              - cells:
+                  - OSLC-HA 2801
+                  - Fort Morgan
+              - cells: [""]
+          - label: Logged By
+            values:
+              - Erik Leslie
+              - ""
+          - label: Witnessed By
+            values:
+              - Garth Larsen
+              - ""
+    remarks: []
+    log_sections: []
+    tail:
+      enabled: true
+  bindings:
+    on_missing: skip
+    channels: []
