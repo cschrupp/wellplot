@@ -54,8 +54,15 @@ section_title:
   enabled: true
   height_mm: 6.0
   background_color: "#efefef"
+  border_mode: bottom_rule
   border_color: "#222222"
   border_linewidth: 0.8
+  padding_left: 0.03
+  padding_right: 0.03
+  title_x:
+  title_align: center
+  subtitle_x:
+  subtitle_align: center
   title_fontsize: 10.5
   subtitle_fontsize: 7.2
   title_color: "#111111"

@@ -526,8 +526,28 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "enabled": {"type": "boolean"},
                 "height_mm": {"type": "number", "minimum": 0},
                 "background_color": {"type": "string", "minLength": 1},
+                "border_mode": {
+                    "type": "string",
+                    "enum": ["box", "bottom_rule", "none"],
+                },
                 "border_color": {"type": "string", "minLength": 1},
                 "border_linewidth": {"type": "number", "exclusiveMinimum": 0},
+                "padding_left": {"type": "number", "minimum": 0, "maximum": 1},
+                "padding_right": {"type": "number", "minimum": 0, "maximum": 1},
+                "title_x": {
+                    "anyOf": [
+                        {"type": "number"},
+                        {"type": "null"},
+                    ]
+                },
+                "title_align": {"type": "string", "enum": ["left", "center", "right"]},
+                "subtitle_x": {
+                    "anyOf": [
+                        {"type": "number"},
+                        {"type": "null"},
+                    ]
+                },
+                "subtitle_align": {"type": "string", "enum": ["left", "center", "right"]},
                 "title_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "subtitle_fontsize": {"type": "number", "exclusiveMinimum": 0},
                 "title_color": {"type": "string", "minLength": 1},

@@ -81,6 +81,13 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track_header"]["title_x"], 0.03)
         self.assertTrue(renderer.style["section_title"]["enabled"])
         self.assertEqual(renderer.style["section_title"]["height_mm"], 6.0)
+        self.assertEqual(renderer.style["section_title"]["border_mode"], "bottom_rule")
+        self.assertEqual(renderer.style["section_title"]["padding_left"], 0.03)
+        self.assertEqual(renderer.style["section_title"]["padding_right"], 0.03)
+        self.assertIsNone(renderer.style["section_title"]["title_x"])
+        self.assertEqual(renderer.style["section_title"]["title_align"], "center")
+        self.assertIsNone(renderer.style["section_title"]["subtitle_x"])
+        self.assertEqual(renderer.style["section_title"]["subtitle_align"], "center")
         self.assertEqual(renderer.style["raster"]["colorbar_width_ratio"], 0.06)
         self.assertEqual(renderer.style["raster"]["sample_axis_tick_labelsize"], 5.0)
         self.assertEqual(renderer.style["raster"]["header_colorbar_bar_height_ratio"], 0.26)
@@ -106,6 +113,73 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertEqual(renderer.style["track_header"]["background_color"], "#e8e8e8")
         self.assertEqual(renderer.style["track_header"]["title_align"], "center")
         self.assertEqual(renderer.style["track_header"]["title_x"], 0.5)
+        self.assertEqual(renderer.style["section_title"]["title_align"], "center")
+
+    def test_section_title_style_controls_alignment_and_position(self) -> None:
+        """Verify section title style controls the title and subtitle anchors."""
+        document = document_from_mapping(
+            {
+                "name": "section title alignment",
+                "page": {"size": "A4", "track_header_height_mm": 14.0},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "depth_range": [1000.0, 1004.0],
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [{"kind": "curve", "channel": "A"}],
+                    }
+                ],
+                "metadata": {
+                    "layout_sections": {
+                        "active_section": {
+                            "id": "main",
+                            "title": "Main Pass",
+                            "subtitle": "CBL_Main.dlis",
+                        }
+                    }
+                },
+            }
+        )
+        dataset = WellDataset(name="sample")
+        renderer = MatplotlibRenderer(
+            style={
+                "section_title": {
+                    "title_align": "left",
+                    "subtitle_align": "left",
+                    "padding_left": 0.04,
+                    "padding_right": 0.05,
+                    "border_mode": "bottom_rule",
+                }
+            }
+        )
+        page_layout = LayoutEngine().layout(document, dataset)[0]
+        fig = plt.figure(
+            figsize=(
+                page_layout.page.width_mm / 25.4,
+                page_layout.page.height_mm / 25.4,
+            )
+        )
+        try:
+            height = renderer._draw_section_title_box(fig, document, page_layout)
+            self.assertGreater(height, 0.0)
+            self.assertEqual(len(fig.axes), 1)
+            texts = fig.axes[0].texts
+            self.assertEqual(len(texts), 2)
+            self.assertEqual(texts[0].get_text(), "Main Pass")
+            self.assertEqual(texts[0].get_ha(), "left")
+            self.assertAlmostEqual(texts[0].get_position()[0], 0.04)
+            self.assertEqual(texts[1].get_text(), "CBL_Main.dlis")
+            self.assertEqual(texts[1].get_ha(), "left")
+            self.assertAlmostEqual(texts[1].get_position()[0], 0.04)
+            self.assertFalse(fig.axes[0].spines["left"].get_visible())
+            self.assertFalse(fig.axes[0].spines["top"].get_visible())
+            self.assertFalse(fig.axes[0].spines["right"].get_visible())
+            self.assertTrue(fig.axes[0].spines["bottom"].get_visible())
+        finally:
+            plt.close(fig)
 
     def test_renderer_auto_adjusts_header_height_for_multicurve_legend(self) -> None:
         """Verify renderer auto adjusts header height for multicurve legend."""

@@ -553,6 +553,41 @@ class MatplotlibRenderer(Renderer):
             return 0.0
         return max(float(style.get("height_mm", 0.0)), 0.0)
 
+    def _normalized_section_title_align(self, value: object, *, default: str = "center") -> str:
+        align = str(value if value is not None else default).lower()
+        if align not in {"left", "center", "right"}:
+            return default
+        return align
+
+    def _section_title_x_position(
+        self,
+        style: dict[str, Any],
+        *,
+        key: str,
+        align: str,
+    ) -> float:
+        padding_left = float(style.get("padding_left", 0.03))
+        padding_right = float(style.get("padding_right", 0.03))
+        left_limit = min(max(padding_left, 0.0), 1.0)
+        right_limit = max(min(1.0 - padding_right, 1.0), 0.0)
+        if right_limit < left_limit:
+            left_limit = right_limit = min(max((left_limit + right_limit) * 0.5, 0.0), 1.0)
+
+        if align == "left":
+            default_x = left_limit
+        elif align == "right":
+            default_x = right_limit
+        else:
+            default_x = 0.5
+
+        raw_x = style.get(key)
+        x = default_x if raw_x is None else float(raw_x)
+        if align == "left":
+            return max(x, left_limit)
+        if align == "right":
+            return min(x, right_limit)
+        return min(max(x, left_limit), right_limit)
+
     def _draw_section_title_box(
         self,
         fig: Figure,
@@ -590,18 +625,33 @@ class MatplotlibRenderer(Renderer):
         ax.set_facecolor(str(section_style["background_color"]))
         ax.set_xticks([])
         ax.set_yticks([])
-        for spine in ax.spines.values():
-            spine.set_visible(True)
-            spine.set_color(str(section_style["border_color"]))
-            spine.set_linewidth(float(section_style["border_linewidth"]))
+        border_mode = str(section_style.get("border_mode", "box")).lower()
+        if border_mode not in {"box", "bottom_rule", "none"}:
+            border_mode = "box"
+        for spine_name, spine in ax.spines.items():
+            visible = border_mode == "box" or (border_mode == "bottom_rule" and spine_name == "bottom")
+            spine.set_visible(visible)
+            if visible:
+                spine.set_color(str(section_style["border_color"]))
+                spine.set_linewidth(float(section_style["border_linewidth"]))
 
         title, subtitle = self._active_section_title(document)
+        title_align = self._normalized_section_title_align(
+            section_style.get("title_align", "center"),
+        )
+        subtitle_align = self._normalized_section_title_align(
+            section_style.get("subtitle_align", "center"),
+        )
         ax.text(
-            0.5,
+            self._section_title_x_position(
+                section_style,
+                key="title_x",
+                align=title_align,
+            ),
             float(section_style["title_y"]),
             title,
             transform=ax.transAxes,
-            ha="center",
+            ha=title_align,
             va="center",
             fontsize=float(section_style["title_fontsize"]),
             fontweight="bold",
@@ -610,11 +660,15 @@ class MatplotlibRenderer(Renderer):
         )
         if subtitle:
             ax.text(
-                0.5,
+                self._section_title_x_position(
+                    section_style,
+                    key="subtitle_x",
+                    align=subtitle_align,
+                ),
                 float(section_style["subtitle_y"]),
                 subtitle,
                 transform=ax.transAxes,
-                ha="center",
+                ha=subtitle_align,
                 va="center",
                 fontsize=float(section_style["subtitle_fontsize"]),
                 color=str(section_style["subtitle_color"]),

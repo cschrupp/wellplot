@@ -19,11 +19,19 @@ render:
         tail_frame_y: 0.74
         tail_frame_height: 0.22
       section_title:
-        height_mm: 8.0
-        title_fontsize: 9.0
-        subtitle_fontsize: 6.2
-        title_y: 0.7
-        subtitle_y: 0.2
+        background_color: "#f7f7f7"
+        border_mode: bottom_rule
+        border_color: "#2b2b2b"
+        border_linewidth: 0.9
+        height_mm: 11.0
+        padding_left: 0.03
+        padding_right: 0.03
+        title_align: center
+        subtitle_align: center
+        title_fontsize: 11.5
+        subtitle_fontsize: 6.8
+        title_y: 0.68
+        subtitle_y: 0.22
       track_header:
         background_color: "#e8e8e8"
         separator_color: "#5a5a5a"
