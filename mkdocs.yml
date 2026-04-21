@@ -50,9 +50,11 @@ nav:
       - Python API Workflow: workflows/python-api.md
       - Rendering: workflows/rendering.md
       - Report Pages: workflows/report-pages.md
+      - Release And Publishing: workflows/release-publishing.md
   - Guides:
       - Datasets: guides/datasets.md
       - Examples: guides/examples.md
+      - "Example 1: CBL Reconstruction": guides/example-1-cbl-reconstruction.md
   - Reference:
       - Overview: reference/index.md
       - Python API: reference/python-api.md

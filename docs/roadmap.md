@@ -202,7 +202,8 @@ Current status:
 - next:
   - keep pruning stale comments and filling public API docstring gaps where they still exist
   - keep expanding user docs depth while the public library surface stabilizes
-  - document the release/publish workflow on the user site once we want that exposed publicly
+  - review and refactor the example set into clearer end-user guides instead of
+    development-oriented validation demos
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
