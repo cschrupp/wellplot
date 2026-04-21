@@ -34,7 +34,11 @@ def create_dataset(
     well_metadata: Mapping[str, object] | None = None,
     provenance: Mapping[str, object] | None = None,
 ) -> WellDataset:
-    """Create an empty dataset with optional metadata and provenance."""
+    """Create an empty in-memory dataset for programmatic ingestion workflows.
+
+    Use this helper when you want direct access to a mutable :class:`WellDataset`
+    without going through the fluent :class:`DatasetBuilder` chain.
+    """
     return WellDataset(
         name=name,
         well_metadata=dict(well_metadata or {}),
@@ -43,7 +47,12 @@ def create_dataset(
 
 
 class DatasetBuilder:
-    """Fluent builder for creating and enriching in-memory datasets."""
+    """Fluent builder for assembling computed or imported log datasets.
+
+    The builder wraps a mutable :class:`WellDataset` and returns itself from
+    every mutating method so notebook and scripting workflows can build a
+    dataset step by step before calling :meth:`build`.
+    """
 
     def __init__(
         self,
@@ -60,26 +69,30 @@ class DatasetBuilder:
 
     @property
     def dataset(self) -> WellDataset:
-        """Expose the underlying dataset while the builder remains mutable."""
+        """Return the mutable dataset currently owned by the builder."""
         return self._dataset
 
     def build(self) -> WellDataset:
-        """Validate and return the dataset."""
+        """Validate the current dataset state and return it.
+
+        This is the point where builder-oriented workflows should stop mutating
+        the dataset and start handing it to the layout or render layers.
+        """
         self._dataset.validate()
         return self._dataset
 
     def add_channel(self, channel: BaseChannel, *, replace: bool = True) -> DatasetBuilder:
-        """Insert an already constructed channel object."""
+        """Insert a fully constructed channel object into the dataset."""
         self._dataset.add_channel(channel, replace=replace)
         return self
 
     def add_or_replace_channel(self, channel: BaseChannel) -> DatasetBuilder:
-        """Insert a channel, replacing any channel with the same mnemonic."""
+        """Insert a channel and overwrite any existing mnemonic match."""
         self._dataset.add_or_replace_channel(channel)
         return self
 
     def rename_channel(self, mnemonic: str, new_mnemonic: str) -> DatasetBuilder:
-        """Rename an existing channel in the dataset."""
+        """Rename an existing channel in-place before later render binding."""
         self._dataset.rename_channel(mnemonic, new_mnemonic)
         return self
 
@@ -97,7 +110,11 @@ class DatasetBuilder:
         metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
-        """Add a scalar curve from array-like values and index samples."""
+        """Add a scalar curve from values plus an index axis.
+
+        This is the normal ingestion path for computed petrophysical curves,
+        QC flags, and any other one-dimensional sampled channel.
+        """
         self._dataset.add_curve(
             mnemonic=mnemonic,
             values=values,
@@ -129,7 +146,11 @@ class DatasetBuilder:
         metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
-        """Add a 2D array channel from values plus index and sample axes."""
+        """Add a two-dimensional sampled array channel.
+
+        Use this for waveform-style or image-like channels that have both a
+        reference index and a sample axis.
+        """
         self._dataset.add_array(
             mnemonic=mnemonic,
             values=values,
@@ -161,7 +182,11 @@ class DatasetBuilder:
         metadata: Mapping[str, object] | None = None,
         replace: bool = True,
     ) -> DatasetBuilder:
-        """Add a scalar curve from a pandas-style series object."""
+        """Add a scalar curve from a pandas-style series object.
+
+        The series values become channel values and either the series index or
+        an explicit ``index`` argument becomes the reference axis.
+        """
         self._dataset.add_series(
             series=series,
             index_unit=index_unit,
@@ -189,7 +214,12 @@ class DatasetBuilder:
         source: str | None = None,
         metadata: Mapping[str, object] | None = None,
     ) -> DatasetBuilder:
-        """Add multiple scalar curves from a pandas-style dataframe."""
+        """Add multiple scalar curves from a pandas-style dataframe.
+
+        Each selected column becomes one curve channel. Use ``curves`` to pass
+        per-column metadata and ``index_column`` or ``use_index`` to define the
+        reference axis.
+        """
         self._dataset.add_dataframe(
             frame,
             index_unit=index_unit,
@@ -221,7 +251,11 @@ class DatasetBuilder:
         colormap: str = "viridis",
         replace: bool = True,
     ) -> DatasetBuilder:
-        """Add a raster channel with colormap metadata."""
+        """Add a raster-oriented array channel with display metadata.
+
+        This is a convenience wrapper over :meth:`add_array` that also stores
+        colormap metadata used by array-track renderers.
+        """
         self._dataset.add_raster(
             mnemonic=mnemonic,
             values=values,
@@ -250,7 +284,11 @@ class DatasetBuilder:
         merge_well_metadata: bool = False,
         merge_provenance: bool = False,
     ) -> DatasetBuilder:
-        """Merge another dataset using the selected collision policy."""
+        """Merge another dataset using the selected collision policy.
+
+        This is the main bridge for workflows that combine raw, derived, and QC
+        channels into one working dataset before layout binding.
+        """
         self._dataset.merge(
             other,
             replace=replace,
@@ -277,7 +315,11 @@ class DatasetBuilder:
         *,
         channels: list[str] | None = None,
     ) -> DatasetBuilder:
-        """Convert one or more channel indices to another unit."""
+        """Convert one or more channel indices to another unit.
+
+        This is useful when notebook calculations were performed in a different
+        index unit than the target report layout.
+        """
         self._dataset.convert_index_unit(unit, channels=channels)
         return self
 
@@ -290,7 +332,11 @@ class DatasetBuilder:
         method: str = "linear",
         channels: list[str] | None = None,
     ) -> DatasetBuilder:
-        """Reindex selected channels to another channel or explicit axis."""
+        """Reindex selected channels to another channel or explicit axis.
+
+        Use ``channel`` to align to an existing dataset channel or ``index`` and
+        ``index_unit`` to align to an explicit sampling grid.
+        """
         self._dataset.reindex_to(
             channel=channel,
             index=index,

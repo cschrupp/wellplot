@@ -233,7 +233,11 @@ def build_documents(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> tuple[LogDocument, ...]:
-    """Build render-ready documents for the selected report scope."""
+    """Build render-ready documents for the selected report scope.
+
+    This is the normalization step to use when you want to inspect or reuse the
+    concrete :class:`LogDocument` objects before rendering them.
+    """
     normalized_sections = _normalize_section_ids(section_ids)
     normalized_tracks = _normalize_track_selection(
         track_ids_by_section=track_ids_by_section,
@@ -262,7 +266,12 @@ def render_report(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> RenderResult:
-    """Render the selected report scope with the configured backend."""
+    """Render the selected report scope with the configured backend.
+
+    The scope can be narrowed by section, track selection, and depth window. If
+    ``output_path`` is omitted for the matplotlib backend, in-memory figures are
+    returned inside the :class:`RenderResult`.
+    """
     normalized_sections = _normalize_section_ids(section_ids)
     normalized_tracks = _normalize_track_selection(
         track_ids_by_section=track_ids_by_section,
@@ -319,7 +328,7 @@ def render_section(
     section_id: str,
     output_path: str | Path | None = None,
 ) -> RenderResult:
-    """Render a single log section without report pages."""
+    """Render one section without the report heading, remarks, or tail pages."""
     return render_report(
         report,
         output_path=output_path,
@@ -337,7 +346,7 @@ def render_track(
     depth_range: tuple[float, float] | None = None,
     depth_range_unit: str | None = None,
 ) -> RenderResult:
-    """Render selected tracks from a section without report pages."""
+    """Render selected tracks from one section without report pages."""
     track_selection = _normalize_track_selection(section_id, track_ids)
     return render_report(
         report,
@@ -358,7 +367,11 @@ def render_window(
     output_path: str | Path | None = None,
     section_ids: list[str] | tuple[str, ...] | None = None,
 ) -> RenderResult:
-    """Render a depth- or time-windowed subset of the report."""
+    """Render a depth- or time-windowed subset of the report.
+
+    The requested window is converted into the report axis unit when
+    ``depth_range_unit`` differs from the report's configured index unit.
+    """
     return render_report(
         report,
         output_path=output_path,
@@ -422,7 +435,11 @@ def render_png_bytes(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> bytes:
-    """Render the selected scope and return one page as PNG bytes."""
+    """Render the selected scope and return one page as PNG bytes.
+
+    This helper is designed for notebooks, dashboards, and API responses that
+    need an in-memory raster preview instead of a saved file.
+    """
     result = render_report(
         report,
         output_path=None,
@@ -445,7 +462,11 @@ def render_svg_bytes(
     depth_range_unit: str | None = None,
     include_report_pages: bool = True,
 ) -> bytes:
-    """Render the selected scope and return one page as SVG bytes."""
+    """Render the selected scope and return one page as SVG bytes.
+
+    This is the vector equivalent of :func:`render_png_bytes` and is useful for
+    notebook or browser workflows that prefer scalable output.
+    """
     result = render_report(
         report,
         output_path=None,
@@ -465,7 +486,7 @@ def render_section_png(
     page_index: int = 0,
     dpi: int | None = None,
 ) -> bytes:
-    """Render a single section and return the selected page as PNG bytes."""
+    """Render one section and return the selected page as PNG bytes."""
     return render_png_bytes(
         report,
         page_index=page_index,
