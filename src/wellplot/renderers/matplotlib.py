@@ -5080,30 +5080,6 @@ class MatplotlibRenderer(Renderer):
         )
         return _CurveFillRenderData(primary_data, secondary_values, valid_mask)
 
-    def _curve_fill_header_segments_from_masks(
-        self,
-        primary_count: int,
-        secondary_count: int,
-        *,
-        primary_color: str,
-        secondary_color: str,
-        alpha: float,
-        fallback_color: str,
-        fallback_alpha: float,
-    ) -> list[tuple[float, float, str, float]]:
-        if primary_count > 0 and secondary_count > 0:
-            total = primary_count + secondary_count
-            primary_fraction = primary_count / total
-            return [
-                (0.0, primary_fraction, primary_color, alpha),
-                (primary_fraction, 1.0, secondary_color, alpha),
-            ]
-        if primary_count > 0:
-            return [(0.0, 1.0, primary_color, alpha)]
-        if secondary_count > 0:
-            return [(0.0, 1.0, secondary_color, alpha)]
-        return [(0.0, 1.0, fallback_color, fallback_alpha)]
-
     def _curve_fill_header_marker_x(
         self,
         track: TrackSpec,
@@ -5180,8 +5156,6 @@ class MatplotlibRenderer(Renderer):
         if not element.fill.crossover.enabled:
             return [(0.0, 1.0, fill_color, fill_alpha)]
 
-        left_mask = valid_mask & (primary_data.plot_values < secondary_values)
-        right_mask = valid_mask & (primary_data.plot_values > secondary_values)
         left_color = element.fill.crossover.left_color or fill_color
         right_color = element.fill.crossover.right_color or fill_color
         crossover_alpha = (
@@ -5189,15 +5163,12 @@ class MatplotlibRenderer(Renderer):
             if element.fill.crossover.alpha is not None
             else fill_alpha
         )
-        return self._curve_fill_header_segments_from_masks(
-            int(np.count_nonzero(left_mask)),
-            int(np.count_nonzero(right_mask)),
-            primary_color=left_color,
-            secondary_color=right_color,
-            alpha=crossover_alpha,
-            fallback_color=fill_color,
-            fallback_alpha=fill_alpha,
-        )
+        # The header row is a legend swatch, not a histogram of where each crossover
+        # color dominates in the plotted interval. Show both crossover colors evenly.
+        return [
+            (0.0, 0.5, left_color, crossover_alpha),
+            (0.5, 1.0, right_color, crossover_alpha),
+        ]
 
     def _draw_curve_fill(
         self,

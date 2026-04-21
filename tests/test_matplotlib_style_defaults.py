@@ -1476,6 +1476,62 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         finally:
             plt.close(fig)
 
+    def test_crossover_fill_header_segments_use_equal_split(self) -> None:
+        """Verify crossover fill headers render as an even two-color legend."""
+        depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)
+        dataset = WellDataset(name="header crossover")
+        dataset.add_channel(ScalarChannel("CBL", depth, "m", "mV", values=np.array([2, 4, 6, 8])))
+        document = document_from_mapping(
+            {
+                "name": "between instances header split",
+                "page": {"size": "A4"},
+                "depth": {"unit": "m", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "cbl",
+                        "title": "CBL",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "id": "cbl_0_100",
+                                "channel": "CBL",
+                                "scale": {"kind": "linear", "min": 0, "max": 100},
+                                "fill": {
+                                    "kind": "between_instances",
+                                    "other_element_id": "cbl_0_10",
+                                    "color": "#d1d5db",
+                                    "crossover": {
+                                        "enabled": True,
+                                        "left_color": "#22c55e",
+                                        "right_color": "#ef4444",
+                                    },
+                                },
+                            },
+                            {
+                                "kind": "curve",
+                                "id": "cbl_0_10",
+                                "channel": "CBL",
+                                "scale": {"kind": "linear", "min": 0, "max": 10},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        segments = renderer._curve_fill_header_segments(
+            document.tracks[0],
+            document.tracks[0].elements[0],
+            document,
+            dataset,
+            independent_curve_scales=True,
+        )
+
+        self.assertEqual(segments, [(0.0, 0.5, "#22c55e", 0.2), (0.5, 1.0, "#ef4444", 0.2)])
+
     def test_between_curves_fill_rejects_mismatched_scales(self) -> None:
         """Verify between curves fill rejects mismatched scales."""
         depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
