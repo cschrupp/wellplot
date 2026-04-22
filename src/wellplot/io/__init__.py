@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Public data-loading adapters for LAS and DLIS sources."""
+
 from .dlis import load_dlis
 from .las import load_las
 

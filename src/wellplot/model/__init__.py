@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Public model types for datasets, channels, and log documents."""
+
 from .channels import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel
 from .dataset import WellDataset
 from .document import (

@@ -236,6 +236,7 @@ class WellDataset:
     provenance: dict[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Validate the dataset immediately after dataclass construction."""
         self.validate()
 
     def add_channel(self, channel: BaseChannel, *, replace: bool = True) -> BaseChannel:

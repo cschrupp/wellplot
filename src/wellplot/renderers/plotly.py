@@ -50,6 +50,7 @@ class PlotlyRenderer(Renderer):
     """Render a single document into a Plotly figure."""
 
     def __init__(self, registry: SimpleUnitRegistry = DEFAULT_UNITS) -> None:
+        """Initialize the renderer with the registry used for layout conversion."""
         self.registry = registry
         self.layout_engine = LayoutEngine(registry)
 

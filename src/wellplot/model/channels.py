@@ -55,6 +55,7 @@ class BaseChannel:
     metadata: ChannelMetadata = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Normalize the depth axis and validate the shared channel contract."""
         self.depth = _as_float_array(self.depth, name="depth", ndim=1)
         self.validate()
 
@@ -101,6 +102,7 @@ class ScalarChannel(BaseChannel):
     values: np.ndarray = field(default_factory=lambda: np.asarray([], dtype=float))
 
     def __post_init__(self) -> None:
+        """Normalize scalar samples before running the base channel validation."""
         self.values = _as_float_array(self.values, name="values", ndim=1)
         BaseChannel.__post_init__(self)
 
@@ -136,6 +138,7 @@ class ArrayChannel(BaseChannel):
     sample_label: str = "sample"
 
     def __post_init__(self) -> None:
+        """Normalize array samples and sample-axis values before validation."""
         self.values = _as_float_array(self.values, name="values", ndim=2)
         self.sample_axis = _as_float_array(self.sample_axis, name="sample_axis", ndim=1)
         BaseChannel.__post_init__(self)

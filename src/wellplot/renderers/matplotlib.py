@@ -195,6 +195,7 @@ class MatplotlibRenderer(Renderer):
         continuous_strip_page_height_mm: float | None = None,
         style: dict[str, Any] | None = None,
     ) -> None:
+        """Initialize renderer state and validate optional style overrides."""
         if dpi <= 0:
             raise ValueError("Renderer dpi must be positive.")
         if continuous_strip_page_height_mm is not None and continuous_strip_page_height_mm <= 0:

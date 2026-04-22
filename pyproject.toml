@@ -122,11 +122,6 @@ select = [
   "SIM",
   "UP",
 ]
-ignore = [
-  "D104",
-  "D105",
-  "D107",
-]
 
 [tool.ruff.lint.isort]
 known-first-party = ["wellplot"]

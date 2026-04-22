@@ -17,6 +17,8 @@
 #
 ###############################################################################
 
+"""Public renderer classes and shared render result types."""
+
 from .base import Renderer, RenderResult
 from .matplotlib import MatplotlibRenderer
 from .plotly import PlotlyRenderer

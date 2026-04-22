@@ -76,6 +76,7 @@ class SectionBuilder:
     """
 
     def __init__(self, builder: LogBuilder, section_id: str) -> None:
+        """Bind the section builder to one parent-builder section mapping."""
         self._builder = builder
         self._section_id = section_id
 
@@ -237,6 +238,7 @@ class LogBuilder:
     """
 
     def __init__(self, *, name: str) -> None:
+        """Initialize a new builder with default render and document settings."""
         self._mapping: dict[str, object] = {
             "version": 1,
             "name": name,

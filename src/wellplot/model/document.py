@@ -206,6 +206,7 @@ class AnnotationIntervalSpec:
     padding: float = 0.02
 
     def __post_init__(self) -> None:
+        """Validate interval bounds, styling, and label placement settings."""
         if self.base <= self.top:
             raise ValueError("Annotation interval base must be greater than top.")
         if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
@@ -270,6 +271,7 @@ class AnnotationTextSpec:
     padding: float = 0.02
 
     def __post_init__(self) -> None:
+        """Validate text placement, interval selection, and styling fields."""
         if not str(self.text).strip():
             raise ValueError("Annotation text must be non-empty.")
         if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
@@ -340,6 +342,7 @@ class AnnotationMarkerSpec:
     label_lane_end: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate marker geometry, label controls, and optional lane bounds."""
         if not 0.0 <= self.x <= 1.0:
             raise ValueError("Annotation marker x must be between 0 and 1.")
         shape = self.shape.strip().lower()
@@ -428,6 +431,7 @@ class AnnotationArrowSpec:
     label_lane_end: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate arrow geometry, styling, and optional dedicated label lane."""
         for name, value in (("start_x", self.start_x), ("end_x", self.end_x)):
             if not 0.0 <= value <= 1.0:
                 raise ValueError(f"Annotation arrow {name} must be between 0 and 1.")
@@ -498,6 +502,7 @@ class AnnotationGlyphSpec:
     padding: float = 0.02
 
     def __post_init__(self) -> None:
+        """Validate glyph placement, interval selection, and styling fields."""
         if not str(self.glyph).strip():
             raise ValueError("Annotation glyph must be non-empty.")
         if not 0.0 <= self.lane_start < self.lane_end <= 1.0:
@@ -559,6 +564,7 @@ class ScaleSpec:
     reverse: bool = False
 
     def __post_init__(self) -> None:
+        """Validate scale bounds and log-scale positivity requirements."""
         if self.minimum == self.maximum:
             raise ValueError("Scale minimum and maximum must differ.")
         if self.kind == ScaleKind.LOG and (self.minimum <= 0 or self.maximum <= 0):
@@ -599,6 +605,7 @@ class GridSpec:
     vertical_secondary_spacing_mode: GridSpacingMode = GridSpacingMode.COUNT
 
     def __post_init__(self) -> None:
+        """Validate grid alpha, thickness, and line-count settings."""
         for name, alpha in (
             ("major_alpha", self.major_alpha),
             ("minor_alpha", self.minor_alpha),
@@ -652,6 +659,7 @@ class ReferenceTrackSpec:
     events: tuple[ReferenceEventSpec, ...] = ()
 
     def __post_init__(self) -> None:
+        """Validate reference-axis settings and normalize value orientation."""
         if self.scale_ratio is not None and self.scale_ratio <= 0:
             raise ValueError("Reference track scale_ratio must be positive when provided.")
         if self.major_step is not None and self.major_step <= 0:
@@ -678,6 +686,7 @@ class TrackHeaderObjectSpec:
     line_units: int = 1
 
     def __post_init__(self) -> None:
+        """Validate the reserved line-unit count for this header row object."""
         if self.line_units <= 0:
             raise ValueError("Track header object line_units must be positive.")
 
@@ -705,6 +714,7 @@ class TrackHeaderSpec:
     )
 
     def __post_init__(self) -> None:
+        """Validate the object list and enforce unique header row kinds."""
         if not self.objects:
             raise ValueError("Track header must contain at least one object.")
         kinds = [item.kind for item in self.objects]
@@ -732,6 +742,7 @@ class CurveValueLabelsSpec:
     vertical_alignment: str = "center"
 
     def __post_init__(self) -> None:
+        """Validate label stepping, formatting, and text alignment settings."""
         if self.step <= 0:
             raise ValueError("Curve value-label step must be positive.")
         if self.precision < 0:
@@ -769,6 +780,7 @@ class ReferenceCurveOverlaySpec:
     threshold: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate overlay lane bounds and optional tick-length settings."""
         if (self.lane_start is None) != (self.lane_end is None):
             raise ValueError(
                 "Reference curve overlay lane_start and lane_end must be set together."
@@ -812,6 +824,7 @@ class ReferenceEventSpec:
     arrow_linewidth: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate event styling, lane bounds, and text placement controls."""
         if self.label and not str(self.label).strip():
             raise ValueError("Reference event label must be non-empty when provided.")
         if not str(self.color).strip():
@@ -873,6 +886,7 @@ class CurveCalloutSpec:
     arrow_linewidth: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate callout placement, cadence, and optional arrow styling."""
         if self.label is not None and not str(self.label).strip():
             raise ValueError("Curve callout label must be non-empty when provided.")
         side = self.side.strip().lower()
@@ -917,6 +931,7 @@ class CurveFillCrossoverSpec:
     alpha: float | None = None
 
     def __post_init__(self) -> None:
+        """Validate optional crossover colors and alpha override values."""
         if self.left_color is not None and not str(self.left_color).strip():
             raise ValueError("Curve fill crossover left_color must be non-empty when provided.")
         if self.right_color is not None and not str(self.right_color).strip():
@@ -937,6 +952,7 @@ class CurveFillBaselineSpec:
     line_style: str = "--"
 
     def __post_init__(self) -> None:
+        """Validate optional baseline colors and guide-line styling."""
         if self.lower_color is not None and not str(self.lower_color).strip():
             raise ValueError("Curve fill baseline lower_color must be non-empty when provided.")
         if self.upper_color is not None and not str(self.upper_color).strip():
@@ -963,6 +979,7 @@ class CurveFillSpec:
     crossover: CurveFillCrossoverSpec = field(default_factory=CurveFillCrossoverSpec)
 
     def __post_init__(self) -> None:
+        """Validate fill targeting, kind-specific requirements, and styling."""
         if self.other_channel is not None:
             self.other_channel = str(self.other_channel).strip()
             if not self.other_channel:
@@ -1028,6 +1045,7 @@ class CurveElement:
     fill: CurveFillSpec | None = None
 
     def __post_init__(self) -> None:
+        """Validate curve element identifiers, wrapping, and render mode."""
         if self.id is not None and not str(self.id).strip():
             raise ValueError("Curve id must be non-empty when provided.")
         if not isinstance(self.wrap, bool):
@@ -1056,6 +1074,7 @@ class RasterWaveformSpec:
     max_traces: int | None = None
 
     def __post_init__(self) -> None:
+        """Validate waveform overlay sampling, amplitude, and color settings."""
         if self.stride <= 0:
             raise ValueError("Raster waveform stride must be positive.")
         if self.amplitude_scale <= 0:
@@ -1101,6 +1120,7 @@ class RasterElement:
     waveform: RasterWaveformSpec = field(default_factory=RasterWaveformSpec)
 
     def __post_init__(self) -> None:
+        """Validate raster display controls and optional sample-axis overrides."""
         if self.label is not None and not str(self.label).strip():
             raise ValueError("Raster label must be non-empty when provided.")
         if self.clip_percentiles is not None:
@@ -1163,6 +1183,7 @@ class ReportValueSpec:
     default: str = ""
 
     def __post_init__(self) -> None:
+        """Normalize literal/report-key inputs and validate the optional source key."""
         if self.source_key is not None and not str(self.source_key).strip():
             raise ValueError("Report value source_key must be non-empty when provided.")
         if self.value is not None:
@@ -1181,6 +1202,7 @@ class ReportFieldSpec:
     value: ReportValueSpec = field(default_factory=ReportValueSpec)
 
     def __post_init__(self) -> None:
+        """Validate the field identifiers and normalize the storage key."""
         if not str(self.key).strip():
             raise ValueError("Report field key must be non-empty.")
         if not str(self.label).strip():
@@ -1201,6 +1223,7 @@ class ReportServiceTitleSpec:
     alignment: str = "left"
 
     def __post_init__(self) -> None:
+        """Validate title styling flags and normalize text alignment."""
         if self.font_size is not None and self.font_size <= 0:
             raise ValueError("Report service title font_size must be positive when provided.")
         if not isinstance(self.auto_adjust, bool):
@@ -1227,6 +1250,7 @@ class ReportDetailCellSpec:
     divider_right_visible: bool = True
 
     def __post_init__(self) -> None:
+        """Validate detail-cell colors, font weight, and divider flags."""
         if self.background_color is not None and not str(self.background_color).strip():
             raise ValueError("Report detail cell background_color must be non-empty when set.")
         if self.text_color is not None and not str(self.text_color).strip():
@@ -1249,6 +1273,7 @@ class ReportDetailColumnSpec:
     cells: tuple[ReportDetailCellSpec, ...]
 
     def __post_init__(self) -> None:
+        """Validate the column cell count against the supported table shape."""
         if not self.cells:
             raise ValueError("Report detail columns must contain at least one cell.")
         if len(self.cells) > 4:
@@ -1263,6 +1288,7 @@ class ReportDetailRowSpec:
     columns: tuple[ReportDetailColumnSpec, ...]
 
     def __post_init__(self) -> None:
+        """Validate the row label cells and value-column counts."""
         if not self.label_cells:
             raise ValueError("Report detail rows must contain at least one label cell.")
         if len(self.label_cells) > 4:
@@ -1283,6 +1309,7 @@ class ReportDetailSpec:
     rows: tuple[ReportDetailRowSpec, ...] = ()
 
     def __post_init__(self) -> None:
+        """Validate table shape and derive a default title when needed."""
         if self.title is not None and not str(self.title).strip():
             raise ValueError("Report detail title must be non-empty when provided.")
         if self.column_titles:
@@ -1321,6 +1348,7 @@ class ReportBlockSpec:
     tail_enabled: bool = False
 
     def __post_init__(self) -> None:
+        """Validate and normalize the optional provider name."""
         if self.provider_name is not None and not str(self.provider_name).strip():
             raise ValueError("Report block provider_name must be non-empty when provided.")
         if self.provider_name is not None:
@@ -1365,6 +1393,7 @@ class ZoneSpec:
     alpha: float = 0.25
 
     def __post_init__(self) -> None:
+        """Validate that the zone interval has positive thickness."""
         if self.base <= self.top:
             raise ValueError("Zone base must be greater than top.")
 
@@ -1436,6 +1465,7 @@ class DepthAxisSpec:
     minor_step: float = 2.0
 
     def __post_init__(self) -> None:
+        """Validate scale ratio and tick-step values for the shared depth axis."""
         if self.scale_ratio <= 0:
             raise ValueError("Depth scale ratio must be positive.")
         if self.major_step <= 0 or self.minor_step <= 0:
@@ -1458,6 +1488,7 @@ class TrackSpec:
     reference: ReferenceTrackSpec | None = None
 
     def __post_init__(self) -> None:
+        """Validate track width and enforce kind-specific element constraints."""
         if self.width_mm <= 0:
             raise ValueError(f"Track {self.id} width must be positive.")
         element_ids = [
@@ -1528,6 +1559,7 @@ class LogDocument:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
+        """Validate that the document contains at least one rendered track."""
         if not self.tracks:
             raise ValueError("A log document must contain at least one track.")
 

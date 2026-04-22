@@ -61,6 +61,7 @@ class DatasetBuilder:
         well_metadata: Mapping[str, object] | None = None,
         provenance: Mapping[str, object] | None = None,
     ) -> None:
+        """Start a new mutable dataset with optional well metadata and provenance."""
         self._dataset = create_dataset(
             name,
             well_metadata=well_metadata,
