@@ -1918,7 +1918,10 @@ def _set_active_layout_section(document: dict[str, Any], section: dict[str, Any]
     }
     if "depth_range" in section:
         depth_range = _ensure_sequence(section["depth_range"], context="active section depth_range")
-        layout_sections["active_section"]["depth_range"] = [float(depth_range[0]), float(depth_range[1])]
+        layout_sections["active_section"]["depth_range"] = [
+            float(depth_range[0]),
+            float(depth_range[1]),
+        ]
     metadata["layout_sections"] = layout_sections
     document["metadata"] = metadata
 

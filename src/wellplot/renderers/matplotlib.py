@@ -629,7 +629,9 @@ class MatplotlibRenderer(Renderer):
         if border_mode not in {"box", "bottom_rule", "none"}:
             border_mode = "box"
         for spine_name, spine in ax.spines.items():
-            visible = border_mode == "box" or (border_mode == "bottom_rule" and spine_name == "bottom")
+            visible = border_mode == "box" or (
+                border_mode == "bottom_rule" and spine_name == "bottom"
+            )
             spine.set_visible(visible)
             if visible:
                 spine.set_color(str(section_style["border_color"]))
@@ -5122,8 +5124,6 @@ class MatplotlibRenderer(Renderer):
             dataset,
             independent_curve_scales=independent_curve_scales,
         )
-        primary_data = fill_data.primary
-        secondary_values = fill_data.secondary_values
         valid_mask = fill_data.valid_mask
         if not np.any(valid_mask):
             return []

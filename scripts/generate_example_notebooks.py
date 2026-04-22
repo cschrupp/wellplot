@@ -331,8 +331,9 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             dedent(
                 """
                 # Build the shared synthetic layout used by the byte-render example.
+                from IPython.display import SVG, Image, display
+
                 import api_layout_render_demo as base_demo
-                from IPython.display import Image, SVG, display
                 from wellplot import render_section_png, render_svg_bytes, render_window_png
 
                 dataset = base_demo.build_dataset()
@@ -682,8 +683,8 @@ def _repo_setup_code() -> str:
     """Return the common repository path setup code used in notebooks."""
     return dedent(
         """
-        from pathlib import Path
         import sys
+        from pathlib import Path
 
         # Walk upward from the current working directory until we find the
         # repository root. This keeps the notebook runnable whether Jupyter was
@@ -899,7 +900,8 @@ def _production_summary_code(package_name: str) -> str:
         # rendered before the render step runs.
         import yaml
 
-        logfile_path = EXAMPLES_DIR / "production" / "{package_name}" / "full_reconstruction.log.yaml"
+        package_dir = EXAMPLES_DIR / "production" / "{package_name}"
+        logfile_path = package_dir / "full_reconstruction.log.yaml"
         mapping = yaml.safe_load(logfile_path.read_text())
         layout = mapping.get("document", {{}}).get("layout", {{}})
         sections = layout.get("log_sections", [])
@@ -928,7 +930,8 @@ def _production_render_code(package_name: str) -> str:
         # file-based pipeline a final user would call from the CLI.
         from wellplot import load_logfile, render_from_logfile
 
-        logfile_path = EXAMPLES_DIR / "production" / "{package_name}" / "full_reconstruction.log.yaml"
+        package_dir = EXAMPLES_DIR / "production" / "{package_name}"
+        logfile_path = package_dir / "full_reconstruction.log.yaml"
         spec = load_logfile(logfile_path)
         print("Validated:", spec.name)
 
@@ -1106,6 +1109,7 @@ def _legacy_triple_combo_notebook() -> dict[str, object]:
                 # Load the legacy document and summarize the structural parts that
                 # matter before rendering.
                 import yaml
+
                 from wellplot import load_document
 
                 document_path = EXAMPLES_DIR / "triple_combo.yaml"
