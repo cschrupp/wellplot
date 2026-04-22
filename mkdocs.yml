@@ -55,6 +55,7 @@ nav:
       - Datasets: guides/datasets.md
       - Examples: guides/examples.md
       - "Example 1: CBL Reconstruction": guides/example-1-cbl-reconstruction.md
+      - "Example 2: Porosity Reconstruction": guides/example-2-porosity-reconstruction.md
   - Reference:
       - Overview: reference/index.md
       - Python API: reference/python-api.md

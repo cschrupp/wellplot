@@ -10,16 +10,21 @@ The examples are grouped by workflow rather than by isolated feature.
     still useful reference material, but many of them were built for feature
     development and validation rather than first-time-user guidance.
 
+    Every example in the repository now also has a generated walkthrough
+    notebook under `examples/notebooks/`. Those notebooks act as recipe-style
+    companions: they show the source example, explain the main moving parts, and
+    run the validation/render flow from an interactive session.
+
 ## Production examples
 
 - [Example 1: CBL Reconstruction](example-1-cbl-reconstruction.md)
   - canonical DLIS-backed packet example
   - shows `heading`, `remarks`, main/repeat log sections, reference overlays,
     dual-scale CBL, VDL, and tail composition
-- `examples/production/forge16b_porosity_example/`
-  - LAS-backed open-hole production packet
+- [Example 2: Porosity Reconstruction](example-2-porosity-reconstruction.md)
+  - canonical LAS-backed open-hole packet example
   - keeps the production report template while swapping in the replacement
-    30/23a-3 well data and LAS-derived header metadata
+    30/23a-3 well data, LAS-derived header metadata, and gas-crossover fill
 
 ## Programmatic API examples
 

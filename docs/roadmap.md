@@ -204,6 +204,9 @@ Current status:
   - keep expanding user docs depth while the public library surface stabilizes
   - review and refactor the example set into clearer end-user guides instead of
     development-oriented validation demos
+  - after the first published package flow is stable, update example notebooks
+    and recipe docs to prefer installed-package imports over repo-local
+    bootstrapping
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 
