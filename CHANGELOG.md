@@ -21,10 +21,9 @@
 
 This changelog tracks public release notes for the `wellplot` distribution.
 
-The `0.1.0` section below is drafted for the first production PyPI release.
-Replace `Draft` with the publication date when the release is promoted.
+The entries below track public PyPI releases of the `wellplot` distribution.
 
-## [0.1.0] - Draft
+## [0.1.0] - 2026-04-22
 
 Initial public release of `wellplot` as an open-source Python toolkit for
 building printable and interactive well-log layouts from LAS, DLIS, and
