@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-04-12
+Last updated: 2026-04-22
 
 ## Scope Summary
 
@@ -199,14 +199,13 @@ Current status:
     - GitHub Actions publish to TestPyPI succeeded
     - fresh TestPyPI install in a clean virtual environment succeeded
     - `wellplot --help` and the installed-wheel smoke test both passed
+  - generated example notebooks and production example docs now prefer
+    installed-package usage over repo-local `src/` bootstrapping
 - next:
   - keep pruning stale comments and filling public API docstring gaps where they still exist
   - keep expanding user docs depth while the public library surface stabilizes
   - review and refactor the example set into clearer end-user guides instead of
     development-oriented validation demos
-  - after the first published package flow is stable, update example notebooks
-    and recipe docs to prefer installed-package imports over repo-local
-    bootstrapping
 
 ## CBL Parity Gaps (from comparison test, 2026-03-09)
 

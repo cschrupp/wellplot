@@ -57,13 +57,16 @@ example stays compact while still showing the deeper resistivity interval.
 
 ## Validate and render
 
-From the repository root:
+From the repository root, with the published package installed in the active
+environment:
 
 ```bash
-uv run python -m wellplot.cli validate \
+pip install wellplot
+
+wellplot validate \
   examples/production/forge16b_porosity_example/full_reconstruction.log.yaml
 
-uv run python -m wellplot.cli render \
+wellplot render \
   examples/production/forge16b_porosity_example/full_reconstruction.log.yaml
 ```
 

@@ -4,8 +4,12 @@ This example depends on:
 
 - `workspace/data/30-23a-3 8117_d.las`
 
-No optional dependency extra is required beyond the default `wellplot`
-installation because this package is LAS-backed.
+No optional dependency extra is required beyond the published `wellplot`
+installation because this package is LAS-backed:
+
+```bash
+pip install wellplot
+```
 
 ## Packet facts from the LAS header
 

@@ -13,16 +13,11 @@ Reference packet for structural comparison:
 
 ## Required dependency
 
-To render these files, install the DLIS extra:
+To render these files from an installed environment:
 
 ```bash
-uv sync --extra dlis
-```
-
-Or use an ephemeral run:
-
-```bash
-uv run --with dlisio python -m wellplot.cli render \
+pip install "wellplot[dlis]"
+wellplot render \
   examples/production/cbl_log_example/full_reconstruction.log.yaml
 ```
 

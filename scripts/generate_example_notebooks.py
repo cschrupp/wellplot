@@ -77,7 +77,7 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             "Merge raw and derived channels into one validated working dataset.",
             "Save a quick PNG preview before moving on to full report layout work.",
         ),
-        prerequisites=("uv sync --extra pandas",),
+        prerequisites=("pandas",),
         code_cells=(
             dedent(
                 """
@@ -394,7 +394,7 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             "Keep raw and processed channels visible together inside a single working dataset.",
             "Produce both final artifacts and lighter preview artifacts from the same report definition.",
         ),
-        prerequisites=("uv sync --extra pandas",),
+        prerequisites=("pandas",),
         code_cells=(
             dedent(
                 """
@@ -516,7 +516,7 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             "Point the wrapper at a different YAML config without changing the renderer internals.",
             "Reuse the same render pipeline from both notebooks and CLI-style scripts.",
         ),
-        prerequisites=("uv sync --extra las",),
+        prerequisites=("las",),
         code_cells=(
             dedent(
                 """
@@ -680,31 +680,42 @@ def _write_if_changed(path: Path, content: str) -> bool:
 
 
 def _repo_setup_code() -> str:
-    """Return the common repository path setup code used in notebooks."""
+    """Return the common notebook setup code used in generated recipes."""
     return dedent(
         """
         import sys
         from pathlib import Path
 
+        try:
+            import wellplot
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install the published 'wellplot' package in the active "
+                "environment before running this notebook."
+            ) from exc
+
         # Walk upward from the current working directory until we find the
-        # repository root. This keeps the notebook runnable whether Jupyter was
-        # launched from the repo root or from examples/notebooks.
+        # repository checkout that holds the example sources and sample data.
         cwd = Path.cwd().resolve()
-        REPO_ROOT = next(
-            path for path in (cwd, *cwd.parents)
-            if (path / "examples").exists() and (path / "src").exists()
-        )
+        REPO_ROOT = next((path for path in (cwd, *cwd.parents) if (path / "examples").exists()), None)
+        if REPO_ROOT is None:
+            raise RuntimeError(
+                "Run this notebook from a checkout of the wellplot repository "
+                "so the example files and sample data are available."
+            )
 
         EXAMPLES_DIR = REPO_ROOT / "examples"
-        SRC_DIR = REPO_ROOT / "src"
         WORKSPACE_DIR = REPO_ROOT / "workspace"
         WORKSPACE_RENDERS = WORKSPACE_DIR / "renders"
         WORKSPACE_RENDERS.mkdir(parents=True, exist_ok=True)
 
-        for candidate in (SRC_DIR, EXAMPLES_DIR):
-            candidate_text = str(candidate)
-            if candidate_text not in sys.path:
-                sys.path.insert(0, candidate_text)
+        examples_path = str(EXAMPLES_DIR)
+        if examples_path not in sys.path:
+            sys.path.insert(0, examples_path)
+
+        print("wellplot version:", wellplot.__version__)
+        print("Examples root:", EXAMPLES_DIR)
+        print("Render output:", WORKSPACE_RENDERS)
         """
     ).strip()
 
@@ -734,7 +745,7 @@ def _join_markdown_lines(lines: list[str]) -> str:
 
 
 def _yaml_source_descriptions(mapping: dict[str, object]) -> tuple[str, ...]:
-    """Infer prerequisite installation steps from YAML source metadata."""
+    """Infer optional dependency extras from YAML source metadata."""
     document = mapping.get("document", {})
     layout = document.get("layout", {})
     sections = layout.get("log_sections", [])
@@ -749,9 +760,9 @@ def _yaml_source_descriptions(mapping: dict[str, object]) -> tuple[str, ...]:
             source_format = str(data.get("source_format", "")).strip().lower()
             source_path = str(data.get("source_path", "")).strip().lower()
             if source_format == "dlis" or source_path.endswith(".dlis"):
-                extras.add("uv sync --extra dlis")
+                extras.add("dlis")
             if source_format == "las" or source_path.endswith(".las"):
-                extras.add("uv sync --extra las")
+                extras.add("las")
     return tuple(sorted(extras))
 
 
@@ -961,12 +972,10 @@ def _production_intro_markdown(package_name: str, title: str, prerequisites: tup
             "",
             prereq_block,
             "",
-            "Release follow-up:",
+            "Runtime model:",
             "",
-            "- these notebooks currently bootstrap the local repository paths so they run",
-            "  directly from a source checkout",
-            "- after the published package workflow is in place, update them to prefer",
-            "  installed-package imports and published-example usage first",
+            "- import `wellplot` from the active installed environment",
+            "- use the repository checkout for the example files, helper modules, and sample data",
         ]
     )
 
@@ -990,12 +999,10 @@ def _python_intro_markdown(recipe: PythonRecipe) -> str:
             "",
             prereq_block,
             "",
-            "Release follow-up:",
+            "Runtime model:",
             "",
-            "- this notebook currently adds the local `src/` and `examples/` paths so it",
-            "  can run from a source checkout",
-            "- after publishing, switch the recipe toward installed-package-first imports",
-            "  and validate it against the published distribution",
+            "- import `wellplot` from the active installed environment",
+            "- use the repository checkout for the example files, helper modules, and sample data",
         ]
     )
 
@@ -1022,28 +1029,33 @@ def _yaml_intro_markdown(path: Path, mapping: dict[str, object]) -> str:
             "",
             prereq_block,
             "",
-            "Release follow-up:",
+            "Runtime model:",
             "",
-            "- this notebook currently validates and renders the YAML from the repository",
-            "  checkout",
-            "- after publishing, add an installed-package-first version of the recipe and",
-            "  confirm the same example still works against the published distribution",
+            "- import `wellplot` from the active installed environment",
+            "- use the repository checkout for the example files, helper modules, and sample data",
         ]
     )
 
 
+def _install_command(extras: tuple[str, ...]) -> str:
+    """Return the published-package install command for one notebook."""
+    normalized = tuple(sorted({extra.strip() for extra in extras if extra.strip()}))
+    if not normalized:
+        return "pip install wellplot"
+    joined = ",".join(normalized)
+    return f'pip install "wellplot[{joined}]"'
+
+
 def _prerequisites_markdown(steps: tuple[str, ...]) -> str:
     """Return a prerequisite markdown block."""
-    if not steps:
-        return _join_markdown_lines(
-            [
-                "Prerequisites:",
-                "",
-                "- the repository dependencies installed in the active environment",
-            ]
-        )
-    joined = "\n".join(f"- `{step}`" for step in steps)
-    return _join_markdown_lines(["Prerequisites:", "", joined])
+    return _join_markdown_lines(
+        [
+            "Prerequisites:",
+            "",
+            f"- `{_install_command(steps)}`",
+            "- run the notebook from a checkout of this repository so the `examples/` files and sample data are available",
+        ]
+    )
 
 
 def _source_display_code(relative_path: str, language: str) -> str:
@@ -1089,14 +1101,15 @@ def _legacy_triple_combo_notebook() -> dict[str, object]:
 
         Prerequisites:
 
-        - the repository dependencies installed in the active environment
+        - `pip install wellplot`
+        - run the notebook from a checkout of this repository so the
+          `examples/` files and sample data are available
 
-        Release follow-up:
+        Runtime model:
 
-        - this notebook currently relies on the source checkout and local path
-          bootstrapping
-        - after publishing, keep a published-package version of the recipe for
-          users who are not working inside the repository
+        - import `wellplot` from the active installed environment
+        - use the repository checkout for the example files, helper modules,
+          and sample data
         """
     ).strip()
     cells = [
@@ -1321,12 +1334,12 @@ def _readme_text() -> str:
         "",
         "These files are generated by `scripts/generate_example_notebooks.py`.",
         "",
-        "Current note:",
+        "Runtime note:",
         "",
-        "- the notebooks still bootstrap the local repository paths so they run from a",
-        "  source checkout",
-        "- after publishing, update them to prefer installed-package-first recipes and",
-        "  verify them against the published distribution",
+        "- the notebooks import the installed `wellplot` package from the active",
+        "  environment",
+        "- they still expect to run from a repository checkout so the example",
+        "  files and sample data are available",
         "",
     ]
     for heading, entries in sections.items():
