@@ -15,6 +15,8 @@ Runtime note:
   environment
 - they still expect to run from a repository checkout so the example
   files and sample data are available
+- for local repository testing, `uv sync` installs the notebook kernel
+  in `.venv`; for installed-package use, include the `notebook` extra
 
 ## Production package walkthroughs
 

@@ -1039,9 +1039,7 @@ def _yaml_intro_markdown(path: Path, mapping: dict[str, object]) -> str:
 
 def _install_command(extras: tuple[str, ...]) -> str:
     """Return the published-package install command for one notebook."""
-    normalized = tuple(sorted({extra.strip() for extra in extras if extra.strip()}))
-    if not normalized:
-        return "pip install wellplot"
+    normalized = tuple(sorted({extra.strip() for extra in extras if extra.strip()} | {"notebook"}))
     joined = ",".join(normalized)
     return f'pip install "wellplot[{joined}]"'
 
@@ -1340,6 +1338,8 @@ def _readme_text() -> str:
         "  environment",
         "- they still expect to run from a repository checkout so the example",
         "  files and sample data are available",
+        "- for local repository testing, `uv sync` installs the notebook kernel",
+        "  in `.venv`; for installed-package use, include the `notebook` extra",
         "",
     ]
     for heading, entries in sections.items():

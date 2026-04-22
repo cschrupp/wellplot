@@ -15,6 +15,12 @@ The examples are grouped by workflow rather than by isolated feature.
     companions: they show the source example, explain the main moving parts, and
     run the validation/render flow from an interactive session.
 
+    To run those notebooks in Jupyter or VS Code, install notebook support in
+    the same environment. From a source checkout, `uv sync` includes
+    `ipykernel` in `.venv`. From an installed-package workflow, start with
+    `pip install "wellplot[notebook]"` and add `las` or `dlis` extras when the
+    example requires those adapters.
+
 ## Production examples
 
 - [Example 1: CBL Reconstruction](example-1-cbl-reconstruction.md)

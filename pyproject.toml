@@ -53,6 +53,9 @@ pdf = [
 interactive = [
   "plotly>=5.18",
 ]
+notebook = [
+  "ipykernel>=6.29",
+]
 pandas = [
   "pandas>=2.2",
 ]
@@ -65,6 +68,7 @@ all = [
   "dlisio>=1.0",
   "matplotlib>=3.8",
   "plotly>=5.18",
+  "ipykernel>=6.29",
   "pandas>=2.2",
   "pint>=0.24",
 ]
@@ -74,6 +78,7 @@ wellplot = "wellplot.cli:main"
 
 [dependency-groups]
 dev = [
+  "ipykernel>=6.29",
   "pytest>=8.0",
   "ruff>=0.8.0",
 ]
