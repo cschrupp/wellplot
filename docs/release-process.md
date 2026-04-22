@@ -113,7 +113,7 @@ Only promote to PyPI after a successful TestPyPI rehearsal.
 
 Recommended PyPI sequence:
 
-1. confirm the version and changelog/release notes
+1. confirm the version and update `CHANGELOG.md` for the release
 2. run the `Release` workflow with:
    - `publish_target=pypi`
    - `expected_version=<current version>`

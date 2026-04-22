@@ -249,6 +249,7 @@ For a user-facing workflow explanation, see
 
 For the package release workflow and TestPyPI/PyPI publishing process, see
 [docs/release-process.md](docs/release-process.md).
+Draft public release notes live in [CHANGELOG.md](CHANGELOG.md).
 
 ## Example Template
 

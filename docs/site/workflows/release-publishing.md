@@ -105,10 +105,11 @@ MPLBACKEND=Agg /tmp/wellplot-release-check/bin/python scripts/smoke_installed_wh
 ## Recommended Release Sequence
 
 1. confirm the package version in `src/wellplot/_version.py`
-2. run the local preflight checks
-3. trigger the GitHub Actions workflow with `publish_target=testpypi`
-4. install from TestPyPI in a fresh environment and smoke test the package
-5. only after that, trigger the workflow again with `publish_target=pypi`
+2. update the repository `CHANGELOG.md` entry for the release
+3. run the local preflight checks
+4. trigger the GitHub Actions workflow with `publish_target=testpypi`
+5. install from TestPyPI in a fresh environment and smoke test the package
+6. only after that, trigger the workflow again with `publish_target=pypi`
 
 Example TestPyPI install:
 
