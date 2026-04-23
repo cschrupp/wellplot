@@ -1,4 +1,4 @@
-name: Docs
+name: Docs Mirror
 
 on:
   push:
@@ -32,7 +32,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Pages
+      - name: Set up GitHub Pages mirror
         uses: actions/configure-pages@v6
 
       - name: Sync docs environment
@@ -54,6 +54,6 @@ jobs:
     needs: build
 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages mirror
         id: deployment
         uses: actions/deploy-pages@v5

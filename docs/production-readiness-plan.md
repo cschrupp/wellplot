@@ -5,13 +5,14 @@
 This historical planning document defined the production-readiness phase for
 `wellplot` after the initial rendering and programmatic API milestones.
 
-Most of this phase has now been completed: the package is published on PyPI, the
-GitHub Pages documentation site is live, and release operations have moved to
+Most of this phase has now been completed: the package is published on PyPI,
+the Read the Docs documentation site is live, GitHub Pages remains available as
+a mirror, and release operations have moved to
 [release-process.md](release-process.md).
 
 The original goals of this phase were:
 
-1. Create proper user documentation suitable for publication on GitHub Pages.
+1. Create proper user documentation suitable for publication on a hosted docs site.
 2. Normalize copyright and license notices across the codebase.
 3. Raise code quality to production level with explicit Python/PEP compliance targets.
 4. Finalize the project as a reusable Python library and prepare it for publication.
@@ -140,7 +141,7 @@ We **do** need to comply with the Python conventions that materially improve:
 
 ### Goal
 
-Publish proper user-facing documentation on GitHub Pages.
+Publish proper user-facing documentation on a hosted docs site.
 
 ### Recommendation
 
@@ -148,7 +149,7 @@ Use **MkDocs + Material for MkDocs** for the first production docs site.
 
 Reason:
 
-- simpler GitHub Pages deployment than a custom stack
+- simple static-site deployment with either Read the Docs or GitHub Pages
 - strong navigation/search out of the box
 - works well with Markdown
 - low friction for example-heavy projects
@@ -219,7 +220,7 @@ Recommended top-level sections:
 - curated examples with screenshots/PDF links
 - avoid synthetic nonsense; prefer coherent demos
 
-### GitHub Pages rollout tasks
+### Hosted docs rollout tasks
 
 1. Add `mkdocs.yml`
 2. Create `docs/site/` or equivalent docs-site content layout
@@ -495,7 +496,7 @@ Examples must be:
 ## Phase 1: Docs foundation
 
 1. add MkDocs scaffold
-2. create GitHub Pages deployment
+2. create hosted docs deployment
 3. create user-doc skeleton
 4. migrate README into docs landing flow
 
@@ -540,7 +541,7 @@ Examples must be:
 
 This phase is complete when all of the following are true:
 
-1. A user can browse complete documentation on GitHub Pages.
+1. A user can browse complete documentation on Read the Docs, with GitHub Pages available as a mirror.
 2. The package can be installed cleanly from a built wheel.
 3. Public API surfaces are documented and tested.
 4. Licensing is internally consistent and visible in source headers.

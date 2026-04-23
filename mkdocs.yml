@@ -1,6 +1,6 @@
 site_name: wellplot
 site_description: User documentation for wellplot
-site_url: https://cschrupp.github.io/wellplot/
+site_url: https://wellplot.readthedocs.io/en/latest/
 repo_url: https://github.com/cschrupp/wellplot
 repo_name: cschrupp/wellplot
 docs_dir: docs/site

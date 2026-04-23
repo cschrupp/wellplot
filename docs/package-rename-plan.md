@@ -148,7 +148,7 @@ Changes:
 - rename repository if desired:
   - `well-log-os` -> `wellplot`
 - update project URLs in `pyproject.toml`
-- update GitHub Pages path if repository name changes
+- update documentation host URLs if repository name or docs host changes
 - update badges, release workflow text, and documentation URLs
 
 Validation:

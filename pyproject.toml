@@ -35,7 +35,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/cschrupp/wellplot"
-Documentation = "https://cschrupp.github.io/wellplot/"
+Documentation = "https://wellplot.readthedocs.io/en/latest/"
 Source = "https://github.com/cschrupp/wellplot"
 Issues = "https://github.com/cschrupp/wellplot/issues"
 

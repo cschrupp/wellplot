@@ -74,7 +74,8 @@ Decision history is tracked in `docs/decision-log.md`.
   - first-page `remarks` sections
 - User documentation foundation is now in place:
   - MkDocs + Material site scaffold under `docs/site`
-  - GitHub Pages deployment workflow under `.github/workflows/docs.yml`
+  - Read the Docs primary build configuration under `.readthedocs.yaml`
+  - GitHub Pages mirror deployment workflow under `.github/workflows/docs.yml`
   - workflow-oriented guides for installation, concepts, datasets, examples, report pages,
     rendering, and the Python API
   - expanded reference pages for:
@@ -167,14 +168,15 @@ Core goals:
 
 - turn the project into a clean publishable Python library
 - keep the public API stable and explicitly tested
-- publish user documentation on GitHub Pages
+- publish user documentation on Read the Docs with GitHub Pages as a mirror
 - raise code quality with staged, enforceable linting and documentation rules
 
 Current status:
 
 - implemented:
   - MkDocs + Material documentation scaffold
-  - GitHub Pages deployment workflow
+  - Read the Docs primary hosted documentation
+  - GitHub Pages mirror deployment workflow
   - workflow-oriented user docs under `docs/site/`
   - expanded user reference docs for the Python API, YAML logfile schema, and report pages
   - Apache-2.0 SPDX file headers across source, tests, and examples
