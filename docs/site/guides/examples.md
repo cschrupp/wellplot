@@ -38,7 +38,22 @@ The examples are grouped by workflow rather than by isolated feature.
 - [Example 2: Porosity Reconstruction](example-2-porosity-reconstruction.md)
   - canonical LAS-backed open-hole packet example
   - keeps the production report template while swapping in the replacement
-    30/23a-3 well data, LAS-derived header metadata, and gas-crossover fill
+  30/23a-3 well data, LAS-derived header metadata, and gas-crossover fill
+
+## Computed-channel notebook examples
+
+- [Example 3: CBL Computed Channels With NumPy](example-3-cbl-computed-numpy.md)
+  - computes cement-bond interpretation curves from the CBL/VDL example with NumPy
+  - generates the packet layout with `LogBuilder` and `SectionBuilder`
+- [Example 4: Porosity Computed Channels With NumPy](example-4-porosity-computed-numpy.md)
+  - computes porosity and gas-crossover curves from the LAS-backed example with NumPy
+  - generates the packet layout with builder functions instead of hand-editing YAML
+- [Example 5: CBL Computed Channels With pandas](example-5-cbl-computed-pandas.md)
+  - computes cement-bond interpretation curves from the CBL/VDL example with pandas
+  - keeps the same builder-generated layout pattern as Example 3 with a tabular workflow
+- [Example 6: Porosity Computed Channels With pandas](example-6-porosity-computed-pandas.md)
+  - computes porosity and gas-crossover curves from the LAS-backed example with pandas
+  - is the table-oriented companion to Example 4
 
 ## Programmatic API examples
 

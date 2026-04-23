@@ -56,6 +56,10 @@ nav:
       - Examples: guides/examples.md
       - "Example 1: CBL Reconstruction": guides/example-1-cbl-reconstruction.md
       - "Example 2: Porosity Reconstruction": guides/example-2-porosity-reconstruction.md
+      - "Example 3: CBL Computed Channels With NumPy": guides/example-3-cbl-computed-numpy.md
+      - "Example 4: Porosity Computed Channels With NumPy": guides/example-4-porosity-computed-numpy.md
+      - "Example 5: CBL Computed Channels With pandas": guides/example-5-cbl-computed-pandas.md
+      - "Example 6: Porosity Computed Channels With pandas": guides/example-6-porosity-computed-pandas.md
   - Reference:
       - Overview: reference/index.md
       - Python API: reference/python-api.md
