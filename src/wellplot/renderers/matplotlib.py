@@ -2035,9 +2035,7 @@ class MatplotlibRenderer(Renderer):
         label_w = 0.32 * width
         value_w = width - label_w
         col_count = (
-            len(detail.column_titles)
-            if detail.column_titles
-            else len(detail.rows[0].columns)
+            len(detail.column_titles) if detail.column_titles else len(detail.rows[0].columns)
         )
         for col in range(col_count + 1):
             x = x0 + label_w + (value_w / col_count) * col
@@ -2799,10 +2797,9 @@ class MatplotlibRenderer(Renderer):
             element.sample_axis_source_origin is not None
             and element.sample_axis_source_step is not None
         ):
-            return (
-                float(element.sample_axis_source_origin)
-                + float(element.sample_axis_source_step) * np.arange(sample_count, dtype=float)
-            )
+            return float(element.sample_axis_source_origin) + float(
+                element.sample_axis_source_step
+            ) * np.arange(sample_count, dtype=float)
         if channel.sample_axis.shape[0] == sample_count:
             return np.asarray(channel.sample_axis, dtype=float)
         return np.arange(sample_count, dtype=float)
@@ -2827,8 +2824,10 @@ class MatplotlibRenderer(Renderer):
         if right - left < 2:
             left = max(0, min(left, working_axis.size - 2))
             right = min(working_axis.size, max(right, left + 2))
-        if left == 0 and right == working_axis.size and (
-            lower > float(working_axis[-1]) or upper < float(working_axis[0])
+        if (
+            left == 0
+            and right == working_axis.size
+            and (lower > float(working_axis[-1]) or upper < float(working_axis[0]))
         ):
             return sample_axis, values
 
@@ -4846,15 +4845,16 @@ class MatplotlibRenderer(Renderer):
         reference_mask: np.ndarray,
         source_data: _CurvePlotData,
     ) -> np.ndarray:
-        if (
-            source_data.depth.shape == reference_depth.shape
-            and np.allclose(source_data.depth, reference_depth, equal_nan=True)
+        if source_data.depth.shape == reference_depth.shape and np.allclose(
+            source_data.depth, reference_depth, equal_nan=True
         ):
             return np.where(source_data.valid_mask, source_data.plot_values, np.nan)
 
         aligned = np.full(reference_depth.shape, np.nan, dtype=float)
-        mask = source_data.valid_mask & np.isfinite(source_data.depth) & np.isfinite(
-            source_data.plot_values
+        mask = (
+            source_data.valid_mask
+            & np.isfinite(source_data.depth)
+            & np.isfinite(source_data.plot_values)
         )
         if np.count_nonzero(mask) < 2:
             return aligned
@@ -5053,9 +5053,7 @@ class MatplotlibRenderer(Renderer):
         elif element.fill.kind in {CurveFillKind.TO_LOWER_LIMIT, CurveFillKind.TO_UPPER_LIMIT}:
             lower_bound, upper_bound = self._curve_fill_display_bounds(track, element, dataset)
             target_raw = (
-                lower_bound
-                if element.fill.kind == CurveFillKind.TO_LOWER_LIMIT
-                else upper_bound
+                lower_bound if element.fill.kind == CurveFillKind.TO_LOWER_LIMIT else upper_bound
             )
             target_plot = self._curve_fill_plot_coordinate(
                 target_raw,
@@ -5160,9 +5158,7 @@ class MatplotlibRenderer(Renderer):
         left_color = element.fill.crossover.left_color or fill_color
         right_color = element.fill.crossover.right_color or fill_color
         crossover_alpha = (
-            element.fill.crossover.alpha
-            if element.fill.crossover.alpha is not None
-            else fill_alpha
+            element.fill.crossover.alpha if element.fill.crossover.alpha is not None else fill_alpha
         )
         # The header row is a legend swatch, not a histogram of where each crossover
         # color dominates in the plotted interval. Show both crossover colors evenly.
@@ -5250,9 +5246,7 @@ class MatplotlibRenderer(Renderer):
                 element
             )
             crossover_alpha = (
-                element.fill.crossover.alpha
-                if element.fill.crossover.alpha is not None
-                else alpha
+                element.fill.crossover.alpha if element.fill.crossover.alpha is not None else alpha
             )
             left_mask = valid_mask & (primary_data.plot_values < secondary_values)
             right_mask = valid_mask & (primary_data.plot_values > secondary_values)
@@ -5727,6 +5721,7 @@ class MatplotlibRenderer(Renderer):
                 zorder=1.85,
                 clip_on=True,
             )
+
     def _annotation_marker_label_record(
         self,
         annotation: AnnotationMarkerSpec,
@@ -5839,6 +5834,7 @@ class MatplotlibRenderer(Renderer):
             },
             annotation_clip=True,
         )
+
     def _annotation_arrow_label_record(
         self,
         annotation: AnnotationArrowSpec,

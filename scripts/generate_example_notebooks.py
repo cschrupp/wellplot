@@ -1043,7 +1043,9 @@ def _pdf_preview_png_bytes(pdf_path: Path, *, page_number: int) -> bytes:
 
 def _user_setup_code(package_name: str) -> str:
     """Return the lightweight setup cell for one user notebook."""
-    output_rel = _relative_display_path(_configured_output_path(_production_logfile_path(package_name)))
+    output_rel = _relative_display_path(
+        _configured_output_path(_production_logfile_path(package_name))
+    )
     return dedent(
         f"""
         # Run this cell once so the notebook can locate the example package.
@@ -1159,7 +1161,9 @@ def _matplotlib_result_png_bytes(
     if not figures:
         raise ValueError("No rendered figures were available for PNG preview generation.")
     if page_index < 0 or page_index >= len(figures):
-        raise ValueError(f"Requested page_index {page_index} is out of range for {len(figures)} pages.")
+        raise ValueError(
+            f"Requested page_index {page_index} is out of range for {len(figures)} pages."
+        )
 
     buffer = BytesIO()
     try:
@@ -1318,9 +1322,7 @@ def _yaml_learning_goals(source_name: str) -> tuple[str, ...]:
             "Inspect how heading, remarks, and tail pages are composed around the log sections."
         )
     elif "resistivity" in lowered or "scale" in lowered:
-        common.append(
-            "Compare scale conventions before you standardize one for your own packet."
-        )
+        common.append("Compare scale conventions before you standardize one for your own packet.")
     else:
         common.append(
             "Identify the sections, tracks, and bindings you would keep or replace in your own copy."
@@ -1472,7 +1474,9 @@ def _production_render_code(package_name: str) -> str:
     ).strip()
 
 
-def _production_intro_markdown(package_name: str, title: str, prerequisites: tuple[str, ...]) -> str:
+def _production_intro_markdown(
+    package_name: str, title: str, prerequisites: tuple[str, ...]
+) -> str:
     """Return the intro markdown for one production package notebook."""
     prereq_block = _prerequisites_markdown(prerequisites)
     return _join_markdown_lines(
@@ -1745,7 +1749,10 @@ def _detail_rows_by_labels(
         if label in labels:
             selected.append(deepcopy(row))
             continue
-        if isinstance(label_cells, list) and " / ".join(str(cell) for cell in label_cells) in labels:
+        if (
+            isinstance(label_cells, list)
+            and " / ".join(str(cell) for cell in label_cells) in labels
+        ):
             selected.append(deepcopy(row))
     return selected
 
@@ -1761,7 +1768,9 @@ def _logfile_section_by_id(mapping: dict[str, object], section_id: str) -> dict[
     raise KeyError(section_id)
 
 
-def _section_with_tracks(section: dict[str, object], track_ids: tuple[str, ...]) -> dict[str, object]:
+def _section_with_tracks(
+    section: dict[str, object], track_ids: tuple[str, ...]
+) -> dict[str, object]:
     """Return a deep-copied section limited to the selected track ids."""
     tracks = section.get("tracks", [])
     if not isinstance(tracks, list):
@@ -2251,7 +2260,17 @@ def _cbl_user_tutorial() -> UserNotebookTutorial:
             "That split matters because most real CBL work reuses one packet style across many jobs while only the logfile changes.",
         ),
         inspection_section_id="main_pass",
-        inspection_channels=("ECGR_STGC", "TT", "TENS", "MTEM", "CBL", "VDL", "STIT", "TDSP", "VSEC"),
+        inspection_channels=(
+            "ECGR_STGC",
+            "TT",
+            "TENS",
+            "MTEM",
+            "CBL",
+            "VDL",
+            "STIT",
+            "TDSP",
+            "VSEC",
+        ),
         inspection_metadata_keys=("COMP", "WELL", "FIELD", "WELL_ID"),
         stages=(
             UserNotebookStage(
@@ -2798,7 +2817,9 @@ def _yaml_notebook(path: Path, mapping: dict[str, object]) -> dict[str, object]:
     return _notebook(cells)
 
 
-def _production_notebook(package_name: str, title: str, prerequisites: tuple[str, ...]) -> dict[str, object]:
+def _production_notebook(
+    package_name: str, title: str, prerequisites: tuple[str, ...]
+) -> dict[str, object]:
     """Build one production-package walkthrough notebook."""
     cells = [
         markdown_cell(_production_intro_markdown(package_name, title, prerequisites)),
@@ -2930,9 +2951,9 @@ def _notebook(cells: list[dict[str, object]]) -> dict[str, object]:
     for index, cell in enumerate(cells):
         source = cell.get("source", [])
         seed = source[0].strip() if isinstance(source, list) and source else f"cell-{index}"
-        cell_id = hashlib.md5(
-            f"{index}:{cell.get('cell_type', '')}:{seed}".encode()
-        ).hexdigest()[:8]
+        cell_id = hashlib.md5(f"{index}:{cell.get('cell_type', '')}:{seed}".encode()).hexdigest()[
+            :8
+        ]
         normalized_cell = dict(cell)
         normalized_cell["id"] = cell_id
         normalized_cells.append(normalized_cell)
@@ -3027,8 +3048,10 @@ def _developer_grouped_notebook_list() -> dict[str, list[str]]:
     for recipe in PYTHON_RECIPES.values():
         grouped["Programmatic API walkthroughs"].append(_relative_notebook_path(recipe.source).name)
     for path in _yaml_example_paths():
-        if path.name == "triple_combo.yaml" or path.suffix == ".yaml" or path.name.endswith(
-            ".log.yaml"
+        if (
+            path.name == "triple_combo.yaml"
+            or path.suffix == ".yaml"
+            or path.name.endswith(".log.yaml")
         ):
             grouped["YAML and legacy walkthroughs"].append(_relative_notebook_path(path.name).name)
     return grouped
@@ -3036,7 +3059,9 @@ def _developer_grouped_notebook_list() -> dict[str, list[str]]:
 
 def _root_readme_text() -> str:
     """Return the generated top-level README for examples/notebooks."""
-    user_entries = sorted(_user_notebook_path(recipe.package_name).name for recipe in USER_PRODUCTION_RECIPES.values())
+    user_entries = sorted(
+        _user_notebook_path(recipe.package_name).name for recipe in USER_PRODUCTION_RECIPES.values()
+    )
     parts = [
         "# Example Notebooks",
         "",

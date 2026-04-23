@@ -113,8 +113,7 @@ def _micro_time_axis_from_tool(
         return None, None, {}
 
     parameters = {
-        str(parameter.name): parameter
-        for parameter in getattr(source_tool, "parameters", [])
+        str(parameter.name): parameter for parameter in getattr(source_tool, "parameters", [])
     }
     metadata: dict[str, object] = {}
     for name in ("DSIN", "TSTE", "DWCO", "TLL_UT", "TUL_UT", "TWID_UT", "VDM"):

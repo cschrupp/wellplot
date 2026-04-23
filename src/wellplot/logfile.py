@@ -470,9 +470,7 @@ def _validate_document_layout(layout: dict[str, Any], *, context: str) -> None:
                     f"{context}.remarks[{index}].title_font_size must be positive."
                 )
             if "border" in remark and not isinstance(remark["border"], bool):
-                raise TemplateValidationError(
-                    f"{context}.remarks[{index}].border must be boolean."
-                )
+                raise TemplateValidationError(f"{context}.remarks[{index}].border must be boolean.")
     if "tail" in layout:
         _ = _ensure_mapping(layout["tail"], context=f"{context}.tail")
 
@@ -734,9 +732,7 @@ def _parse_binding_curve_fill(value: object, *, context: str) -> dict[str, Any]:
         if "line_width" in baseline:
             line_width = float(baseline["line_width"])
             if line_width <= 0:
-                raise TemplateValidationError(
-                    f"{context}.baseline.line_width must be positive."
-                )
+                raise TemplateValidationError(f"{context}.baseline.line_width must be positive.")
             baseline_payload["line_width"] = line_width
         payload["baseline"] = baseline_payload
     if "label" in fill:
@@ -765,16 +761,12 @@ def _parse_binding_curve_fill(value: object, *, context: str) -> dict[str, Any]:
         if "right_color" in crossover:
             color = str(crossover["right_color"]).strip()
             if not color:
-                raise TemplateValidationError(
-                    f"{context}.crossover.right_color must be non-empty."
-                )
+                raise TemplateValidationError(f"{context}.crossover.right_color must be non-empty.")
             crossover_payload["right_color"] = color
         if "alpha" in crossover:
             alpha = float(crossover["alpha"])
             if alpha < 0 or alpha > 1:
-                raise TemplateValidationError(
-                    f"{context}.crossover.alpha must be between 0 and 1."
-                )
+                raise TemplateValidationError(f"{context}.crossover.alpha must be between 0 and 1.")
             crossover_payload["alpha"] = alpha
         if kind not in {"between_curves", "between_instances"} and crossover_payload["enabled"]:
             raise TemplateValidationError(
@@ -808,16 +800,13 @@ def _parse_binding_curve_callouts(value: object, *, context: str) -> list[dict[s
             placement = str(callout["placement"]).strip().lower()
             if placement not in {"inline", "top", "bottom", "top_and_bottom"}:
                 raise TemplateValidationError(
-                    f"{context}[{index}].placement must be inline, top, bottom, "
-                    "or top_and_bottom."
+                    f"{context}[{index}].placement must be inline, top, bottom, or top_and_bottom."
                 )
             item_payload["placement"] = placement
         if "text_x" in callout:
             text_x = float(callout["text_x"])
             if text_x < 0 or text_x > 1:
-                raise TemplateValidationError(
-                    f"{context}[{index}].text_x must be between 0 and 1."
-                )
+                raise TemplateValidationError(f"{context}[{index}].text_x must be between 0 and 1.")
             item_payload["text_x"] = text_x
         if "depth_offset" in callout:
             item_payload["depth_offset"] = float(callout["depth_offset"])
@@ -838,9 +827,7 @@ def _parse_binding_curve_callouts(value: object, *, context: str) -> list[dict[s
         if "every" in callout:
             every = float(callout["every"])
             if every <= 0:
-                raise TemplateValidationError(
-                    f"{context}[{index}].every must be positive."
-                )
+                raise TemplateValidationError(f"{context}[{index}].every must be positive.")
             item_payload["every"] = every
         if "color" in callout:
             color = str(callout["color"]).strip()
@@ -850,32 +837,24 @@ def _parse_binding_curve_callouts(value: object, *, context: str) -> list[dict[s
         if "font_size" in callout:
             font_size = float(callout["font_size"])
             if font_size <= 0:
-                raise TemplateValidationError(
-                    f"{context}[{index}].font_size must be positive."
-                )
+                raise TemplateValidationError(f"{context}[{index}].font_size must be positive.")
             item_payload["font_size"] = font_size
         if "font_weight" in callout:
             font_weight = str(callout["font_weight"]).strip()
             if not font_weight:
-                raise TemplateValidationError(
-                    f"{context}[{index}].font_weight must be non-empty."
-                )
+                raise TemplateValidationError(f"{context}[{index}].font_weight must be non-empty.")
             item_payload["font_weight"] = font_weight
         if "font_style" in callout:
             font_style = str(callout["font_style"]).strip()
             if not font_style:
-                raise TemplateValidationError(
-                    f"{context}[{index}].font_style must be non-empty."
-                )
+                raise TemplateValidationError(f"{context}[{index}].font_style must be non-empty.")
             item_payload["font_style"] = font_style
         if "arrow" in callout:
             item_payload["arrow"] = bool(callout["arrow"])
         if "arrow_style" in callout:
             arrow_style = str(callout["arrow_style"]).strip()
             if not arrow_style:
-                raise TemplateValidationError(
-                    f"{context}[{index}].arrow_style must be non-empty."
-                )
+                raise TemplateValidationError(f"{context}[{index}].arrow_style must be non-empty.")
             item_payload["arrow_style"] = arrow_style
         if "arrow_linewidth" in callout:
             arrow_linewidth = float(callout["arrow_linewidth"])
@@ -922,9 +901,7 @@ def _parse_binding_reference_overlay(value: object, *, context: str) -> dict[str
     return payload
 
 
-def _parse_binding_raster_colorbar(
-    value: object, *, context: str
-) -> tuple[bool, str | None, str]:
+def _parse_binding_raster_colorbar(value: object, *, context: str) -> tuple[bool, str | None, str]:
     if value is None:
         return False, None, "right"
     if isinstance(value, bool):
@@ -1210,6 +1187,7 @@ def _resolve_text_tokens(document: dict[str, Any], dataset: WellDataset, source_
                     ]
                 rows = detail.get("rows")
                 if isinstance(rows, list):
+
                     def _format_report_cell(item: object) -> object:
                         if isinstance(item, str):
                             return _safe_format(item, tokens)
@@ -1745,11 +1723,9 @@ def _build_tracks_from_layout_bindings(
                 sample_axis_max,
                 sample_axis_source_origin,
                 sample_axis_source_step,
-            ) = (
-                _parse_binding_raster_sample_axis(
-                    binding.get("sample_axis"),
-                    context=f"{binding_context}.sample_axis",
-                )
+            ) = _parse_binding_raster_sample_axis(
+                binding.get("sample_axis"),
+                context=f"{binding_context}.sample_axis",
             )
             profile = str(binding.get("profile", "generic")).strip().lower()
             waveform_input = binding.get("waveform")
@@ -1803,10 +1779,7 @@ def _build_tracks_from_layout_bindings(
                     else sample_axis_enabled
                 ),
                 "waveform": waveform
-                if (
-                    len(waveform) > 1
-                    or waveform.get("enabled", False)
-                )
+                if (len(waveform) > 1 or waveform.get("enabled", False))
                 else waveform["enabled"],
             }
             if "color_limits" in binding:

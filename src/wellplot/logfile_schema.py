@@ -1363,9 +1363,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 {
                     "if": {
                         "required": ["kind"],
-                        "properties": {
-                            "kind": {"enum": ["to_lower_limit", "to_upper_limit"]}
-                        },
+                        "properties": {"kind": {"enum": ["to_lower_limit", "to_upper_limit"]}},
                     },
                     "then": {
                         "not": {
@@ -1427,7 +1425,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                                 ]
                             },
                             "then": {"required": ["min", "max"]},
-                        }
+                        },
                     ],
                 },
             ]

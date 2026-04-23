@@ -19,6 +19,7 @@
 
 """Project-specific exception hierarchy for wellplot."""
 
+
 class WellLogOSError(Exception):
     """Base exception for wellplot."""
 

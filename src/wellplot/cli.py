@@ -33,9 +33,7 @@ from .pipeline import render_from_logfile
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level command-line parser."""
-    parser = argparse.ArgumentParser(
-        prog="wellplot", description="wellplot command-line tools"
-    )
+    parser = argparse.ArgumentParser(prog="wellplot", description="wellplot command-line tools")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     render_parser = subparsers.add_parser("render", help="Render output from a log-file YAML")

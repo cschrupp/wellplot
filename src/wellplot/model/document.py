@@ -229,9 +229,7 @@ class AnnotationIntervalSpec:
             raise ValueError("Annotation interval text_color must be non-empty.")
         orientation = self.text_orientation.strip().lower()
         if orientation not in {"horizontal", "vertical"}:
-            raise ValueError(
-                "Annotation interval text_orientation must be horizontal or vertical."
-            )
+            raise ValueError("Annotation interval text_orientation must be horizontal or vertical.")
         self.text_orientation = orientation
         if self.horizontal_alignment not in {"left", "center", "right"}:
             raise ValueError(
@@ -301,13 +299,9 @@ class AnnotationTextSpec:
             raise ValueError("Annotation text_orientation must be horizontal or vertical.")
         self.text_orientation = orientation
         if self.horizontal_alignment not in {"left", "center", "right"}:
-            raise ValueError(
-                "Annotation text horizontal_alignment must be left, center, or right."
-            )
+            raise ValueError("Annotation text horizontal_alignment must be left, center, or right.")
         if self.vertical_alignment not in {"top", "center", "bottom"}:
-            raise ValueError(
-                "Annotation text vertical_alignment must be top, center, or bottom."
-            )
+            raise ValueError("Annotation text vertical_alignment must be top, center, or bottom.")
         if self.font_size <= 0:
             raise ValueError("Annotation text font_size must be positive.")
         if self.padding < 0:
@@ -348,8 +342,7 @@ class AnnotationMarkerSpec:
         shape = self.shape.strip().lower()
         if shape not in _ANNOTATION_MARKER_SHAPES:
             raise ValueError(
-                "Annotation marker shape must be one of "
-                f"{sorted(_ANNOTATION_MARKER_SHAPES)!r}."
+                f"Annotation marker shape must be one of {sorted(_ANNOTATION_MARKER_SHAPES)!r}."
             )
         self.shape = shape
         if self.size <= 0:
@@ -532,9 +525,7 @@ class AnnotationGlyphSpec:
                 "Annotation glyph horizontal_alignment must be left, center, or right."
             )
         if self.vertical_alignment not in {"top", "center", "bottom"}:
-            raise ValueError(
-                "Annotation glyph vertical_alignment must be top, center, or bottom."
-            )
+            raise ValueError("Annotation glyph vertical_alignment must be top, center, or bottom.")
         if self.font_size <= 0:
             raise ValueError("Annotation glyph font_size must be positive.")
         if self.padding < 0:
@@ -843,8 +834,7 @@ class ReferenceEventSpec:
             and not 0.0 <= self.lane_start < self.lane_end <= 1.0
         ):
             raise ValueError(
-                "Reference event lane_start/lane_end must satisfy "
-                "0 <= lane_start < lane_end <= 1."
+                "Reference event lane_start/lane_end must satisfy 0 <= lane_start < lane_end <= 1."
             )
         side = self.text_side.strip().lower()
         if side not in {"auto", "left", "right"}:
@@ -1019,8 +1009,7 @@ class CurveFillSpec:
         if self.alpha is not None and (self.alpha < 0 or self.alpha > 1):
             raise ValueError("Curve fill alpha must be between 0 and 1.")
         if (
-            self.kind
-            not in {CurveFillKind.BETWEEN_CURVES, CurveFillKind.BETWEEN_INSTANCES}
+            self.kind not in {CurveFillKind.BETWEEN_CURVES, CurveFillKind.BETWEEN_INSTANCES}
             and self.crossover.enabled
         ):
             raise ValueError("Curve fill crossover is only supported for between-curve fills.")
@@ -1520,9 +1509,7 @@ class TrackSpec:
                 if isinstance(element, CurveElement) and element.reference_overlay is not None
             ]
             if invalid_reference_overlays:
-                raise ValueError(
-                    f"Normal track {self.id} cannot use reference curve overlays."
-                )
+                raise ValueError(f"Normal track {self.id} cannot use reference curve overlays.")
         if self.kind == TrackKind.ARRAY:
             invalid_reference_overlays = [
                 element
@@ -1530,9 +1517,7 @@ class TrackSpec:
                 if isinstance(element, CurveElement) and element.reference_overlay is not None
             ]
             if invalid_reference_overlays:
-                raise ValueError(
-                    f"Array track {self.id} cannot use reference curve overlays."
-                )
+                raise ValueError(f"Array track {self.id} cannot use reference curve overlays.")
         if self.kind == TrackKind.ANNOTATION and self.elements:
             raise ValueError(
                 f"Annotation track {self.id} currently does not accept curve/raster elements."

@@ -821,29 +821,33 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
     def test_vdl_header_colorbar_uses_min_amplitude_max_labels(self) -> None:
         """Verify vdl header colorbar uses min amplitude max labels."""
         renderer = MatplotlibRenderer()
-        element = document_from_mapping(
-            {
-                "name": "vdl header labels",
-                "page": {"size": "A4"},
-                "depth": {"unit": "m", "scale": "1:200"},
-                "tracks": [
-                    {
-                        "id": "vdl",
-                        "title": "VDL",
-                        "kind": "array",
-                        "width_mm": 40,
-                        "elements": [
-                            {
-                                "kind": "raster",
-                                "channel": "VDL",
-                                "profile": "vdl",
-                                "colorbar": {"enabled": True, "label": "Amplitude"},
-                            }
-                        ],
-                    }
-                ],
-            }
-        ).tracks[0].elements[0]
+        element = (
+            document_from_mapping(
+                {
+                    "name": "vdl header labels",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "tracks": [
+                        {
+                            "id": "vdl",
+                            "title": "VDL",
+                            "kind": "array",
+                            "width_mm": 40,
+                            "elements": [
+                                {
+                                    "kind": "raster",
+                                    "channel": "VDL",
+                                    "profile": "vdl",
+                                    "colorbar": {"enabled": True, "label": "Amplitude"},
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+            .tracks[0]
+            .elements[0]
+        )
         channel = RasterChannel(
             "VDL",
             depth=np.array([0.0, 1.0]),
@@ -2316,9 +2320,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             self.assertAlmostEqual(tail_bounds[1], 0.0, places=3)
             self.assertAlmostEqual(tail_bounds[3], 0.22, places=3)
             self.assertTrue(any("University of Utah" in value for value in heading_texts))
-            self.assertTrue(
-                any("Detailed acquisition remarks" in value for value in heading_texts)
-            )
+            self.assertTrue(any("Detailed acquisition remarks" in value for value in heading_texts))
             self.assertTrue(any("Cement Bond Log" in value for value in heading_texts))
             self.assertTrue(any("Variable Density Log" in value for value in tail_texts))
             self.assertTrue(any("Forge 78B-32" in value for value in tail_texts))
@@ -2326,10 +2328,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
             self.assertIn("Cement Bond Log", heading_title_sizes)
             self.assertIn("Cement Bond Log", tail_title_sizes)
             self.assertLessEqual(
-                abs(
-                    heading_title_sizes["Cement Bond Log"]
-                    - tail_title_sizes["Cement Bond Log"]
-                ),
+                abs(heading_title_sizes["Cement Bond Log"] - tail_title_sizes["Cement Bond Log"]),
                 1.0,
             )
         finally:

@@ -438,9 +438,7 @@ class WellDataset:
         if curves is None:
             selected_columns = [column for column in frame.columns if column not in skip]
             if index_column is not None:
-                selected_columns = [
-                    column for column in selected_columns if column != index_column
-                ]
+                selected_columns = [column for column in selected_columns if column != index_column]
         else:
             selected_columns = list(curves)
             missing = [column for column in selected_columns if column not in frame.columns]
@@ -579,9 +577,7 @@ class WellDataset:
             raise DatasetValidationError("reindex_to method must be linear or nearest.")
 
         if (channel is None) == (index is None):
-            raise DatasetValidationError(
-                "reindex_to requires exactly one of channel or index."
-            )
+            raise DatasetValidationError("reindex_to requires exactly one of channel or index.")
         if channel is not None and index_unit is not None:
             raise DatasetValidationError(
                 "reindex_to does not accept index_unit when channel is used as the target axis."

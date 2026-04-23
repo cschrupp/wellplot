@@ -830,11 +830,7 @@ def _build_curve_fill(data: object) -> CurveFillSpec | None:
                     if mapping.get("right_color") is not None
                     else None
                 ),
-                alpha=(
-                    float(mapping["alpha"])
-                    if mapping.get("alpha") is not None
-                    else None
-                ),
+                alpha=(float(mapping["alpha"]) if mapping.get("alpha") is not None else None),
             )
         except (TypeError, ValueError) as exc:
             raise TemplateValidationError("Invalid curve.fill.crossover configuration.") from exc
@@ -973,9 +969,7 @@ def _build_report_block(data: object) -> ReportBlockSpec | None:
         context="header.report.general_fields",
     )
     for index, item in enumerate(general_fields_data):
-        field_data = _ensure_mapping(
-            item, context=f"header.report.general_fields[{index}]"
-        )
+        field_data = _ensure_mapping(item, context=f"header.report.general_fields[{index}]")
         try:
             general_fields.append(
                 ReportFieldSpec(
@@ -1245,7 +1239,7 @@ def _build_annotation_objects(
     | AnnotationMarkerSpec
     | AnnotationArrowSpec
     | AnnotationGlyphSpec,
-    ...
+    ...,
 ]:
     if data is None:
         return ()
@@ -1276,16 +1270,12 @@ def _build_annotation_objects(
                         border_linewidth=float(annotation_data.get("border_linewidth", 0.6)),
                         border_style=str(annotation_data.get("border_style", "-")),
                         text_color=str(annotation_data.get("text_color", "#111111")),
-                        text_orientation=str(
-                            annotation_data.get("text_orientation", "horizontal")
-                        ),
+                        text_orientation=str(annotation_data.get("text_orientation", "horizontal")),
                         text_wrap=bool(annotation_data.get("text_wrap", True)),
                         horizontal_alignment=str(
                             annotation_data.get("horizontal_alignment", "center")
                         ),
-                        vertical_alignment=str(
-                            annotation_data.get("vertical_alignment", "center")
-                        ),
+                        vertical_alignment=str(annotation_data.get("vertical_alignment", "center")),
                         font_size=float(annotation_data.get("font_size", 7.0)),
                         font_weight=str(annotation_data.get("font_weight", "normal")),
                         font_style=str(annotation_data.get("font_style", "normal")),
@@ -1330,16 +1320,12 @@ def _build_annotation_objects(
                             if annotation_data.get("border_linewidth") is not None
                             else None
                         ),
-                        text_orientation=str(
-                            annotation_data.get("text_orientation", "horizontal")
-                        ),
+                        text_orientation=str(annotation_data.get("text_orientation", "horizontal")),
                         wrap=bool(annotation_data.get("wrap", True)),
                         horizontal_alignment=str(
                             annotation_data.get("horizontal_alignment", "center")
                         ),
-                        vertical_alignment=str(
-                            annotation_data.get("vertical_alignment", "center")
-                        ),
+                        vertical_alignment=str(annotation_data.get("vertical_alignment", "center")),
                         font_size=float(annotation_data.get("font_size", 7.0)),
                         font_weight=str(annotation_data.get("font_weight", "normal")),
                         font_style=str(annotation_data.get("font_style", "normal")),
@@ -1500,9 +1486,7 @@ def _build_annotation_objects(
                         horizontal_alignment=str(
                             annotation_data.get("horizontal_alignment", "center")
                         ),
-                        vertical_alignment=str(
-                            annotation_data.get("vertical_alignment", "center")
-                        ),
+                        vertical_alignment=str(annotation_data.get("vertical_alignment", "center")),
                         padding=float(annotation_data.get("padding", 0.02)),
                     )
                 )
@@ -1566,10 +1550,7 @@ def _build_track(track_data: Mapping[str, object]) -> TrackSpec:
             clip_percentiles_cfg = element_data.get("clip_percentiles")
             clip_percentiles = None
             if clip_percentiles_cfg is not None:
-                if (
-                    not isinstance(clip_percentiles_cfg, Sequence)
-                    or len(clip_percentiles_cfg) != 2
-                ):
+                if not isinstance(clip_percentiles_cfg, Sequence) or len(clip_percentiles_cfg) != 2:
                     raise TemplateValidationError(
                         "Raster clip_percentiles must contain two numeric values."
                     )
@@ -1590,11 +1571,9 @@ def _build_track(track_data: Mapping[str, object]) -> TrackSpec:
                 sample_axis_max,
                 sample_axis_source_origin,
                 sample_axis_source_step,
-            ) = (
-                _parse_raster_sample_axis_config(
-                    element_data.get("sample_axis"),
-                    context=f"track {track_data.get('id', '')} element.sample_axis",
-                )
+            ) = _parse_raster_sample_axis_config(
+                element_data.get("sample_axis"),
+                context=f"track {track_data.get('id', '')} element.sample_axis",
             )
             profile = _parse_raster_profile(
                 element_data.get("profile", "generic"),

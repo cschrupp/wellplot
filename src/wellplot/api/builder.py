@@ -441,9 +441,7 @@ class LogBuilder:
             str(source_path).strip()
             if source_path is not None
             else (
-                str(source_name).strip()
-                if source_name is not None
-                else f"{normalized_id}.memory"
+                str(source_name).strip() if source_name is not None else f"{normalized_id}.memory"
             )
         )
         self._source_paths_by_section[normalized_id] = Path(path_text)
@@ -468,8 +466,7 @@ class LogBuilder:
         mapping = self.to_mapping()
         spec = logfile_from_mapping(mapping)
         section_ids = {
-            str(section["id"])
-            for section in mapping["document"]["layout"].get("log_sections", [])
+            str(section["id"]) for section in mapping["document"]["layout"].get("log_sections", [])
         }
         missing = sorted(section_ids - self._datasets_by_section.keys())
         if missing:
