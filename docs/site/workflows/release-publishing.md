@@ -3,17 +3,29 @@
 This page documents the maintainer workflow for building and publishing
 `wellplot`.
 
-It is intentionally separate from the normal user workflows because it describes
+It is intentionally separate from normal user workflows because it describes
 package-release operations, not day-to-day dataset or rendering usage.
+
+## Current Status
+
+`wellplot` is live on PyPI. Normal users should install it with:
+
+```bash
+python -m pip install wellplot
+```
+
+The release workflow remains useful for maintenance releases, version checks,
+artifact validation, and optional TestPyPI rehearsals when the publishing
+process changes.
 
 ## Scope
 
-The current release path is designed to be safe by default:
+The release path is designed to be safe by default:
 
 - build artifacts first
 - verify the installed wheel in a clean environment
 - publish only when explicitly requested
-- keep TestPyPI and PyPI as separate gated targets
+- keep TestPyPI and PyPI as separate manual targets
 
 ## Workflow File
 
@@ -57,7 +69,8 @@ anything.
 
 ### `testpypi`
 
-Use this for rehearsals and installer validation against a real package index.
+Use this for optional rehearsals and installer validation against a real package
+index without updating the production PyPI project.
 
 Expected setup:
 
@@ -66,7 +79,7 @@ Expected setup:
 
 ### `pypi`
 
-Use this only after a successful TestPyPI rehearsal.
+Use this for production releases to the public PyPI project.
 
 Expected setup:
 
@@ -74,16 +87,15 @@ Expected setup:
 - trusted publishing configured on PyPI
 - environment protections or reviewers for the production release path
 
-## Required Repository Setup
+## Repository Setup
 
-Before the publish jobs can work, configure trusted publishing on both package
-indexes for:
+Trusted publishing should remain configured on both package indexes for:
 
 - owner: `cschrupp`
 - repository: `wellplot`
 - workflow: `release.yml`
 
-Also create these GitHub environments:
+Required GitHub environments:
 
 - `testpypi`
 - `pypi`
@@ -94,7 +106,7 @@ Run the local checks first:
 
 ```bash
 uv run ruff check .
-uv run pytest
+uv run python -m unittest discover -s tests -v
 uv build
 uv venv /tmp/wellplot-release-check
 uv pip install --python /tmp/wellplot-release-check/bin/python dist/*.whl
@@ -102,16 +114,25 @@ uv pip install --python /tmp/wellplot-release-check/bin/python dist/*.whl
 MPLBACKEND=Agg /tmp/wellplot-release-check/bin/python scripts/smoke_installed_wheel.py
 ```
 
-## Recommended Release Sequence
+## Maintenance Release Sequence
 
 1. confirm the package version in `src/wellplot/_version.py`
-2. update the repository `CHANGELOG.md` entry for the release
+2. update `CHANGELOG.md` for the release
 3. run the local preflight checks
-4. trigger the GitHub Actions workflow with `publish_target=testpypi`
-5. install from TestPyPI in a fresh environment and smoke test the package
-6. only after that, trigger the workflow again with `publish_target=pypi`
+4. trigger the GitHub Actions workflow with `publish_target=verify-only`
+5. use `publish_target=testpypi` if you want an index-level rehearsal
+6. trigger the workflow with `publish_target=pypi` for the production release
+7. verify a fresh PyPI install
 
-Example TestPyPI install:
+Production install verification:
+
+```bash
+python -m venv /tmp/wellplot-pypi-check
+/tmp/wellplot-pypi-check/bin/pip install wellplot
+/tmp/wellplot-pypi-check/bin/wellplot --help
+```
+
+Optional TestPyPI install verification:
 
 ```bash
 python -m venv /tmp/wellplot-testpypi
@@ -120,15 +141,3 @@ python -m venv /tmp/wellplot-testpypi
   --extra-index-url https://pypi.org/simple/ \
   wellplot
 ```
-
-## Current Status
-
-The repository currently has:
-
-- CI coverage for build and installed-wheel smoke testing
-- a manual release workflow
-- a TestPyPI-first publication path
-- a successful TestPyPI rehearsal for `wellplot 0.1.0`
-
-What remains is the first production PyPI release and later maintenance of the
-release workflow as the library surface evolves.

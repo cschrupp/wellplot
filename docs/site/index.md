@@ -1,23 +1,25 @@
 # wellplot
 
-`wellplot` is evolving into a Python library for building printable well-log layouts from LAS, DLIS, and in-memory scientific data.
+`wellplot` is a Python library for building printable and interactive well-log layouts from LAS, DLIS, and in-memory scientific data.
 
 It is designed for two equally important workflows:
 
 - declarative log authoring with YAML templates/savefiles
 - programmatic log authoring from Python, including notebooks and research pipelines
 
-## Documentation Status
+## Installation
 
-This site is currently a **preview documentation set** for the future library.
+Install the published package from PyPI:
 
-It documents:
+```bash
+python -m pip install wellplot
+```
 
-- the stable architectural direction
-- the current implemented workflows
-- the public surfaces that are already usable
+Add extras when you need data adapters or notebook support:
 
-It does **not** yet claim that every API surface is finalized or publish-ready.
+```bash
+python -m pip install "wellplot[las,dlis,pandas,notebook]"
+```
 
 ## Library Workflow
 

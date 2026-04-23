@@ -2,9 +2,14 @@
 
 ## Purpose
 
-This document defines the next major development phase for `wellplot` after the initial rendering and programmatic API milestones.
+This historical planning document defined the production-readiness phase for
+`wellplot` after the initial rendering and programmatic API milestones.
 
-The goals of this phase are:
+Most of this phase has now been completed: the package is published on PyPI, the
+GitHub Pages documentation site is live, and release operations have moved to
+[release-process.md](release-process.md).
+
+The original goals of this phase were:
 
 1. Create proper user documentation suitable for publication on GitHub Pages.
 2. Normalize copyright and license notices across the codebase.
@@ -15,19 +20,19 @@ The goals of this phase are:
 
 ### Current license state
 
-The repository currently ships with:
+At the time of this plan, the repository shipped with:
 
 - `LICENSE`: Apache License 2.0
 - `pyproject.toml`: `License :: OSI Approved :: Apache Software License`
 - docs already reference `Apache-2.0`
 
-This means the repository is currently Apache-2.0 licensed, not GPL.
+This means the repository was already Apache-2.0 licensed, not GPL.
 
 A GPL-style header must therefore **not** be copied into the codebase as-is. If we keep Apache-2.0, the file header text must match Apache-2.0 terms.
 
 ### Current documentation state
 
-The repository already contains internal/project docs:
+At the time of this plan, the repository contained internal/project docs:
 
 - `README.md`
 - `docs/decision-log.md`
@@ -35,18 +40,18 @@ The repository already contains internal/project docs:
 - `docs/rendering-workings.md`
 - `docs/roadmap.md`
 
-These are useful for development, but they are not yet a complete end-user documentation site.
+These were useful for development, but they were not yet a complete end-user documentation site.
 
 ### Current packaging state
 
-The project already has a working package skeleton:
+At the time of this plan, the project had a working package skeleton:
 
 - `pyproject.toml`
 - `src/` layout
 - console script entry point
 - optional dependency groups
 
-This is a good base, but it is not yet a fully polished publishable library.
+This was a good base, but it was not yet a fully polished publishable library.
 
 ## Guiding Decisions
 
@@ -442,10 +447,10 @@ Turn the repository into a clean publishable Python library.
 
 2. add release workflow
 - build artifacts
-- publish to TestPyPI first
-- then PyPI
+- support optional TestPyPI rehearsal
+- publish production releases to PyPI
 
-3. add pre-release checklist
+3. add release checklist
 - docs build
 - examples run
 - package build check
@@ -521,7 +526,7 @@ Examples must be:
 1. build locally
 2. install from wheel in clean environment
 3. run smoke examples
-4. publish to TestPyPI
+4. optionally publish to TestPyPI
 5. verify install and docs links
 
 ## Phase 6: Public release

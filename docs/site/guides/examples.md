@@ -22,11 +22,12 @@ The examples are grouped by workflow rather than by isolated feature.
     Start in `user/` unless you explicitly want the raw example internals,
     source code, or lower-level implementation details.
 
-    To run those notebooks in Jupyter or VS Code, install notebook support in
-    the same environment. From a source checkout, `uv sync` includes
-    `ipykernel` in `.venv`. From an installed-package workflow, start with
-    `pip install "wellplot[notebook]"` and add `las` or `dlis` extras when the
-    example requires those adapters.
+    To run those notebooks in Jupyter or VS Code, install notebook support and
+    any required data-source adapters in the same environment. For normal
+    installed-package usage, start with `pip install "wellplot[notebook]"` and
+    add `las` or `dlis` extras when the example requires those adapters. The
+    notebooks still expect a repository checkout so the example files, public
+    sample data, and preview assets are available.
 
 ## Production examples
 

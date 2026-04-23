@@ -199,6 +199,7 @@ Current status:
     - GitHub Actions publish to TestPyPI succeeded
     - fresh TestPyPI install in a clean virtual environment succeeded
     - `wellplot --help` and the installed-wheel smoke test both passed
+  - first public PyPI release completed for `wellplot 0.1.0`
   - generated example notebooks and production example docs now prefer
     installed-package usage over repo-local `src/` bootstrapping
 - next:
@@ -292,17 +293,16 @@ Longer-term / UI-centric:
 
 ### Phase E: Packaging and Ecosystem
 
-- Publish the package through a rehearsed TestPyPI/PyPI flow.
+- Maintain the published package through the rehearsed PyPI release flow.
 - Expand docs with API reference and cookbook-style templates.
 - Publish contributor guide and architecture notes.
 - Prepare roadmap for web service/UI packaging.
 
 ## Immediate Next Tasks
 
-- Complete release hardening:
-  - prepare the first real PyPI release after the successful TestPyPI rehearsal
-  - clean up remaining workflow maintenance noise such as the `actions/upload-artifact` Node 20
-    deprecation warning
+- Maintain release hardening:
+  - keep PyPI trusted publishing and post-release install verification healthy
+  - clean up remaining workflow maintenance noise such as action runtime deprecation warnings
 - Expand user documentation from the current workflow-first baseline:
   - Python API reference pages
   - YAML/report-schema reference pages

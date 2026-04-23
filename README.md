@@ -112,7 +112,33 @@ Track headers now support explicit object slots (`title`, `scale`, `legend`) wit
 Depth grid density in continuous mode is controlled by `depth.major_step` and `depth.minor_step`.
 Use top-level `markers` and `zones` sections to draw formation and event annotations.
 
-## Development Workflow
+## Install From PyPI
+
+Most users should install the published package from PyPI:
+
+```bash
+python -m pip install wellplot
+```
+
+Install optional adapters and notebook support as needed:
+
+```bash
+python -m pip install "wellplot[las]"
+python -m pip install "wellplot[dlis]"
+python -m pip install "wellplot[pandas]"
+python -m pip install "wellplot[interactive]"
+python -m pip install "wellplot[notebook]"
+```
+
+Common example-workflow installs:
+
+```bash
+python -m pip install "wellplot[las,notebook]"
+python -m pip install "wellplot[dlis,notebook]"
+python -m pip install "wellplot[las,dlis,pandas,notebook,interactive,units]"
+```
+
+## Contributor Development Workflow
 
 This project uses `uv` for environment management and dependency resolution.
 The package continues to support Python `>=3.11`.
@@ -168,9 +194,10 @@ uv run ruff check .
 
 ## Programmatic API
 
-The programmatic API phase is now underway.
+The public programmatic API supports dataset construction, layout composition,
+rendering, partial renders, notebook bytes, and YAML serialization.
 
-Currently implemented:
+Implemented surfaces:
 - dataset ingestion into `WellDataset`
 - pandas `Series` / `DataFrame` adapters on top of the dataset ingestion API
 - dataset alignment and normalization helpers:
@@ -638,37 +665,37 @@ render:
 Use the master loader (single command for any log-file YAML):
 
 ```bash
-uv run python -m wellplot.cli render examples/cbl_main.log.yaml
+wellplot render examples/cbl_main.log.yaml
 ```
 
 Validate a log-file against the JSON Schema before rendering:
 
 ```bash
-uv run python -m wellplot.cli validate examples/cbl_main.log.yaml
+wellplot validate examples/cbl_main.log.yaml
 ```
 
 Optional output override:
 
 ```bash
-uv run python -m wellplot.cli render examples/cbl_main.log.yaml -o out.pdf
+wellplot render examples/cbl_main.log.yaml -o out.pdf
 ```
 
 Convenience wrapper:
 
 ```bash
-uv run examples/real_data_demo.py
+python examples/real_data_demo.py
 ```
 
 Or pass a specific log file:
 
 ```bash
-uv run examples/real_data_demo.py examples/cbl_main.log.yaml
+python examples/real_data_demo.py examples/cbl_main.log.yaml
 ```
 
 Array-track demo with synthetic VDL data and logfile config:
 
 ```bash
-uv run examples/cbl_vdl_array_mvp_demo.py
+python examples/cbl_vdl_array_mvp_demo.py
 ```
 
 Use [templates/wireline_base.template.yaml](templates/wireline_base.template.yaml) as a reusable

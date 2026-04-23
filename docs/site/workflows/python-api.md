@@ -2,16 +2,6 @@
 
 Use the Python API when the log is part of a data-processing workflow.
 
-## Stability note
-
-This page documents the current programmatic surface as it exists in the repository today.
-
-It should be treated as:
-
-- usable
-- intentionally designed
-- still subject to refinement before the first production library release
-
 ## Best fit
 
 - Jupyter notebooks

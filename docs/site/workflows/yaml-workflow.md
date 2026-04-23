@@ -47,13 +47,13 @@ Representative savefiles:
 ## Render from a savefile
 
 ```bash
-uv run python -m wellplot.cli render examples/cbl_main.log.yaml
+wellplot render examples/cbl_main.log.yaml
 ```
 
 Validate before rendering:
 
 ```bash
-uv run python -m wellplot.cli validate examples/cbl_main.log.yaml
+wellplot validate examples/cbl_main.log.yaml
 ```
 
 ## When not to use YAML first

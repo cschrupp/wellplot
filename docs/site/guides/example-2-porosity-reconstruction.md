@@ -275,10 +275,10 @@ See [Report Pages](../workflows/report-pages.md) for the full report model.
 From the repository root:
 
 ```bash
-uv run python -m wellplot.cli validate \
+wellplot validate \
   examples/production/forge16b_porosity_example/full_reconstruction.log.yaml
 
-uv run python -m wellplot.cli render \
+wellplot render \
   examples/production/forge16b_porosity_example/full_reconstruction.log.yaml
 ```
 

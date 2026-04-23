@@ -13,13 +13,17 @@ Completed in the codebase on 2026-04-11:
 
 No rename stages remain pending.
 
+This is a historical planning document. The public package has since launched as
+`wellplot`; use [release-process.md](release-process.md) for the current
+maintenance release workflow.
+
 ## Decision Summary
 
 The library should ship under the public name `wellplot`.
 
 Current state:
 
-- the published package identity in the codebase is now `wellplot`
+- the public package identity is now `wellplot`
 - the top-level Python import is now `wellplot`
 - the CLI entry point is now `wellplot`
 - the GitHub repository name is now `wellplot`
@@ -42,12 +46,12 @@ Conclusion:
 
 ## Migration Strategy
 
-Use a pre-release hard cut.
+The project used a hard cut before the first public PyPI release.
 
 Reasoning:
 
-- the project has not been published to PyPI yet
-- there is no external installed-user base to protect
+- the project had not been published to PyPI yet
+- there was no external installed-user base to protect
 - keeping both `well_log_os` and `wellplot` would add avoidable maintenance and documentation clutter
 
 That means:
@@ -89,7 +93,7 @@ Primary rename targets:
 
 Goal:
 
-- make `wellplot` the only supported package identity before the first public release rehearsal
+- make `wellplot` the only supported package identity before public release rehearsals
 
 Changes:
 
@@ -174,19 +178,22 @@ Validation:
 
 Implemented on 2026-04-11.
 
+The production PyPI release followed this rehearsal and is now complete.
+
 ## Things Not To Do
 
 - do not keep `well_log_os` as a permanent parallel public API unless a real migration case appears
 - do not rename only the distribution while keeping the old import path
 - do not update docs first and postpone code/package changes, because that creates false instructions
-- do not run the first public TestPyPI rehearsal before the package identity is settled
+- do not run package-index rehearsals before the package identity is settled
 
 ## Recommended Order Relative To The Roadmap
 
-Recommended immediate sequence:
+Historical immediate sequence:
 
 1. resume the remaining production-readiness tasks
-2. prepare the first real PyPI release when release notes and versioning are ready
+2. prepare the PyPI release when release notes and versioning are ready
 
-This keeps the first public package rehearsal aligned with the final library name instead of creating
-avoidable cleanup after publication.
+This kept the first public package rehearsal aligned with the final library name
+instead of creating avoidable cleanup after publication. For current release
+operations, use [release-process.md](release-process.md).

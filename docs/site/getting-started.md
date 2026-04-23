@@ -11,16 +11,6 @@ Both workflows converge on the same architecture:
 2. define the layout as a document/report
 3. render full or partial outputs
 
-## Current status
-
-The project is still in the transition from application/repo workflow to publishable library.
-
-That means this site should currently be read as:
-
-- a guide to the implemented workflow
-- a guide to the intended public architecture
-- not yet a final API stability promise
-
 ## Choose a workflow
 
 Use the YAML workflow when you want:
@@ -44,6 +34,18 @@ The shortest path into the library is:
 2. choose YAML or Python API authoring
 3. render a single example
 4. adapt that example to your own data
+
+Base install:
+
+```bash
+python -m pip install wellplot
+```
+
+Notebook and data-source extras:
+
+```bash
+python -m pip install "wellplot[las,dlis,pandas,notebook]"
+```
 
 ## Start with examples
 
