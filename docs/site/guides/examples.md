@@ -10,10 +10,17 @@ The examples are grouped by workflow rather than by isolated feature.
     still useful reference material, but many of them were built for feature
     development and validation rather than first-time-user guidance.
 
-    Every example in the repository now also has a generated walkthrough
-    notebook under `examples/notebooks/`. Those notebooks act as recipe-style
-    companions: they show the source example, explain the main moving parts, and
-    run the validation/render flow from an interactive session.
+    Every example in the repository now also has a generated notebook under
+    `examples/notebooks/`, but that directory is now split by audience:
+
+    - `examples/notebooks/user/`
+      - curated, output-included build tutorials for geologists,
+        petrophysicists, and other end users
+    - `examples/notebooks/developer/`
+      - reference notebooks that mirror the raw example files and library flows
+
+    Start in `user/` unless you explicitly want the raw example internals,
+    source code, or lower-level implementation details.
 
     To run those notebooks in Jupyter or VS Code, install notebook support in
     the same environment. From a source checkout, `uv sync` includes

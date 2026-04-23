@@ -25,17 +25,26 @@ from __future__ import annotations
 
 import argparse
 import ast
+import base64
 import hashlib
 import json
+import re
+import subprocess
+from copy import deepcopy
 from dataclasses import dataclass
+from io import BytesIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from textwrap import dedent
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLES_DIR = REPO_ROOT / "examples"
-NOTEBOOKS_DIR = EXAMPLES_DIR / "notebooks"
+NOTEBOOKS_ROOT = EXAMPLES_DIR / "notebooks"
+DEVELOPER_NOTEBOOKS_DIR = NOTEBOOKS_ROOT / "developer"
+USER_NOTEBOOKS_DIR = NOTEBOOKS_ROOT / "user"
+USER_ASSETS_DIR = USER_NOTEBOOKS_DIR / "assets"
 
 KERNEL_METADATA = {
     "kernelspec": {
@@ -60,6 +69,69 @@ class PythonRecipe:
     learning_goals: tuple[str, ...]
     prerequisites: tuple[str, ...]
     code_cells: tuple[str, ...]
+    adaptation_tips: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class PreviewImageSpec:
+    """Preview image metadata for one curated user notebook."""
+
+    asset_name: str
+    title: str
+    summary: str
+    page_number: int
+
+
+@dataclass(frozen=True)
+class UserProductionRecipe:
+    """Curated notebook metadata for end-user production examples."""
+
+    package_name: str
+    title: str
+    subtitle: str
+    target_user: str
+    why_this_example: str
+    data_highlights: tuple[str, ...]
+    what_to_look_for: tuple[str, ...]
+    first_edits: tuple[str, ...]
+    keep_in_mind: tuple[str, ...]
+    previews: tuple[PreviewImageSpec, ...]
+
+
+@dataclass(frozen=True)
+class UserNotebookPreview:
+    """One rendered checkpoint preview embedded in a user tutorial notebook."""
+
+    asset_name: str
+    title: str
+    summary: str
+    page_index: int = 0
+    section_id: str | None = None
+
+
+@dataclass(frozen=True)
+class UserNotebookStage:
+    """One tutorial stage for a user-facing notebook."""
+
+    slug: str
+    title: str
+    summary: str
+    teaching_points: tuple[str, ...]
+    logfile_text: str
+    previews: tuple[UserNotebookPreview, ...]
+
+
+@dataclass(frozen=True)
+class UserNotebookTutorial:
+    """Tutorial configuration for one user-facing production notebook."""
+
+    package_name: str
+    template_text: str
+    template_explanation: tuple[str, ...]
+    inspection_section_id: str
+    inspection_channels: tuple[str, ...]
+    inspection_metadata_keys: tuple[str, ...]
+    stages: tuple[UserNotebookStage, ...]
     adaptation_tips: tuple[str, ...]
 
 
@@ -644,6 +716,113 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
 }
 
 
+USER_PRODUCTION_RECIPES: dict[str, UserProductionRecipe] = {
+    "cbl_log_example": UserProductionRecipe(
+        package_name="cbl_log_example",
+        title="CBL/VDL Packet User Walkthrough",
+        subtitle=(
+            "Build a CBL/VDL interpretation packet from DLIS data one stage at a time, "
+            "starting with a reusable template and finishing with the repeat pass."
+        ),
+        target_user=(
+            "A geologist, petrophysicist, or subsurface engineer who wants a concrete example "
+            "of how `wellplot` reconstructs a CBL/VDL packet from public or repository-backed "
+            "DLIS data."
+        ),
+        why_this_example=(
+            "This is the best starting point if you care about packet-style cement evaluation "
+            "output rather than isolated renderer features. It includes the heading, remarks, "
+            "main-pass strip, repeat-pass strip, and tail pages."
+        ),
+        data_highlights=(
+            "Source DLIS files: `workspace/data/CBL_Main.dlis` and `workspace/data/CBL_Repeat.dlis`.",
+            "Reference packet for visual comparison: `workspace/renders/CBL_log_example.Pdf`.",
+            "Key curves shown in the strips: `ECGR_STGC`, `TT`, `TENS`, `MTEM`, `CBL`, `VDL`, `STIT`, `TDSP`, and `VSEC`.",
+        ),
+        what_to_look_for=(
+            "The opening page establishes the report context and remarks before the strip sections start.",
+            "The main-pass strip combines a reference overview, dual-scale CBL, and VDL texture in one packet section.",
+            "The repeat-pass strip lets you compare the second pass without rebuilding the packet structure.",
+        ),
+        first_edits=(
+            "Change the DLIS source file paths first if you are adapting the example to another job.",
+            "Update the remarks text before you start changing track geometry or styling.",
+            "Adjust section depth ranges only after you confirm the packet renders cleanly with the new data.",
+        ),
+        keep_in_mind=(
+            "This packet is a new `wellplot` rendering, not an original vendor deliverable.",
+            "Unsupported vendor-only content such as calibration tables and disclaimer pages is intentionally omitted.",
+            "If you need the raw YAML and binding details, use the developer notebook for this same example.",
+        ),
+        previews=(
+            PreviewImageSpec(
+                asset_name="cbl_log_example_opening_page.png",
+                title="Opening packet page",
+                summary="Shows the report heading and remarks context before the strip sections.",
+                page_number=1,
+            ),
+            PreviewImageSpec(
+                asset_name="cbl_log_example_main_pass.png",
+                title="Main-pass strip preview",
+                summary="Shows the first strip section with the reference overview, dual-scale CBL, and VDL raster.",
+                page_number=2,
+            ),
+        ),
+    ),
+    "forge16b_porosity_example": UserProductionRecipe(
+        package_name="forge16b_porosity_example",
+        title="Open-Hole Porosity Packet User Walkthrough",
+        subtitle=(
+            "Build an open-hole porosity packet from a public LAS file one stage at a time, "
+            "from reusable template to gas-crossover fill and the final two-window packet."
+        ),
+        target_user=(
+            "A geologist or petrophysicist who wants to adapt a compact open-hole interpretation "
+            "packet without having to learn the `wellplot` YAML layout structure first."
+        ),
+        why_this_example=(
+            "This example keeps a production-ready report template and swaps in the public "
+            "`30-23a-3 8117_d.las` file. It is the clearest starting point for a LAS-backed "
+            "open-hole packet with header metadata, remarks, and two review windows."
+        ),
+        data_highlights=(
+            "Source LAS file: `workspace/data/30-23a-3 8117_d.las`.",
+            "The heading is populated directly from the LAS well header rather than hard-coded placeholders.",
+            "The strip sections focus on `GR`, `SP`, `ILD`, `ILM`, `MSFL`, `NPHI`, `RHOB`, `PEF`, and `DRHO`.",
+        ),
+        what_to_look_for=(
+            "The opening page shows how the retained template uses the LAS header metadata and production remarks.",
+            "The upper review window is the quickest place to confirm the resistivity and porosity tracks are behaving correctly.",
+            "The porosity track highlights density-neutron crossover as gas-fill interpretation space rather than a density-baseline fill.",
+        ),
+        first_edits=(
+            "Change the LAS file path first if you want to point the packet at another well.",
+            "Update the upper and lower depth windows before you tune track styling or curve scales.",
+            "Refresh the remarks text so the packet reflects your production context rather than the shipped example wording.",
+        ),
+        keep_in_mind=(
+            "This is a reproducible open-hole packet example, not a certified vendor-issued log packet.",
+            "The packet keeps the public-data and IP boundary explicit; preserve that language if you publish derivatives.",
+            "If you need the raw YAML and template internals, use the developer notebook for this same example.",
+        ),
+        previews=(
+            PreviewImageSpec(
+                asset_name="forge16b_porosity_example_opening_page.png",
+                title="Opening packet page",
+                summary="Shows the retained report template, header metadata, and remarks blocks.",
+                page_number=1,
+            ),
+            PreviewImageSpec(
+                asset_name="forge16b_porosity_example_upper_review.png",
+                title="Upper open-hole review",
+                summary="Shows the GR/SP, resistivity, and density-neutron interpretation view with gas crossover fill.",
+                page_number=2,
+            ),
+        ),
+    ),
+}
+
+
 def markdown_cell(text: str) -> dict[str, object]:
     """Return a notebook markdown cell."""
     return {
@@ -653,15 +832,53 @@ def markdown_cell(text: str) -> dict[str, object]:
     }
 
 
-def code_cell(text: str) -> dict[str, object]:
+def code_cell(
+    text: str,
+    *,
+    outputs: list[dict[str, object]] | None = None,
+    execution_count: int | None = None,
+) -> dict[str, object]:
     """Return a notebook code cell."""
     return {
         "cell_type": "code",
-        "execution_count": None,
+        "execution_count": execution_count,
         "metadata": {},
-        "outputs": [],
+        "outputs": [] if outputs is None else outputs,
         "source": _as_lines(text),
     }
+
+
+def stream_output(text: str) -> dict[str, object]:
+    """Return a stdout stream output for one code cell."""
+    return {
+        "name": "stdout",
+        "output_type": "stream",
+        "text": _as_lines(text),
+    }
+
+
+def display_data_output(
+    data: dict[str, object],
+    *,
+    metadata: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Return a display_data output payload."""
+    return {
+        "data": data,
+        "metadata": {} if metadata is None else metadata,
+        "output_type": "display_data",
+    }
+
+
+def markdown_output(text: str) -> dict[str, object]:
+    """Return a markdown display output."""
+    return display_data_output({"text/markdown": text})
+
+
+def png_output(png_bytes: bytes) -> dict[str, object]:
+    """Return a PNG display output."""
+    encoded = base64.b64encode(png_bytes).decode("ascii")
+    return display_data_output({"image/png": encoded})
 
 
 def _as_lines(text: str) -> list[str]:
@@ -677,6 +894,25 @@ def _write_if_changed(path: Path, content: str) -> bool:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content)
     return True
+
+
+def _write_bytes_if_changed(path: Path, content: bytes) -> bool:
+    """Write binary content only when the file contents changed."""
+    if path.exists() and path.read_bytes() == content:
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content)
+    return True
+
+
+def _yaml_text(mapping: dict[str, object]) -> str:
+    """Return a stable YAML string for notebook tutorial snippets."""
+    return yaml.safe_dump(mapping, sort_keys=False).strip()
+
+
+def _python_identifier(value: str) -> str:
+    """Return a Python-friendly identifier derived from a slug."""
+    return re.sub(r"[^0-9a-zA-Z_]+", "_", value).strip("_")
 
 
 def _repo_setup_code() -> str:
@@ -718,6 +954,289 @@ def _repo_setup_code() -> str:
         print("Render output:", WORKSPACE_RENDERS)
         """
     ).strip()
+
+
+def _relative_display_path(path: Path) -> str:
+    """Return one path relative to the repository root when possible."""
+    try:
+        return str(path.relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _production_package_dir(package_name: str) -> Path:
+    """Return the directory for one production example package."""
+    return EXAMPLES_DIR / "production" / package_name
+
+
+def _production_logfile_path(package_name: str) -> Path:
+    """Return the main logfile path for one production example package."""
+    return _production_package_dir(package_name) / "full_reconstruction.log.yaml"
+
+
+def _configured_output_path(logfile_path: Path) -> Path:
+    """Return the resolved configured output path for one logfile."""
+    mapping = _load_yaml(logfile_path)
+    render = mapping.get("render", {})
+    if not isinstance(render, dict):
+        raise TypeError(f"Expected render mapping in {logfile_path}.")
+    configured = str(render.get("output_path", "")).strip()
+    if not configured:
+        raise ValueError(f"Missing render.output_path in {logfile_path}.")
+    output_path = Path(configured)
+    if not output_path.is_absolute():
+        output_path = (logfile_path.parent / output_path).resolve()
+    return output_path
+
+
+def _ensure_output_pdf(logfile_path: Path, output_path: Path, *, check: bool) -> int:
+    """Ensure the configured output PDF exists for preview extraction."""
+    if output_path.exists():
+        return 0
+    if check:
+        raise SystemExit(f"Rendered example PDF is missing: {output_path}")
+
+    from wellplot import render_from_logfile
+
+    render_from_logfile(logfile_path)
+    if not output_path.exists():
+        raise SystemExit(f"Expected rendered example PDF was not created: {output_path}")
+    return 1
+
+
+def _pdf_page_count(pdf_path: Path) -> int:
+    """Return the page count for one rendered PDF using mutool."""
+    result = subprocess.run(
+        ["mutool", "info", str(pdf_path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    match = re.search(r"Pages:\s+(\d+)", result.stdout)
+    if match is None:
+        raise ValueError(f"Could not determine page count for {pdf_path}.")
+    return int(match.group(1))
+
+
+def _pdf_preview_png_bytes(pdf_path: Path, *, page_number: int) -> bytes:
+    """Return one PDF page preview as PNG bytes using mutool."""
+    with TemporaryDirectory() as temp_dir:
+        output_pattern = Path(temp_dir) / "preview-%d.png"
+        subprocess.run(
+            [
+                "mutool",
+                "draw",
+                "-F",
+                "png",
+                "-o",
+                str(output_pattern),
+                str(pdf_path),
+                str(page_number),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        preview_path = Path(temp_dir) / f"preview-{page_number}.png"
+        return preview_path.read_bytes()
+
+
+def _user_setup_code(package_name: str) -> str:
+    """Return the lightweight setup cell for one user notebook."""
+    output_rel = _relative_display_path(_configured_output_path(_production_logfile_path(package_name)))
+    return dedent(
+        f"""
+        # Run this cell once so the notebook can locate the example package.
+        from pathlib import Path
+
+        try:
+            import wellplot
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install the published 'wellplot' package in the active environment "
+                "before running this notebook."
+            ) from exc
+
+        cwd = Path.cwd().resolve()
+        REPO_ROOT = next((path for path in (cwd, *cwd.parents) if (path / "examples").exists()), None)
+        if REPO_ROOT is None:
+            raise RuntimeError(
+                "Run this notebook from a checkout of the wellplot repository so the "
+                "example files and sample data are available."
+            )
+
+        package_dir = REPO_ROOT / "examples" / "production" / "{package_name}"
+        logfile_path = package_dir / "full_reconstruction.log.yaml"
+        expected_output_pdf = REPO_ROOT / "{output_rel}"
+
+        print("wellplot version:", wellplot.__version__)
+        print("Example package:", package_dir.name)
+        print("Logfile:", logfile_path.relative_to(REPO_ROOT))
+        print("Expected PDF:", expected_output_pdf.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _user_render_code() -> str:
+    """Return the main render cell for a user notebook."""
+    return dedent(
+        """
+        # Run the shipped example exactly as a user would: validate the logfile
+        # and render the configured PDF packet.
+        from wellplot import load_logfile, render_from_logfile
+
+        spec = load_logfile(logfile_path)
+        result = render_from_logfile(logfile_path)
+
+        print("Validated:", spec.name)
+        print("Pages created:", result.page_count)
+        print("PDF written to:", result.output_path.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _document_section_id(document: object) -> str:
+    """Return the active layout section identifier stored in document metadata."""
+    metadata = getattr(document, "metadata", None)
+    if isinstance(metadata, dict):
+        layout_sections = metadata.get("layout_sections")
+        if isinstance(layout_sections, dict):
+            active_section = layout_sections.get("active_section")
+            if isinstance(active_section, dict):
+                section_id = active_section.get("id")
+                if isinstance(section_id, str):
+                    return section_id
+    return ""
+
+
+def _close_figures(figures: list[object]) -> None:
+    """Close one list of Matplotlib figures."""
+    try:
+        import matplotlib.pyplot as plt
+
+        for figure in figures:
+            plt.close(figure)
+    except Exception:
+        for figure in figures:
+            clf = getattr(figure, "clf", None)
+            if callable(clf):
+                clf()
+
+
+def _figures_to_png_bytes(
+    figures: list[object],
+    *,
+    page_indexes: tuple[int, ...],
+    dpi: int = 140,
+) -> tuple[dict[int, bytes], int]:
+    """Convert selected Matplotlib figure pages into PNG bytes."""
+    page_count = len(figures)
+    png_bytes: dict[int, bytes] = {}
+    try:
+        for page_index in page_indexes:
+            if page_index < 0 or page_index >= page_count:
+                raise ValueError(
+                    f"Requested page_index {page_index} is out of range for {page_count} pages."
+                )
+            buffer = BytesIO()
+            try:
+                figures[page_index].savefig(buffer, format="png", dpi=dpi)
+                png_bytes[page_index] = buffer.getvalue()
+            finally:
+                buffer.close()
+    finally:
+        _close_figures(figures)
+    return png_bytes, page_count
+
+
+def _matplotlib_result_png_bytes(
+    figures: list[object],
+    *,
+    page_index: int = 0,
+    dpi: int = 140,
+) -> bytes:
+    """Return PNG bytes for one rendered Matplotlib figure page."""
+    if not figures:
+        raise ValueError("No rendered figures were available for PNG preview generation.")
+    if page_index < 0 or page_index >= len(figures):
+        raise ValueError(f"Requested page_index {page_index} is out of range for {len(figures)} pages.")
+
+    buffer = BytesIO()
+    try:
+        figures[page_index].savefig(buffer, format="png", dpi=dpi)
+        return buffer.getvalue()
+    finally:
+        buffer.close()
+        _close_figures(figures)
+
+
+def _render_logfile_figures(
+    logfile_path: Path,
+    *,
+    section_id: str | None = None,
+) -> list[object]:
+    """Render one logfile to in-memory Matplotlib figures."""
+    from wellplot.logfile import (
+        build_documents_for_logfile,
+        load_datasets_for_logfile,
+        load_logfile,
+    )
+    from wellplot.renderers import MatplotlibRenderer
+
+    spec = load_logfile(logfile_path)
+    datasets_by_section, source_paths_by_section = load_datasets_for_logfile(
+        spec,
+        base_dir=logfile_path.parent,
+    )
+    documents = build_documents_for_logfile(
+        spec,
+        datasets_by_section,
+        source_path=source_paths_by_section,
+    )
+    default_dataset = next(iter(datasets_by_section.values()))
+    document_dataset_pairs = [
+        (
+            document,
+            datasets_by_section.get(_document_section_id(document), default_dataset),
+        )
+        for document in documents
+    ]
+    if section_id is not None:
+        document_dataset_pairs = [
+            pair for pair in document_dataset_pairs if _document_section_id(pair[0]) == section_id
+        ]
+        if not document_dataset_pairs:
+            raise ValueError(f"No rendered document matched section_id={section_id!r}.")
+
+    renderer_kwargs: dict[str, object] = {"dpi": spec.render_dpi}
+    if spec.render_continuous_strip_page_height_mm is not None:
+        renderer_kwargs["continuous_strip_page_height_mm"] = (
+            spec.render_continuous_strip_page_height_mm
+        )
+    matplotlib_style = spec.render_matplotlib.get("style")
+    if matplotlib_style is not None:
+        renderer_kwargs["style"] = matplotlib_style
+
+    renderer = MatplotlibRenderer(**renderer_kwargs)
+    documents_only = tuple(document for document, _dataset in document_dataset_pairs)
+    datasets_only = tuple(dataset for _document, dataset in document_dataset_pairs)
+    result = renderer.render_documents(documents_only, datasets_only, output_path=None)
+    figures = result.artifact
+    if not isinstance(figures, list):
+        raise TypeError("Expected in-memory Matplotlib figures for preview generation.")
+    return figures
+
+
+def _render_logfile_preview_png(
+    logfile_path: Path,
+    *,
+    page_index: int = 0,
+    section_id: str | None = None,
+    dpi: int = 140,
+) -> bytes:
+    """Render one logfile preview to PNG bytes."""
+    figures = _render_logfile_figures(logfile_path, section_id=section_id)
+    return _matplotlib_result_png_bytes(figures, page_index=page_index, dpi=dpi)
 
 
 def _load_yaml(path: Path) -> dict[str, object]:
@@ -1076,6 +1595,1095 @@ def _adaptation_markdown(title: str, tips: tuple[str, ...]) -> str:
     return _join_markdown_lines([f"## Adapt {title} Safely", "", bullets])
 
 
+def _user_intro_markdown(recipe: UserProductionRecipe, prerequisites: tuple[str, ...]) -> str:
+    """Return the opening markdown for one curated user notebook."""
+    return _join_markdown_lines(
+        [
+            f"# {recipe.title}",
+            "",
+            recipe.subtitle,
+            "",
+            "## Who This Is For",
+            "",
+            recipe.target_user,
+            "",
+            "## Why Start Here",
+            "",
+            recipe.why_this_example,
+            "",
+            _prerequisites_markdown(prerequisites),
+            "",
+            "## What This Notebook Will Do",
+            "",
+            "- confirm the example package is available in your repository checkout",
+            "- render the shipped PDF packet exactly as provided",
+            "- show you representative preview images so you know what success looks like",
+            "- point you to the first settings worth editing for your own well",
+        ]
+    )
+
+
+def _user_summary_markdown(recipe: UserProductionRecipe, output_rel: str) -> str:
+    """Return the user-facing summary markdown for one production notebook."""
+    data_highlights = "\n".join(f"- {entry}" for entry in recipe.data_highlights)
+    what_to_look_for = "\n".join(f"- {entry}" for entry in recipe.what_to_look_for)
+    return _join_markdown_lines(
+        [
+            "## Example At A Glance",
+            "",
+            data_highlights,
+            "",
+            f"Expected PDF output: `{output_rel}`",
+            "",
+            "## What To Look For In The Result",
+            "",
+            what_to_look_for,
+        ]
+    )
+
+
+def _user_first_edits_markdown(recipe: UserProductionRecipe) -> str:
+    """Return the first-edits guidance for one user notebook."""
+    first_edits = "\n".join(f"- {entry}" for entry in recipe.first_edits)
+    return _join_markdown_lines(["## First Edits To Make For Your Own Well", "", first_edits])
+
+
+def _user_keep_in_mind_markdown(recipe: UserProductionRecipe) -> str:
+    """Return cautionary notes and next-step guidance for one user notebook."""
+    notes = "\n".join(f"- {entry}" for entry in recipe.keep_in_mind)
+    developer_notebook = f"examples/notebooks/developer/{recipe.package_name}.ipynb"
+    return _join_markdown_lines(
+        [
+            "## Keep In Mind",
+            "",
+            notes,
+            "",
+            "If you decide you need the raw YAML, bindings, or template internals next,",
+            f"open the developer notebook: `{developer_notebook}`.",
+        ]
+    )
+
+
+def _user_preview_code(recipe: UserProductionRecipe) -> str:
+    """Return the preview-display cell for one user notebook."""
+    preview_lines = [
+        "from IPython.display import Image, Markdown, display",
+        "",
+        'preview_dir = REPO_ROOT / "examples" / "notebooks" / "user" / "assets"',
+        "",
+    ]
+    for preview in recipe.previews:
+        variable = preview.asset_name.removesuffix(".png").replace("-", "_")
+        preview_lines.append(f'{variable} = preview_dir / "{preview.asset_name}"')
+        preview_lines.append(f'display(Markdown("### {preview.title}"))')
+        preview_lines.append(f'display(Markdown("{preview.summary}"))')
+        preview_lines.append(f"display(Image(filename=str({variable})))")
+        preview_lines.append("")
+    return "\n".join(preview_lines).strip()
+
+
+def _user_preview_outputs(
+    recipe: UserProductionRecipe,
+    pdf_path: Path,
+    *,
+    check: bool,
+) -> tuple[list[dict[str, object]], int]:
+    """Generate or validate preview assets and return notebook outputs."""
+    outputs: list[dict[str, object]] = []
+    changes = 0
+    for preview in recipe.previews:
+        png_bytes = _pdf_preview_png_bytes(pdf_path, page_number=preview.page_number)
+        asset_path = USER_ASSETS_DIR / preview.asset_name
+        if check:
+            current = asset_path.read_bytes() if asset_path.exists() else None
+            if current != png_bytes:
+                raise SystemExit(f"Notebook asset is out of date: {asset_path}")
+        elif _write_bytes_if_changed(asset_path, png_bytes):
+            changes += 1
+        outputs.append(markdown_output(f"### {preview.title}"))
+        outputs.append(markdown_output(preview.summary))
+        outputs.append(png_output(png_bytes))
+    return outputs, changes
+
+
+def _heading_fields_by_keys(
+    heading_mapping: dict[str, object],
+    *,
+    keys: tuple[str, ...],
+) -> list[dict[str, object]]:
+    """Return a filtered copy of heading general fields."""
+    fields = heading_mapping.get("general_fields", [])
+    if not isinstance(fields, list):
+        return []
+    selected: list[dict[str, object]] = []
+    for field in fields:
+        if not isinstance(field, dict):
+            continue
+        if str(field.get("key")) in keys:
+            selected.append(deepcopy(field))
+    return selected
+
+
+def _detail_rows_by_labels(
+    heading_mapping: dict[str, object],
+    *,
+    labels: tuple[str, ...],
+) -> list[dict[str, object]]:
+    """Return a filtered copy of heading detail rows."""
+    detail = heading_mapping.get("detail", {})
+    if not isinstance(detail, dict):
+        return []
+    rows = detail.get("rows", [])
+    if not isinstance(rows, list):
+        return []
+    selected: list[dict[str, object]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        label = row.get("label")
+        label_cells = row.get("label_cells")
+        if label in labels:
+            selected.append(deepcopy(row))
+            continue
+        if isinstance(label_cells, list) and " / ".join(str(cell) for cell in label_cells) in labels:
+            selected.append(deepcopy(row))
+    return selected
+
+
+def _logfile_section_by_id(mapping: dict[str, object], section_id: str) -> dict[str, object]:
+    """Return one deep-copied section mapping by id."""
+    sections = mapping.get("document", {}).get("layout", {}).get("log_sections", [])
+    if not isinstance(sections, list):
+        raise KeyError(section_id)
+    for section in sections:
+        if isinstance(section, dict) and str(section.get("id")) == section_id:
+            return deepcopy(section)
+    raise KeyError(section_id)
+
+
+def _section_with_tracks(section: dict[str, object], track_ids: tuple[str, ...]) -> dict[str, object]:
+    """Return a deep-copied section limited to the selected track ids."""
+    tracks = section.get("tracks", [])
+    if not isinstance(tracks, list):
+        return section
+    section_copy = deepcopy(section)
+    section_copy["tracks"] = [
+        deepcopy(track)
+        for track in tracks
+        if isinstance(track, dict) and str(track.get("id")) in track_ids
+    ]
+    return section_copy
+
+
+def _bindings_subset(
+    mapping: dict[str, object],
+    *,
+    section_id: str | None = None,
+    track_ids: tuple[str, ...] | None = None,
+    channels: tuple[str, ...] | None = None,
+    element_ids: tuple[str, ...] | None = None,
+) -> list[dict[str, object]]:
+    """Return deep-copied binding mappings filtered by section, track, or channel."""
+    bindings = mapping.get("document", {}).get("bindings", {}).get("channels", [])
+    if not isinstance(bindings, list):
+        return []
+    selected: list[dict[str, object]] = []
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        if section_id is not None and str(binding.get("section")) != section_id:
+            continue
+        if track_ids is not None and str(binding.get("track_id")) not in track_ids:
+            continue
+        if channels is not None and str(binding.get("channel")) not in channels:
+            continue
+        if element_ids is not None and str(binding.get("id")) not in element_ids:
+            continue
+        selected.append(deepcopy(binding))
+    return selected
+
+
+def _tutorial_render_style_subset(template_mapping: dict[str, object]) -> dict[str, object]:
+    """Return a compact but still production-like Matplotlib style mapping."""
+    render = template_mapping.get("render", {})
+    matplotlib_mapping = render.get("matplotlib", {}) if isinstance(render, dict) else {}
+    style = matplotlib_mapping.get("style", {}) if isinstance(matplotlib_mapping, dict) else {}
+    if not isinstance(style, dict):
+        return {}
+    return {
+        key: deepcopy(value)
+        for key, value in style.items()
+        if key in {"report", "section_title", "track_header", "track", "grid"}
+    }
+
+
+def _porosity_tutorial_template_text() -> str:
+    """Return a simplified reusable template for the porosity user notebook."""
+    template_path = _production_package_dir("forge16b_porosity_example") / "base.template.yaml"
+    template_mapping = _load_yaml(template_path)
+    heading = template_mapping.get("document", {}).get("layout", {}).get("heading", {})
+    if not isinstance(heading, dict):
+        raise TypeError("Expected heading mapping in porosity template.")
+
+    template_mapping["render"] = {
+        "backend": "matplotlib",
+        "output_path": "./renders/tutorial_template_placeholder.pdf",
+        "dpi": 180,
+        "matplotlib": {
+            "style": _tutorial_render_style_subset(template_mapping),
+        },
+    }
+    heading["general_fields"] = _heading_fields_by_keys(
+        heading,
+        keys=(
+            "company",
+            "well",
+            "field",
+            "location",
+            "uwi",
+            "logging_date",
+            "scale",
+        ),
+    )
+    detail = heading.get("detail", {})
+    if isinstance(detail, dict):
+        detail["rows"] = _detail_rows_by_labels(
+            heading,
+            labels=(
+                "Project",
+                "Service Company",
+                "Permanent Datum",
+                "Logging Measured From",
+            ),
+        )
+    template_mapping["document"]["layout"]["remarks"] = [
+        {
+            "title": "Public Data and IP Notice",
+            "lines": [
+                "This tutorial uses publicly available or repository-provided demonstration data intended for educational use.",
+                "Rendered layouts are independent reproductions generated by wellplot, not vendor-authored originals or official service-company deliverables.",
+            ],
+            "alignment": "left",
+        }
+    ]
+    return _yaml_text(template_mapping)
+
+
+def _porosity_user_tutorial() -> UserNotebookTutorial:
+    """Return the stage plan for the porosity user notebook."""
+    logfile_mapping = _load_yaml(
+        _production_package_dir("forge16b_porosity_example") / "full_reconstruction.log.yaml"
+    )
+    for section in logfile_mapping["document"]["layout"]["log_sections"]:
+        section["data"]["source_path"] = "../../data/30-23a-3 8117_d.las"
+
+    upper_review = _logfile_section_by_id(logfile_mapping, "upper_review")
+
+    step_1_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "Porosity tutorial step 1 - first packet",
+        "render": {"output_path": "./renders/step_1_first_packet.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "What this first packet proves",
+                        "lines": [
+                            "The template can resolve heading fields from the LAS header.",
+                            "A single section is enough to prove page geometry, depth scale, and one first curve.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [
+                    _section_with_tracks(upper_review, ("gr_sp", "depth")),
+                ],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="upper_review",
+                    track_ids=("gr_sp",),
+                    channels=("GR",),
+                )
+            },
+        },
+    }
+    step_2_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "Porosity tutorial step 2 - add the resistivity track",
+        "render": {"output_path": "./renders/step_2_add_resistivity.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "Why the second step matters",
+                        "lines": [
+                            "Keep the same section and add more tracks only after the first packet renders cleanly.",
+                            "The resistivity track shows how one source file can feed multiple curve overlays with different styles and scales.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [
+                    _section_with_tracks(upper_review, ("gr_sp", "depth", "resistivity")),
+                ],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="upper_review",
+                    track_ids=("gr_sp", "resistivity"),
+                    channels=("GR", "SP", "ILD", "ILM", "MSFL"),
+                )
+            },
+        },
+    }
+    step_3_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "Porosity tutorial step 3 - add the porosity interpretation track",
+        "render": {"output_path": "./renders/step_3_add_porosity_fill.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "Why the porosity track is built last",
+                        "lines": [
+                            "The density-neutron track depends on two related curves plus optional QC curves.",
+                            "The gas crossover fill works only after both the neutron and density bindings exist and their ids match.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [upper_review],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="upper_review",
+                )
+            },
+        },
+    }
+    step_4_mapping = deepcopy(logfile_mapping)
+    step_4_mapping["template"] = {"path": "./base.template.yaml"}
+    step_4_mapping["name"] = "Porosity tutorial step 4 - final two-window packet"
+    step_4_mapping["render"] = {"output_path": "./renders/step_4_final_two_window_packet.pdf"}
+
+    return UserNotebookTutorial(
+        package_name="forge16b_porosity_example",
+        template_text=_porosity_tutorial_template_text(),
+        template_explanation=(
+            "Put page size, depth scale, heading fields, default style, and tail behavior in the template because you will usually reuse those decisions across many wells.",
+            "Keep the logfile for the parts that change per well or per packet: data source paths, depth windows, remarks, tracks, curve bindings, and fills.",
+            "Start with a small reusable template. Add only the heading fields and style defaults you need before you copy the packet to another well.",
+        ),
+        inspection_section_id="upper_review",
+        inspection_channels=("GR", "SP", "ILD", "ILM", "MSFL", "NPHI", "RHOB", "PEF", "DRHO"),
+        inspection_metadata_keys=("COMP", "WELL", "FLD", "LOC", "UWI", "DATE"),
+        stages=(
+            UserNotebookStage(
+                slug="step_1_first_packet",
+                title="Step 1. Build the smallest useful packet",
+                summary="Start with one depth window, one overview track, and one first curve so you can prove the template, heading, remarks, and depth axis all work together.",
+                teaching_points=(
+                    "The template supplies the heading and page defaults.",
+                    "The logfile adds one section, one data source, and one first binding.",
+                    "The depth track defines the vertical layout axis even though no curve is bound to it.",
+                ),
+                logfile_text=_yaml_text(step_1_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_1_opening_page.png",
+                        title="Opening page after step 1",
+                        summary="The heading resolves from LAS metadata and the remarks explain the packet scope.",
+                        page_index=0,
+                    ),
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_1_first_strip.png",
+                        title="First strip after step 1",
+                        summary="A single GR curve is enough to confirm the depth axis, grid, and track header are behaving correctly.",
+                        section_id="upper_review",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_2_add_resistivity",
+                title="Step 2. Add the resistivity review track",
+                summary="Once the first strip is stable, add the resistivity track and bind the deep, medium, and flushed-zone curves with log scaling.",
+                teaching_points=(
+                    "One section can host multiple tracks that share the same source file and depth range.",
+                    "Each curve binding chooses its own style and scale even when several curves share the same track.",
+                    "This is the right point to tune curve labels, line styles, and track widths before you add interpretation fills.",
+                ),
+                logfile_text=_yaml_text(step_2_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_2_resistivity_review.png",
+                        title="Upper review after step 2",
+                        summary="The packet now shows GR/SP plus deep, medium, and flushed-zone resistivity overlays.",
+                        section_id="upper_review",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_3_add_porosity_fill",
+                title="Step 3. Add the porosity track and gas crossover fill",
+                summary="Bind neutron, density, and QC curves, then add the crossover fill so the packet starts carrying porosity interpretation value instead of only presentation structure.",
+                teaching_points=(
+                    "Use ids on related curve bindings when a fill needs to refer to another element.",
+                    "The crossover block is what creates the two-sided gas fill in the strip and the matching header indicator.",
+                    "Add QC curves such as PEF and DRHO only after the main interpretation pair is already behaving correctly.",
+                ),
+                logfile_text=_yaml_text(step_3_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_3_porosity_fill.png",
+                        title="Upper review after step 3",
+                        summary="The porosity track now combines NPHI, RHOB, PEF, DRHO, and the gas crossover fill.",
+                        section_id="upper_review",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_4_final_two_window_packet",
+                title="Step 4. Finish the packet with a second depth window",
+                summary="Reuse the same template and same LAS source, but add a second section so the packet covers both the upper and lower review intervals.",
+                teaching_points=(
+                    "Reusing the template keeps report styling and headings consistent while the logfile adds a second interpretation window.",
+                    "The public-data and IP remarks belong in the final production packet, not only in the README.",
+                    "Only duplicate a section after the first one is correct; otherwise you duplicate mistakes and double the cleanup.",
+                ),
+                logfile_text=_yaml_text(step_4_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_4_opening_page.png",
+                        title="Opening page of the final tutorial packet",
+                        summary="The final packet keeps the reusable template and adds production remarks suitable for a public example.",
+                        page_index=0,
+                    ),
+                    UserNotebookPreview(
+                        asset_name="forge16b_step_4_lower_review.png",
+                        title="Lower review section",
+                        summary="The same LAS source is reused over a second depth window so the packet can extend deeper without changing the template.",
+                        section_id="lower_review",
+                        page_index=1,
+                    ),
+                ),
+            ),
+        ),
+        adaptation_tips=(
+            "Copy the template first if your page style and heading layout will be reused across wells.",
+            "Point the logfile at your own LAS file and list only the curves that actually exist in that source.",
+            "Tune one section until it looks right before you add extra windows, extra tracks, or extra fills.",
+            "Keep the public-data and IP notice explicit whenever the source data is public or redistributed for demonstration purposes.",
+        ),
+    )
+
+
+def _cbl_tutorial_template_text() -> str:
+    """Return a simplified reusable template for the CBL user notebook."""
+    template_path = _production_package_dir("cbl_log_example") / "base.template.yaml"
+    template_mapping = _load_yaml(template_path)
+    heading = template_mapping.get("document", {}).get("layout", {}).get("heading", {})
+    if not isinstance(heading, dict):
+        raise TypeError("Expected heading mapping in CBL template.")
+
+    template_mapping["render"] = {
+        "backend": "matplotlib",
+        "output_path": "./renders/tutorial_template_placeholder.pdf",
+        "dpi": 180,
+        "continuous_strip_page_height_mm": 297,
+        "matplotlib": {
+            "style": _tutorial_render_style_subset(template_mapping),
+        },
+    }
+    heading["general_fields"] = _heading_fields_by_keys(
+        heading,
+        keys=(
+            "company",
+            "well",
+            "field",
+            "location",
+            "logging_date",
+            "scale",
+            "fluid_type",
+        ),
+    )
+    detail = heading.get("detail", {})
+    if isinstance(detail, dict):
+        detail["rows"] = detail.get("rows", [])[:6]
+    template_mapping["document"]["layout"]["remarks"] = [
+        {
+            "title": "Public Data and IP Notice",
+            "lines": [
+                "This tutorial uses publicly available or repository-provided demonstration data intended for educational use.",
+                "Rendered layouts are independent reproductions generated by wellplot, not vendor-authored originals or official service-company deliverables.",
+            ],
+            "alignment": "left",
+        }
+    ]
+    return _yaml_text(template_mapping)
+
+
+def _cbl_user_tutorial() -> UserNotebookTutorial:
+    """Return the stage plan for the CBL user notebook."""
+    logfile_mapping = _load_yaml(
+        _production_package_dir("cbl_log_example") / "full_reconstruction.log.yaml"
+    )
+    source_paths = {
+        "main_pass": "../../data/CBL_Main.dlis",
+        "repeat_pass": "../../data/CBL_Repeat.dlis",
+    }
+    for section in logfile_mapping["document"]["layout"]["log_sections"]:
+        section["data"]["source_path"] = source_paths[str(section["id"])]
+        if str(section["id"]) == "main_pass":
+            section["depth_range"] = [8230, 8490]
+
+    main_pass = _logfile_section_by_id(logfile_mapping, "main_pass")
+
+    step_1_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "CBL tutorial step 1 - first packet",
+        "render": {"output_path": "./renders/step_1_first_packet.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "What this first packet proves",
+                        "lines": [
+                            "The heading, remarks, and first main-pass section are all connected to the DLIS-backed packet.",
+                            "You do not need every CBL feature on the first pass; prove the packet structure first.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [
+                    _section_with_tracks(main_pass, ("combo", "depth")),
+                ],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="main_pass",
+                    track_ids=("combo",),
+                    channels=("ECGR_STGC", "TT"),
+                )
+            },
+        },
+    }
+    step_2_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "CBL tutorial step 2 - add the CBL amplitude track",
+        "render": {"output_path": "./renders/step_2_add_cbl_track.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "Why the dedicated CBL track matters",
+                        "lines": [
+                            "The same CBL channel can be bound twice so the packet shows both the broad 0 to 100 scale and the tighter 0 to 10 scale.",
+                            "This is a good example of how one channel can support more than one interpretation view.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [
+                    _section_with_tracks(main_pass, ("combo", "depth", "cbl")),
+                ],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="main_pass",
+                    track_ids=("combo", "cbl"),
+                    channels=("ECGR_STGC", "TT", "TENS", "MTEM", "CBL"),
+                )
+            },
+        },
+    }
+    step_3_mapping = {
+        "template": {"path": "./base.template.yaml"},
+        "version": 1,
+        "name": "CBL tutorial step 3 - add VDL and depth overlays",
+        "render": {"output_path": "./renders/step_3_add_vdl_and_overlays.pdf"},
+        "document": {
+            "layout": {
+                "remarks": [
+                    {
+                        "title": "Why this is the key CBL interpretation step",
+                        "lines": [
+                            "The VDL array track turns the packet from a simple curve sheet into a CBL/VDL interpretation view.",
+                            "Reference overlays on the depth track keep local indicators visible without creating extra tracks.",
+                        ],
+                        "alignment": "left",
+                    }
+                ],
+                "log_sections": [main_pass],
+            },
+            "bindings": {
+                "channels": _bindings_subset(
+                    logfile_mapping,
+                    section_id="main_pass",
+                )
+            },
+        },
+    }
+    step_4_mapping = deepcopy(logfile_mapping)
+    step_4_mapping["template"] = {"path": "./base.template.yaml"}
+    step_4_mapping["name"] = "CBL tutorial step 4 - final packet with repeat pass"
+    step_4_mapping["render"] = {"output_path": "./renders/step_4_final_packet.pdf"}
+
+    return UserNotebookTutorial(
+        package_name="cbl_log_example",
+        template_text=_cbl_tutorial_template_text(),
+        template_explanation=(
+            "The CBL template owns the reusable packet identity: page geometry, heading content, track-header styling, and tail behavior.",
+            "The logfile owns job-specific content: DLIS source paths, which pass to plot, which tracks to show, and which channels to bind.",
+            "That split matters because most real CBL work reuses one packet style across many jobs while only the logfile changes.",
+        ),
+        inspection_section_id="main_pass",
+        inspection_channels=("ECGR_STGC", "TT", "TENS", "MTEM", "CBL", "VDL", "STIT", "TDSP", "VSEC"),
+        inspection_metadata_keys=("COMP", "WELL", "FIELD", "WELL_ID"),
+        stages=(
+            UserNotebookStage(
+                slug="step_1_first_packet",
+                title="Step 1. Build the first main-pass packet",
+                summary="Start with the heading, remarks, one main-pass section, and a small combo track so you can prove that the packet skeleton is correct before you add the heavier CBL/VDL features.",
+                teaching_points=(
+                    "A production packet can begin with only one pass and only a few curves.",
+                    "The depth track still defines layout even before you add special overlay indicators.",
+                    "This is the right stage to verify that the DLIS source path, page scale, and headings are all correct.",
+                ),
+                logfile_text=_yaml_text(step_1_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="cbl_step_1_opening_page.png",
+                        title="Opening page after step 1",
+                        summary="The packet already has headings and remarks even though the log content is still minimal.",
+                        page_index=0,
+                    ),
+                    UserNotebookPreview(
+                        asset_name="cbl_step_1_main_pass.png",
+                        title="Main-pass skeleton after step 1",
+                        summary="The first strip proves the packet layout with only the combo and depth tracks.",
+                        section_id="main_pass",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_2_add_cbl_track",
+                title="Step 2. Add the dedicated CBL amplitude track",
+                summary="Bind the same CBL channel twice so the packet shows both the broad and tight amplitude scales that make cement interpretation easier.",
+                teaching_points=(
+                    "One channel can be plotted more than once when each binding serves a different reading task.",
+                    "The packet gets easier to read when the CBL amplitude leaves the crowded combo track and gets its own track.",
+                    "This is also the stage where supporting combo curves such as tension and mud temperature become more useful.",
+                ),
+                logfile_text=_yaml_text(step_2_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="cbl_step_2_dual_scale_cbl.png",
+                        title="Main pass after step 2",
+                        summary="The CBL amplitude track now carries both the wide and tight scales using two bindings to the same channel.",
+                        section_id="main_pass",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_3_add_vdl_and_overlays",
+                title="Step 3. Add the VDL array and depth overlays",
+                summary="Finish the main pass by adding the VDL raster and the local indicator overlays on the depth track.",
+                teaching_points=(
+                    "Array tracks are configured differently from normal tracks because they plot raster data instead of scalar curves.",
+                    "The sample-axis block tells wellplot how to label the VDL waveform axis in the header.",
+                    "Reference overlays let you add local indicators without giving up the depth track as the packet layout axis.",
+                ),
+                logfile_text=_yaml_text(step_3_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="cbl_step_3_vdl_and_overlays.png",
+                        title="Main pass after step 3",
+                        summary="The packet now has the VDL raster plus the stuck-tool and drag indicators on the depth track.",
+                        section_id="main_pass",
+                        page_index=1,
+                    ),
+                ),
+            ),
+            UserNotebookStage(
+                slug="step_4_final_packet",
+                title="Step 4. Add the repeat pass and finish the packet",
+                summary="Reuse the same template and packet rules, then add the repeat pass so the final example covers the supported reconstruction scope.",
+                teaching_points=(
+                    "Repeat sections should reuse the same layout vocabulary unless the second pass truly needs a different design.",
+                    "The production remarks and public-data notice belong inside the final packet so the PDF can stand on its own.",
+                    "Once both passes are working, further edits should usually be curve styles, interval windows, or heading content rather than structural redesign.",
+                ),
+                logfile_text=_yaml_text(step_4_mapping),
+                previews=(
+                    UserNotebookPreview(
+                        asset_name="cbl_step_4_opening_page.png",
+                        title="Opening page of the final tutorial packet",
+                        summary="The final packet has the production remarks and keeps the public-data / IP boundary explicit.",
+                        page_index=0,
+                    ),
+                    UserNotebookPreview(
+                        asset_name="cbl_step_4_repeat_pass.png",
+                        title="Repeat-pass section",
+                        summary="The repeat pass reuses the same packet structure so the second DLIS file drops into a familiar interpretation view.",
+                        section_id="repeat_pass",
+                        page_index=1,
+                    ),
+                ),
+            ),
+        ),
+        adaptation_tips=(
+            "Keep the template stable across jobs and change the logfile first when the source files or intervals change.",
+            "Prove the main pass before you add the repeat pass or heavier raster content.",
+            "Bind the same channel twice only when the second scale really adds interpretation value.",
+            "Keep the IP boundary explicit whenever you compare your rendered packet against a reference vendor PDF.",
+        ),
+    )
+
+
+def _user_tutorial_for_recipe(recipe: UserProductionRecipe) -> UserNotebookTutorial:
+    """Return the tutorial configuration for one user-facing production package."""
+    if recipe.package_name == "forge16b_porosity_example":
+        return _porosity_user_tutorial()
+    if recipe.package_name == "cbl_log_example":
+        return _cbl_user_tutorial()
+    raise KeyError(f"Unsupported user tutorial package {recipe.package_name!r}.")
+
+
+def _tutorial_output_rel(package_name: str, output_name: str) -> str:
+    """Return the expected render path for one tutorial stage."""
+    return f"workspace/tutorials/{package_name}/renders/{output_name}"
+
+
+def _user_tutorial_intro_markdown(
+    recipe: UserProductionRecipe,
+    tutorial: UserNotebookTutorial,
+    *,
+    prerequisites: tuple[str, ...],
+) -> str:
+    """Return the opening markdown for one rewritten user tutorial notebook."""
+    return _join_markdown_lines(
+        [
+            f"# {recipe.title}",
+            "",
+            recipe.subtitle,
+            "",
+            "## Who This Notebook Is For",
+            "",
+            recipe.target_user,
+            "",
+            "## What You Will Learn",
+            "",
+            "- how to inspect the source data and confirm which channels and header fields are available",
+            "- how to separate reusable template work from well-specific logfile work",
+            "- how to validate YAML and template wiring with `load_logfile(...)`",
+            "- how to render a packet with `render_from_logfile(...)` after each major edit",
+            "- how to add headings, remarks, tracks, curve bindings, fills, and extra sections in a controlled order",
+            "",
+            _prerequisites_markdown(prerequisites),
+            "",
+            "## The Three `wellplot` Functions That Matter In This Workflow",
+            "",
+            "- `load_datasets_for_logfile(...)` to inspect the source file and list the channels you can actually plot",
+            "- `load_logfile(...)` to validate the YAML and the template resolution before you render",
+            "- `render_from_logfile(...)` to produce the packet PDF once the YAML is ready",
+            "",
+            "## How To Read This Notebook",
+            "",
+            "- each stage writes a real YAML file under `workspace/tutorials/`",
+            "- each render cell validates and renders that stage exactly like a real user workflow",
+            "- the inline images are visual checkpoints so you can compare your result with the expected packet state",
+        ]
+    )
+
+
+def _user_tutorial_setup_code(package_name: str) -> str:
+    """Return the setup cell for a user tutorial notebook."""
+    return dedent(
+        f"""
+        from pathlib import Path
+
+        try:
+            import wellplot
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install the published 'wellplot' package in the active environment "
+                "before running this notebook."
+            ) from exc
+
+        cwd = Path.cwd().resolve()
+        REPO_ROOT = next((path for path in (cwd, *cwd.parents) if (path / "examples").exists()), None)
+        if REPO_ROOT is None:
+            raise RuntimeError(
+                "Run this notebook from a checkout of the wellplot repository so the "
+                "example files and sample data are available."
+            )
+
+        package_dir = REPO_ROOT / "examples" / "production" / "{package_name}"
+        example_logfile = package_dir / "full_reconstruction.log.yaml"
+        tutorial_dir = REPO_ROOT / "workspace" / "tutorials" / "{package_name}"
+        render_dir = tutorial_dir / "renders"
+        tutorial_dir.mkdir(parents=True, exist_ok=True)
+        render_dir.mkdir(parents=True, exist_ok=True)
+
+        print("wellplot version:", wellplot.__version__)
+        print("Production example:", example_logfile.relative_to(REPO_ROOT))
+        print("Tutorial workspace:", tutorial_dir.relative_to(REPO_ROOT))
+        print("Render output folder:", render_dir.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _user_data_inspection_markdown(recipe: UserProductionRecipe) -> str:
+    """Return the data-inspection markdown for one user tutorial."""
+    return _join_markdown_lines(
+        [
+            "## Inspect The Source Data Before You Design The Plot",
+            "",
+            "A practical workflow starts by confirming two things:",
+            "",
+            "- which channels are available in the source file",
+            "- which metadata fields are good enough to populate the heading",
+            "",
+            f"Use the shipped `{recipe.package_name}` example as the inspection source, then copy the same pattern to your own well.",
+        ]
+    )
+
+
+def _user_data_inspection_code(tutorial: UserNotebookTutorial) -> str:
+    """Return the code cell that inspects the source data for one tutorial."""
+    channels = ", ".join(repr(channel) for channel in tutorial.inspection_channels)
+    metadata_keys = ", ".join(repr(key) for key in tutorial.inspection_metadata_keys)
+    return dedent(
+        f"""
+        from wellplot import load_datasets_for_logfile, load_logfile
+
+        spec = load_logfile(example_logfile)
+        datasets_by_section, _source_paths = load_datasets_for_logfile(spec, base_dir=example_logfile.parent)
+        dataset = datasets_by_section["{tutorial.inspection_section_id}"]
+
+        wanted_channels = [{channels}]
+        available_channels = [channel for channel in wanted_channels if channel in dataset.channels]
+        print("Sections available:", ", ".join(datasets_by_section))
+        print("Channels used in this tutorial:", ", ".join(available_channels))
+        print("Header fields available from the source data:")
+        for key in [{metadata_keys}]:
+            print(f"  {{key}}: {{dataset.well_metadata.get(key)}}")
+        """
+    ).strip()
+
+
+def _user_data_inspection_output(tutorial: UserNotebookTutorial) -> str:
+    """Return the executed output for the data-inspection cell."""
+    from wellplot import load_datasets_for_logfile, load_logfile
+
+    example_logfile = _production_logfile_path(tutorial.package_name)
+    spec = load_logfile(example_logfile)
+    datasets_by_section, _source_paths = load_datasets_for_logfile(
+        spec,
+        base_dir=example_logfile.parent,
+    )
+    dataset = datasets_by_section[tutorial.inspection_section_id]
+    available_channels = [
+        channel for channel in tutorial.inspection_channels if channel in dataset.channels
+    ]
+    lines = [
+        f"Sections available: {', '.join(datasets_by_section)}",
+        f"Channels used in this tutorial: {', '.join(available_channels)}",
+        "Header fields available from the source data:",
+    ]
+    for key in tutorial.inspection_metadata_keys:
+        lines.append(f"  {key}: {dataset.well_metadata.get(key)}")
+    return "\n".join(lines)
+
+
+def _user_template_markdown(tutorial: UserNotebookTutorial) -> str:
+    """Return the markdown that explains the reusable template."""
+    bullets = "\n".join(f"- {entry}" for entry in tutorial.template_explanation)
+    return _join_markdown_lines(
+        [
+            "## Create The Reusable Template First",
+            "",
+            "This file should hold the decisions that you expect to reuse for many wells.",
+            "",
+            bullets,
+            "",
+            "Write the template once, then keep the later stage files focused on data sources, sections, tracks, and bindings.",
+        ]
+    )
+
+
+def _user_template_write_code(tutorial: UserNotebookTutorial) -> str:
+    """Return the code cell that writes the reusable tutorial template."""
+    return "\n".join(
+        [
+            'template_path = tutorial_dir / "base.template.yaml"',
+            "template_text = '''",
+            tutorial.template_text,
+            "'''",
+            "template_path.write_text(template_text)",
+            "",
+            'print("Wrote:", template_path.relative_to(REPO_ROOT))',
+        ]
+    )
+
+
+def _user_stage_markdown(stage: UserNotebookStage) -> str:
+    """Return the markdown that introduces one user tutorial stage."""
+    bullets = "\n".join(f"- {point}" for point in stage.teaching_points)
+    return _join_markdown_lines(
+        [
+            f"## {stage.title}",
+            "",
+            stage.summary,
+            "",
+            "What this step teaches:",
+            "",
+            bullets,
+        ]
+    )
+
+
+def _user_stage_write_code(stage: UserNotebookStage) -> str:
+    """Return the code cell that writes one stage logfile."""
+    variable = _python_identifier(stage.slug)
+    return "\n".join(
+        [
+            f'{variable}_logfile_path = tutorial_dir / "{stage.slug}.log.yaml"',
+            f"{variable}_logfile_text = '''",
+            stage.logfile_text,
+            "'''",
+            f"{variable}_logfile_path.write_text({variable}_logfile_text)",
+            "",
+            f'print("Wrote:", {variable}_logfile_path.relative_to(REPO_ROOT))',
+        ]
+    )
+
+
+def _user_stage_render_code(stage: UserNotebookStage) -> str:
+    """Return the render cell for one user tutorial stage."""
+    variable = _python_identifier(stage.slug)
+    return dedent(
+        f"""
+        from wellplot import load_logfile, render_from_logfile
+
+        spec = load_logfile({variable}_logfile_path)
+        result = render_from_logfile({variable}_logfile_path)
+
+        print("Validated:", spec.name)
+        print("Pages created:", result.page_count)
+        print("PDF written to:", result.output_path.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _render_grouped_previews(
+    logfile_path: Path,
+    previews: tuple[UserNotebookPreview, ...],
+) -> tuple[dict[str, bytes], int]:
+    """Render grouped preview PNGs and return them by asset name."""
+    previews_by_section: dict[str | None, set[int]] = {}
+    for preview in previews:
+        previews_by_section.setdefault(preview.section_id, set()).add(preview.page_index)
+
+    rendered_pngs: dict[tuple[str | None, int], bytes] = {}
+    full_page_count = 0
+    for section_id, page_indexes in previews_by_section.items():
+        figures = _render_logfile_figures(logfile_path, section_id=section_id)
+        png_bytes, page_count = _figures_to_png_bytes(
+            figures,
+            page_indexes=tuple(sorted(page_indexes)),
+        )
+        if section_id is None:
+            full_page_count = page_count
+        for page_index, image_bytes in png_bytes.items():
+            rendered_pngs[(section_id, page_index)] = image_bytes
+
+    if full_page_count == 0:
+        full_figures = _render_logfile_figures(logfile_path)
+        _png_bytes, full_page_count = _figures_to_png_bytes(full_figures, page_indexes=(0,))
+
+    asset_bytes: dict[str, bytes] = {}
+    for preview in previews:
+        asset_bytes[preview.asset_name] = rendered_pngs[(preview.section_id, preview.page_index)]
+    return asset_bytes, full_page_count
+
+
+def _user_stage_outputs(
+    tutorial: UserNotebookTutorial,
+    stage: UserNotebookStage,
+    *,
+    check: bool,
+) -> tuple[str, int, list[dict[str, object]], int]:
+    """Render checkpoint previews and notebook outputs for one user tutorial stage."""
+    tutorials_root = REPO_ROOT / "workspace" / "tutorials"
+    tutorials_root.mkdir(parents=True, exist_ok=True)
+    changes = 0
+    with TemporaryDirectory(dir=tutorials_root) as temp_dir:
+        temp_root = Path(temp_dir)
+        (temp_root / "renders").mkdir(parents=True, exist_ok=True)
+        (temp_root / "base.template.yaml").write_text(tutorial.template_text)
+        logfile_path = temp_root / f"{stage.slug}.log.yaml"
+        logfile_path.write_text(stage.logfile_text)
+
+        from wellplot import load_logfile
+
+        spec = load_logfile(logfile_path)
+        rendered_assets, page_count = _render_grouped_previews(logfile_path, stage.previews)
+
+    outputs: list[dict[str, object]] = []
+    for preview in stage.previews:
+        png_bytes = rendered_assets[preview.asset_name]
+        asset_path = USER_ASSETS_DIR / preview.asset_name
+        if check:
+            current = asset_path.read_bytes() if asset_path.exists() else None
+            if current != png_bytes:
+                raise SystemExit(f"Notebook asset is out of date: {asset_path}")
+        elif _write_bytes_if_changed(asset_path, png_bytes):
+            changes += 1
+        outputs.append(markdown_output(f"### {preview.title}"))
+        outputs.append(markdown_output(preview.summary))
+        outputs.append(png_output(png_bytes))
+
+    return spec.name, page_count, outputs, changes
+
+
+def _user_adaptation_markdown(
+    recipe: UserProductionRecipe,
+    tutorial: UserNotebookTutorial,
+) -> str:
+    """Return the final adaptation checklist for one rewritten user notebook."""
+    bullets = "\n".join(f"- {tip}" for tip in tutorial.adaptation_tips)
+    developer_notebook = f"examples/notebooks/developer/{recipe.package_name}.ipynb"
+    return _join_markdown_lines(
+        [
+            "## How To Adapt This Tutorial To Your Own Well",
+            "",
+            bullets,
+            "",
+            "## When To Open The Developer Notebook",
+            "",
+            "- use the developer notebook only when you want the raw repository example internals, full source dumps, or lower-level implementation details",
+            f"- developer reference notebook: `{developer_notebook}`",
+        ]
+    )
+
+
 def _legacy_triple_combo_notebook() -> dict[str, object]:
     """Build the notebook for the legacy triple-combo document example."""
     title = "Triple Combo Legacy Document Walkthrough"
@@ -1212,6 +2820,110 @@ def _production_notebook(package_name: str, title: str, prerequisites: tuple[str
     return _notebook(cells)
 
 
+def _user_production_notebook(
+    recipe: UserProductionRecipe,
+    *,
+    check: bool,
+) -> tuple[dict[str, object], int]:
+    """Build one rewritten user tutorial notebook and its checkpoint assets."""
+    tutorial = _user_tutorial_for_recipe(recipe)
+    setup_outputs = []
+
+    from wellplot import __version__ as wellplot_version
+
+    setup_outputs.append(
+        stream_output(
+            "\n".join(
+                [
+                    f"wellplot version: {wellplot_version}",
+                    f"Production example: examples/production/{tutorial.package_name}/full_reconstruction.log.yaml",
+                    f"Tutorial workspace: workspace/tutorials/{tutorial.package_name}",
+                    f"Render output folder: workspace/tutorials/{tutorial.package_name}/renders",
+                ]
+            )
+        )
+    )
+
+    cells: list[dict[str, object]] = [
+        markdown_cell(
+            _user_tutorial_intro_markdown(
+                recipe,
+                tutorial,
+                prerequisites=_production_prerequisites(
+                    _production_package_dir(recipe.package_name)
+                ),
+            )
+        ),
+        code_cell(
+            _user_tutorial_setup_code(recipe.package_name),
+            execution_count=1,
+            outputs=setup_outputs,
+        ),
+        markdown_cell(_user_data_inspection_markdown(recipe)),
+        code_cell(
+            _user_data_inspection_code(tutorial),
+            execution_count=2,
+            outputs=[stream_output(_user_data_inspection_output(tutorial))],
+        ),
+        markdown_cell(_user_template_markdown(tutorial)),
+        code_cell(
+            _user_template_write_code(tutorial),
+            execution_count=3,
+            outputs=[
+                stream_output(
+                    f"Wrote: workspace/tutorials/{tutorial.package_name}/base.template.yaml"
+                )
+            ],
+        ),
+    ]
+
+    execution_count = 4
+    changes = 0
+    for stage in tutorial.stages:
+        spec_name, page_count, preview_outputs, asset_changes = _user_stage_outputs(
+            tutorial,
+            stage,
+            check=check,
+        )
+        changes += asset_changes
+        output_name = f"{stage.slug}.pdf"
+        cells.append(markdown_cell(_user_stage_markdown(stage)))
+        cells.append(
+            code_cell(
+                _user_stage_write_code(stage),
+                execution_count=execution_count,
+                outputs=[
+                    stream_output(
+                        f"Wrote: workspace/tutorials/{tutorial.package_name}/{stage.slug}.log.yaml"
+                    )
+                ],
+            )
+        )
+        execution_count += 1
+        cells.append(
+            code_cell(
+                _user_stage_render_code(stage),
+                execution_count=execution_count,
+                outputs=[
+                    stream_output(
+                        "\n".join(
+                            [
+                                f"Validated: {spec_name}",
+                                f"Pages created: {page_count}",
+                                f"PDF written to: {_tutorial_output_rel(tutorial.package_name, output_name)}",
+                            ]
+                        )
+                    ),
+                    *preview_outputs,
+                ],
+            )
+        )
+        execution_count += 1
+
+    cells.append(markdown_cell(_user_adaptation_markdown(recipe, tutorial)))
+    return _notebook(cells), changes
+
+
 def _notebook(cells: list[dict[str, object]]) -> dict[str, object]:
     """Return a complete notebook payload."""
     normalized_cells: list[dict[str, object]] = []
@@ -1242,12 +2954,17 @@ def _relative_notebook_path(source: str) -> Path:
         notebook_name = source.removesuffix(".py") + ".ipynb"
     else:
         raise ValueError(f"Unsupported example source {source!r}.")
-    return NOTEBOOKS_DIR / notebook_name
+    return DEVELOPER_NOTEBOOKS_DIR / notebook_name
 
 
 def _production_notebook_path(package_name: str) -> Path:
     """Return the notebook path for one production package."""
-    return NOTEBOOKS_DIR / f"{package_name}.ipynb"
+    return DEVELOPER_NOTEBOOKS_DIR / f"{package_name}.ipynb"
+
+
+def _user_notebook_path(package_name: str) -> Path:
+    """Return the notebook path for one user-facing production package notebook."""
+    return USER_NOTEBOOKS_DIR / f"{package_name}.ipynb"
 
 
 def _production_title(package_dir: Path) -> str:
@@ -1296,8 +3013,8 @@ def _write_notebook(path: Path, notebook: dict[str, object], *, check: bool) -> 
     return _write_if_changed(path, rendered)
 
 
-def _grouped_notebook_list() -> dict[str, list[str]]:
-    """Return grouped notebook names for the generated README."""
+def _developer_grouped_notebook_list() -> dict[str, list[str]]:
+    """Return grouped developer notebook names for the generated README."""
     grouped = {
         "Production package walkthroughs": [],
         "Programmatic API walkthroughs": [],
@@ -1317,18 +3034,67 @@ def _grouped_notebook_list() -> dict[str, list[str]]:
     return grouped
 
 
-def _readme_text() -> str:
-    """Return the generated README text for examples/notebooks."""
-    sections = _grouped_notebook_list()
+def _root_readme_text() -> str:
+    """Return the generated top-level README for examples/notebooks."""
+    user_entries = sorted(_user_notebook_path(recipe.package_name).name for recipe in USER_PRODUCTION_RECIPES.values())
     parts = [
         "# Example Notebooks",
         "",
-        "This directory contains generated walkthrough notebooks that mirror the repository",
-        "example set. Each notebook is intended to act as a recipe for final users:",
+        "This directory is split by audience:",
         "",
-        "- read the source example inside the notebook",
-        "- understand the main moving parts",
-        "- run the validation and render steps from an interactive session",
+        "- `user/` contains curated, executed notebooks aimed at geologists, petrophysicists,",
+        "  and other end users who want to run and adapt a production example with minimal",
+        "  Python knowledge.",
+        "- `developer/` contains unexecuted reference notebooks that mirror the repository",
+        "  example set and expose the raw YAML, source code, and implementation details.",
+        "",
+        "These files are generated by `scripts/generate_example_notebooks.py`.",
+        "",
+        "## Start Here",
+        "",
+        "- begin with `examples/notebooks/user/` if you want a step-by-step packet-building tutorial with inline checkpoints",
+        "- use `examples/notebooks/developer/` when you need the raw example internals",
+        "",
+        "## User Notebooks",
+        "",
+    ]
+    for entry in user_entries:
+        parts.append(f"- `user/{entry}`")
+    parts.extend(
+        [
+            "",
+            "## Runtime Note",
+            "",
+            "- the notebooks import the installed `wellplot` package from the active",
+            "  environment",
+            "- they still expect to run from a repository checkout so the example",
+            "  files and sample data are available",
+            "- for local repository testing, `uv sync` installs the notebook kernel",
+            "  in `.venv`; for installed-package use, include the `notebook` extra",
+            "",
+            "## Regenerate",
+            "",
+            "```bash",
+            "uv run python scripts/generate_example_notebooks.py",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(parts)
+
+
+def _developer_readme_text() -> str:
+    """Return the generated developer README for examples/notebooks/developer."""
+    sections = _developer_grouped_notebook_list()
+    parts = [
+        "# Developer Notebooks",
+        "",
+        "These generated notebooks mirror the repository example set and are meant",
+        "for developers, advanced users, and contributors who want to inspect the",
+        "raw example files, implementation details, and lower-level `wellplot` flows.",
+        "",
+        "They are intentionally unexecuted in git and act as reference material rather",
+        "than polished end-user recipes.",
         "",
         "These files are generated by `scripts/generate_example_notebooks.py`.",
         "",
@@ -1361,10 +3127,80 @@ def _readme_text() -> str:
     return "\n".join(parts)
 
 
-def generate(*, check: bool = False) -> int:
-    """Generate or check the walkthrough notebook set."""
-    NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
+def _user_readme_text() -> str:
+    """Return the generated user README for examples/notebooks/user."""
+    parts = [
+        "# User Notebooks",
+        "",
+        "These notebooks are the curated starting point for geologists, petrophysicists,",
+        "and other end users.",
+        "",
+        "They differ from the developer notebooks in three ways:",
+        "",
+        "- they teach how to build and adapt a production packet step by step instead of only reopening a shipped example",
+        "- they explain the YAML workflow in domain language: inspect data, create the template, add sections, bind curves, and render",
+        "- they include inline rendered checkpoints so the user can compare each stage with the expected visual result",
+        "",
+        "## Available Notebooks",
+        "",
+    ]
+    for recipe in USER_PRODUCTION_RECIPES.values():
+        parts.append(f"- `{_user_notebook_path(recipe.package_name).name}`")
+        parts.append(f"  - {recipe.subtitle}")
+    parts.extend(
+        [
+            "",
+            "## Runtime Note",
+            "",
+            "- install the published package with the `notebook` extra and any data-source",
+            "  extras required by the example",
+            "- run the notebooks from a checkout of this repository so the example files,",
+            "  sample data, and preview assets are available",
+            "",
+            "## Regenerate",
+            "",
+            "```bash",
+            "uv run python scripts/generate_example_notebooks.py",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(parts)
+
+
+def _cleanup_stale_notebook_files(expected_files: set[Path], *, check: bool) -> int:
+    """Remove stale generated files from the notebook tree."""
+    existing_files = {path for path in NOTEBOOKS_ROOT.rglob("*") if path.is_file()}
+    stale_files = sorted(existing_files - expected_files)
+    if check and stale_files:
+        raise SystemExit(f"Stale generated notebook file found: {stale_files[0]}")
+
     changes = 0
+    for stale_path in stale_files:
+        stale_path.unlink()
+        changes += 1
+
+    directories = sorted(
+        [path for path in NOTEBOOKS_ROOT.rglob("*") if path.is_dir()],
+        reverse=True,
+    )
+    for directory in directories:
+        if directory == NOTEBOOKS_ROOT:
+            continue
+        if any(directory.iterdir()):
+            continue
+        directory.rmdir()
+    return changes
+
+
+def generate(*, check: bool = False) -> int:
+    """Generate or check the user and developer notebook sets."""
+    NOTEBOOKS_ROOT.mkdir(parents=True, exist_ok=True)
+    DEVELOPER_NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    USER_NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
+    USER_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    changes = 0
+    expected_files: set[Path] = set()
 
     for package_dir in _production_packages():
         title = _production_title(package_dir)
@@ -1373,12 +3209,16 @@ def generate(*, check: bool = False) -> int:
             title,
             _production_prerequisites(package_dir),
         )
-        if _write_notebook(_production_notebook_path(package_dir.name), notebook, check=check):
+        output_path = _production_notebook_path(package_dir.name)
+        expected_files.add(output_path)
+        if _write_notebook(output_path, notebook, check=check):
             changes += 1
 
     for recipe in PYTHON_RECIPES.values():
         notebook = _python_notebook(recipe)
-        if _write_notebook(_relative_notebook_path(recipe.source), notebook, check=check):
+        output_path = _relative_notebook_path(recipe.source)
+        expected_files.add(output_path)
+        if _write_notebook(output_path, notebook, check=check):
             changes += 1
 
     for path in _yaml_example_paths():
@@ -1386,18 +3226,36 @@ def generate(*, check: bool = False) -> int:
             notebook = _legacy_triple_combo_notebook()
         else:
             notebook = _yaml_notebook(path, _load_yaml(path))
-        if _write_notebook(_relative_notebook_path(path.name), notebook, check=check):
+        output_path = _relative_notebook_path(path.name)
+        expected_files.add(output_path)
+        if _write_notebook(output_path, notebook, check=check):
             changes += 1
 
-    readme_path = NOTEBOOKS_DIR / "README.md"
-    readme_text = _readme_text()
-    if check:
-        current = readme_path.read_text() if readme_path.exists() else None
-        if current != readme_text:
-            raise SystemExit(f"Notebook README is out of date: {readme_path}")
-    elif _write_if_changed(readme_path, readme_text):
-        changes += 1
+    for recipe in USER_PRODUCTION_RECIPES.values():
+        notebook, asset_changes = _user_production_notebook(recipe, check=check)
+        output_path = _user_notebook_path(recipe.package_name)
+        expected_files.add(output_path)
+        for preview in recipe.previews:
+            expected_files.add(USER_ASSETS_DIR / preview.asset_name)
+        changes += asset_changes
+        if _write_notebook(output_path, notebook, check=check):
+            changes += 1
 
+    readmes = {
+        NOTEBOOKS_ROOT / "README.md": _root_readme_text(),
+        DEVELOPER_NOTEBOOKS_DIR / "README.md": _developer_readme_text(),
+        USER_NOTEBOOKS_DIR / "README.md": _user_readme_text(),
+    }
+    for readme_path, readme_text in readmes.items():
+        expected_files.add(readme_path)
+        if check:
+            current = readme_path.read_text() if readme_path.exists() else None
+            if current != readme_text:
+                raise SystemExit(f"Notebook README is out of date: {readme_path}")
+        elif _write_if_changed(readme_path, readme_text):
+            changes += 1
+
+    changes += _cleanup_stale_notebook_files(expected_files, check=check)
     return changes
 
 

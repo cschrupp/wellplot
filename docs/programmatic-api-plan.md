@@ -222,7 +222,7 @@ Status:
     - `merge(...)`
 - reference example:
   - [examples/api_dataset_ingest_demo.py](/home/user/projects/well_log_os/examples/api_dataset_ingest_demo.py)
-  - [examples/notebooks/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_dataset_ingest_demo.ipynb)
+  - [examples/notebooks/developer/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/developer/api_dataset_ingest_demo.ipynb)
 
 ### Phase 3. Add the in-memory composition/render bridge
 
@@ -259,7 +259,7 @@ Status:
 - implemented for full-document rendering
 - reference example:
   - [examples/api_layout_render_demo.py](/home/user/projects/well_log_os/examples/api_layout_render_demo.py)
-  - [examples/notebooks/api_layout_render_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_layout_render_demo.ipynb)
+  - [examples/notebooks/developer/api_layout_render_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/developer/api_layout_render_demo.ipynb)
 
 ### Phase 4. Add pandas/numpy adapters
 
@@ -306,7 +306,7 @@ Status:
   - `DatasetBuilder.add_dataframe(...)`
 - reference example:
   - [examples/api_dataset_ingest_demo.py](/home/user/projects/well_log_os/examples/api_dataset_ingest_demo.py)
-  - [examples/notebooks/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/api_dataset_ingest_demo.ipynb)
+  - [examples/notebooks/developer/api_dataset_ingest_demo.ipynb](/home/user/projects/well_log_os/examples/notebooks/developer/api_dataset_ingest_demo.ipynb)
 
 ### Phase 5. Add validation and alignment helpers
 
