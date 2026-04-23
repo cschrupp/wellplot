@@ -11,10 +11,26 @@ They differ from the developer notebooks in three ways:
 
 ## Available Notebooks
 
+### YAML-First Production Recipes
+
 - `cbl_log_example.ipynb`
   - Build a CBL/VDL interpretation packet from DLIS data one stage at a time, starting with a reusable template and finishing with the repeat pass.
 - `forge16b_porosity_example.ipynb`
   - Build an open-hole porosity packet from a public LAS file one stage at a time, from reusable template to gas-crossover fill and the final two-window packet.
+
+### Computed-Channel NumPy Recipes
+
+- `computed_numpy/cbl_log_example_numpy_computed.ipynb`
+  - Compute derived channels with NumPy arrays, then generate layout YAML with wellplot builders.
+- `computed_numpy/forge16b_porosity_example_numpy_computed.ipynb`
+  - Compute derived channels with NumPy arrays, then generate layout YAML with wellplot builders.
+
+### Computed-Channel pandas Recipes
+
+- `computed_pandas/cbl_log_example_pandas_computed.ipynb`
+  - Compute derived channels with pandas tables, then generate layout YAML with wellplot builders.
+- `computed_pandas/forge16b_porosity_example_pandas_computed.ipynb`
+  - Compute derived channels with pandas tables, then generate layout YAML with wellplot builders.
 
 ## Runtime Note
 

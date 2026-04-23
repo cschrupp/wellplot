@@ -45,6 +45,8 @@ NOTEBOOKS_ROOT = EXAMPLES_DIR / "notebooks"
 DEVELOPER_NOTEBOOKS_DIR = NOTEBOOKS_ROOT / "developer"
 USER_NOTEBOOKS_DIR = NOTEBOOKS_ROOT / "user"
 USER_ASSETS_DIR = USER_NOTEBOOKS_DIR / "assets"
+USER_COMPUTED_NUMPY_DIR = USER_NOTEBOOKS_DIR / "computed_numpy"
+USER_COMPUTED_PANDAS_DIR = USER_NOTEBOOKS_DIR / "computed_pandas"
 
 KERNEL_METADATA = {
     "kernelspec": {
@@ -2703,6 +2705,1712 @@ def _user_adaptation_markdown(
     )
 
 
+def _computed_series_label(series: str) -> str:
+    """Return the user-facing label for one computed-channel series."""
+    labels = {"numpy": "NumPy", "pandas": "pandas"}
+    return labels[series]
+
+
+def _computed_series_dir(series: str) -> Path:
+    """Return the notebook directory for one computed-channel series."""
+    if series == "numpy":
+        return USER_COMPUTED_NUMPY_DIR
+    if series == "pandas":
+        return USER_COMPUTED_PANDAS_DIR
+    raise KeyError(f"Unsupported computed notebook series {series!r}.")
+
+
+def _computed_notebook_path(series: str, package_name: str) -> Path:
+    """Return the generated notebook path for one computed-channel recipe."""
+    suffix = f"{series}_computed"
+    return _computed_series_dir(series) / f"{package_name}_{suffix}.ipynb"
+
+
+def _computed_workspace_rel(series: str, package_name: str) -> str:
+    """Return the relative workspace folder used by one computed-channel notebook."""
+    return f"workspace/tutorials/computed_{series}/{package_name}"
+
+
+def _computed_output_rel(series: str, package_name: str, filename: str) -> str:
+    """Return the expected output path for one computed-channel notebook artifact."""
+    return f"{_computed_workspace_rel(series, package_name)}/{filename}"
+
+
+def _computed_source_section_id(package_name: str) -> str:
+    """Return the source section used by one computed-channel notebook."""
+    if package_name == "cbl_log_example":
+        return "main_pass"
+    if package_name == "forge16b_porosity_example":
+        return "upper_review"
+    raise KeyError(f"Unsupported computed notebook package {package_name!r}.")
+
+
+def _computed_source_channels(package_name: str) -> tuple[str, ...]:
+    """Return the source channels highlighted by one computed-channel notebook."""
+    if package_name == "cbl_log_example":
+        return ("ECGR_STGC", "CBL", "TT", "VDL")
+    if package_name == "forge16b_porosity_example":
+        return ("GR", "ILD", "ILM", "RHOB", "NPHI")
+    raise KeyError(f"Unsupported computed notebook package {package_name!r}.")
+
+
+def _clean_numeric_values(values: object) -> object:
+    """Return a numeric array with common LAS/DLIS null sentinels converted to NaN."""
+    import numpy as np
+
+    data = np.asarray(values, dtype=float)
+    return np.where(data <= -900.0, np.nan, data)
+
+
+def _moving_average(values: object, window: int) -> object:
+    """Return a simple NaN-tolerant moving average."""
+    import numpy as np
+
+    data = _clean_numeric_values(values)
+    valid = np.isfinite(data)
+    fill = float(np.nanmedian(data[valid])) if valid.any() else 0.0
+    filled = np.where(valid, data, fill)
+    kernel = np.ones(int(window), dtype=float) / float(window)
+    return np.convolve(filled, kernel, mode="same")
+
+
+def _computed_source_dataset(package_name: str) -> tuple[object, Path]:
+    """Load the source dataset used by a computed-channel notebook."""
+    from wellplot import load_logfile
+    from wellplot.logfile import load_datasets_for_logfile
+
+    logfile_path = _production_logfile_path(package_name)
+    spec = load_logfile(logfile_path)
+    datasets_by_section, source_paths_by_section = load_datasets_for_logfile(
+        spec,
+        base_dir=logfile_path.parent,
+    )
+    section_id = _computed_source_section_id(package_name)
+    return datasets_by_section[section_id], source_paths_by_section[section_id]
+
+
+def _computed_cbl_numpy_dataset(source_dataset: object) -> tuple[object, tuple[str, ...]]:
+    """Build the CBL NumPy computed-channel dataset."""
+    import numpy as np
+
+    from wellplot import DatasetBuilder
+
+    cbl = source_dataset.get_channel("CBL")
+    vdl = source_dataset.get_channel("VDL")
+    cbl_smooth = _moving_average(cbl.values, 41)
+    bond_index = np.clip((80.0 - cbl_smooth) / 80.0, 0.0, 1.0)
+    vdl_energy = np.nanmean(np.abs(np.asarray(vdl.values, dtype=float)), axis=1)
+    p95 = float(np.nanpercentile(vdl_energy, 95))
+    vdl_energy_norm = np.clip(vdl_energy / p95, 0.0, 1.0) if p95 else vdl_energy
+
+    dataset = (
+        DatasetBuilder(name="cbl-numpy-computed")
+        .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+        .add_curve(
+            mnemonic="CBL_SMOOTH_NP",
+            values=cbl_smooth,
+            index=cbl.depth,
+            index_unit=cbl.depth_unit,
+            value_unit="mV",
+            source="numpy moving average",
+            description="Moving-average CBL amplitude computed with NumPy.",
+        )
+        .add_curve(
+            mnemonic="BOND_INDEX_NP",
+            values=bond_index,
+            index=cbl.depth,
+            index_unit=cbl.depth_unit,
+            value_unit="fraction",
+            source="numpy expression",
+            description="Simple normalized bond index from smoothed CBL amplitude.",
+        )
+        .add_curve(
+            mnemonic="VDL_ENERGY_NP",
+            values=vdl_energy_norm,
+            index=vdl.depth,
+            index_unit=vdl.depth_unit,
+            value_unit="fraction",
+            source="numpy mean absolute amplitude",
+            description="Normalized VDL energy envelope computed from the raster trace.",
+        )
+        .build()
+    )
+    return dataset, ("CBL_SMOOTH_NP", "BOND_INDEX_NP", "VDL_ENERGY_NP")
+
+
+def _computed_cbl_pandas_dataset(source_dataset: object) -> tuple[object, tuple[str, ...]]:
+    """Build the CBL pandas computed-channel dataset."""
+    import pandas as pd
+
+    from wellplot import DatasetBuilder
+
+    cbl = source_dataset.get_channel("CBL")
+    tt = source_dataset.get_channel("TT")
+    gr = source_dataset.get_channel("ECGR_STGC")
+    frame = pd.DataFrame(
+        {
+            "CBL": cbl.values,
+            "TT": tt.values,
+            "GR": gr.values,
+        },
+        index=cbl.depth,
+    )
+    frame.index.name = "DEPTH_IN"
+    frame = frame.mask(frame <= -900.0)
+    frame["CBL_ROLLING_PD"] = frame["CBL"].rolling(41, center=True, min_periods=1).median()
+    frame["BOND_INDEX_PD"] = ((80.0 - frame["CBL_ROLLING_PD"]) / 80.0).clip(0.0, 1.0)
+    frame["TT_DELTA_PD"] = (
+        frame["TT"]
+        - frame["TT"]
+        .rolling(
+            41,
+            center=True,
+            min_periods=1,
+        )
+        .median()
+    )
+
+    dataset = (
+        DatasetBuilder(name="cbl-pandas-computed")
+        .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+        .add_dataframe(
+            frame[["CBL_ROLLING_PD", "BOND_INDEX_PD", "TT_DELTA_PD"]],
+            use_index=True,
+            index_unit=cbl.depth_unit,
+            curves={
+                "CBL_ROLLING_PD": {
+                    "value_unit": "mV",
+                    "source": "pandas rolling median",
+                    "description": "Rolling-median CBL amplitude computed with pandas.",
+                },
+                "BOND_INDEX_PD": {
+                    "value_unit": "fraction",
+                    "source": "pandas expression",
+                    "description": "Simple normalized bond index from rolling CBL amplitude.",
+                },
+                "TT_DELTA_PD": {
+                    "value_unit": "us",
+                    "source": "pandas rolling median",
+                    "description": "Transit-time deviation from a rolling median trend.",
+                },
+            },
+        )
+        .build()
+    )
+    return dataset, ("CBL_ROLLING_PD", "BOND_INDEX_PD", "TT_DELTA_PD")
+
+
+def _computed_porosity_numpy_dataset(source_dataset: object) -> tuple[object, tuple[str, ...]]:
+    """Build the porosity NumPy computed-channel dataset."""
+    import numpy as np
+
+    from wellplot import DatasetBuilder
+
+    rhob_channel = source_dataset.get_channel("RHOB")
+    depth = rhob_channel.depth
+    depth_unit = rhob_channel.depth_unit
+    rhob = _clean_numeric_values(rhob_channel.values)
+    nphi = _clean_numeric_values(source_dataset.get_channel("NPHI").values)
+    gr = _clean_numeric_values(source_dataset.get_channel("GR").values)
+    ild = _clean_numeric_values(source_dataset.get_channel("ILD").values)
+    ilm = _clean_numeric_values(source_dataset.get_channel("ILM").values)
+
+    phid = np.clip((2.65 - rhob) / (2.65 - 1.0) * 100.0, -15.0, 60.0)
+    neutron_density_separation = np.clip(nphi - phid, -30.0, 30.0)
+    resistivity_ratio = np.log10(np.clip(ild, 0.2, None) / np.clip(ilm, 0.2, None))
+    shale_index = np.clip((gr - 35.0) / (120.0 - 35.0), 0.0, 1.0)
+
+    dataset = (
+        DatasetBuilder(name="porosity-numpy-computed")
+        .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+        .add_curve(
+            mnemonic="PHID_NP",
+            values=phid,
+            index=depth,
+            index_unit=depth_unit,
+            value_unit="pu",
+            source="numpy density porosity",
+            description="Density porosity from RHOB using matrix/fluid density assumptions.",
+        )
+        .add_curve(
+            mnemonic="ND_SEP_NP",
+            values=neutron_density_separation,
+            index=depth,
+            index_unit=depth_unit,
+            value_unit="pu",
+            source="numpy expression",
+            description="NPHI minus computed density porosity.",
+        )
+        .add_curve(
+            mnemonic="RES_RATIO_NP",
+            values=resistivity_ratio,
+            index=depth,
+            index_unit=depth_unit,
+            value_unit="log10 ratio",
+            source="numpy log ratio",
+            description="Log10 deep-to-medium resistivity ratio.",
+        )
+        .add_curve(
+            mnemonic="VSH_GR_NP",
+            values=shale_index,
+            index=depth,
+            index_unit=depth_unit,
+            value_unit="fraction",
+            source="numpy linear GR index",
+            description="Simple gamma-ray shale index clipped to 0-1.",
+        )
+        .build()
+    )
+    return dataset, ("PHID_NP", "ND_SEP_NP", "RES_RATIO_NP", "VSH_GR_NP")
+
+
+def _computed_porosity_pandas_dataset(source_dataset: object) -> tuple[object, tuple[str, ...]]:
+    """Build the porosity pandas computed-channel dataset."""
+    import numpy as np
+    import pandas as pd
+
+    from wellplot import DatasetBuilder
+
+    rhob_channel = source_dataset.get_channel("RHOB")
+    depth = rhob_channel.depth
+    depth_unit = rhob_channel.depth_unit
+    frame = pd.DataFrame(
+        {
+            "GR": source_dataset.get_channel("GR").values,
+            "ILD": source_dataset.get_channel("ILD").values,
+            "ILM": source_dataset.get_channel("ILM").values,
+            "RHOB": rhob_channel.values,
+            "NPHI": source_dataset.get_channel("NPHI").values,
+        },
+        index=depth,
+    )
+    frame.index.name = "DEPTH_FT"
+    frame = frame.mask(frame <= -900.0)
+    frame["GR_SMOOTH_PD"] = frame["GR"].rolling(21, center=True, min_periods=1).mean()
+    frame["PHID_PD"] = ((2.65 - frame["RHOB"]) / (2.65 - 1.0) * 100.0).clip(-15.0, 60.0)
+    frame["ND_SEP_PD"] = (frame["NPHI"] - frame["PHID_PD"]).clip(-30.0, 30.0)
+    frame["RES_RATIO_PD"] = np.log10(frame["ILD"].clip(lower=0.2) / frame["ILM"].clip(lower=0.2))
+    frame["VSH_GR_PD"] = ((frame["GR_SMOOTH_PD"] - 35.0) / (120.0 - 35.0)).clip(0.0, 1.0)
+
+    dataset = (
+        DatasetBuilder(name="porosity-pandas-computed")
+        .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+        .add_dataframe(
+            frame[["GR_SMOOTH_PD", "PHID_PD", "ND_SEP_PD", "RES_RATIO_PD", "VSH_GR_PD"]],
+            use_index=True,
+            index_unit=depth_unit,
+            curves={
+                "GR_SMOOTH_PD": {
+                    "value_unit": "gAPI",
+                    "source": "pandas rolling mean",
+                    "description": "Rolling-mean gamma ray for shale-index stabilization.",
+                },
+                "PHID_PD": {
+                    "value_unit": "pu",
+                    "source": "pandas density porosity",
+                    "description": "Density porosity from RHOB.",
+                },
+                "ND_SEP_PD": {
+                    "value_unit": "pu",
+                    "source": "pandas expression",
+                    "description": "NPHI minus computed density porosity.",
+                },
+                "RES_RATIO_PD": {
+                    "value_unit": "log10 ratio",
+                    "source": "pandas expression",
+                    "description": "Log10 deep-to-medium resistivity ratio.",
+                },
+                "VSH_GR_PD": {
+                    "value_unit": "fraction",
+                    "source": "pandas expression",
+                    "description": "Simple gamma-ray shale index clipped to 0-1.",
+                },
+            },
+        )
+        .build()
+    )
+    return dataset, ("GR_SMOOTH_PD", "PHID_PD", "ND_SEP_PD", "RES_RATIO_PD", "VSH_GR_PD")
+
+
+def _computed_dataset(
+    package_name: str,
+    series: str,
+    source_dataset: object,
+) -> tuple[object, tuple[str, ...]]:
+    """Build the computed dataset for one notebook."""
+    if package_name == "cbl_log_example" and series == "numpy":
+        return _computed_cbl_numpy_dataset(source_dataset)
+    if package_name == "cbl_log_example" and series == "pandas":
+        return _computed_cbl_pandas_dataset(source_dataset)
+    if package_name == "forge16b_porosity_example" and series == "numpy":
+        return _computed_porosity_numpy_dataset(source_dataset)
+    if package_name == "forge16b_porosity_example" and series == "pandas":
+        return _computed_porosity_pandas_dataset(source_dataset)
+    raise KeyError(f"Unsupported computed recipe {package_name!r}/{series!r}.")
+
+
+def _computed_channel_stats(dataset: object, channels: tuple[str, ...]) -> str:
+    """Return deterministic summary lines for computed channels."""
+    import numpy as np
+
+    lines = ["Computed channels added:"]
+    for mnemonic in channels:
+        channel = dataset.get_channel(mnemonic)
+        values = _clean_numeric_values(channel.values)
+        finite = values[np.isfinite(values)]
+        if finite.size == 0:
+            lines.append(f"  {mnemonic}: no finite values")
+            continue
+        lines.append(
+            f"  {mnemonic}: min={np.nanmin(finite):.3g}, "
+            f"p50={np.nanpercentile(finite, 50):.3g}, max={np.nanmax(finite):.3g}"
+        )
+    return "\n".join(lines)
+
+
+def _computed_report(
+    package_name: str,
+    series: str,
+    dataset: object,
+) -> object:
+    """Build the programmatic report for one computed-channel notebook."""
+    if package_name == "cbl_log_example":
+        return _computed_cbl_report(series, dataset)
+    if package_name == "forge16b_porosity_example":
+        return _computed_porosity_report(series, dataset)
+    raise KeyError(f"Unsupported computed notebook package {package_name!r}.")
+
+
+def _computed_header_objects() -> dict[str, object]:
+    """Return compact track-header objects used by computed notebooks."""
+    return {
+        "objects": [
+            {"kind": "title", "enabled": False, "reserve_space": False},
+            {"kind": "scale", "enabled": True, "line_units": 1},
+            {"kind": "legend", "enabled": True, "line_units": 2},
+            {"kind": "divisions", "enabled": False, "reserve_space": False},
+        ]
+    }
+
+
+def _computed_reference_track() -> dict[str, object]:
+    """Return the reference-track configuration used by computed notebooks."""
+    return {
+        "axis": "depth",
+        "define_layout": True,
+        "unit": "ft",
+        "scale_ratio": 240,
+        "major_step": 10,
+        "secondary_grid": {"display": True, "line_count": 5},
+        "header": {"display_unit": True, "display_scale": True},
+    }
+
+
+def _computed_base_builder(
+    *,
+    name: str,
+    method_label: str,
+    package_name: str,
+    output_filename: str,
+    source_dataset: object,
+) -> object:
+    """Return a base LogBuilder configured for computed-channel notebooks."""
+    from wellplot import LogBuilder
+
+    builder = LogBuilder(name=name)
+    builder.set_render(
+        backend="matplotlib",
+        output_path=_computed_output_rel(
+            method_label.lower(),
+            package_name,
+            f"renders/{output_filename}",
+        ),
+        dpi=150,
+    )
+    builder.set_page(
+        size="A4",
+        orientation="portrait",
+        continuous=False,
+        bottom_track_header_enabled=True,
+        margin_left_mm=0,
+        margin_right_mm=8,
+        margin_top_mm=0,
+        margin_bottom_mm=0,
+        track_gap_mm=0,
+        header_height_mm=0,
+        footer_height_mm=0,
+        track_header_height_mm=26,
+    )
+    builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+    builder.set_heading(
+        enabled=True,
+        provider_name="wellplot",
+        service_titles=[
+            {
+                "value": name,
+                "alignment": "center",
+                "font_size": 15,
+                "bold": True,
+                "auto_adjust": True,
+            }
+        ],
+        general_fields=[
+            {"key": "well", "label": "Well", "value": source_dataset.well_metadata.get("WELL", "")},
+            {"key": "method", "label": "Computed With", "value": method_label},
+            {"key": "workflow", "label": "Layout Source", "value": "LogBuilder + save_report"},
+        ],
+        tail_enabled=False,
+    )
+    builder.set_remarks(
+        [
+            {
+                "title": "Computed-Channel Recipe",
+                "lines": [
+                    f"This notebook computes derived channels with {method_label} and attaches them to an in-memory WellDataset.",
+                    "The YAML is generated from wellplot builders instead of hand-edited text.",
+                    "The saved YAML captures the layout; computed channels are recreated by the notebook code.",
+                ],
+                "alignment": "left",
+            }
+        ]
+    )
+    builder.set_on_missing("skip")
+    return builder
+
+
+def _computed_cbl_report(series: str, dataset: object) -> object:
+    """Build the CBL computed-channel report."""
+    method_label = _computed_series_label(series)
+    smooth_channel = "CBL_SMOOTH_NP" if series == "numpy" else "CBL_ROLLING_PD"
+    bond_channel = "BOND_INDEX_NP" if series == "numpy" else "BOND_INDEX_PD"
+    diagnostic_channel = "VDL_ENERGY_NP" if series == "numpy" else "TT_DELTA_PD"
+    diagnostic_label = "VDL Energy" if series == "numpy" else "TT Delta"
+    diagnostic_scale = (
+        {"kind": "linear", "min": 0, "max": 1}
+        if series == "numpy"
+        else {"kind": "linear", "min": -50, "max": 50}
+    )
+    builder = _computed_base_builder(
+        name=f"CBL Computed {method_label} Recipe",
+        method_label=method_label,
+        package_name="cbl_log_example",
+        output_filename=f"cbl_{series}_computed.pdf",
+        source_dataset=dataset,
+    )
+    builder.set_depth_range(8230, 8490)
+    header = _computed_header_objects()
+    section = builder.add_section(
+        "main_pass",
+        dataset=dataset,
+        title=f"Main Pass - {method_label} Computed Channels",
+        subtitle="Raw CBL, computed bond index, and VDL context",
+        depth_range=(8230, 8490),
+        source_name="CBL_Main.dlis + notebook computed channels",
+    )
+    section.add_track(
+        id="gr", title="", kind="normal", width_mm=32, position=1, track_header=header
+    )
+    section.add_track(
+        id="depth",
+        title="",
+        kind="reference",
+        width_mm=24,
+        position=2,
+        reference=_computed_reference_track(),
+        track_header=header,
+    )
+    section.add_track(
+        id="cbl",
+        title="",
+        kind="normal",
+        width_mm=42,
+        position=3,
+        track_header=header,
+    )
+    section.add_track(
+        id="computed",
+        title="",
+        kind="normal",
+        width_mm=36,
+        position=4,
+        track_header=header,
+    )
+    section.add_track(
+        id="vdl",
+        title="",
+        kind="array",
+        width_mm=48,
+        position=5,
+        x_scale={"kind": "linear", "min": 200, "max": 1200},
+        grid={"vertical": {"main": {"visible": False}, "secondary": {"visible": False}}},
+        track_header=header,
+    )
+    section.add_curve(
+        channel="ECGR_STGC",
+        track_id="gr",
+        label="Gamma Ray",
+        style={"color": "#15803d", "line_width": 0.75},
+        scale={"kind": "linear", "min": 0, "max": 200},
+    )
+    section.add_curve(
+        channel="CBL",
+        track_id="cbl",
+        label="CBL Raw",
+        style={"color": "#111111", "line_width": 0.7},
+        scale={"kind": "linear", "min": 0, "max": 100},
+    )
+    section.add_curve(
+        channel=smooth_channel,
+        track_id="cbl",
+        label="CBL Smoothed",
+        style={"color": "#1d4ed8", "line_width": 0.9, "line_style": "--"},
+        scale={"kind": "linear", "min": 0, "max": 100},
+        header_display={"wrap_name": True},
+    )
+    section.add_curve(
+        channel=bond_channel,
+        track_id="computed",
+        label="Bond Index",
+        style={"color": "#b45309", "line_width": 0.9},
+        scale={"kind": "linear", "min": 0, "max": 1},
+        fill={"kind": "to_lower_limit", "label": "Higher bond", "color": "#fbbf24", "alpha": 0.25},
+    )
+    section.add_curve(
+        channel=diagnostic_channel,
+        track_id="computed",
+        label=diagnostic_label,
+        style={"color": "#7c3aed", "line_width": 0.8, "line_style": ":"},
+        scale=diagnostic_scale,
+        header_display={"wrap_name": True},
+    )
+    section.add_raster(
+        channel="VDL",
+        track_id="vdl",
+        label="VDL",
+        profile="vdl",
+        colorbar={"enabled": True, "label": "Amplitude", "position": "header"},
+        sample_axis={"enabled": True, "unit": "us", "min": 200, "max": 1200, "ticks": 5},
+    )
+    return builder.build()
+
+
+def _computed_porosity_report(series: str, dataset: object) -> object:
+    """Build the porosity computed-channel report."""
+    method_label = _computed_series_label(series)
+    phid_channel = "PHID_NP" if series == "numpy" else "PHID_PD"
+    nd_sep_channel = "ND_SEP_NP" if series == "numpy" else "ND_SEP_PD"
+    res_ratio_channel = "RES_RATIO_NP" if series == "numpy" else "RES_RATIO_PD"
+    vsh_channel = "VSH_GR_NP" if series == "numpy" else "VSH_GR_PD"
+    gr_channel = "GR" if series == "numpy" else "GR_SMOOTH_PD"
+    builder = _computed_base_builder(
+        name=f"Porosity Computed {method_label} Recipe",
+        method_label=method_label,
+        package_name="forge16b_porosity_example",
+        output_filename=f"porosity_{series}_computed.pdf",
+        source_dataset=dataset,
+    )
+    builder.set_depth_range(8400, 9300)
+    header = _computed_header_objects()
+    section = builder.add_section(
+        "upper_review",
+        dataset=dataset,
+        title=f"Upper Review - {method_label} Computed Channels",
+        subtitle="Density porosity, neutron-density separation, and resistivity ratio",
+        depth_range=(8400, 9300),
+        source_name="30-23a-3 8117_d.las + notebook computed channels",
+    )
+    section.add_track(
+        id="gr", title="", kind="normal", width_mm=34, position=1, track_header=header
+    )
+    section.add_track(
+        id="depth",
+        title="",
+        kind="reference",
+        width_mm=24,
+        position=2,
+        reference=_computed_reference_track(),
+        track_header=header,
+    )
+    section.add_track(
+        id="res",
+        title="",
+        kind="normal",
+        width_mm=42,
+        position=3,
+        track_header=header,
+    )
+    section.add_track(
+        id="por",
+        title="",
+        kind="normal",
+        width_mm=48,
+        position=4,
+        track_header=header,
+    )
+    section.add_track(
+        id="computed",
+        title="",
+        kind="normal",
+        width_mm=34,
+        position=5,
+        track_header=header,
+    )
+    section.add_curve(
+        channel=gr_channel,
+        track_id="gr",
+        label="Gamma Ray" if series == "numpy" else "GR Smooth",
+        style={"color": "#16a34a", "line_width": 0.8},
+        scale={"kind": "linear", "min": 0, "max": 150},
+        fill={"kind": "to_lower_limit", "label": "GR Fill", "color": "#8fd19e", "alpha": 0.22},
+    )
+    section.add_curve(
+        channel=vsh_channel,
+        track_id="gr",
+        label="GR Shale Index",
+        style={"color": "#b45309", "line_width": 0.8, "line_style": "--"},
+        scale={"kind": "linear", "min": 0, "max": 1},
+        header_display={"wrap_name": True},
+    )
+    section.add_curve(
+        channel="ILD",
+        track_id="res",
+        label="ILD",
+        style={"color": "#111111", "line_width": 0.75},
+        scale={"kind": "log", "min": 0.2, "max": 2000},
+    )
+    section.add_curve(
+        channel="ILM",
+        track_id="res",
+        label="ILM",
+        style={"color": "#2142ff", "line_width": 0.7, "line_style": "--"},
+        scale={"kind": "log", "min": 0.2, "max": 2000},
+    )
+    section.add_curve(
+        channel="NPHI",
+        track_id="por",
+        label="NPHI",
+        style={"color": "#2142ff", "line_width": 0.75},
+        scale={"kind": "linear", "min": -5, "max": 45, "reverse": True},
+        fill={
+            "kind": "between_curves",
+            "other_channel": phid_channel,
+            "label": "N-D Crossover",
+            "crossover": {
+                "enabled": True,
+                "left_color": "#bfdbfe",
+                "right_color": "#fbbf24",
+                "alpha": 0.28,
+            },
+        },
+    )
+    section.add_curve(
+        channel=phid_channel,
+        track_id="por",
+        label="PHID from RHOB",
+        style={"color": "#111111", "line_width": 0.75},
+        scale={"kind": "linear", "min": -5, "max": 45, "reverse": True},
+        header_display={"wrap_name": True},
+    )
+    section.add_curve(
+        channel=res_ratio_channel,
+        track_id="computed",
+        label="Log ILD/ILM",
+        style={"color": "#7c3aed", "line_width": 0.8},
+        scale={"kind": "linear", "min": -0.5, "max": 0.5},
+        header_display={"wrap_name": True},
+    )
+    section.add_curve(
+        channel=nd_sep_channel,
+        track_id="computed",
+        label="NPHI-PHID",
+        style={"color": "#d97706", "line_width": 0.8, "line_style": "--"},
+        scale={"kind": "linear", "min": -30, "max": 30},
+        header_display={"wrap_name": True},
+    )
+    return builder.build()
+
+
+def _computed_intro_markdown(package_name: str, series: str) -> str:
+    """Return the opening markdown for one computed-channel notebook."""
+    method_label = _computed_series_label(series)
+    if package_name == "cbl_log_example":
+        title = f"CBL/VDL Computed Channels With {method_label}"
+        focus = "cement-bond interpretation curves from the CBL/VDL production example"
+    else:
+        title = f"Density-Neutron Computed Channels With {method_label}"
+        focus = "porosity and gas-crossover curves from the open-hole production example"
+    return _join_markdown_lines(
+        [
+            f"# {title}",
+            "",
+            f"This recipe uses {method_label} to compute {focus}.",
+            "",
+            "The important shift from the YAML-first notebooks is that the data and the layout are both created from Python:",
+            "",
+            "- source channels are loaded from the public example data",
+            "- derived channels are computed in the notebook and attached to a working `WellDataset`",
+            "- `LogBuilder` and `SectionBuilder` create tracks, bindings, fills, headings, and remarks",
+            "- `save_report(...)` writes the generated YAML layout artifact",
+            "- `render_report(...)` renders the in-memory report that still carries the computed channels",
+            "",
+            "Important limitation: the saved YAML records the layout, but it does not persist the computed channel arrays by itself. To reproduce the computed curves, rerun the notebook or export the computed dataset with a project-specific data export step.",
+        ]
+    )
+
+
+def _computed_setup_code(package_name: str, series: str) -> str:
+    """Return setup code for one computed-channel notebook."""
+    section_id = _computed_source_section_id(package_name)
+    return dedent(
+        f"""
+        from pathlib import Path
+
+        try:
+            import wellplot
+        except ImportError as exc:
+            raise RuntimeError(
+                "Install the published 'wellplot' package in the active environment "
+                "before running this notebook."
+            ) from exc
+
+        cwd = Path.cwd().resolve()
+        REPO_ROOT = next((path for path in (cwd, *cwd.parents) if (path / "examples").exists()), None)
+        if REPO_ROOT is None:
+            raise RuntimeError(
+                "Run this notebook from a checkout of the wellplot repository so the "
+                "example files and sample data are available."
+            )
+
+        package_dir = REPO_ROOT / "examples" / "production" / "{package_name}"
+        example_logfile = package_dir / "full_reconstruction.log.yaml"
+        source_section = "{section_id}"
+        tutorial_dir = REPO_ROOT / "{_computed_workspace_rel(series, package_name)}"
+        render_dir = tutorial_dir / "renders"
+        tutorial_dir.mkdir(parents=True, exist_ok=True)
+        render_dir.mkdir(parents=True, exist_ok=True)
+
+        print("wellplot version:", wellplot.__version__)
+        print("Production example:", example_logfile.relative_to(REPO_ROOT))
+        print("Source section:", source_section)
+        print("Tutorial workspace:", tutorial_dir.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _computed_setup_output(package_name: str, series: str) -> str:
+    """Return deterministic setup output for one computed-channel notebook."""
+    from wellplot import __version__ as wellplot_version
+
+    return "\n".join(
+        [
+            f"wellplot version: {wellplot_version}",
+            f"Production example: examples/production/{package_name}/full_reconstruction.log.yaml",
+            f"Source section: {_computed_source_section_id(package_name)}",
+            f"Tutorial workspace: {_computed_workspace_rel(series, package_name)}",
+        ]
+    )
+
+
+def _computed_inspection_code(package_name: str) -> str:
+    """Return source-data inspection code for one computed-channel notebook."""
+    wanted = ", ".join(repr(channel) for channel in _computed_source_channels(package_name))
+    return dedent(
+        f"""
+        from wellplot import load_datasets_for_logfile, load_logfile
+
+        spec = load_logfile(example_logfile)
+        datasets_by_section, source_paths_by_section = load_datasets_for_logfile(
+            spec,
+            base_dir=example_logfile.parent,
+        )
+        source_dataset = datasets_by_section[source_section]
+        source_path = source_paths_by_section[source_section]
+
+        wanted_channels = [{wanted}]
+        print("Source file:", source_path.relative_to(REPO_ROOT))
+        print("Dataset name:", source_dataset.name)
+        print("Depth range, ft:", tuple(round(value, 2) for value in source_dataset.depth_range("ft")))
+        print("Channels used here:")
+        for mnemonic in wanted_channels:
+            channel = source_dataset.get_channel(mnemonic)
+            print(f"  {{mnemonic}}: {{type(channel).__name__}}, unit={{getattr(channel, 'value_unit', None)}}")
+        """
+    ).strip()
+
+
+def _computed_inspection_output(package_name: str) -> str:
+    """Return deterministic inspection output for one computed-channel notebook."""
+    dataset, source_path = _computed_source_dataset(package_name)
+    lines = [
+        f"Source file: {_relative_display_path(source_path)}",
+        f"Dataset name: {dataset.name}",
+        f"Depth range, ft: {tuple(round(value, 2) for value in dataset.depth_range('ft'))}",
+        "Channels used here:",
+    ]
+    for mnemonic in _computed_source_channels(package_name):
+        channel = dataset.get_channel(mnemonic)
+        lines.append(
+            f"  {mnemonic}: {type(channel).__name__}, unit={getattr(channel, 'value_unit', None)}"
+        )
+    return "\n".join(lines)
+
+
+def _computed_compute_code(package_name: str, series: str) -> str:
+    """Return the computed-channel code cell for one notebook."""
+    if package_name == "cbl_log_example" and series == "numpy":
+        return _computed_cbl_numpy_code()
+    if package_name == "cbl_log_example" and series == "pandas":
+        return _computed_cbl_pandas_code()
+    if package_name == "forge16b_porosity_example" and series == "numpy":
+        return _computed_porosity_numpy_code()
+    if package_name == "forge16b_porosity_example" and series == "pandas":
+        return _computed_porosity_pandas_code()
+    raise KeyError(f"Unsupported computed recipe {package_name!r}/{series!r}.")
+
+
+def _computed_cbl_numpy_code() -> str:
+    """Return CBL NumPy computation code."""
+    return dedent(
+        """
+        import numpy as np
+
+        from wellplot import DatasetBuilder
+
+        def clean_curve(values: object) -> np.ndarray:
+            \"\"\"Replace common LAS/DLIS null sentinels with NaN.\"\"\"
+            data = np.asarray(values, dtype=float)
+            return np.where(data <= -900.0, np.nan, data)
+
+        def moving_average(values: object, window: int) -> np.ndarray:
+            \"\"\"Return a simple NaN-tolerant moving average.\"\"\"
+            data = clean_curve(values)
+            valid = np.isfinite(data)
+            fill = float(np.nanmedian(data[valid])) if valid.any() else 0.0
+            filled = np.where(valid, data, fill)
+            kernel = np.ones(window, dtype=float) / float(window)
+            return np.convolve(filled, kernel, mode="same")
+
+        cbl = source_dataset.get_channel("CBL")
+        vdl = source_dataset.get_channel("VDL")
+
+        cbl_smooth = moving_average(cbl.values, window=41)
+        bond_index = np.clip((80.0 - cbl_smooth) / 80.0, 0.0, 1.0)
+        vdl_energy = np.nanmean(np.abs(np.asarray(vdl.values, dtype=float)), axis=1)
+        vdl_energy_norm = np.clip(vdl_energy / np.nanpercentile(vdl_energy, 95), 0.0, 1.0)
+
+        working_dataset = (
+            DatasetBuilder(name="cbl-numpy-computed")
+            .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+            .add_curve(
+                mnemonic="CBL_SMOOTH_NP",
+                values=cbl_smooth,
+                index=cbl.depth,
+                index_unit=cbl.depth_unit,
+                value_unit="mV",
+                description="Moving-average CBL amplitude computed with NumPy.",
+            )
+            .add_curve(
+                mnemonic="BOND_INDEX_NP",
+                values=bond_index,
+                index=cbl.depth,
+                index_unit=cbl.depth_unit,
+                value_unit="fraction",
+                description="Simple normalized bond index from smoothed CBL amplitude.",
+            )
+            .add_curve(
+                mnemonic="VDL_ENERGY_NP",
+                values=vdl_energy_norm,
+                index=vdl.depth,
+                index_unit=vdl.depth_unit,
+                value_unit="fraction",
+                description="Normalized VDL energy envelope computed from the raster trace.",
+            )
+            .build()
+        )
+
+        computed_channels = ("CBL_SMOOTH_NP", "BOND_INDEX_NP", "VDL_ENERGY_NP")
+        print("Working dataset:", working_dataset.name)
+        print("Computed channels added:")
+        for mnemonic in computed_channels:
+            channel = working_dataset.get_channel(mnemonic)
+            values = clean_curve(channel.values)
+            print(
+                f"  {mnemonic}: min={np.nanmin(values):.3g}, "
+                f"p50={np.nanpercentile(values, 50):.3g}, max={np.nanmax(values):.3g}"
+            )
+        """
+    ).strip()
+
+
+def _computed_cbl_pandas_code() -> str:
+    """Return CBL pandas computation code."""
+    return dedent(
+        """
+        import pandas as pd
+
+        from wellplot import DatasetBuilder
+
+        cbl = source_dataset.get_channel("CBL")
+        tt = source_dataset.get_channel("TT")
+        gr = source_dataset.get_channel("ECGR_STGC")
+
+        frame = pd.DataFrame(
+            {
+                "CBL": cbl.values,
+                "TT": tt.values,
+                "GR": gr.values,
+            },
+            index=cbl.depth,
+        )
+        frame.index.name = "DEPTH_IN"
+        frame = frame.mask(frame <= -900.0)
+        frame["CBL_ROLLING_PD"] = frame["CBL"].rolling(41, center=True, min_periods=1).median()
+        frame["BOND_INDEX_PD"] = ((80.0 - frame["CBL_ROLLING_PD"]) / 80.0).clip(0.0, 1.0)
+        frame["TT_DELTA_PD"] = frame["TT"] - frame["TT"].rolling(
+            41,
+            center=True,
+            min_periods=1,
+        ).median()
+
+        working_dataset = (
+            DatasetBuilder(name="cbl-pandas-computed")
+            .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+            .add_dataframe(
+                frame[["CBL_ROLLING_PD", "BOND_INDEX_PD", "TT_DELTA_PD"]],
+                use_index=True,
+                index_unit=cbl.depth_unit,
+                curves={
+                    "CBL_ROLLING_PD": {
+                        "value_unit": "mV",
+                        "description": "Rolling-median CBL amplitude computed with pandas.",
+                    },
+                    "BOND_INDEX_PD": {
+                        "value_unit": "fraction",
+                        "description": "Simple normalized bond index from rolling CBL amplitude.",
+                    },
+                    "TT_DELTA_PD": {
+                        "value_unit": "us",
+                        "description": "Transit-time deviation from a rolling median trend.",
+                    },
+                },
+            )
+            .build()
+        )
+
+        computed_channels = ("CBL_ROLLING_PD", "BOND_INDEX_PD", "TT_DELTA_PD")
+        print("Working dataset:", working_dataset.name)
+        print("Computed channels added:")
+        for mnemonic in computed_channels:
+            series = frame[mnemonic]
+            print(
+                f"  {mnemonic}: min={series.min():.3g}, "
+                f"p50={series.quantile(0.5):.3g}, max={series.max():.3g}"
+            )
+        """
+    ).strip()
+
+
+def _computed_porosity_numpy_code() -> str:
+    """Return porosity NumPy computation code."""
+    return dedent(
+        """
+        import numpy as np
+
+        from wellplot import DatasetBuilder
+
+        def clean_curve(values: object) -> np.ndarray:
+            \"\"\"Replace common LAS/DLIS null sentinels with NaN.\"\"\"
+            data = np.asarray(values, dtype=float)
+            return np.where(data <= -900.0, np.nan, data)
+
+        rhob_channel = source_dataset.get_channel("RHOB")
+        depth = rhob_channel.depth
+        depth_unit = rhob_channel.depth_unit
+
+        rhob = clean_curve(rhob_channel.values)
+        nphi = clean_curve(source_dataset.get_channel("NPHI").values)
+        gr = clean_curve(source_dataset.get_channel("GR").values)
+        ild = clean_curve(source_dataset.get_channel("ILD").values)
+        ilm = clean_curve(source_dataset.get_channel("ILM").values)
+
+        phid = np.clip((2.65 - rhob) / (2.65 - 1.0) * 100.0, -15.0, 60.0)
+        neutron_density_separation = np.clip(nphi - phid, -30.0, 30.0)
+        resistivity_ratio = np.log10(np.clip(ild, 0.2, None) / np.clip(ilm, 0.2, None))
+        shale_index = np.clip((gr - 35.0) / (120.0 - 35.0), 0.0, 1.0)
+
+        working_dataset = (
+            DatasetBuilder(name="porosity-numpy-computed")
+            .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+            .add_curve(
+                mnemonic="PHID_NP",
+                values=phid,
+                index=depth,
+                index_unit=depth_unit,
+                value_unit="pu",
+                description="Density porosity from RHOB.",
+            )
+            .add_curve(
+                mnemonic="ND_SEP_NP",
+                values=neutron_density_separation,
+                index=depth,
+                index_unit=depth_unit,
+                value_unit="pu",
+                description="NPHI minus computed density porosity.",
+            )
+            .add_curve(
+                mnemonic="RES_RATIO_NP",
+                values=resistivity_ratio,
+                index=depth,
+                index_unit=depth_unit,
+                value_unit="log10 ratio",
+                description="Log10 deep-to-medium resistivity ratio.",
+            )
+            .add_curve(
+                mnemonic="VSH_GR_NP",
+                values=shale_index,
+                index=depth,
+                index_unit=depth_unit,
+                value_unit="fraction",
+                description="Simple gamma-ray shale index clipped to 0-1.",
+            )
+            .build()
+        )
+
+        computed_channels = ("PHID_NP", "ND_SEP_NP", "RES_RATIO_NP", "VSH_GR_NP")
+        print("Working dataset:", working_dataset.name)
+        print("Computed channels added:")
+        for mnemonic in computed_channels:
+            values = clean_curve(working_dataset.get_channel(mnemonic).values)
+            print(
+                f"  {mnemonic}: min={np.nanmin(values):.3g}, "
+                f"p50={np.nanpercentile(values, 50):.3g}, max={np.nanmax(values):.3g}"
+            )
+        """
+    ).strip()
+
+
+def _computed_porosity_pandas_code() -> str:
+    """Return porosity pandas computation code."""
+    return dedent(
+        """
+        import numpy as np
+        import pandas as pd
+
+        from wellplot import DatasetBuilder
+
+        rhob_channel = source_dataset.get_channel("RHOB")
+        depth = rhob_channel.depth
+        depth_unit = rhob_channel.depth_unit
+
+        frame = pd.DataFrame(
+            {
+                "GR": source_dataset.get_channel("GR").values,
+                "ILD": source_dataset.get_channel("ILD").values,
+                "ILM": source_dataset.get_channel("ILM").values,
+                "RHOB": rhob_channel.values,
+                "NPHI": source_dataset.get_channel("NPHI").values,
+            },
+            index=depth,
+        )
+        frame.index.name = "DEPTH_FT"
+        frame = frame.mask(frame <= -900.0)
+        frame["GR_SMOOTH_PD"] = frame["GR"].rolling(21, center=True, min_periods=1).mean()
+        frame["PHID_PD"] = ((2.65 - frame["RHOB"]) / (2.65 - 1.0) * 100.0).clip(-15.0, 60.0)
+        frame["ND_SEP_PD"] = (frame["NPHI"] - frame["PHID_PD"]).clip(-30.0, 30.0)
+        frame["RES_RATIO_PD"] = np.log10(frame["ILD"].clip(lower=0.2) / frame["ILM"].clip(lower=0.2))
+        frame["VSH_GR_PD"] = ((frame["GR_SMOOTH_PD"] - 35.0) / (120.0 - 35.0)).clip(0.0, 1.0)
+
+        working_dataset = (
+            DatasetBuilder(name="porosity-pandas-computed")
+            .merge(source_dataset, merge_well_metadata=True, merge_provenance=True)
+            .add_dataframe(
+                frame[["GR_SMOOTH_PD", "PHID_PD", "ND_SEP_PD", "RES_RATIO_PD", "VSH_GR_PD"]],
+                use_index=True,
+                index_unit=depth_unit,
+                curves={
+                    "GR_SMOOTH_PD": {"value_unit": "gAPI", "description": "Rolling-mean gamma ray."},
+                    "PHID_PD": {"value_unit": "pu", "description": "Density porosity from RHOB."},
+                    "ND_SEP_PD": {"value_unit": "pu", "description": "NPHI minus density porosity."},
+                    "RES_RATIO_PD": {
+                        "value_unit": "log10 ratio",
+                        "description": "Log10 deep-to-medium resistivity ratio.",
+                    },
+                    "VSH_GR_PD": {
+                        "value_unit": "fraction",
+                        "description": "Simple gamma-ray shale index clipped to 0-1.",
+                    },
+                },
+            )
+            .build()
+        )
+
+        computed_channels = ("GR_SMOOTH_PD", "PHID_PD", "ND_SEP_PD", "RES_RATIO_PD", "VSH_GR_PD")
+        print("Working dataset:", working_dataset.name)
+        print("Computed channels added:")
+        for mnemonic in computed_channels:
+            series = frame[mnemonic]
+            print(
+                f"  {mnemonic}: min={series.min():.3g}, "
+                f"p50={series.quantile(0.5):.3g}, max={series.max():.3g}"
+            )
+        """
+    ).strip()
+
+
+def _computed_report_code(package_name: str, series: str) -> str:
+    """Return the programmatic report-builder code cell for one notebook."""
+    if package_name == "cbl_log_example":
+        return _computed_cbl_report_code(series)
+    if package_name == "forge16b_porosity_example":
+        return _computed_porosity_report_code(series)
+    raise KeyError(f"Unsupported computed recipe {package_name!r}/{series!r}.")
+
+
+def _computed_common_report_code_prelude(package_name: str, series: str) -> str:
+    """Return shared report-builder setup code."""
+    method_label = _computed_series_label(series)
+    return dedent(
+        f"""
+        from IPython.display import Code, display
+
+        from wellplot import LogBuilder, save_report
+
+        yaml_path = tutorial_dir / "{package_name}_{series}_computed.yaml"
+        pdf_path = render_dir / "{package_name}_{series}_computed.pdf"
+        method_label = "{method_label}"
+
+        header_objects = {{
+            "objects": [
+                {{"kind": "title", "enabled": False, "reserve_space": False}},
+                {{"kind": "scale", "enabled": True, "line_units": 1}},
+                {{"kind": "legend", "enabled": True, "line_units": 2}},
+                {{"kind": "divisions", "enabled": False, "reserve_space": False}},
+            ]
+        }}
+        reference_track = {{
+            "axis": "depth",
+            "define_layout": True,
+            "unit": "ft",
+            "scale_ratio": 240,
+            "major_step": 10,
+            "secondary_grid": {{"display": True, "line_count": 5}},
+            "header": {{"display_unit": True, "display_scale": True}},
+        }}
+        """
+    ).strip()
+
+
+def _computed_cbl_report_code(series: str) -> str:
+    """Return CBL report-builder code."""
+    smooth_channel = "CBL_SMOOTH_NP" if series == "numpy" else "CBL_ROLLING_PD"
+    bond_channel = "BOND_INDEX_NP" if series == "numpy" else "BOND_INDEX_PD"
+    diagnostic_channel = "VDL_ENERGY_NP" if series == "numpy" else "TT_DELTA_PD"
+    diagnostic_label = "VDL Energy" if series == "numpy" else "TT Delta"
+    diagnostic_scale = (
+        '{"kind": "linear", "min": 0, "max": 1}'
+        if series == "numpy"
+        else '{"kind": "linear", "min": -50, "max": 50}'
+    )
+    return "\n\n".join(
+        [
+            _computed_common_report_code_prelude("cbl_log_example", series),
+            dedent(
+                f"""
+                builder = LogBuilder(name=f"CBL Computed {{method_label}} Recipe")
+                builder.set_render(backend="matplotlib", output_path=str(pdf_path), dpi=150)
+                builder.set_page(
+                    size="A4",
+                    orientation="portrait",
+                    continuous=False,
+                    bottom_track_header_enabled=True,
+                    margin_left_mm=0,
+                    margin_right_mm=8,
+                    margin_top_mm=0,
+                    margin_bottom_mm=0,
+                    track_gap_mm=0,
+                    header_height_mm=0,
+                    footer_height_mm=0,
+                    track_header_height_mm=26,
+                )
+                builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+                builder.set_depth_range(8230, 8490)
+                builder.set_heading(
+                    enabled=True,
+                    provider_name="wellplot",
+                    service_titles=[
+                        {{
+                            "value": f"CBL Computed {{method_label}} Recipe",
+                            "alignment": "center",
+                            "font_size": 15,
+                            "bold": True,
+                            "auto_adjust": True,
+                        }}
+                    ],
+                    general_fields=[
+                        {{"key": "well", "label": "Well", "value": source_dataset.well_metadata.get("WELL", "")}},
+                        {{"key": "method", "label": "Computed With", "value": method_label}},
+                        {{"key": "workflow", "label": "Layout Source", "value": "LogBuilder + save_report"}},
+                    ],
+                    tail_enabled=False,
+                )
+                builder.set_remarks(
+                    [
+                        {{
+                            "title": "Computed-Channel Recipe",
+                            "lines": [
+                                (
+                                    f"This notebook computes derived channels with {{method_label}} "
+                                    "and attaches them to an in-memory WellDataset."
+                                ),
+                                "The YAML is generated from wellplot builders instead of hand-edited text.",
+                                (
+                                    "The saved YAML captures the layout; computed channels are "
+                                    "recreated by the notebook code."
+                                ),
+                            ],
+                            "alignment": "left",
+                        }}
+                    ]
+                )
+
+                section = builder.add_section(
+                    "main_pass",
+                    dataset=working_dataset,
+                    title=f"Main Pass - {{method_label}} Computed Channels",
+                    subtitle="Raw CBL, computed bond index, and VDL context",
+                    depth_range=(8230, 8490),
+                    source_name="CBL_Main.dlis + notebook computed channels",
+                )
+                section.add_track(id="gr", title="", kind="normal", width_mm=32, position=1, track_header=header_objects)
+                section.add_track(
+                    id="depth",
+                    title="",
+                    kind="reference",
+                    width_mm=24,
+                    position=2,
+                    reference=reference_track,
+                    track_header=header_objects,
+                )
+                section.add_track(id="cbl", title="", kind="normal", width_mm=42, position=3, track_header=header_objects)
+                section.add_track(
+                    id="computed",
+                    title="",
+                    kind="normal",
+                    width_mm=36,
+                    position=4,
+                    track_header=header_objects,
+                )
+                section.add_track(
+                    id="vdl",
+                    title="",
+                    kind="array",
+                    width_mm=48,
+                    position=5,
+                    x_scale={{"kind": "linear", "min": 200, "max": 1200}},
+                    grid={{"vertical": {{"main": {{"visible": False}}, "secondary": {{"visible": False}}}}}},
+                    track_header=header_objects,
+                )
+
+                section.add_curve(
+                    channel="ECGR_STGC",
+                    track_id="gr",
+                    label="Gamma Ray",
+                    style={{"color": "#15803d", "line_width": 0.75}},
+                    scale={{"kind": "linear", "min": 0, "max": 200}},
+                )
+                section.add_curve(
+                    channel="CBL",
+                    track_id="cbl",
+                    label="CBL Raw",
+                    style={{"color": "#111111", "line_width": 0.7}},
+                    scale={{"kind": "linear", "min": 0, "max": 100}},
+                )
+                section.add_curve(
+                    channel="{smooth_channel}",
+                    track_id="cbl",
+                    label="CBL Smoothed",
+                    style={{"color": "#1d4ed8", "line_width": 0.9, "line_style": "--"}},
+                    scale={{"kind": "linear", "min": 0, "max": 100}},
+                    header_display={{"wrap_name": True}},
+                )
+                section.add_curve(
+                    channel="{bond_channel}",
+                    track_id="computed",
+                    label="Bond Index",
+                    style={{"color": "#b45309", "line_width": 0.9}},
+                    scale={{"kind": "linear", "min": 0, "max": 1}},
+                    fill={{"kind": "to_lower_limit", "label": "Higher bond", "color": "#fbbf24", "alpha": 0.25}},
+                )
+                section.add_curve(
+                    channel="{diagnostic_channel}",
+                    track_id="computed",
+                    label="{diagnostic_label}",
+                    style={{"color": "#7c3aed", "line_width": 0.8, "line_style": ":"}},
+                    scale={diagnostic_scale},
+                    header_display={{"wrap_name": True}},
+                )
+                section.add_raster(
+                    channel="VDL",
+                    track_id="vdl",
+                    label="VDL",
+                    profile="vdl",
+                    colorbar={{"enabled": True, "label": "Amplitude", "position": "header"}},
+                    sample_axis={{"enabled": True, "unit": "us", "min": 200, "max": 1200, "ticks": 5}},
+                )
+
+                report = builder.build()
+                save_report(report, yaml_path)
+                print("Saved generated YAML:", yaml_path.relative_to(REPO_ROOT))
+                print("Layout was created with LogBuilder and SectionBuilder.")
+                print("Remember: rerun the notebook to recreate computed channel arrays.")
+                display(Code(yaml_path.read_text(), language="yaml"))
+                """
+            ).strip(),
+        ]
+    )
+
+
+def _computed_porosity_report_code(series: str) -> str:
+    """Return porosity report-builder code."""
+    phid_channel = "PHID_NP" if series == "numpy" else "PHID_PD"
+    nd_sep_channel = "ND_SEP_NP" if series == "numpy" else "ND_SEP_PD"
+    res_ratio_channel = "RES_RATIO_NP" if series == "numpy" else "RES_RATIO_PD"
+    vsh_channel = "VSH_GR_NP" if series == "numpy" else "VSH_GR_PD"
+    gr_channel = "GR" if series == "numpy" else "GR_SMOOTH_PD"
+    gr_label = "Gamma Ray" if series == "numpy" else "GR Smooth"
+    return "\n\n".join(
+        [
+            _computed_common_report_code_prelude("forge16b_porosity_example", series),
+            dedent(
+                f"""
+                builder = LogBuilder(name=f"Porosity Computed {{method_label}} Recipe")
+                builder.set_render(backend="matplotlib", output_path=str(pdf_path), dpi=150)
+                builder.set_page(
+                    size="A4",
+                    orientation="portrait",
+                    continuous=False,
+                    bottom_track_header_enabled=True,
+                    margin_left_mm=0,
+                    margin_right_mm=8,
+                    margin_top_mm=0,
+                    margin_bottom_mm=0,
+                    track_gap_mm=0,
+                    header_height_mm=0,
+                    footer_height_mm=0,
+                    track_header_height_mm=26,
+                )
+                builder.set_depth_axis(unit="ft", scale=240, major_step=10, minor_step=2)
+                builder.set_depth_range(8400, 9300)
+                builder.set_heading(
+                    enabled=True,
+                    provider_name="wellplot",
+                    service_titles=[
+                        {{
+                            "value": f"Porosity Computed {{method_label}} Recipe",
+                            "alignment": "center",
+                            "font_size": 15,
+                            "bold": True,
+                            "auto_adjust": True,
+                        }}
+                    ],
+                    general_fields=[
+                        {{"key": "well", "label": "Well", "value": source_dataset.well_metadata.get("WELL", "30-23a-3")}},
+                        {{"key": "method", "label": "Computed With", "value": method_label}},
+                        {{"key": "workflow", "label": "Layout Source", "value": "LogBuilder + save_report"}},
+                    ],
+                    tail_enabled=False,
+                )
+                builder.set_remarks(
+                    [
+                        {{
+                            "title": "Computed-Channel Recipe",
+                            "lines": [
+                                (
+                                    f"This notebook computes derived channels with {{method_label}} "
+                                    "and attaches them to an in-memory WellDataset."
+                                ),
+                                "The YAML is generated from wellplot builders instead of hand-edited text.",
+                                (
+                                    "The saved YAML captures the layout; computed channels are "
+                                    "recreated by the notebook code."
+                                ),
+                            ],
+                            "alignment": "left",
+                        }}
+                    ]
+                )
+
+                section = builder.add_section(
+                    "upper_review",
+                    dataset=working_dataset,
+                    title=f"Upper Review - {{method_label}} Computed Channels",
+                    subtitle="Density porosity, neutron-density separation, and resistivity ratio",
+                    depth_range=(8400, 9300),
+                    source_name="30-23a-3 8117_d.las + notebook computed channels",
+                )
+                section.add_track(id="gr", title="", kind="normal", width_mm=34, position=1, track_header=header_objects)
+                section.add_track(
+                    id="depth",
+                    title="",
+                    kind="reference",
+                    width_mm=24,
+                    position=2,
+                    reference=reference_track,
+                    track_header=header_objects,
+                )
+                section.add_track(id="res", title="", kind="normal", width_mm=42, position=3, track_header=header_objects)
+                section.add_track(id="por", title="", kind="normal", width_mm=48, position=4, track_header=header_objects)
+                section.add_track(
+                    id="computed",
+                    title="",
+                    kind="normal",
+                    width_mm=34,
+                    position=5,
+                    track_header=header_objects,
+                )
+
+                section.add_curve(
+                    channel="{gr_channel}",
+                    track_id="gr",
+                    label="{gr_label}",
+                    style={{"color": "#16a34a", "line_width": 0.8}},
+                    scale={{"kind": "linear", "min": 0, "max": 150}},
+                    fill={{"kind": "to_lower_limit", "label": "GR Fill", "color": "#8fd19e", "alpha": 0.22}},
+                )
+                section.add_curve(
+                    channel="{vsh_channel}",
+                    track_id="gr",
+                    label="GR Shale Index",
+                    style={{"color": "#b45309", "line_width": 0.8, "line_style": "--"}},
+                    scale={{"kind": "linear", "min": 0, "max": 1}},
+                    header_display={{"wrap_name": True}},
+                )
+                section.add_curve(
+                    channel="ILD",
+                    track_id="res",
+                    label="ILD",
+                    style={{"color": "#111111", "line_width": 0.75}},
+                    scale={{"kind": "log", "min": 0.2, "max": 2000}},
+                )
+                section.add_curve(
+                    channel="ILM",
+                    track_id="res",
+                    label="ILM",
+                    style={{"color": "#2142ff", "line_width": 0.7, "line_style": "--"}},
+                    scale={{"kind": "log", "min": 0.2, "max": 2000}},
+                )
+                section.add_curve(
+                    channel="NPHI",
+                    track_id="por",
+                    label="NPHI",
+                    style={{"color": "#2142ff", "line_width": 0.75}},
+                    scale={{"kind": "linear", "min": -5, "max": 45, "reverse": True}},
+                    fill={{
+                        "kind": "between_curves",
+                        "other_channel": "{phid_channel}",
+                        "label": "N-D Crossover",
+                        "crossover": {{
+                            "enabled": True,
+                            "left_color": "#bfdbfe",
+                            "right_color": "#fbbf24",
+                            "alpha": 0.28,
+                        }},
+                    }},
+                )
+                section.add_curve(
+                    channel="{phid_channel}",
+                    track_id="por",
+                    label="PHID from RHOB",
+                    style={{"color": "#111111", "line_width": 0.75}},
+                    scale={{"kind": "linear", "min": -5, "max": 45, "reverse": True}},
+                    header_display={{"wrap_name": True}},
+                )
+                section.add_curve(
+                    channel="{res_ratio_channel}",
+                    track_id="computed",
+                    label="Log ILD/ILM",
+                    style={{"color": "#7c3aed", "line_width": 0.8}},
+                    scale={{"kind": "linear", "min": -0.5, "max": 0.5}},
+                    header_display={{"wrap_name": True}},
+                )
+                section.add_curve(
+                    channel="{nd_sep_channel}",
+                    track_id="computed",
+                    label="NPHI-PHID",
+                    style={{"color": "#d97706", "line_width": 0.8, "line_style": "--"}},
+                    scale={{"kind": "linear", "min": -30, "max": 30}},
+                    header_display={{"wrap_name": True}},
+                )
+
+                report = builder.build()
+                save_report(report, yaml_path)
+                print("Saved generated YAML:", yaml_path.relative_to(REPO_ROOT))
+                print("Layout was created with LogBuilder and SectionBuilder.")
+                print("Remember: rerun the notebook to recreate computed channel arrays.")
+                display(Code(yaml_path.read_text(), language="yaml"))
+                """
+            ).strip(),
+        ]
+    )
+
+
+def _computed_report_output(package_name: str, series: str) -> str:
+    """Return deterministic report-build output for one computed notebook."""
+    return "\n".join(
+        [
+            f"Saved generated YAML: {_computed_output_rel(series, package_name, f'{package_name}_{series}_computed.yaml')}",
+            "Layout was created with LogBuilder and SectionBuilder.",
+            "Remember: rerun the notebook to recreate computed channel arrays.",
+        ]
+    )
+
+
+def _computed_render_code(package_name: str, series: str) -> str:
+    """Return the render code cell for one computed-channel notebook."""
+    return dedent(
+        """
+        from io import BytesIO
+
+        import matplotlib.pyplot as plt
+        from IPython.display import Image, display
+
+        from wellplot import render_report
+
+        preview_result = render_report(report)
+        preview_page_index = min(1, preview_result.page_count - 1)
+
+        buffer = BytesIO()
+        preview_result.artifact[preview_page_index].savefig(buffer, format="png", dpi=140)
+        preview_png = buffer.getvalue()
+        for figure in preview_result.artifact:
+            plt.close(figure)
+
+        display(Image(data=preview_png))
+
+        pdf_result = render_report(report, output_path=pdf_path)
+        print("Pages created:", pdf_result.page_count)
+        print("Preview page shown:", preview_page_index + 1)
+        print("PDF written to:", pdf_result.output_path.relative_to(REPO_ROOT))
+        """
+    ).strip()
+
+
+def _computed_render_outputs(
+    package_name: str,
+    series: str,
+) -> tuple[str, list[dict[str, object]]]:
+    """Render one computed-channel notebook preview and return output payloads."""
+    from wellplot import render_report
+
+    source_dataset, _source_path = _computed_source_dataset(package_name)
+    working_dataset, _computed_channels = _computed_dataset(package_name, series, source_dataset)
+    report = _computed_report(package_name, series, working_dataset)
+    result = render_report(report)
+    preview_page_index = min(1, result.page_count - 1)
+    png_by_page, page_count = _figures_to_png_bytes(
+        result.artifact,
+        page_indexes=(preview_page_index,),
+    )
+    pdf_filename = (
+        f"cbl_{series}_computed.pdf"
+        if package_name == "cbl_log_example"
+        else f"porosity_{series}_computed.pdf"
+    )
+    output = "\n".join(
+        [
+            f"Pages created: {page_count}",
+            f"Preview page shown: {preview_page_index + 1}",
+            f"PDF written to: {_computed_output_rel(series, package_name, f'renders/{pdf_filename}')}",
+        ]
+    )
+    return output, [png_output(png_by_page[preview_page_index])]
+
+
+def _computed_compute_output(package_name: str, series: str) -> str:
+    """Return deterministic compute-cell output for one computed-channel notebook."""
+    source_dataset, _source_path = _computed_source_dataset(package_name)
+    working_dataset, computed_channels = _computed_dataset(package_name, series, source_dataset)
+    return "\n".join(
+        [
+            f"Working dataset: {working_dataset.name}",
+            _computed_channel_stats(working_dataset, computed_channels),
+        ]
+    )
+
+
+def _computed_adaptation_markdown(package_name: str, series: str) -> str:
+    """Return final adaptation notes for one computed-channel notebook."""
+    method_label = _computed_series_label(series)
+    if package_name == "cbl_log_example":
+        example_tip = "replace the bond-index equation with your preferred cement-evaluation rule"
+    else:
+        example_tip = (
+            "replace the matrix/fluid density constants with values appropriate for your reservoir"
+        )
+    return _join_markdown_lines(
+        [
+            "## How To Adapt This Recipe",
+            "",
+            f"- keep the {method_label} computation cell separate from the layout cell so petrophysical logic and plotting logic remain reviewable",
+            f"- {example_tip}",
+            "- add every derived channel to `working_dataset` before creating the report builder",
+            "- use `LogBuilder` for repeatable YAML generation instead of copying and editing YAML by hand",
+            "- remember that saved YAML does not persist in-memory computed arrays; export computed data separately if you need a standalone file-only workflow",
+        ]
+    )
+
+
+def _computed_notebook(
+    package_name: str,
+    series: str,
+) -> dict[str, object]:
+    """Build one computed-channel user notebook."""
+    compute_output = _computed_compute_output(package_name, series)
+    render_output, render_preview_outputs = _computed_render_outputs(package_name, series)
+    cells = [
+        markdown_cell(_computed_intro_markdown(package_name, series)),
+        code_cell(
+            _computed_setup_code(package_name, series),
+            execution_count=1,
+            outputs=[stream_output(_computed_setup_output(package_name, series))],
+        ),
+        markdown_cell(
+            "## Inspect The Source Channels\n\nStart by loading the same source data used by the production example and confirming the channels you will compute from."
+        ),
+        code_cell(
+            _computed_inspection_code(package_name),
+            execution_count=2,
+            outputs=[stream_output(_computed_inspection_output(package_name))],
+        ),
+        markdown_cell(
+            "## Compute New Channels\n\nThis cell creates derived curves and attaches them to a working dataset. In your own well, this is where your interpretation logic belongs."
+        ),
+        code_cell(
+            _computed_compute_code(package_name, series),
+            execution_count=3,
+            outputs=[stream_output(compute_output)],
+        ),
+        markdown_cell(
+            "## Create The YAML Layout With Builder Functions\n\nUse `LogBuilder` and `SectionBuilder` to create the same YAML structure that a hand-written file would contain, then save it with `save_report(...)`."
+        ),
+        code_cell(
+            _computed_report_code(package_name, series),
+            execution_count=4,
+            outputs=[stream_output(_computed_report_output(package_name, series))],
+        ),
+        markdown_cell(
+            "## Render The Computed Report\n\nRender from the in-memory report object so `wellplot` can see both the generated layout and the computed channels."
+        ),
+        code_cell(
+            _computed_render_code(package_name, series),
+            execution_count=5,
+            outputs=[*render_preview_outputs, stream_output(render_output)],
+        ),
+        markdown_cell(_computed_adaptation_markdown(package_name, series)),
+    ]
+    return _notebook(cells)
+
+
 def _legacy_triple_combo_notebook() -> dict[str, object]:
     """Build the notebook for the legacy triple-combo document example."""
     title = "Triple Combo Legacy Document Walkthrough"
@@ -3026,12 +4734,28 @@ def _production_packages() -> list[Path]:
 def _write_notebook(path: Path, notebook: dict[str, object], *, check: bool) -> bool:
     """Write or check one notebook payload."""
     rendered = json.dumps(notebook, indent=2) + "\n"
+    rendered = _format_notebook_content(path, rendered)
     if check:
         current = path.read_text() if path.exists() else None
         if current != rendered:
             raise SystemExit(f"Notebook is out of date: {path}")
         return False
     return _write_if_changed(path, rendered)
+
+
+def _format_notebook_content(path: Path, rendered: str) -> str:
+    """Return notebook JSON normalized by Ruff's notebook formatter."""
+    with TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir) / path.name
+        temp_path.write_text(rendered)
+        subprocess.run(
+            ["ruff", "format", str(temp_path)],
+            check=True,
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        return temp_path.read_text()
 
 
 def _developer_grouped_notebook_list() -> dict[str, list[str]]:
@@ -3062,6 +4786,14 @@ def _root_readme_text() -> str:
     user_entries = sorted(
         _user_notebook_path(recipe.package_name).name for recipe in USER_PRODUCTION_RECIPES.values()
     )
+    computed_numpy_entries = sorted(
+        _computed_notebook_path("numpy", recipe.package_name).name
+        for recipe in USER_PRODUCTION_RECIPES.values()
+    )
+    computed_pandas_entries = sorted(
+        _computed_notebook_path("pandas", recipe.package_name).name
+        for recipe in USER_PRODUCTION_RECIPES.values()
+    )
     parts = [
         "# Example Notebooks",
         "",
@@ -3085,6 +4817,10 @@ def _root_readme_text() -> str:
     ]
     for entry in user_entries:
         parts.append(f"- `user/{entry}`")
+    for entry in computed_numpy_entries:
+        parts.append(f"- `user/computed_numpy/{entry}`")
+    for entry in computed_pandas_entries:
+        parts.append(f"- `user/computed_pandas/{entry}`")
     parts.extend(
         [
             "",
@@ -3168,10 +4904,40 @@ def _user_readme_text() -> str:
         "",
         "## Available Notebooks",
         "",
+        "### YAML-First Production Recipes",
+        "",
     ]
     for recipe in USER_PRODUCTION_RECIPES.values():
         parts.append(f"- `{_user_notebook_path(recipe.package_name).name}`")
         parts.append(f"  - {recipe.subtitle}")
+    parts.extend(
+        [
+            "",
+            "### Computed-Channel NumPy Recipes",
+            "",
+        ]
+    )
+    for recipe in USER_PRODUCTION_RECIPES.values():
+        parts.append(
+            f"- `computed_numpy/{_computed_notebook_path('numpy', recipe.package_name).name}`"
+        )
+        parts.append(
+            "  - Compute derived channels with NumPy arrays, then generate layout YAML with wellplot builders."
+        )
+    parts.extend(
+        [
+            "",
+            "### Computed-Channel pandas Recipes",
+            "",
+        ]
+    )
+    for recipe in USER_PRODUCTION_RECIPES.values():
+        parts.append(
+            f"- `computed_pandas/{_computed_notebook_path('pandas', recipe.package_name).name}`"
+        )
+        parts.append(
+            "  - Compute derived channels with pandas tables, then generate layout YAML with wellplot builders."
+        )
     parts.extend(
         [
             "",
@@ -3181,6 +4947,45 @@ def _user_readme_text() -> str:
             "  extras required by the example",
             "- run the notebooks from a checkout of this repository so the example files,",
             "  sample data, and preview assets are available",
+            "",
+            "## Regenerate",
+            "",
+            "```bash",
+            "uv run python scripts/generate_example_notebooks.py",
+            "```",
+            "",
+        ]
+    )
+    return "\n".join(parts)
+
+
+def _computed_series_readme_text(series: str) -> str:
+    """Return the generated README for one computed-channel notebook series."""
+    method_label = _computed_series_label(series)
+    parts = [
+        f"# Computed-Channel {method_label} Notebooks",
+        "",
+        "These notebooks start from the same two production examples as the YAML-first user recipes,",
+        f"but compute new interpretation channels with {method_label} before building the layout.",
+        "",
+        "The workflow is:",
+        "",
+        "- load the public example data",
+        "- compute derived channels in Python",
+        "- attach those channels to a `WellDataset`",
+        "- use `LogBuilder` and `SectionBuilder` to create the YAML-style layout",
+        "- save the generated YAML with `save_report(...)`",
+        "- render from the in-memory report so computed channels are available",
+        "",
+        "Important: the saved YAML is a layout artifact. It does not persist the computed channel arrays by itself.",
+        "",
+        "## Available Notebooks",
+        "",
+    ]
+    for recipe in USER_PRODUCTION_RECIPES.values():
+        parts.append(f"- `{_computed_notebook_path(series, recipe.package_name).name}`")
+    parts.extend(
+        [
             "",
             "## Regenerate",
             "",
@@ -3224,6 +5029,8 @@ def generate(*, check: bool = False) -> int:
     DEVELOPER_NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
     USER_NOTEBOOKS_DIR.mkdir(parents=True, exist_ok=True)
     USER_ASSETS_DIR.mkdir(parents=True, exist_ok=True)
+    USER_COMPUTED_NUMPY_DIR.mkdir(parents=True, exist_ok=True)
+    USER_COMPUTED_PANDAS_DIR.mkdir(parents=True, exist_ok=True)
     changes = 0
     expected_files: set[Path] = set()
 
@@ -3260,16 +5067,28 @@ def generate(*, check: bool = False) -> int:
         notebook, asset_changes = _user_production_notebook(recipe, check=check)
         output_path = _user_notebook_path(recipe.package_name)
         expected_files.add(output_path)
-        for preview in recipe.previews:
-            expected_files.add(USER_ASSETS_DIR / preview.asset_name)
+        tutorial = _user_tutorial_for_recipe(recipe)
+        for stage in tutorial.stages:
+            for preview in stage.previews:
+                expected_files.add(USER_ASSETS_DIR / preview.asset_name)
         changes += asset_changes
         if _write_notebook(output_path, notebook, check=check):
             changes += 1
+
+    for series in ("numpy", "pandas"):
+        for recipe in USER_PRODUCTION_RECIPES.values():
+            notebook = _computed_notebook(recipe.package_name, series)
+            output_path = _computed_notebook_path(series, recipe.package_name)
+            expected_files.add(output_path)
+            if _write_notebook(output_path, notebook, check=check):
+                changes += 1
 
     readmes = {
         NOTEBOOKS_ROOT / "README.md": _root_readme_text(),
         DEVELOPER_NOTEBOOKS_DIR / "README.md": _developer_readme_text(),
         USER_NOTEBOOKS_DIR / "README.md": _user_readme_text(),
+        USER_COMPUTED_NUMPY_DIR / "README.md": _computed_series_readme_text("numpy"),
+        USER_COMPUTED_PANDAS_DIR / "README.md": _computed_series_readme_text("pandas"),
     }
     for readme_path, readme_text in readmes.items():
         expected_files.add(readme_path)
