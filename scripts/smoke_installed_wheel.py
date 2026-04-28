@@ -147,7 +147,7 @@ def main() -> int:
             raise RuntimeError("wellplot MCP server did not expose a runnable server instance.")
 
         schema_payload = schema_resource().text
-        if "\"$schema\"" not in schema_payload:
+        if '"$schema"' not in schema_payload:
             raise RuntimeError("wellplot MCP schema resource did not contain JSON schema text.")
 
         example_ids = [item["id"] for item in production_example_manifest()["examples"]]
@@ -192,9 +192,7 @@ def main() -> int:
                     {"logfile_path": "examples/cbl_main.log.yaml"},
                 )
                 if validation.structuredContent.get("valid") is not True:
-                    raise RuntimeError(
-                        "Installed wheel MCP validate_logfile call did not succeed."
-                    )
+                    raise RuntimeError("Installed wheel MCP validate_logfile call did not succeed.")
 
         anyio.run(_exercise_stdio_server)
 

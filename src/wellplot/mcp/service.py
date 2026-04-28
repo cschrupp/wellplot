@@ -329,11 +329,7 @@ def _ensure_known_track_ids(spec: LogFileSpec, section_id: str, track_ids: list[
     _ensure_known_section(spec, section_id)
     section = _section_map_from_spec(spec)[section_id]
     tracks = list(section.get("tracks", []))
-    available = {
-        str(track.get("id", ""))
-        for track in tracks
-        if isinstance(track, dict)
-    }
+    available = {str(track.get("id", "")) for track in tracks if isinstance(track, dict)}
     missing = [track_id for track_id in track_ids if track_id not in available]
     if missing:
         raise TemplateValidationError(
