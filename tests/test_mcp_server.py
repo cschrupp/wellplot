@@ -30,7 +30,10 @@ import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
-from _mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
+try:
+    from tests._mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
+except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
+    from _mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
 from wellplot.errors import DependencyUnavailableError
 from wellplot.mcp.server import create_mcp_server, main
 
