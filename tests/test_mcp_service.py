@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -29,6 +30,8 @@ from pathlib import Path
 from wellplot.errors import PathAccessError, TemplateValidationError
 from wellplot.mcp import service
 
+HAS_LAS = importlib.util.find_spec("lasio") is not None
+HAS_DLIS = importlib.util.find_spec("dlisio") is not None
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_LOGFILE_TEXT = (REPO_ROOT / "examples" / "cbl_main.log.yaml").read_text(encoding="utf-8")
 
@@ -36,6 +39,7 @@ EXAMPLE_LOGFILE_TEXT = (REPO_ROOT / "examples" / "cbl_main.log.yaml").read_text(
 class McpServiceTests(unittest.TestCase):
     """Verify the pure-Python MCP service helpers."""
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_validate_logfile_success(self) -> None:
         """Validate a real example logfile under the repository root."""
         result = service.validate_logfile(
@@ -63,6 +67,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(result.section_ids, [])
         self.assertIn("root must be a mapping", result.message)
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_validate_logfile_text_success(self) -> None:
         """Validate unsaved logfile text relative to the provided base directory."""
         result = service.validate_logfile_text(
@@ -111,6 +116,7 @@ class McpServiceTests(unittest.TestCase):
             with self.assertRaises(PathAccessError):
                 service.validate_logfile(str(logfile_path), root=root)
 
+    @unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
     def test_inspect_logfile_returns_multisection_metadata(self) -> None:
         """Inspect a production example and expose section/source summaries."""
         result = service.inspect_logfile(
@@ -127,6 +133,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("workspace/data/CBL_Main.dlis", result.sections[0].source_path)
         self.assertIn("depth", result.sections[0].track_ids)
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_logfile_png_returns_png_bytes(self) -> None:
         """Render a PNG preview from a real logfile path."""
         png_bytes = service.preview_logfile_png(
@@ -137,6 +144,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_section_png_returns_png_bytes(self) -> None:
         """Render a section-scoped PNG preview from a real logfile path."""
         png_bytes = service.preview_section_png(
@@ -148,6 +156,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_track_png_returns_png_bytes(self) -> None:
         """Render a track-scoped PNG preview from a real logfile path."""
         inspection = service.inspect_logfile(
@@ -164,6 +173,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
+    @unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
     def test_preview_window_png_returns_png_bytes(self) -> None:
         """Render a depth-window PNG preview from a real logfile path."""
         inspection = service.inspect_logfile(
@@ -181,6 +191,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_section_png_rejects_unknown_section(self) -> None:
         """Reject explicit section preview requests for missing section ids."""
         with self.assertRaises(TemplateValidationError):
@@ -209,6 +220,7 @@ class McpServiceTests(unittest.TestCase):
                 root=REPO_ROOT,
             )
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_render_logfile_to_file_writes_pdf(self) -> None:
         """Render a real logfile to an explicit output file path."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -281,6 +293,7 @@ class McpServiceTests(unittest.TestCase):
                     root=root,
                 )
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:
         """Return canonical logfile YAML text through the serializer path."""
         result = service.format_logfile_text(
@@ -296,6 +309,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("render:", result.yaml_text)
         self.assertNotIn("\ntemplate:\n", result.yaml_text)
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_save_logfile_text_writes_rebased_normalized_yaml(self) -> None:
         """Write normalized logfile YAML that still validates from the new location."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:

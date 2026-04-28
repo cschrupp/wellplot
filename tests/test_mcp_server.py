@@ -33,6 +33,8 @@ from wellplot.errors import DependencyUnavailableError
 from wellplot.mcp.server import create_mcp_server, main
 
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
+HAS_LAS = importlib.util.find_spec("lasio") is not None
+HAS_DLIS = importlib.util.find_spec("dlisio") is not None
 REPO_ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE_LOGFILE_TEXT = (REPO_ROOT / "examples" / "cbl_main.log.yaml").read_text(encoding="utf-8")
 CBL_MAIN_LOGFILE = "examples/cbl_main.log.yaml"
@@ -59,6 +61,8 @@ class McpServerDependencyTests(unittest.TestCase):
 
 
 @unittest.skipUnless(MCP_AVAILABLE, "optional mcp dependency is not installed")
+@unittest.skipUnless(HAS_LAS, "lasio is not installed")
+@unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
 class McpServerIntegrationTests(unittest.TestCase):
     """Verify the stdio MCP surface against the real SDK."""
 

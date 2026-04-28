@@ -113,6 +113,9 @@ jobs:
           print(load_las, load_dlis, MatplotlibRenderer, PlotlyRenderer)
           PY
 
+      - name: Run MCP tests with optional dependencies
+        run: uv run python -m unittest tests.test_mcp_service tests.test_mcp_server -v
+
   package:
     name: Package Build and Wheel Smoke Test
     runs-on: ubuntu-latest

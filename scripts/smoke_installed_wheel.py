@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import shutil
 import sys
 from io import StringIO
 from pathlib import Path
@@ -156,43 +157,66 @@ def main() -> int:
                 "wellplot MCP example manifest did not expose the expected examples."
             )
 
-        server_command = Path(sys.executable).resolve().with_name("wellplot-mcp")
-        if not server_command.exists():
-            candidate = server_command.with_suffix(".exe")
-            if candidate.exists():
-                server_command = candidate
-            else:
-                raise RuntimeError("Installed wheel smoke test could not locate wellplot-mcp.")
+        server_command_text = shutil.which("wellplot-mcp")
+        server_command = Path(server_command_text).resolve() if server_command_text else None
+        server_args: list[str] = []
+        if server_command is None:
+            server_command = Path(sys.executable).resolve().with_name("wellplot-mcp")
+            if not server_command.exists():
+                candidate = server_command.with_suffix(".exe")
+                if candidate.exists():
+                    server_command = candidate
+                else:
+                    server_command = Path(sys.executable).resolve()
+                    server_args = ["-m", "wellplot.mcp.server"]
 
         async def _exercise_stdio_server() -> None:
-            server_params = StdioServerParameters(
-                command=str(server_command),
-                cwd=str(Path.cwd()),
-            )
-            async with stdio_client(server_params) as streams, ClientSession(*streams) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                tool_names = [tool.name for tool in tools.tools]
-                required_tools = {
-                    "validate_logfile",
-                    "preview_section_png",
-                    "preview_track_png",
-                    "preview_window_png",
-                    "export_example_bundle",
-                    "validate_logfile_text",
-                    "format_logfile_text",
-                    "save_logfile_text",
-                }
-                if not required_tools.issubset(tool_names):
-                    raise RuntimeError(
-                        "Installed wheel MCP server did not expose the expected tool set."
-                    )
-                validation = await session.call_tool(
-                    "validate_logfile",
-                    {"logfile_path": "examples/cbl_main.log.yaml"},
+            with TemporaryDirectory(dir=Path.cwd(), prefix="mcp-smoke-") as tmpdir:
+                export_dir = Path(tmpdir) / "exported-example"
+                relative_export_dir = Path(os.path.relpath(export_dir, start=Path.cwd())).as_posix()
+
+                server_params = StdioServerParameters(
+                    command=str(server_command),
+                    args=server_args,
+                    cwd=str(Path.cwd()),
                 )
-                if validation.structuredContent.get("valid") is not True:
-                    raise RuntimeError("Installed wheel MCP validate_logfile call did not succeed.")
+                async with (
+                    stdio_client(server_params) as streams,
+                    ClientSession(*streams) as session,
+                ):
+                    await session.initialize()
+                    tools = await session.list_tools()
+                    tool_names = [tool.name for tool in tools.tools]
+                    required_tools = {
+                        "validate_logfile",
+                        "preview_section_png",
+                        "preview_track_png",
+                        "preview_window_png",
+                        "export_example_bundle",
+                        "validate_logfile_text",
+                        "format_logfile_text",
+                        "save_logfile_text",
+                    }
+                    if not required_tools.issubset(tool_names):
+                        raise RuntimeError(
+                            "Installed wheel MCP server did not expose the expected tool set."
+                        )
+                    exported = await session.call_tool(
+                        "export_example_bundle",
+                        {
+                            "example_id": "cbl_log_example",
+                            "output_dir": relative_export_dir,
+                        },
+                    )
+                    if exported.structuredContent.get("example_id") != "cbl_log_example":
+                        raise RuntimeError(
+                            "Installed wheel MCP export_example_bundle call did not succeed."
+                        )
+                    if len(exported.structuredContent.get("written_files", [])) != 4:
+                        raise RuntimeError(
+                            "Installed wheel MCP export_example_bundle call wrote an "
+                            "unexpected file set."
+                        )
 
         anyio.run(_exercise_stdio_server)
 
