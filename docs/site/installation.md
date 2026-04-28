@@ -23,6 +23,7 @@ python -m pip install "wellplot[pandas]"
 python -m pip install "wellplot[interactive]"
 python -m pip install "wellplot[notebook]"
 python -m pip install "wellplot[units]"
+python -m pip install "wellplot[mcp]"
 ```
 
 Common combinations:
@@ -37,6 +38,47 @@ If you want every optional dependency exposed by the package metadata:
 
 ```bash
 python -m pip install "wellplot[all]"
+```
+
+## Experimental MCP Install
+
+Install the MCP surface only when you need agent-driven logfile workflows:
+
+```bash
+python -m pip install "wellplot[mcp]"
+```
+
+Verify that the stdio entry point was installed:
+
+```bash
+python - <<'PY'
+import shutil
+
+path = shutil.which("wellplot-mcp")
+print(path)
+if path is None:
+    raise SystemExit("wellplot-mcp entry point was not installed")
+PY
+```
+
+Launch behavior:
+
+- `wellplot-mcp` starts a stdio server and stays attached to the client session
+- the server root is the current working directory when the process starts
+- logfile paths, referenced source data, saved YAML files, export directories,
+  and render outputs must all resolve inside that root
+
+Typical client registration:
+
+```json
+{
+  "mcpServers": {
+    "wellplot": {
+      "command": "wellplot-mcp",
+      "cwd": "/absolute/path/to/job-root"
+    }
+  }
+}
 ```
 
 ## Verify The Install
@@ -70,14 +112,15 @@ This is not required for normal installed-package usage.
 ```bash
 uv sync
 uv run ruff check .
-uv run python -m unittest discover -s tests -v
+uv run pytest tests/test_mcp_service.py tests/test_mcp_server.py tests/test_pipeline.py tests/test_cli.py tests/test_public_api.py
+uv run --with mcp pytest tests/test_mcp_server.py
 ```
 
 Build the local documentation:
 
 ```bash
 uv sync --group docs
-uv run mkdocs build --strict
+uv run --group docs mkdocs build --strict
 ```
 
 Build and smoke-test a local wheel:

@@ -16,6 +16,8 @@ This repository currently contains the current MVP baseline:
 - a physical page layout engine
 - optional `matplotlib` and `plotly` renderer backends
 - optional LAS and DLIS ingestion adapters
+- optional experimental MCP server support for local logfile validation,
+  previews, starter example export, and canonical YAML save workflows
 - DLIS VDL/WF1-style array support with derived micro-time sample axes
 - printable VDL density and waveform array rendering
 - scale-aware curve fills, including crossover, limit, and baseline modes
@@ -93,9 +95,10 @@ The intended workflow is:
 - render a full report or a partial view
 - optionally serialize the layout back to YAML
 
-The next development phase adds two public API surfaces on top of those layers:
-- dataset ingestion for computed numpy/pandas results
-- programmatic composition/rendering so users can build logs without hand-authoring YAML
+The public interaction layers now sit on top of that same render pipeline:
+- YAML templates and savefiles for declarative jobs
+- the Python surfaces exposed through `wellplot` and `wellplot.api`
+- the experimental stdio MCP server exposed through `wellplot[mcp]`
 
 Track types are explicit: `reference`, `normal`, `array`, and `annotation`
 (with compatibility aliases `depth`, `curve`, `image`).
@@ -128,6 +131,7 @@ python -m pip install "wellplot[dlis]"
 python -m pip install "wellplot[pandas]"
 python -m pip install "wellplot[interactive]"
 python -m pip install "wellplot[notebook]"
+python -m pip install "wellplot[mcp]"
 ```
 
 Common example-workflow installs:
@@ -137,6 +141,44 @@ python -m pip install "wellplot[las,notebook]"
 python -m pip install "wellplot[dlis,notebook]"
 python -m pip install "wellplot[las,dlis,pandas,notebook,interactive,units]"
 ```
+
+## Experimental MCP Server
+
+The optional MCP surface is experimental and is exposed only through the
+optional dependency extra and the stdio entry point.
+
+Install it with:
+
+```bash
+python -m pip install "wellplot[mcp]"
+```
+
+The server root is fixed to the current working directory when `wellplot-mcp`
+starts. Logfile paths, referenced source data, exported example bundles, saved
+YAML files, and explicit render outputs must all resolve inside that root.
+
+Typical client registration:
+
+```json
+{
+  "mcpServers": {
+    "wellplot": {
+      "command": "wellplot-mcp",
+      "cwd": "/absolute/path/to/job-root"
+    }
+  }
+}
+```
+
+The MCP tool surface currently supports:
+- `validate_logfile` and `inspect_logfile`
+- `preview_logfile_png` plus explicit section/track/window preview tools
+- `render_logfile_to_file`
+- `export_example_bundle`
+- `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
+
+Packaged example resources and guided prompts are also exposed for MCP-aware
+clients.
 
 ## Contributor Development Workflow
 
@@ -172,6 +214,7 @@ Run tests:
 
 ```bash
 uv run python -m unittest discover -s tests -v
+uv run --with mcp pytest tests/test_mcp_service.py tests/test_mcp_server.py
 ```
 
 Build and smoke-test the wheel:
@@ -183,6 +226,11 @@ python -m venv .smoke-venv
 ./.smoke-venv/bin/pip install dist/*.whl
 ./.smoke-venv/bin/wellplot --help
 MPLBACKEND=Agg ./.smoke-venv/bin/python scripts/smoke_installed_wheel.py
+
+python -m venv .smoke-venv-mcp
+./.smoke-venv-mcp/bin/pip install --upgrade pip
+./.smoke-venv-mcp/bin/pip install dist/*.whl "mcp>=1,<2"
+MPLBACKEND=Agg ./.smoke-venv-mcp/bin/python scripts/smoke_installed_wheel.py
 ```
 
 Format and lint:
@@ -250,6 +298,8 @@ Current examples:
 - [examples/api_partial_render_demo.py](examples/api_partial_render_demo.py)
 - [examples/api_notebook_bytes_demo.py](examples/api_notebook_bytes_demo.py)
 - [examples/api_serialize_demo.py](examples/api_serialize_demo.py)
+- [examples/mcp_workflow_demo.py](examples/mcp_workflow_demo.py)
+- [examples/notebooks/developer/mcp_workflow_demo.ipynb](examples/notebooks/developer/mcp_workflow_demo.ipynb)
 
 Important current boundary:
 - `document_*` helpers round-trip the normalized `LogDocument` template shape

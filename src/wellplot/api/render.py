@@ -123,6 +123,8 @@ def _suppress_report_pages(filtered_mapping: dict[str, Any]) -> None:
 def _filter_track_layout(
     filtered_mapping: dict[str, Any],
     track_ids_by_section: dict[str, tuple[str, ...]],
+    *,
+    implicit_section_id: str | None = None,
 ) -> None:
     layout = filtered_mapping["document"]["layout"]
     sections = list(layout.get("log_sections", []))
@@ -147,9 +149,14 @@ def _filter_track_layout(
         binding
         for binding in bindings.get("channels", [])
         if (
-            selected_by_section.get(str(binding.get("section", ""))) is None
+            selected_by_section.get(
+                _binding_section_id(binding, implicit_section_id=implicit_section_id)
+            )
+            is None
             or str(binding.get("track_id", ""))
-            in selected_by_section[str(binding.get("section", ""))]
+            in selected_by_section[
+                _binding_section_id(binding, implicit_section_id=implicit_section_id)
+            ]
         )
     ]
 
@@ -159,6 +166,17 @@ def _apply_depth_window(
     depth_range: tuple[float, float],
 ) -> None:
     filtered_mapping["document"]["depth_range"] = [float(depth_range[0]), float(depth_range[1])]
+
+
+def _binding_section_id(
+    binding: dict[str, Any],
+    *,
+    implicit_section_id: str | None = None,
+) -> str:
+    section_id = str(binding.get("section", "")).strip()
+    if section_id:
+        return section_id
+    return "" if implicit_section_id is None else implicit_section_id
 
 
 def _filtered_report(
@@ -185,6 +203,7 @@ def _filtered_report(
         requested = set(track_ids_by_section)
     else:
         requested = set(available_section_ids)
+    implicit_section_id = available_section_ids[0] if len(available_section_ids) == 1 else None
 
     filtered_mapping = report.to_mapping()
     layout = filtered_mapping["document"]["layout"]
@@ -197,10 +216,14 @@ def _filtered_report(
     bindings["channels"] = [
         binding
         for binding in bindings.get("channels", [])
-        if str(binding.get("section", "")) in requested
+        if _binding_section_id(binding, implicit_section_id=implicit_section_id) in requested
     ]
     if track_ids_by_section:
-        _filter_track_layout(filtered_mapping, track_ids_by_section)
+        _filter_track_layout(
+            filtered_mapping,
+            track_ids_by_section,
+            implicit_section_id=implicit_section_id,
+        )
     if depth_range is not None:
         _apply_depth_window(filtered_mapping, depth_range)
     if not include_report_pages:

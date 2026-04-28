@@ -23,6 +23,46 @@ This changelog tracks public release notes for the `wellplot` distribution.
 
 The entries below track public PyPI releases of the `wellplot` distribution.
 
+## [0.3.0] - 2026-04-28
+
+Experimental MCP support is now part of the public `wellplot` distribution.
+This release folds the planned scoped-preview and writable-authoring MCP slices
+into one publishable version.
+
+### Added
+
+- Optional `wellplot[mcp]` install extra and `wellplot-mcp` stdio entry point
+  for local MCP clients.
+- MCP tools for logfile validation, inspection, generic preview rendering,
+  explicit section/track/window PNG previews, explicit file rendering, example
+  bundle export, and canonical logfile YAML validation/format/save flows.
+- Packaged MCP resources for the logfile schema and curated production example
+  bundles, plus guided prompts for logfile review, preview, and example-based
+  starts.
+- Public MCP user documentation covering installation, client registration,
+  server-root policy, workflow usage, and API reference.
+
+### Changed
+
+- Release verification now smoke-tests both the base installed wheel and a
+  clean environment with the optional MCP dependency enabled.
+- Maintainer release guidance now includes MCP-specific preflight checks and a
+  TestPyPI rehearsal recommendation for releases that change the MCP surface or
+  verification path.
+
+### Fixed
+
+- Scoped section and track previews now preserve implicit bindings for
+  single-section savefiles, preventing filtered render failures during MCP
+  preview calls.
+
+### Notes
+
+- MCP remains experimental in this release.
+- `format_logfile_text(...)` and `save_logfile_text(...)` normalize the logfile
+  through the canonical serializer path; comments, anchors, and template
+  indirection are not preserved in the returned YAML text.
+
 ## [0.1.0] - 2026-04-22
 
 Initial public release of `wellplot` as an open-source Python toolkit for

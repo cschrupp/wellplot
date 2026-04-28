@@ -578,6 +578,108 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             "Inspect a short text slice in the notebook before diffing the files in your editor.",
         ),
     ),
+    "mcp_workflow_demo.py": PythonRecipe(
+        source="mcp_workflow_demo.py",
+        title="Experimental MCP Workflow Walkthrough",
+        summary=(
+            "Launch the local stdio MCP server, inspect its public contract, preview a "
+            "production logfile, and exercise the writable authoring tools without "
+            "dropping down to the direct Python or YAML pipeline."
+        ),
+        learning_goals=(
+            "Start the experimental `wellplot-mcp` surface from a notebook-friendly Python workflow.",
+            "Inspect the registered tools, resources, resource templates, and prompts before using them.",
+            "Use MCP tool calls to validate, inspect, and preview a production logfile at full-report, section, track, and window scopes.",
+            "Round-trip a full logfile through MCP text validation, formatting, export, save, and explicit render-to-file calls.",
+        ),
+        prerequisites=("mcp",),
+        code_cells=(
+            dedent(
+                """
+                # Import the MCP helper module and inspect the default example paths it
+                # uses for the walkthrough.
+                import mcp_workflow_demo as demo
+
+                print("Demo logfile:", demo.DEFAULT_LOGFILE)
+                print("Demo base dir:", demo.DEFAULT_BASE_DIR)
+                print("Demo output root:", demo.DEFAULT_OUTPUT_ROOT)
+                """
+            ).strip(),
+            dedent(
+                """
+                # Ask the MCP server what it exposes before calling the workflow tools.
+                contract = await demo.collect_server_contract()
+
+                print("Tools:")
+                for name in contract["tools"]:
+                    print(" -", name)
+
+                print("\\nResources:")
+                for uri in contract["resources"]:
+                    print(" -", uri)
+
+                print("\\nResource templates:")
+                for uri_template in contract["resource_templates"]:
+                    print(" -", uri_template)
+
+                print("\\nPrompts:")
+                for name in contract["prompts"]:
+                    print(" -", name)
+
+                print("\\nPackaged production examples:")
+                for example in contract["example_manifest"]["examples"]:
+                    print(f" - {example['id']}: {example['title']}")
+
+                print("\\nreview_logfile prompt preview:\\n")
+                print(contract["review_prompt"])
+                """
+            ).strip(),
+            dedent(
+                """
+                # Validate, inspect, and preview the production logfile through MCP only.
+                from IPython.display import Image, display
+
+                review = await demo.run_review_flow()
+
+                print("Validation:")
+                print(review["validation"])
+                print("\\nSelected section:", review["selected_section_id"])
+                print("Selected tracks:", review["selected_track_ids"])
+                print("Window depth range:", review["window_depth_range"])
+                print("\\nResolved section ids:", review["inspection"]["section_ids"])
+
+                display(Image(data=review["section_preview_png"]))
+                display(Image(data=review["track_preview_png"]))
+                display(Image(data=review["window_preview_png"]))
+                """
+            ).strip(),
+            dedent(
+                """
+                # Exercise the writable MCP tools against the same production example.
+                from IPython.display import Code, display
+
+                authoring = await demo.run_authoring_flow()
+
+                print("Text validation:")
+                print(authoring["text_validation"])
+                print("\\nExported files:")
+                for path in authoring["export"]["written_files"]:
+                    print(" -", path)
+                print("\\nSaved logfile:", authoring["save"]["output_path"])
+                print("Rendered logfile:", authoring["rendered_logfile"])
+                print("Rendered PDF:", authoring["render"]["output_path"])
+
+                preview_yaml = "\\n".join(authoring["formatted_yaml"].splitlines()[:80])
+                display(Code(preview_yaml, language="yaml"))
+                """
+            ).strip(),
+        ),
+        adaptation_tips=(
+            "Keep the server root pointed at a narrow working directory when you move from a repo demo to a real job directory.",
+            "Use `inspect_logfile(...)` first and then drive the narrow preview tools with the returned section and track ids.",
+            "Treat `format_logfile_text(...)` and `save_logfile_text(...)` as normalization steps, not as comment-preserving editors.",
+        ),
+    ),
     "real_data_demo.py": PythonRecipe(
         source="real_data_demo.py",
         title="Real-Data CLI Wrapper Walkthrough",
@@ -4763,6 +4865,7 @@ def _developer_grouped_notebook_list() -> dict[str, list[str]]:
     grouped = {
         "Production package walkthroughs": [],
         "Programmatic API walkthroughs": [],
+        "MCP walkthroughs": [],
         "YAML and legacy walkthroughs": [],
     }
     for package_dir in _production_packages():
@@ -4770,7 +4873,12 @@ def _developer_grouped_notebook_list() -> dict[str, list[str]]:
             _production_notebook_path(package_dir.name).name
         )
     for recipe in PYTHON_RECIPES.values():
-        grouped["Programmatic API walkthroughs"].append(_relative_notebook_path(recipe.source).name)
+        section = (
+            "MCP walkthroughs"
+            if recipe.source.startswith("mcp_")
+            else "Programmatic API walkthroughs"
+        )
+        grouped[section].append(_relative_notebook_path(recipe.source).name)
     for path in _yaml_example_paths():
         if (
             path.name == "triple_combo.yaml"

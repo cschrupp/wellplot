@@ -29,7 +29,7 @@ from typing import Any
 import numpy as np
 import yaml
 
-from .errors import TemplateValidationError
+from .errors import PathAccessError, TemplateValidationError
 from .io import load_dlis, load_las
 from .logfile_schema import validate_logfile_mapping
 from .model import LogDocument, RasterChannel, ScalarChannel, WellDataset
@@ -98,10 +98,20 @@ def _load_yaml_mapping(path: Path, *, context: str) -> dict[str, Any]:
     return payload
 
 
+def _ensure_path_within_root(path: Path, *, allowed_root: Path, context: str) -> None:
+    try:
+        path.relative_to(allowed_root)
+    except ValueError as exc:
+        raise PathAccessError(
+            f"{context} must resolve inside the allowed root {allowed_root}."
+        ) from exc
+
+
 def _resolve_template_inheritance(
     payload: dict[str, Any],
     *,
     base_dir: Path,
+    allowed_root: Path | None = None,
     visited_templates: set[Path] | None = None,
 ) -> dict[str, Any]:
     template_ref = payload.get("template")
@@ -118,6 +128,12 @@ def _resolve_template_inheritance(
         template_path = (base_dir / template_path).resolve()
     else:
         template_path = template_path.resolve()
+    if allowed_root is not None:
+        _ensure_path_within_root(
+            template_path,
+            allowed_root=allowed_root,
+            context="template.path",
+        )
 
     visited = set() if visited_templates is None else set(visited_templates)
     if template_path in visited:
@@ -128,6 +144,7 @@ def _resolve_template_inheritance(
     resolved_template = _resolve_template_inheritance(
         template_payload,
         base_dir=template_path.parent,
+        allowed_root=allowed_root,
         visited_templates=visited,
     )
 
@@ -1110,11 +1127,40 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
     )
 
 
-def load_logfile(path: str | Path) -> LogFileSpec:
+def load_logfile(path: str | Path, *, allowed_root: Path | None = None) -> LogFileSpec:
     """Load a logfile YAML file, resolve templates, and return a typed spec."""
     file_path = Path(path).resolve()
+    if allowed_root is not None:
+        _ensure_path_within_root(file_path, allowed_root=allowed_root, context="logfile_path")
     payload = _load_yaml_mapping(file_path, context="Log file")
-    resolved_payload = _resolve_template_inheritance(payload, base_dir=file_path.parent)
+    resolved_payload = _resolve_template_inheritance(
+        payload,
+        base_dir=file_path.parent,
+        allowed_root=allowed_root,
+    )
+    return logfile_from_mapping(resolved_payload)
+
+
+def load_logfile_text(
+    yaml_text: str,
+    *,
+    base_dir: str | Path | None = None,
+    allowed_root: Path | None = None,
+) -> LogFileSpec:
+    """Load logfile YAML text, resolve templates, and return a typed spec."""
+    resolved_base_dir = Path.cwd().resolve()
+    if base_dir is not None:
+        resolved_base_dir = Path(base_dir).expanduser().resolve()
+    if allowed_root is not None:
+        _ensure_path_within_root(resolved_base_dir, allowed_root=allowed_root, context="base_dir")
+    payload = yaml.safe_load(yaml_text) or {}
+    if not isinstance(payload, dict):
+        raise TemplateValidationError("Logfile text root must be a mapping.")
+    resolved_payload = _resolve_template_inheritance(
+        dict(payload),
+        base_dir=resolved_base_dir,
+        allowed_root=allowed_root,
+    )
     return logfile_from_mapping(resolved_payload)
 
 
@@ -1249,11 +1295,23 @@ def _resolve_text_tokens(document: dict[str, Any], dataset: WellDataset, source_
             ]
 
 
-def _resolve_data_source_path(source_path: str, *, base_dir: Path | None = None) -> Path:
+def _resolve_data_source_path(
+    source_path: str,
+    *,
+    base_dir: Path | None = None,
+    allowed_root: Path | None = None,
+) -> Path:
     resolved_path = Path(source_path)
     if not resolved_path.is_absolute():
         resolved_path = (base_dir or Path.cwd()) / resolved_path
-    return resolved_path.resolve()
+    resolved_path = resolved_path.resolve()
+    if allowed_root is not None:
+        _ensure_path_within_root(
+            resolved_path,
+            allowed_root=allowed_root,
+            context="data.source_path",
+        )
+    return resolved_path
 
 
 def _load_dataset_from_source(
@@ -1261,8 +1319,13 @@ def _load_dataset_from_source(
     source_format: str,
     *,
     base_dir: Path | None = None,
+    allowed_root: Path | None = None,
 ) -> tuple[WellDataset, Path]:
-    resolved_path = _resolve_data_source_path(source_path, base_dir=base_dir)
+    resolved_path = _resolve_data_source_path(
+        source_path,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
     resolved_format = _normalized_source_format(source_format, context="source_format")
     if resolved_format == "auto":
         resolved_format = resolved_path.suffix.lower().lstrip(".")
@@ -1313,31 +1376,55 @@ def _section_data_sources_for_logfile(
     return section_sources
 
 
-def load_datasets_for_logfile(
+def resolve_section_data_sources_for_logfile(
     spec: LogFileSpec,
     *,
     base_dir: Path | None = None,
-) -> tuple[dict[str, WellDataset], dict[str, Path]]:
-    """Load and cache datasets for every layout section in a logfile spec."""
+    allowed_root: Path | None = None,
+) -> dict[str, tuple[Path, str]]:
+    """Resolve each logfile section data source to an absolute path and format."""
     section_sources = _section_data_sources_for_logfile(spec)
-    cache: dict[tuple[Path, str], tuple[WellDataset, Path]] = {}
-    datasets_by_section: dict[str, WellDataset] = {}
-    source_paths_by_section: dict[str, Path] = {}
-
+    resolved_sources: dict[str, tuple[Path, str]] = {}
     for section_id, (source_path, source_format) in section_sources.items():
-        resolved_path = _resolve_data_source_path(source_path, base_dir=base_dir)
+        resolved_path = _resolve_data_source_path(
+            source_path,
+            base_dir=base_dir,
+            allowed_root=allowed_root,
+        )
         resolved_format = _normalized_source_format(
             source_format,
             context=f"document.layout.log_sections[{section_id}].data.source_format",
         )
         if resolved_format == "auto":
             resolved_format = resolved_path.suffix.lower().lstrip(".")
+        resolved_sources[section_id] = (resolved_path, resolved_format)
+    return resolved_sources
+
+
+def load_datasets_for_logfile(
+    spec: LogFileSpec,
+    *,
+    base_dir: Path | None = None,
+    allowed_root: Path | None = None,
+) -> tuple[dict[str, WellDataset], dict[str, Path]]:
+    """Load and cache datasets for every layout section in a logfile spec."""
+    section_sources = resolve_section_data_sources_for_logfile(
+        spec,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
+    cache: dict[tuple[Path, str], tuple[WellDataset, Path]] = {}
+    datasets_by_section: dict[str, WellDataset] = {}
+    source_paths_by_section: dict[str, Path] = {}
+
+    for section_id, (resolved_path, resolved_format) in section_sources.items():
         cache_key = (resolved_path, resolved_format)
         if cache_key not in cache:
             dataset, loaded_path = _load_dataset_from_source(
                 str(resolved_path),
                 resolved_format,
                 base_dir=base_dir,
+                allowed_root=allowed_root,
             )
             cache[cache_key] = (dataset, loaded_path)
         dataset, loaded_path = cache[cache_key]
@@ -1348,7 +1435,10 @@ def load_datasets_for_logfile(
 
 
 def load_dataset_for_logfile(
-    spec: LogFileSpec, *, base_dir: Path | None = None
+    spec: LogFileSpec,
+    *,
+    base_dir: Path | None = None,
+    allowed_root: Path | None = None,
 ) -> tuple[WellDataset, Path]:
     """Load a single dataset when the logfile resolves to one unique source."""
     if spec.data_source_path is not None:
@@ -1356,9 +1446,14 @@ def load_dataset_for_logfile(
             spec.data_source_path,
             spec.data_source_format,
             base_dir=base_dir,
+            allowed_root=allowed_root,
         )
 
-    section_sources = _section_data_sources_for_logfile(spec)
+    section_sources = resolve_section_data_sources_for_logfile(
+        spec,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
     unique_sources = set(section_sources.values())
     if len(unique_sources) != 1:
         raise TemplateValidationError(
@@ -1367,9 +1462,10 @@ def load_dataset_for_logfile(
         )
     source_path, source_format = next(iter(unique_sources))
     return _load_dataset_from_source(
-        source_path,
+        str(source_path),
         source_format,
         base_dir=base_dir,
+        allowed_root=allowed_root,
     )
 
 

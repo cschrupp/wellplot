@@ -39,6 +39,10 @@ Runtime note:
 - `synthetic_demo.ipynb`
 - `cbl_vdl_array_mvp_demo.ipynb`
 
+## MCP walkthroughs
+
+- `mcp_workflow_demo.ipynb`
+
 ## YAML and legacy walkthroughs
 
 - `annotation_track_objects_showcase.ipynb`

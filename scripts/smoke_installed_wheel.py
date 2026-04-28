@@ -21,7 +21,9 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
+import sys
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -131,6 +133,70 @@ def main() -> int:
         png_bytes = render_png_bytes(report, dpi=96)
         if not png_bytes:
             raise RuntimeError("Installed wheel smoke render did not produce PNG bytes.")
+
+    if importlib.util.find_spec("mcp") is not None:
+        import anyio
+        from mcp.client.session import ClientSession
+        from mcp.client.stdio import StdioServerParameters, stdio_client
+
+        from wellplot.mcp import create_mcp_server
+        from wellplot.mcp.service import production_example_manifest, schema_resource
+
+        server = create_mcp_server()
+        if not hasattr(server, "run"):
+            raise RuntimeError("wellplot MCP server did not expose a runnable server instance.")
+
+        schema_payload = schema_resource().text
+        if "\"$schema\"" not in schema_payload:
+            raise RuntimeError("wellplot MCP schema resource did not contain JSON schema text.")
+
+        example_ids = [item["id"] for item in production_example_manifest()["examples"]]
+        if example_ids != ["cbl_log_example", "forge16b_porosity_example"]:
+            raise RuntimeError(
+                "wellplot MCP example manifest did not expose the expected examples."
+            )
+
+        server_command = Path(sys.executable).resolve().with_name("wellplot-mcp")
+        if not server_command.exists():
+            candidate = server_command.with_suffix(".exe")
+            if candidate.exists():
+                server_command = candidate
+            else:
+                raise RuntimeError("Installed wheel smoke test could not locate wellplot-mcp.")
+
+        async def _exercise_stdio_server() -> None:
+            server_params = StdioServerParameters(
+                command=str(server_command),
+                cwd=str(Path.cwd()),
+            )
+            async with stdio_client(server_params) as streams, ClientSession(*streams) as session:
+                await session.initialize()
+                tools = await session.list_tools()
+                tool_names = [tool.name for tool in tools.tools]
+                required_tools = {
+                    "validate_logfile",
+                    "preview_section_png",
+                    "preview_track_png",
+                    "preview_window_png",
+                    "export_example_bundle",
+                    "validate_logfile_text",
+                    "format_logfile_text",
+                    "save_logfile_text",
+                }
+                if not required_tools.issubset(tool_names):
+                    raise RuntimeError(
+                        "Installed wheel MCP server did not expose the expected tool set."
+                    )
+                validation = await session.call_tool(
+                    "validate_logfile",
+                    {"logfile_path": "examples/cbl_main.log.yaml"},
+                )
+                if validation.structuredContent.get("valid") is not True:
+                    raise RuntimeError(
+                        "Installed wheel MCP validate_logfile call did not succeed."
+                    )
+
+        anyio.run(_exercise_stdio_server)
 
     print(f"Installed wheel smoke test passed for wellplot {__version__}.")
     return 0

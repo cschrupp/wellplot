@@ -54,6 +54,9 @@ pdf = [
 interactive = [
   "plotly>=5.18",
 ]
+mcp = [
+  "mcp>=1,<2",
+]
 notebook = [
   "ipykernel>=6.29",
 ]
@@ -70,6 +73,7 @@ all = [
   "dlisio>=1.0",
   "matplotlib>=3.8",
   "plotly>=5.18",
+  "mcp>=1,<2",
   "ipykernel>=6.29",
   "pandas>=2.2",
   "pint>=0.24",
@@ -77,6 +81,7 @@ all = [
 
 [project.scripts]
 wellplot = "wellplot.cli:main"
+wellplot-mcp = "wellplot.mcp.server:main"
 
 [dependency-groups]
 dev = [
@@ -101,6 +106,10 @@ version = {attr = "wellplot._version.__version__"}
 
 [tool.setuptools.package-data]
 "wellplot.renderers" = ["*.yaml"]
+"wellplot.mcp.assets" = [
+  "production/*/*.md",
+  "production/*/*.yaml",
+]
 
 [tool.uv]
 default-groups = ["dev"]

@@ -72,6 +72,15 @@ The examples are grouped by workflow rather than by isolated feature.
 - `examples/api_end_to_end_demo.py`
   - ingest, compute, align, merge, render, serialize
 
+## Experimental MCP examples
+
+- `examples/mcp_workflow_demo.py`
+  - launch the local stdio MCP server, inspect its tools/resources/prompts,
+    preview a production logfile, and exercise export/format/save/render calls
+- `examples/notebooks/developer/mcp_workflow_demo.ipynb`
+  - notebook companion to the same MCP walkthrough, generated into the
+    developer notebook set
+
 ## YAML/report examples
 
 - `examples/cbl_job_demo.log.yaml`

@@ -42,3 +42,7 @@ class LayoutError(WellLogOSError):
 
 class DatasetValidationError(WellLogOSError):
     """Raised when a dataset or channel violates the normalized data contract."""
+
+
+class PathAccessError(WellLogOSError):
+    """Raised when a requested path is inaccessible or outside an allowed root."""

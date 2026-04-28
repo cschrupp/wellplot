@@ -1,0 +1,238 @@
+render:
+  backend: matplotlib
+  output_path: ../../../workspace/renders/30-23a-3_8117_template_placeholder.pdf
+  dpi: 180
+  continuous_strip_page_height_mm: 297
+  matplotlib:
+    style:
+      report:
+        summary_label_fontsize: 8.0
+        summary_value_fontsize: 10.5
+        provider_fontsize: 16.0
+        service_fontsize: 8.0
+        tail_service_fontsize: 8.0
+        field_label_fontsize: 7.0
+        field_value_fontsize: 7.8
+        detail_header_fontsize: 9.0
+        detail_label_fontsize: 6.4
+        detail_value_fontsize: 6.4
+        tail_frame_y: 0.74
+        tail_frame_height: 0.22
+      section_title:
+        background_color: "#0d3fb3"
+        border_mode: box
+        border_color: "#0d3fb3"
+        border_linewidth: 0.8
+        padding_left: 0.03
+        padding_right: 0.03
+        title_align: center
+        subtitle_align: center
+        title_fontsize: 11.0
+        subtitle_fontsize: 6.6
+        title_color: "#ffffff"
+        subtitle_color: "#eaf0ff"
+        title_y: 0.68
+        subtitle_y: 0.22
+      track_header:
+        background_color: "#eef2f8"
+      track:
+        x_tick_labelsize: 6.0
+      grid:
+        depth_major_linewidth: 0.65
+document:
+  depth_range:
+    - 8400
+    - 10200
+  page:
+    size: A4
+    orientation: portrait
+    continuous: false
+    bottom_track_header_enabled: true
+    margin_left_mm: 0
+    margin_right_mm: 8
+    margin_top_mm: 0
+    margin_bottom_mm: 0
+    track_gap_mm: 0
+    header_height_mm: 0
+    track_header_height_mm: 30
+    footer_height_mm: 0
+  depth:
+    unit: ft
+    scale: 240
+    major_step: 10
+    minor_step: 2
+  layout:
+    heading:
+      enabled: true
+      provider_name: Company
+      general_fields:
+        - key: company
+          label: Company
+          source_key: COMP
+        - key: well
+          label: Well
+          source_key: WELL
+        - key: field
+          label: Field
+          source_key: FLD
+        - key: location
+          label: Location
+          source_key: LOC
+        - key: country
+          label: Country
+          source_key: CTRY
+        - key: province
+          label: Province
+          source_key: PROV
+        - key: uwi
+          label: UWI
+          source_key: UWI
+        - key: logging_date
+          label: Logging Date
+          source_key: DATE
+        - key: scale
+          label: Scale
+          value: ft 1:240
+        - key: logging_measured_from
+          label: Logging Measured From
+          source_key: LMF
+        - key: permanent_datum
+          label: Permanent Datum
+          source_key: PDAT
+        - key: service_company
+          label: Service Company
+          source_key: SRVC
+      service_titles:
+        - value: Open Hole Density
+          font_size: 15
+          auto_adjust: true
+          bold: true
+          alignment: left
+        - value: Neutron Porosity
+          font_size: 14
+          auto_adjust: true
+          alignment: center
+        - value: Resistivity Review
+          font_size: 13
+          auto_adjust: true
+          alignment: right
+      detail:
+        kind: open_hole
+        title: Open Hole Metadata
+        rows:
+          - label: Date
+            values:
+              - source_key: DATE
+              - ""
+          - label: Project
+            values:
+              - source_key: PROJ
+              - ""
+          - label: Service Company
+            values:
+              - source_key: SRVC
+              - ""
+          - label: Well UWI
+            values:
+              - source_key: UWI
+              - ""
+          - label: Total Depth (Driller)
+            columns:
+              - cells:
+                  - source_key: TDD
+                  - ft
+              - cells: [""]
+          - label: Total Depth (Logger)
+            columns:
+              - cells:
+                  - source_key: TDL
+                  - ft
+              - cells: [""]
+          - label: First Reading (Bottom)
+            columns:
+              - cells:
+                  - source_key: STOP
+                  - ft
+              - cells: [""]
+          - label: Last Reading
+            columns:
+              - cells:
+                  - source_key: STRT
+                  - ft
+              - cells: [""]
+          - label: Logging Measured From
+            values:
+              - source_key: LMF
+              - ""
+          - label: Permanent Datum
+            values:
+              - source_key: PDAT
+              - ""
+          - label: Elev. Kelly Bushing
+            columns:
+              - cells:
+                  - source_key: EKB
+                  - ft
+              - cells: [""]
+          - label: Elev. Drill Floor
+            columns:
+              - cells:
+                  - source_key: EDF
+                  - ft
+              - cells: [""]
+          - label: Elev. Ground Level
+            columns:
+              - cells:
+                  - source_key: EGL
+                  - ft
+              - cells: [""]
+          - label: Elev. Perm Datum
+            columns:
+              - cells:
+                  - source_key: EPD
+                  - ft
+              - cells: [""]
+          - label: Above Perm Datum
+            columns:
+              - cells:
+                  - source_key: APD
+                  - ft
+              - cells: [""]
+          - label: Log Set
+            values:
+              - source_key: SET
+              - ""
+          - label: Location
+            values:
+              - source_key: LOC
+              - ""
+          - label_cells:
+              - Country
+              - Province
+            columns:
+              - cells:
+                  - source_key: CTRY
+              - cells:
+                  - source_key: PROV
+          - label_cells:
+              - Latitude
+              - Longitude
+            columns:
+              - cells:
+                  - source_key: LATI
+              - cells:
+                  - source_key: LONG
+    remarks:
+      - title: Public Data and IP Notice
+        lines:
+          - This example uses publicly available or repository-provided demonstration data intended for educational use.
+          - Rendered layouts are independent reproductions generated by wellplot, not vendor-authored originals or official service-company deliverables.
+          - Original trademarks and service names remain the property of their respective owners.
+          - Confirm data provenance and redistribution rights before reusing outputs outside this repository.
+        alignment: left
+    log_sections: []
+    tail:
+      enabled: true
+  bindings:
+    on_missing: skip
+    channels: []

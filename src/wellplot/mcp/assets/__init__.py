@@ -17,6 +17,4 @@
 #
 ###############################################################################
 
-"""Package version metadata."""
-
-__version__ = "0.3.0"
+"""Packaged MCP assets for schema and example resources."""
