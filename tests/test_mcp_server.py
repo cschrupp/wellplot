@@ -23,22 +23,19 @@ from __future__ import annotations
 
 import importlib.util
 import io
+import os
 import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
+from _mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
 from wellplot.errors import DependencyUnavailableError
 from wellplot.mcp.server import create_mcp_server, main
 
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 HAS_LAS = importlib.util.find_spec("lasio") is not None
-HAS_DLIS = importlib.util.find_spec("dlisio") is not None
-REPO_ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE_LOGFILE_TEXT = (REPO_ROOT / "examples" / "cbl_main.log.yaml").read_text(encoding="utf-8")
-CBL_MAIN_LOGFILE = "examples/cbl_main.log.yaml"
-PRODUCTION_LOGFILE = "examples/production/cbl_log_example/full_reconstruction.log.yaml"
 
 
 @unittest.skipIf(MCP_AVAILABLE, "optional mcp dependency is installed")
@@ -62,7 +59,6 @@ class McpServerDependencyTests(unittest.TestCase):
 
 @unittest.skipUnless(MCP_AVAILABLE, "optional mcp dependency is not installed")
 @unittest.skipUnless(HAS_LAS, "lasio is not installed")
-@unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
 class McpServerIntegrationTests(unittest.TestCase):
     """Verify the stdio MCP surface against the real SDK."""
 
@@ -71,14 +67,17 @@ class McpServerIntegrationTests(unittest.TestCase):
         import anyio
 
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
-            anyio.run(self._exercise_stdio_server, Path(tmpdir))
+            anyio.run(
+                self._exercise_stdio_server,
+                create_mcp_fixture_paths(Path(tmpdir)),
+            )
 
-    async def _exercise_stdio_server(self, tmpdir: Path) -> None:
+    async def _exercise_stdio_server(self, fixture_paths: McpFixturePaths) -> None:
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
-        export_dir = tmpdir / "exported-example"
-        saved_logfile = tmpdir / "saved.log.yaml"
+        export_dir = fixture_paths.fixture_dir / "exported-example"
+        saved_logfile = fixture_paths.fixture_dir / "saved.log.yaml"
         server = StdioServerParameters(
             command=sys.executable,
             args=["-m", "wellplot.mcp.server"],
@@ -93,17 +92,22 @@ class McpServerIntegrationTests(unittest.TestCase):
             templates = await session.list_resource_templates()
             validation = await session.call_tool(
                 "validate_logfile",
-                {"logfile_path": CBL_MAIN_LOGFILE},
+                {"logfile_path": fixture_paths.single_logfile_relative},
             )
             cbl_main_inspection = await session.call_tool(
                 "inspect_logfile",
-                {"logfile_path": CBL_MAIN_LOGFILE},
+                {"logfile_path": fixture_paths.single_logfile_relative},
             )
             section = cbl_main_inspection.structuredContent["sections"][0]
+            multi_inspection = await session.call_tool(
+                "inspect_logfile",
+                {"logfile_path": fixture_paths.multi_logfile_relative},
+            )
+            multi_section = multi_inspection.structuredContent["sections"][0]
             preview = await session.call_tool(
                 "preview_section_png",
                 {
-                    "logfile_path": CBL_MAIN_LOGFILE,
+                    "logfile_path": fixture_paths.single_logfile_relative,
                     "section_id": section["id"],
                     "dpi": 72,
                 },
@@ -111,7 +115,7 @@ class McpServerIntegrationTests(unittest.TestCase):
             preview_track = await session.call_tool(
                 "preview_track_png",
                 {
-                    "logfile_path": CBL_MAIN_LOGFILE,
+                    "logfile_path": fixture_paths.single_logfile_relative,
                     "section_id": section["id"],
                     "track_ids": [section["track_ids"][1]],
                     "dpi": 72,
@@ -120,24 +124,31 @@ class McpServerIntegrationTests(unittest.TestCase):
             preview_window = await session.call_tool(
                 "preview_window_png",
                 {
-                    "logfile_path": PRODUCTION_LOGFILE,
-                    "depth_range": [100.0, 200.0],
-                    "section_ids": ["main_pass"],
+                    "logfile_path": fixture_paths.multi_logfile_relative,
+                    "depth_range": [
+                        multi_section["depth_range"][0],
+                        multi_section["depth_range"][0] + 8.0,
+                    ],
+                    "section_ids": [multi_section["id"]],
                     "dpi": 72,
                 },
             )
             text_validation = await session.call_tool(
                 "validate_logfile_text",
                 {
-                    "yaml_text": EXAMPLE_LOGFILE_TEXT,
-                    "base_dir": "examples",
+                    "yaml_text": fixture_paths.single_logfile_text,
+                    "base_dir": Path(
+                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
+                    ).as_posix(),
                 },
             )
             formatting = await session.call_tool(
                 "format_logfile_text",
                 {
-                    "yaml_text": EXAMPLE_LOGFILE_TEXT,
-                    "base_dir": "examples",
+                    "yaml_text": fixture_paths.single_logfile_text,
+                    "base_dir": Path(
+                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
+                    ).as_posix(),
                 },
             )
             exported = await session.call_tool(
@@ -150,9 +161,11 @@ class McpServerIntegrationTests(unittest.TestCase):
             saved = await session.call_tool(
                 "save_logfile_text",
                 {
-                    "yaml_text": EXAMPLE_LOGFILE_TEXT,
+                    "yaml_text": fixture_paths.single_logfile_text,
                     "output_path": str(saved_logfile),
-                    "base_dir": "examples",
+                    "base_dir": Path(
+                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
+                    ).as_posix(),
                 },
             )
 
@@ -201,7 +214,7 @@ class McpServerIntegrationTests(unittest.TestCase):
             {
                 "valid": True,
                 "message": "Valid logfile.",
-                "name": "CBL Main Configuration",
+                "name": "MCP Single Fixture",
                 "render_backend": "matplotlib",
                 "section_ids": ["main"],
             },
@@ -217,7 +230,7 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(getattr(preview_window.content[0], "mimeType", None), "image/png")
         self.assertEqual(text_validation.structuredContent["valid"], True)
         self.assertEqual(text_validation.structuredContent["section_ids"], ["main"])
-        self.assertEqual(formatting.structuredContent["name"], "CBL Main Configuration")
+        self.assertEqual(formatting.structuredContent["name"], "MCP Single Fixture")
         self.assertIn("version: 1", formatting.structuredContent["yaml_text"])
         self.assertNotIn("\ntemplate:\n", formatting.structuredContent["yaml_text"])
         self.assertEqual(exported.structuredContent["example_id"], "cbl_log_example")
@@ -230,7 +243,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "data-notes.md",
             ],
         )
-        self.assertEqual(saved.structuredContent["name"], "CBL Main Configuration")
+        self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(saved.structuredContent["output_path"], str(saved_logfile))
         self.assertTrue(export_dir.exists())
         self.assertTrue(saved_logfile.exists())

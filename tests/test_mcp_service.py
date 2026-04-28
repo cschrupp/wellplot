@@ -27,28 +27,39 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 from wellplot.errors import PathAccessError, TemplateValidationError
 from wellplot.mcp import service
 
 HAS_LAS = importlib.util.find_spec("lasio") is not None
-HAS_DLIS = importlib.util.find_spec("dlisio") is not None
-REPO_ROOT = Path(__file__).resolve().parents[1]
-EXAMPLE_LOGFILE_TEXT = (REPO_ROOT / "examples" / "cbl_main.log.yaml").read_text(encoding="utf-8")
 
 
 class McpServiceTests(unittest.TestCase):
     """Verify the pure-Python MCP service helpers."""
 
+    @classmethod
+    def setUpClass(cls) -> None:
+        """Create synthetic LAS-backed logfile fixtures once for the test class."""
+        super().setUpClass()
+        cls._fixture_tmpdir = tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-service-")
+        cls._fixture_paths = create_mcp_fixture_paths(Path(cls._fixture_tmpdir.name))
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        """Remove the shared synthetic fixture directory after all tests finish."""
+        cls._fixture_tmpdir.cleanup()
+        super().tearDownClass()
+
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_validate_logfile_success(self) -> None:
         """Validate a real example logfile under the repository root."""
         result = service.validate_logfile(
-            "examples/cbl_main.log.yaml",
+            self._fixture_paths.single_logfile_relative,
             root=REPO_ROOT,
         )
 
         self.assertTrue(result.valid)
-        self.assertEqual(result.name, "CBL Main Configuration")
+        self.assertEqual(result.name, "MCP Single Fixture")
         self.assertEqual(result.render_backend, "matplotlib")
         self.assertEqual(result.section_ids, ["main"])
 
@@ -71,13 +82,13 @@ class McpServiceTests(unittest.TestCase):
     def test_validate_logfile_text_success(self) -> None:
         """Validate unsaved logfile text relative to the provided base directory."""
         result = service.validate_logfile_text(
-            EXAMPLE_LOGFILE_TEXT,
-            base_dir="examples",
+            self._fixture_paths.single_logfile_text,
+            base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
             root=REPO_ROOT,
         )
 
         self.assertTrue(result.valid)
-        self.assertEqual(result.name, "CBL Main Configuration")
+        self.assertEqual(result.name, "MCP Single Fixture")
         self.assertEqual(result.render_backend, "matplotlib")
         self.assertEqual(result.section_ids, ["main"])
 
@@ -116,28 +127,28 @@ class McpServiceTests(unittest.TestCase):
             with self.assertRaises(PathAccessError):
                 service.validate_logfile(str(logfile_path), root=root)
 
-    @unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_inspect_logfile_returns_multisection_metadata(self) -> None:
-        """Inspect a production example and expose section/source summaries."""
+        """Inspect a multisection fixture and expose section/source summaries."""
         result = service.inspect_logfile(
-            "examples/production/cbl_log_example/full_reconstruction.log.yaml",
+            self._fixture_paths.multi_logfile_relative,
             root=REPO_ROOT,
         )
 
-        self.assertEqual(result.name, "CBL Log Example Full Reconstruction")
+        self.assertEqual(result.name, "MCP Multi Fixture")
         self.assertEqual(result.render_backend, "matplotlib")
         self.assertEqual(result.section_ids, ["main_pass", "repeat_pass"])
         self.assertTrue(result.has_remarks)
         self.assertEqual(len(result.sections), 2)
         self.assertEqual(result.sections[0].id, "main_pass")
-        self.assertIn("workspace/data/CBL_Main.dlis", result.sections[0].source_path)
+        self.assertEqual(result.sections[0].source_path, str(self._fixture_paths.las_path))
         self.assertIn("depth", result.sections[0].track_ids)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_logfile_png_returns_png_bytes(self) -> None:
         """Render a PNG preview from a real logfile path."""
         png_bytes = service.preview_logfile_png(
-            "examples/cbl_main.log.yaml",
+            self._fixture_paths.single_logfile_relative,
             dpi=96,
             root=REPO_ROOT,
         )
@@ -148,7 +159,7 @@ class McpServiceTests(unittest.TestCase):
     def test_preview_section_png_returns_png_bytes(self) -> None:
         """Render a section-scoped PNG preview from a real logfile path."""
         png_bytes = service.preview_section_png(
-            "examples/cbl_main.log.yaml",
+            self._fixture_paths.single_logfile_relative,
             section_id="main",
             dpi=96,
             root=REPO_ROOT,
@@ -160,11 +171,11 @@ class McpServiceTests(unittest.TestCase):
     def test_preview_track_png_returns_png_bytes(self) -> None:
         """Render a track-scoped PNG preview from a real logfile path."""
         inspection = service.inspect_logfile(
-            "examples/cbl_main.log.yaml",
+            self._fixture_paths.single_logfile_relative,
             root=REPO_ROOT,
         )
         png_bytes = service.preview_track_png(
-            "examples/cbl_main.log.yaml",
+            self._fixture_paths.single_logfile_relative,
             section_id=inspection.sections[0].id,
             track_ids=[inspection.sections[0].track_ids[1]],
             dpi=96,
@@ -173,17 +184,17 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
 
-    @unittest.skipUnless(HAS_DLIS, "dlisio is not installed")
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_window_png_returns_png_bytes(self) -> None:
         """Render a depth-window PNG preview from a real logfile path."""
         inspection = service.inspect_logfile(
-            "examples/production/cbl_log_example/full_reconstruction.log.yaml",
+            self._fixture_paths.multi_logfile_relative,
             root=REPO_ROOT,
         )
         top_depth = inspection.sections[0].depth_range[0]
         png_bytes = service.preview_window_png(
-            "examples/production/cbl_log_example/full_reconstruction.log.yaml",
-            depth_range=(top_depth, top_depth + 100.0),
+            self._fixture_paths.multi_logfile_relative,
+            depth_range=(top_depth, top_depth + 8.0),
             section_ids=[inspection.sections[0].id],
             dpi=96,
             root=REPO_ROOT,
@@ -196,7 +207,7 @@ class McpServiceTests(unittest.TestCase):
         """Reject explicit section preview requests for missing section ids."""
         with self.assertRaises(TemplateValidationError):
             service.preview_section_png(
-                "examples/cbl_main.log.yaml",
+                self._fixture_paths.single_logfile_relative,
                 section_id="missing",
                 root=REPO_ROOT,
             )
@@ -226,7 +237,7 @@ class McpServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
             output_path = Path(tmpdir) / "mcp-render.pdf"
             result = service.render_logfile_to_file(
-                "examples/cbl_main.log.yaml",
+                self._fixture_paths.single_logfile_relative,
                 str(output_path),
                 root=REPO_ROOT,
             )
@@ -297,12 +308,12 @@ class McpServiceTests(unittest.TestCase):
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:
         """Return canonical logfile YAML text through the serializer path."""
         result = service.format_logfile_text(
-            EXAMPLE_LOGFILE_TEXT,
-            base_dir="examples",
+            self._fixture_paths.single_logfile_text,
+            base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
             root=REPO_ROOT,
         )
 
-        self.assertEqual(result.name, "CBL Main Configuration")
+        self.assertEqual(result.name, "MCP Single Fixture")
         self.assertEqual(result.render_backend, "matplotlib")
         self.assertEqual(result.section_ids, ["main"])
         self.assertIn("version: 1", result.yaml_text)
@@ -315,13 +326,13 @@ class McpServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
             output_path = Path(tmpdir) / "saved" / "normalized.log.yaml"
             result = service.save_logfile_text(
-                EXAMPLE_LOGFILE_TEXT,
+                self._fixture_paths.single_logfile_text,
                 str(output_path),
-                base_dir="examples",
+                base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
                 root=REPO_ROOT,
             )
 
-            self.assertEqual(result.name, "CBL Main Configuration")
+            self.assertEqual(result.name, "MCP Single Fixture")
             self.assertEqual(result.output_path, str(output_path))
             self.assertTrue(output_path.exists())
             saved_text = output_path.read_text(encoding="utf-8")
@@ -338,9 +349,9 @@ class McpServiceTests(unittest.TestCase):
 
             with self.assertRaises(FileExistsError):
                 service.save_logfile_text(
-                    EXAMPLE_LOGFILE_TEXT,
+                    self._fixture_paths.single_logfile_text,
                     str(output_path),
-                    base_dir="examples",
+                    base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
                     root=REPO_ROOT,
                 )
 
