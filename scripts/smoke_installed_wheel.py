@@ -157,17 +157,21 @@ def main() -> int:
                 "wellplot MCP example manifest did not expose the expected examples."
             )
 
-        server_command_text = shutil.which("wellplot-mcp")
-        server_command = Path(server_command_text).resolve() if server_command_text else None
+        python_executable = Path(sys.executable)
+        search_path = os.pathsep.join(
+            path for path in [str(python_executable.parent), os.environ.get("PATH", "")] if path
+        )
+        server_command_text = shutil.which("wellplot-mcp", path=search_path)
+        server_command = Path(server_command_text) if server_command_text else None
         server_args: list[str] = []
         if server_command is None:
-            server_command = Path(sys.executable).resolve().with_name("wellplot-mcp")
+            server_command = python_executable.with_name("wellplot-mcp")
             if not server_command.exists():
                 candidate = server_command.with_suffix(".exe")
                 if candidate.exists():
                     server_command = candidate
                 else:
-                    server_command = Path(sys.executable).resolve()
+                    server_command = python_executable
                     server_args = ["-m", "wellplot.mcp.server"]
 
         async def _exercise_stdio_server() -> None:
