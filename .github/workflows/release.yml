@@ -82,6 +82,20 @@ jobs:
           MPLBACKEND: Agg
         run: ./.release-venv/bin/python scripts/smoke_installed_wheel.py
 
+      - name: Create clean MCP release-test environment
+        run: python -m venv .release-mcp-venv
+
+      - name: Install built wheel with MCP dependency into clean environment
+        run: |
+          ./.release-mcp-venv/bin/pip install --upgrade pip
+          ./.release-mcp-venv/bin/pip install dist/*.whl
+          ./.release-mcp-venv/bin/pip install "mcp>=1,<2"
+
+      - name: Run installed-wheel smoke test with MCP support
+        env:
+          MPLBACKEND: Agg
+        run: ./.release-mcp-venv/bin/python scripts/smoke_installed_wheel.py
+
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:

@@ -11,6 +11,10 @@ surface, YAML shape, or report-page structure.
   - public package imports
   - `wellplot.api` module surfaces
   - dataset, builder, render, and serialization entry points
+- [MCP API](mcp-api.md)
+  - experimental stdio server surface
+  - tools, resources, and prompts
+  - write semantics and server-root policy
 - [YAML Logfile](logfile-yaml.md)
   - top-level logfile structure
   - section-first layout and binding model

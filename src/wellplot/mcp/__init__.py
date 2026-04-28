@@ -17,6 +17,23 @@
 #
 ###############################################################################
 
-"""Package version metadata."""
+"""Optional MCP server support for wellplot."""
 
-__version__ = "0.3.0"
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from mcp.server.fastmcp import FastMCP
+
+
+def create_mcp_server(root: str | Path | None = None) -> FastMCP:
+    """Create and configure the wellplot MCP server."""
+    from .server import create_mcp_server as _create_mcp_server
+
+    return _create_mcp_server(root)
+
+
+__all__ = ["create_mcp_server"]

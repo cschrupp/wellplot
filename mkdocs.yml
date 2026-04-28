@@ -48,6 +48,7 @@ nav:
   - Workflows:
       - YAML Workflow: workflows/yaml-workflow.md
       - Python API Workflow: workflows/python-api.md
+      - MCP Workflow: workflows/mcp-workflow.md
       - Rendering: workflows/rendering.md
       - Report Pages: workflows/report-pages.md
       - Release And Publishing: workflows/release-publishing.md
@@ -63,5 +64,6 @@ nav:
   - Reference:
       - Overview: reference/index.md
       - Python API: reference/python-api.md
+      - MCP API: reference/mcp-api.md
       - YAML Logfile: reference/logfile-yaml.md
       - Report Pages: reference/report-pages.md

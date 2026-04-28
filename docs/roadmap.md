@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-04-22
+Last updated: 2026-04-28
 
 ## Scope Summary
 
@@ -72,6 +72,12 @@ Decision history is tracked in `docs/decision-log.md`.
   - shared heading/tail report blocks
   - fixed-row `open_hole` and `cased_hole` detail tables
   - first-page `remarks` sections
+- Experimental MCP support is now available through:
+  - optional install extra `wellplot[mcp]`
+  - stdio entry point `wellplot-mcp`
+  - logfile validate/inspect/preview/render tools
+  - example-bundle export and normalized logfile YAML authoring tools
+  - packaged example/schema resources and guided prompts
 - User documentation foundation is now in place:
   - MkDocs + Material site scaffold under `docs/site`
   - Read the Docs primary build configuration under `.readthedocs.yaml`
@@ -94,6 +100,29 @@ Decision history is tracked in `docs/decision-log.md`.
 - Data source routing is section-first with optional root fallback:
   - `layout.log_sections[*].data.source_path`
   - `layout.log_sections[*].data.source_format`
+
+## Completed Slice: Experimental MCP Server (2026-04-28)
+
+This slice is now part of the project baseline.
+
+Delivered goals:
+
+- local MCP clients can validate, inspect, preview, and render existing
+  logfiles under a fixed server root
+- local MCP clients can export starter example bundles and safely validate,
+  normalize, and save full logfile YAML text
+- package and release verification now explicitly cover the optional MCP extra
+  instead of relying only on the base wheel
+
+Delivered public surface:
+
+- optional extra `wellplot[mcp]`
+- stdio entry point `wellplot-mcp`
+- tools, resources, and prompts documented in `docs/site/reference/mcp-api.md`
+
+Detailed checklist and release status:
+
+- [docs/mcp-plan.md](mcp-plan.md)
 
 ## MVP Architecture Gaps (layout/bindings model, 2026-03-10)
 
@@ -204,6 +233,9 @@ Current status:
   - first public PyPI release completed for `wellplot 0.1.0`
   - generated example notebooks and production example docs now prefer
     installed-package usage over repo-local `src/` bootstrapping
+  - release workflow now verifies both:
+    - the base installed wheel
+    - a clean environment with the optional MCP dependency enabled
 - next:
   - keep pruning stale comments and filling public API docstring gaps where they still exist
   - keep expanding user docs depth while the public library surface stabilizes

@@ -23,7 +23,7 @@ The manual workflow accepts:
    - `testpypi`
    - `pypi`
 2. `expected_version`
-   - optional version guard such as `0.1.0`
+   - optional version guard such as `0.3.0`
    - if provided, the workflow checks it against `src/wellplot/_version.py`
 
 ## What The Workflow Does
@@ -34,11 +34,14 @@ The `build` job always runs first:
 2. sets up Python and `uv`
 3. optionally verifies the requested version
 4. runs `uv build`
-5. creates a clean virtual environment
+5. creates a clean virtual environment for the base wheel
 6. installs the built wheel into that clean environment
 7. verifies the `wellplot` console entry point
 8. runs `scripts/smoke_installed_wheel.py`
-9. uploads the built artifacts for later publish jobs
+9. creates a second clean virtual environment for MCP verification
+10. installs the built wheel plus `mcp>=1,<2`
+11. reruns `scripts/smoke_installed_wheel.py` with MCP support enabled
+12. uploads the built artifacts for later publish jobs
 
 Publishing jobs only run when selected:
 
@@ -76,12 +79,17 @@ Run the local validation path first:
 
 ```bash
 uv run ruff check .
-uv run python -m unittest discover -s tests -v
+uv run pytest tests/test_mcp_service.py tests/test_mcp_server.py tests/test_pipeline.py tests/test_cli.py tests/test_public_api.py
+uv run --with mcp pytest tests/test_mcp_server.py
+uv run --group docs mkdocs build --strict
 uv build
 uv venv /tmp/wellplot-release-check
 uv pip install --python /tmp/wellplot-release-check/bin/python dist/*.whl
 /tmp/wellplot-release-check/bin/wellplot --help
 MPLBACKEND=Agg /tmp/wellplot-release-check/bin/python scripts/smoke_installed_wheel.py
+uv venv /tmp/wellplot-release-check-mcp
+uv pip install --python /tmp/wellplot-release-check-mcp/bin/python dist/*.whl "mcp>=1,<2"
+MPLBACKEND=Agg /tmp/wellplot-release-check-mcp/bin/python scripts/smoke_installed_wheel.py
 ```
 
 ## Maintenance Release Sequence
@@ -92,7 +100,8 @@ MPLBACKEND=Agg /tmp/wellplot-release-check/bin/python scripts/smoke_installed_wh
 4. Trigger the `Release` workflow with:
    - `publish_target=verify-only`
    - `expected_version=<current version>`
-5. Optionally rehearse on TestPyPI if the workflow, metadata, or dependencies changed in a risky way.
+5. Rehearse on TestPyPI when the workflow, metadata, optional dependencies, or
+   MCP verification path changed in a risky way.
 6. Trigger the `Release` workflow with:
    - `publish_target=pypi`
    - `expected_version=<current version>`
@@ -104,6 +113,14 @@ Production install verification:
 python -m venv /tmp/wellplot-pypi-check
 /tmp/wellplot-pypi-check/bin/pip install wellplot
 /tmp/wellplot-pypi-check/bin/wellplot --help
+```
+
+Experimental MCP install verification:
+
+```bash
+python -m venv /tmp/wellplot-pypi-check-mcp
+/tmp/wellplot-pypi-check-mcp/bin/pip install "wellplot[mcp]"
+/tmp/wellplot-pypi-check-mcp/bin/python scripts/smoke_installed_wheel.py
 ```
 
 Optional TestPyPI install verification:
@@ -124,3 +141,5 @@ The first public PyPI release has been completed. Future work is maintenance:
 - keep trusted publishing claims aligned with repository and environment names
 - update the changelog before each release
 - verify the public PyPI install after each release
+- keep the optional MCP smoke path working whenever the experimental MCP
+  surface changes

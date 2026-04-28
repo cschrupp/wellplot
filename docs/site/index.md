@@ -2,10 +2,11 @@
 
 `wellplot` is a Python library for building printable and interactive well-log layouts from LAS, DLIS, and in-memory scientific data.
 
-It is designed for two equally important workflows:
+It is designed for three complementary workflows:
 
 - declarative log authoring with YAML templates/savefiles
 - programmatic log authoring from Python, including notebooks and research pipelines
+- experimental MCP-driven log review, preview, and YAML authoring
 
 ## Installation
 
@@ -80,6 +81,7 @@ flowchart LR
 - add computed channels from `numpy` and `pandas`
 - align, sort, convert, and merge channels before rendering
 - build layouts with YAML or with the Python API
+- validate, inspect, preview, and safely save logfile workflows through MCP
 - render full reports, sections, tracks, and bounded windows
 - generate PDF reports and notebook-friendly PNG/SVG outputs
 - serialize layout/report definitions back to YAML
@@ -89,4 +91,4 @@ flowchart LR
 - Read [Getting Started](getting-started.md)
 - Install the package from [Installation](installation.md)
 - Learn the core objects in [Concepts](concepts.md)
-- Choose a [YAML Workflow](workflows/yaml-workflow.md) or a [Python API Workflow](workflows/python-api.md)
+- Choose a [YAML Workflow](workflows/yaml-workflow.md), a [Python API Workflow](workflows/python-api.md), or the experimental [MCP Workflow](workflows/mcp-workflow.md)
