@@ -36,6 +36,11 @@ for, and what still requires maintainer action outside the repo.
 - `preview_window_png(logfile_path, depth_range, depth_range_unit=None, page_index=0, dpi=144, section_ids=None)`
 - `render_logfile_to_file(logfile_path, output_path, overwrite=False)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
+- `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
+- `summarize_logfile_draft(logfile_path)`
+- `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
+- `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
 - `save_logfile_text(yaml_text, output_path, overwrite=False, base_dir=None)`
@@ -70,6 +75,10 @@ Packaged example ids:
 - Explicit writes only happen through:
   - `render_logfile_to_file(...)`
   - `export_example_bundle(...)`
+  - `create_logfile_draft(...)`
+  - `add_track(...)`
+  - `bind_curve(...)`
+  - `update_curve_binding(...)`
   - `save_logfile_text(...)`
 - `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` accept unsaved full logfile YAML text. When
@@ -143,4 +152,11 @@ Concrete `0.4.0` foundation tools:
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 
-The first implementation wave should focus on the first five items above.
+The first implementation wave is now in the repository. The next authoring
+focus should move to:
+
+- `move_track(...)`
+- `set_heading_content(...)`
+- `set_remarks_content(...)`
+- `inspect_authoring_vocab(...)`
+- `summarize_logfile_changes(...)`

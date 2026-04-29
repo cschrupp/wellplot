@@ -98,6 +98,9 @@ Main tools:
 
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
+- `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
@@ -107,6 +110,8 @@ Recommended split:
 
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
+- use `add_track(...)`, `bind_curve(...)`, and `update_curve_binding(...)`
+  for the first deterministic draft-edit loop
 - use `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` when the client is still working with unsaved YAML
   text in memory

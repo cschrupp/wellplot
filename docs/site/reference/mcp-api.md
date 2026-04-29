@@ -206,6 +206,78 @@ Notes:
 - channel discovery is best-effort and depends on the referenced data source
   and optional format dependencies being available
 
+### `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
+
+Purpose: append one track to a draft logfile and persist the validated result.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track_ids`
+- `track_count`
+
+Behavior:
+
+- appends the new track at the end of the target section
+- writes back to the explicit `logfile_path`
+- rejects duplicate track ids within the target section
+- validates the mutated draft through the normal renderable logfile path before
+  saving
+
+### `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+
+Purpose: add one scalar curve binding to an existing draft track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding_kind`
+- `binding_count`
+
+Behavior:
+
+- resolves the requested channel against the target section dataset
+- rejects duplicate curve bindings for the same section, track, and channel
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
+
+Purpose: patch one existing curve binding inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding`
+
+Supported patch keys:
+
+- `label`
+- `style`
+- `scale`
+- `header_display`
+- `fill`
+- `reference_overlay`
+- `value_labels`
+- `wrap`
+- `render_mode`
+
+Behavior:
+
+- deep-merges nested mapping updates
+- removes optional properties when their patch value is `null`
+- rejects unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `validate_logfile_text(yaml_text, base_dir=None)`
 
 Purpose: validate unsaved full logfile YAML text.
@@ -315,6 +387,6 @@ For draft authoring:
 
 1. `create_logfile_draft(...)`
 2. `summarize_logfile_draft(...)`
-3. preview with a narrow PNG tool
-4. apply future explicit edit tools
+3. apply `add_track(...)`, `bind_curve(...)`, and `update_curve_binding(...)`
+4. preview with a narrow PNG tool
 5. render or save only after review

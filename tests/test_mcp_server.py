@@ -175,6 +175,51 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "logfile_path": str(draft_logfile),
                 },
             )
+            added_track = await session.call_tool(
+                "add_track",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "id": "porosity",
+                    "title": "Porosity",
+                    "kind": "normal",
+                    "width_mm": 32.0,
+                },
+            )
+            bound_curve = await session.call_tool(
+                "bind_curve",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
+                    "channel": "GR",
+                    "label": "Gamma",
+                    "style": {"color": "#008000"},
+                },
+            )
+            updated_binding = await session.call_tool(
+                "update_curve_binding",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
+                    "channel": "GR",
+                    "patch": {
+                        "label": "Gamma Ray",
+                        "scale": {
+                            "kind": "linear",
+                            "min": 0.0,
+                            "max": 150.0,
+                        },
+                    },
+                },
+            )
+            updated_draft_summary = await session.call_tool(
+                "summarize_logfile_draft",
+                {
+                    "logfile_path": str(draft_logfile),
+                },
+            )
             saved = await session.call_tool(
                 "save_logfile_text",
                 {
@@ -199,6 +244,9 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "export_example_bundle",
                 "create_logfile_draft",
                 "summarize_logfile_draft",
+                "add_track",
+                "bind_curve",
+                "update_curve_binding",
                 "validate_logfile_text",
                 "format_logfile_text",
                 "save_logfile_text",
@@ -275,6 +323,25 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
         self.assertTrue(draft_summary.structuredContent["sections"][0]["dataset_loaded"])
         self.assertIn("GR", draft_summary.structuredContent["sections"][0]["available_channels"])
+        self.assertEqual(added_track.structuredContent["track_id"], "porosity")
+        self.assertEqual(added_track.structuredContent["track_count"], 7)
+        self.assertEqual(added_track.structuredContent["track_ids"][-1], "porosity")
+        self.assertEqual(bound_curve.structuredContent["channel"], "GR")
+        self.assertEqual(bound_curve.structuredContent["binding_kind"], "curve")
+        self.assertEqual(bound_curve.structuredContent["binding_count"], 6)
+        self.assertEqual(updated_binding.structuredContent["binding"]["label"], "Gamma Ray")
+        self.assertEqual(
+            updated_binding.structuredContent["binding"]["scale"]["max"],
+            150.0,
+        )
+        self.assertEqual(
+            updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
+            6,
+        )
+        self.assertEqual(
+            updated_draft_summary.structuredContent["sections"][0]["track_ids"][-1],
+            "porosity",
+        )
         self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(saved.structuredContent["output_path"], str(saved_logfile))
         self.assertTrue(draft_logfile.exists())

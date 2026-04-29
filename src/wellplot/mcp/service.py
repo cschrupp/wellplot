@@ -197,6 +197,40 @@ class LogfileDraftSummaryResult:
     sections: list[LogfileDraftSectionSummary]
 
 
+@dataclass(slots=True)
+class AddedTrackResult:
+    """Structured result for appending one track to a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track_ids: list[str]
+    track_count: int
+
+
+@dataclass(slots=True)
+class BoundCurveResult:
+    """Structured result for adding one curve binding to a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding_kind: str
+    binding_count: int
+
+
+@dataclass(slots=True)
+class UpdatedCurveBindingResult:
+    """Structured result for updating one curve binding in a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding: dict[str, object]
+
+
 def resolve_server_root(root: str | Path | None = None) -> Path:
     """Resolve the effective MCP server root."""
     return Path.cwd().resolve() if root is None else Path(root).expanduser().resolve()
@@ -366,6 +400,151 @@ def _persist_rebased_logfile_mapping(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(normalized_yaml, encoding="utf-8")
     return logfile_from_mapping(rebased_mapping)
+
+
+def _logfile_mapping_sections(mapping: dict[str, object]) -> list[dict[str, object]]:
+    document = mapping.get("document")
+    if not isinstance(document, dict):
+        raise TemplateValidationError("Logfile mapping is missing document configuration.")
+    layout = document.get("layout")
+    if not isinstance(layout, dict):
+        raise TemplateValidationError("Logfile mapping is missing document.layout configuration.")
+    sections = layout.get("log_sections")
+    if not isinstance(sections, list):
+        raise TemplateValidationError(
+            "Logfile mapping is missing document.layout.log_sections configuration."
+        )
+    return sections
+
+
+def _logfile_mapping_bindings(mapping: dict[str, object]) -> list[dict[str, object]]:
+    document = mapping.get("document")
+    if not isinstance(document, dict):
+        raise TemplateValidationError("Logfile mapping is missing document configuration.")
+    bindings = document.get("bindings")
+    if not isinstance(bindings, dict):
+        raise TemplateValidationError("Logfile mapping is missing document.bindings configuration.")
+    channels = bindings.get("channels")
+    if not isinstance(channels, list):
+        raise TemplateValidationError(
+            "Logfile mapping is missing document.bindings.channels configuration."
+        )
+    return channels
+
+
+def _logfile_mapping_section(
+    mapping: dict[str, object],
+    section_id: str,
+) -> dict[str, object]:
+    sections = _logfile_mapping_sections(mapping)
+    available: list[str] = []
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        current_id = str(section.get("id", ""))
+        available.append(current_id)
+        if current_id == section_id:
+            return section
+    raise TemplateValidationError(
+        f"Unknown section_id {section_id!r}. Available sections: {available}."
+    )
+
+
+def _logfile_mapping_section_tracks(
+    section: dict[str, object],
+    *,
+    section_id: str,
+) -> list[dict[str, object]]:
+    tracks = section.get("tracks")
+    if not isinstance(tracks, list):
+        raise TemplateValidationError(f"Section {section_id!r} is missing a tracks list.")
+    return tracks
+
+
+def _persist_validated_logfile_mapping(
+    mapping: dict[str, object],
+    *,
+    logfile_path: Path,
+    root: Path,
+) -> LogFileSpec:
+    spec = logfile_from_mapping(mapping)
+    _validate_logfile_spec_renderable(
+        spec,
+        base_dir=logfile_path.parent,
+        allowed_root=root,
+    )
+    normalized_yaml = report_to_yaml(spec)
+    if not isinstance(normalized_yaml, str):
+        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
+    logfile_path.write_text(normalized_yaml, encoding="utf-8")
+    return spec
+
+
+def _resolve_section_channel_name(
+    spec: LogFileSpec,
+    *,
+    logfile_path: Path,
+    root: Path,
+    section_id: str,
+    channel: str,
+) -> str:
+    datasets_by_section, _ = load_datasets_for_logfile(
+        spec,
+        base_dir=logfile_path.parent,
+        allowed_root=root,
+    )
+    dataset = datasets_by_section.get(section_id)
+    if dataset is None:
+        raise TemplateValidationError(f"Missing dataset for section {section_id!r}.")
+    for mnemonic in dataset.channels:
+        if mnemonic.upper() == channel.upper():
+            return mnemonic
+    raise TemplateValidationError(
+        f"Channel {channel!r} was not found in section {section_id!r}. "
+        f"Available channels: {sorted(dataset.channels)}."
+    )
+
+
+def _find_curve_binding_index(
+    bindings: list[dict[str, object]],
+    *,
+    spec: LogFileSpec,
+    section_id: str,
+    track_id: str,
+    channel: str,
+) -> int:
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "curve")).strip().lower() != "curve":
+            continue
+        if _binding_target_section_id(spec, binding) != section_id:
+            continue
+        if str(binding.get("track_id", "")) != track_id:
+            continue
+        if str(binding.get("channel", "")).upper() == channel.upper():
+            return index
+    raise TemplateValidationError(
+        f"Curve binding for channel {channel!r} was not found on track {track_id!r} "
+        f"in section {section_id!r}."
+    )
+
+
+def _merge_optional_patch(
+    target: dict[str, object],
+    patch: dict[str, object],
+) -> dict[str, object]:
+    merged = deepcopy(target)
+    for key, value in patch.items():
+        if value is None:
+            merged.pop(key, None)
+            continue
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_optional_patch(existing, value)
+            continue
+        merged[key] = deepcopy(value)
+    return merged
 
 
 def _validate_preview_parameters(
@@ -1061,6 +1240,227 @@ def summarize_logfile_draft(
         section_count=len(section_summaries),
         section_ids=[summary.id for summary in section_summaries],
         sections=section_summaries,
+    )
+
+
+def add_track(
+    logfile_path: str,
+    *,
+    section_id: str,
+    id: str,
+    title: str,
+    kind: str,
+    width_mm: float,
+    x_scale: dict[str, object] | None = None,
+    grid: dict[str, object] | None = None,
+    track_header: dict[str, object] | None = None,
+    reference: dict[str, object] | None = None,
+    annotations: list[dict[str, object]] | None = None,
+    root: str | Path | None = None,
+) -> AddedTrackResult:
+    """Append one track to a draft logfile and persist the validated result."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_section(current_spec, section_id)
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_id = str(id).strip()
+    if not track_id:
+        raise TemplateValidationError("Track id must be non-empty.")
+    existing_track_ids = [str(track.get("id", "")) for track in tracks if isinstance(track, dict)]
+    if track_id in existing_track_ids:
+        raise TemplateValidationError(
+            f"Track id {track_id!r} already exists in section {section_id!r}."
+        )
+
+    track_mapping: dict[str, object] = {
+        "id": track_id,
+        "title": str(title),
+        "kind": str(kind),
+        "width_mm": float(width_mm),
+        "position": len(existing_track_ids) + 1,
+    }
+    if x_scale is not None:
+        track_mapping["x_scale"] = deepcopy(x_scale)
+    if grid is not None:
+        track_mapping["grid"] = deepcopy(grid)
+    if track_header is not None:
+        track_mapping["track_header"] = deepcopy(track_header)
+    if reference is not None:
+        track_mapping["reference"] = deepcopy(reference)
+    if annotations is not None:
+        track_mapping["annotations"] = deepcopy(annotations)
+    tracks.append(track_mapping)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    saved_track_ids = [
+        str(track.get("id", ""))
+        for track in list(saved_section.get("tracks", []))
+        if isinstance(track, dict)
+    ]
+    return AddedTrackResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track_ids=saved_track_ids,
+        track_count=len(saved_track_ids),
+    )
+
+
+def bind_curve(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    label: str | None = None,
+    style: dict[str, object] | None = None,
+    scale: dict[str, object] | None = None,
+    header_display: dict[str, object] | None = None,
+    root: str | Path | None = None,
+) -> BoundCurveResult:
+    """Add one curve binding to a draft logfile and persist the validated result."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    resolved_channel = _resolve_section_channel_name(
+        current_spec,
+        logfile_path=resolved_logfile,
+        root=server_root,
+        section_id=section_id,
+        channel=channel,
+    )
+    bindings = _logfile_mapping_bindings(mapping)
+    try:
+        _ = _find_curve_binding_index(
+            bindings,
+            spec=current_spec,
+            section_id=section_id,
+            track_id=track_id,
+            channel=resolved_channel,
+        )
+    except TemplateValidationError:
+        pass
+    else:
+        raise TemplateValidationError(
+            f"Curve binding for channel {resolved_channel!r} already exists on "
+            f"track {track_id!r} in section {section_id!r}."
+        )
+
+    binding: dict[str, object] = {
+        "section": section_id,
+        "track_id": track_id,
+        "channel": resolved_channel,
+        "kind": "curve",
+    }
+    if label is not None:
+        binding["label"] = label
+    if style is not None:
+        binding["style"] = deepcopy(style)
+    if scale is not None:
+        binding["scale"] = deepcopy(scale)
+    if header_display is not None:
+        binding["header_display"] = deepcopy(header_display)
+    bindings.append(binding)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    binding_count = _binding_counts_by_section(saved_spec)[section_id]["curve"]
+    return BoundCurveResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+        binding_kind="curve",
+        binding_count=binding_count,
+    )
+
+
+def update_curve_binding(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedCurveBindingResult:
+    """Patch one curve binding in a draft logfile and persist the validated result."""
+    allowed_keys = {
+        "label",
+        "style",
+        "scale",
+        "header_display",
+        "fill",
+        "reference_overlay",
+        "value_labels",
+        "wrap",
+        "render_mode",
+    }
+    invalid = sorted(key for key in patch if key not in allowed_keys)
+    if invalid:
+        raise TemplateValidationError(
+            f"Unsupported curve-binding patch keys {invalid}. Allowed keys: {sorted(allowed_keys)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_curve_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    bindings[binding_index] = _merge_optional_patch(binding, patch)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_bindings = _logfile_mapping_bindings(report_to_dict(saved_spec))
+    saved_binding_index = _find_curve_binding_index(
+        saved_bindings,
+        spec=saved_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    saved_binding = saved_bindings[saved_binding_index]
+    if not isinstance(saved_binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    return UpdatedCurveBindingResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=str(saved_binding.get("channel", channel)),
+        binding=deepcopy(saved_binding),
     )
 
 

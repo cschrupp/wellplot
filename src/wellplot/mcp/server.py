@@ -208,6 +208,84 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return asdict(service.summarize_logfile_draft(logfile_path, root=server_root))
 
     @mcp.tool()
+    def add_track(
+        logfile_path: str,
+        section_id: str,
+        id: str,
+        title: str,
+        kind: str,
+        width_mm: float,
+        x_scale: dict[str, object] | None = None,
+        grid: dict[str, object] | None = None,
+        track_header: dict[str, object] | None = None,
+        reference: dict[str, object] | None = None,
+        annotations: list[dict[str, object]] | None = None,
+    ) -> dict[str, object]:
+        """Append one track to a draft logfile."""
+        return asdict(
+            service.add_track(
+                logfile_path,
+                section_id=section_id,
+                id=id,
+                title=title,
+                kind=kind,
+                width_mm=width_mm,
+                x_scale=x_scale,
+                grid=grid,
+                track_header=track_header,
+                reference=reference,
+                annotations=annotations,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def bind_curve(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+        label: str | None = None,
+        style: dict[str, object] | None = None,
+        scale: dict[str, object] | None = None,
+        header_display: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Bind one scalar channel to a draft track as a curve."""
+        return asdict(
+            service.bind_curve(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                label=label,
+                style=style,
+                scale=scale,
+                header_display=header_display,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def update_curve_binding(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Patch one existing curve binding inside a draft logfile."""
+        return asdict(
+            service.update_curve_binding(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def validate_logfile_text(
         yaml_text: str,
         base_dir: str | None = None,

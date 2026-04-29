@@ -162,6 +162,13 @@ Follow-on `0.4.0` tools after that foundation:
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 
+Current status:
+
+- the first authoring-foundation wave now exists in the repo-local MCP
+  implementation
+- the next implementation step should move to track ordering, heading/remarks
+  edits, authoring vocabulary discovery, and change summaries
+
 Detailed plan:
 
 - [docs/mcp-authoring-plan.md](mcp-authoring-plan.md)

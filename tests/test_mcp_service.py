@@ -28,6 +28,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 try:
     from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
@@ -389,6 +391,182 @@ class McpServiceTests(unittest.TestCase):
         else:
             self.assertFalse(section.dataset_loaded)
             self.assertIn("lasio", section.dataset_message)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_track_appends_one_track_to_draft(self) -> None:
+        """Append one track to a cloned draft and persist the updated order."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "porosity")
+            self.assertEqual(result.track_ids[-1], "porosity")
+            self.assertEqual(result.track_count, 7)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            self.assertEqual(tracks[-1]["id"], "porosity")
+            self.assertEqual(tracks[-1]["position"], 7)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_track_rejects_duplicate_track_id(self) -> None:
+        """Reject duplicate track identifiers inside one draft section."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.add_track(
+                    str(draft_path),
+                    section_id="main",
+                    id="gr",
+                    title="Duplicate GR",
+                    kind="normal",
+                    width_mm=24.0,
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_bind_curve_adds_section_scoped_binding(self) -> None:
+        """Add one curve binding to a draft track and persist the result."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+
+            result = service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="GR",
+                label="Gamma",
+                style={"color": "#008000"},
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "porosity")
+            self.assertEqual(result.channel, "GR")
+            self.assertEqual(result.binding_kind, "curve")
+            self.assertEqual(result.binding_count, 6)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("section") == "main"
+                and binding.get("track_id") == "porosity"
+                and binding.get("channel") == "GR"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["label"], "Gamma")
+            self.assertEqual(matching[0]["style"]["color"], "#008000")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_curve_binding_merges_patch_and_persists(self) -> None:
+        """Patch one existing curve binding and persist the normalized result."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.update_curve_binding(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                channel="GR",
+                patch={
+                    "label": "Gamma Ray",
+                    "style": {
+                        "color": "#00aa00",
+                        "line_width": 1.6,
+                    },
+                    "scale": {
+                        "kind": "linear",
+                        "min": 0.0,
+                        "max": 150.0,
+                    },
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "gr")
+            self.assertEqual(result.channel, "GR")
+            self.assertEqual(result.binding["label"], "Gamma Ray")
+            self.assertEqual(result.binding["style"]["color"], "#00aa00")
+            self.assertEqual(result.binding["scale"]["max"], 150.0)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "gr" and binding.get("channel") == "GR"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["label"], "Gamma Ray")
+            self.assertEqual(matching[0]["style"]["line_width"], 1.6)
+            self.assertEqual(matching[0]["scale"]["max"], 150.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_curve_binding_rejects_unknown_patch_key(self) -> None:
+        """Reject curve-binding patches outside the supported editable surface."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.update_curve_binding(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="gr",
+                    channel="GR",
+                    patch={"unsupported": True},
+                    root=REPO_ROOT,
+                )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:
