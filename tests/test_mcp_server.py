@@ -80,6 +80,7 @@ class McpServerIntegrationTests(unittest.TestCase):
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
         export_dir = fixture_paths.fixture_dir / "exported-example"
+        draft_logfile = fixture_paths.fixture_dir / "drafts" / "single-draft.log.yaml"
         saved_logfile = fixture_paths.fixture_dir / "saved.log.yaml"
         server = StdioServerParameters(
             command=sys.executable,
@@ -161,6 +162,19 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "output_dir": str(export_dir),
                 },
             )
+            created_draft = await session.call_tool(
+                "create_logfile_draft",
+                {
+                    "output_path": str(draft_logfile),
+                    "source_logfile_path": fixture_paths.single_logfile_relative,
+                },
+            )
+            draft_summary = await session.call_tool(
+                "summarize_logfile_draft",
+                {
+                    "logfile_path": str(draft_logfile),
+                },
+            )
             saved = await session.call_tool(
                 "save_logfile_text",
                 {
@@ -183,6 +197,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "preview_window_png",
                 "render_logfile_to_file",
                 "export_example_bundle",
+                "create_logfile_draft",
+                "summarize_logfile_draft",
                 "validate_logfile_text",
                 "format_logfile_text",
                 "save_logfile_text",
@@ -246,8 +262,22 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "data-notes.md",
             ],
         )
+        self.assertEqual(created_draft.structuredContent["output_path"], str(draft_logfile))
+        self.assertEqual(created_draft.structuredContent["name"], "MCP Single Fixture")
+        self.assertEqual(created_draft.structuredContent["section_ids"], ["main"])
+        self.assertEqual(created_draft.structuredContent["seed_kind"], "logfile")
+        self.assertEqual(
+            created_draft.structuredContent["seed_value"],
+            str(fixture_paths.single_logfile),
+        )
+        self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")
+        self.assertEqual(draft_summary.structuredContent["section_count"], 1)
+        self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
+        self.assertTrue(draft_summary.structuredContent["sections"][0]["dataset_loaded"])
+        self.assertIn("GR", draft_summary.structuredContent["sections"][0]["available_channels"])
         self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(saved.structuredContent["output_path"], str(saved_logfile))
+        self.assertTrue(draft_logfile.exists())
         self.assertTrue(export_dir.exists())
         self.assertTrue(saved_logfile.exists())
 

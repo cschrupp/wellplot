@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -306,6 +307,88 @@ class McpServiceTests(unittest.TestCase):
                     "../outside",
                     root=root,
                 )
+
+    def test_create_logfile_draft_requires_exactly_one_seed_source(self) -> None:
+        """Reject missing or conflicting draft seed arguments."""
+        with self.assertRaises(ValueError):
+            service.create_logfile_draft("draft.log.yaml", root=REPO_ROOT)
+
+        with self.assertRaises(ValueError):
+            service.create_logfile_draft(
+                "draft.log.yaml",
+                example_id="cbl_log_example",
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+    def test_create_logfile_draft_clones_existing_logfile(self) -> None:
+        """Clone an existing logfile into a rebased normalized authoring draft."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            output_path = Path(tmpdir) / "drafts" / "single-draft.log.yaml"
+            result = service.create_logfile_draft(
+                str(output_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.output_path, str(output_path))
+            self.assertEqual(result.name, "MCP Single Fixture")
+            self.assertEqual(result.section_ids, ["main"])
+            self.assertEqual(result.seed_kind, "logfile")
+            self.assertEqual(result.seed_value, str(self._fixture_paths.single_logfile))
+            self.assertTrue(output_path.exists())
+
+            saved_text = output_path.read_text(encoding="utf-8")
+            self.assertIn("version: 1", saved_text)
+            self.assertNotIn("\ntemplate:\n", saved_text)
+            expected_source_path = Path(
+                os.path.relpath(self._fixture_paths.las_path, start=output_path.parent)
+            ).as_posix()
+            self.assertIn(f"source_path: {expected_source_path}", saved_text)
+
+    def test_create_logfile_draft_from_packaged_example_writes_normalized_yaml(self) -> None:
+        """Create one normalized draft logfile directly from a packaged example."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            output_path = Path(tmpdir) / "drafts" / "example-draft.log.yaml"
+            result = service.create_logfile_draft(
+                str(output_path),
+                example_id="cbl_log_example",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.output_path, str(output_path))
+            self.assertEqual(result.seed_kind, "example")
+            self.assertEqual(result.seed_value, "cbl_log_example")
+            self.assertTrue(output_path.exists())
+
+            saved_text = output_path.read_text(encoding="utf-8")
+            self.assertIn("CBL Log Example Full Reconstruction", saved_text)
+            self.assertNotIn("\ntemplate:\n", saved_text)
+
+    def test_summarize_logfile_draft_returns_authoring_metadata(self) -> None:
+        """Summarize one draft logfile for deterministic authoring planning."""
+        result = service.summarize_logfile_draft(
+            self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.name, "MCP Single Fixture")
+        self.assertEqual(result.render_backend, "matplotlib")
+        self.assertEqual(result.section_count, 1)
+        self.assertEqual(result.section_ids, ["main"])
+        section = result.sections[0]
+        self.assertEqual(section.id, "main")
+        self.assertEqual(section.curve_binding_count, 5)
+        self.assertEqual(section.raster_binding_count, 0)
+        self.assertIn("depth", section.track_ids)
+        self.assertIn("gr", section.track_ids)
+        if HAS_LAS:
+            self.assertTrue(section.dataset_loaded)
+            self.assertEqual(section.dataset_message, "")
+            self.assertIn("GR", section.available_channels)
+        else:
+            self.assertFalse(section.dataset_loaded)
+            self.assertIn("lasio", section.dataset_message)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:

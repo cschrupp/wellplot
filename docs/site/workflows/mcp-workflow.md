@@ -88,18 +88,28 @@ artifact such as a PDF.
 
 The experimental authoring flow is intentionally conservative:
 
-1. start from a packaged example bundle when useful
-2. generate or edit full logfile YAML text
-3. validate the text before writing
-4. normalize it through the canonical serializer path
-5. save only to an explicit output path
+1. create a normalized draft from an example or existing logfile
+2. summarize the draft before issuing authoring edits
+3. preview the affected section, track, or window
+4. validate or normalize text only when you are operating on unsaved YAML
+5. save or render only to explicit output paths
 
 Main tools:
 
+- `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
+- `summarize_logfile_draft(logfile_path)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
 - `save_logfile_text(yaml_text, output_path, overwrite=False, base_dir=None)`
+
+Recommended split:
+
+- use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
+  want a file-backed authoring target that an MCP client can revise in steps
+- use `validate_logfile_text(...)`, `format_logfile_text(...)`, and
+  `save_logfile_text(...)` when the client is still working with unsaved YAML
+  text in memory
 
 ## `base_dir` Semantics
 

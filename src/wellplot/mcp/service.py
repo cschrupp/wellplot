@@ -25,7 +25,7 @@ import json
 import os
 from copy import deepcopy
 from dataclasses import dataclass
-from importlib.resources import files
+from importlib.resources import as_file, files
 from pathlib import Path
 
 import yaml
@@ -38,7 +38,7 @@ from ..api.render import (
     render_window_png,
 )
 from ..api.serialize import report_to_dict, report_to_yaml
-from ..errors import PathAccessError, TemplateValidationError
+from ..errors import DependencyUnavailableError, PathAccessError, TemplateValidationError
 from ..logfile import (
     LogFileSpec,
     build_documents_for_logfile,
@@ -153,6 +153,50 @@ class SavedLogfileTextResult:
     output_path: str
 
 
+@dataclass(slots=True)
+class LogfileDraftCreateResult:
+    """Structured result for creating one normalized logfile draft."""
+
+    output_path: str
+    name: str
+    section_ids: list[str]
+    seed_kind: str
+    seed_value: str
+
+
+@dataclass(slots=True)
+class LogfileDraftSectionSummary:
+    """Structured per-section authoring summary for one draft logfile."""
+
+    id: str
+    title: str
+    source_path: str
+    source_format: str
+    depth_range: list[float] | None
+    track_ids: list[str]
+    track_kinds: list[str]
+    curve_binding_count: int
+    raster_binding_count: int
+    available_channels: list[str]
+    dataset_loaded: bool
+    dataset_message: str
+
+
+@dataclass(slots=True)
+class LogfileDraftSummaryResult:
+    """Structured authoring summary for one draft logfile."""
+
+    name: str
+    render_backend: str
+    configured_output_path: str
+    has_heading: bool
+    has_remarks: bool
+    has_tail: bool
+    section_count: int
+    section_ids: list[str]
+    sections: list[LogfileDraftSectionSummary]
+
+
 def resolve_server_root(root: str | Path | None = None) -> Path:
     """Resolve the effective MCP server root."""
     return Path.cwd().resolve() if root is None else Path(root).expanduser().resolve()
@@ -178,6 +222,16 @@ def _section_map_from_spec(spec: LogFileSpec) -> dict[str, dict[str, object]]:
     layout = dict(spec.document.get("layout", {}))
     sections = list(layout.get("log_sections", []))
     return {str(section.get("id", "")): dict(section) for section in sections}
+
+
+def _track_to_sections(spec: LogFileSpec) -> dict[str, list[str]]:
+    track_sections: dict[str, list[str]] = {}
+    for section_id, section in _section_map_from_spec(spec).items():
+        for track in list(section.get("tracks", [])):
+            if isinstance(track, dict):
+                track_id = str(track.get("id", ""))
+                track_sections.setdefault(track_id, []).append(section_id)
+    return track_sections
 
 
 def _resolve_base_dir(
@@ -249,6 +303,69 @@ def _preview_report(prepared: object) -> ProgrammaticLogSpec:
         datasets_by_section=prepared.datasets_by_section,
         source_paths_by_section=prepared.source_paths_by_section,
     )
+
+
+def _binding_target_section_id(
+    spec: LogFileSpec,
+    binding: dict[str, object],
+) -> str | None:
+    section_value = binding.get("section")
+    if isinstance(section_value, str) and section_value.strip():
+        return section_value
+
+    candidates = _track_to_sections(spec).get(str(binding.get("track_id", "")), [])
+    if len(candidates) == 1:
+        return candidates[0]
+
+    section_ids = _section_ids_from_spec(spec)
+    if len(section_ids) == 1:
+        return section_ids[0]
+    return None
+
+
+def _binding_counts_by_section(spec: LogFileSpec) -> dict[str, dict[str, int]]:
+    counts = {section_id: {"curve": 0, "raster": 0} for section_id in _section_ids_from_spec(spec)}
+    bindings = dict(spec.document.get("bindings", {}))
+    for binding in list(bindings.get("channels", [])):
+        if not isinstance(binding, dict):
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            continue
+        kind = str(binding.get("kind", "curve")).strip().lower()
+        if kind == "curve":
+            counts[section_id]["curve"] += 1
+        elif kind == "raster":
+            counts[section_id]["raster"] += 1
+    return counts
+
+
+def _normalize_logfile_mapping_from_path(
+    logfile_path: Path,
+    *,
+    allowed_root: Path | None = None,
+) -> tuple[LogFileSpec, dict[str, object]]:
+    spec = load_logfile(logfile_path, allowed_root=allowed_root)
+    return spec, report_to_dict(spec)
+
+
+def _persist_rebased_logfile_mapping(
+    mapping: dict[str, object],
+    *,
+    from_base_dir: Path,
+    output_path: Path,
+) -> LogFileSpec:
+    rebased_mapping = _rebase_report_paths(
+        deepcopy(mapping),
+        from_base_dir=from_base_dir,
+        to_base_dir=output_path.parent,
+    )
+    normalized_yaml = report_to_yaml(rebased_mapping)
+    if not isinstance(normalized_yaml, str):
+        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(normalized_yaml, encoding="utf-8")
+    return logfile_from_mapping(rebased_mapping)
 
 
 def _validate_preview_parameters(
@@ -808,6 +925,142 @@ def export_example_bundle(
         example_id=example_id,
         output_dir=str(resolved_output_dir),
         written_files=written_files,
+    )
+
+
+def create_logfile_draft(
+    output_path: str,
+    *,
+    example_id: str | None = None,
+    source_logfile_path: str | None = None,
+    overwrite: bool = False,
+    root: str | Path | None = None,
+) -> LogfileDraftCreateResult:
+    """Create one normalized draft logfile from an example or existing logfile."""
+    if (example_id is None) == (source_logfile_path is None):
+        raise ValueError(
+            "Provide exactly one of example_id or source_logfile_path when creating a draft."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_output_path = _resolve_user_path(output_path, root=server_root, context="output_path")
+    if resolved_output_path.exists() and not overwrite:
+        raise FileExistsError(f"Output path already exists: {resolved_output_path}")
+
+    if example_id is not None:
+        asset = _production_asset_path(example_id, "full_reconstruction.log.yaml")
+        with as_file(asset) as asset_path:
+            spec = load_logfile_text(
+                asset_path.read_text(encoding="utf-8"),
+                base_dir=asset_path.parent,
+            )
+            normalized_spec = _persist_rebased_logfile_mapping(
+                report_to_dict(spec),
+                from_base_dir=asset_path.parent,
+                output_path=resolved_output_path,
+            )
+        return LogfileDraftCreateResult(
+            output_path=str(resolved_output_path),
+            name=normalized_spec.name,
+            section_ids=_section_ids_from_spec(normalized_spec),
+            seed_kind="example",
+            seed_value=example_id,
+        )
+
+    resolved_source_logfile = _resolve_user_path(
+        source_logfile_path,
+        root=server_root,
+        context="source_logfile_path",
+    )
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_source_logfile,
+        allowed_root=server_root,
+    )
+    normalized_spec = _persist_rebased_logfile_mapping(
+        mapping,
+        from_base_dir=resolved_source_logfile.parent,
+        output_path=resolved_output_path,
+    )
+    return LogfileDraftCreateResult(
+        output_path=str(resolved_output_path),
+        name=normalized_spec.name,
+        section_ids=_section_ids_from_spec(normalized_spec),
+        seed_kind="logfile",
+        seed_value=str(resolved_source_logfile),
+    )
+
+
+def summarize_logfile_draft(
+    logfile_path: str,
+    *,
+    root: str | Path | None = None,
+) -> LogfileDraftSummaryResult:
+    """Summarize one draft logfile for deterministic authoring workflows."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    spec = load_logfile(resolved_logfile, allowed_root=server_root)
+    resolved_sources = resolve_section_data_sources_for_logfile(
+        spec,
+        base_dir=resolved_logfile.parent,
+        allowed_root=server_root,
+    )
+    default_depth_range = _document_default_depth_range(spec)
+    binding_counts = _binding_counts_by_section(spec)
+
+    available_channels_by_section = {section_id: [] for section_id in _section_ids_from_spec(spec)}
+    dataset_loaded = False
+    dataset_message = ""
+    try:
+        datasets_by_section, _ = load_datasets_for_logfile(
+            spec,
+            base_dir=resolved_logfile.parent,
+            allowed_root=server_root,
+        )
+    except (DependencyUnavailableError, FileNotFoundError, OSError, TemplateValidationError) as exc:
+        dataset_message = str(exc)
+    else:
+        dataset_loaded = True
+        for section_id, dataset in datasets_by_section.items():
+            available_channels_by_section[section_id] = list(dataset.channels)
+
+    layout = dict(spec.document.get("layout", {}))
+    sections = list(layout.get("log_sections", []))
+    section_summaries: list[LogfileDraftSectionSummary] = []
+    for section in sections:
+        section_id = str(section.get("id", ""))
+        tracks = [track for track in list(section.get("tracks", [])) if isinstance(track, dict)]
+        source_path, source_format = resolved_sources[section_id]
+        counts = binding_counts.get(section_id, {"curve": 0, "raster": 0})
+        section_summaries.append(
+            LogfileDraftSectionSummary(
+                id=section_id,
+                title=str(section.get("title", "")),
+                source_path=str(source_path),
+                source_format=source_format,
+                depth_range=_section_depth_range(
+                    section,
+                    default_depth_range=default_depth_range,
+                ),
+                track_ids=[str(track.get("id", "")) for track in tracks],
+                track_kinds=[str(track.get("kind", "")) for track in tracks],
+                curve_binding_count=counts["curve"],
+                raster_binding_count=counts["raster"],
+                available_channels=available_channels_by_section[section_id],
+                dataset_loaded=dataset_loaded,
+                dataset_message=dataset_message,
+            )
+        )
+
+    return LogfileDraftSummaryResult(
+        name=spec.name,
+        render_backend=spec.render_backend,
+        configured_output_path=spec.render_output_path,
+        has_heading=bool(layout.get("heading")),
+        has_remarks=bool(layout.get("remarks")),
+        has_tail=bool(layout.get("tail")),
+        section_count=len(section_summaries),
+        section_ids=[summary.id for summary in section_summaries],
+        sections=section_summaries,
     )
 
 

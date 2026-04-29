@@ -185,6 +185,29 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def create_logfile_draft(
+        output_path: str,
+        example_id: str | None = None,
+        source_logfile_path: str | None = None,
+        overwrite: bool = False,
+    ) -> dict[str, object]:
+        """Create one normalized draft logfile from an example or existing logfile."""
+        return asdict(
+            service.create_logfile_draft(
+                output_path,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                overwrite=overwrite,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def summarize_logfile_draft(logfile_path: str) -> dict[str, object]:
+        """Summarize one draft logfile for deterministic authoring workflows."""
+        return asdict(service.summarize_logfile_draft(logfile_path, root=server_root))
+
+    @mcp.tool()
     def validate_logfile_text(
         yaml_text: str,
         base_dir: str | None = None,

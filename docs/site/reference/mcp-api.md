@@ -145,6 +145,67 @@ Exported files:
 - `full_reconstruction.log.yaml`
 - `data-notes.md`
 
+### `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
+
+Purpose: create one normalized draft logfile from either a packaged example or
+an existing logfile.
+
+Returns:
+
+- `output_path`
+- `name`
+- `section_ids`
+- `seed_kind`
+- `seed_value`
+
+Behavior:
+
+- requires exactly one seed source:
+  - `example_id`, or
+  - `source_logfile_path`
+- writes only to an explicit `output_path`
+- rejects existing targets unless `overwrite=True`
+- normalizes the draft through the canonical serializer path
+- rebases relative render and data paths so the cloned draft resolves from its
+  new location
+
+### `summarize_logfile_draft(logfile_path)`
+
+Purpose: inspect one draft logfile for deterministic authoring workflows.
+
+Returns:
+
+- `name`
+- `render_backend`
+- `configured_output_path`
+- `has_heading`
+- `has_remarks`
+- `has_tail`
+- `section_count`
+- `section_ids`
+- `sections`
+
+Each section record contains:
+
+- `id`
+- `title`
+- `source_path`
+- `source_format`
+- `depth_range`
+- `track_ids`
+- `track_kinds`
+- `curve_binding_count`
+- `raster_binding_count`
+- `available_channels`
+- `dataset_loaded`
+- `dataset_message`
+
+Notes:
+
+- this is the preferred inspect-first tool for draft authoring flows
+- channel discovery is best-effort and depends on the referenced data source
+  and optional format dependencies being available
+
 ### `validate_logfile_text(yaml_text, base_dir=None)`
 
 Purpose: validate unsaved full logfile YAML text.
@@ -249,3 +310,11 @@ For new YAML authoring:
 2. `validate_logfile_text(...)`
 3. `format_logfile_text(...)`
 4. `save_logfile_text(...)`
+
+For draft authoring:
+
+1. `create_logfile_draft(...)`
+2. `summarize_logfile_draft(...)`
+3. preview with a narrow PNG tool
+4. apply future explicit edit tools
+5. render or save only after review
