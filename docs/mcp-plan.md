@@ -1,6 +1,6 @@
 # MCP Rollout Status
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Purpose
 
@@ -113,3 +113,34 @@ document and still need to happen through the normal release flow:
 3. Publish `0.3.0` to PyPI.
 4. Let the merged documentation changes publish through the normal docs path to
    Read the Docs and the GitHub Pages mirror.
+
+## Next Planned Slice
+
+After the `0.3.0` experimental release is out, the next MCP milestone should be
+natural-language-driven authoring.
+
+Key direction:
+
+- keep freeform language understanding in the MCP client or host LLM
+- expand `wellplot-mcp` with deterministic authoring tools, vocabularies,
+  prompts, and draft workflows
+- avoid server-side opaque YAML rewrites from raw freeform text
+
+Detailed plan:
+
+- [docs/mcp-authoring-plan.md](mcp-authoring-plan.md)
+
+Concrete `0.4.0` foundation tools:
+
+- `create_logfile_draft(...)`
+- `summarize_logfile_draft(...)`
+- `add_track(...)`
+- `bind_curve(...)`
+- `update_curve_binding(...)`
+- `move_track(...)`
+- `set_heading_content(...)`
+- `set_remarks_content(...)`
+- `inspect_authoring_vocab(...)`
+- `summarize_logfile_changes(...)`
+
+The first implementation wave should focus on the first five items above.

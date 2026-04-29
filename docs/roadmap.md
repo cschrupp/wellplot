@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-04-28
+Last updated: 2026-04-29
 
 ## Scope Summary
 
@@ -123,6 +123,48 @@ Delivered public surface:
 Detailed checklist and release status:
 
 - [docs/mcp-plan.md](mcp-plan.md)
+
+## Next Planned Slice: Natural-Language MCP Authoring (2026-04-29)
+
+This is the next MCP-focused version target after the `0.3.0` release work is
+finished.
+
+Product goal:
+
+- let users describe plot construction and edits in natural language through an
+  MCP client, while keeping `wellplot-mcp` itself deterministic and
+  schema-backed
+
+Planned direction:
+
+- add a draft lifecycle for authoring
+- add explicit authoring tools for tracks, bindings, fills, headings, and
+  remarks
+- add discovery resources for authoring vocabularies and archetypes
+- add prompts that teach MCP clients how to decompose user requests into safe
+  tool calls
+- add deterministic helpers for applying extracted header values and previewing
+  the results before save
+
+Concrete `0.4.0` foundation set:
+
+- `create_logfile_draft(...)`
+- `summarize_logfile_draft(...)`
+- `add_track(...)`
+- `bind_curve(...)`
+- `update_curve_binding(...)`
+
+Follow-on `0.4.0` tools after that foundation:
+
+- `move_track(...)`
+- `set_heading_content(...)`
+- `set_remarks_content(...)`
+- `inspect_authoring_vocab(...)`
+- `summarize_logfile_changes(...)`
+
+Detailed plan:
+
+- [docs/mcp-authoring-plan.md](mcp-authoring-plan.md)
 
 ## MVP Architecture Gaps (layout/bindings model, 2026-03-10)
 
