@@ -4451,3 +4451,44 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
         "6. Validate or save only after the preview looks correct.\n"
     )
+
+
+def ingest_header_text_prompt(
+    logfile_path: str,
+    source_text: str,
+    source_description: str | None = None,
+) -> str:
+    """Return the guided prompt text for deterministic report-header ingestion."""
+    description_line = (
+        "Source description: copied header packet."
+        if source_description is None
+        else f"Source description: {source_description}"
+    )
+    return (
+        "Ingest this report-header text into a wellplot draft through deterministic MCP steps.\n\n"
+        f"Logfile path: {logfile_path}\n"
+        f"{description_line}\n\n"
+        "Source text\n"
+        "```text\n"
+        f"{source_text}\n"
+        "```\n\n"
+        "Workflow:\n"
+        "1. Call inspect_heading_slots(logfile_path=logfile_path) to see the exact provider, "
+        "general-field, service-title, detail-row, and remarks targets.\n"
+        "2. Call parse_key_value_text(source_text, format_hint=None) before inventing any "
+        "mapping.\n"
+        "3. If the parsed output leaves important lines unparsed, explain that instead of "
+        "guessing values.\n"
+        "4. Build the smallest explicit values mapping you can, using disambiguated keys like "
+        "general_field.company, detail.date, or service_title_1 when needed.\n"
+        '5. Call preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty") '
+        "before any mutation.\n"
+        "6. If preview_header_mapping(...) reports ambiguities or conflicts, resolve them before "
+        "apply_header_values(...).\n"
+        "7. Call apply_header_values(logfile_path, values, overwrite_policy=...) only after the "
+        "preview looks correct.\n"
+        "8. If the source text includes freeform note blocks that do not belong in heading "
+        "slots, use set_remarks_content(...) separately.\n"
+        "9. Summarize the saved heading state and recommend a first-page preview before any "
+        "final render.\n"
+    )

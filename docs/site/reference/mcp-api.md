@@ -713,6 +713,7 @@ Prompt names:
 - `start_from_example(example_id, goal)`
 - `author_plot_from_request(goal, logfile_path=None, example_id=None)`
 - `revise_plot_from_feedback(logfile_path, feedback)`
+- `ingest_header_text(logfile_path, source_text, source_description=None)`
 
 Intent:
 
@@ -725,6 +726,8 @@ Intent:
   request starts from raw LAS/DLIS data
 - `revise_plot_from_feedback` guides iterative draft revision plus preview and
   structural change review
+- `ingest_header_text` guides parse -> inspect slots -> preview mapping ->
+  apply mapping when the source material is copied header text
 
 ## Suggested Client Order
 

@@ -95,6 +95,14 @@ class McpServerIntegrationTests(unittest.TestCase):
             resources = await session.list_resources()
             prompts = await session.list_prompts()
             templates = await session.list_resource_templates()
+            header_prompt = await session.get_prompt(
+                "ingest_header_text",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "source_text": "Company: Acme Energy\nWell: Demo-01\nDirection: Up\n",
+                    "source_description": "Copied field ticket header packet",
+                },
+            )
             validation = await session.call_tool(
                 "validate_logfile",
                 {"logfile_path": fixture_paths.single_logfile_relative},
@@ -447,6 +455,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "start_from_example",
                 "author_plot_from_request",
                 "revise_plot_from_feedback",
+                "ingest_header_text",
             ],
         )
         self.assertEqual(
@@ -457,6 +466,16 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://examples/production/{example_id}/full_reconstruction.log.yaml",
                 "wellplot://examples/production/{example_id}/data-notes.md",
             ],
+        )
+        self.assertEqual(len(header_prompt.messages), 1)
+        self.assertEqual(header_prompt.messages[0].role, "user")
+        self.assertIn(
+            "Copied field ticket header packet",
+            header_prompt.messages[0].content.text,
+        )
+        self.assertIn(
+            'preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")',
+            header_prompt.messages[0].content.text,
         )
         self.assertEqual(
             validation.structuredContent,

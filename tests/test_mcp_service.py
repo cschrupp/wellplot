@@ -1555,6 +1555,24 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
+    def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:
+        """Guide clients toward parse -> preview -> apply for copied header text."""
+        prompt = service.ingest_header_text_prompt(
+            "drafts/demo.log.yaml",
+            "Company: Acme Energy\nWell: Demo-01\n",
+            source_description="Copied contractor header packet",
+        )
+
+        self.assertIn("Copied contractor header packet", prompt)
+        self.assertIn("inspect_heading_slots(logfile_path=logfile_path)", prompt)
+        self.assertIn("parse_key_value_text(source_text, format_hint=None)", prompt)
+        self.assertIn(
+            'preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")',
+            prompt,
+        )
+        self.assertIn("apply_header_values(logfile_path, values, overwrite_policy=...)", prompt)
+        self.assertIn("set_remarks_content(...)", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()

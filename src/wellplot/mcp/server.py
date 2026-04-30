@@ -652,6 +652,19 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         """Guide a model through deterministic plot revision from user feedback."""
         return service.revise_plot_from_feedback_prompt(logfile_path, feedback)
 
+    @mcp.prompt()
+    def ingest_header_text(
+        logfile_path: str,
+        source_text: str,
+        source_description: str | None = None,
+    ) -> str:
+        """Guide a model through deterministic report-header ingestion from copied text."""
+        return service.ingest_header_text_prompt(
+            logfile_path,
+            source_text,
+            source_description=source_description,
+        )
+
     return mcp
 
 

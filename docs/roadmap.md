@@ -198,8 +198,11 @@ Current `0.5.0` progress:
 - curated style guidance is implemented through `inspect_style_presets(...)`
 - curated style presets are exposed through
   `wellplot://authoring/catalog/style-presets.json`
-- the next step is the `ingest_header_text(...)` prompt
+- copied header-packet guidance is implemented through the
+  `ingest_header_text(...)` prompt
 - upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
+- the next step is richer MCP notebook/demo coverage for one end-to-end header
+  ingestion flow
 
 Out of scope for this slice:
 

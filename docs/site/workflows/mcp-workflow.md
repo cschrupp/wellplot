@@ -209,6 +209,8 @@ The server also exposes:
 - authoring catalog resources for deterministic edit planning
 - prompts for logfile review, preview, example-driven starts, and
   natural-language-to-tool authoring flows
+- `ingest_header_text(...)` for copied header packets that should move through
+  parse -> preview mapping -> apply mapping instead of ad hoc edits
 
 See [MCP API](../reference/mcp-api.md) for the exact tool, resource, and prompt
 names.

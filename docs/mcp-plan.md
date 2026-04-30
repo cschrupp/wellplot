@@ -191,9 +191,10 @@ Implemented so far in `0.5.0`:
 - `apply_header_values(...)`
 - `parse_key_value_text(...)`
 - `inspect_style_presets(...)`
+- `ingest_header_text(...)` prompt
 - `wellplot://authoring/catalog/header-key-aliases.json`
 - `wellplot://authoring/catalog/style-presets.json`
 
 Next up:
 
-- `ingest_header_text(...)` prompt
+- richer MCP notebook/demo coverage for the full header-ingestion workflow
