@@ -56,6 +56,68 @@ class McpServiceTests(unittest.TestCase):
         cls._fixture_tmpdir.cleanup()
         super().tearDownClass()
 
+    def _seed_header_mapping_draft(self, draft_path: Path) -> None:
+        """Create one draft with deterministic heading slots for ingestion tests."""
+        service.create_logfile_draft(
+            str(draft_path),
+            source_logfile_path=self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+        service.set_heading_content(
+            str(draft_path),
+            patch={
+                "provider_name": "Company",
+                "general_fields": [
+                    {
+                        "key": "company",
+                        "label": "Company",
+                        "source_key": "COMP",
+                    },
+                    {
+                        "key": "well",
+                        "label": "Well",
+                        "source_key": "WELL",
+                    },
+                    {
+                        "key": "service_company",
+                        "label": "Service Company",
+                        "value": "Legacy Header Service",
+                    },
+                ],
+                "service_titles": [
+                    {
+                        "value": "Legacy Title",
+                        "alignment": "left",
+                        "bold": True,
+                    }
+                ],
+                "detail": {
+                    "kind": "open_hole",
+                    "rows": [
+                        {
+                            "label": "Date",
+                            "values": [
+                                {"source_key": "DATE"},
+                                "",
+                            ],
+                        },
+                        {
+                            "label_cells": ["Run", "Direction"],
+                            "columns": [
+                                {"cells": [""]},
+                                {"cells": [""]},
+                            ],
+                        },
+                        {
+                            "label": "Service Company",
+                            "values": ["Legacy Detail Service", ""],
+                        },
+                    ],
+                },
+            },
+            root=REPO_ROOT,
+        )
+
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_validate_logfile_success(self) -> None:
         """Validate a real example logfile under the repository root."""
@@ -132,6 +194,90 @@ class McpServiceTests(unittest.TestCase):
 
             with self.assertRaises(PathAccessError):
                 service.validate_logfile(str(logfile_path), root=root)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_inspect_data_source_returns_channel_metadata(self) -> None:
+        """Inspect one raw LAS source before draft authoring starts."""
+        result = service.inspect_data_source(
+            str(self._fixture_paths.las_path),
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.source_path, str(self._fixture_paths.las_path))
+        self.assertEqual(result.source_format_detected, "las")
+        self.assertEqual(result.dataset_name, "MCP FIXTURE-01")
+        self.assertEqual(result.index.depth_unit, "m")
+        self.assertEqual(result.index.depth_min, 1000.0)
+        self.assertEqual(result.index.depth_max, 1020.0)
+        self.assertEqual(result.index.sample_count, 11)
+        self.assertTrue(result.index.shared_axis)
+        self.assertEqual(result.channel_count, 5)
+        self.assertIn("COMP", result.metadata_keys)
+        self.assertIn("FLD", result.metadata_keys)
+        self.assertIn("WELL", result.metadata_keys)
+        self.assertIn("source_path", result.provenance)
+        gr_summary = next(channel for channel in result.channels if channel.mnemonic == "GR")
+        self.assertEqual(gr_summary.kind, "scalar")
+        self.assertEqual(gr_summary.value_shape, [11])
+        self.assertEqual(gr_summary.value_unit, "gAPI")
+        self.assertEqual(gr_summary.value_min, 70.0)
+        self.assertEqual(gr_summary.value_max, 90.0)
+
+    def test_inspect_data_source_blocks_path_outside_root(self) -> None:
+        """Reject raw source inspection when the path escapes the server root."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with self.assertRaises(PathAccessError):
+                service.inspect_data_source("../outside.las", root=root)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_check_channel_availability_from_source_supports_aliases(self) -> None:
+        """Resolve exact and alias channel requests against one raw source."""
+        result = service.check_channel_availability(
+            ["GR", "gamma ray", "NPHI"],
+            source_path=str(self._fixture_paths.las_path),
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_kind, "source")
+        self.assertEqual(result.source_format_detected, "las")
+        self.assertEqual(result.available_channels, ["CBL", "VDL", "GR", "CALI", "RT"])
+        self.assertEqual(result.found_channels, ["GR"])
+        self.assertEqual(result.missing_channels, ["NPHI"])
+        self.assertEqual(result.alias_matches[0]["requested_channel"], "gamma ray")
+        self.assertEqual(result.alias_matches[0]["matched_channels"], ["GR"])
+        self.assertEqual(result.resolutions[0].status, "exact")
+        self.assertEqual(result.resolutions[1].status, "alias")
+        self.assertEqual(result.resolutions[2].status, "missing")
+        self.assertEqual(result.resolutions[2].canonical_alias_id, "neutron_porosity")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_check_channel_availability_from_logfile_uses_section_dataset(self) -> None:
+        """Resolve requested channels through one logfile-backed section dataset."""
+        result = service.check_channel_availability(
+            ["gamma ray", "RT"],
+            logfile_path=self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_kind, "logfile")
+        self.assertEqual(result.logfile_path, str(self._fixture_paths.single_logfile))
+        self.assertEqual(result.section_id, "main")
+        self.assertEqual(result.found_channels, ["GR", "RT"])
+        self.assertEqual(result.missing_channels, [])
+
+    def test_check_channel_availability_requires_one_target(self) -> None:
+        """Reject missing or conflicting target arguments for channel checks."""
+        with self.assertRaises(ValueError):
+            service.check_channel_availability(["GR"], root=REPO_ROOT)
+
+        with self.assertRaises(ValueError):
+            service.check_channel_availability(
+                ["GR"],
+                source_path=str(self._fixture_paths.las_path),
+                logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_inspect_logfile_returns_multisection_metadata(self) -> None:
@@ -739,6 +885,187 @@ class McpServiceTests(unittest.TestCase):
                 ["Synthetic authoring note 1.", "Synthetic authoring note 2."],
             )
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_inspect_heading_slots_with_logfile_exposes_precise_slots(self) -> None:
+        """Expose provider, field, detail, and remarks slots for one draft/logfile target."""
+        result = service.inspect_heading_slots(
+            logfile_path=self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_kind, "logfile")
+        self.assertEqual(result.target_path, str(self._fixture_paths.single_logfile))
+        self.assertTrue(result.has_heading)
+        self.assertTrue(result.has_remarks)
+        self.assertTrue(result.has_tail)
+        self.assertEqual(result.provider_slots[0]["key"], "provider_name")
+        self.assertEqual(result.general_field_slots, [])
+        self.assertEqual(result.service_title_slots, [])
+        self.assertFalse(result.detail_slots["enabled"])
+        self.assertEqual(result.remarks_capabilities["existing_block_count"], 1)
+        self.assertIn("heading", result.current_values)
+        self.assertIn("wellplot://authoring/catalog/header-fields.json", result.resource_uris)
+        self.assertIn(
+            "wellplot://authoring/catalog/header-key-aliases.json",
+            result.resource_uris,
+        )
+
+    def test_inspect_heading_slots_with_template_exposes_dataset_backed_fields(self) -> None:
+        """Expose source-key backed report slots from one packaged template."""
+        result = service.inspect_heading_slots(
+            template_path="examples/production/forge16b_porosity_example/base.template.yaml",
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_kind, "template")
+        self.assertTrue(result.has_heading)
+        self.assertTrue(result.has_remarks)
+        self.assertTrue(result.has_tail)
+        self.assertEqual(result.provider_slots[0]["current_value"], "Company")
+        self.assertEqual(result.general_field_slots[0]["key"], "company")
+        self.assertEqual(
+            result.general_field_slots[0]["value_slot"]["source_key"],
+            "COMP",
+        )
+        self.assertEqual(result.service_title_slots[0]["value_slot"]["value"], "Open Hole Density")
+        self.assertEqual(result.detail_slots["kind"], "open_hole")
+        self.assertGreater(result.detail_slots["row_count"], 0)
+        self.assertEqual(
+            result.detail_slots["rows"][0]["column_slots"][0][0]["source_key"],
+            "DATE",
+        )
+
+    def test_inspect_heading_slots_rejects_conflicting_targets(self) -> None:
+        """Reject simultaneous logfile and template targets."""
+        with self.assertRaises(ValueError):
+            service.inspect_heading_slots(
+                logfile_path=self._fixture_paths.single_logfile_relative,
+                template_path="examples/production/forge16b_porosity_example/base.template.yaml",
+                root=REPO_ROOT,
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_preview_header_mapping_resolves_fillable_heading_slots(self) -> None:
+        """Dry-run provider, field, detail, and explicit title assignments."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "provider": "Acme Logging",
+                    "company": "Acme Energy",
+                    "well": "Demo-01",
+                    "date": "2026-04-30",
+                    "run": "ONE",
+                    "direction": "Up",
+                    "service_title_1": "Gamma Ray Review",
+                    "unknown_header_key": "ignored",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.overwrite_policy, "fill_empty")
+            self.assertEqual(
+                [entry["target_key"] for entry in result.resolved_assignments],
+                ["company", "well", "Date", "Run", "Direction"],
+            )
+            self.assertEqual(
+                result.unmatched_values,
+                [
+                    {
+                        "input_key": "unknown_header_key",
+                        "input_value": "ignored",
+                    }
+                ],
+            )
+            self.assertEqual(
+                [entry["target_key"] for entry in result.conflicting_values],
+                ["provider_name", "service_title_1"],
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["general_fields"][0]["value"],
+                "Acme Energy",
+            )
+            self.assertNotIn(
+                "source_key",
+                result.predicted_heading_patch["general_fields"][0],
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["detail"]["rows"][0]["values"][0],
+                "2026-04-30",
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["detail"]["rows"][1]["columns"][0]["cells"][0],
+                "ONE",
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["detail"]["rows"][1]["columns"][1]["cells"][0],
+                "Up",
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_preview_header_mapping_reports_ambiguous_matches(self) -> None:
+        """Report ambiguous human-readable keys instead of guessing one slot."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.preview_header_mapping(
+                str(draft_path),
+                values={"service company": "Acme Wireline"},
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.resolved_assignments, [])
+            self.assertEqual(result.unmatched_values, [])
+            self.assertEqual(len(result.conflicting_values), 1)
+            self.assertEqual(
+                result.conflicting_values[0]["reason"],
+                "Ambiguous header key. Use an explicit prefixed key.",
+            )
+            self.assertEqual(
+                {
+                    candidate["target_kind"]
+                    for candidate in result.conflicting_values[0]["candidate_targets"]
+                },
+                {"general_field", "detail_field"},
+            )
+            self.assertEqual(result.predicted_heading_patch, {})
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_preview_header_mapping_replace_overwrites_literal_values(self) -> None:
+        """Allow explicit literal replacement when overwrite_policy requests it."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "service_title_1": "Gamma Ray Review",
+                    "general_field.service_company": "Acme Wireline",
+                },
+                overwrite_policy="replace",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(len(result.conflicting_values), 0)
+            self.assertEqual(
+                [entry["action"] for entry in result.resolved_assignments],
+                ["replace", "replace"],
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["service_titles"][0]["value"],
+                "Gamma Ray Review",
+            )
+            self.assertEqual(
+                result.predicted_heading_patch["general_fields"][2]["value"],
+                "Acme Wireline",
+            )
+
     def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
         """Expose stable authoring vocabularies even without a target draft."""
         result = service.inspect_authoring_vocab(root=REPO_ROOT)
@@ -758,6 +1085,14 @@ class McpServiceTests(unittest.TestCase):
         self.assertTrue(result.track_archetypes)
         self.assertIn(
             "wellplot://authoring/catalog/track-archetypes.json",
+            result.resource_uris,
+        )
+        self.assertIn(
+            "wellplot://authoring/catalog/header-key-aliases.json",
+            result.resource_uris,
+        )
+        self.assertIn(
+            "wellplot://authoring/catalog/channel-aliases.json",
             result.resource_uris,
         )
         self.assertIsNone(result.target_summary)
@@ -957,6 +1292,8 @@ class McpServiceTests(unittest.TestCase):
         patch_resource = service.authoring_patch_schema_resource()
         fill_resource = service.authoring_fill_kinds_resource()
         header_resource = service.authoring_header_fields_resource()
+        header_alias_resource = service.authoring_header_key_aliases_resource()
+        channel_alias_resource = service.authoring_channel_aliases_resource()
 
         self.assertEqual(patch_resource.mime_type, "application/json")
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
@@ -964,6 +1301,10 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(header_resource.mime_type, "application/json")
         self.assertIn("general_field_keys", json.loads(header_resource.text))
+        self.assertEqual(header_alias_resource.mime_type, "application/json")
+        self.assertIn("provider_aliases", json.loads(header_alias_resource.text))
+        self.assertEqual(channel_alias_resource.mime_type, "application/json")
+        self.assertIn("channel_aliases", json.loads(channel_alias_resource.text))
 
     def test_start_from_example_prompt_embeds_goal_and_example(self) -> None:
         """Embed the requested goal and packaged example resources in the prompt."""
@@ -985,6 +1326,8 @@ class McpServiceTests(unittest.TestCase):
         )
 
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
+        self.assertIn("inspect_data_source(source_path)", prompt)
+        self.assertIn("check_channel_availability(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 

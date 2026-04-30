@@ -67,6 +67,40 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return asdict(service.inspect_logfile(logfile_path, root=server_root))
 
     @mcp.tool()
+    def inspect_data_source(
+        source_path: str,
+        source_format: str = "auto",
+    ) -> dict[str, object]:
+        """Inspect one raw LAS/DLIS source under the server root."""
+        return asdict(
+            service.inspect_data_source(
+                source_path,
+                source_format=source_format,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def check_channel_availability(
+        requested_channels: list[str],
+        source_path: str | None = None,
+        logfile_path: str | None = None,
+        section_id: str | None = None,
+        source_format: str = "auto",
+    ) -> dict[str, object]:
+        """Check whether requested channels or aliases exist in one source or logfile."""
+        return asdict(
+            service.check_channel_availability(
+                requested_channels,
+                source_path=source_path,
+                logfile_path=logfile_path,
+                section_id=section_id,
+                source_format=source_format,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def preview_logfile_png(
         logfile_path: str,
         page_index: int = 0,
@@ -336,6 +370,36 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def inspect_heading_slots(
+        logfile_path: str | None = None,
+        template_path: str | None = None,
+    ) -> dict[str, object]:
+        """Inspect precise heading, detail-table, and remarks slots for one target."""
+        return asdict(
+            service.inspect_heading_slots(
+                logfile_path=logfile_path,
+                template_path=template_path,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def preview_header_mapping(
+        logfile_path: str,
+        values: dict[str, object],
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Dry-run heading/report value assignment without mutating the draft."""
+        return asdict(
+            service.preview_header_mapping(
+                logfile_path,
+                values=values,
+                overwrite_policy=overwrite_policy,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def inspect_authoring_vocab(
         logfile_path: str | None = None,
         template_path: str | None = None,
@@ -490,6 +554,22 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_header_fields_resource() -> str:
         """Return heading and remarks field guidance for draft authoring."""
         return service.authoring_header_fields_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/header-key-aliases.json",
+        mime_type="application/json",
+    )
+    def authoring_header_key_aliases_resource() -> str:
+        """Return deterministic header-slot lookup aliases for draft ingestion."""
+        return service.authoring_header_key_aliases_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/channel-aliases.json",
+        mime_type="application/json",
+    )
+    def authoring_channel_aliases_resource() -> str:
+        """Return channel alias guidance for deterministic source inspection."""
+        return service.authoring_channel_aliases_resource().text
 
     @mcp.prompt()
     def review_logfile(logfile_path: str) -> str:

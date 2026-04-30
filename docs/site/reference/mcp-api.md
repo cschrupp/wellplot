@@ -70,6 +70,75 @@ Each section record contains:
 - `track_ids`
 - `track_kinds`
 
+### `inspect_data_source(source_path, source_format="auto")`
+
+Purpose: inspect one raw LAS or DLIS source before any draft exists.
+
+Returns:
+
+- `source_path`
+- `source_format_detected`
+- `dataset_name`
+- `index`
+- `channel_count`
+- `channels`
+- `metadata_keys`
+- `well_metadata`
+- `provenance`
+- `warnings`
+
+Each channel record contains:
+
+- `mnemonic`
+- `kind`
+- `depth_unit`
+- `depth_min`
+- `depth_max`
+- `sample_count`
+- `value_unit`
+- `description`
+- `value_shape`
+- `value_min`
+- `value_max`
+- `sample_axis_count`
+- `sample_unit`
+- `sample_label`
+- `metadata_keys`
+
+Notes:
+
+- standalone source inspection is limited to LAS and DLIS
+- LIS support is not added in this slice
+
+### `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
+
+Purpose: resolve requested channel names or aliases against one raw source or
+one logfile-backed section dataset.
+
+Returns:
+
+- `target_kind`
+- `source_path`
+- `source_format_detected`
+- `logfile_path`
+- `section_id`
+- `requested_channels`
+- `available_channels`
+- `found_channels`
+- `missing_channels`
+- `alias_matches`
+- `ambiguous_matches`
+- `resolutions`
+- `warnings`
+
+Behavior:
+
+- requires exactly one of `source_path` or `logfile_path`
+- accepts case-insensitive exact mnemonic matches
+- supports deterministic alias resolution for common domains such as gamma ray,
+  density, neutron porosity, resistivity, CBL, and VDL
+- uses `section_id` when checking one logfile-backed section explicitly
+
 ### `preview_logfile_png(logfile_path, page_index=0, dpi=144, section_id=None, track_ids=None, depth_range=None, depth_range_unit=None, include_report_pages=True)`
 
 Purpose: generic superset preview tool for whole-report or filtered PNG output.
@@ -347,6 +416,69 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `inspect_heading_slots(logfile_path=None, template_path=None)`
+
+Purpose: expose the exact heading/report slots and remarks capabilities
+available in one draft or template before header-value ingestion.
+
+Returns:
+
+- `target_kind`
+- `target_path`
+- `has_heading`
+- `has_remarks`
+- `has_tail`
+- `provider_slots`
+- `general_field_slots`
+- `service_title_slots`
+- `detail_slots`
+- `remarks_capabilities`
+- `current_values`
+- `resource_uris`
+
+Behavior:
+
+- accepts at most one target:
+  - `logfile_path`, or
+  - `template_path`
+- with `logfile_path`, inspects the normalized inherited heading state of the
+  current draft/logfile
+- with `template_path`, preserves source-key backed report-field slots from the
+  referenced template mapping
+- without a target, falls back to the static heading-field catalog surface
+
+### `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
+
+Purpose: dry-run deterministic heading/report value assignment without mutating
+the draft.
+
+Returns:
+
+- `logfile_path`
+- `overwrite_policy`
+- `resolved_assignments`
+- `unmatched_values`
+- `conflicting_values`
+- `warnings`
+- `predicted_heading_patch`
+
+Behavior:
+
+- requires a draft/logfile target
+- matches extracted keys against provider, general-field, service-title, and
+  detail-row slots exposed by `inspect_heading_slots(...)`
+- accepts these overwrite policies:
+  - `fill_empty`
+  - `replace`
+  - `merge_lists`
+- `merge_lists` currently behaves like `replace` for scalar heading/detail
+  slots and returns a warning to make that explicit
+- reports ambiguous human-readable keys instead of guessing one slot; clients
+  can disambiguate with explicit keys like `general_field.company`,
+  `service_title_1`, or `detail.date`
+- does not write the draft; the returned `predicted_heading_patch` is the exact
+  heading patch the server would apply in a later mutating step
+
 ### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 
 Purpose: expose deterministic authoring vocabularies plus optional draft or
@@ -474,6 +606,8 @@ Static resources:
 - `wellplot://authoring/catalog/fill-kinds.json`
 - `wellplot://authoring/catalog/track-archetypes.json`
 - `wellplot://authoring/catalog/header-fields.json`
+- `wellplot://authoring/catalog/header-key-aliases.json`
+- `wellplot://authoring/catalog/channel-aliases.json`
 
 Resource templates:
 
@@ -504,7 +638,8 @@ Intent:
 - `start_from_example` embeds example resources and asks the client to adapt
   them to a stated goal
 - `author_plot_from_request` guides a host model toward deterministic authoring
-  edits instead of full YAML rewrites
+  edits instead of full YAML rewrites, including source inspection when the
+  request starts from raw LAS/DLIS data
 - `revise_plot_from_feedback` guides iterative draft revision plus preview and
   structural change review
 
@@ -526,13 +661,18 @@ For new YAML authoring:
 
 For draft authoring:
 
-1. `create_logfile_draft(...)`
-2. `summarize_logfile_draft(...)`
-3. `inspect_authoring_vocab(...)`
-4. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+1. `inspect_data_source(...)` and `check_channel_availability(...)` when the
+   workflow starts from raw LAS/DLIS data
+2. `create_logfile_draft(...)`
+3. `summarize_logfile_draft(...)`
+4. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+   remarks-aware report-page edits
+5. `preview_header_mapping(...)` before mutating header/report values
+6. `inspect_authoring_vocab(...)`
+7. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
-5. `summarize_logfile_changes(...)` when the client retained a previous YAML
+8. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-6. preview with a narrow PNG tool
-7. render or save only after review
+9. preview with a narrow PNG tool
+10. render or save only after review

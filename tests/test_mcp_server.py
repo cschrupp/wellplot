@@ -99,6 +99,17 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "validate_logfile",
                 {"logfile_path": fixture_paths.single_logfile_relative},
             )
+            source_inspection = await session.call_tool(
+                "inspect_data_source",
+                {"source_path": str(fixture_paths.las_path)},
+            )
+            channel_availability = await session.call_tool(
+                "check_channel_availability",
+                {
+                    "requested_channels": ["gamma ray", "RT", "NPHI"],
+                    "source_path": str(fixture_paths.las_path),
+                },
+            )
             cbl_main_inspection = await session.call_tool(
                 "inspect_logfile",
                 {"logfile_path": fixture_paths.single_logfile_relative},
@@ -177,6 +188,18 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "logfile_path": str(draft_logfile),
                 },
             )
+            heading_slots = await session.call_tool(
+                "inspect_heading_slots",
+                {
+                    "logfile_path": str(draft_logfile),
+                },
+            )
+            template_heading_slots = await session.call_tool(
+                "inspect_heading_slots",
+                {
+                    "template_path": example_template,
+                },
+            )
             authoring_vocab = await session.call_tool(
                 "inspect_authoring_vocab",
                 {
@@ -242,15 +265,63 @@ class McpServerIntegrationTests(unittest.TestCase):
                 {
                     "logfile_path": str(draft_logfile),
                     "patch": {
-                        "provider_name": "Acme Logging",
+                        "provider_name": "Company",
+                        "general_fields": [
+                            {
+                                "key": "company",
+                                "label": "Company",
+                                "source_key": "COMP",
+                            },
+                            {
+                                "key": "well",
+                                "label": "Well",
+                                "source_key": "WELL",
+                            },
+                            {
+                                "key": "service_company",
+                                "label": "Service Company",
+                                "value": "Legacy Header Service",
+                            },
+                        ],
                         "service_titles": [
                             {
-                                "value": "Gamma Ray",
+                                "value": "Legacy Title",
                                 "alignment": "left",
                                 "bold": True,
                             }
                         ],
+                        "detail": {
+                            "kind": "open_hole",
+                            "rows": [
+                                {
+                                    "label": "Date",
+                                    "values": [{"source_key": "DATE"}, ""],
+                                },
+                                {
+                                    "label_cells": ["Run", "Direction"],
+                                    "columns": [
+                                        {"cells": [""]},
+                                        {"cells": [""]},
+                                    ],
+                                },
+                            ],
+                        },
                         "tail_enabled": True,
+                    },
+                },
+            )
+            preview_mapping = await session.call_tool(
+                "preview_header_mapping",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "values": {
+                        "provider": "Acme Logging",
+                        "company": "Acme Energy",
+                        "well": "Demo-01",
+                        "date": "2026-04-30",
+                        "run": "ONE",
+                        "direction": "Up",
+                        "service_title_1": "Gamma Ray Review",
                     },
                 },
             )
@@ -296,6 +367,8 @@ class McpServerIntegrationTests(unittest.TestCase):
             [
                 "validate_logfile",
                 "inspect_logfile",
+                "inspect_data_source",
+                "check_channel_availability",
                 "preview_logfile_png",
                 "preview_section_png",
                 "preview_track_png",
@@ -310,6 +383,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "move_track",
                 "set_heading_content",
                 "set_remarks_content",
+                "inspect_heading_slots",
+                "preview_header_mapping",
                 "inspect_authoring_vocab",
                 "summarize_logfile_changes",
                 "validate_logfile_text",
@@ -327,6 +402,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://authoring/catalog/fill-kinds.json",
                 "wellplot://authoring/catalog/track-archetypes.json",
                 "wellplot://authoring/catalog/header-fields.json",
+                "wellplot://authoring/catalog/header-key-aliases.json",
+                "wellplot://authoring/catalog/channel-aliases.json",
             ],
         )
         self.assertEqual(
@@ -358,6 +435,10 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "section_ids": ["main"],
             },
         )
+        self.assertEqual(source_inspection.structuredContent["source_format_detected"], "las")
+        self.assertEqual(source_inspection.structuredContent["channel_count"], 5)
+        self.assertEqual(channel_availability.structuredContent["found_channels"], ["GR", "RT"])
+        self.assertEqual(channel_availability.structuredContent["missing_channels"], ["NPHI"])
         self.assertEqual(len(preview.content), 1)
         self.assertEqual(preview.content[0].type, "image")
         self.assertEqual(getattr(preview.content[0], "mimeType", None), "image/png")
@@ -395,6 +476,13 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
         self.assertTrue(draft_summary.structuredContent["sections"][0]["dataset_loaded"])
         self.assertIn("GR", draft_summary.structuredContent["sections"][0]["available_channels"])
+        self.assertEqual(heading_slots.structuredContent["target_kind"], "logfile")
+        self.assertTrue(heading_slots.structuredContent["has_heading"])
+        self.assertEqual(
+            template_heading_slots.structuredContent["target_kind"],
+            "template",
+        )
+        self.assertTrue(template_heading_slots.structuredContent["detail_slots"]["enabled"])
         self.assertIn("reference", authoring_vocab.structuredContent["track_kinds"])
         self.assertEqual(
             authoring_vocab.structuredContent["target_summary"]["target_kind"], "logfile"
@@ -419,10 +507,27 @@ class McpServerIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             updated_heading.structuredContent["heading"]["provider_name"],
-            "Acme Logging",
+            "Company",
         )
         self.assertEqual(updated_heading.structuredContent["heading"]["tail_enabled"], True)
         self.assertEqual(updated_heading.structuredContent["has_tail"], True)
+        self.assertEqual(
+            preview_mapping.structuredContent["resolved_assignments"][0]["target_key"],
+            "company",
+        )
+        self.assertEqual(
+            [
+                entry["target_key"]
+                for entry in preview_mapping.structuredContent["conflicting_values"]
+            ],
+            ["provider_name", "service_title_1"],
+        )
+        self.assertEqual(
+            preview_mapping.structuredContent["predicted_heading_patch"]["general_fields"][0][
+                "value"
+            ],
+            "Acme Energy",
+        )
         self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
         self.assertEqual(
             updated_remarks.structuredContent["remarks"][0]["title"],

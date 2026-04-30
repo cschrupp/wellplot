@@ -181,3 +181,15 @@ Scope note:
 
 - standalone source inspection in this phase is for LAS and DLIS only; LIS
   support is not planned in this slice.
+
+Implemented so far in `0.5.0`:
+
+- `inspect_data_source(...)`
+- `check_channel_availability(...)`
+- `inspect_heading_slots(...)`
+- `preview_header_mapping(...)`
+- `wellplot://authoring/catalog/header-key-aliases.json`
+
+Next up:
+
+- `apply_header_values(...)`

@@ -172,12 +172,14 @@ Typical client registration:
 
 The MCP tool surface currently supports:
 - `validate_logfile` and `inspect_logfile`
+- `inspect_data_source` and `check_channel_availability`
 - `preview_logfile_png` plus explicit section/track/window preview tools
 - `render_logfile_to_file`
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
+- `inspect_heading_slots` and `preview_header_mapping`
 - `inspect_authoring_vocab` and `summarize_logfile_changes`
 - `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
 

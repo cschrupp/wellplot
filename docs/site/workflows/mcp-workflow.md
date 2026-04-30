@@ -84,20 +84,44 @@ All preview tools:
 Use `render_logfile_to_file(...)` only when you want an explicit on-disk
 artifact such as a PDF.
 
+## Data Inspection Flow
+
+When a request starts from raw LAS/DLIS data instead of an existing draft,
+inspect the source before you start binding curves.
+
+Main tools:
+
+- `inspect_data_source(source_path, source_format="auto")`
+- `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
+
+Recommended split:
+
+- use `inspect_data_source(...)` first to discover the source format, shared
+  index range, available channels, and basic well metadata
+- use `check_channel_availability(...)` before authoring when the user names
+  channels or domains such as gamma ray, porosity, resistivity, CBL, or VDL
+- use `logfile_path` + `section_id` when you want to confirm availability
+  against one draft section rather than the raw source directly
+
 ## Authoring Flow
 
 The experimental authoring flow is intentionally conservative:
 
-1. create a normalized draft from an example or existing logfile
-2. summarize the draft before issuing authoring edits
-3. preview the affected section, track, or window
-4. validate or normalize text only when you are operating on unsaved YAML
-5. save or render only to explicit output paths
+1. inspect the raw source when the workflow starts from LAS/DLIS data
+2. create a normalized draft from an example or existing logfile
+3. summarize the draft before issuing authoring edits
+4. preview the affected section, track, or window
+5. validate or normalize text only when you are operating on unsaved YAML
+6. save or render only to explicit output paths
 
 Main tools:
 
+- `inspect_data_source(source_path, source_format="auto")`
+- `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `inspect_heading_slots(logfile_path=None, template_path=None)`
+- `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
 - `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
@@ -113,8 +137,16 @@ Main tools:
 
 Recommended split:
 
+- use `inspect_data_source(...)` and `check_channel_availability(...)` before
+  draft creation when the request starts from one raw LAS/DLIS source
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
+- use `inspect_heading_slots(...)` when the next task is filling provider
+  fields, general report fields, service titles, detail-table cells, or
+  remarks content from external text
+- use `preview_header_mapping(...)` after you extract header values but before
+  you write anything into the draft; it will surface ambiguous keys,
+  overwrite-policy conflicts, and the exact heading patch it would apply
 - use `inspect_authoring_vocab(...)` before major edits so the client sees the
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft

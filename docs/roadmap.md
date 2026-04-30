@@ -178,6 +178,20 @@ Planned `0.5.0` scope:
 - inspect precise heading/report slots before ingestion
 - preview header mappings before mutating drafts
 - apply normalized header values with explicit overwrite policies
+
+Current `0.5.0` progress:
+
+- raw LAS/DLIS source inspection is implemented through
+  `inspect_data_source(...)`
+- channel-presence checks are implemented through
+  `check_channel_availability(...)`
+- precise report-slot inspection is implemented through
+  `inspect_heading_slots(...)`
+- dry-run header assignment review is implemented through
+  `preview_header_mapping(...)`
+- deterministic lookup guidance is exposed through
+  `wellplot://authoring/catalog/header-key-aliases.json`
+- the next step is the mutating counterpart: `apply_header_values(...)`
 - parse simple structured key-value text deterministically
 - expose stronger alias/style preset catalogs for common conventions
 - upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
@@ -185,6 +199,13 @@ Planned `0.5.0` scope:
 Out of scope for this slice:
 
 - LIS ingestion/support
+
+Current `0.5.0` progress:
+
+- raw source inspection is implemented
+- requested-channel availability checks are implemented
+- precise heading/report slot inspection is implemented
+- next step is dry-run header mapping preview
 
 Detailed plan:
 

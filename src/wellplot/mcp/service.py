@@ -29,6 +29,7 @@ from difflib import SequenceMatcher
 from importlib.resources import as_file, files
 from pathlib import Path
 
+import numpy as np
 import yaml
 
 from ..api.builder import ProgrammaticLogSpec
@@ -40,6 +41,7 @@ from ..api.render import (
 )
 from ..api.serialize import report_to_dict, report_to_yaml
 from ..errors import DependencyUnavailableError, PathAccessError, TemplateValidationError
+from ..io import load_dlis, load_las
 from ..logfile import (
     LogFileSpec,
     build_documents_for_logfile,
@@ -50,6 +52,7 @@ from ..logfile import (
     resolve_section_data_sources_for_logfile,
 )
 from ..logfile_schema import get_logfile_json_schema
+from ..model import ArrayChannel, RasterChannel, ScalarChannel, WellDataset
 from ..model.document import (
     CurveFillKind,
     ReportDetailKind,
@@ -99,7 +102,10 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
     "wellplot://authoring/catalog/header-fields.json",
+    "wellplot://authoring/catalog/header-key-aliases.json",
+    "wellplot://authoring/catalog/channel-aliases.json",
 )
+AUTHORING_HEADER_OVERWRITE_POLICIES = ("fill_empty", "replace", "merge_lists")
 AUTHORING_TRACK_ARCHETYPES = (
     {
         "id": "reference_depth",
@@ -145,6 +151,57 @@ AUTHORING_TRACK_ARCHETYPES = (
         "notes": "Array/raster track for waveform-style VDL presentation.",
     },
 )
+AUTHORING_CHANNEL_ALIASES = (
+    {
+        "id": "gamma_ray",
+        "label": "Gamma Ray",
+        "aliases": ["gamma ray", "gamma"],
+        "mnemonics": ["GR", "SGR", "CGR"],
+    },
+    {
+        "id": "bulk_density",
+        "label": "Bulk Density",
+        "aliases": ["bulk density", "density"],
+        "mnemonics": ["RHOB", "RHOZ", "ZDEN", "DEN"],
+    },
+    {
+        "id": "neutron_porosity",
+        "label": "Neutron Porosity",
+        "aliases": ["neutron porosity", "porosity neutron"],
+        "mnemonics": ["NPHI", "TNPH", "NPHI", "NPL"],
+    },
+    {
+        "id": "deep_resistivity",
+        "label": "Deep Resistivity",
+        "aliases": ["deep resistivity", "true resistivity", "resistivity"],
+        "mnemonics": ["RT", "RESD", "RDEP", "ILD", "AT90"],
+    },
+    {
+        "id": "shallow_resistivity",
+        "label": "Shallow Resistivity",
+        "aliases": ["shallow resistivity", "medium resistivity"],
+        "mnemonics": ["RS", "RMED", "ILM", "AT30"],
+    },
+    {
+        "id": "caliper",
+        "label": "Caliper",
+        "aliases": ["caliper", "hole size"],
+        "mnemonics": ["CALI", "CAL"],
+    },
+    {
+        "id": "cement_bond",
+        "label": "Cement Bond",
+        "aliases": ["cement bond", "cbl"],
+        "mnemonics": ["CBL", "CBLF"],
+    },
+    {
+        "id": "variable_density_log",
+        "label": "Variable Density Log",
+        "aliases": ["variable density log", "vdl", "waveform"],
+        "mnemonics": ["VDL"],
+    },
+)
+SUPPORTED_SOURCE_FORMATS = ("auto", "las", "dlis")
 
 
 @dataclass(slots=True)
@@ -185,6 +242,85 @@ class LogfileInspectionResult:
     has_tail: bool
     section_ids: list[str]
     sections: list[LogfileSectionSummary]
+
+
+@dataclass(slots=True)
+class DataSourceIndexSummary:
+    """Structured shared-index summary for one inspected raw data source."""
+
+    depth_unit: str | None
+    depth_min: float | None
+    depth_max: float | None
+    sample_count: int | None
+    shared_axis: bool
+
+
+@dataclass(slots=True)
+class DataSourceChannelSummary:
+    """Structured per-channel summary for one inspected raw data source."""
+
+    mnemonic: str
+    kind: str
+    depth_unit: str
+    depth_min: float
+    depth_max: float
+    sample_count: int
+    value_unit: str | None
+    description: str
+    value_shape: list[int]
+    value_min: float | None
+    value_max: float | None
+    sample_axis_count: int | None
+    sample_unit: str | None
+    sample_label: str | None
+    metadata_keys: list[str]
+
+
+@dataclass(slots=True)
+class DataSourceInspectionResult:
+    """Structured inspection payload for one raw LAS/DLIS source."""
+
+    source_path: str
+    source_format_detected: str
+    dataset_name: str
+    index: DataSourceIndexSummary
+    channel_count: int
+    channels: list[DataSourceChannelSummary]
+    metadata_keys: list[str]
+    well_metadata: dict[str, object]
+    provenance: dict[str, object]
+    warnings: list[str]
+
+
+@dataclass(slots=True)
+class RequestedChannelResolution:
+    """Structured per-request channel-availability resolution."""
+
+    requested_channel: str
+    status: str
+    matched_channels: list[str]
+    canonical_alias_id: str | None
+    matched_alias: str | None
+    suggested_channels: list[str]
+
+
+@dataclass(slots=True)
+class ChannelAvailabilityResult:
+    """Structured channel-availability result for one source or logfile target."""
+
+    target_kind: str
+    source_path: str
+    source_format_detected: str
+    logfile_path: str | None
+    section_id: str | None
+    requested_channels: list[str]
+    available_channels: list[str]
+    found_channels: list[str]
+    missing_channels: list[str]
+    alias_matches: list[dict[str, object]]
+    ambiguous_matches: list[dict[str, object]]
+    resolutions: list[RequestedChannelResolution]
+    warnings: list[str]
 
 
 @dataclass(slots=True)
@@ -342,6 +478,56 @@ class RemarksContentResult:
 
 
 @dataclass(slots=True)
+class HeadingSlotsResult:
+    """Structured heading/report slot inspection payload for MCP ingestion flows."""
+
+    target_kind: str
+    target_path: str | None
+    has_heading: bool
+    has_remarks: bool
+    has_tail: bool
+    provider_slots: list[dict[str, object]]
+    general_field_slots: list[dict[str, object]]
+    service_title_slots: list[dict[str, object]]
+    detail_slots: dict[str, object]
+    remarks_capabilities: dict[str, object]
+    current_values: dict[str, object]
+    resource_uris: list[str]
+
+
+@dataclass(slots=True)
+class HeaderMappingPreviewResult:
+    """Structured dry-run result for deterministic heading-value assignment."""
+
+    logfile_path: str
+    overwrite_policy: str
+    resolved_assignments: list[dict[str, object]]
+    unmatched_values: list[dict[str, object]]
+    conflicting_values: list[dict[str, object]]
+    warnings: list[str]
+    predicted_heading_patch: dict[str, object]
+
+
+@dataclass(slots=True)
+class _HeaderAssignmentTarget:
+    """Internal target descriptor for one previewable heading assignment slot."""
+
+    target_kind: str
+    target_key: str
+    display_label: str
+    slot_path: str
+    lookup_keys: list[str]
+    current_mode: str
+    current_value: str | None
+    general_field_index: int | None = None
+    service_title_index: int | None = None
+    detail_row_index: int | None = None
+    detail_column_index: int | None = None
+    detail_cell_index: int | None = None
+    detail_uses_values: bool = False
+
+
+@dataclass(slots=True)
 class AuthoringVocabularyResult:
     """Structured authoring vocabulary surface for MCP-guided draft edits."""
 
@@ -392,6 +578,45 @@ def _resolve_user_path(path_value: str | Path, *, root: Path, context: str) -> P
     except ValueError as exc:
         raise PathAccessError(f"{context} must resolve inside the server root {root}.") from exc
     return path
+
+
+def _normalize_source_format(source_format: str) -> str:
+    normalized = str(source_format).strip().lower()
+    if normalized not in SUPPORTED_SOURCE_FORMATS:
+        raise ValueError(
+            f"source_format must be one of {list(SUPPORTED_SOURCE_FORMATS)}, got {source_format!r}."
+        )
+    return normalized
+
+
+def _detect_source_format(source_path: Path, source_format: str) -> str:
+    normalized = _normalize_source_format(source_format)
+    if normalized != "auto":
+        return normalized
+    suffix = source_path.suffix.strip().lower()
+    if suffix == ".las":
+        return "las"
+    if suffix == ".dlis":
+        return "dlis"
+    raise TemplateValidationError(
+        "Could not detect source_format from "
+        f"{source_path.name!r}. Set source_format to 'las' or 'dlis' explicitly."
+    )
+
+
+def _load_dataset_from_source_path(
+    source_path: str | Path,
+    *,
+    source_format: str = "auto",
+    root: Path,
+) -> tuple[WellDataset, Path, str]:
+    resolved_source = _resolve_user_path(source_path, root=root, context="source_path")
+    detected_format = _detect_source_format(resolved_source, source_format)
+    if detected_format == "las":
+        return load_las(resolved_source), resolved_source, detected_format
+    if detected_format == "dlis":
+        return load_dlis(resolved_source), resolved_source, detected_format
+    raise RuntimeError(f"Unsupported source_format {detected_format!r}.")
 
 
 def _section_ids_from_spec(spec: LogFileSpec) -> list[str]:
@@ -855,6 +1080,212 @@ def _enum_values(enum_type: type[object]) -> list[str]:
     return values
 
 
+def _normalize_channel_token(value: str) -> str:
+    return "".join(character for character in str(value).upper() if character.isalnum())
+
+
+def _safe_numeric_range(values: np.ndarray) -> tuple[float | None, float | None]:
+    finite = np.asarray(values, dtype=float)[np.isfinite(values)]
+    if finite.size == 0:
+        return None, None
+    return float(np.nanmin(finite)), float(np.nanmax(finite))
+
+
+def _normalized_depth_unit_text(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    return text.lower() or None
+
+
+def _masked_channel_values(channel: ScalarChannel | ArrayChannel | RasterChannel) -> np.ndarray:
+    if isinstance(channel, ScalarChannel):
+        return channel.masked_values()
+    masked = np.asarray(channel.values, dtype=float).copy()
+    if channel.null_value is not None:
+        masked[np.isclose(masked, channel.null_value, equal_nan=False)] = np.nan
+    return masked
+
+
+def _channel_kind(channel: ScalarChannel | ArrayChannel | RasterChannel) -> str:
+    if isinstance(channel, RasterChannel):
+        return "raster"
+    if isinstance(channel, ArrayChannel):
+        return "array"
+    return "scalar"
+
+
+def _same_depth_axis(
+    left: ScalarChannel | ArrayChannel | RasterChannel,
+    right: ScalarChannel | ArrayChannel | RasterChannel,
+) -> bool:
+    if left.depth_unit != right.depth_unit:
+        return False
+    if left.depth.shape != right.depth.shape:
+        return False
+    return bool(np.allclose(left.depth, right.depth, equal_nan=True))
+
+
+def _dataset_index_summary(dataset: WellDataset) -> DataSourceIndexSummary:
+    channels = list(dataset.channels.values())
+    if not channels:
+        return DataSourceIndexSummary(
+            depth_unit=None,
+            depth_min=None,
+            depth_max=None,
+            sample_count=None,
+            shared_axis=False,
+        )
+
+    first = channels[0]
+    shared_axis = all(_same_depth_axis(first, channel) for channel in channels[1:])
+    common_unit = (
+        _normalized_depth_unit_text(first.depth_unit)
+        if all(channel.depth_unit == first.depth_unit for channel in channels)
+        else None
+    )
+    depth_min = min(channel.depth_min for channel in channels)
+    depth_max = max(channel.depth_max for channel in channels)
+    sample_count = int(first.depth.shape[0]) if shared_axis else None
+    return DataSourceIndexSummary(
+        depth_unit=common_unit,
+        depth_min=float(depth_min),
+        depth_max=float(depth_max),
+        sample_count=sample_count,
+        shared_axis=shared_axis,
+    )
+
+
+def _channel_summary(
+    channel: ScalarChannel | ArrayChannel | RasterChannel,
+) -> DataSourceChannelSummary:
+    masked_values = _masked_channel_values(channel)
+    value_min, value_max = _safe_numeric_range(masked_values)
+    sample_axis_count: int | None = None
+    sample_unit: str | None = None
+    sample_label: str | None = None
+    if isinstance(channel, ArrayChannel):
+        sample_axis_count = int(channel.sample_axis.shape[0])
+        sample_unit = channel.sample_unit
+        sample_label = channel.sample_label
+    return DataSourceChannelSummary(
+        mnemonic=channel.mnemonic,
+        kind=_channel_kind(channel),
+        depth_unit=_normalized_depth_unit_text(channel.depth_unit) or channel.depth_unit,
+        depth_min=channel.depth_min,
+        depth_max=channel.depth_max,
+        sample_count=int(channel.depth.shape[0]),
+        value_unit=channel.value_unit,
+        description=channel.description,
+        value_shape=list(np.asarray(channel.values).shape),
+        value_min=value_min,
+        value_max=value_max,
+        sample_axis_count=sample_axis_count,
+        sample_unit=_normalized_depth_unit_text(sample_unit),
+        sample_label=sample_label,
+        metadata_keys=sorted(str(key) for key in channel.metadata),
+    )
+
+
+def _channel_alias_catalog() -> list[dict[str, object]]:
+    return deepcopy(list(AUTHORING_CHANNEL_ALIASES))
+
+
+def _matching_channel_alias_entry(requested_channel: str) -> dict[str, object] | None:
+    normalized_request = _normalize_channel_token(requested_channel)
+    for entry in AUTHORING_CHANNEL_ALIASES:
+        lookup_terms = [
+            entry["id"],
+            entry["label"],
+            *list(entry["aliases"]),
+            *list(entry["mnemonics"]),
+        ]
+        if normalized_request in {_normalize_channel_token(str(term)) for term in lookup_terms}:
+            return deepcopy(dict(entry))
+    return None
+
+
+def _channel_suggestions(
+    requested_channel: str,
+    available_channels: list[str],
+    *,
+    limit: int = 3,
+) -> list[str]:
+    normalized_request = _normalize_channel_token(requested_channel)
+    scored: list[tuple[float, str]] = []
+    for channel in available_channels:
+        score = SequenceMatcher(
+            a=normalized_request,
+            b=_normalize_channel_token(channel),
+            autojunk=False,
+        ).ratio()
+        if score >= 0.45:
+            scored.append((score, channel))
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return [channel for _score, channel in scored[:limit]]
+
+
+def _logfile_channel_target(
+    logfile_path: str | Path,
+    *,
+    section_id: str | None,
+    root: Path,
+) -> tuple[WellDataset, Path, str, Path, str, list[str]]:
+    resolved_logfile = _resolve_user_path(logfile_path, root=root, context="logfile_path")
+    spec = load_logfile(resolved_logfile, allowed_root=root)
+    section_ids = _section_ids_from_spec(spec)
+    if not section_ids:
+        raise TemplateValidationError("Logfile does not define any log sections.")
+
+    resolved_section_id = section_id
+    warnings: list[str] = []
+    if resolved_section_id is None:
+        if len(section_ids) == 1:
+            resolved_section_id = section_ids[0]
+        else:
+            resolved_sources = resolve_section_data_sources_for_logfile(
+                spec,
+                base_dir=resolved_logfile.parent,
+                allowed_root=root,
+            )
+            unique_sources = {
+                (str(path), source_format) for path, source_format in resolved_sources.values()
+            }
+            if len(unique_sources) != 1:
+                raise ValueError(
+                    "section_id is required when logfile_path resolves multiple section "
+                    "data sources."
+                )
+            resolved_section_id = section_ids[0]
+            warnings.append(
+                "No section_id was provided. The logfile has multiple sections, but they "
+                "share the same source, so the first section was used for availability checks."
+            )
+    assert resolved_section_id is not None
+    _ensure_known_section(spec, resolved_section_id)
+
+    datasets_by_section, _ = load_datasets_for_logfile(
+        spec,
+        base_dir=resolved_logfile.parent,
+        allowed_root=root,
+    )
+    dataset = datasets_by_section.get(resolved_section_id)
+    if dataset is None:
+        raise TemplateValidationError(f"Missing dataset for section {resolved_section_id!r}.")
+    resolved_sources = resolve_section_data_sources_for_logfile(
+        spec,
+        base_dir=resolved_logfile.parent,
+        allowed_root=root,
+    )
+    source_path, source_format_detected = resolved_sources[resolved_section_id]
+    return (
+        dataset,
+        source_path,
+        source_format_detected,
+        resolved_logfile,
+        resolved_section_id,
+        warnings,
+    )
+
+
 def _heading_general_field_keys_from_layout(layout: dict[str, object]) -> list[str]:
     heading = layout.get("heading")
     if not isinstance(heading, dict):
@@ -981,6 +1412,571 @@ def _heading_field_catalog() -> dict[str, object]:
     }
 
 
+def _header_key_alias_catalog() -> dict[str, object]:
+    return {
+        "provider_aliases": ["provider_name", "provider"],
+        "general_field_prefixes": ["general_field.<key>", "field.<key>"],
+        "service_title_patterns": ["service_title_<1-based-index>", "title_<1-based-index>"],
+        "detail_prefixes": ["detail.<row label>", "detail.row_<row-index>.col_<column-index>"],
+        "overwrite_policies": list(AUTHORING_HEADER_OVERWRITE_POLICIES),
+        "notes": [
+            "General fields match by canonical key and visible label text.",
+            "Detail rows match by label text when one target cell can be identified.",
+            "When a label matches multiple slots, use an explicit prefixed key to disambiguate.",
+        ],
+    }
+
+
+def _normalize_header_lookup(value: object) -> str:
+    return _normalize_channel_token(str(value))
+
+
+def _coerce_header_assignment_value(value: object) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        text = str(value).strip()
+        return text or None
+    return None
+
+
+def _header_value_text(value: object) -> str | None:
+    if isinstance(value, dict):
+        for key in ("value", "default", "source_key"):
+            text = _coerce_header_assignment_value(value.get(key))
+            if text is not None:
+                return text
+        return None
+    return _coerce_header_assignment_value(value)
+
+
+def _heading_value_slot_mode(value: object) -> str:
+    return str(_report_value_slot(value, slot_path=None)["mode"])
+
+
+def _header_slot_is_filled(mode: str, current_value: str | None) -> bool:
+    return mode in {"literal", "mixed"} and current_value not in (None, "")
+
+
+def _header_slot_lookup_keys(*values: object) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = _coerce_header_assignment_value(value)
+        if text is None:
+            continue
+        lookup = _normalize_header_lookup(text)
+        if not lookup or lookup in seen:
+            continue
+        seen.add(lookup)
+        normalized.append(lookup)
+    return normalized
+
+
+def _heading_target_descriptors(
+    heading: dict[str, object],
+    *,
+    slot_prefix: str,
+) -> list[_HeaderAssignmentTarget]:
+    targets: list[_HeaderAssignmentTarget] = [
+        _HeaderAssignmentTarget(
+            target_kind="provider",
+            target_key="provider_name",
+            display_label="Provider Name",
+            slot_path=f"{slot_prefix}.provider_name",
+            lookup_keys=_header_slot_lookup_keys("provider_name", "provider"),
+            current_mode="literal"
+            if _coerce_header_assignment_value(heading.get("provider_name")) is not None
+            else "empty",
+            current_value=_coerce_header_assignment_value(heading.get("provider_name")),
+        )
+    ]
+
+    general_fields = heading.get("general_fields")
+    if isinstance(general_fields, list):
+        for index, item in enumerate(general_fields):
+            if not isinstance(item, dict):
+                continue
+            if "value" in item:
+                slot_value: object = item.get("value")
+            else:
+                slot_value = {key: item[key] for key in ("source_key", "default") if key in item}
+            key = str(item.get("key", "")).strip()
+            label = str(item.get("label", key)).strip()
+            targets.append(
+                _HeaderAssignmentTarget(
+                    target_kind="general_field",
+                    target_key=key,
+                    display_label=label or key,
+                    slot_path=f"{slot_prefix}.general_fields[{index}].value",
+                    lookup_keys=_header_slot_lookup_keys(
+                        key,
+                        label,
+                        f"general_field.{key}",
+                        f"field.{key}",
+                    ),
+                    current_mode=_heading_value_slot_mode(slot_value),
+                    current_value=_header_value_text(slot_value),
+                    general_field_index=index,
+                )
+            )
+
+    service_titles = heading.get("service_titles")
+    if isinstance(service_titles, list):
+        for index, item in enumerate(service_titles):
+            slot_value: object = item if isinstance(item, dict) else item
+            targets.append(
+                _HeaderAssignmentTarget(
+                    target_kind="service_title",
+                    target_key=f"service_title_{index + 1}",
+                    display_label=f"Service Title {index + 1}",
+                    slot_path=f"{slot_prefix}.service_titles[{index}].value",
+                    lookup_keys=_header_slot_lookup_keys(
+                        f"service_title_{index + 1}",
+                        f"title_{index + 1}",
+                    ),
+                    current_mode=_heading_value_slot_mode(slot_value),
+                    current_value=_header_value_text(slot_value),
+                    service_title_index=index,
+                )
+            )
+
+    detail = heading.get("detail")
+    if not isinstance(detail, dict):
+        return targets
+
+    rows = detail.get("rows")
+    if not isinstance(rows, list):
+        return targets
+
+    for row_index, row in enumerate(rows):
+        if not isinstance(row, dict):
+            continue
+
+        label_cells = row.get("label_cells")
+        columns = row.get("columns")
+        if isinstance(label_cells, list) and isinstance(columns, list):
+            for column_index, label_value in enumerate(label_cells):
+                if column_index >= len(columns):
+                    continue
+                column = columns[column_index]
+                if not isinstance(column, dict):
+                    continue
+                cells = column.get("cells")
+                if not isinstance(cells, list) or not cells:
+                    continue
+                label_text = _header_value_text(label_value)
+                if label_text is None:
+                    continue
+                cell_value = cells[0]
+                targets.append(
+                    _HeaderAssignmentTarget(
+                        target_kind="detail_field",
+                        target_key=label_text,
+                        display_label=label_text,
+                        slot_path=(
+                            f"{slot_prefix}.detail.rows[{row_index}].columns[{column_index}]"
+                            ".cells[0]"
+                        ),
+                        lookup_keys=_header_slot_lookup_keys(
+                            label_text,
+                            f"detail.{label_text}",
+                            f"detail.row_{row_index + 1}.col_{column_index + 1}",
+                        ),
+                        current_mode=_heading_value_slot_mode(cell_value),
+                        current_value=_header_value_text(cell_value),
+                        detail_row_index=row_index,
+                        detail_column_index=column_index,
+                        detail_cell_index=0,
+                    )
+                )
+            continue
+
+        label_text = _header_value_text(row.get("label"))
+        if label_text is None:
+            continue
+        values = row.get("values")
+        if isinstance(values, list) and values:
+            cell_value = values[0]
+            targets.append(
+                _HeaderAssignmentTarget(
+                    target_kind="detail_field",
+                    target_key=label_text,
+                    display_label=label_text,
+                    slot_path=f"{slot_prefix}.detail.rows[{row_index}].values[0]",
+                    lookup_keys=_header_slot_lookup_keys(
+                        label_text,
+                        f"detail.{label_text}",
+                        f"detail.row_{row_index + 1}.col_1",
+                    ),
+                    current_mode=_heading_value_slot_mode(cell_value),
+                    current_value=_header_value_text(cell_value),
+                    detail_row_index=row_index,
+                    detail_column_index=0,
+                    detail_cell_index=0,
+                    detail_uses_values=True,
+                )
+            )
+            continue
+        if isinstance(columns, list) and columns:
+            column = columns[0]
+            if not isinstance(column, dict):
+                continue
+            cells = column.get("cells")
+            if not isinstance(cells, list) or not cells:
+                continue
+            cell_value = cells[0]
+            targets.append(
+                _HeaderAssignmentTarget(
+                    target_kind="detail_field",
+                    target_key=label_text,
+                    display_label=label_text,
+                    slot_path=f"{slot_prefix}.detail.rows[{row_index}].columns[0].cells[0]",
+                    lookup_keys=_header_slot_lookup_keys(
+                        label_text,
+                        f"detail.{label_text}",
+                        f"detail.row_{row_index + 1}.col_1",
+                    ),
+                    current_mode=_heading_value_slot_mode(cell_value),
+                    current_value=_header_value_text(cell_value),
+                    detail_row_index=row_index,
+                    detail_column_index=0,
+                    detail_cell_index=0,
+                )
+            )
+    return targets
+
+
+def _apply_header_target_value(
+    heading: dict[str, object],
+    target: _HeaderAssignmentTarget,
+    value: str,
+) -> None:
+    if target.target_kind == "provider":
+        heading["provider_name"] = value
+        return
+
+    if target.target_kind == "general_field":
+        fields = heading.get("general_fields")
+        assert isinstance(fields, list)
+        assert target.general_field_index is not None
+        item = fields[target.general_field_index]
+        assert isinstance(item, dict)
+        item["value"] = value
+        item.pop("source_key", None)
+        item.pop("default", None)
+        return
+
+    if target.target_kind == "service_title":
+        titles = heading.get("service_titles")
+        assert isinstance(titles, list)
+        assert target.service_title_index is not None
+        item = titles[target.service_title_index]
+        if isinstance(item, dict):
+            item["value"] = value
+        else:
+            titles[target.service_title_index] = {"value": value}
+        return
+
+    if target.target_kind != "detail_field":
+        raise RuntimeError(f"Unsupported heading target kind {target.target_kind!r}.")
+
+    detail = heading.get("detail")
+    assert isinstance(detail, dict)
+    rows = detail.get("rows")
+    assert isinstance(rows, list)
+    assert target.detail_row_index is not None
+    row = rows[target.detail_row_index]
+    assert isinstance(row, dict)
+    assert target.detail_column_index is not None
+    if target.detail_uses_values:
+        values = row.get("values")
+        assert isinstance(values, list)
+        values[target.detail_column_index] = value
+        return
+
+    columns = row.get("columns")
+    assert isinstance(columns, list)
+    column = columns[target.detail_column_index]
+    assert isinstance(column, dict)
+    cells = column.get("cells")
+    assert isinstance(cells, list)
+    assert target.detail_cell_index is not None
+    cells[target.detail_cell_index] = value
+
+
+def _predicted_heading_patch(
+    current_heading: dict[str, object],
+    updated_heading: dict[str, object],
+) -> dict[str, object]:
+    patch: dict[str, object] = {}
+    for key in (
+        "enabled",
+        "provider_name",
+        "general_fields",
+        "service_titles",
+        "detail",
+        "tail_enabled",
+    ):
+        if current_heading.get(key) != updated_heading.get(key):
+            patch[key] = deepcopy(updated_heading.get(key))
+    return patch
+
+
+def _report_value_slot(
+    data: object,
+    *,
+    slot_path: str | None,
+) -> dict[str, object]:
+    value_mapping: dict[str, object] = {}
+    if isinstance(data, dict):
+        value = data.get("value")
+        source_key = data.get("source_key")
+        default = data.get("default")
+        if value not in (None, ""):
+            value_mapping["value"] = str(value)
+        if source_key not in (None, ""):
+            value_mapping["source_key"] = str(source_key)
+        if default not in (None, ""):
+            value_mapping["default"] = str(default)
+    elif data not in (None, ""):
+        value_mapping["value"] = str(data)
+
+    has_value = "value" in value_mapping
+    has_source_key = "source_key" in value_mapping
+    if has_value and has_source_key:
+        mode = "mixed"
+    elif has_source_key:
+        mode = "dataset"
+    elif has_value:
+        mode = "literal"
+    elif "default" in value_mapping:
+        mode = "default_only"
+    else:
+        mode = "empty"
+
+    return {
+        "slot_path": slot_path,
+        "mode": mode,
+        **value_mapping,
+    }
+
+
+def _heading_provider_slots(
+    heading: dict[str, object],
+    *,
+    slot_prefix: str,
+) -> list[dict[str, object]]:
+    return [
+        {
+            "key": "provider_name",
+            "slot_path": f"{slot_prefix}.provider_name",
+            "current_value": heading.get("provider_name"),
+        }
+    ]
+
+
+def _heading_general_field_slots(
+    heading: dict[str, object],
+    *,
+    slot_prefix: str,
+    target_kind: str,
+) -> list[dict[str, object]]:
+    fields = heading.get("general_fields")
+    slots: list[dict[str, object]] = []
+    if isinstance(fields, list):
+        for index, item in enumerate(fields):
+            if not isinstance(item, dict):
+                continue
+            value_data: object
+            if "value" in item:
+                value_data = item.get("value")
+            else:
+                value_data = {key: item[key] for key in ("source_key", "default") if key in item}
+            slots.append(
+                {
+                    "index": index,
+                    "key": str(item.get("key", "")),
+                    "label": str(item.get("label", "")),
+                    "value_slot": _report_value_slot(
+                        value_data,
+                        slot_path=f"{slot_prefix}.general_fields[{index}].value",
+                    ),
+                }
+            )
+        return slots
+
+    if target_kind == "catalog":
+        for index, key in enumerate(_heading_field_catalog()["general_field_keys"]):
+            slots.append(
+                {
+                    "index": index,
+                    "key": key,
+                    "label": str(key).replace("_", " ").title(),
+                    "value_slot": _report_value_slot(
+                        None,
+                        slot_path=None,
+                    ),
+                }
+            )
+    return slots
+
+
+def _heading_service_title_slots(
+    heading: dict[str, object],
+    *,
+    slot_prefix: str,
+    target_kind: str,
+) -> list[dict[str, object]]:
+    titles = heading.get("service_titles")
+    slots: list[dict[str, object]] = []
+    if isinstance(titles, list):
+        for index, item in enumerate(titles):
+            metadata: dict[str, object] = {
+                "index": index,
+                "value_slot": _report_value_slot(
+                    item,
+                    slot_path=f"{slot_prefix}.service_titles[{index}].value",
+                ),
+            }
+            if isinstance(item, dict):
+                for key in ("font_size", "auto_adjust", "bold", "italic", "alignment"):
+                    if key in item:
+                        metadata[key] = deepcopy(item[key])
+            slots.append(metadata)
+        return slots
+
+    if target_kind == "catalog":
+        slots.append(
+            {
+                "index": 0,
+                "value_slot": _report_value_slot(None, slot_path=None),
+                "auto_adjust": True,
+                "bold": False,
+                "italic": False,
+                "alignment": "left",
+            }
+        )
+    return slots
+
+
+def _detail_row_slot(row: object, *, row_index: int, slot_prefix: str) -> dict[str, object]:
+    if not isinstance(row, dict):
+        return {
+            "row_index": row_index,
+            "label_slots": [],
+            "column_slots": [],
+        }
+
+    label_slots: list[dict[str, object]] = []
+    label_cells = row.get("label_cells")
+    if isinstance(label_cells, list):
+        for index, item in enumerate(label_cells):
+            label_slots.append(
+                _report_value_slot(
+                    item,
+                    slot_path=f"{slot_prefix}.rows[{row_index}].label_cells[{index}]",
+                )
+            )
+    elif "label" in row:
+        label_slots.append(
+            _report_value_slot(
+                row.get("label"),
+                slot_path=f"{slot_prefix}.rows[{row_index}].label",
+            )
+        )
+
+    column_slots: list[list[dict[str, object]]] = []
+    columns = row.get("columns")
+    if isinstance(columns, list):
+        for column_index, column in enumerate(columns):
+            if not isinstance(column, dict):
+                continue
+            cells = column.get("cells")
+            if not isinstance(cells, list):
+                continue
+            column_slots.append(
+                [
+                    _report_value_slot(
+                        cell,
+                        slot_path=(
+                            f"{slot_prefix}.rows[{row_index}].columns[{column_index}].cells"
+                            f"[{cell_index}]"
+                        ),
+                    )
+                    for cell_index, cell in enumerate(cells)
+                ]
+            )
+    else:
+        values = row.get("values")
+        if isinstance(values, list):
+            for column_index, value in enumerate(values):
+                column_slots.append(
+                    [
+                        _report_value_slot(
+                            value,
+                            slot_path=f"{slot_prefix}.rows[{row_index}].values[{column_index}]",
+                        )
+                    ]
+                )
+
+    return {
+        "row_index": row_index,
+        "label_slots": label_slots,
+        "column_slots": column_slots,
+    }
+
+
+def _heading_detail_slots(heading: dict[str, object], *, slot_prefix: str) -> dict[str, object]:
+    detail = heading.get("detail")
+    if not isinstance(detail, dict):
+        return {
+            "enabled": False,
+            "detail_kinds": _enum_values(ReportDetailKind),
+            "rows": [],
+        }
+
+    rows = detail.get("rows")
+    row_slots = []
+    if isinstance(rows, list):
+        row_slots = [
+            _detail_row_slot(item, row_index=index, slot_prefix=f"{slot_prefix}.detail")
+            for index, item in enumerate(rows)
+        ]
+    return {
+        "enabled": True,
+        "kind": detail.get("kind"),
+        "title": detail.get("title"),
+        "column_titles": deepcopy(list(detail.get("column_titles", [])))
+        if isinstance(detail.get("column_titles"), list)
+        else [],
+        "row_count": len(row_slots),
+        "rows": row_slots,
+        "detail_kinds": _enum_values(ReportDetailKind),
+    }
+
+
+def _remarks_capabilities(layout: dict[str, object]) -> dict[str, object]:
+    remarks = layout.get("remarks")
+    remark_blocks = remarks if isinstance(remarks, list) else []
+    return {
+        "supports_title": True,
+        "supports_lines": True,
+        "supports_alignment": True,
+        "alignment_values": ["left", "center", "right"],
+        "entry_fields": ["title", "lines", "alignment"],
+        "existing_block_count": len(remark_blocks),
+    }
+
+
+def _heading_slot_resource_uris() -> list[str]:
+    return [
+        "wellplot://authoring/catalog/header-fields.json",
+        "wellplot://authoring/catalog/header-key-aliases.json",
+        "wellplot://authoring/schema/patch.json",
+    ]
+
+
 def _track_archetypes_catalog() -> list[dict[str, object]]:
     return deepcopy(list(AUTHORING_TRACK_ARCHETYPES))
 
@@ -1057,6 +2053,22 @@ def authoring_track_archetypes_resource() -> ResourceContent:
 def authoring_header_fields_resource() -> ResourceContent:
     """Return heading and remarks field guidance as JSON text."""
     payload = json.dumps(_heading_field_catalog(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_header_key_aliases_resource() -> ResourceContent:
+    """Return deterministic header-slot lookup guidance as JSON text."""
+    payload = json.dumps(_header_key_alias_catalog(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_channel_aliases_resource() -> ResourceContent:
+    """Return curated channel-alias guidance as JSON text."""
+    payload = json.dumps(
+        {"channel_aliases": _channel_alias_catalog()},
+        indent=2,
+        sort_keys=True,
+    )
     return ResourceContent(text=payload, mime_type="application/json")
 
 
@@ -1194,6 +2206,205 @@ def inspect_logfile(
         has_tail=_layout_has_tail(layout),
         section_ids=[summary.id for summary in section_summaries],
         sections=section_summaries,
+    )
+
+
+def inspect_data_source(
+    source_path: str,
+    *,
+    source_format: str = "auto",
+    root: str | Path | None = None,
+) -> DataSourceInspectionResult:
+    """Inspect one raw LAS/DLIS source before draft authoring begins."""
+    server_root = resolve_server_root(root)
+    dataset, resolved_source, detected_format = _load_dataset_from_source_path(
+        source_path,
+        source_format=source_format,
+        root=server_root,
+    )
+    channel_summaries = [_channel_summary(channel) for channel in dataset.channels.values()]
+    return DataSourceInspectionResult(
+        source_path=str(resolved_source),
+        source_format_detected=detected_format,
+        dataset_name=dataset.name,
+        index=_dataset_index_summary(dataset),
+        channel_count=len(channel_summaries),
+        channels=channel_summaries,
+        metadata_keys=sorted(str(key) for key in dataset.well_metadata),
+        well_metadata=deepcopy(dataset.well_metadata),
+        provenance=deepcopy(dataset.provenance),
+        warnings=[],
+    )
+
+
+def check_channel_availability(
+    requested_channels: list[str],
+    *,
+    source_path: str | None = None,
+    logfile_path: str | None = None,
+    section_id: str | None = None,
+    source_format: str = "auto",
+    root: str | Path | None = None,
+) -> ChannelAvailabilityResult:
+    """Resolve requested channel names or aliases against one source or logfile section."""
+    if not requested_channels:
+        raise ValueError("requested_channels must contain at least one channel name.")
+    if (source_path is None) == (logfile_path is None):
+        raise ValueError("Provide exactly one of source_path or logfile_path.")
+    if source_path is not None and section_id is not None:
+        raise ValueError("section_id is only supported when checking logfile_path targets.")
+
+    server_root = resolve_server_root(root)
+    warnings: list[str] = []
+    if source_path is not None:
+        dataset, resolved_source, detected_format = _load_dataset_from_source_path(
+            source_path,
+            source_format=source_format,
+            root=server_root,
+        )
+        target_kind = "source"
+        resolved_logfile_path: str | None = None
+        resolved_section_id: str | None = None
+    else:
+        (
+            dataset,
+            resolved_source,
+            detected_format,
+            resolved_logfile,
+            resolved_section_id,
+            target_warnings,
+        ) = _logfile_channel_target(
+            logfile_path,
+            section_id=section_id,
+            root=server_root,
+        )
+        warnings.extend(target_warnings)
+        target_kind = "logfile"
+        resolved_logfile_path = str(resolved_logfile)
+
+    available_channels = list(dataset.channels)
+    available_by_token: dict[str, list[str]] = {}
+    for channel in available_channels:
+        available_by_token.setdefault(_normalize_channel_token(channel), []).append(channel)
+
+    found_channels: list[str] = []
+    missing_channels: list[str] = []
+    alias_matches: list[dict[str, object]] = []
+    ambiguous_matches: list[dict[str, object]] = []
+    resolutions: list[RequestedChannelResolution] = []
+
+    for requested_channel in requested_channels:
+        exact_matches = list(
+            available_by_token.get(_normalize_channel_token(requested_channel), [])
+        )
+        if len(exact_matches) == 1:
+            matched_channel = exact_matches[0]
+            if matched_channel not in found_channels:
+                found_channels.append(matched_channel)
+            resolutions.append(
+                RequestedChannelResolution(
+                    requested_channel=requested_channel,
+                    status="exact",
+                    matched_channels=exact_matches,
+                    canonical_alias_id=None,
+                    matched_alias=None,
+                    suggested_channels=[],
+                )
+            )
+            continue
+
+        alias_entry = _matching_channel_alias_entry(requested_channel)
+        if alias_entry is not None:
+            alias_mnemonics = {
+                _normalize_channel_token(str(value))
+                for value in alias_entry.get("mnemonics", [])
+                if str(value).strip()
+            }
+            alias_channel_matches = [
+                channel
+                for channel in available_channels
+                if _normalize_channel_token(channel) in alias_mnemonics
+            ]
+            if len(alias_channel_matches) == 1:
+                matched_channel = alias_channel_matches[0]
+                if matched_channel not in found_channels:
+                    found_channels.append(matched_channel)
+                alias_matches.append(
+                    {
+                        "requested_channel": requested_channel,
+                        "canonical_alias_id": alias_entry["id"],
+                        "matched_channels": alias_channel_matches,
+                    }
+                )
+                resolutions.append(
+                    RequestedChannelResolution(
+                        requested_channel=requested_channel,
+                        status="alias",
+                        matched_channels=alias_channel_matches,
+                        canonical_alias_id=str(alias_entry["id"]),
+                        matched_alias=str(alias_entry["label"]),
+                        suggested_channels=[],
+                    )
+                )
+                continue
+            if len(alias_channel_matches) > 1:
+                ambiguous_matches.append(
+                    {
+                        "requested_channel": requested_channel,
+                        "canonical_alias_id": alias_entry["id"],
+                        "matched_channels": alias_channel_matches,
+                    }
+                )
+                warnings.append(
+                    f"Requested channel {requested_channel!r} matched multiple available "
+                    f"channels {alias_channel_matches}."
+                )
+                resolutions.append(
+                    RequestedChannelResolution(
+                        requested_channel=requested_channel,
+                        status="ambiguous",
+                        matched_channels=alias_channel_matches,
+                        canonical_alias_id=str(alias_entry["id"]),
+                        matched_alias=str(alias_entry["label"]),
+                        suggested_channels=[],
+                    )
+                )
+                continue
+
+        suggestions = _channel_suggestions(requested_channel, available_channels)
+        missing_channels.append(requested_channel)
+        if suggestions:
+            warnings.append(
+                f"Requested channel {requested_channel!r} was not found. "
+                f"Suggested channels: {suggestions}."
+            )
+        else:
+            warnings.append(f"Requested channel {requested_channel!r} was not found.")
+        resolutions.append(
+            RequestedChannelResolution(
+                requested_channel=requested_channel,
+                status="missing",
+                matched_channels=[],
+                canonical_alias_id=None if alias_entry is None else str(alias_entry["id"]),
+                matched_alias=None if alias_entry is None else str(alias_entry["label"]),
+                suggested_channels=suggestions,
+            )
+        )
+
+    return ChannelAvailabilityResult(
+        target_kind=target_kind,
+        source_path=str(resolved_source),
+        source_format_detected=detected_format,
+        logfile_path=resolved_logfile_path,
+        section_id=resolved_section_id,
+        requested_channels=list(requested_channels),
+        available_channels=available_channels,
+        found_channels=found_channels,
+        missing_channels=missing_channels,
+        alias_matches=alias_matches,
+        ambiguous_matches=ambiguous_matches,
+        resolutions=resolutions,
+        warnings=warnings,
     )
 
 
@@ -1980,6 +3191,226 @@ def set_remarks_content(
     )
 
 
+def inspect_heading_slots(
+    *,
+    logfile_path: str | None = None,
+    template_path: str | None = None,
+    root: str | Path | None = None,
+) -> HeadingSlotsResult:
+    """Inspect precise heading, detail-table, and remarks slots for one target."""
+    if logfile_path is not None and template_path is not None:
+        raise ValueError("Provide at most one of logfile_path or template_path.")
+
+    server_root = resolve_server_root(root)
+    target_kind = "catalog"
+    target_path: str | None = None
+    layout: dict[str, object] = {}
+    if logfile_path is not None:
+        target_kind = "logfile"
+        resolved_logfile = _resolve_user_path(
+            logfile_path,
+            root=server_root,
+            context="logfile_path",
+        )
+        _, mapping = _normalize_logfile_mapping_from_path(
+            resolved_logfile,
+            allowed_root=server_root,
+        )
+        layout = _logfile_mapping_layout(mapping)
+        target_path = str(resolved_logfile)
+    elif template_path is not None:
+        target_kind = "template"
+        resolved_template = _resolve_user_path(
+            template_path,
+            root=server_root,
+            context="template_path",
+        )
+        layout = _logfile_mapping_layout(_raw_yaml_mapping_from_path(resolved_template))
+        target_path = str(resolved_template)
+
+    heading_raw = layout.get("heading")
+    heading = dict(heading_raw) if isinstance(heading_raw, dict) else {}
+    remarks_raw = layout.get("remarks")
+    remarks = deepcopy(list(remarks_raw)) if isinstance(remarks_raw, list) else []
+    tail_raw = layout.get("tail")
+    tail = deepcopy(dict(tail_raw)) if isinstance(tail_raw, dict) else {}
+    slot_prefix = "document.layout.heading"
+    return HeadingSlotsResult(
+        target_kind=target_kind,
+        target_path=target_path,
+        has_heading=bool(heading),
+        has_remarks=bool(remarks),
+        has_tail=_layout_has_tail(layout),
+        provider_slots=_heading_provider_slots(heading, slot_prefix=slot_prefix),
+        general_field_slots=_heading_general_field_slots(
+            heading,
+            slot_prefix=slot_prefix,
+            target_kind=target_kind,
+        ),
+        service_title_slots=_heading_service_title_slots(
+            heading,
+            slot_prefix=slot_prefix,
+            target_kind=target_kind,
+        ),
+        detail_slots=_heading_detail_slots(heading, slot_prefix=slot_prefix),
+        remarks_capabilities=_remarks_capabilities(layout),
+        current_values={
+            "heading": deepcopy(heading),
+            "remarks": remarks,
+            "tail": tail,
+        },
+        resource_uris=_heading_slot_resource_uris(),
+    )
+
+
+def preview_header_mapping(
+    logfile_path: str,
+    *,
+    values: dict[str, object],
+    overwrite_policy: str = "fill_empty",
+    root: str | Path | None = None,
+) -> HeaderMappingPreviewResult:
+    """Dry-run heading/report value assignment without mutating the draft logfile."""
+    if overwrite_policy not in AUTHORING_HEADER_OVERWRITE_POLICIES:
+        raise ValueError(
+            f"overwrite_policy must be one of {list(AUTHORING_HEADER_OVERWRITE_POLICIES)}."
+        )
+    if not isinstance(values, dict):
+        raise ValueError("values must be a mapping of extracted header keys to values.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    layout = _logfile_mapping_layout(mapping)
+    current_heading_raw = layout.get("heading")
+    current_heading = dict(current_heading_raw) if isinstance(current_heading_raw, dict) else {}
+    predicted_heading = deepcopy(current_heading)
+    targets = _heading_target_descriptors(predicted_heading, slot_prefix="document.layout.heading")
+    targets_by_lookup: dict[str, list[_HeaderAssignmentTarget]] = {}
+    for target in targets:
+        for lookup_key in target.lookup_keys:
+            targets_by_lookup.setdefault(lookup_key, []).append(target)
+
+    warnings: list[str] = []
+    if overwrite_policy == "merge_lists":
+        warnings.append(
+            "overwrite_policy='merge_lists' currently behaves like 'replace' for scalar "
+            "heading and detail slots."
+        )
+
+    resolved_assignments: list[dict[str, object]] = []
+    unmatched_values: list[dict[str, object]] = []
+    conflicting_values: list[dict[str, object]] = []
+    effective_policy = "replace" if overwrite_policy == "merge_lists" else overwrite_policy
+
+    for input_key, raw_value in values.items():
+        input_value = _coerce_header_assignment_value(raw_value)
+        if input_value is None:
+            unmatched_values.append(
+                {
+                    "input_key": str(input_key),
+                    "input_value": raw_value,
+                    "reason": "Unsupported value type. Use scalar string, number, or boolean data.",
+                }
+            )
+            continue
+
+        lookup_key = _normalize_header_lookup(input_key)
+        matches = targets_by_lookup.get(lookup_key, [])
+        if not matches:
+            unmatched_values.append(
+                {
+                    "input_key": str(input_key),
+                    "input_value": input_value,
+                }
+            )
+            continue
+
+        if len(matches) > 1:
+            conflicting_values.append(
+                {
+                    "input_key": str(input_key),
+                    "input_value": input_value,
+                    "reason": "Ambiguous header key. Use an explicit prefixed key.",
+                    "candidate_targets": [
+                        {
+                            "target_kind": match.target_kind,
+                            "target_key": match.target_key,
+                            "slot_path": match.slot_path,
+                        }
+                        for match in matches
+                    ],
+                }
+            )
+            continue
+
+        target = matches[0]
+        if target.current_value == input_value:
+            resolved_assignments.append(
+                {
+                    "input_key": str(input_key),
+                    "input_value": input_value,
+                    "target_kind": target.target_kind,
+                    "target_key": target.target_key,
+                    "slot_path": target.slot_path,
+                    "previous_mode": target.current_mode,
+                    "previous_value": target.current_value,
+                    "action": "unchanged",
+                }
+            )
+            continue
+
+        if effective_policy == "fill_empty" and _header_slot_is_filled(
+            target.current_mode,
+            target.current_value,
+        ):
+            conflicting_values.append(
+                {
+                    "input_key": str(input_key),
+                    "input_value": input_value,
+                    "target_kind": target.target_kind,
+                    "target_key": target.target_key,
+                    "slot_path": target.slot_path,
+                    "existing_value": target.current_value,
+                    "reason": "Target already has an explicit literal value.",
+                }
+            )
+            continue
+
+        action = "replace" if target.current_value not in (None, "") else "set"
+        _apply_header_target_value(predicted_heading, target, input_value)
+        resolved_assignments.append(
+            {
+                "input_key": str(input_key),
+                "input_value": input_value,
+                "target_kind": target.target_kind,
+                "target_key": target.target_key,
+                "slot_path": target.slot_path,
+                "previous_mode": target.current_mode,
+                "previous_value": target.current_value,
+                "action": action,
+            }
+        )
+        target.current_mode = "literal"
+        target.current_value = input_value
+
+    if not targets:
+        warnings.append("The draft does not expose any heading slots that can receive values.")
+
+    return HeaderMappingPreviewResult(
+        logfile_path=str(resolved_logfile),
+        overwrite_policy=overwrite_policy,
+        resolved_assignments=resolved_assignments,
+        unmatched_values=unmatched_values,
+        conflicting_values=conflicting_values,
+        warnings=warnings,
+        predicted_heading_patch=_predicted_heading_patch(current_heading, predicted_heading),
+    )
+
+
 def inspect_authoring_vocab(
     *,
     logfile_path: str | None = None,
@@ -2399,15 +3830,18 @@ def author_plot_from_request_prompt(
         "Available starting point:\n"
         f"{seed_block}\n\n"
         "Workflow:\n"
-        "1. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "2. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "3. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "1. If the request starts from a raw LAS/DLIS source, call "
+        "inspect_data_source(source_path) and check_channel_availability(...) "
+        "before you create bindings.\n"
+        "2. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "3. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "4. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
         "update_curve_binding(...), move_track(...), set_heading_content(...), and "
         "set_remarks_content(...).\n"
-        "4. Preview the affected section, track, or window before recommending a final render.\n"
-        "5. If you captured the previous YAML text before editing, call "
+        "5. Preview the affected section, track, or window before recommending a final render.\n"
+        "6. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "6. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "7. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
