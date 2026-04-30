@@ -98,12 +98,14 @@ Main tools:
 
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
 - `set_heading_content(logfile_path, patch)`
 - `set_remarks_content(logfile_path, remarks)`
+- `summarize_logfile_changes(logfile_path, previous_text=None)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
@@ -113,10 +115,15 @@ Recommended split:
 
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
+- use `inspect_authoring_vocab(...)` before major edits so the client sees the
+  valid track kinds, fill kinds, heading fields, and any available channels in
+  the current draft
 - use `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`, and
   `move_track(...)` for the deterministic track/layout edit loop
 - use `set_heading_content(...)` and `set_remarks_content(...)` for first-page
   report text and summary-block edits
+- use `summarize_logfile_changes(...)` when the client kept the prior YAML text
+  and needs a structural review summary before render or save
 - use `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` when the client is still working with unsaved YAML
   text in memory
@@ -156,7 +163,9 @@ when you need a comment-preserving editor.
 The server also exposes:
 
 - schema and example resources for discovery and example adaptation
-- prompts for logfile review, preview, and example-driven starts
+- authoring catalog resources for deterministic edit planning
+- prompts for logfile review, preview, example-driven starts, and
+  natural-language-to-tool authoring flows
 
 See [MCP API](../reference/mcp-api.md) for the exact tool, resource, and prompt
 names.

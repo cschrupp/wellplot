@@ -25,6 +25,7 @@ import json
 import os
 from copy import deepcopy
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -49,6 +50,13 @@ from ..logfile import (
     resolve_section_data_sources_for_logfile,
 )
 from ..logfile_schema import get_logfile_json_schema
+from ..model.document import (
+    CurveFillKind,
+    ReportDetailKind,
+    ScaleKind,
+    TrackHeaderObjectKind,
+    TrackKind,
+)
 from ..pipeline import prepare_logfile_render, render_prepared_logfile
 
 ASSET_PACKAGE = "wellplot.mcp.assets"
@@ -65,6 +73,78 @@ RESOURCE_MIME_TYPES = {
     "full_reconstruction.log.yaml": "text/yaml",
     "data-notes.md": "text/markdown",
 }
+AUTHORING_HEADING_PATCH_KEYS = (
+    "enabled",
+    "provider_name",
+    "general_fields",
+    "service_titles",
+    "detail",
+    "tail_enabled",
+)
+AUTHORING_CURVE_BINDING_PATCH_KEYS = (
+    "label",
+    "style",
+    "scale",
+    "header_display",
+    "fill",
+    "reference_overlay",
+    "value_labels",
+    "wrap",
+    "render_mode",
+)
+AUTHORING_MOVE_TRACK_SELECTORS = ("before_track_id", "after_track_id", "position")
+AUTHORING_RESOURCE_URIS = (
+    "wellplot://authoring/schema/patch.json",
+    "wellplot://authoring/catalog/track-kinds.json",
+    "wellplot://authoring/catalog/fill-kinds.json",
+    "wellplot://authoring/catalog/track-archetypes.json",
+    "wellplot://authoring/catalog/header-fields.json",
+)
+AUTHORING_TRACK_ARCHETYPES = (
+    {
+        "id": "reference_depth",
+        "label": "Reference Depth",
+        "kind": "reference",
+        "default_width_mm": 16.0,
+        "notes": "Shared depth axis, markers, and event context.",
+    },
+    {
+        "id": "gamma_ray",
+        "label": "Gamma Ray",
+        "kind": "normal",
+        "default_width_mm": 28.0,
+        "recommended_binding": {
+            "scale": {"kind": "linear", "min": 0.0, "max": 150.0},
+            "style": {"color": "#008000"},
+        },
+        "notes": "Single-curve scalar track for GR review.",
+    },
+    {
+        "id": "porosity_overlay",
+        "label": "Porosity Overlay",
+        "kind": "normal",
+        "default_width_mm": 32.0,
+        "recommended_channels": ["NPHI", "RHOB"],
+        "notes": "Dual-curve porosity track, often followed by crossover fill edits.",
+    },
+    {
+        "id": "resistivity_log",
+        "label": "Resistivity",
+        "kind": "normal",
+        "default_width_mm": 28.0,
+        "recommended_binding": {
+            "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
+        },
+        "notes": "Scalar resistivity track with logarithmic scale.",
+    },
+    {
+        "id": "vdl_array",
+        "label": "VDL Array",
+        "kind": "array",
+        "default_width_mm": 28.0,
+        "notes": "Array/raster track for waveform-style VDL presentation.",
+    },
+)
 
 
 @dataclass(slots=True)
@@ -259,6 +339,44 @@ class RemarksContentResult:
     logfile_path: str
     remarks_count: int
     remarks: list[dict[str, object]]
+
+
+@dataclass(slots=True)
+class AuthoringVocabularyResult:
+    """Structured authoring vocabulary surface for MCP-guided draft edits."""
+
+    track_kinds: list[str]
+    scale_kinds: list[str]
+    curve_fill_kinds: list[str]
+    report_detail_kinds: list[str]
+    track_header_object_kinds: list[str]
+    heading_patch_keys: list[str]
+    curve_binding_patch_keys: list[str]
+    move_track_selectors: list[str]
+    heading_field_catalog: dict[str, object]
+    track_archetypes: list[dict[str, object]]
+    resource_uris: list[str]
+    target_summary: dict[str, object] | None
+
+
+@dataclass(slots=True)
+class LogfileChangeSummaryResult:
+    """Structured structural-diff summary for one mutable logfile draft."""
+
+    logfile_path: str
+    changed: bool
+    message: str
+    section_ids: list[str]
+    added_tracks_by_section: dict[str, list[str]]
+    removed_tracks_by_section: dict[str, list[str]]
+    reordered_tracks_by_section: dict[str, list[str]]
+    added_curve_bindings: list[dict[str, str]]
+    removed_curve_bindings: list[dict[str, str]]
+    updated_curve_bindings: list[dict[str, str]]
+    heading_changed: bool
+    remarks_changed: bool
+    render_output_changed: bool
+    summary_lines: list[str]
 
 
 def resolve_server_root(root: str | Path | None = None) -> Path:
@@ -650,6 +768,16 @@ def _load_validated_logfile_text_spec(
     return spec
 
 
+def _normalized_logfile_mapping_from_text(
+    yaml_text: str,
+    *,
+    base_dir: Path,
+    root: Path,
+) -> tuple[LogFileSpec, dict[str, object]]:
+    spec = _load_validated_logfile_text_spec(yaml_text, base_dir=base_dir, root=root)
+    return spec, report_to_dict(spec)
+
+
 def _ensure_known_section(spec: LogFileSpec, section_id: str) -> None:
     available = _section_ids_from_spec(spec)
     if section_id not in available:
@@ -716,6 +844,147 @@ def read_production_example_text(example_id: str, filename: str) -> str:
     return asset_path.read_text(encoding="utf-8")
 
 
+def _enum_values(enum_type: type[object]) -> list[str]:
+    values: list[str] = []
+    seen: set[str] = set()
+    for member in enum_type:  # type: ignore[operator]
+        value = str(member.value)  # type: ignore[attr-defined]
+        if value not in seen:
+            seen.add(value)
+            values.append(value)
+    return values
+
+
+def _heading_general_field_keys_from_layout(layout: dict[str, object]) -> list[str]:
+    heading = layout.get("heading")
+    if not isinstance(heading, dict):
+        return []
+    general_fields = heading.get("general_fields")
+    if not isinstance(general_fields, list):
+        return []
+    keys: list[str] = []
+    for entry in general_fields:
+        if not isinstance(entry, dict):
+            continue
+        key = str(entry.get("key", "")).strip()
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _raw_yaml_mapping_from_path(path: Path) -> dict[str, object]:
+    payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise TemplateValidationError(f"Expected a mapping at {path}.")
+    return payload
+
+
+def _section_track_ids_from_mapping(mapping: dict[str, object]) -> dict[str, list[str]]:
+    track_ids_by_section: dict[str, list[str]] = {}
+    for section in _logfile_mapping_sections(mapping):
+        if not isinstance(section, dict):
+            continue
+        section_id = str(section.get("id", "")).strip()
+        if not section_id:
+            continue
+        tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+        track_ids_by_section[section_id] = [
+            str(track.get("id", ""))
+            for track in tracks
+            if isinstance(track, dict) and str(track.get("id", "")).strip()
+        ]
+    return track_ids_by_section
+
+
+def _reordered_track_ids(previous_ids: list[str], current_ids: list[str]) -> list[str]:
+    reordered: list[str] = []
+    matcher = SequenceMatcher(a=previous_ids, b=current_ids, autojunk=False)
+    for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        for track_id in current_ids[j1:j2]:
+            if track_id in previous_ids and track_id not in reordered:
+                reordered.append(track_id)
+    return reordered
+
+
+def _curve_bindings_by_key(spec: LogFileSpec) -> dict[tuple[str, str, str], dict[str, object]]:
+    bindings = dict(spec.document.get("bindings", {})).get("channels", [])
+    if not isinstance(bindings, list):
+        return {}
+    mapping: dict[tuple[str, str, str], dict[str, object]] = {}
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "curve")).strip().lower() != "curve":
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            continue
+        track_id = str(binding.get("track_id", "")).strip()
+        channel = str(binding.get("channel", "")).strip()
+        if not track_id or not channel:
+            continue
+        mapping[(section_id, track_id, channel.upper())] = deepcopy(binding)
+    return mapping
+
+
+def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]:
+    return {
+        "section_id": section_id,
+        "track_id": track_id,
+        "channel": channel,
+    }
+
+
+def _authoring_patch_schema() -> dict[str, object]:
+    return {
+        "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
+        "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
+        "move_track_target_selectors": list(AUTHORING_MOVE_TRACK_SELECTORS),
+        "remarks_entry_fields": ["title", "lines", "alignment"],
+    }
+
+
+def _heading_field_catalog() -> dict[str, object]:
+    general_field_keys: list[str] = []
+    for example_id in PRODUCTION_EXAMPLE_IDS:
+        template_mapping = yaml.safe_load(
+            read_production_example_text(example_id, "base.template.yaml")
+        )
+        if not isinstance(template_mapping, dict):
+            continue
+        try:
+            layout = _logfile_mapping_layout(template_mapping)
+        except TemplateValidationError:
+            continue
+        for key in _heading_general_field_keys_from_layout(layout):
+            if key not in general_field_keys:
+                general_field_keys.append(key)
+    return {
+        "provider_fields": ["provider_name"],
+        "general_field_keys": general_field_keys,
+        "service_title_fields": [
+            "value",
+            "font_size",
+            "auto_adjust",
+            "bold",
+            "italic",
+            "alignment",
+        ],
+        "detail_kinds": _enum_values(ReportDetailKind),
+        "detail_row_shapes": [
+            "label + values",
+            "label_cells + columns.cells",
+        ],
+        "remarks_fields": ["title", "lines", "alignment"],
+    }
+
+
+def _track_archetypes_catalog() -> list[dict[str, object]]:
+    return deepcopy(list(AUTHORING_TRACK_ARCHETYPES))
+
+
 def schema_resource() -> ResourceContent:
     """Return the JSON schema resource payload."""
     payload = json.dumps(get_logfile_json_schema(), indent=2, sort_keys=True)
@@ -748,6 +1017,47 @@ def production_example_resource(example_id: str, filename: str) -> ResourceConte
         text=read_production_example_text(example_id, filename),
         mime_type=RESOURCE_MIME_TYPES[filename],
     )
+
+
+def authoring_patch_schema_resource() -> ResourceContent:
+    """Return the draft-authoring patch contract as JSON text."""
+    payload = json.dumps(_authoring_patch_schema(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_track_kinds_resource() -> ResourceContent:
+    """Return supported draft-authoring track kinds as JSON text."""
+    payload = json.dumps({"track_kinds": _enum_values(TrackKind)}, indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_fill_kinds_resource() -> ResourceContent:
+    """Return supported curve-fill kinds as JSON text."""
+    payload = json.dumps(
+        {
+            "curve_fill_kinds": _enum_values(CurveFillKind),
+            "scale_kinds": _enum_values(ScaleKind),
+        },
+        indent=2,
+        sort_keys=True,
+    )
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_track_archetypes_resource() -> ResourceContent:
+    """Return curated draft-authoring track archetypes as JSON text."""
+    payload = json.dumps(
+        {"track_archetypes": _track_archetypes_catalog()},
+        indent=2,
+        sort_keys=True,
+    )
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_header_fields_resource() -> ResourceContent:
+    """Return heading and remarks field guidance as JSON text."""
+    payload = json.dumps(_heading_field_catalog(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
 
 
 def validate_logfile(
@@ -1670,6 +1980,281 @@ def set_remarks_content(
     )
 
 
+def inspect_authoring_vocab(
+    *,
+    logfile_path: str | None = None,
+    template_path: str | None = None,
+    root: str | Path | None = None,
+) -> AuthoringVocabularyResult:
+    """Return deterministic authoring vocabularies and optional target context."""
+    if logfile_path is not None and template_path is not None:
+        raise ValueError("Provide at most one of logfile_path or template_path.")
+
+    server_root = resolve_server_root(root)
+    target_summary: dict[str, object] | None = None
+    if logfile_path is not None:
+        resolved_logfile = _resolve_user_path(
+            logfile_path, root=server_root, context="logfile_path"
+        )
+        summary = summarize_logfile_draft(str(resolved_logfile), root=server_root)
+        _, mapping = _normalize_logfile_mapping_from_path(
+            resolved_logfile,
+            allowed_root=server_root,
+        )
+        layout = _logfile_mapping_layout(mapping)
+        target_summary = {
+            "target_kind": "logfile",
+            "target_path": str(resolved_logfile),
+            "section_ids": list(summary.section_ids),
+            "track_ids_by_section": {
+                section.id: list(section.track_ids) for section in summary.sections
+            },
+            "available_channels_by_section": {
+                section.id: list(section.available_channels) for section in summary.sections
+            },
+            "dataset_loaded_by_section": {
+                section.id: bool(section.dataset_loaded) for section in summary.sections
+            },
+            "heading_general_field_keys": _heading_general_field_keys_from_layout(layout),
+            "has_heading": summary.has_heading,
+            "has_remarks": summary.has_remarks,
+            "has_tail": summary.has_tail,
+        }
+    elif template_path is not None:
+        resolved_template = _resolve_user_path(
+            template_path,
+            root=server_root,
+            context="template_path",
+        )
+        mapping = _raw_yaml_mapping_from_path(resolved_template)
+        layout = _logfile_mapping_layout(mapping)
+        target_summary = {
+            "target_kind": "template",
+            "target_path": str(resolved_template),
+            "section_ids": list(_section_track_ids_from_mapping(mapping)),
+            "track_ids_by_section": _section_track_ids_from_mapping(mapping),
+            "heading_general_field_keys": _heading_general_field_keys_from_layout(layout),
+            "has_heading": bool(layout.get("heading")),
+            "has_remarks": bool(layout.get("remarks")),
+            "has_tail": _layout_has_tail(layout),
+        }
+
+    return AuthoringVocabularyResult(
+        track_kinds=_enum_values(TrackKind),
+        scale_kinds=_enum_values(ScaleKind),
+        curve_fill_kinds=_enum_values(CurveFillKind),
+        report_detail_kinds=_enum_values(ReportDetailKind),
+        track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
+        heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
+        curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
+        move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
+        heading_field_catalog=_heading_field_catalog(),
+        track_archetypes=_track_archetypes_catalog(),
+        resource_uris=list(AUTHORING_RESOURCE_URIS),
+        target_summary=target_summary,
+    )
+
+
+def summarize_logfile_changes(
+    logfile_path: str,
+    *,
+    previous_text: str | None = None,
+    root: str | Path | None = None,
+) -> LogfileChangeSummaryResult:
+    """Summarize structural draft changes relative to an optional previous YAML snapshot."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(
+        logfile_path,
+        root=server_root,
+        context="logfile_path",
+    )
+    current_spec, current_mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    current_section_ids = _section_ids_from_spec(current_spec)
+
+    if previous_text is None:
+        message = (
+            "No previous_text snapshot was provided. Capture the draft text before edits "
+            "if you want a structural change summary."
+        )
+        return LogfileChangeSummaryResult(
+            logfile_path=str(resolved_logfile),
+            changed=False,
+            message=message,
+            section_ids=current_section_ids,
+            added_tracks_by_section={},
+            removed_tracks_by_section={},
+            reordered_tracks_by_section={},
+            added_curve_bindings=[],
+            removed_curve_bindings=[],
+            updated_curve_bindings=[],
+            heading_changed=False,
+            remarks_changed=False,
+            render_output_changed=False,
+            summary_lines=[message],
+        )
+
+    previous_spec, previous_mapping = _normalized_logfile_mapping_from_text(
+        previous_text,
+        base_dir=resolved_logfile.parent,
+        root=server_root,
+    )
+
+    previous_track_ids = {
+        section_id: [
+            str(track.get("id", ""))
+            for track in list(section.get("tracks", []))
+            if isinstance(track, dict)
+        ]
+        for section_id, section in _section_map_from_spec(previous_spec).items()
+    }
+    current_track_ids = {
+        section_id: [
+            str(track.get("id", ""))
+            for track in list(section.get("tracks", []))
+            if isinstance(track, dict)
+        ]
+        for section_id, section in _section_map_from_spec(current_spec).items()
+    }
+    section_union = sorted(set(previous_track_ids) | set(current_track_ids))
+
+    added_tracks_by_section: dict[str, list[str]] = {}
+    removed_tracks_by_section: dict[str, list[str]] = {}
+    reordered_tracks_by_section: dict[str, list[str]] = {}
+    for section_id in section_union:
+        previous_ids = previous_track_ids.get(section_id, [])
+        current_ids = current_track_ids.get(section_id, [])
+        added = [track_id for track_id in current_ids if track_id not in previous_ids]
+        removed = [track_id for track_id in previous_ids if track_id not in current_ids]
+        reordered = _reordered_track_ids(previous_ids, current_ids)
+        if added:
+            added_tracks_by_section[section_id] = added
+        if removed:
+            removed_tracks_by_section[section_id] = removed
+        if reordered:
+            reordered_tracks_by_section[section_id] = reordered
+
+    previous_bindings = _curve_bindings_by_key(previous_spec)
+    current_bindings = _curve_bindings_by_key(current_spec)
+    previous_keys = set(previous_bindings)
+    current_keys = set(current_bindings)
+    added_curve_bindings = [
+        _binding_ref(
+            section_id,
+            track_id,
+            str(current_bindings[(section_id, track_id, channel)]["channel"]),
+        )
+        for section_id, track_id, channel in sorted(current_keys - previous_keys)
+    ]
+    removed_curve_bindings = [
+        _binding_ref(
+            section_id,
+            track_id,
+            previous_bindings[(section_id, track_id, channel)]["channel"],
+        )
+        for section_id, track_id, channel in sorted(previous_keys - current_keys)
+    ]
+    updated_curve_bindings = [
+        _binding_ref(
+            section_id,
+            track_id,
+            current_bindings[(section_id, track_id, channel)]["channel"],
+        )
+        for section_id, track_id, channel in sorted(previous_keys & current_keys)
+        if previous_bindings[(section_id, track_id, channel)]
+        != current_bindings[(section_id, track_id, channel)]
+    ]
+
+    previous_layout = _logfile_mapping_layout(previous_mapping)
+    current_layout = _logfile_mapping_layout(current_mapping)
+    previous_heading = previous_layout.get("heading")
+    current_heading = current_layout.get("heading")
+    previous_remarks = previous_layout.get("remarks")
+    current_remarks = current_layout.get("remarks")
+    heading_changed = (dict(previous_heading) if isinstance(previous_heading, dict) else {}) != (
+        dict(current_heading) if isinstance(current_heading, dict) else {}
+    )
+    remarks_changed = (list(previous_remarks) if isinstance(previous_remarks, list) else []) != (
+        list(current_remarks) if isinstance(current_remarks, list) else []
+    )
+    render_output_changed = previous_spec.render_output_path != current_spec.render_output_path
+
+    summary_lines: list[str] = []
+    for section_id in section_union:
+        if section_id in added_tracks_by_section:
+            summary_lines.append(
+                f"Section {section_id}: added tracks {added_tracks_by_section[section_id]}."
+            )
+        if section_id in removed_tracks_by_section:
+            summary_lines.append(
+                f"Section {section_id}: removed tracks {removed_tracks_by_section[section_id]}."
+            )
+        if section_id in reordered_tracks_by_section:
+            summary_lines.append(
+                f"Section {section_id}: reordered tracks {reordered_tracks_by_section[section_id]}."
+            )
+    if added_curve_bindings:
+        summary_lines.append(
+            "Added curve bindings: "
+            + ", ".join(
+                f"{entry['section_id']}/{entry['track_id']}/{entry['channel']}"
+                for entry in added_curve_bindings
+            )
+            + "."
+        )
+    if removed_curve_bindings:
+        summary_lines.append(
+            "Removed curve bindings: "
+            + ", ".join(
+                f"{entry['section_id']}/{entry['track_id']}/{entry['channel']}"
+                for entry in removed_curve_bindings
+            )
+            + "."
+        )
+    if updated_curve_bindings:
+        summary_lines.append(
+            "Updated curve bindings: "
+            + ", ".join(
+                f"{entry['section_id']}/{entry['track_id']}/{entry['channel']}"
+                for entry in updated_curve_bindings
+            )
+            + "."
+        )
+    if heading_changed:
+        summary_lines.append("Heading content changed.")
+    if remarks_changed:
+        summary_lines.append("Remarks content changed.")
+    if render_output_changed:
+        summary_lines.append("Render output_path changed.")
+
+    changed = bool(summary_lines)
+    if not changed:
+        summary_lines.append("No structural changes detected.")
+    message = (
+        f"Detected {len(summary_lines)} structural change summaries."
+        if changed
+        else "No structural changes detected."
+    )
+    return LogfileChangeSummaryResult(
+        logfile_path=str(resolved_logfile),
+        changed=changed,
+        message=message,
+        section_ids=current_section_ids,
+        added_tracks_by_section=added_tracks_by_section,
+        removed_tracks_by_section=removed_tracks_by_section,
+        reordered_tracks_by_section=reordered_tracks_by_section,
+        added_curve_bindings=added_curve_bindings,
+        removed_curve_bindings=removed_curve_bindings,
+        updated_curve_bindings=updated_curve_bindings,
+        heading_changed=heading_changed,
+        remarks_changed=remarks_changed,
+        render_output_changed=render_output_changed,
+        summary_lines=summary_lines,
+    )
+
+
 def format_logfile_text(
     yaml_text: str,
     *,
@@ -1791,4 +2376,53 @@ def start_from_example_prompt(example_id: str, goal: str) -> str:
         "```\n\n"
         "Preserve wellplot schema compatibility, explain the main edits you make, and prefer "
         "changing only the sections that are necessary for the stated goal.\n"
+    )
+
+
+def author_plot_from_request_prompt(
+    goal: str,
+    logfile_path: str | None = None,
+    example_id: str | None = None,
+) -> str:
+    """Return the guided prompt text for deterministic MCP authoring from freeform goals."""
+    seed_lines: list[str] = []
+    if logfile_path is not None:
+        seed_lines.append(f"- existing draft logfile: {logfile_path}")
+    if example_id is not None:
+        seed_lines.append(f"- packaged example seed: {example_id}")
+    if not seed_lines:
+        seed_lines.append("- no explicit draft seed was provided")
+    seed_block = "\n".join(seed_lines)
+    return (
+        "Translate this plotting request into deterministic wellplot MCP authoring steps.\n\n"
+        f"Goal:\n{goal}\n\n"
+        "Available starting point:\n"
+        f"{seed_block}\n\n"
+        "Workflow:\n"
+        "1. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "2. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "3. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "update_curve_binding(...), move_track(...), set_heading_content(...), and "
+        "set_remarks_content(...).\n"
+        "4. Preview the affected section, track, or window before recommending a final render.\n"
+        "5. If you captured the previous YAML text before editing, call "
+        "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
+        "6. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+    )
+
+
+def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
+    """Return the guided prompt text for revising one draft logfile from user feedback."""
+    return (
+        "Revise this wellplot draft through deterministic MCP edit operations.\n\n"
+        f"Logfile path: {logfile_path}\n"
+        f"Feedback:\n{feedback}\n\n"
+        "Workflow:\n"
+        "1. Call summarize_logfile_draft(logfile_path).\n"
+        "2. Call inspect_authoring_vocab(logfile_path=logfile_path).\n"
+        "3. Choose the smallest edit sequence that addresses the feedback.\n"
+        "4. Preview the affected section, track, or depth window after the edits.\n"
+        "5. If the client retained the previous YAML text, call "
+        "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
+        "6. Validate or save only after the preview looks correct.\n"
     )

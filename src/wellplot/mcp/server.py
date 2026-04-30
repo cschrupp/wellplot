@@ -336,6 +336,34 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def inspect_authoring_vocab(
+        logfile_path: str | None = None,
+        template_path: str | None = None,
+    ) -> dict[str, object]:
+        """Return deterministic draft-authoring vocabularies and optional target context."""
+        return asdict(
+            service.inspect_authoring_vocab(
+                logfile_path=logfile_path,
+                template_path=template_path,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def summarize_logfile_changes(
+        logfile_path: str,
+        previous_text: str | None = None,
+    ) -> dict[str, object]:
+        """Summarize structural draft changes relative to a previous YAML snapshot."""
+        return asdict(
+            service.summarize_logfile_changes(
+                logfile_path,
+                previous_text=previous_text,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def validate_logfile_text(
         yaml_text: str,
         base_dir: str | None = None,
@@ -423,6 +451,46 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         """Return the packaged production example notes resource."""
         return service.production_example_resource(example_id, "data-notes.md").text
 
+    @mcp.resource(
+        "wellplot://authoring/schema/patch.json",
+        mime_type="application/json",
+    )
+    def authoring_patch_schema_resource() -> str:
+        """Return the draft-authoring patch contract resource."""
+        return service.authoring_patch_schema_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/track-kinds.json",
+        mime_type="application/json",
+    )
+    def authoring_track_kinds_resource() -> str:
+        """Return the supported draft-authoring track kinds resource."""
+        return service.authoring_track_kinds_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/fill-kinds.json",
+        mime_type="application/json",
+    )
+    def authoring_fill_kinds_resource() -> str:
+        """Return the supported draft-authoring fill kinds resource."""
+        return service.authoring_fill_kinds_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/track-archetypes.json",
+        mime_type="application/json",
+    )
+    def authoring_track_archetypes_resource() -> str:
+        """Return curated draft-authoring track archetypes."""
+        return service.authoring_track_archetypes_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/header-fields.json",
+        mime_type="application/json",
+    )
+    def authoring_header_fields_resource() -> str:
+        """Return heading and remarks field guidance for draft authoring."""
+        return service.authoring_header_fields_resource().text
+
     @mcp.prompt()
     def review_logfile(logfile_path: str) -> str:
         """Guide a model through the logfile review workflow."""
@@ -437,6 +505,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def start_from_example(example_id: str, goal: str) -> str:
         """Guide a model through adapting one packaged example to a new goal."""
         return service.start_from_example_prompt(example_id, goal)
+
+    @mcp.prompt()
+    def author_plot_from_request(
+        goal: str,
+        logfile_path: str | None = None,
+        example_id: str | None = None,
+    ) -> str:
+        """Guide a model through deterministic plot authoring from a freeform request."""
+        return service.author_plot_from_request_prompt(
+            goal,
+            logfile_path=logfile_path,
+            example_id=example_id,
+        )
+
+    @mcp.prompt()
+    def revise_plot_from_feedback(logfile_path: str, feedback: str) -> str:
+        """Guide a model through deterministic plot revision from user feedback."""
+        return service.revise_plot_from_feedback_prompt(logfile_path, feedback)
 
     return mcp
 

@@ -178,10 +178,11 @@ The MCP tool surface currently supports:
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
+- `inspect_authoring_vocab` and `summarize_logfile_changes`
 - `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
 
-Packaged example resources and guided prompts are also exposed for MCP-aware
-clients.
+Packaged example resources, authoring catalog resources, and guided prompts are
+also exposed for MCP-aware clients.
 
 ## Contributor Development Workflow
 

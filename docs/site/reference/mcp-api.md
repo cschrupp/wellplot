@@ -347,6 +347,67 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
+
+Purpose: expose deterministic authoring vocabularies plus optional draft or
+template context.
+
+Returns:
+
+- `track_kinds`
+- `scale_kinds`
+- `curve_fill_kinds`
+- `report_detail_kinds`
+- `track_header_object_kinds`
+- `heading_patch_keys`
+- `curve_binding_patch_keys`
+- `move_track_selectors`
+- `heading_field_catalog`
+- `track_archetypes`
+- `resource_uris`
+- `target_summary`
+
+Behavior:
+
+- accepts at most one target:
+  - `logfile_path`, or
+  - `template_path`
+- without a target, still returns the static authoring catalogs
+- with `logfile_path`, includes section ids, track ids, available channels, and
+  heading/remarks state from the current draft
+- with `template_path`, includes heading-field and section/track context from
+  the referenced template mapping
+
+### `summarize_logfile_changes(logfile_path, previous_text=None)`
+
+Purpose: summarize structural draft changes relative to an optional earlier YAML
+snapshot.
+
+Returns:
+
+- `logfile_path`
+- `changed`
+- `message`
+- `section_ids`
+- `added_tracks_by_section`
+- `removed_tracks_by_section`
+- `reordered_tracks_by_section`
+- `added_curve_bindings`
+- `removed_curve_bindings`
+- `updated_curve_bindings`
+- `heading_changed`
+- `remarks_changed`
+- `render_output_changed`
+- `summary_lines`
+
+Behavior:
+
+- when `previous_text` is omitted, returns a usage hint instead of inventing a
+  diff baseline
+- compares normalized report structures, not raw YAML formatting
+- focuses on structural changes relevant to the current deterministic authoring
+  surface
+
 ### `validate_logfile_text(yaml_text, base_dir=None)`
 
 Purpose: validate unsaved full logfile YAML text.
@@ -408,6 +469,11 @@ Static resources:
 
 - `wellplot://schema/logfile.json`
 - `wellplot://examples/production/index.json`
+- `wellplot://authoring/schema/patch.json`
+- `wellplot://authoring/catalog/track-kinds.json`
+- `wellplot://authoring/catalog/fill-kinds.json`
+- `wellplot://authoring/catalog/track-archetypes.json`
+- `wellplot://authoring/catalog/header-fields.json`
 
 Resource templates:
 
@@ -428,6 +494,8 @@ Prompt names:
 - `review_logfile(logfile_path)`
 - `preview_logfile(logfile_path, focus=None)`
 - `start_from_example(example_id, goal)`
+- `author_plot_from_request(goal, logfile_path=None, example_id=None)`
+- `revise_plot_from_feedback(logfile_path, feedback)`
 
 Intent:
 
@@ -435,6 +503,10 @@ Intent:
 - `preview_logfile` guides the validate -> inspect -> preview path
 - `start_from_example` embeds example resources and asks the client to adapt
   them to a stated goal
+- `author_plot_from_request` guides a host model toward deterministic authoring
+  edits instead of full YAML rewrites
+- `revise_plot_from_feedback` guides iterative draft revision plus preview and
+  structural change review
 
 ## Suggested Client Order
 
@@ -456,8 +528,11 @@ For draft authoring:
 
 1. `create_logfile_draft(...)`
 2. `summarize_logfile_draft(...)`
-3. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+3. `inspect_authoring_vocab(...)`
+4. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
-4. preview with a narrow PNG tool
-5. render or save only after review
+5. `summarize_logfile_changes(...)` when the client retained a previous YAML
+   snapshot
+6. preview with a narrow PNG tool
+7. render or save only after review

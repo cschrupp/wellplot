@@ -300,13 +300,16 @@ Implemented so far:
 - `move_track(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
-
-Still needed to close `0.4.0`:
-
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 - `author_plot_from_request(...)` prompt
 - `revise_plot_from_feedback(...)` prompt
+
+`0.4.0` status:
+
+- complete in the repository-local MCP implementation
+- remaining work for that release is release/docs closure, not missing authoring
+  primitives
 
 ## First Five Operations
 

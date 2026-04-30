@@ -739,6 +739,143 @@ class McpServiceTests(unittest.TestCase):
                 ["Synthetic authoring note 1.", "Synthetic authoring note 2."],
             )
 
+    def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
+        """Expose stable authoring vocabularies even without a target draft."""
+        result = service.inspect_authoring_vocab(root=REPO_ROOT)
+
+        self.assertIn("reference", result.track_kinds)
+        self.assertIn("normal", result.track_kinds)
+        self.assertIn("array", result.track_kinds)
+        self.assertIn("annotation", result.track_kinds)
+        self.assertIn("linear", result.scale_kinds)
+        self.assertIn("log", result.scale_kinds)
+        self.assertIn("between_curves", result.curve_fill_kinds)
+        self.assertIn("open_hole", result.report_detail_kinds)
+        self.assertIn("title", result.track_header_object_kinds)
+        self.assertIn("provider_name", result.heading_patch_keys)
+        self.assertIn("fill", result.curve_binding_patch_keys)
+        self.assertIn("after_track_id", result.move_track_selectors)
+        self.assertTrue(result.track_archetypes)
+        self.assertIn(
+            "wellplot://authoring/catalog/track-archetypes.json",
+            result.resource_uris,
+        )
+        self.assertIsNone(result.target_summary)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_inspect_authoring_vocab_with_logfile_exposes_target_context(self) -> None:
+        """Expose section, track, and channel context for one draft logfile."""
+        result = service.inspect_authoring_vocab(
+            logfile_path=self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_summary["target_kind"], "logfile")
+        self.assertEqual(result.target_summary["section_ids"], ["main"])
+        self.assertIn("gr", result.target_summary["track_ids_by_section"]["main"])
+        self.assertIn("GR", result.target_summary["available_channels_by_section"]["main"])
+
+    def test_inspect_authoring_vocab_with_template_exposes_heading_context(self) -> None:
+        """Expose heading-field expectations from one packaged example template."""
+        result = service.inspect_authoring_vocab(
+            template_path="examples/production/cbl_log_example/base.template.yaml",
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.target_summary["target_kind"], "template")
+        self.assertTrue(result.target_summary["has_heading"])
+        self.assertIn("company", result.target_summary["heading_general_field_keys"])
+
+    def test_summarize_logfile_changes_without_previous_text_returns_hint(self) -> None:
+        """Explain how to use change summaries when no prior snapshot is provided."""
+        result = service.summarize_logfile_changes(
+            self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+
+        self.assertFalse(result.changed)
+        self.assertEqual(result.section_ids, ["main"])
+        self.assertIn("No previous_text snapshot", result.message)
+        self.assertEqual(len(result.summary_lines), 1)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_summarize_logfile_changes_detects_authoring_edits(self) -> None:
+        """Summarize reordered tracks, binding edits, and report-text changes."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            previous_text = draft_path.read_text(encoding="utf-8")
+
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="GR",
+                label="Gamma",
+                root=REPO_ROOT,
+            )
+            service.update_curve_binding(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                channel="GR",
+                patch={"label": "Gamma Ray"},
+                root=REPO_ROOT,
+            )
+            service.move_track(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                after_track_id="depth",
+                root=REPO_ROOT,
+            )
+            service.set_heading_content(
+                str(draft_path),
+                patch={"provider_name": "Acme Logging", "tail_enabled": True},
+                root=REPO_ROOT,
+            )
+            service.set_remarks_content(
+                str(draft_path),
+                remarks=[
+                    {
+                        "title": "Generated Remarks",
+                        "lines": ["Synthetic authoring note 1."],
+                        "alignment": "center",
+                    }
+                ],
+                root=REPO_ROOT,
+            )
+
+            result = service.summarize_logfile_changes(
+                str(draft_path),
+                previous_text=previous_text,
+                root=REPO_ROOT,
+            )
+
+            self.assertTrue(result.changed)
+            self.assertEqual(result.added_tracks_by_section["main"], ["porosity"])
+            self.assertEqual(result.reordered_tracks_by_section["main"], ["gr"])
+            self.assertEqual(result.added_curve_bindings[0]["track_id"], "porosity")
+            self.assertEqual(result.updated_curve_bindings[0]["track_id"], "gr")
+            self.assertTrue(result.heading_changed)
+            self.assertTrue(result.remarks_changed)
+            self.assertTrue(
+                any(line == "Heading content changed." for line in result.summary_lines)
+            )
+
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:
         """Return canonical logfile YAML text through the serializer path."""
@@ -815,6 +952,19 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(resource.mime_type, "text/markdown")
         self.assertIn("CBL/VDL Reconstruction Example", resource.text)
 
+    def test_authoring_catalog_resources_are_json(self) -> None:
+        """Expose authoring catalog resources as JSON payloads."""
+        patch_resource = service.authoring_patch_schema_resource()
+        fill_resource = service.authoring_fill_kinds_resource()
+        header_resource = service.authoring_header_fields_resource()
+
+        self.assertEqual(patch_resource.mime_type, "application/json")
+        self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
+        self.assertEqual(fill_resource.mime_type, "application/json")
+        self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
+        self.assertEqual(header_resource.mime_type, "application/json")
+        self.assertIn("general_field_keys", json.loads(header_resource.text))
+
     def test_start_from_example_prompt_embeds_goal_and_example(self) -> None:
         """Embed the requested goal and packaged example resources in the prompt."""
         prompt = service.start_from_example_prompt(
@@ -825,6 +975,29 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("Create a variant with simplified headers.", prompt)
         self.assertIn("base.template.yaml", prompt)
         self.assertIn("full_reconstruction.log.yaml", prompt)
+
+    def test_author_plot_from_request_prompt_mentions_authoring_tools(self) -> None:
+        """Guide clients toward deterministic authoring tools for freeform requests."""
+        prompt = service.author_plot_from_request_prompt(
+            "Add a porosity track and simplify the header.",
+            logfile_path="drafts/demo.log.yaml",
+            example_id="forge16b_porosity_example",
+        )
+
+        self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
+        self.assertIn("inspect_authoring_vocab(...)", prompt)
+        self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
+
+    def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
+        """Guide revision workflows toward previews and structural change summaries."""
+        prompt = service.revise_plot_from_feedback_prompt(
+            "drafts/demo.log.yaml",
+            "Move caliper next to depth and shorten the remarks.",
+        )
+
+        self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
+        self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
+        self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
 
 if __name__ == "__main__":

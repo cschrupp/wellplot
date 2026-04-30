@@ -82,6 +82,7 @@ class McpServerIntegrationTests(unittest.TestCase):
         export_dir = fixture_paths.fixture_dir / "exported-example"
         draft_logfile = fixture_paths.fixture_dir / "drafts" / "single-draft.log.yaml"
         saved_logfile = fixture_paths.fixture_dir / "saved.log.yaml"
+        example_template = "examples/production/cbl_log_example/base.template.yaml"
         server = StdioServerParameters(
             command=sys.executable,
             args=["-m", "wellplot.mcp.server"],
@@ -169,10 +170,23 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "source_logfile_path": fixture_paths.single_logfile_relative,
                 },
             )
+            previous_draft_text = draft_logfile.read_text(encoding="utf-8")
             draft_summary = await session.call_tool(
                 "summarize_logfile_draft",
                 {
                     "logfile_path": str(draft_logfile),
+                },
+            )
+            authoring_vocab = await session.call_tool(
+                "inspect_authoring_vocab",
+                {
+                    "logfile_path": str(draft_logfile),
+                },
+            )
+            template_vocab = await session.call_tool(
+                "inspect_authoring_vocab",
+                {
+                    "template_path": example_template,
                 },
             )
             added_track = await session.call_tool(
@@ -253,6 +267,13 @@ class McpServerIntegrationTests(unittest.TestCase):
                     ],
                 },
             )
+            change_summary = await session.call_tool(
+                "summarize_logfile_changes",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "previous_text": previous_draft_text,
+                },
+            )
             updated_draft_summary = await session.call_tool(
                 "summarize_logfile_draft",
                 {
@@ -289,6 +310,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "move_track",
                 "set_heading_content",
                 "set_remarks_content",
+                "inspect_authoring_vocab",
+                "summarize_logfile_changes",
                 "validate_logfile_text",
                 "format_logfile_text",
                 "save_logfile_text",
@@ -299,6 +322,11 @@ class McpServerIntegrationTests(unittest.TestCase):
             [
                 "wellplot://schema/logfile.json",
                 "wellplot://examples/production/index.json",
+                "wellplot://authoring/schema/patch.json",
+                "wellplot://authoring/catalog/track-kinds.json",
+                "wellplot://authoring/catalog/fill-kinds.json",
+                "wellplot://authoring/catalog/track-archetypes.json",
+                "wellplot://authoring/catalog/header-fields.json",
             ],
         )
         self.assertEqual(
@@ -307,6 +335,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "review_logfile",
                 "preview_logfile",
                 "start_from_example",
+                "author_plot_from_request",
+                "revise_plot_from_feedback",
             ],
         )
         self.assertEqual(
@@ -365,6 +395,13 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
         self.assertTrue(draft_summary.structuredContent["sections"][0]["dataset_loaded"])
         self.assertIn("GR", draft_summary.structuredContent["sections"][0]["available_channels"])
+        self.assertIn("reference", authoring_vocab.structuredContent["track_kinds"])
+        self.assertEqual(
+            authoring_vocab.structuredContent["target_summary"]["target_kind"], "logfile"
+        )
+        self.assertEqual(
+            template_vocab.structuredContent["target_summary"]["target_kind"], "template"
+        )
         self.assertEqual(added_track.structuredContent["track_id"], "porosity")
         self.assertEqual(added_track.structuredContent["track_count"], 7)
         self.assertEqual(added_track.structuredContent["track_ids"][-1], "porosity")
@@ -391,6 +428,9 @@ class McpServerIntegrationTests(unittest.TestCase):
             updated_remarks.structuredContent["remarks"][0]["title"],
             "Generated Remarks",
         )
+        self.assertTrue(change_summary.structuredContent["changed"])
+        self.assertTrue(change_summary.structuredContent["heading_changed"])
+        self.assertTrue(change_summary.structuredContent["remarks_changed"])
         self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
             6,

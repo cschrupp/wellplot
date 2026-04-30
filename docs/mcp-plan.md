@@ -152,10 +152,15 @@ Concrete `0.4.0` foundation tools:
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 
-The first two implementation waves are now in the repository. The remaining
-`0.4.0` authoring focus should move to:
+The full `0.4.0` deterministic authoring foundation now exists in the
+repository, including:
 
-- `inspect_authoring_vocab(...)`
-- `summarize_logfile_changes(...)`
-- `author_plot_from_request(...)` prompt
-- `revise_plot_from_feedback(...)` prompt
+- draft lifecycle tools
+- deterministic track/curve/heading/remarks edit tools
+- authoring vocabulary inspection plus catalog resources
+- structural change summaries
+- LLM-facing prompts for freeform authoring and revision
+
+The next MCP-focused implementation slice should now move to the richer
+`0.5.0` ingestion and workflow ergonomics work described in
+[docs/mcp-authoring-plan.md](mcp-authoring-plan.md).

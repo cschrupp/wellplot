@@ -124,7 +124,7 @@ Detailed checklist and release status:
 
 - [docs/mcp-plan.md](mcp-plan.md)
 
-## Next Planned Slice: Natural-Language MCP Authoring (2026-04-29)
+## Completed Slice: Natural-Language MCP Authoring Foundation (2026-04-29)
 
 This is the next MCP-focused version target after the `0.3.0` release work is
 finished.
@@ -156,19 +156,20 @@ Concrete `0.4.0` foundation set:
 - `move_track(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
-
-Remaining `0.4.0` tools after the current implementation waves:
-
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
+- `author_plot_from_request(...)` prompt
+- `revise_plot_from_feedback(...)` prompt
 
 Current status:
 
-- the draft lifecycle, track/curve editing, track reordering, and
-  heading/remarks editing waves now exist in the repo-local MCP
-  implementation
-- the next implementation step should move to authoring vocabulary discovery,
-  change summaries, and LLM-facing MCP prompts
+- the full deterministic `0.4.0` authoring foundation now exists in the
+  repo-local MCP implementation
+- local MCP clients can now create drafts, inspect authoring vocabularies,
+  mutate tracks/bindings/report text, summarize structural changes, and follow
+  authoring/revision prompt contracts without hand-editing YAML
+- the next MCP slice should move to `0.5.0` header-value ingestion and
+  workflow ergonomics
 
 Detailed plan:
 
