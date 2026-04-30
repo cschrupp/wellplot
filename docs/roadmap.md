@@ -171,6 +171,15 @@ Current status:
 - the next MCP slice should move to `0.5.0` header-value ingestion and
   workflow ergonomics
 
+Planned `0.5.0` scope:
+
+- inspect precise heading/report slots before ingestion
+- preview header mappings before mutating drafts
+- apply normalized header values with explicit overwrite policies
+- parse simple structured key-value text deterministically
+- expose stronger alias/style preset catalogs for common conventions
+- upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
+
 Detailed plan:
 
 - [docs/mcp-authoring-plan.md](mcp-authoring-plan.md)

@@ -164,3 +164,13 @@ repository, including:
 The next MCP-focused implementation slice should now move to the richer
 `0.5.0` ingestion and workflow ergonomics work described in
 [docs/mcp-authoring-plan.md](mcp-authoring-plan.md).
+
+Planned `0.5.0` focus:
+
+- `inspect_heading_slots(...)`
+- `preview_header_mapping(...)`
+- `apply_header_values(...)`
+- `parse_key_value_text(...)`
+- `inspect_style_presets(...)`
+- header/style catalog resources
+- `ingest_header_text(...)` prompt

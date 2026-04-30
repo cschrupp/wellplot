@@ -252,15 +252,22 @@ Acceptance:
 
 Deliver:
 
-- header-value mapping helpers
+- header-slot inspection and mapping helpers
 - deterministic import helpers for simple structured text sources
-- stronger archetype catalogs and style presets
+- stronger archetype catalogs, alias catalogs, and style presets
 - richer authoring notebook/demo flows
 
 Acceptance:
 
 - a client can ingest header values from provided text, map them into the
   report structure, preview the result, and save confidently
+
+Concrete focus:
+
+- make header and cover-page value mapping deterministic instead of ad hoc
+- reduce prompt verbosity by exposing reusable style and archetype presets
+- keep freeform language in the MCP client while giving it better structured
+  targets for ingestion and revision
 
 ## Release 0.4.0 Concrete Tool Set
 
@@ -310,6 +317,183 @@ Implemented so far:
 - complete in the repository-local MCP implementation
 - remaining work for that release is release/docs closure, not missing authoring
   primitives
+
+## Release 0.5.0 Concrete Tool Set
+
+This is the next concrete MCP slice after the deterministic authoring
+foundation.
+
+1. `inspect_heading_slots(logfile_path=None, template_path=None)`
+2. `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
+3. `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
+4. `parse_key_value_text(source_text, format_hint=None)`
+5. `inspect_style_presets(logfile_path=None)`
+6. `ingest_header_text(logfile_path, source_text, source_description=None)` prompt
+
+Supporting resources:
+
+- `wellplot://authoring/catalog/header-key-aliases.json`
+- `wellplot://authoring/catalog/style-presets.json`
+- `wellplot://authoring/catalog/overwrite-policies.json`
+
+Notes:
+
+- `0.5.0` is still not a server-side "understand any document" feature.
+- the parser should stay deterministic and limited to simple structured forms:
+  - `Key: Value`
+  - `KEY=VALUE`
+  - two-column text blocks
+- OCR, PDF table extraction, and ambiguous freeform interpretation remain the
+  MCP client's responsibility.
+
+## Release 0.5.0 Tool Contracts
+
+### 1. `inspect_heading_slots(...)`
+
+Purpose:
+
+- expose the exact heading/report slots available in a draft or template before
+  applying imported values
+
+Return shape:
+
+- `provider_slots`
+- `general_field_slots`
+- `service_title_slots`
+- `detail_slots`
+- `remarks_capabilities`
+- `current_values`
+- `resource_uris`
+
+Why it matters:
+
+- `inspect_authoring_vocab(...)` gives broad editing vocabulary
+- `inspect_heading_slots(...)` should become the precise contract for
+  report-header ingestion and review
+
+### 2. `preview_header_mapping(...)`
+
+Purpose:
+
+- dry-run header value application without mutating the draft
+
+Inputs:
+
+- `logfile_path`
+- `values`
+- `overwrite_policy`
+
+Return shape:
+
+- `resolved_assignments`
+- `unmatched_values`
+- `conflicting_values`
+- `warnings`
+- `predicted_heading_patch`
+
+Why it matters:
+
+- the MCP client needs one reviewable step between "I extracted these values"
+  and "write them into the draft"
+
+### 3. `apply_header_values(...)`
+
+Purpose:
+
+- apply normalized header values to a draft through the server-owned mapping
+  rules
+
+Inputs:
+
+- `logfile_path`
+- `values`
+- `overwrite_policy`
+
+Supported overwrite policies:
+
+- `fill_empty`
+- `replace`
+- `merge_lists`
+
+Return shape:
+
+- `logfile_path`
+- `applied_assignments`
+- `skipped_assignments`
+- `warnings`
+- `heading_summary`
+
+### 4. `parse_key_value_text(...)`
+
+Purpose:
+
+- deterministically parse simple structured text blocks into normalized
+  key-value pairs
+
+Inputs:
+
+- `source_text`
+- `format_hint`
+
+Return shape:
+
+- `pairs`
+- `unparsed_lines`
+- `format_detected`
+- `warnings`
+
+Deliberate first-pass limit:
+
+- no OCR
+- no PDF parsing
+- no fuzzy multi-table inference
+- no hidden value-to-slot mapping in this tool
+
+### 5. `inspect_style_presets(...)`
+
+Purpose:
+
+- expose curated style presets and recommended patches for common authoring
+  goals
+
+Expected preset families:
+
+- porosity overlays
+- gamma ray defaults
+- resistivity log conventions
+- CBL/VDL high-contrast and print-safe variants
+- first-page header/remarks presentation presets
+
+Why it matters:
+
+- many natural-language requests include color/scale/fill conventions that
+  should map to reusable presets instead of one-off patches every time
+
+## Release 0.5.0 Implementation Order
+
+Recommended build order:
+
+1. `inspect_heading_slots(...)`
+2. header-key alias resources
+3. `preview_header_mapping(...)`
+4. `apply_header_values(...)`
+5. `parse_key_value_text(...)`
+6. style-preset resources + `inspect_style_presets(...)`
+7. richer notebook/demo flow
+8. `ingest_header_text(...)` prompt
+
+## Release 0.5.0 Acceptance
+
+`0.5.0` is complete when:
+
+- a client can inspect the exact heading/report slots in a target draft
+- a client can parse simple structured header text into key-value pairs
+- a client can preview how those values would map into the draft before saving
+- a client can apply the mapping with an explicit overwrite policy
+- a client can rely on preset catalogs for common style conventions instead of
+  restating them in every prompt
+- the MCP notebook/demo shows one end-to-end "header packet to rendered draft"
+  workflow
 
 ## First Five Operations
 
@@ -592,13 +776,14 @@ Docs to add or update:
 
 ## Immediate Next Step
 
-Implement the `0.4.0` foundation, not a monolithic "prompt-to-plot" tool.
+Implement the `0.5.0` ingestion and workflow layer on top of the completed
+`0.4.0` authoring foundation.
 
 That means:
 
-1. add draft lifecycle support
-2. add structured high-value edit tools
-3. add authoring vocabulary resources
-4. add prompts that teach MCP clients how to orchestrate those tools
+1. add precise heading-slot inspection
+2. add preview/apply header mapping helpers
+3. add deterministic simple-text parsing
+4. add preset and alias catalogs that reduce prompt verbosity
 5. validate with one end-to-end example:
-   - "build a porosity review track from a natural-language request"
+   - "take this header text block, map it into the report, preview it, and save"
