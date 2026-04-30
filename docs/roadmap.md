@@ -153,21 +153,22 @@ Concrete `0.4.0` foundation set:
 - `add_track(...)`
 - `bind_curve(...)`
 - `update_curve_binding(...)`
-
-Follow-on `0.4.0` tools after that foundation:
-
 - `move_track(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
+
+Remaining `0.4.0` tools after the current implementation waves:
+
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 
 Current status:
 
-- the first authoring-foundation wave now exists in the repo-local MCP
+- the draft lifecycle, track/curve editing, track reordering, and
+  heading/remarks editing waves now exist in the repo-local MCP
   implementation
-- the next implementation step should move to track ordering, heading/remarks
-  edits, authoring vocabulary discovery, and change summaries
+- the next implementation step should move to authoring vocabulary discovery,
+  change summaries, and LLM-facing MCP prompts
 
 Detailed plan:
 

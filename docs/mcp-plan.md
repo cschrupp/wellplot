@@ -152,11 +152,10 @@ Concrete `0.4.0` foundation tools:
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
 
-The first implementation wave is now in the repository. The next authoring
-focus should move to:
+The first two implementation waves are now in the repository. The remaining
+`0.4.0` authoring focus should move to:
 
-- `move_track(...)`
-- `set_heading_content(...)`
-- `set_remarks_content(...)`
 - `inspect_authoring_vocab(...)`
 - `summarize_logfile_changes(...)`
+- `author_plot_from_request(...)` prompt
+- `revise_plot_from_feedback(...)` prompt

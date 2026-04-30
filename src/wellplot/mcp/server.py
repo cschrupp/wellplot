@@ -286,6 +286,56 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def move_track(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        before_track_id: str | None = None,
+        after_track_id: str | None = None,
+        position: int | None = None,
+    ) -> dict[str, object]:
+        """Reorder one track inside a draft logfile."""
+        return asdict(
+            service.move_track(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                before_track_id=before_track_id,
+                after_track_id=after_track_id,
+                position=position,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def set_heading_content(
+        logfile_path: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Patch the report heading block inside a draft logfile."""
+        return asdict(
+            service.set_heading_content(
+                logfile_path,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def set_remarks_content(
+        logfile_path: str,
+        remarks: list[dict[str, object]],
+    ) -> dict[str, object]:
+        """Replace the first-page remarks block inside a draft logfile."""
+        return asdict(
+            service.set_remarks_content(
+                logfile_path,
+                remarks=remarks,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def validate_logfile_text(
         yaml_text: str,
         base_dir: str | None = None,

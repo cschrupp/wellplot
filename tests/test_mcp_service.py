@@ -568,6 +568,177 @@ class McpServiceTests(unittest.TestCase):
                     root=REPO_ROOT,
                 )
 
+    def test_move_track_requires_exactly_one_target_selector(self) -> None:
+        """Reject ambiguous track-move requests before draft mutation starts."""
+        with self.assertRaises(ValueError):
+            service.move_track(
+                "draft.log.yaml",
+                section_id="main",
+                track_id="gr",
+                before_track_id="depth",
+                position=1,
+                root=REPO_ROOT,
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_move_track_reorders_tracks_and_positions(self) -> None:
+        """Move one track inside a draft and persist the normalized order."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+
+            result = service.move_track(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                after_track_id="depth",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "porosity")
+            self.assertEqual(
+                result.track_ids,
+                ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt"],
+            )
+            self.assertEqual(result.track_count, 7)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            self.assertEqual(
+                [track["id"] for track in tracks],
+                ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt"],
+            )
+            self.assertEqual(
+                [track["position"] for track in tracks],
+                [1, 2, 3, 4, 5, 6, 7],
+            )
+
+    def test_set_heading_content_rejects_unknown_patch_key(self) -> None:
+        """Reject heading patches outside the supported editable surface."""
+        with self.assertRaises(TemplateValidationError):
+            service.set_heading_content(
+                "draft.log.yaml",
+                patch={"unsupported": True},
+                root=REPO_ROOT,
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_heading_content_persists_heading_and_tail_toggle(self) -> None:
+        """Patch heading content and materialize the tail toggle on save."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_heading_content(
+                str(draft_path),
+                patch={
+                    "provider_name": "Acme Logging",
+                    "general_fields": [
+                        {
+                            "key": "well",
+                            "label": "Well",
+                            "value": "MCP FIXTURE-01",
+                        }
+                    ],
+                    "service_titles": [
+                        {
+                            "value": "Gamma Ray",
+                            "alignment": "left",
+                            "bold": True,
+                        }
+                    ],
+                    "detail": {
+                        "kind": "open_hole",
+                        "rows": [
+                            {
+                                "label": "Logged Depth",
+                                "values": ["1000 m", "1020 m"],
+                            }
+                        ],
+                    },
+                    "tail_enabled": True,
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertTrue(result.has_heading)
+            self.assertTrue(result.has_tail)
+            self.assertEqual(result.heading["enabled"], True)
+            self.assertEqual(result.heading["provider_name"], "Acme Logging")
+            self.assertEqual(result.heading["general_fields"][0]["key"], "well")
+            self.assertEqual(result.heading["service_titles"][0]["value"], "Gamma Ray")
+            self.assertEqual(result.heading["detail"]["kind"], "open_hole")
+            self.assertEqual(result.heading["tail_enabled"], True)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            layout = saved_mapping["document"]["layout"]
+            self.assertEqual(layout["heading"]["provider_name"], "Acme Logging")
+            self.assertEqual(layout["heading"]["general_fields"][0]["value"], "MCP FIXTURE-01")
+            self.assertEqual(layout["heading"]["service_titles"][0]["value"], "Gamma Ray")
+            self.assertEqual(layout["heading"]["detail"]["kind"], "open_hole")
+            self.assertEqual(layout["heading"]["tail_enabled"], True)
+            self.assertEqual(layout["tail"]["enabled"], True)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_remarks_content_replaces_remarks(self) -> None:
+        """Replace the first-page remarks block and persist the new content."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_remarks_content(
+                str(draft_path),
+                remarks=[
+                    {
+                        "title": "Generated Remarks",
+                        "lines": [
+                            "Synthetic authoring note 1.",
+                            "Synthetic authoring note 2.",
+                        ],
+                        "alignment": "center",
+                    }
+                ],
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.remarks_count, 1)
+            self.assertEqual(result.remarks[0]["title"], "Generated Remarks")
+            self.assertEqual(result.remarks[0]["alignment"], "center")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            remarks = saved_mapping["document"]["layout"]["remarks"]
+            self.assertEqual(len(remarks), 1)
+            self.assertEqual(remarks[0]["title"], "Generated Remarks")
+            self.assertEqual(
+                remarks[0]["lines"],
+                ["Synthetic authoring note 1.", "Synthetic authoring note 2."],
+            )
+
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_format_logfile_text_returns_normalized_yaml(self) -> None:
         """Return canonical logfile YAML text through the serializer path."""

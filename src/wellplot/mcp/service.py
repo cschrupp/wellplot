@@ -231,6 +231,36 @@ class UpdatedCurveBindingResult:
     binding: dict[str, object]
 
 
+@dataclass(slots=True)
+class MovedTrackResult:
+    """Structured result for reordering one track inside a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track_ids: list[str]
+    track_count: int
+
+
+@dataclass(slots=True)
+class HeadingContentResult:
+    """Structured result for updating heading content in a draft logfile."""
+
+    logfile_path: str
+    has_heading: bool
+    has_tail: bool
+    heading: dict[str, object]
+
+
+@dataclass(slots=True)
+class RemarksContentResult:
+    """Structured result for replacing first-page remark content."""
+
+    logfile_path: str
+    remarks_count: int
+    remarks: list[dict[str, object]]
+
+
 def resolve_server_root(root: str | Path | None = None) -> Path:
     """Resolve the effective MCP server root."""
     return Path.cwd().resolve() if root is None else Path(root).expanduser().resolve()
@@ -403,18 +433,23 @@ def _persist_rebased_logfile_mapping(
 
 
 def _logfile_mapping_sections(mapping: dict[str, object]) -> list[dict[str, object]]:
-    document = mapping.get("document")
-    if not isinstance(document, dict):
-        raise TemplateValidationError("Logfile mapping is missing document configuration.")
-    layout = document.get("layout")
-    if not isinstance(layout, dict):
-        raise TemplateValidationError("Logfile mapping is missing document.layout configuration.")
+    layout = _logfile_mapping_layout(mapping)
     sections = layout.get("log_sections")
     if not isinstance(sections, list):
         raise TemplateValidationError(
             "Logfile mapping is missing document.layout.log_sections configuration."
         )
     return sections
+
+
+def _logfile_mapping_layout(mapping: dict[str, object]) -> dict[str, object]:
+    document = mapping.get("document")
+    if not isinstance(document, dict):
+        raise TemplateValidationError("Logfile mapping is missing document configuration.")
+    layout = document.get("layout")
+    if not isinstance(layout, dict):
+        raise TemplateValidationError("Logfile mapping is missing document.layout configuration.")
+    return layout
 
 
 def _logfile_mapping_bindings(mapping: dict[str, object]) -> list[dict[str, object]]:
@@ -478,6 +513,12 @@ def _persist_validated_logfile_mapping(
         raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
     logfile_path.write_text(normalized_yaml, encoding="utf-8")
     return spec
+
+
+def _renumber_section_track_positions(tracks: list[dict[str, object]]) -> None:
+    for index, track in enumerate(tracks, start=1):
+        if isinstance(track, dict):
+            track["position"] = index
 
 
 def _resolve_section_channel_name(
@@ -545,6 +586,13 @@ def _merge_optional_patch(
             continue
         merged[key] = deepcopy(value)
     return merged
+
+
+def _layout_has_tail(layout: dict[str, object]) -> bool:
+    heading = layout.get("heading")
+    if isinstance(heading, dict) and bool(heading.get("tail_enabled")):
+        return True
+    return bool(layout.get("tail"))
 
 
 def _validate_preview_parameters(
@@ -833,7 +881,7 @@ def inspect_logfile(
         depth_settings=deepcopy(dict(spec.document.get("depth", {}))),
         has_heading=bool(layout.get("heading")),
         has_remarks=bool(layout.get("remarks")),
-        has_tail=bool(layout.get("tail")),
+        has_tail=_layout_has_tail(layout),
         section_ids=[summary.id for summary in section_summaries],
         sections=section_summaries,
     )
@@ -1236,7 +1284,7 @@ def summarize_logfile_draft(
         configured_output_path=spec.render_output_path,
         has_heading=bool(layout.get("heading")),
         has_remarks=bool(layout.get("remarks")),
-        has_tail=bool(layout.get("tail")),
+        has_tail=_layout_has_tail(layout),
         section_count=len(section_summaries),
         section_ids=[summary.id for summary in section_summaries],
         sections=section_summaries,
@@ -1461,6 +1509,164 @@ def update_curve_binding(
         track_id=track_id,
         channel=str(saved_binding.get("channel", channel)),
         binding=deepcopy(saved_binding),
+    )
+
+
+def move_track(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    before_track_id: str | None = None,
+    after_track_id: str | None = None,
+    position: int | None = None,
+    root: str | Path | None = None,
+) -> MovedTrackResult:
+    """Reorder one track inside a draft logfile and persist the validated result."""
+    target_count = sum(value is not None for value in (before_track_id, after_track_id, position))
+    if target_count != 1:
+        raise ValueError("Provide exactly one of before_track_id, after_track_id, or position.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_ids = [str(track.get("id", "")) for track in tracks if isinstance(track, dict)]
+    source_index = track_ids.index(track_id)
+    moving_track = tracks.pop(source_index)
+    remaining_track_ids = [str(track.get("id", "")) for track in tracks if isinstance(track, dict)]
+
+    insert_index: int
+    if before_track_id is not None:
+        if before_track_id == track_id:
+            raise TemplateValidationError("before_track_id must differ from track_id.")
+        if before_track_id not in remaining_track_ids:
+            raise TemplateValidationError(
+                "Unknown before_track_id "
+                f"{before_track_id!r}. Available tracks: {remaining_track_ids}."
+            )
+        insert_index = remaining_track_ids.index(before_track_id)
+    elif after_track_id is not None:
+        if after_track_id == track_id:
+            raise TemplateValidationError("after_track_id must differ from track_id.")
+        if after_track_id not in remaining_track_ids:
+            raise TemplateValidationError(
+                "Unknown after_track_id "
+                f"{after_track_id!r}. Available tracks: {remaining_track_ids}."
+            )
+        insert_index = remaining_track_ids.index(after_track_id) + 1
+    else:
+        assert position is not None
+        if position < 1 or position > len(track_ids):
+            raise ValueError(f"position must be between 1 and {len(track_ids)}.")
+        insert_index = position - 1
+
+    tracks.insert(insert_index, moving_track)
+    _renumber_section_track_positions(tracks)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    saved_track_ids = [
+        str(track.get("id", ""))
+        for track in list(saved_section.get("tracks", []))
+        if isinstance(track, dict)
+    ]
+    return MovedTrackResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track_ids=saved_track_ids,
+        track_count=len(saved_track_ids),
+    )
+
+
+def set_heading_content(
+    logfile_path: str,
+    *,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> HeadingContentResult:
+    """Patch the report heading block inside a draft logfile."""
+    allowed_keys = {
+        "enabled",
+        "provider_name",
+        "general_fields",
+        "service_titles",
+        "detail",
+        "tail_enabled",
+    }
+    invalid = sorted(key for key in patch if key not in allowed_keys)
+    if invalid:
+        raise TemplateValidationError(
+            f"Unsupported heading patch keys {invalid}. Allowed keys: {sorted(allowed_keys)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    layout = _logfile_mapping_layout(mapping)
+    current_heading = layout.get("heading")
+    if not isinstance(current_heading, dict):
+        current_heading = {}
+    updated_heading = _merge_optional_patch(current_heading, patch)
+    if "enabled" not in updated_heading:
+        updated_heading["enabled"] = True
+    layout["heading"] = updated_heading
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_layout = dict(saved_spec.document.get("layout", {}))
+    saved_heading = deepcopy(dict(saved_layout.get("heading", {})))
+    return HeadingContentResult(
+        logfile_path=str(resolved_logfile),
+        has_heading=bool(saved_heading),
+        has_tail=_layout_has_tail(saved_layout),
+        heading=saved_heading,
+    )
+
+
+def set_remarks_content(
+    logfile_path: str,
+    *,
+    remarks: list[dict[str, object]],
+    root: str | Path | None = None,
+) -> RemarksContentResult:
+    """Replace the first-page remarks block inside a draft logfile."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    layout = _logfile_mapping_layout(mapping)
+    layout["remarks"] = deepcopy(remarks)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_layout = dict(saved_spec.document.get("layout", {}))
+    saved_remarks = deepcopy(list(saved_layout.get("remarks", [])))
+    return RemarksContentResult(
+        logfile_path=str(resolved_logfile),
+        remarks_count=len(saved_remarks),
+        remarks=saved_remarks,
     )
 
 

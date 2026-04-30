@@ -101,6 +101,9 @@ Main tools:
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
+- `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
+- `set_heading_content(logfile_path, patch)`
+- `set_remarks_content(logfile_path, remarks)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
@@ -110,8 +113,10 @@ Recommended split:
 
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
-- use `add_track(...)`, `bind_curve(...)`, and `update_curve_binding(...)`
-  for the first deterministic draft-edit loop
+- use `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`, and
+  `move_track(...)` for the deterministic track/layout edit loop
+- use `set_heading_content(...)` and `set_remarks_content(...)` for first-page
+  report text and summary-block edits
 - use `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` when the client is still working with unsaved YAML
   text in memory

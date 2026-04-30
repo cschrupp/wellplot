@@ -290,6 +290,24 @@ Notes:
 - header text ingestion from raw source files remains a `0.5.0` item. The
   `0.4.0` goal is to make the target heading structure editable first.
 
+Implemented so far:
+
+- `create_logfile_draft(...)`
+- `summarize_logfile_draft(...)`
+- `add_track(...)`
+- `bind_curve(...)`
+- `update_curve_binding(...)`
+- `move_track(...)`
+- `set_heading_content(...)`
+- `set_remarks_content(...)`
+
+Still needed to close `0.4.0`:
+
+- `inspect_authoring_vocab(...)`
+- `summarize_logfile_changes(...)`
+- `author_plot_from_request(...)` prompt
+- `revise_plot_from_feedback(...)` prompt
+
 ## First Five Operations
 
 These are the first five authoring operations that should be defined and built

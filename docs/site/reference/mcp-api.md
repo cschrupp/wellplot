@@ -278,6 +278,75 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
+
+Purpose: reorder one track inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track_ids`
+- `track_count`
+
+Behavior:
+
+- requires exactly one target selector:
+  - `before_track_id`, or
+  - `after_track_id`, or
+  - `position`
+- renumbers the full section track order before saving
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `set_heading_content(logfile_path, patch)`
+
+Purpose: patch the report heading block inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `has_heading`
+- `has_tail`
+- `heading`
+
+Supported patch keys:
+
+- `enabled`
+- `provider_name`
+- `general_fields`
+- `service_titles`
+- `detail`
+- `tail_enabled`
+
+Behavior:
+
+- deep-merges nested heading mapping updates
+- removes optional properties when their patch value is `null`
+- defaults `heading.enabled` to `true` when omitted
+- accepts `tail_enabled` on the heading patch and materializes
+  `layout.tail.enabled` in the normalized YAML
+- rejects unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `set_remarks_content(logfile_path, remarks)`
+
+Purpose: replace the first-page remarks block inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `remarks_count`
+- `remarks`
+
+Behavior:
+
+- replaces the full remarks list rather than appending to it
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `validate_logfile_text(yaml_text, base_dir=None)`
 
 Purpose: validate unsaved full logfile YAML text.
@@ -387,6 +456,8 @@ For draft authoring:
 
 1. `create_logfile_draft(...)`
 2. `summarize_logfile_draft(...)`
-3. apply `add_track(...)`, `bind_curve(...)`, and `update_curve_binding(...)`
+3. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+   `move_track(...)`, `set_heading_content(...)`, and
+   `set_remarks_content(...)`
 4. preview with a narrow PNG tool
 5. render or save only after review

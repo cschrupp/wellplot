@@ -214,6 +214,45 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            moved_track = await session.call_tool(
+                "move_track",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
+                    "after_track_id": "depth",
+                },
+            )
+            updated_heading = await session.call_tool(
+                "set_heading_content",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "patch": {
+                        "provider_name": "Acme Logging",
+                        "service_titles": [
+                            {
+                                "value": "Gamma Ray",
+                                "alignment": "left",
+                                "bold": True,
+                            }
+                        ],
+                        "tail_enabled": True,
+                    },
+                },
+            )
+            updated_remarks = await session.call_tool(
+                "set_remarks_content",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "remarks": [
+                        {
+                            "title": "Generated Remarks",
+                            "lines": ["Synthetic authoring note 1."],
+                            "alignment": "center",
+                        }
+                    ],
+                },
+            )
             updated_draft_summary = await session.call_tool(
                 "summarize_logfile_draft",
                 {
@@ -247,6 +286,9 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "add_track",
                 "bind_curve",
                 "update_curve_binding",
+                "move_track",
+                "set_heading_content",
+                "set_remarks_content",
                 "validate_logfile_text",
                 "format_logfile_text",
                 "save_logfile_text",
@@ -335,13 +377,29 @@ class McpServerIntegrationTests(unittest.TestCase):
             150.0,
         )
         self.assertEqual(
+            moved_track.structuredContent["track_ids"],
+            ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt"],
+        )
+        self.assertEqual(
+            updated_heading.structuredContent["heading"]["provider_name"],
+            "Acme Logging",
+        )
+        self.assertEqual(updated_heading.structuredContent["heading"]["tail_enabled"], True)
+        self.assertEqual(updated_heading.structuredContent["has_tail"], True)
+        self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
+        self.assertEqual(
+            updated_remarks.structuredContent["remarks"][0]["title"],
+            "Generated Remarks",
+        )
+        self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
             6,
         )
         self.assertEqual(
-            updated_draft_summary.structuredContent["sections"][0]["track_ids"][-1],
+            updated_draft_summary.structuredContent["sections"][0]["track_ids"][1],
             "porosity",
         )
+        self.assertEqual(updated_draft_summary.structuredContent["has_tail"], True)
         self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(saved.structuredContent["output_path"], str(saved_logfile))
         self.assertTrue(draft_logfile.exists())

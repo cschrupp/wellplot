@@ -176,7 +176,8 @@ The MCP tool surface currently supports:
 - `render_logfile_to_file`
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
-- `add_track`, `bind_curve`, and `update_curve_binding`
+- `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
+- `set_heading_content` and `set_remarks_content`
 - `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
 
 Packaged example resources and guided prompts are also exposed for MCP-aware
