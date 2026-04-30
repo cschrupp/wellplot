@@ -122,6 +122,7 @@ Main tools:
 - `summarize_logfile_draft(logfile_path)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
+- `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
 - `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
@@ -147,6 +148,9 @@ Recommended split:
 - use `preview_header_mapping(...)` after you extract header values but before
   you write anything into the draft; it will surface ambiguous keys,
   overwrite-policy conflicts, and the exact heading patch it would apply
+- use `apply_header_values(...)` only after the preview looks right; it writes
+  the same deterministic mapping result back into the draft and returns the
+  saved heading summary
 - use `inspect_authoring_vocab(...)` before major edits so the client sees the
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft

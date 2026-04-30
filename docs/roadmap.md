@@ -189,9 +189,11 @@ Current `0.5.0` progress:
   `inspect_heading_slots(...)`
 - dry-run header assignment review is implemented through
   `preview_header_mapping(...)`
+- persisted header assignment is implemented through
+  `apply_header_values(...)`
 - deterministic lookup guidance is exposed through
   `wellplot://authoring/catalog/header-key-aliases.json`
-- the next step is the mutating counterpart: `apply_header_values(...)`
+- the next step is deterministic text parsing through `parse_key_value_text(...)`
 - parse simple structured key-value text deterministically
 - expose stronger alias/style preset catalogs for common conventions
 - upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow

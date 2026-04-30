@@ -479,6 +479,33 @@ Behavior:
 - does not write the draft; the returned `predicted_heading_patch` is the exact
   heading patch the server would apply in a later mutating step
 
+### `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
+
+Purpose: persist deterministic heading/report value assignment into a mutable
+draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `overwrite_policy`
+- `applied_assignments`
+- `skipped_assignments`
+- `warnings`
+- `heading_summary`
+
+Behavior:
+
+- reuses the same deterministic mapping and overwrite-policy logic as
+  `preview_header_mapping(...)`
+- writes only the predicted heading patch; it does not mutate unrelated draft
+  sections
+- returns `applied_assignments` only for actual saved changes
+- returns `skipped_assignments` for unchanged, unmatched, or conflicting
+  inputs, each with a status and reason
+- returns a post-save `heading_summary` so clients can confirm the persisted
+  provider fields, general fields, service titles, detail rows, and remarks
+  capabilities without a second manual diff
+
 ### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 
 Purpose: expose deterministic authoring vocabularies plus optional draft or
@@ -668,11 +695,12 @@ For draft authoring:
 4. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
 5. `preview_header_mapping(...)` before mutating header/report values
-6. `inspect_authoring_vocab(...)`
-7. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+6. `apply_header_values(...)` when the previewed mapping should be persisted
+7. `inspect_authoring_vocab(...)`
+8. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
-8. `summarize_logfile_changes(...)` when the client retained a previous YAML
+9. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-9. preview with a narrow PNG tool
-10. render or save only after review
+10. preview with a narrow PNG tool
+11. render or save only after review

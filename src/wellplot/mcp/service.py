@@ -509,6 +509,18 @@ class HeaderMappingPreviewResult:
 
 
 @dataclass(slots=True)
+class AppliedHeaderValuesResult:
+    """Structured result for persisted heading/report value assignment."""
+
+    logfile_path: str
+    overwrite_policy: str
+    applied_assignments: list[dict[str, object]]
+    skipped_assignments: list[dict[str, object]]
+    warnings: list[str]
+    heading_summary: dict[str, object]
+
+
+@dataclass(slots=True)
 class _HeaderAssignmentTarget:
     """Internal target descriptor for one previewable heading assignment slot."""
 
@@ -3411,6 +3423,100 @@ def preview_header_mapping(
     )
 
 
+def _heading_summary_payload(slots: HeadingSlotsResult) -> dict[str, object]:
+    return {
+        "has_heading": slots.has_heading,
+        "has_remarks": slots.has_remarks,
+        "has_tail": slots.has_tail,
+        "provider_slots": deepcopy(slots.provider_slots),
+        "general_field_slots": deepcopy(slots.general_field_slots),
+        "service_title_slots": deepcopy(slots.service_title_slots),
+        "detail_slots": deepcopy(slots.detail_slots),
+        "remarks_capabilities": deepcopy(slots.remarks_capabilities),
+        "current_values": deepcopy(slots.current_values),
+    }
+
+
+def apply_header_values(
+    logfile_path: str,
+    *,
+    values: dict[str, object],
+    overwrite_policy: str = "fill_empty",
+    root: str | Path | None = None,
+) -> AppliedHeaderValuesResult:
+    """Apply deterministic heading/report value assignment to a mutable draft logfile."""
+    preview = preview_header_mapping(
+        logfile_path,
+        values=values,
+        overwrite_policy=overwrite_policy,
+        root=root,
+    )
+    warnings = list(preview.warnings)
+    applied_assignments = [
+        deepcopy(entry)
+        for entry in preview.resolved_assignments
+        if str(entry.get("action", "")).strip().lower() != "unchanged"
+    ]
+    skipped_assignments: list[dict[str, object]] = [
+        {
+            "input_key": str(entry.get("input_key", "")),
+            "input_value": deepcopy(entry.get("input_value")),
+            "status": "unchanged",
+            "reason": "Target already contains the requested value.",
+            "target_kind": entry.get("target_kind"),
+            "target_key": entry.get("target_key"),
+            "slot_path": entry.get("slot_path"),
+        }
+        for entry in preview.resolved_assignments
+        if str(entry.get("action", "")).strip().lower() == "unchanged"
+    ]
+    skipped_assignments.extend(
+        {
+            "input_key": str(entry.get("input_key", "")),
+            "input_value": deepcopy(entry.get("input_value")),
+            "status": "unmatched",
+            "reason": str(entry.get("reason", "No matching heading slot was found.")),
+        }
+        for entry in preview.unmatched_values
+    )
+    skipped_assignments.extend(
+        {
+            "input_key": str(entry.get("input_key", "")),
+            "input_value": deepcopy(entry.get("input_value")),
+            "status": "conflict",
+            "reason": str(entry.get("reason", "The target could not be updated safely.")),
+            "target_kind": entry.get("target_kind"),
+            "target_key": entry.get("target_key"),
+            "slot_path": entry.get("slot_path"),
+            "existing_value": deepcopy(entry.get("existing_value")),
+            "candidate_targets": deepcopy(entry.get("candidate_targets")),
+        }
+        for entry in preview.conflicting_values
+    )
+
+    if preview.predicted_heading_patch:
+        set_heading_content(
+            preview.logfile_path,
+            patch=preview.predicted_heading_patch,
+            root=root,
+        )
+    else:
+        warnings.append("No header values were applied.")
+
+    heading_slots = inspect_heading_slots(
+        logfile_path=preview.logfile_path,
+        root=root,
+    )
+    return AppliedHeaderValuesResult(
+        logfile_path=preview.logfile_path,
+        overwrite_policy=overwrite_policy,
+        applied_assignments=applied_assignments,
+        skipped_assignments=skipped_assignments,
+        warnings=warnings,
+        heading_summary=_heading_summary_payload(heading_slots),
+    )
+
+
 def inspect_authoring_vocab(
     *,
     logfile_path: str | None = None,
@@ -3834,14 +3940,17 @@ def author_plot_from_request_prompt(
         "inspect_data_source(source_path) and check_channel_availability(...) "
         "before you create bindings.\n"
         "2. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "3. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "4. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "3. If the request includes report-header or remarks content, call "
+        "inspect_heading_slots(...), preview_header_mapping(...), and "
+        "apply_header_values(...) before generic heading patches.\n"
+        "4. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "5. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
         "update_curve_binding(...), move_track(...), set_heading_content(...), and "
         "set_remarks_content(...).\n"
-        "5. Preview the affected section, track, or window before recommending a final render.\n"
-        "6. If you captured the previous YAML text before editing, call "
+        "6. Preview the affected section, track, or window before recommending a final render.\n"
+        "7. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "7. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "8. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 

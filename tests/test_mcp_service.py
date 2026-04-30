@@ -1066,6 +1066,95 @@ class McpServiceTests(unittest.TestCase):
                 "Acme Wireline",
             )
 
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_apply_header_values_persists_fillable_assignments(self) -> None:
+        """Persist fillable heading values and report skipped/conflicting inputs."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.apply_header_values(
+                str(draft_path),
+                values={
+                    "provider": "Acme Logging",
+                    "company": "Acme Energy",
+                    "well": "Demo-01",
+                    "date": "2026-04-30",
+                    "run": "ONE",
+                    "direction": "Up",
+                    "service_title_1": "Gamma Ray Review",
+                    "unknown_header_key": "ignored",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(
+                [entry["target_key"] for entry in result.applied_assignments],
+                ["company", "well", "Date", "Run", "Direction"],
+            )
+            skipped_by_key = {entry["input_key"]: entry for entry in result.skipped_assignments}
+            self.assertEqual(skipped_by_key["unknown_header_key"]["status"], "unmatched")
+            self.assertEqual(skipped_by_key["provider"]["status"], "conflict")
+            self.assertEqual(skipped_by_key["service_title_1"]["status"], "conflict")
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["provider_name"],
+                "Company",
+            )
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["general_fields"][0]["value"],
+                "Acme Energy",
+            )
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["detail"]["rows"][0]["values"][
+                    0
+                ],
+                "2026-04-30",
+            )
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            heading = saved_mapping["document"]["layout"]["heading"]
+            self.assertEqual(heading["provider_name"], "Company")
+            self.assertEqual(heading["general_fields"][0]["value"], "Acme Energy")
+            self.assertEqual(heading["detail"]["rows"][1]["columns"][0]["cells"][0], "ONE")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_apply_header_values_replace_overwrites_literal_values(self) -> None:
+        """Persist literal replacement when overwrite_policy requests it."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.apply_header_values(
+                str(draft_path),
+                values={
+                    "provider": "Acme Logging",
+                    "company": "Acme Energy",
+                    "service_title_1": "Gamma Ray Review",
+                    "general_field.service_company": "Acme Wireline",
+                },
+                overwrite_policy="replace",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(
+                [entry["target_key"] for entry in result.applied_assignments],
+                ["provider_name", "company", "service_title_1", "service_company"],
+            )
+            self.assertEqual(result.skipped_assignments, [])
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["provider_name"],
+                "Acme Logging",
+            )
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["service_titles"][0]["value"],
+                "Gamma Ray Review",
+            )
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            heading = saved_mapping["document"]["layout"]["heading"]
+            self.assertEqual(heading["provider_name"], "Acme Logging")
+            self.assertEqual(heading["general_fields"][2]["value"], "Acme Wireline")
+            self.assertEqual(heading["service_titles"][0]["value"], "Gamma Ray Review")
+
     def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
         """Expose stable authoring vocabularies even without a target draft."""
         result = service.inspect_authoring_vocab(root=REPO_ROOT)
@@ -1328,6 +1417,9 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
         self.assertIn("inspect_data_source(source_path)", prompt)
         self.assertIn("check_channel_availability(...)", prompt)
+        self.assertIn("inspect_heading_slots(...)", prompt)
+        self.assertIn("preview_header_mapping(...)", prompt)
+        self.assertIn("apply_header_values(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 

@@ -325,6 +325,23 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            applied_header_values = await session.call_tool(
+                "apply_header_values",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "values": {
+                        "provider": "Acme Logging",
+                        "company": "Acme Energy",
+                        "well": "Demo-01",
+                        "date": "2026-04-30",
+                        "run": "ONE",
+                        "direction": "Up",
+                        "service_title_1": "Gamma Ray Review",
+                        "general_field.service_company": "Acme Wireline",
+                    },
+                    "overwrite_policy": "replace",
+                },
+            )
             updated_remarks = await session.call_tool(
                 "set_remarks_content",
                 {
@@ -385,6 +402,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "set_remarks_content",
                 "inspect_heading_slots",
                 "preview_header_mapping",
+                "apply_header_values",
                 "inspect_authoring_vocab",
                 "summarize_logfile_changes",
                 "validate_logfile_text",
@@ -527,6 +545,34 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "value"
             ],
             "Acme Energy",
+        )
+        self.assertEqual(
+            [
+                entry["target_key"]
+                for entry in applied_header_values.structuredContent["applied_assignments"]
+            ],
+            [
+                "provider_name",
+                "company",
+                "well",
+                "Date",
+                "Run",
+                "Direction",
+                "service_title_1",
+                "service_company",
+            ],
+        )
+        self.assertEqual(
+            applied_header_values.structuredContent["heading_summary"]["current_values"][
+                "heading"
+            ]["provider_name"],
+            "Acme Logging",
+        )
+        self.assertEqual(
+            applied_header_values.structuredContent["heading_summary"]["current_values"][
+                "heading"
+            ]["service_titles"][0]["value"],
+            "Gamma Ray Review",
         )
         self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
         self.assertEqual(

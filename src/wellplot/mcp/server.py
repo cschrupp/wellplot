@@ -400,6 +400,22 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def apply_header_values(
+        logfile_path: str,
+        values: dict[str, object],
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Persist deterministic heading/report value assignment into the draft."""
+        return asdict(
+            service.apply_header_values(
+                logfile_path,
+                values=values,
+                overwrite_policy=overwrite_policy,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def inspect_authoring_vocab(
         logfile_path: str | None = None,
         template_path: str | None = None,
