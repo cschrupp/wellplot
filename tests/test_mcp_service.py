@@ -1155,6 +1155,87 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(heading["general_fields"][2]["value"], "Acme Wireline")
             self.assertEqual(heading["service_titles"][0]["value"], "Gamma Ray Review")
 
+    def test_parse_key_value_text_auto_detects_colon_format(self) -> None:
+        """Auto-detect colon-separated packets and preserve ordered pairs."""
+        result = service.parse_key_value_text(
+            "\n".join(
+                [
+                    "Company: Acme Energy",
+                    "Well: Demo-01",
+                    "",
+                    "# ignored comment",
+                    "Logging Date: 2026-04-30",
+                ]
+            )
+        )
+
+        self.assertEqual(result.format_detected, "colon")
+        self.assertEqual(
+            result.pairs,
+            [
+                {
+                    "key": "Company",
+                    "value": "Acme Energy",
+                    "line_number": 1,
+                    "normalized_key": "COMPANY",
+                },
+                {
+                    "key": "Well",
+                    "value": "Demo-01",
+                    "line_number": 2,
+                    "normalized_key": "WELL",
+                },
+                {
+                    "key": "Logging Date",
+                    "value": "2026-04-30",
+                    "line_number": 5,
+                    "normalized_key": "LOGGINGDATE",
+                },
+            ],
+        )
+        self.assertEqual(result.unparsed_lines, [])
+        self.assertEqual(result.warnings, [])
+
+    def test_parse_key_value_text_supports_requested_equals_format(self) -> None:
+        """Parse equals-separated text when the caller provides an explicit hint."""
+        result = service.parse_key_value_text(
+            "\n".join(
+                [
+                    "Company = Acme Energy",
+                    "Well = Demo-01",
+                    "Malformed line",
+                ]
+            ),
+            format_hint="equals",
+        )
+
+        self.assertEqual(result.format_detected, "equals")
+        self.assertEqual(
+            [pair["key"] for pair in result.pairs],
+            ["Company", "Well"],
+        )
+        self.assertEqual(len(result.unparsed_lines), 1)
+        self.assertEqual(result.unparsed_lines[0]["line_number"], 3)
+        self.assertTrue(result.warnings)
+
+    def test_parse_key_value_text_supports_tsv_and_duplicate_warnings(self) -> None:
+        """Parse tab-separated packets and keep duplicate keys in order."""
+        result = service.parse_key_value_text(
+            "Company\tAcme Energy\nCompany\tAcme Wireline\n",
+            format_hint="tab",
+        )
+
+        self.assertEqual(result.format_detected, "tsv")
+        self.assertEqual(len(result.pairs), 2)
+        self.assertEqual(result.pairs[1]["value"], "Acme Wireline")
+        self.assertEqual(result.unparsed_lines, [])
+        self.assertIn("Duplicate keys were preserved in order", result.warnings[0])
+
+    def test_parse_key_value_text_rejects_unknown_format_hint(self) -> None:
+        """Reject unsupported parse hints instead of guessing a format."""
+        with self.assertRaises(ValueError):
+            service.parse_key_value_text("Company: Acme Energy", format_hint="yaml")
+
     def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
         """Expose stable authoring vocabularies even without a target draft."""
         result = service.inspect_authoring_vocab(root=REPO_ROOT)

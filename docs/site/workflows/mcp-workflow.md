@@ -120,6 +120,7 @@ Main tools:
 - `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
 - `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
@@ -142,6 +143,8 @@ Recommended split:
   draft creation when the request starts from one raw LAS/DLIS source
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
+- use `parse_key_value_text(...)` when the source material is a copied header
+  packet, tabular note block, or other simple key-value text
 - use `inspect_heading_slots(...)` when the next task is filling provider
   fields, general report fields, service titles, detail-table cells, or
   remarks content from external text

@@ -416,6 +416,19 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def parse_key_value_text(
+        source_text: str,
+        format_hint: str | None = None,
+    ) -> dict[str, object]:
+        """Parse a simple header text block into deterministic ordered key-value pairs."""
+        return asdict(
+            service.parse_key_value_text(
+                source_text,
+                format_hint=format_hint,
+            )
+        )
+
+    @mcp.tool()
     def inspect_authoring_vocab(
         logfile_path: str | None = None,
         template_path: str | None = None,

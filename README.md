@@ -179,7 +179,7 @@ The MCP tool surface currently supports:
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
-- `inspect_heading_slots`, `preview_header_mapping`, and `apply_header_values`
+- `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`, and `parse_key_value_text`
 - `inspect_authoring_vocab` and `summarize_logfile_changes`
 - `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
 

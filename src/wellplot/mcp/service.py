@@ -21,6 +21,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 from copy import deepcopy
@@ -106,6 +107,7 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/catalog/channel-aliases.json",
 )
 AUTHORING_HEADER_OVERWRITE_POLICIES = ("fill_empty", "replace", "merge_lists")
+SUPPORTED_KEY_VALUE_FORMAT_HINTS = ("auto", "colon", "equals", "tsv", "csv")
 AUTHORING_TRACK_ARCHETYPES = (
     {
         "id": "reference_depth",
@@ -518,6 +520,16 @@ class AppliedHeaderValuesResult:
     skipped_assignments: list[dict[str, object]]
     warnings: list[str]
     heading_summary: dict[str, object]
+
+
+@dataclass(slots=True)
+class ParsedKeyValueTextResult:
+    """Structured result for deterministic key-value text extraction."""
+
+    pairs: list[dict[str, object]]
+    unparsed_lines: list[dict[str, object]]
+    format_detected: str
+    warnings: list[str]
 
 
 @dataclass(slots=True)
@@ -1470,6 +1482,28 @@ def _header_slot_is_filled(mode: str, current_value: str | None) -> bool:
     return mode in {"literal", "mixed"} and current_value not in (None, "")
 
 
+def _normalize_key_value_format_hint(format_hint: str | None) -> str:
+    normalized = str(format_hint or "auto").strip().lower().replace("-", "_")
+    aliases = {
+        "auto": "auto",
+        "colon": "colon",
+        "equals": "equals",
+        "equal": "equals",
+        "tsv": "tsv",
+        "tab": "tsv",
+        "tab_separated": "tsv",
+        "csv": "csv",
+        "comma": "csv",
+        "comma_separated": "csv",
+    }
+    try:
+        return aliases[normalized]
+    except KeyError as exc:
+        raise ValueError(
+            f"format_hint must be one of {list(SUPPORTED_KEY_VALUE_FORMAT_HINTS)}."
+        ) from exc
+
+
 def _header_slot_lookup_keys(*values: object) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
@@ -1733,6 +1767,138 @@ def _predicted_heading_patch(
         if current_heading.get(key) != updated_heading.get(key):
             patch[key] = deepcopy(updated_heading.get(key))
     return patch
+
+
+def _parseable_key_value_lines(
+    source_text: str,
+) -> list[tuple[int, str, str]]:
+    lines: list[tuple[int, str, str]] = []
+    for line_number, raw_line in enumerate(source_text.splitlines(), start=1):
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        lines.append((line_number, raw_line, stripped))
+    return lines
+
+
+def _parse_separator_key_value_lines(
+    source_text: str,
+    *,
+    separator: str,
+    format_name: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    pairs: list[dict[str, object]] = []
+    unparsed_lines: list[dict[str, object]] = []
+    for line_number, raw_line, _stripped in _parseable_key_value_lines(source_text):
+        if separator not in raw_line:
+            unparsed_lines.append(
+                {
+                    "line_number": line_number,
+                    "text": raw_line,
+                    "reason": f"Expected `{format_name}` key-value syntax.",
+                }
+            )
+            continue
+        key_text, value_text = raw_line.split(separator, 1)
+        key = key_text.strip()
+        if not key:
+            unparsed_lines.append(
+                {
+                    "line_number": line_number,
+                    "text": raw_line,
+                    "reason": "Key text cannot be empty.",
+                }
+            )
+            continue
+        pairs.append(
+            {
+                "key": key,
+                "value": value_text.strip(),
+                "line_number": line_number,
+            }
+        )
+    return pairs, unparsed_lines
+
+
+def _parse_table_key_value_lines(
+    source_text: str,
+    *,
+    delimiter: str,
+    format_name: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    pairs: list[dict[str, object]] = []
+    unparsed_lines: list[dict[str, object]] = []
+    for line_number, raw_line, _stripped in _parseable_key_value_lines(source_text):
+        try:
+            row = next(csv.reader([raw_line], delimiter=delimiter))
+        except csv.Error as exc:
+            unparsed_lines.append(
+                {
+                    "line_number": line_number,
+                    "text": raw_line,
+                    "reason": f"{format_name.upper()} parse error: {exc}",
+                }
+            )
+            continue
+        if len(row) != 2:
+            unparsed_lines.append(
+                {
+                    "line_number": line_number,
+                    "text": raw_line,
+                    "reason": f"Expected exactly two {format_name.upper()} columns.",
+                }
+            )
+            continue
+        key = row[0].strip()
+        if not key:
+            unparsed_lines.append(
+                {
+                    "line_number": line_number,
+                    "text": raw_line,
+                    "reason": "Key text cannot be empty.",
+                }
+            )
+            continue
+        pairs.append(
+            {
+                "key": key,
+                "value": row[1].strip(),
+                "line_number": line_number,
+            }
+        )
+    return pairs, unparsed_lines
+
+
+def _parse_key_value_text_with_format(
+    source_text: str,
+    *,
+    format_name: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    if format_name == "colon":
+        return _parse_separator_key_value_lines(
+            source_text,
+            separator=":",
+            format_name=format_name,
+        )
+    if format_name == "equals":
+        return _parse_separator_key_value_lines(
+            source_text,
+            separator="=",
+            format_name=format_name,
+        )
+    if format_name == "tsv":
+        return _parse_table_key_value_lines(
+            source_text,
+            delimiter="\t",
+            format_name=format_name,
+        )
+    if format_name == "csv":
+        return _parse_table_key_value_lines(
+            source_text,
+            delimiter=",",
+            format_name=format_name,
+        )
+    raise ValueError(f"Unsupported key-value format {format_name!r}.")
 
 
 def _report_value_slot(
@@ -3517,6 +3683,80 @@ def apply_header_values(
     )
 
 
+def parse_key_value_text(
+    source_text: str,
+    *,
+    format_hint: str | None = None,
+) -> ParsedKeyValueTextResult:
+    """Parse a simple key-value text block into ordered pairs without slot mapping."""
+    normalized_hint = _normalize_key_value_format_hint(format_hint)
+    warnings: list[str] = []
+    if normalized_hint == "auto":
+        candidates = ["colon", "equals", "tsv", "csv"]
+        ranked: list[
+            tuple[int, int, int, str, list[dict[str, object]], list[dict[str, object]]]
+        ] = []
+        for rank, candidate in enumerate(candidates):
+            pairs, unparsed_lines = _parse_key_value_text_with_format(
+                source_text,
+                format_name=candidate,
+            )
+            ranked.append(
+                (len(pairs), -len(unparsed_lines), -rank, candidate, pairs, unparsed_lines)
+            )
+        best = max(ranked, key=lambda item: item[:3])
+        pairs = best[4]
+        unparsed_lines = best[5]
+        if best[0] == 0:
+            warnings.append("No supported key-value pattern was detected in the provided text.")
+            return ParsedKeyValueTextResult(
+                pairs=[],
+                unparsed_lines=unparsed_lines,
+                format_detected="unknown",
+                warnings=warnings,
+            )
+        format_detected = best[3]
+        if unparsed_lines:
+            warnings.append(
+                f"Auto-detected `{format_detected}` format, but {len(unparsed_lines)} "
+                "non-empty lines were left unparsed."
+            )
+    else:
+        format_detected = normalized_hint
+        pairs, unparsed_lines = _parse_key_value_text_with_format(
+            source_text,
+            format_name=format_detected,
+        )
+        if unparsed_lines:
+            warnings.append(
+                f"{len(unparsed_lines)} non-empty lines did not match the requested "
+                f"`{format_detected}` format."
+            )
+
+    normalized_keys: dict[str, int] = {}
+    duplicate_keys: list[str] = []
+    for pair in pairs:
+        normalized_key = _normalize_header_lookup(pair["key"])
+        pair["normalized_key"] = normalized_key
+        count = normalized_keys.get(normalized_key, 0) + 1
+        normalized_keys[normalized_key] = count
+        if count == 2:
+            duplicate_keys.append(str(pair["key"]))
+    if duplicate_keys:
+        warnings.append(
+            "Duplicate keys were preserved in order: "
+            + ", ".join(sorted(set(duplicate_keys), key=duplicate_keys.index))
+            + "."
+        )
+
+    return ParsedKeyValueTextResult(
+        pairs=pairs,
+        unparsed_lines=unparsed_lines,
+        format_detected=format_detected,
+        warnings=warnings,
+    )
+
+
 def inspect_authoring_vocab(
     *,
     logfile_path: str | None = None,
@@ -3940,17 +4180,19 @@ def author_plot_from_request_prompt(
         "inspect_data_source(source_path) and check_channel_availability(...) "
         "before you create bindings.\n"
         "2. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "3. If the request includes report-header or remarks content, call "
+        "3. If the request includes report-header or remarks content from text, call "
+        "parse_key_value_text(source_text, format_hint=None) first.\n"
+        "4. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "4. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "5. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "5. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "6. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
         "update_curve_binding(...), move_track(...), set_heading_content(...), and "
         "set_remarks_content(...).\n"
-        "6. Preview the affected section, track, or window before recommending a final render.\n"
-        "7. If you captured the previous YAML text before editing, call "
+        "7. Preview the affected section, track, or window before recommending a final render.\n"
+        "8. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "8. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "9. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 

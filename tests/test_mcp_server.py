@@ -342,6 +342,12 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "overwrite_policy": "replace",
                 },
             )
+            parsed_header_text = await session.call_tool(
+                "parse_key_value_text",
+                {
+                    "source_text": "Company: Acme Energy\nWell: Demo-01\nDirection: Up\n",
+                },
+            )
             updated_remarks = await session.call_tool(
                 "set_remarks_content",
                 {
@@ -403,6 +409,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "inspect_heading_slots",
                 "preview_header_mapping",
                 "apply_header_values",
+                "parse_key_value_text",
                 "inspect_authoring_vocab",
                 "summarize_logfile_changes",
                 "validate_logfile_text",
@@ -563,16 +570,21 @@ class McpServerIntegrationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            applied_header_values.structuredContent["heading_summary"]["current_values"][
-                "heading"
-            ]["provider_name"],
+            applied_header_values.structuredContent["heading_summary"]["current_values"]["heading"][
+                "provider_name"
+            ],
             "Acme Logging",
         )
         self.assertEqual(
-            applied_header_values.structuredContent["heading_summary"]["current_values"][
-                "heading"
-            ]["service_titles"][0]["value"],
+            applied_header_values.structuredContent["heading_summary"]["current_values"]["heading"][
+                "service_titles"
+            ][0]["value"],
             "Gamma Ray Review",
+        )
+        self.assertEqual(parsed_header_text.structuredContent["format_detected"], "colon")
+        self.assertEqual(
+            [pair["key"] for pair in parsed_header_text.structuredContent["pairs"]],
+            ["Company", "Well", "Direction"],
         )
         self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
         self.assertEqual(

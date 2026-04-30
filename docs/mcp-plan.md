@@ -189,8 +189,9 @@ Implemented so far in `0.5.0`:
 - `inspect_heading_slots(...)`
 - `preview_header_mapping(...)`
 - `apply_header_values(...)`
+- `parse_key_value_text(...)`
 - `wellplot://authoring/catalog/header-key-aliases.json`
 
 Next up:
 
-- `parse_key_value_text(...)`
+- `inspect_style_presets(...)`

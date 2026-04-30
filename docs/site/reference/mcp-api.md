@@ -506,6 +506,28 @@ Behavior:
   provider fields, general fields, service titles, detail rows, and remarks
   capabilities without a second manual diff
 
+### `parse_key_value_text(source_text, format_hint=None)`
+
+Purpose: deterministically parse simple copied text blocks into ordered
+key-value pairs before header mapping.
+
+Returns:
+
+- `pairs`
+- `unparsed_lines`
+- `format_detected`
+- `warnings`
+
+Behavior:
+
+- supports `auto`, `colon`, `equals`, `tsv`, and `csv` format hints
+- ignores blank lines and comment lines that start with `#`
+- preserves duplicate keys in input order and reports them through warnings
+- with `auto`, chooses the supported format that parses the most non-empty
+  lines
+- does not perform any hidden header-slot mapping; it only extracts ordered
+  text pairs
+
 ### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 
 Purpose: expose deterministic authoring vocabularies plus optional draft or
@@ -692,15 +714,16 @@ For draft authoring:
    workflow starts from raw LAS/DLIS data
 2. `create_logfile_draft(...)`
 3. `summarize_logfile_draft(...)`
-4. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+4. `parse_key_value_text(...)` when the input starts as copied header text
+5. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-5. `preview_header_mapping(...)` before mutating header/report values
-6. `apply_header_values(...)` when the previewed mapping should be persisted
-7. `inspect_authoring_vocab(...)`
-8. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+6. `preview_header_mapping(...)` before mutating header/report values
+7. `apply_header_values(...)` when the previewed mapping should be persisted
+8. `inspect_authoring_vocab(...)`
+9. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
-9. `summarize_logfile_changes(...)` when the client retained a previous YAML
+10. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-10. preview with a narrow PNG tool
-11. render or save only after review
+11. preview with a narrow PNG tool
+12. render or save only after review
