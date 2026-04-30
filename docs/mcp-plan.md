@@ -167,6 +167,8 @@ The next MCP-focused implementation slice should now move to the richer
 
 Planned `0.5.0` focus:
 
+- `inspect_data_source(...)`
+- `check_channel_availability(...)`
 - `inspect_heading_slots(...)`
 - `preview_header_mapping(...)`
 - `apply_header_values(...)`
@@ -174,3 +176,8 @@ Planned `0.5.0` focus:
 - `inspect_style_presets(...)`
 - header/style catalog resources
 - `ingest_header_text(...)` prompt
+
+Scope note:
+
+- standalone source inspection in this phase is for LAS and DLIS only; LIS
+  support is not planned in this slice.

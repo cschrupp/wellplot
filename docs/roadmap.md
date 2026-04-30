@@ -173,12 +173,18 @@ Current status:
 
 Planned `0.5.0` scope:
 
+- inspect raw LAS/DLIS sources before draft creation
+- check requested-channel availability before creating bindings
 - inspect precise heading/report slots before ingestion
 - preview header mappings before mutating drafts
 - apply normalized header values with explicit overwrite policies
 - parse simple structured key-value text deterministically
 - expose stronger alias/style preset catalogs for common conventions
 - upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
+
+Out of scope for this slice:
+
+- LIS ingestion/support
 
 Detailed plan:
 

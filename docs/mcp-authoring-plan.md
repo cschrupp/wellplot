@@ -252,6 +252,7 @@ Acceptance:
 
 Deliver:
 
+- standalone LAS/DLIS data-source inspection and channel availability checks
 - header-slot inspection and mapping helpers
 - deterministic import helpers for simple structured text sources
 - stronger archetype catalogs, alias catalogs, and style presets
@@ -259,11 +260,17 @@ Deliver:
 
 Acceptance:
 
+- a client can inspect a raw LAS/DLIS source, confirm the channels needed for a
+  requested plot are actually present, then move into deterministic draft
+  authoring
 - a client can ingest header values from provided text, map them into the
   report structure, preview the result, and save confidently
 
 Concrete focus:
 
+- make raw data inspection explicit instead of requiring a pre-existing draft
+- let MCP clients answer "do we have GR/RHOB/NPHI/CBL/VDL in this source?"
+  before they start creating bindings
 - make header and cover-page value mapping deterministic instead of ad hoc
 - reduce prompt verbosity by exposing reusable style and archetype presets
 - keep freeform language in the MCP client while giving it better structured
@@ -323,22 +330,30 @@ Implemented so far:
 This is the next concrete MCP slice after the deterministic authoring
 foundation.
 
-1. `inspect_heading_slots(logfile_path=None, template_path=None)`
-2. `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
-3. `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
-4. `parse_key_value_text(source_text, format_hint=None)`
-5. `inspect_style_presets(logfile_path=None)`
-6. `ingest_header_text(logfile_path, source_text, source_description=None)` prompt
+1. `inspect_data_source(source_path, source_format="auto")`
+2. `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
+3. `inspect_heading_slots(logfile_path=None, template_path=None)`
+4. `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
+5. `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
+6. `parse_key_value_text(source_text, format_hint=None)`
+7. `inspect_style_presets(logfile_path=None)`
+8. `ingest_header_text(logfile_path, source_text, source_description=None)` prompt
 
 Supporting resources:
 
 - `wellplot://authoring/catalog/header-key-aliases.json`
+- `wellplot://authoring/catalog/channel-aliases.json`
 - `wellplot://authoring/catalog/style-presets.json`
 - `wellplot://authoring/catalog/overwrite-policies.json`
 
 Notes:
 
 - `0.5.0` is still not a server-side "understand any document" feature.
+- standalone data inspection in this phase is file-based and limited to the
+  formats the project already supports today: LAS and DLIS.
+- actual LIS support remains out of scope for `0.5.0`.
+- direct inspection of live pandas/numpy objects is also out of scope for MCP
+  in this phase unless a client serializes them into an explicit payload.
 - the parser should stay deterministic and limited to simple structured forms:
   - `Key: Value`
   - `KEY=VALUE`
@@ -348,7 +363,63 @@ Notes:
 
 ## Release 0.5.0 Tool Contracts
 
-### 1. `inspect_heading_slots(...)`
+### 1. `inspect_data_source(...)`
+
+Purpose:
+
+- inspect one raw LAS or DLIS source before any draft/logfile exists
+
+Inputs:
+
+- `source_path`
+- `source_format`
+
+Return shape:
+
+- `source_path`
+- `source_format_detected`
+- `dataset_name`
+- `index`
+- `channels`
+- `metadata_keys`
+- `warnings`
+
+Why it matters:
+
+- authoring starts with "what data do I actually have?"
+- this should be the first MCP-native step before creating bindings or
+  explaining missing channels back to the user
+
+### 2. `check_channel_availability(...)`
+
+Purpose:
+
+- compare requested channel names or aliases against one inspected source or one
+  draft section dataset
+
+Inputs:
+
+- `requested_channels`
+- `source_path` or `logfile_path`
+- `section_id`
+- `source_format`
+
+Return shape:
+
+- `requested_channels`
+- `found_channels`
+- `missing_channels`
+- `alias_matches`
+- `ambiguous_matches`
+- `warnings`
+
+Why it matters:
+
+- natural-language authoring requests often start with domain names like
+  "porosity", "deep resistivity", or "VDL"
+- the MCP client needs one deterministic check before it starts binding curves
+
+### 3. `inspect_heading_slots(...)`
 
 Purpose:
 
@@ -371,7 +442,7 @@ Why it matters:
 - `inspect_heading_slots(...)` should become the precise contract for
   report-header ingestion and review
 
-### 2. `preview_header_mapping(...)`
+### 4. `preview_header_mapping(...)`
 
 Purpose:
 
@@ -396,7 +467,7 @@ Why it matters:
 - the MCP client needs one reviewable step between "I extracted these values"
   and "write them into the draft"
 
-### 3. `apply_header_values(...)`
+### 5. `apply_header_values(...)`
 
 Purpose:
 
@@ -423,7 +494,7 @@ Return shape:
 - `warnings`
 - `heading_summary`
 
-### 4. `parse_key_value_text(...)`
+### 6. `parse_key_value_text(...)`
 
 Purpose:
 
@@ -449,7 +520,7 @@ Deliberate first-pass limit:
 - no fuzzy multi-table inference
 - no hidden value-to-slot mapping in this tool
 
-### 5. `inspect_style_presets(...)`
+### 7. `inspect_style_presets(...)`
 
 Purpose:
 
@@ -473,19 +544,26 @@ Why it matters:
 
 Recommended build order:
 
-1. `inspect_heading_slots(...)`
-2. header-key alias resources
-3. `preview_header_mapping(...)`
-4. `apply_header_values(...)`
-5. `parse_key_value_text(...)`
-6. style-preset resources + `inspect_style_presets(...)`
-7. richer notebook/demo flow
-8. `ingest_header_text(...)` prompt
+1. `inspect_data_source(...)`
+2. `check_channel_availability(...)`
+3. channel-alias resources
+4. `inspect_heading_slots(...)`
+5. header-key alias resources
+6. `preview_header_mapping(...)`
+7. `apply_header_values(...)`
+8. `parse_key_value_text(...)`
+9. style-preset resources + `inspect_style_presets(...)`
+10. richer notebook/demo flow
+11. `ingest_header_text(...)` prompt
 
 ## Release 0.5.0 Acceptance
 
 `0.5.0` is complete when:
 
+- a client can inspect one raw LAS/DLIS source and understand its available
+  channels, index range, and basic metadata before drafting
+- a client can deterministically check whether requested channels are present
+  before creating bindings
 - a client can inspect the exact heading/report slots in a target draft
 - a client can parse simple structured header text into key-value pairs
 - a client can preview how those values would map into the draft before saving
