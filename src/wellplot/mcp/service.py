@@ -105,6 +105,7 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/catalog/header-fields.json",
     "wellplot://authoring/catalog/header-key-aliases.json",
     "wellplot://authoring/catalog/channel-aliases.json",
+    "wellplot://authoring/catalog/style-presets.json",
 )
 AUTHORING_HEADER_OVERWRITE_POLICIES = ("fill_empty", "replace", "merge_lists")
 SUPPORTED_KEY_VALUE_FORMAT_HINTS = ("auto", "colon", "equals", "tsv", "csv")
@@ -151,6 +152,183 @@ AUTHORING_TRACK_ARCHETYPES = (
         "kind": "array",
         "default_width_mm": 28.0,
         "notes": "Array/raster track for waveform-style VDL presentation.",
+    },
+)
+AUTHORING_STYLE_PRESETS = (
+    {
+        "family": "porosity_overlays",
+        "id": "density_neutron_overlay",
+        "label": "Density-Neutron Overlay",
+        "summary": "Balanced overlay style for RHOB/NPHI porosity review.",
+        "use_cases": ["porosity", "density-neutron", "overlay"],
+        "track_patch": {
+            "kind": "normal",
+            "width_mm": 32.0,
+            "grid": {"enabled": True, "vertical": {"minor_count": 4}},
+        },
+        "binding_templates": [
+            {
+                "alias_id": "bulk_density",
+                "label": "Density",
+                "scale": {"kind": "linear", "min": 1.95, "max": 2.95},
+                "style": {"color": "#c2410c", "line_width": 1.3},
+            },
+            {
+                "alias_id": "neutron_porosity",
+                "label": "Neutron",
+                "scale": {"kind": "linear", "min": 0.45, "max": -0.15},
+                "style": {"color": "#1d4ed8", "line_width": 1.1},
+                "fill": {
+                    "kind": "between_curves",
+                    "target_channel": "RHOB",
+                    "left_color": "#bfdbfe",
+                    "right_color": "#fed7aa",
+                    "alpha": 0.35,
+                },
+            },
+        ],
+        "notes": [
+            "Use one shared track for RHOB and NPHI.",
+            "Reverse the neutron scale so low porosity plots to the right.",
+        ],
+    },
+    {
+        "family": "gamma_ray_defaults",
+        "id": "gamma_ray_clean_print",
+        "label": "Gamma Ray Clean Print",
+        "summary": "Single-curve gamma ray styling with strong print contrast.",
+        "use_cases": ["gamma ray", "gr", "print-safe"],
+        "track_patch": {
+            "kind": "normal",
+            "width_mm": 28.0,
+            "grid": {"enabled": True},
+        },
+        "binding_templates": [
+            {
+                "alias_id": "gamma_ray",
+                "label": "Gamma Ray",
+                "scale": {"kind": "linear", "min": 0.0, "max": 150.0},
+                "style": {"color": "#166534", "line_width": 1.2},
+                "header_display": {"scale_text_color": "#166534"},
+            }
+        ],
+        "notes": [
+            "Good default for single-track GR review.",
+            "Keeps the scale conventional and readable on grayscale printouts.",
+        ],
+    },
+    {
+        "family": "resistivity_log_conventions",
+        "id": "triple_combo_resistivity",
+        "label": "Triple Combo Resistivity",
+        "summary": "Log-scale resistivity convention for shallow/medium/deep overlays.",
+        "use_cases": ["resistivity", "deep resistivity", "triple combo"],
+        "track_patch": {
+            "kind": "normal",
+            "width_mm": 32.0,
+            "grid": {"enabled": True, "horizontal": {"enabled": True}},
+        },
+        "binding_templates": [
+            {
+                "alias_id": "shallow_resistivity",
+                "label": "RSH",
+                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
+                "style": {"color": "#2563eb", "line_width": 1.0},
+            },
+            {
+                "alias_id": "medium_resistivity",
+                "label": "RME",
+                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
+                "style": {"color": "#7c3aed", "line_width": 1.0},
+            },
+            {
+                "alias_id": "deep_resistivity",
+                "label": "RDEEP",
+                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
+                "style": {"color": "#dc2626", "line_width": 1.2},
+            },
+        ],
+        "notes": [
+            "Keep all resistivity curves on the same logarithmic scale.",
+            "Use the deepest investigation curve with the strongest visual weight.",
+        ],
+    },
+    {
+        "family": "cbl_vdl_variants",
+        "id": "cbl_vdl_high_contrast",
+        "label": "CBL/VDL High Contrast",
+        "summary": "High-contrast CBL/VDL presentation for screen review.",
+        "use_cases": ["cbl", "vdl", "cement bond", "waveform"],
+        "binding_templates": [
+            {
+                "alias_id": "cement_bond",
+                "label": "CBL",
+                "scale": {"kind": "linear", "min": 0.0, "max": 100.0},
+                "style": {"color": "#111827", "line_width": 1.3},
+            },
+            {
+                "alias_id": "variable_density_log",
+                "label": "VDL",
+                "render_mode": "raster",
+                "style": {"colormap": "gray_r"},
+            },
+        ],
+        "notes": [
+            "Use a dark scalar CBL curve against an inverted grayscale VDL raster.",
+            "Intended for screen-first diagnostics and anomaly review.",
+        ],
+    },
+    {
+        "family": "cbl_vdl_variants",
+        "id": "cbl_vdl_print_safe",
+        "label": "CBL/VDL Print Safe",
+        "summary": "Print-oriented CBL/VDL styling with restrained grayscale choices.",
+        "use_cases": ["cbl", "vdl", "print-safe"],
+        "binding_templates": [
+            {
+                "alias_id": "cement_bond",
+                "label": "CBL",
+                "scale": {"kind": "linear", "min": 0.0, "max": 100.0},
+                "style": {"color": "#374151", "line_width": 1.2},
+            },
+            {
+                "alias_id": "variable_density_log",
+                "label": "VDL",
+                "render_mode": "raster",
+                "style": {"colormap": "Greys"},
+            },
+        ],
+        "notes": [
+            "Avoids overly dark fills that collapse in office printers.",
+            "Prefer this preset when the main artifact will be PDF or paper.",
+        ],
+    },
+    {
+        "family": "report_page_styles",
+        "id": "report_header_clean",
+        "label": "Report Header Clean",
+        "summary": "Cleaner first page with fewer title rows and restrained remarks.",
+        "use_cases": ["header", "report page", "clean presentation"],
+        "heading_patch": {
+            "service_titles": [
+                {
+                    "value": "Primary Interpretation",
+                    "alignment": "left",
+                    "bold": True,
+                }
+            ]
+        },
+        "remarks_patch": [
+            {
+                "title": "Notes",
+                "lines": ["Condense first-page commentary to one short block."],
+                "alignment": "left",
+            }
+        ],
+        "notes": [
+            "Good fit when the plot should read more like a concise report page.",
+            "Use with inspect_heading_slots(...) before applying extracted header text.",
+        ],
     },
 )
 AUTHORING_CHANNEL_ALIASES = (
@@ -530,6 +708,16 @@ class ParsedKeyValueTextResult:
     unparsed_lines: list[dict[str, object]]
     format_detected: str
     warnings: list[str]
+
+
+@dataclass(slots=True)
+class StylePresetsResult:
+    """Structured style-preset catalog surface for authoring workflows."""
+
+    available_families: list[str]
+    selected_family: str | None
+    presets: list[dict[str, object]]
+    resource_uris: list[str]
 
 
 @dataclass(slots=True)
@@ -2159,6 +2347,19 @@ def _track_archetypes_catalog() -> list[dict[str, object]]:
     return deepcopy(list(AUTHORING_TRACK_ARCHETYPES))
 
 
+def _style_presets_catalog() -> list[dict[str, object]]:
+    return deepcopy(list(AUTHORING_STYLE_PRESETS))
+
+
+def _style_preset_families() -> list[str]:
+    families: list[str] = []
+    for preset in AUTHORING_STYLE_PRESETS:
+        family = str(preset.get("family", "")).strip()
+        if family and family not in families:
+            families.append(family)
+    return families
+
+
 def schema_resource() -> ResourceContent:
     """Return the JSON schema resource payload."""
     payload = json.dumps(get_logfile_json_schema(), indent=2, sort_keys=True)
@@ -2231,6 +2432,19 @@ def authoring_track_archetypes_resource() -> ResourceContent:
 def authoring_header_fields_resource() -> ResourceContent:
     """Return heading and remarks field guidance as JSON text."""
     payload = json.dumps(_heading_field_catalog(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_style_presets_resource() -> ResourceContent:
+    """Return curated draft-authoring style presets as JSON text."""
+    payload = json.dumps(
+        {
+            "available_families": _style_preset_families(),
+            "style_presets": _style_presets_catalog(),
+        },
+        indent=2,
+        sort_keys=True,
+    )
     return ResourceContent(text=payload, mime_type="application/json")
 
 
@@ -3757,6 +3971,30 @@ def parse_key_value_text(
     )
 
 
+def inspect_style_presets(
+    *,
+    preset_family: str | None = None,
+) -> StylePresetsResult:
+    """Return curated style presets, optionally filtered to one family."""
+    available_families = _style_preset_families()
+    selected_family = str(preset_family).strip() if preset_family is not None else None
+    if selected_family is not None and selected_family not in available_families:
+        raise ValueError(
+            f"preset_family must be one of {available_families}, got {preset_family!r}."
+        )
+    presets = [
+        preset
+        for preset in _style_presets_catalog()
+        if selected_family is None or str(preset.get("family", "")) == selected_family
+    ]
+    return StylePresetsResult(
+        available_families=available_families,
+        selected_family=selected_family,
+        presets=presets,
+        resource_uris=["wellplot://authoring/catalog/style-presets.json"],
+    )
+
+
 def inspect_authoring_vocab(
     *,
     logfile_path: str | None = None,
@@ -4185,14 +4423,16 @@ def author_plot_from_request_prompt(
         "4. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "5. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "6. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "5. If the request is mainly about visual conventions, call "
+        "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
+        "6. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "7. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
         "update_curve_binding(...), move_track(...), set_heading_content(...), and "
         "set_remarks_content(...).\n"
-        "7. Preview the affected section, track, or window before recommending a final render.\n"
-        "8. If you captured the previous YAML text before editing, call "
+        "8. Preview the affected section, track, or window before recommending a final render.\n"
+        "9. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "9. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "10. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 

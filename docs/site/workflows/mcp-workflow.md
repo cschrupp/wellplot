@@ -124,6 +124,7 @@ Main tools:
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
 - `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
+- `inspect_style_presets(preset_family=None)`
 - `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
@@ -154,6 +155,9 @@ Recommended split:
 - use `apply_header_values(...)` only after the preview looks right; it writes
   the same deterministic mapping result back into the draft and returns the
   saved heading summary
+- use `inspect_style_presets(...)` when the request is mostly about visual
+  conventions such as color, fill, contrast, scale defaults, or common
+  CBL/VDL, porosity, gamma-ray, and resistivity layouts
 - use `inspect_authoring_vocab(...)` before major edits so the client sees the
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft

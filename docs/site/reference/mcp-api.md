@@ -528,6 +528,39 @@ Behavior:
 - does not perform any hidden header-slot mapping; it only extracts ordered
   text pairs
 
+### `inspect_style_presets(preset_family=None)`
+
+Purpose: expose curated style presets and recommended patches for common
+authoring requests before ad hoc visual edits.
+
+Returns:
+
+- `available_families`
+- `selected_family`
+- `presets`
+- `resource_uris`
+
+Each preset record can contain:
+
+- `family`
+- `id`
+- `label`
+- `summary`
+- `use_cases`
+- `track_patch`
+- `binding_templates`
+- `heading_patch`
+- `remarks_patch`
+- `notes`
+
+Behavior:
+
+- returns the full curated catalog by default
+- accepts one optional `preset_family` filter
+- rejects unsupported preset families instead of silently falling back
+- points clients at `wellplot://authoring/catalog/style-presets.json` for the
+  full packaged catalog payload
+
 ### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 
 Purpose: expose deterministic authoring vocabularies plus optional draft or
@@ -657,6 +690,7 @@ Static resources:
 - `wellplot://authoring/catalog/header-fields.json`
 - `wellplot://authoring/catalog/header-key-aliases.json`
 - `wellplot://authoring/catalog/channel-aliases.json`
+- `wellplot://authoring/catalog/style-presets.json`
 
 Resource templates:
 

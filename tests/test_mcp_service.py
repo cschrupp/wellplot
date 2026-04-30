@@ -1236,6 +1236,38 @@ class McpServiceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.parse_key_value_text("Company: Acme Energy", format_hint="yaml")
 
+    def test_inspect_style_presets_returns_all_families(self) -> None:
+        """Expose curated style preset families for deterministic authoring guidance."""
+        result = service.inspect_style_presets()
+
+        self.assertIn("porosity_overlays", result.available_families)
+        self.assertIn("gamma_ray_defaults", result.available_families)
+        self.assertIn("resistivity_log_conventions", result.available_families)
+        self.assertIn("cbl_vdl_variants", result.available_families)
+        self.assertIn("report_page_styles", result.available_families)
+        self.assertIsNone(result.selected_family)
+        self.assertTrue(result.presets)
+        self.assertIn("wellplot://authoring/catalog/style-presets.json", result.resource_uris)
+
+    def test_inspect_style_presets_can_filter_one_family(self) -> None:
+        """Filter the preset catalog to one requested family."""
+        result = service.inspect_style_presets(preset_family="cbl_vdl_variants")
+
+        self.assertEqual(result.selected_family, "cbl_vdl_variants")
+        self.assertEqual(
+            {preset["family"] for preset in result.presets},
+            {"cbl_vdl_variants"},
+        )
+        self.assertEqual(
+            {preset["id"] for preset in result.presets},
+            {"cbl_vdl_high_contrast", "cbl_vdl_print_safe"},
+        )
+
+    def test_inspect_style_presets_rejects_unknown_family(self) -> None:
+        """Reject unsupported preset-family filters."""
+        with self.assertRaises(ValueError):
+            service.inspect_style_presets(preset_family="unknown")
+
     def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
         """Expose stable authoring vocabularies even without a target draft."""
         result = service.inspect_authoring_vocab(root=REPO_ROOT)
@@ -1259,6 +1291,10 @@ class McpServiceTests(unittest.TestCase):
         )
         self.assertIn(
             "wellplot://authoring/catalog/header-key-aliases.json",
+            result.resource_uris,
+        )
+        self.assertIn(
+            "wellplot://authoring/catalog/style-presets.json",
             result.resource_uris,
         )
         self.assertIn(
@@ -1461,6 +1497,7 @@ class McpServiceTests(unittest.TestCase):
         """Expose authoring catalog resources as JSON payloads."""
         patch_resource = service.authoring_patch_schema_resource()
         fill_resource = service.authoring_fill_kinds_resource()
+        style_resource = service.authoring_style_presets_resource()
         header_resource = service.authoring_header_fields_resource()
         header_alias_resource = service.authoring_header_key_aliases_resource()
         channel_alias_resource = service.authoring_channel_aliases_resource()
@@ -1469,6 +1506,8 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertEqual(fill_resource.mime_type, "application/json")
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
+        self.assertEqual(style_resource.mime_type, "application/json")
+        self.assertIn("style_presets", json.loads(style_resource.text))
         self.assertEqual(header_resource.mime_type, "application/json")
         self.assertIn("general_field_keys", json.loads(header_resource.text))
         self.assertEqual(header_alias_resource.mime_type, "application/json")
@@ -1501,6 +1540,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
         self.assertIn("apply_header_values(...)", prompt)
+        self.assertIn("inspect_style_presets(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 

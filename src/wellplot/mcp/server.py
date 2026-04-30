@@ -429,6 +429,17 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def inspect_style_presets(
+        preset_family: str | None = None,
+    ) -> dict[str, object]:
+        """Return curated style presets, optionally filtered to one family."""
+        return asdict(
+            service.inspect_style_presets(
+                preset_family=preset_family,
+            )
+        )
+
+    @mcp.tool()
     def inspect_authoring_vocab(
         logfile_path: str | None = None,
         template_path: str | None = None,
@@ -575,6 +586,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_track_archetypes_resource() -> str:
         """Return curated draft-authoring track archetypes."""
         return service.authoring_track_archetypes_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/style-presets.json",
+        mime_type="application/json",
+    )
+    def authoring_style_presets_resource() -> str:
+        """Return curated style presets for deterministic authoring guidance."""
+        return service.authoring_style_presets_resource().text
 
     @mcp.resource(
         "wellplot://authoring/catalog/header-fields.json",

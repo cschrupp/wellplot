@@ -190,8 +190,10 @@ Implemented so far in `0.5.0`:
 - `preview_header_mapping(...)`
 - `apply_header_values(...)`
 - `parse_key_value_text(...)`
+- `inspect_style_presets(...)`
 - `wellplot://authoring/catalog/header-key-aliases.json`
+- `wellplot://authoring/catalog/style-presets.json`
 
 Next up:
 
-- `inspect_style_presets(...)`
+- `ingest_header_text(...)` prompt

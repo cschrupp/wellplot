@@ -195,21 +195,15 @@ Current `0.5.0` progress:
   `parse_key_value_text(...)`
 - deterministic lookup guidance is exposed through
   `wellplot://authoring/catalog/header-key-aliases.json`
-- the next step is style-preset inspection through `inspect_style_presets(...)`
-- parse simple structured key-value text deterministically
-- expose stronger alias/style preset catalogs for common conventions
+- curated style guidance is implemented through `inspect_style_presets(...)`
+- curated style presets are exposed through
+  `wellplot://authoring/catalog/style-presets.json`
+- the next step is the `ingest_header_text(...)` prompt
 - upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
 
 Out of scope for this slice:
 
 - LIS ingestion/support
-
-Current `0.5.0` progress:
-
-- raw source inspection is implemented
-- requested-channel availability checks are implemented
-- precise heading/report slot inspection is implemented
-- next step is dry-run header mapping preview
 
 Detailed plan:
 

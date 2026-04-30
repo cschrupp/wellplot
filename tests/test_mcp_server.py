@@ -348,6 +348,12 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "source_text": "Company: Acme Energy\nWell: Demo-01\nDirection: Up\n",
                 },
             )
+            style_presets = await session.call_tool(
+                "inspect_style_presets",
+                {
+                    "preset_family": "cbl_vdl_variants",
+                },
+            )
             updated_remarks = await session.call_tool(
                 "set_remarks_content",
                 {
@@ -410,6 +416,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "preview_header_mapping",
                 "apply_header_values",
                 "parse_key_value_text",
+                "inspect_style_presets",
                 "inspect_authoring_vocab",
                 "summarize_logfile_changes",
                 "validate_logfile_text",
@@ -426,6 +433,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://authoring/catalog/track-kinds.json",
                 "wellplot://authoring/catalog/fill-kinds.json",
                 "wellplot://authoring/catalog/track-archetypes.json",
+                "wellplot://authoring/catalog/style-presets.json",
                 "wellplot://authoring/catalog/header-fields.json",
                 "wellplot://authoring/catalog/header-key-aliases.json",
                 "wellplot://authoring/catalog/channel-aliases.json",
@@ -585,6 +593,14 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(
             [pair["key"] for pair in parsed_header_text.structuredContent["pairs"]],
             ["Company", "Well", "Direction"],
+        )
+        self.assertEqual(
+            style_presets.structuredContent["selected_family"],
+            "cbl_vdl_variants",
+        )
+        self.assertEqual(
+            {preset["id"] for preset in style_presets.structuredContent["presets"]},
+            {"cbl_vdl_high_contrast", "cbl_vdl_print_safe"},
         )
         self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
         self.assertEqual(
