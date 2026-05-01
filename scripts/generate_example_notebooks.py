@@ -583,16 +583,18 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
         title="Experimental MCP Workflow Walkthrough",
         summary=(
             "Launch the local stdio MCP server, inspect its public contract, preview a "
-            "production logfile, and exercise the writable authoring tools without "
-            "dropping down to the direct Python or YAML pipeline."
+            "production logfile, exercise the writable authoring tools, and walk a "
+            "copied header packet through deterministic MCP ingestion without dropping "
+            "down to the direct Python or YAML pipeline."
         ),
         learning_goals=(
             "Start the experimental `wellplot-mcp` surface from a notebook-friendly Python workflow.",
             "Inspect the registered tools, resources, resource templates, and prompts before using them.",
             "Use MCP tool calls to validate, inspect, and preview a production logfile at full-report, section, track, and window scopes.",
             "Round-trip a full logfile through MCP text validation, formatting, export, save, and explicit render-to-file calls.",
+            "Parse copied header text, inspect exact heading slots, preview the mapping, apply it, and preview the first report page through MCP.",
         ),
-        prerequisites=("mcp",),
+        prerequisites=("mcp", "dlis"),
         code_cells=(
             dedent(
                 """
@@ -601,6 +603,7 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
                 import mcp_workflow_demo as demo
 
                 print("Demo logfile:", demo.DEFAULT_LOGFILE)
+                print("Header-ingestion logfile:", demo.DEFAULT_HEADER_LOGFILE)
                 print("Demo base dir:", demo.DEFAULT_BASE_DIR)
                 print("Demo output root:", demo.DEFAULT_OUTPUT_ROOT)
                 """
@@ -673,11 +676,47 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
                 display(Code(preview_yaml, language="yaml"))
                 """
             ).strip(),
+            dedent(
+                """
+                # Clone a draft, parse copied header text, preview the mapping, apply it,
+                # and preview the first report page through MCP only.
+                import json
+                from IPython.display import Image, Code, display
+
+                header_demo = await demo.run_header_ingestion_flow()
+
+                print("Header draft:", header_demo["draft_logfile"])
+                print("Mapped values:")
+                print(header_demo["mapped_values"])
+
+                print("\\nParsed pairs:")
+                for pair in header_demo["parsed"]["pairs"]:
+                    print(f" - {pair['key']}: {pair['value']}")
+
+                print("\\nPrompt excerpt:\\n")
+                print("\\n".join(header_demo["ingest_prompt"].splitlines()[:14]))
+
+                print("\\nReport-page style presets:")
+                for preset in header_demo["style_presets"]["presets"]:
+                    print(f" - {preset['id']}: {preset['label']}")
+
+                print("\\nPreview warnings:", header_demo["preview"]["warnings"])
+                print("Applied assignments:", len(header_demo["apply"]["applied_assignments"]))
+
+                predicted_patch = json.dumps(
+                    header_demo["preview"]["predicted_heading_patch"],
+                    indent=2,
+                )
+                display(Code(predicted_patch, language="json"))
+                display(Image(data=header_demo["page_preview_png"]))
+                """
+            ).strip(),
         ),
         adaptation_tips=(
             "Keep the server root pointed at a narrow working directory when you move from a repo demo to a real job directory.",
             "Use `inspect_logfile(...)` first and then drive the narrow preview tools with the returned section and track ids.",
             "Treat `format_logfile_text(...)` and `save_logfile_text(...)` as normalization steps, not as comment-preserving editors.",
+            "Use explicit keys like `general_field.company`, `detail.date`, or `service_title_1` when copied header text could map to multiple slots.",
         ),
     ),
     "real_data_demo.py": PythonRecipe(

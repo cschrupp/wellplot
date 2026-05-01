@@ -36,7 +36,33 @@ DEFAULT_EXAMPLE_ID = "cbl_log_example"
 DEFAULT_LOGFILE = Path("examples/production/cbl_log_example/full_reconstruction.log.yaml")
 DEFAULT_BASE_DIR = DEFAULT_LOGFILE.parent
 DEFAULT_OUTPUT_ROOT = Path("workspace/mcp_demo")
-DEFAULT_RENDER_LOGFILE = Path("examples/cbl_main.log.yaml")
+DEFAULT_RENDER_LOGFILE = DEFAULT_LOGFILE
+DEFAULT_HEADER_LOGFILE = Path(
+    "examples/production/forge16b_porosity_example/full_reconstruction.log.yaml"
+)
+DEFAULT_HEADER_DRAFT_SUFFIX = "header_ingestion_draft.log.yaml"
+SAMPLE_HEADER_PACKET = "\n".join(
+    [
+        "Provider: Acme Logging",
+        "Company: Acme Energy",
+        "Well: Demo-01",
+        "Service Company: Acme Wireline",
+        "Date: 2026-04-30",
+        "Run: ONE",
+        "Direction: Up",
+        "Service Title: Gamma Ray Review",
+    ]
+)
+HEADER_PAIR_TO_SLOT_KEY = {
+    "provider": "provider",
+    "company": "general_field.company",
+    "well": "general_field.well",
+    "service company": "general_field.service_company",
+    "date": "detail.date",
+    "run": "detail.run",
+    "direction": "detail.direction",
+    "service title": "service_title_1",
+}
 
 
 def repo_root() -> Path:
@@ -72,6 +98,16 @@ def default_saved_logfile(
     return Path(output_root) / f"{example_id}_saved.log.yaml"
 
 
+def default_header_draft_logfile(
+    *,
+    output_root: str | Path = DEFAULT_OUTPUT_ROOT,
+    logfile_path: str | Path = DEFAULT_LOGFILE,
+) -> Path:
+    """Return the normalized draft path used by the header-ingestion walkthrough."""
+    stem = Path(logfile_path).name.removesuffix(".log.yaml")
+    return Path(output_root) / f"{stem}_{DEFAULT_HEADER_DRAFT_SUFFIX}"
+
+
 def relative_repo_path(path: str | Path) -> str:
     """Return one path relative to the repository root."""
     raw = Path(path)
@@ -90,6 +126,52 @@ def decode_image_data(image_data: str | bytes) -> bytes:
     if isinstance(image_data, bytes):
         return image_data
     return base64.b64decode(image_data)
+
+
+def header_packet_text(source_text: str | None = None) -> str:
+    """Return the copied header packet text used by the ingestion walkthrough."""
+    return SAMPLE_HEADER_PACKET if source_text is None else source_text
+
+
+def map_header_pairs_to_values(
+    pairs: list[dict[str, str]],
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    """Map parsed header pairs onto explicit wellplot heading-slot keys."""
+    values: dict[str, str] = {}
+    unmapped_pairs: list[dict[str, str]] = []
+    for pair in pairs:
+        key = str(pair.get("key", "")).strip().lower()
+        value = str(pair.get("value", "")).strip()
+        target_key = HEADER_PAIR_TO_SLOT_KEY.get(key)
+        if target_key is None:
+            unmapped_pairs.append({"key": key, "value": value})
+            continue
+        values[target_key] = value
+    return values, unmapped_pairs
+
+
+def _empty_heading_patch() -> dict[str, object]:
+    """Return one minimal editable heading skeleton for ingestion demos."""
+    return {
+        "enabled": True,
+        "provider_name": "",
+        "general_fields": [
+            {"label": "Company", "value": ""},
+            {"label": "Well", "value": ""},
+            {"label": "Service Company", "value": ""},
+        ],
+        "service_titles": [{"value": "", "alignment": "left"}],
+        "detail": [
+            {
+                "label_cells": ["Date", "Run", "Direction"],
+                "columns": [
+                    {"cells": ["", "", ""]},
+                    {"cells": ["", "", ""]},
+                ],
+            }
+        ],
+        "tail_enabled": True,
+    }
 
 
 def _load_mcp_runtime() -> tuple[type[Any], type[Any], Any]:
@@ -333,10 +415,117 @@ async def run_authoring_flow(
     }
 
 
+async def run_header_ingestion_flow(
+    logfile_path: str | Path = DEFAULT_HEADER_LOGFILE,
+    *,
+    output_root: str | Path = DEFAULT_OUTPUT_ROOT,
+    source_text: str | None = None,
+    source_description: str = "Copied contractor header packet",
+    overwrite_policy: str = "fill_empty",
+    dpi: int = 96,
+    root: str | Path | None = None,
+) -> dict[str, Any]:
+    """Exercise the `0.5.0` header-ingestion MCP workflow end to end."""
+    relative_logfile = relative_repo_path(logfile_path)
+    relative_draft_logfile = relative_repo_path(
+        default_header_draft_logfile(output_root=output_root, logfile_path=logfile_path)
+    )
+    packet_text = header_packet_text(source_text)
+
+    async with open_mcp_session(root) as session:
+        draft = await session.call_tool(
+            "create_logfile_draft",
+            {
+                "output_path": relative_draft_logfile,
+                "source_logfile_path": relative_logfile,
+                "overwrite": True,
+            },
+        )
+        await session.call_tool(
+            "set_heading_content",
+            {
+                "logfile_path": relative_draft_logfile,
+                "patch": _empty_heading_patch(),
+            },
+        )
+        await session.call_tool(
+            "set_remarks_content",
+            {
+                "logfile_path": relative_draft_logfile,
+                "remarks": [],
+            },
+        )
+        prompt = await session.get_prompt(
+            "ingest_header_text",
+            {
+                "logfile_path": relative_draft_logfile,
+                "source_text": packet_text,
+                "source_description": source_description,
+            },
+        )
+        slots = await session.call_tool(
+            "inspect_heading_slots",
+            {"logfile_path": relative_draft_logfile},
+        )
+        parsed = await session.call_tool(
+            "parse_key_value_text",
+            {"source_text": packet_text},
+        )
+        mapped_values, unmapped_pairs = map_header_pairs_to_values(
+            list(parsed.structuredContent["pairs"])
+        )
+        style_presets = await session.call_tool(
+            "inspect_style_presets",
+            {"preset_family": "report_page_styles"},
+        )
+        preview = await session.call_tool(
+            "preview_header_mapping",
+            {
+                "logfile_path": relative_draft_logfile,
+                "values": mapped_values,
+                "overwrite_policy": overwrite_policy,
+            },
+        )
+        applied = await session.call_tool(
+            "apply_header_values",
+            {
+                "logfile_path": relative_draft_logfile,
+                "values": mapped_values,
+                "overwrite_policy": overwrite_policy,
+            },
+        )
+        first_page_preview = await session.call_tool(
+            "preview_logfile_png",
+            {
+                "logfile_path": relative_draft_logfile,
+                "page_index": 0,
+                "dpi": dpi,
+                "include_report_pages": True,
+            },
+        )
+
+    return {
+        "draft": dict(draft.structuredContent),
+        "draft_logfile": relative_draft_logfile,
+        "source_text": packet_text,
+        "source_description": source_description,
+        "ingest_prompt": _first_prompt_text(prompt),
+        "slots": dict(slots.structuredContent),
+        "parsed": dict(parsed.structuredContent),
+        "mapped_values": mapped_values,
+        "unmapped_pairs": unmapped_pairs,
+        "style_presets": dict(style_presets.structuredContent),
+        "preview": dict(preview.structuredContent),
+        "apply": dict(applied.structuredContent),
+        "page_preview_png": _tool_image_bytes(first_page_preview),
+    }
+
+
 async def _run_demo() -> None:
     contract = await collect_server_contract()
     review = await run_review_flow()
     authoring = await run_authoring_flow()
+    header_ingestion = await run_header_ingestion_flow()
     summary = {
         "tools": contract["tools"],
         "resources": contract["resources"],
@@ -348,6 +537,8 @@ async def _run_demo() -> None:
         "rendered_output": authoring["render"]["output_path"],
         "saved_logfile": authoring["save"]["output_path"],
         "exported_file_count": len(authoring["export"]["written_files"]),
+        "header_draft_logfile": header_ingestion["draft_logfile"],
+        "header_assignment_count": len(header_ingestion["apply"]["applied_assignments"]),
     }
     print(json.dumps(summary, indent=2))
 

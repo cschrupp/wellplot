@@ -200,9 +200,9 @@ Current `0.5.0` progress:
   `wellplot://authoring/catalog/style-presets.json`
 - copied header-packet guidance is implemented through the
   `ingest_header_text(...)` prompt
-- upgrade the MCP notebook/demo to cover one end-to-end header ingestion flow
-- the next step is richer MCP notebook/demo coverage for one end-to-end header
-  ingestion flow
+- the MCP notebook/demo now covers one end-to-end header ingestion flow
+- the next step is release/docs closure for the completed `0.5.0` MCP
+  workflow slice
 
 Out of scope for this slice:
 

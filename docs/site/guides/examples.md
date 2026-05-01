@@ -76,7 +76,8 @@ The examples are grouped by workflow rather than by isolated feature.
 
 - `examples/mcp_workflow_demo.py`
   - launch the local stdio MCP server, inspect its tools/resources/prompts,
-    preview a production logfile, and exercise export/format/save/render calls
+    preview a production logfile, exercise export/format/save/render calls,
+    and walk copied header text through deterministic MCP ingestion
 - `examples/notebooks/developer/mcp_workflow_demo.ipynb`
   - notebook companion to the same MCP walkthrough, generated into the
     developer notebook set

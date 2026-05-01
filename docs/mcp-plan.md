@@ -197,4 +197,4 @@ Implemented so far in `0.5.0`:
 
 Next up:
 
-- richer MCP notebook/demo coverage for the full header-ingestion workflow
+- release/docs closure for the completed `0.5.0` MCP workflow slice
