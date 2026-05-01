@@ -1,6 +1,6 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-04-29
+Last updated: 2026-05-01
 
 ## Summary
 
@@ -573,6 +573,232 @@ Recommended build order:
 - the MCP notebook/demo shows one end-to-end "header packet to rendered draft"
   workflow
 
+## Release 0.6.0: Provider-Neutral Agent Layer
+
+### Goal
+
+Move the natural-language orchestration glue out of notebooks and into a
+public, host-side `wellplot` API while keeping `wellplot-mcp` deterministic and
+provider-agnostic.
+
+### Problem Statement
+
+The current natural-language notebook proves the workflow, but it exposes too
+much infrastructure code to the user:
+
+- MCP stdio session setup
+- tool filtering and schema translation
+- provider-specific tool-loop control
+- API-key loading and environment setup
+- result aggregation for previews, validation, and change summaries
+
+That notebook is acceptable as an integration proof, but it is too complex as a
+real end-user surface.
+
+### Product Decision
+
+The agent layer should be provider-neutral at the core, but not provider-
+identical.
+
+The right boundary is:
+
+- `wellplot.mcp`: deterministic tools, prompts, resources, safety, validation
+- `wellplot.agent`: provider-neutral orchestration core
+- provider adapters:
+  - OpenAI
+  - OpenAI-compatible providers
+  - Anthropic
+
+This logic should not move into `wellplot-mcp`.
+
+### Keep In The MCP Server
+
+- deterministic tool implementations
+- deterministic prompts
+- deterministic resources
+- server-root/path safety
+- validation, preview, and normalized-save semantics
+
+### Keep Out Of The MCP Server
+
+- provider SDK clients
+- API-key loading as a server concern
+- provider-specific tool-loop behavior
+- notebook display code
+
+## Release 0.6.0 Architecture
+
+### Module Shape
+
+Recommended layout:
+
+- `wellplot.agent`
+- `wellplot.agent.core`
+- `wellplot.agent.mcp`
+- `wellplot.agent.providers.openai`
+- `wellplot.agent.providers.openai_compat`
+- `wellplot.agent.providers.anthropic`
+
+Exact names can change, but the split should remain.
+
+### Core Concepts
+
+#### 1. MCP Session Layer
+
+Responsibilities:
+
+- launch local `wellplot-mcp`
+- open and close stdio sessions
+- normalize MCP tools/prompts/resources for the agent core
+- later support remote MCP as a separate transport mode if needed
+
+Candidate types:
+
+- `LocalStdioMcpSession`
+- `McpToolRegistry`
+- `McpPromptRegistry`
+
+#### 2. Provider-Neutral Agent Core
+
+Responsibilities:
+
+- accept a natural-language authoring request
+- accept a deterministic MCP tool surface
+- run a provider adapter until completion or failure
+- collect tool trace, final text, previews, validation, and change summary in
+  one notebook-friendly result object
+
+Candidate types:
+
+- `AuthoringRequest`
+- `AuthoringResult`
+- `ToolCallEvent`
+- `ToolResultEvent`
+- `AgentBackend`
+
+#### 3. Provider Adapters
+
+Adapters translate provider APIs into the shared core contract.
+
+Planned first adapters:
+
+- `OpenAIResponsesBackend`
+- `OpenAICompatBackend`
+- `AnthropicMessagesBackend`
+
+Notes:
+
+- OpenAI-compatible providers can share a large part of the implementation
+- Anthropic should be separate from the beginning
+- Ollama should initially be supported only where the OpenAI-compatible path is
+  sufficient
+
+#### 4. Execution Modes
+
+Make these explicit:
+
+- local stdio MCP + provider tool loop
+- remote MCP + provider-native connector path later, where useful
+
+Do not force them into one fake abstraction too early.
+
+## Release 0.6.0 Provider Strategy
+
+### OpenAI
+
+- first-class
+- primary reference implementation
+
+### Hugging Face
+
+- second-wave support through the OpenAI-compatible adapter where practical
+
+### Ollama
+
+- OpenAI-compatible fallback path only
+- expect a more manual loop because stateful Responses semantics are weaker
+
+### Anthropic
+
+- separate adapter
+- do not hide its API shape behind an OpenAI-specific abstraction
+
+## Release 0.6.0 Public API Shape
+
+The notebook should eventually shrink to something like:
+
+```python
+from wellplot.agent import run_authoring_request
+
+result = await run_authoring_request(
+    goal="Recreate the porosity example with a simpler header.",
+    example_id="forge16b_porosity_example",
+    output_logfile="workspace/mcp_demo/openai_forge16b_recreated.log.yaml",
+    provider="openai",
+    model="gpt-5.4-mini",
+)
+```
+
+Or an explicit session:
+
+```python
+from wellplot.agent import AuthoringSession
+
+session = AuthoringSession.from_local_mcp(provider="openai", model="gpt-5.4-mini")
+result = await session.run(
+    goal="Add a porosity overlay track and shorten the remarks.",
+    example_id="forge16b_porosity_example",
+    output_logfile="workspace/mcp_demo/porosity_variant.log.yaml",
+)
+```
+
+The notebook should consume public `wellplot` interfaces, not embed provider
+tool-loop internals.
+
+## Release 0.6.0 Concrete Scope
+
+### In Scope
+
+- public host-side agent API for local stdio `wellplot-mcp`
+- provider-neutral orchestration core
+- OpenAI adapter
+- one OpenAI-compatible adapter path
+- notebook refactor to use the new public API
+- tests around deterministic orchestration glue where possible
+- docs for credentials, optional installs, and supported providers
+
+### Out Of Scope
+
+- moving provider logic into `wellplot-mcp`
+- promising perfect feature parity across all providers
+- mandatory CI execution of live hosted-model notebooks
+- remote MCP transport in the same slice unless it becomes necessary for one
+  chosen adapter
+
+## Release 0.6.0 Implementation Order
+
+1. extract the current notebook glue into a private internal prototype module
+2. define the provider-neutral result and event model
+3. implement local stdio MCP session helpers
+4. implement the OpenAI adapter
+5. refactor the notebook to use the public agent API
+6. add the OpenAI-compatible adapter
+7. add the Anthropic adapter
+8. document provider capabilities and limitations explicitly
+
+## Release 0.6.0 Acceptance
+
+`0.6.0` is complete when:
+
+- the natural-language notebook no longer embeds large MCP/provider helper
+  cells
+- the notebook imports public `wellplot` APIs and remains runnable
+- OpenAI works through the shared agent core
+- at least one OpenAI-compatible backend also works through the same core
+- Anthropic support is either implemented or explicitly deferred with a
+  documented adapter contract
+- the MCP server itself remains deterministic and unchanged in role
+
 ## First Five Operations
 
 These are the first five authoring operations that should be defined and built
@@ -854,14 +1080,14 @@ Docs to add or update:
 
 ## Immediate Next Step
 
-Implement the `0.5.0` ingestion and workflow layer on top of the completed
-`0.4.0` authoring foundation.
+Implement the `0.6.0` provider-neutral agent layer on top of the completed
+`0.5.0` MCP authoring and ingestion surface.
 
 That means:
 
-1. add precise heading-slot inspection
-2. add preview/apply header mapping helpers
-3. add deterministic simple-text parsing
-4. add preset and alias catalogs that reduce prompt verbosity
-5. validate with one end-to-end example:
-   - "take this header text block, map it into the report, preview it, and save"
+1. extract the notebook orchestration glue into a host-side `wellplot.agent`
+   prototype
+2. define the shared request/result/event model
+3. build the OpenAI adapter first
+4. refactor the natural-language notebook to import the new public API
+5. follow with one OpenAI-compatible adapter path

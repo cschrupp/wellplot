@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-04-29
+Last updated: 2026-05-01
 
 ## Scope Summary
 
@@ -203,6 +203,27 @@ Current `0.5.0` progress:
 - the MCP notebook/demo now covers one end-to-end header ingestion flow
 - the next step is release/docs closure for the completed `0.5.0` MCP
   workflow slice
+
+Planned `0.6.0` scope:
+
+- move natural-language orchestration glue out of notebooks and into a public
+  host-side `wellplot.agent` layer
+- keep `wellplot-mcp` deterministic, reviewable, and provider-agnostic
+- add a provider-neutral orchestration core plus thin provider adapters
+- support OpenAI first, then one OpenAI-compatible path, then Anthropic
+- shrink the natural-language notebook so it imports public `wellplot` APIs
+  instead of embedding MCP/provider session helpers
+
+Why this matters:
+
+- the current notebook proves the workflow, but the helper cell is too large
+  and too provider-specific for a real user-facing example
+- the missing product layer is orchestration, not more notebook glue
+
+Key constraint:
+
+- provider-neutral should mean a shared core with explicit adapters, not a
+  false promise that all providers expose identical capabilities
 
 Out of scope for this slice:
 

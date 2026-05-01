@@ -1,6 +1,6 @@
 # MCP Rollout Status
 
-Last updated: 2026-04-29
+Last updated: 2026-05-01
 
 ## Purpose
 
@@ -198,3 +198,22 @@ Implemented so far in `0.5.0`:
 Next up:
 
 - release/docs closure for the completed `0.5.0` MCP workflow slice
+- the `0.6.0` host-side agent layer that removes provider/session glue from
+  end-user notebooks
+
+Planned `0.6.0` focus:
+
+- add `wellplot.agent` as a public host-side orchestration layer
+- keep `wellplot-mcp` deterministic and provider-agnostic
+- add a provider-neutral core plus thin adapters:
+  - OpenAI
+  - OpenAI-compatible providers
+  - Anthropic
+- refactor the natural-language notebook to use the public agent API instead of
+  embedded MCP/provider glue
+
+Scope note:
+
+- this is a host-side integration layer, not a redesign of the MCP server
+- provider-neutral does not mean provider-identical; adapter differences should
+  stay explicit
