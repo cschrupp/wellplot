@@ -306,6 +306,10 @@ Current examples:
 - [examples/api_notebook_bytes_demo.py](examples/api_notebook_bytes_demo.py)
 - [examples/api_serialize_demo.py](examples/api_serialize_demo.py)
 - [examples/mcp_workflow_demo.py](examples/mcp_workflow_demo.py)
+- [examples/notebooks/developer/mcp_natural_language_demo.ipynb](examples/notebooks/developer/mcp_natural_language_demo.ipynb)
+  - manual OpenAI + local MCP integration notebook; run from a repository
+    checkout with `wellplot[mcp,notebook,las]`, `openai`, and a local
+    `OPENAI_API_KEY`
 - [examples/notebooks/developer/mcp_workflow_demo.ipynb](examples/notebooks/developer/mcp_workflow_demo.ipynb)
 
 Important current boundary:

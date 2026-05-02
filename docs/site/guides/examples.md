@@ -78,6 +78,15 @@ The examples are grouped by workflow rather than by isolated feature.
   - launch the local stdio MCP server, inspect its tools/resources/prompts,
     preview a production logfile, exercise export/format/save/render calls,
     and walk copied header text through deterministic MCP ingestion
+- `examples/notebooks/developer/mcp_natural_language_demo.ipynb`
+  - self-contained OpenAI + MCP notebook that recreates a LAS-backed production
+    packet variant from natural-language instructions through local MCP tool
+    execution
+  - requires a repository checkout, `wellplot[mcp,notebook,las]`, the
+    `openai` package, and a local `OPENAI_API_KEY` source such as `.env.local`
+    or `OPENAI_API_KEY.txt`
+  - should be treated as a manual or opt-in integration example rather than a
+    deterministic CI notebook
 - `examples/notebooks/developer/mcp_workflow_demo.ipynb`
   - notebook companion to the same MCP walkthrough, generated into the
     developer notebook set

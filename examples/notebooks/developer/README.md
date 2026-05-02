@@ -42,6 +42,16 @@ Runtime note:
 ## MCP walkthroughs
 
 - `mcp_workflow_demo.ipynb`
+- `mcp_natural_language_demo.ipynb`
+
+Runtime note for `mcp_natural_language_demo.ipynb`:
+
+- install `wellplot[mcp,notebook,las]` plus the `openai` package
+- run it from a repository checkout so the example data and YAML files resolve
+- provide `OPENAI_API_KEY` through the environment or one of the local ignored
+  files such as `.env.local` or `OPENAI_API_KEY.txt`
+- treat it as a manual/opt-in integration notebook, not as a deterministic CI
+  artifact
 
 ## YAML and legacy walkthroughs
 

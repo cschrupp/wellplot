@@ -217,3 +217,117 @@ Scope note:
 - this is a host-side integration layer, not a redesign of the MCP server
 - provider-neutral does not mean provider-identical; adapter differences should
   stay explicit
+
+## Pause Checkpoint (2026-05-01)
+
+This section records the exact repo-local pause point after the first
+natural-language notebook prototype and before the `wellplot.agent`
+implementation starts.
+
+### Latest Committed Planning Boundary
+
+- branch in use during this checkpoint: `codex/release-mcp-launcher-fix`
+- latest planning commit: `8f1823a`
+- commit message: `Plan MCP 0.6 provider-neutral agent layer`
+
+### In-Progress Worktree Prototype
+
+The following work exists in the local worktree but is not yet captured in the
+committed plan history:
+
+- `.gitignore`
+  - ignores local OpenAI token files:
+    - `.env`
+    - `.env.local`
+    - `OPENAI_API_KEY.txt`
+    - `openai_api_key.txt`
+- `src/wellplot/mcp/service.py`
+  - fixes `create_logfile_draft(example_id=...)` so packaged example rebasing
+    uses `examples/production/{example_id}` semantics under the current server
+    root instead of the installed asset-package path
+- `tests/test_mcp_service.py`
+  - adds coverage for packaged-example draft rebasing
+- `scripts/generate_example_notebooks.py`
+  - adds the self-contained natural-language MCP notebook generator
+  - contains the current OpenAI-specific orchestration prototype
+- `examples/notebooks/developer/mcp_natural_language_demo.ipynb`
+  - generated and executed notebook artifact for the OpenAI + local MCP proof
+- docs/runtime references:
+  - `README.md`
+  - `docs/site/guides/examples.md`
+  - `examples/notebooks/developer/README.md`
+
+### Notebook Prototype Status
+
+Current prototype notebook:
+
+- `examples/notebooks/developer/mcp_natural_language_demo.ipynb`
+
+What it currently demonstrates:
+
+- local API-key loading from ignored files or environment variables
+- OpenAI Responses API driving local stdio `wellplot-mcp`
+- deterministic MCP tool execution against the LAS-backed
+  `forge16b_porosity_example`
+- executed artifact checked in locally with outputs
+
+Current practical outcome:
+
+- the notebook successfully creates and validates a draft at
+  `workspace/mcp_demo/openai_forge16b_recreated.log.yaml`
+- the recorded run currently applies heading and remarks mutations reliably
+- the prototype is useful as a workflow proof, but it is still too provider-
+  specific and too glue-heavy for the final user-facing API
+
+Why this matters:
+
+- this prototype confirms that the missing product layer is host-side
+  orchestration, not more MCP server functionality
+- this is the main justification for the planned `0.6.0` `wellplot.agent`
+  layer
+
+### Verified Commands At This Pause Point
+
+The following commands passed against the prototype state:
+
+- `uv run ruff check src/wellplot/mcp/service.py tests/test_mcp_service.py scripts/generate_example_notebooks.py`
+- `uv run ruff format --check src/wellplot/mcp/service.py tests/test_mcp_service.py scripts/generate_example_notebooks.py`
+- `uv run python -m unittest tests.test_mcp_service tests.test_mcp_server -v`
+- `uv run --group docs mkdocs build --strict`
+- notebook execution:
+  - `uv run python - <<'PY' ... NotebookClient(...).execute() ... PY`
+
+### Runtime Requirements For The Prototype Notebook
+
+- repository checkout is required
+- install extras and dependencies in the active environment:
+  - `wellplot[mcp,notebook,las]`
+  - `openai`
+- provide `OPENAI_API_KEY` through one of:
+  - environment variable
+  - `.env.local`
+  - `.env`
+  - `OPENAI_API_KEY.txt`
+  - `openai_api_key.txt`
+
+Notes:
+
+- those token-file paths are intentionally git-ignored
+- the live-model notebook should remain manual or opt-in; it should not become
+  a required CI gate
+
+### Recommended Restart Order
+
+When work resumes:
+
+1. review the uncommitted natural-language notebook prototype diff
+2. decide whether to commit the prototype state as one checkpoint or split it
+   into:
+   - MCP packaged-example rebasing fix
+   - notebook/generator/docs prototype
+3. start the `0.6.0` extraction by moving the orchestration glue from the
+   notebook into a host-side internal prototype module
+4. define the public `wellplot.agent` request/result/event model
+5. implement the OpenAI adapter first
+6. then shrink the notebook so it imports the new public API instead of
+   embedding the orchestration logic
