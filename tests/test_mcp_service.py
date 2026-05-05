@@ -512,6 +512,18 @@ class McpServiceTests(unittest.TestCase):
             saved_text = output_path.read_text(encoding="utf-8")
             self.assertIn("CBL Log Example Full Reconstruction", saved_text)
             self.assertNotIn("\ntemplate:\n", saved_text)
+            expected_render_path = (
+                REPO_ROOT / "workspace" / "renders" / "CBL_log_example_full_reconstruction.pdf"
+            )
+            expected_output_path = Path(
+                os.path.relpath(expected_render_path, start=output_path.parent)
+            ).as_posix()
+            expected_main_source_path = REPO_ROOT / "workspace" / "data" / "CBL_Main.dlis"
+            expected_main_source = Path(
+                os.path.relpath(expected_main_source_path, start=output_path.parent)
+            ).as_posix()
+            self.assertIn(f"output_path: {expected_output_path}", saved_text)
+            self.assertIn(f"source_path: {expected_main_source}", saved_text)
 
     def test_summarize_logfile_draft_returns_authoring_metadata(self) -> None:
         """Summarize one draft logfile for deterministic authoring planning."""

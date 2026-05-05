@@ -7,6 +7,12 @@ uv.lock.bak
 .codex
 .vscode/
 
+# Local API credentials
+.env
+.env.local
+OPENAI_API_KEY.txt
+openai_api_key.txt
+
 # Generated outputs
 workspace/
 

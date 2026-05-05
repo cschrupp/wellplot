@@ -3094,9 +3094,10 @@ def create_logfile_draft(
                 asset_path.read_text(encoding="utf-8"),
                 base_dir=asset_path.parent,
             )
+            example_base_dir = server_root / "examples" / "production" / example_id
             normalized_spec = _persist_rebased_logfile_mapping(
                 report_to_dict(spec),
-                from_base_dir=asset_path.parent,
+                from_base_dir=example_base_dir,
                 output_path=resolved_output_path,
             )
         return LogfileDraftCreateResult(

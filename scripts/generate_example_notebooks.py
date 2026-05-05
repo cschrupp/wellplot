@@ -72,6 +72,9 @@ class PythonRecipe:
     prerequisites: tuple[str, ...]
     code_cells: tuple[str, ...]
     adaptation_tips: tuple[str, ...]
+    install_command: str | None = None
+    display_source: bool = True
+    self_contained: bool = False
 
 
 @dataclass(frozen=True)
@@ -717,6 +720,499 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             "Use `inspect_logfile(...)` first and then drive the narrow preview tools with the returned section and track ids.",
             "Treat `format_logfile_text(...)` and `save_logfile_text(...)` as normalization steps, not as comment-preserving editors.",
             "Use explicit keys like `general_field.company`, `detail.date`, or `service_title_1` when copied header text could map to multiple slots.",
+        ),
+    ),
+    "mcp_natural_language_demo.py": PythonRecipe(
+        source="mcp_natural_language_demo.py",
+        title="Natural-Language MCP Authoring With OpenAI",
+        summary=(
+            "Run a self-contained notebook that uses the OpenAI Responses API as the "
+            "host LLM loop, proxies local `wellplot-mcp` tools into function calls, "
+            "and recreates a production example variant from natural-language instructions."
+        ),
+        learning_goals=(
+            "Load a local OpenAI API key without committing it to the repository.",
+            "Retrieve the MCP authoring prompt and turn the local stdio server tools into OpenAI function tools.",
+            "Let a model clone and revise a production draft through deterministic MCP edit operations.",
+            "Inspect the tool trace, structural change summary, and resulting previews from one natural-language authoring run.",
+        ),
+        prerequisites=("las", "mcp"),
+        install_command='pip install "wellplot[las,mcp,notebook]" openai',
+        display_source=False,
+        self_contained=True,
+        code_cells=(
+            dedent(
+                """
+                # Self-contained helpers for driving the local stdio MCP server from the
+                # OpenAI Responses API without importing any repository-local helper module.
+                import base64
+                import json
+                import os
+                import shutil
+                import sys
+                from contextlib import asynccontextmanager
+                from pathlib import Path
+                from typing import Any
+
+                DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+                DEFAULT_EXAMPLE_ID = "forge16b_porosity_example"
+                DEFAULT_OUTPUT_LOGFILE = Path("workspace/mcp_demo/openai_forge16b_recreated.log.yaml")
+                ALLOWED_MCP_TOOLS = (
+                    "create_logfile_draft",
+                    "summarize_logfile_draft",
+                    "validate_logfile",
+                    "inspect_logfile",
+                    "inspect_data_source",
+                    "check_channel_availability",
+                    "inspect_heading_slots",
+                    "parse_key_value_text",
+                    "preview_header_mapping",
+                    "apply_header_values",
+                    "inspect_style_presets",
+                    "inspect_authoring_vocab",
+                    "add_track",
+                    "bind_curve",
+                    "update_curve_binding",
+                    "move_track",
+                    "set_heading_content",
+                    "set_remarks_content",
+                    "summarize_logfile_changes",
+                )
+
+                def repo_relative(path: str | Path) -> str:
+                    raw = Path(path)
+                    if raw.is_absolute():
+                        return raw.resolve().relative_to(REPO_ROOT).as_posix()
+                    return raw.as_posix()
+
+                def load_openai_api_key() -> tuple[str, str]:
+                    env_key = os.getenv("OPENAI_API_KEY", "").strip()
+                    if env_key:
+                        return env_key, "environment variable OPENAI_API_KEY"
+
+                    env_paths = (REPO_ROOT / ".env.local", REPO_ROOT / ".env")
+                    for env_path in env_paths:
+                        if not env_path.exists():
+                            continue
+                        for line in env_path.read_text(encoding="utf-8").splitlines():
+                            stripped = line.strip()
+                            if not stripped or stripped.startswith("#") or "=" not in stripped:
+                                continue
+                            key, value = stripped.split("=", 1)
+                            if key.strip() == "OPENAI_API_KEY" and value.strip():
+                                token = value.strip().strip('"').strip("'")
+                                if token:
+                                    return token, str(env_path.relative_to(REPO_ROOT))
+
+                    text_paths = (
+                        REPO_ROOT / "OPENAI_API_KEY.txt",
+                        REPO_ROOT / "openai_api_key.txt",
+                    )
+                    for text_path in text_paths:
+                        if not text_path.exists():
+                            continue
+                        token = text_path.read_text(encoding="utf-8").strip()
+                        if token:
+                            return token, str(text_path.relative_to(REPO_ROOT))
+
+                    raise RuntimeError(
+                        "Set OPENAI_API_KEY or create one of .env.local, .env, "
+                        "OPENAI_API_KEY.txt, or openai_api_key.txt in the repository root."
+                    )
+
+                def load_openai_client() -> tuple[Any, str]:
+                    try:
+                        from openai import OpenAI
+                    except ImportError as exc:
+                        raise RuntimeError(
+                            "Install the `openai` package in the active environment "
+                            "before running this notebook."
+                        ) from exc
+                    api_key, token_source = load_openai_api_key()
+                    return OpenAI(api_key=api_key), token_source
+
+                def _server_command() -> tuple[str, list[str]]:
+                    entry_point = shutil.which("wellplot-mcp")
+                    if entry_point is not None:
+                        return entry_point, []
+                    return sys.executable, ["-m", "wellplot.mcp.server"]
+
+                @asynccontextmanager
+                async def open_mcp_session() -> Any:
+                    from mcp.client.session import ClientSession
+                    from mcp.client.stdio import StdioServerParameters, stdio_client
+
+                    command, args = _server_command()
+                    server = StdioServerParameters(
+                        command=command,
+                        args=args,
+                        cwd=str(REPO_ROOT),
+                    )
+                    async with stdio_client(server) as streams, ClientSession(*streams) as session:
+                        await session.initialize()
+                        yield session
+
+                def first_prompt_text(result: Any) -> str:
+                    messages = getattr(result, "messages", None)
+                    if not messages:
+                        raise RuntimeError("Expected prompt messages from the MCP prompt response.")
+                    content = getattr(messages[0], "content", None)
+                    text = getattr(content, "text", None)
+                    if not isinstance(text, str):
+                        raise RuntimeError("Expected text content from the MCP prompt response.")
+                    return text
+
+                def decode_image_bytes(result: Any) -> bytes:
+                    content = getattr(result, "content", None)
+                    if not content:
+                        raise RuntimeError("Expected image content from the MCP tool response.")
+                    image_data = getattr(content[0], "data", None)
+                    if isinstance(image_data, bytes):
+                        return image_data
+                    if isinstance(image_data, str):
+                        return base64.b64decode(image_data)
+                    raise RuntimeError("Expected base64 image data from the MCP tool response.")
+
+                def tool_result_payload(result: Any) -> dict[str, Any]:
+                    structured = getattr(result, "structuredContent", None)
+                    if structured is not None:
+                        return {"structured": structured}
+
+                    content_items: list[dict[str, Any]] = []
+                    for item in getattr(result, "content", []) or []:
+                        item_type = getattr(item, "type", None)
+                        text = getattr(item, "text", None)
+                        if isinstance(text, str):
+                            content_items.append({"type": item_type, "text": text})
+                            continue
+                        if getattr(item, "data", None) is not None:
+                            content_items.append(
+                                {
+                                    "type": item_type,
+                                    "mime_type": getattr(item, "mimeType", None),
+                                    "note": "Binary content omitted from OpenAI tool replay.",
+                                }
+                            )
+                    return {"content": content_items}
+
+                def build_openai_function_tools(
+                    mcp_tools: list[Any],
+                    *,
+                    excluded_names: set[str] | None = None,
+                ) -> list[dict[str, Any]]:
+                    excluded = set() if excluded_names is None else set(excluded_names)
+                    function_tools: list[dict[str, Any]] = []
+                    for tool in mcp_tools:
+                        if tool.name not in ALLOWED_MCP_TOOLS or tool.name in excluded:
+                            continue
+                        schema = getattr(tool, "inputSchema", None) or {
+                            "type": "object",
+                            "properties": {},
+                        }
+                        function_tools.append(
+                            {
+                                "type": "function",
+                                "name": tool.name,
+                                "description": tool.description or f"Call {tool.name}.",
+                                "parameters": schema,
+                            }
+                        )
+                    return function_tools
+
+                async def run_openai_authoring(
+                    *,
+                    goal: str,
+                    example_id: str,
+                    output_logfile: str | Path,
+                    model: str = DEFAULT_MODEL,
+                    max_rounds: int = 12,
+                ) -> dict[str, Any]:
+                    client, token_source = load_openai_client()
+                    relative_output_logfile = repo_relative(output_logfile)
+                    output_path = REPO_ROOT / relative_output_logfile
+                    output_path.parent.mkdir(parents=True, exist_ok=True)
+                    if output_path.exists():
+                        output_path.unlink()
+
+                    async with open_mcp_session() as session:
+                        baseline_result = await session.call_tool(
+                            "create_logfile_draft",
+                            {
+                                "output_path": relative_output_logfile,
+                                "example_id": example_id,
+                                "overwrite": True,
+                            },
+                        )
+                        baseline_draft_text = output_path.read_text(encoding="utf-8")
+                        bootstrap_summary = await session.call_tool(
+                            "summarize_logfile_draft",
+                            {"logfile_path": relative_output_logfile},
+                        )
+                        bootstrap_vocab = await session.call_tool(
+                            "inspect_authoring_vocab",
+                            {"logfile_path": relative_output_logfile},
+                        )
+                        prompt_result = await session.get_prompt(
+                            "author_plot_from_request",
+                            {
+                                "goal": goal,
+                                "logfile_path": relative_output_logfile,
+                                "example_id": example_id,
+                            },
+                        )
+                        authoring_prompt = first_prompt_text(prompt_result)
+                        tools_result = await session.list_tools()
+                        function_tools = build_openai_function_tools(
+                            tools_result.tools,
+                            excluded_names={"create_logfile_draft"},
+                        )
+
+                        if not function_tools:
+                            raise RuntimeError("No MCP tools were exposed to the OpenAI loop.")
+
+                        bootstrap_sections = []
+                        for section in bootstrap_summary.structuredContent.get("sections", []):
+                            bootstrap_sections.append(
+                                {
+                                    "id": section.get("id"),
+                                    "track_ids": section.get("track_ids", []),
+                                    "track_kinds": section.get("track_kinds", []),
+                                    "available_channels": section.get("available_channels", []),
+                                }
+                            )
+                        bootstrap_context = {
+                            "draft_logfile": relative_output_logfile,
+                            "seed_result": baseline_result.structuredContent,
+                            "sections": bootstrap_sections,
+                            "heading_patch_keys": bootstrap_vocab.structuredContent.get(
+                                "heading_patch_keys", []
+                            ),
+                            "curve_binding_patch_keys": bootstrap_vocab.structuredContent.get(
+                                "curve_binding_patch_keys", []
+                            ),
+                        }
+                        initial_input: list[dict[str, Any]] = [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "input_text",
+                                        "text": (
+                                            f"A starter draft already exists at `{relative_output_logfile}` "
+                                            f"from packaged example `{example_id}`. Do not call "
+                                            "create_logfile_draft again. Use MCP mutation tools only, and make "
+                                            "real changes before you finish. At minimum, apply one heading patch "
+                                            "and one concise remarks replacement that satisfy the goal.\\n\\n"
+                                            "Draft context:\\n"
+                                            f"{json.dumps(bootstrap_context, indent=2)}\\n\\n"
+                                            "Mutation call examples:\\n"
+                                            f'- set_heading_content({{"logfile_path": "{relative_output_logfile}", '
+                                            '"patch": {"provider_name": "OpenAI Demo", "service_titles": '
+                                            '[{"value": "Simplified Porosity Review", "alignment": "center", '
+                                            '"bold": true}]}}})\\n'
+                                            f'- set_remarks_content({{"logfile_path": "{relative_output_logfile}", '
+                                            '"remarks": [{"title": "Simplified reconstruction", "lines": '
+                                            '["Short QC note."], "alignment": "left"}]}})\\n\\n'
+                                            "Use MCP tools only; do not rewrite YAML in prose.\\n\\n"
+                                            f"Goal:\\n{goal}"
+                                        ),
+                                    }
+                                ],
+                            }
+                        ]
+                        tool_trace: list[dict[str, Any]] = []
+                        final_text = ""
+                        response = None
+                        pending_input: list[dict[str, Any]] = initial_input
+
+                        for round_index in range(1, max_rounds + 1):
+                            request_kwargs: dict[str, Any] = {
+                                "model": model,
+                                "tools": function_tools,
+                            }
+                            if response is None:
+                                request_kwargs["instructions"] = authoring_prompt
+                                request_kwargs["input"] = pending_input
+                            else:
+                                request_kwargs["previous_response_id"] = response.id
+                                request_kwargs["input"] = pending_input
+                            response = client.responses.create(**request_kwargs)
+                            function_calls = [
+                                item for item in response.output if getattr(item, "type", None) == "function_call"
+                            ]
+                            if not function_calls:
+                                final_text = response.output_text
+                                break
+
+                            pending_input = []
+                            for call in function_calls:
+                                arguments = json.loads(call.arguments or "{}")
+                                tool_trace.append(
+                                    {
+                                        "round": round_index,
+                                        "name": call.name,
+                                        "arguments": arguments,
+                                    }
+                                )
+                                tool_result = await session.call_tool(call.name, arguments)
+                                pending_input.append(
+                                    {
+                                        "type": "function_call_output",
+                                        "call_id": call.call_id,
+                                        "output": json.dumps(tool_result_payload(tool_result)),
+                                    }
+                                )
+                        else:
+                            raise RuntimeError(
+                                f"The OpenAI authoring loop exceeded {max_rounds} rounds."
+                            )
+
+                        if response is not None and not final_text.strip():
+                            summary_response = client.responses.create(
+                                model=model,
+                                previous_response_id=response.id,
+                                input=[
+                                    {
+                                        "role": "user",
+                                        "content": [
+                                            {
+                                                "type": "input_text",
+                                                "text": (
+                                                    "Summarize the applied draft changes in three concise bullet "
+                                                    "points without calling more tools."
+                                                ),
+                                            }
+                                        ],
+                                    }
+                                ],
+                            )
+                            final_text = summary_response.output_text
+
+                        if not output_path.exists():
+                            raise RuntimeError(
+                                "The model finished without creating the expected draft logfile."
+                            )
+
+                        validation = await session.call_tool(
+                            "validate_logfile",
+                            {"logfile_path": relative_output_logfile},
+                        )
+                        draft_summary = await session.call_tool(
+                            "summarize_logfile_draft",
+                            {"logfile_path": relative_output_logfile},
+                        )
+                        inspect_summary = await session.call_tool(
+                            "inspect_logfile",
+                            {"logfile_path": relative_output_logfile},
+                        )
+                        change_summary = (
+                            await session.call_tool(
+                                "summarize_logfile_changes",
+                                {
+                                    "logfile_path": relative_output_logfile,
+                                    "previous_text": baseline_draft_text,
+                                },
+                            )
+                            if baseline_draft_text is not None
+                            else None
+                        )
+                        first_section_id = inspect_summary.structuredContent["section_ids"][0]
+                        report_preview = await session.call_tool(
+                            "preview_logfile_png",
+                            {
+                                "logfile_path": relative_output_logfile,
+                                "page_index": 0,
+                                "dpi": 72,
+                                "include_report_pages": True,
+                            },
+                        )
+                        section_preview = await session.call_tool(
+                            "preview_section_png",
+                            {
+                                "logfile_path": relative_output_logfile,
+                                "section_id": first_section_id,
+                                "dpi": 72,
+                            },
+                        )
+
+                    return {
+                        "token_source": token_source,
+                        "model": model,
+                        "example_id": example_id,
+                        "goal": goal,
+                        "draft_logfile": relative_output_logfile,
+                        "tool_trace": tool_trace,
+                        "final_text": final_text,
+                        "validation": dict(validation.structuredContent),
+                        "draft_summary": dict(draft_summary.structuredContent),
+                        "inspect_summary": dict(inspect_summary.structuredContent),
+                        "change_summary": None
+                        if change_summary is None or change_summary.structuredContent is None
+                        else dict(change_summary.structuredContent),
+                        "report_preview_png": decode_image_bytes(report_preview),
+                        "section_preview_png": decode_image_bytes(section_preview),
+                        "draft_text": output_path.read_text(encoding="utf-8"),
+                    }
+                """
+            ).strip(),
+            dedent(
+                """
+                # Edit these values before rerunning the notebook on a different target.
+                GOAL = (
+                    "Recreate the forge16b porosity example as a simplified interpretation "
+                    "packet. Keep one GR/SP track, one depth track, one resistivity track, "
+                    "and one porosity overlay track with RHOB and NPHI. Shorten the remarks "
+                    "to one concise block and simplify the heading."
+                )
+                EXAMPLE_ID = DEFAULT_EXAMPLE_ID
+                MODEL = DEFAULT_MODEL
+                OUTPUT_LOGFILE = DEFAULT_OUTPUT_LOGFILE
+
+                print("Model:", MODEL)
+                print("Seed example:", EXAMPLE_ID)
+                print("Draft output:", OUTPUT_LOGFILE)
+                print("Allowed MCP tools:", ", ".join(ALLOWED_MCP_TOOLS))
+                """
+            ).strip(),
+            dedent(
+                """
+                # Run the natural-language authoring loop through OpenAI + local MCP.
+                from IPython.display import Code, Image, Markdown, display
+
+                authoring = await run_openai_authoring(
+                    goal=GOAL,
+                    example_id=EXAMPLE_ID,
+                    output_logfile=OUTPUT_LOGFILE,
+                    model=MODEL,
+                )
+
+                print("Token source:", authoring["token_source"])
+                print("Draft logfile:", authoring["draft_logfile"])
+                print("Validation:", authoring["validation"])
+                print("\\nModel summary:\\n")
+                display(Markdown(authoring["final_text"] or "_No final text returned._"))
+
+                print("\\nTool trace:")
+                for item in authoring["tool_trace"]:
+                    print(f" - round {item['round']}: {item['name']}({item['arguments']})")
+
+                print("\\nChange summary:")
+                for line in (authoring["change_summary"] or {}).get("summary_lines", []):
+                    print(" -", line)
+
+                print("\\nFirst section ids:", authoring["inspect_summary"]["section_ids"])
+                display(Image(data=authoring["report_preview_png"]))
+                display(Image(data=authoring["section_preview_png"]))
+
+                preview_yaml = "\\n".join(authoring["draft_text"].splitlines()[:120])
+                display(Code(preview_yaml, language="yaml"))
+                """
+            ).strip(),
+        ),
+        adaptation_tips=(
+            "Keep secrets in `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`; those paths stay local and should not be committed.",
+            "Start from `forge16b_porosity_example` or another LAS-backed production packet first so the natural-language loop stays fast and reproducible.",
+            "Treat the OpenAI model as the planner and `wellplot-mcp` as the deterministic executor; if the result is close but not right, rerun with a tighter goal or use `revise_plot_from_feedback(...)` in a follow-up loop.",
         ),
     ),
     "real_data_demo.py": PythonRecipe(
@@ -1649,13 +2145,38 @@ def _production_intro_markdown(
 def _python_intro_markdown(recipe: PythonRecipe) -> str:
     """Return the intro markdown for one Python example notebook."""
     goals = "\n".join(f"- {goal}" for goal in recipe.learning_goals)
-    prereq_block = _prerequisites_markdown(recipe.prerequisites)
-    return _join_markdown_lines(
+    prereq_block = _prerequisites_markdown(
+        recipe.prerequisites,
+        install_command=recipe.install_command,
+    )
+    intro_lines = (
         [
             f"# {recipe.title}",
             "",
             "This generated notebook is the recipe companion for",
             f"`examples/{recipe.source}`.",
+        ]
+        if not recipe.self_contained
+        else [
+            f"# {recipe.title}",
+            "",
+            "This generated notebook is a self-contained walkthrough.",
+        ]
+    )
+    runtime_lines = (
+        [
+            "- import `wellplot` from the active installed environment",
+            "- use the repository checkout for the example files and sample data",
+        ]
+        if recipe.self_contained
+        else [
+            "- import `wellplot` from the active installed environment",
+            "- use the repository checkout for the example files, helper modules, and sample data",
+        ]
+    )
+    return _join_markdown_lines(
+        intro_lines
+        + [
             "",
             recipe.summary,
             "",
@@ -1667,9 +2188,8 @@ def _python_intro_markdown(recipe: PythonRecipe) -> str:
             "",
             "Runtime model:",
             "",
-            "- import `wellplot` from the active installed environment",
-            "- use the repository checkout for the example files, helper modules, and sample data",
         ]
+        + runtime_lines
     )
 
 
@@ -1710,13 +2230,18 @@ def _install_command(extras: tuple[str, ...]) -> str:
     return f'pip install "wellplot[{joined}]"'
 
 
-def _prerequisites_markdown(steps: tuple[str, ...]) -> str:
+def _prerequisites_markdown(
+    steps: tuple[str, ...],
+    *,
+    install_command: str | None = None,
+) -> str:
     """Return a prerequisite markdown block."""
+    command = _install_command(steps) if install_command is None else install_command
     return _join_markdown_lines(
         [
             "Prerequisites:",
             "",
-            f"- `{_install_command(steps)}`",
+            f"- `{command}`",
             "- run the notebook from a checkout of this repository so the `examples/` files and sample data are available",
         ]
     )
@@ -4646,8 +5171,9 @@ def _python_notebook(recipe: PythonRecipe) -> dict[str, object]:
     cells: list[dict[str, object]] = [
         markdown_cell(_python_intro_markdown(recipe)),
         code_cell(_repo_setup_code()),
-        code_cell(_source_display_code(recipe.source, "python")),
     ]
+    if recipe.display_source:
+        cells.append(code_cell(_source_display_code(recipe.source, "python")))
     cells.extend(code_cell(step) for step in recipe.code_cells)
     cells.append(markdown_cell(_adaptation_markdown(recipe.title, recipe.adaptation_tips)))
     return _notebook(cells)
@@ -5025,6 +5551,20 @@ def _developer_readme_text() -> str:
         parts.append("")
         for entry in entries:
             parts.append(f"- `{entry}`")
+        if heading == "MCP walkthroughs":
+            parts.extend(
+                [
+                    "",
+                    "Runtime note for `mcp_natural_language_demo.ipynb`:",
+                    "",
+                    "- install `wellplot[mcp,notebook,las]` plus the `openai` package",
+                    "- run it from a repository checkout so the example data and YAML files resolve",
+                    "- provide `OPENAI_API_KEY` through the environment or one of the local ignored",
+                    "  files such as `.env.local` or `OPENAI_API_KEY.txt`",
+                    "- treat it as a manual/opt-in integration notebook, not as a deterministic CI",
+                    "  artifact",
+                ]
+            )
         parts.append("")
     parts.extend(
         [
