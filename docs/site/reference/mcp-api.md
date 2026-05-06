@@ -9,9 +9,9 @@ This page documents the experimental MCP server surface exposed by
 - transport: stdio
 - entry point: `wellplot-mcp`
 - import boundary:
-  - no new public `wellplot` or `wellplot.api` imports were added for this
-    feature
-  - the public surface is the MCP server contract itself
+  - the server contract remains the primary MCP surface
+  - the companion host-side Python authoring API now lives under
+    `wellplot.agent`
 
 ## Root Policy
 

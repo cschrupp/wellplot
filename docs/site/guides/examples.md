@@ -79,16 +79,14 @@ The examples are grouped by workflow rather than by isolated feature.
     preview a production logfile, exercise export/format/save/render calls,
     and walk copied header text through deterministic MCP ingestion
 - `examples/mcp_natural_language_demo.py`
-  - run an OpenAI + local MCP authoring loop that starts from a packaged
-    production example, applies deterministic draft edits, and writes preview
-    PNGs alongside the generated logfile
+  - run the public `wellplot.agent` authoring flow against a packaged
+    production example, apply deterministic draft edits, and write preview PNGs
+    alongside the generated logfile
 - `examples/notebooks/developer/mcp_natural_language_demo.ipynb`
-  - self-contained notebook companion to the same OpenAI + MCP authoring flow
-    that recreates a LAS-backed production packet variant through local MCP
-    tool execution
-  - requires a repository checkout, `wellplot[mcp,notebook,las]`, the
-    `openai` package, and a local `OPENAI_API_KEY` source such as `.env.local`
-    or `OPENAI_API_KEY.txt`
+  - notebook companion to the same `wellplot.agent` workflow that recreates a
+    LAS-backed production packet variant through local MCP tool execution
+  - requires a repository checkout, `wellplot[agent,notebook,las]`, and a
+    local `OPENAI_API_KEY` source such as `.env.local` or `OPENAI_API_KEY.txt`
   - should be treated as a manual or opt-in integration example rather than a
     deterministic CI notebook
 - `examples/notebooks/developer/mcp_workflow_demo.ipynb`

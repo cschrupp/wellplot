@@ -57,6 +57,10 @@ interactive = [
 mcp = [
   "mcp>=1,<2",
 ]
+agent = [
+  "mcp>=1,<2",
+  "openai>=1.0",
+]
 notebook = [
   "ipykernel>=6.29",
 ]
@@ -74,6 +78,7 @@ all = [
   "matplotlib>=3.8",
   "plotly>=5.18",
   "mcp>=1,<2",
+  "openai>=1.0",
   "ipykernel>=6.29",
   "pandas>=2.2",
   "pint>=0.24",

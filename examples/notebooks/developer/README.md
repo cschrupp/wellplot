@@ -46,7 +46,7 @@ Runtime note:
 
 Runtime note for `mcp_natural_language_demo.ipynb`:
 
-- install `wellplot[mcp,notebook,las]` plus the `openai` package
+- install `wellplot[agent,notebook,las]`
 - run it from a repository checkout so the example data and YAML files resolve
 - provide `OPENAI_API_KEY` through the environment or one of the local ignored
   files such as `.env.local` or `OPENAI_API_KEY.txt`

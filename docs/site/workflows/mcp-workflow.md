@@ -7,10 +7,15 @@ Use it when you want an MCP-aware client to validate, inspect, preview, and
 author normalized logfile YAML without adding new Python import surfaces to your
 own code.
 
+If you want hosted-model natural-language authoring from Python, use the public
+`wellplot.agent` layer on top of this server instead of re-implementing the
+provider + MCP tool loop yourself.
+
 ## Install
 
 ```bash
 python -m pip install "wellplot[mcp]"
+python -m pip install "wellplot[agent]"
 ```
 
 ## Launch Model

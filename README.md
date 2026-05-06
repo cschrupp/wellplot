@@ -132,6 +132,7 @@ python -m pip install "wellplot[pandas]"
 python -m pip install "wellplot[interactive]"
 python -m pip install "wellplot[notebook]"
 python -m pip install "wellplot[mcp]"
+python -m pip install "wellplot[agent]"
 ```
 
 Common example-workflow installs:
@@ -186,6 +187,24 @@ The MCP tool surface currently supports:
 
 Packaged example resources, authoring catalog resources, and guided prompts are
 also exposed for MCP-aware clients.
+
+## Experimental Agent API
+
+The natural-language authoring workflow now has a public host-side Python API
+on top of the local MCP server.
+
+Install it with:
+
+```bash
+python -m pip install "wellplot[agent]"
+```
+
+Current provider support:
+- OpenAI through `wellplot.agent`
+
+The main entry points are:
+- `from wellplot.agent import AuthoringSession`
+- `from wellplot.agent import run_authoring_request`
 
 ## Contributor Development Workflow
 
@@ -307,12 +326,11 @@ Current examples:
 - [examples/api_serialize_demo.py](examples/api_serialize_demo.py)
 - [examples/mcp_workflow_demo.py](examples/mcp_workflow_demo.py)
 - [examples/mcp_natural_language_demo.py](examples/mcp_natural_language_demo.py)
-  - OpenAI + local MCP authoring demo that recreates a production draft from
+  - public `wellplot.agent` demo that recreates a production draft from
     natural-language instructions and writes preview PNGs into `workspace/`
 - [examples/notebooks/developer/mcp_natural_language_demo.ipynb](examples/notebooks/developer/mcp_natural_language_demo.ipynb)
-  - self-contained notebook companion to the same workflow; run from a
-    repository checkout with `wellplot[mcp,notebook,las]`, `openai`, and a
-    local `OPENAI_API_KEY`
+  - notebook companion to the same workflow; run from a repository checkout
+    with `wellplot[agent,notebook,las]` and a local `OPENAI_API_KEY`
 - [examples/notebooks/developer/mcp_workflow_demo.ipynb](examples/notebooks/developer/mcp_workflow_demo.ipynb)
 
 Important current boundary:

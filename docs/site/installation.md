@@ -24,6 +24,7 @@ python -m pip install "wellplot[interactive]"
 python -m pip install "wellplot[notebook]"
 python -m pip install "wellplot[units]"
 python -m pip install "wellplot[mcp]"
+python -m pip install "wellplot[agent]"
 ```
 
 Common combinations:
@@ -80,6 +81,19 @@ Typical client registration:
   }
 }
 ```
+
+## Experimental Agent Install
+
+Install the public host-side authoring API when you want Python code to drive
+local `wellplot-mcp` sessions through a supported hosted model provider:
+
+```bash
+python -m pip install "wellplot[agent]"
+```
+
+Current provider support:
+
+- OpenAI
 
 ## Verify The Install
 
