@@ -48,8 +48,8 @@ Runtime note for `mcp_natural_language_demo.ipynb`:
 
 - install `wellplot[agent,notebook,las]`
 - run it from a repository checkout so the example data and YAML files resolve
-- provide `OPENAI_API_KEY` through the environment or one of the local ignored
-  files such as `.env.local` or `OPENAI_API_KEY.txt`
+- prefer `OPENAI_API_KEY` in the shell or `.env.local`; the notebook
+  also includes a one-cell `getpass()` fallback for the current kernel
 - treat it as a manual/opt-in integration notebook, not as a deterministic CI
   artifact
 

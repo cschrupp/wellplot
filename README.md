@@ -201,6 +201,17 @@ python -m pip install "wellplot[agent]"
 
 Current provider support:
 - OpenAI through `wellplot.agent`
+- OpenAI-compatible endpoints through `provider="openai_compat"` plus
+  `base_url=...`
+
+Recommended credential setup:
+- prefer `OPENAI_API_KEY` in the shell for OpenAI sessions
+- for notebooks, prompt once with `getpass()` and keep the key only in the
+  current kernel
+- use `.env.local` in the job or repository root when you want one local
+  persistent secret file that stays out of version control
+- loopback OpenAI-compatible endpoints such as `http://localhost:11434/v1`
+  receive an automatic placeholder token when no key is configured
 
 The main entry points are:
 - `from wellplot.agent import AuthoringSession`
@@ -330,7 +341,9 @@ Current examples:
     natural-language instructions and writes preview PNGs into `workspace/`
 - [examples/notebooks/developer/mcp_natural_language_demo.ipynb](examples/notebooks/developer/mcp_natural_language_demo.ipynb)
   - notebook companion to the same workflow; run from a repository checkout
-    with `wellplot[agent,notebook,las]` and a local `OPENAI_API_KEY`
+    with `wellplot[agent,notebook,las]`
+  - prefers `OPENAI_API_KEY` in the shell, but includes a safe notebook
+    `getpass()` fallback and also honors `.env.local`
 - [examples/notebooks/developer/mcp_workflow_demo.ipynb](examples/notebooks/developer/mcp_workflow_demo.ipynb)
 
 Important current boundary:

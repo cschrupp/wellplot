@@ -754,6 +754,19 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             ).strip(),
             dedent(
                 """
+                # Preferred path: export OPENAI_API_KEY before launching Jupyter.
+                # Safe notebook fallback: prompt once for this kernel only.
+                from getpass import getpass
+
+                if not os.getenv("OPENAI_API_KEY"):
+                    token = getpass("OpenAI API key: ").strip()
+                    if not token:
+                        raise RuntimeError("OPENAI_API_KEY is required for provider='openai'.")
+                    os.environ["OPENAI_API_KEY"] = token
+                """
+            ).strip(),
+            dedent(
+                """
                 # Edit these values before rerunning the notebook on a different target.
                 GOAL = (
                     "Recreate the forge16b porosity example as a simplified interpretation "
@@ -820,7 +833,8 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             ).strip(),
         ),
         adaptation_tips=(
-            "Keep secrets in `OPENAI_API_KEY`, `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`; those paths stay local and should not be committed.",
+            "Prefer exporting `OPENAI_API_KEY` before launching Jupyter; the notebook also includes a one-cell `getpass()` fallback that keeps the key in memory only for the current kernel session.",
+            "Use `.env.local` under the repository or job root if you want one persistent local secret file that still stays out of version control.",
             "Start from `forge16b_porosity_example` or another LAS-backed production packet first so the natural-language loop stays fast and reproducible.",
             "Treat the OpenAI model as the planner and `wellplot-mcp` as the deterministic executor; if the result is close but not right, rerun with a tighter goal or follow up with `revise_plot_from_feedback(...)` through the MCP prompt layer.",
         ),
@@ -5169,8 +5183,8 @@ def _developer_readme_text() -> str:
                     "",
                     "- install `wellplot[agent,notebook,las]`",
                     "- run it from a repository checkout so the example data and YAML files resolve",
-                    "- provide `OPENAI_API_KEY` through the environment or one of the local ignored",
-                    "  files such as `.env.local` or `OPENAI_API_KEY.txt`",
+                    "- prefer `OPENAI_API_KEY` in the shell or `.env.local`; the notebook",
+                    "  also includes a one-cell `getpass()` fallback for the current kernel",
                     "- treat it as a manual/opt-in integration notebook, not as a deterministic CI",
                     "  artifact",
                 ]

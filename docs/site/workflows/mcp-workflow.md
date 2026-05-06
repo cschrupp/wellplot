@@ -18,6 +18,41 @@ python -m pip install "wellplot[mcp]"
 python -m pip install "wellplot[agent]"
 ```
 
+Current `wellplot.agent` provider support:
+
+- OpenAI
+- OpenAI-compatible endpoints through `provider="openai_compat"` plus
+  `base_url=...`
+
+## Agent Credentials
+
+Preferred OpenAI setup:
+
+```bash
+export OPENAI_API_KEY="your-key-here"
+```
+
+Notebook-only fallback:
+
+```python
+import os
+from getpass import getpass
+
+if not os.getenv("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = getpass("OpenAI API key: ").strip()
+```
+
+Guidance:
+
+- do not hard-code provider keys in notebooks, YAML, or committed example files
+- use `.env.local` under the job or repository root when you want one local
+  persistent secret file that stays out of version control
+- for `provider="openai_compat"`, loopback endpoints such as
+  `http://localhost:11434/v1` receive an automatic placeholder token when no
+  key is configured
+- non-loopback OpenAI-compatible endpoints still require a real key through
+  `api_key=...`, `OPENAI_COMPAT_API_KEY`, `OPENAI_API_KEY`, or `.env.local`
+
 ## Launch Model
 
 `wellplot-mcp` is a stdio server. In normal use, an MCP client launches it for

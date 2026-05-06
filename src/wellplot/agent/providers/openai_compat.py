@@ -22,7 +22,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from ipaddress import ip_address
 from pathlib import Path
+from urllib.parse import urlparse
 
 from ..core import FunctionToolDefinition, ProviderRunResult, ToolCaller
 from ._openai_responses import (
@@ -32,31 +34,58 @@ from ._openai_responses import (
 )
 
 
+def _is_loopback_base_url(base_url: str) -> bool:
+    """Return whether the configured base URL targets only the local machine."""
+    hostname = urlparse(base_url).hostname
+    if hostname is None:
+        return False
+    if hostname == "localhost":
+        return True
+    try:
+        return ip_address(hostname).is_loopback
+    except ValueError:
+        return False
+
+
 def load_openai_compatible_api_key(
     *,
     server_root: str | Path,
+    base_url: str,
     api_key: str | None = None,
 ) -> tuple[str, str]:
     """Load one OpenAI-compatible API key from explicit input or local sources."""
-    return load_api_key_from_sources(
-        server_root=server_root,
-        api_key=api_key,
-        env_var_names=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-        env_file_keys=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-        text_file_names=(
-            "OPENAI_COMPAT_API_KEY.txt",
-            "openai_compat_api_key.txt",
-            "OPENAI_API_KEY.txt",
-            "openai_api_key.txt",
-        ),
-        missing_message=(
+    try:
+        return load_api_key_from_sources(
+            server_root=server_root,
+            api_key=api_key,
+            env_var_names=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
+            env_file_keys=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
+            text_file_names=(
+                "OPENAI_COMPAT_API_KEY.txt",
+                "openai_compat_api_key.txt",
+                "OPENAI_API_KEY.txt",
+                "openai_api_key.txt",
+            ),
+            missing_message=(
+                "Pass api_key=..., set OPENAI_COMPAT_API_KEY or OPENAI_API_KEY, or create "
+                "one of OPENAI_COMPAT_API_KEY.txt, openai_compat_api_key.txt, "
+                "OPENAI_API_KEY.txt, or openai_api_key.txt under the configured server "
+                "root."
+            ),
+        )
+    except RuntimeError:
+        if _is_loopback_base_url(base_url):
+            return (
+                "wellplot-local-openai-compat",
+                "implicit placeholder api_key for loopback openai_compat base_url",
+            )
+        raise RuntimeError(
             "Pass api_key=..., set OPENAI_COMPAT_API_KEY or OPENAI_API_KEY, or create "
             "one of OPENAI_COMPAT_API_KEY.txt, openai_compat_api_key.txt, "
             "OPENAI_API_KEY.txt, or openai_api_key.txt under the configured server "
-            "root. For local no-auth OpenAI-compatible endpoints, any non-empty "
-            "placeholder token is acceptable."
-        ),
-    )
+            "root. Loopback endpoints such as http://localhost:11434/v1 can omit a "
+            "real key and will receive an automatic placeholder token."
+        ) from None
 
 
 @dataclass(frozen=True)
@@ -84,6 +113,7 @@ class OpenAICompatibleAuthoringBackend:
             raise ValueError("OpenAI-compatible authoring requires a non-empty base_url.")
         token, token_source = load_openai_compatible_api_key(
             server_root=server_root,
+            base_url=normalized_base_url,
             api_key=api_key,
         )
         return cls(

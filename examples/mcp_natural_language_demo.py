@@ -60,6 +60,8 @@ async def run_openai_authoring(
     max_rounds: int = 12,
 ) -> AuthoringResult:
     """Run one natural-language authoring pass through the public agent API."""
+    # Keep provider credentials outside the script body. The agent layer loads
+    # OPENAI_API_KEY or local ignored secret files rooted at repo_root().
     return await run_authoring_request(
         goal=goal,
         example_id=example_id,

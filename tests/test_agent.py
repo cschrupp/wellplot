@@ -32,6 +32,7 @@ import anyio
 
 from wellplot.agent import AuthoringRequest, AuthoringResult, AuthoringSession, AuthoringToolCall
 from wellplot.agent.core import FunctionToolDefinition, run_authoring_request
+from wellplot.agent.providers import load_openai_compatible_api_key
 
 
 class FakeBackend:
@@ -329,6 +330,32 @@ class AgentTests(unittest.TestCase):
         """Reject the compatibility provider when no base URL is supplied."""
         with self.assertRaisesRegex(ValueError, "base_url"):
             AuthoringSession.from_local_mcp(provider="openai_compat", model="demo")
+
+    def test_openai_compat_uses_placeholder_token_for_loopback_base_url(self) -> None:
+        """Allow local OpenAI-compatible endpoints to run without a configured key."""
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.dict("os.environ", {}, clear=True):
+            token, source = load_openai_compatible_api_key(
+                server_root=tmpdir,
+                base_url="http://localhost:11434/v1",
+            )
+
+        self.assertEqual(token, "wellplot-local-openai-compat")
+        self.assertEqual(
+            source,
+            "implicit placeholder api_key for loopback openai_compat base_url",
+        )
+
+    def test_openai_compat_still_requires_key_for_non_loopback_base_url(self) -> None:
+        """Reject missing credentials for non-local OpenAI-compatible endpoints."""
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            mock.patch.dict("os.environ", {}, clear=True),
+            self.assertRaisesRegex(RuntimeError, "OPENAI_COMPAT_API_KEY"),
+        ):
+            load_openai_compatible_api_key(
+                server_root=tmpdir,
+                base_url="https://example-hosted-compat.test/v1",
+            )
 
     def test_run_authoring_request_uses_public_factory(self) -> None:
         """Delegate the convenience helper through the public session factory."""
