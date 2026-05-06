@@ -195,22 +195,24 @@ Implemented so far in `0.5.0`:
 - `wellplot://authoring/catalog/header-key-aliases.json`
 - `wellplot://authoring/catalog/style-presets.json`
 
+Current `0.6.0` status:
+
+- `wellplot.agent` is now implemented as the public host-side orchestration
+  layer
+- `wellplot-mcp` remains deterministic and provider-agnostic
+- the shared core plus thin adapters are implemented for:
+  - OpenAI
+  - one OpenAI-compatible provider path
+- the natural-language notebook now uses the public agent API instead of
+  embedded MCP/provider glue
+- Anthropic is explicitly deferred as a separate follow-on adapter task
+
 Next up:
 
-- release/docs closure for the completed `0.5.0` MCP workflow slice
-- the `0.6.0` host-side agent layer that removes provider/session glue from
-  end-user notebooks
-
-Planned `0.6.0` focus:
-
-- add `wellplot.agent` as a public host-side orchestration layer
-- keep `wellplot-mcp` deterministic and provider-agnostic
-- add a provider-neutral core plus thin adapters:
-  - OpenAI
-  - OpenAI-compatible providers
-  - Anthropic
-- refactor the natural-language notebook to use the public agent API instead of
-  embedded MCP/provider glue
+- keep release/docs closure aligned with the implemented agent slice
+- merge or rebase the branch back onto `main`
+- decide whether to add one explicit `openai_compat` example before the next
+  release cut
 
 Scope note:
 
@@ -218,7 +220,62 @@ Scope note:
 - provider-neutral does not mean provider-identical; adapter differences should
   stay explicit
 
-## Pause Checkpoint (2026-05-01)
+## Implementation Checkpoint (2026-05-06)
+
+This section records the repo-local state after the `wellplot.agent`
+implementation landed on `codex/release-mcp-launcher-fix`.
+
+### Latest Branch Boundary
+
+- branch in use during this checkpoint: `codex/release-mcp-launcher-fix`
+- latest branch commit at this checkpoint: `881068c`
+- commit message: `agent streamline credential onboarding`
+
+### Delivered In This Slice
+
+- `wellplot.agent` is implemented as the public host-side orchestration layer
+- the shared core now owns:
+  - request/result models
+  - local stdio MCP runtime launch
+  - tool replay through the provider loop
+  - preview, validation, and change-summary aggregation
+- provider adapters implemented in this branch:
+  - OpenAI
+  - one OpenAI-compatible path through `provider="openai_compat"`
+- the natural-language notebook and example script now import the public API
+  instead of embedding provider/MCP session glue
+- credential guidance is now documented around:
+  - `OPENAI_API_KEY`
+  - notebook `getpass()` fallback
+  - `.env.local` as the local persistent secret-file option
+- loopback-compatible endpoints such as `http://localhost:11434/v1` now accept
+  an automatic placeholder token when no real key is configured
+
+### Explicit Deferral
+
+- Anthropic is deferred from the current branch
+- the adapter remains planned as a separate provider-specific follow-on task
+- deferral is documented rather than left as an ambiguous unfinished item
+
+### Verified Commands At This Checkpoint
+
+- `uv run ruff check examples/mcp_natural_language_demo.py scripts/generate_example_notebooks.py src/wellplot/agent/providers/openai_compat.py tests/test_agent.py`
+- `uv run python -m unittest tests.test_agent -v`
+- `uv run python -m py_compile examples/mcp_natural_language_demo.py`
+- `UV_CACHE_DIR=/tmp/uv-cache uv run --group docs mkdocs build --strict`
+
+### Recommended Next Step
+
+When work resumes:
+
+1. keep the plan/docs state aligned with the implemented branch
+2. merge or rebase `codex/release-mcp-launcher-fix` onto `main`
+3. decide whether to add one explicit `openai_compat` example before the next
+   release cut
+4. revisit Anthropic as a separate adapter task instead of extending this
+   branch indefinitely
+
+## Historical Pause Checkpoint (2026-05-01)
 
 This section records the exact repo-local pause point after the first
 natural-language notebook prototype and before the `wellplot.agent`

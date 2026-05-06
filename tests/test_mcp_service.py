@@ -551,6 +551,45 @@ class McpServiceTests(unittest.TestCase):
             self.assertIn("lasio", section.dataset_message)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_section_data_source_replaces_one_draft_source(self) -> None:
+        """Replace one draft section source path and persist the validated result."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            replacement_las = Path(tmpdir) / "replacement.las"
+            replacement_text = self._fixture_paths.las_path.read_text(encoding="utf-8").replace(
+                "MCP FIXTURE-01",
+                "MCP REPLACEMENT-01",
+            )
+            replacement_las.write_text(replacement_text, encoding="utf-8")
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_section_data_source(
+                str(draft_path),
+                section_id="main",
+                source_path=str(replacement_las),
+                subtitle="Replacement LAS Source",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.source_path, str(replacement_las))
+            self.assertEqual(result.source_format, "las")
+            self.assertEqual(result.subtitle, "Replacement LAS Source")
+            self.assertIn("GR", result.available_channels)
+            self.assertIn("WELL", result.metadata_keys)
+            self.assertEqual(result.depth_unit, "m")
+            self.assertEqual(result.sample_count, 11)
+
+            summary = service.summarize_logfile_draft(str(draft_path), root=REPO_ROOT)
+            self.assertEqual(summary.sections[0].source_path, str(replacement_las))
+            self.assertEqual(summary.sections[0].source_format, "las")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_add_track_appends_one_track_to_draft(self) -> None:
         """Append one track to a cloned draft and persist the updated order."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -1549,6 +1588,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
         self.assertIn("inspect_data_source(source_path)", prompt)
         self.assertIn("check_channel_availability(...)", prompt)
+        self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
         self.assertIn("apply_header_values(...)", prompt)
@@ -1565,6 +1605,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
         self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
+        self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:

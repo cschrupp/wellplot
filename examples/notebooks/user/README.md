@@ -18,6 +18,16 @@ They differ from the developer notebooks in three ways:
 - `forge16b_porosity_example.ipynb`
   - Build an open-hole porosity packet from a public LAS file one stage at a time, from reusable template to gas-crossover fill and the final two-window packet.
 
+### Agent-Assisted Manual Recipe
+
+- `agent_las_step_by_step.ipynb`
+  - build one open-hole packet from a user LAS file through the public
+    `wellplot.agent` API, revising the same draft cell by cell
+  - manual and credentialed: requires `wellplot[agent,las,notebook]`
+    plus an OpenAI API key at runtime
+  - working first-pass recipe: functional, but still less curated than the
+    deterministic production notebooks
+
 ### Computed-Channel NumPy Recipes
 
 - `computed_numpy/cbl_log_example_numpy_computed.ipynb`

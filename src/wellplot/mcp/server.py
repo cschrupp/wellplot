@@ -242,6 +242,28 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return asdict(service.summarize_logfile_draft(logfile_path, root=server_root))
 
     @mcp.tool()
+    def set_section_data_source(
+        logfile_path: str,
+        section_id: str,
+        source_path: str,
+        source_format: str = "auto",
+        title: str | None = None,
+        subtitle: str | None = None,
+    ) -> dict[str, object]:
+        """Replace one section data source in a mutable draft logfile."""
+        return asdict(
+            service.set_section_data_source(
+                logfile_path,
+                section_id=section_id,
+                source_path=source_path,
+                source_format=source_format,
+                title=title,
+                subtitle=subtitle,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def add_track(
         logfile_path: str,
         section_id: str,

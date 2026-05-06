@@ -24,6 +24,8 @@ from .core import (
     AuthoringResult,
     AuthoringSession,
     AuthoringToolCall,
+    RevisionRequest,
+    revise_authoring_request,
     run_authoring_request,
 )
 
@@ -32,5 +34,7 @@ __all__ = [
     "AuthoringResult",
     "AuthoringSession",
     "AuthoringToolCall",
+    "RevisionRequest",
+    "revise_authoring_request",
     "run_authoring_request",
 ]

@@ -32,21 +32,20 @@ Preferred OpenAI setup:
 export OPENAI_API_KEY="your-key-here"
 ```
 
-Notebook-only fallback:
+Equivalent ignored local-file sources supported by `wellplot.agent`:
 
-```python
-import os
-from getpass import getpass
-
-if not os.getenv("OPENAI_API_KEY"):
-    os.environ["OPENAI_API_KEY"] = getpass("OpenAI API key: ").strip()
+```text
+.env.local
+.env
+OPENAI_API_KEY.txt
+openai_api_key.txt
 ```
 
 Guidance:
 
 - do not hard-code provider keys in notebooks, YAML, or committed example files
-- use `.env.local` under the job or repository root when you want one local
-  persistent secret file that stays out of version control
+- use `.env.local` or `OPENAI_API_KEY.txt` under the job or repository root
+  when you want one local persistent secret that stays out of version control
 - for `provider="openai_compat"`, loopback endpoints such as
   `http://localhost:11434/v1` receive an automatic placeholder token when no
   key is configured
@@ -160,6 +159,7 @@ Main tools:
 - `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
@@ -184,6 +184,8 @@ Recommended split:
   draft creation when the request starts from one raw LAS/DLIS source
 - use `create_logfile_draft(...)` + `summarize_logfile_draft(...)` when you
   want a file-backed authoring target that an MCP client can revise in steps
+- use `set_section_data_source(...)` when a starter draft should be switched to
+  one user LAS/DLIS file before you start adding tracks and bindings
 - use `parse_key_value_text(...)` when the source material is a copied header
   packet, tabular note block, or other simple key-value text
 - use `inspect_heading_slots(...)` when the next task is filling provider
@@ -210,6 +212,23 @@ Recommended split:
 - use `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` when the client is still working with unsaved YAML
   text in memory
+
+## Iterative Agent Pattern
+
+For hosted-model authoring from Python, the public `wellplot.agent` layer is
+meant to be iterative rather than one giant prompt.
+
+Recommended split:
+
+- use `await session.run(...)` once to seed the first draft from either
+  `example_id` or `source_logfile_path`
+- use `await session.revise(...)` for later notebook cells and user feedback
+- use `await session.render_logfile_to_file(...)` for the final MCP-backed PDF
+  render once the previews look correct
+
+This is the pattern used by the step-by-step user notebook:
+
+- `examples/notebooks/user/agent_las_step_by_step.ipynb`
 
 ## `base_dir` Semantics
 

@@ -82,6 +82,14 @@ class McpServerIntegrationTests(unittest.TestCase):
         export_dir = fixture_paths.fixture_dir / "exported-example"
         draft_logfile = fixture_paths.fixture_dir / "drafts" / "single-draft.log.yaml"
         saved_logfile = fixture_paths.fixture_dir / "saved.log.yaml"
+        replacement_las = fixture_paths.fixture_dir / "replacement.las"
+        replacement_las.write_text(
+            fixture_paths.las_path.read_text(encoding="utf-8").replace(
+                "MCP FIXTURE-01",
+                "MCP REPLACEMENT-01",
+            ),
+            encoding="utf-8",
+        )
         example_template = "examples/production/cbl_log_example/base.template.yaml"
         server = StdioServerParameters(
             command=sys.executable,
@@ -187,6 +195,15 @@ class McpServerIntegrationTests(unittest.TestCase):
                 {
                     "output_path": str(draft_logfile),
                     "source_logfile_path": fixture_paths.single_logfile_relative,
+                },
+            )
+            updated_source = await session.call_tool(
+                "set_section_data_source",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "source_path": str(replacement_las),
+                    "subtitle": "Replacement LAS Source",
                 },
             )
             previous_draft_text = draft_logfile.read_text(encoding="utf-8")
@@ -414,6 +431,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "export_example_bundle",
                 "create_logfile_draft",
                 "summarize_logfile_draft",
+                "set_section_data_source",
                 "add_track",
                 "bind_curve",
                 "update_curve_binding",
@@ -523,6 +541,9 @@ class McpServerIntegrationTests(unittest.TestCase):
             created_draft.structuredContent["seed_value"],
             str(fixture_paths.single_logfile),
         )
+        self.assertEqual(updated_source.structuredContent["source_path"], str(replacement_las))
+        self.assertEqual(updated_source.structuredContent["source_format"], "las")
+        self.assertEqual(updated_source.structuredContent["subtitle"], "Replacement LAS Source")
         self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(draft_summary.structuredContent["section_count"], 1)
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])

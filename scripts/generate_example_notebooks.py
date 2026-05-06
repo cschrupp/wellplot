@@ -60,6 +60,8 @@ KERNEL_METADATA = {
     },
 }
 
+AGENT_USER_NOTEBOOK_STEM = "agent_las_step_by_step"
+
 
 @dataclass(frozen=True)
 class PythonRecipe:
@@ -754,15 +756,11 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             ).strip(),
             dedent(
                 """
-                # Preferred path: export OPENAI_API_KEY before launching Jupyter.
-                # Safe notebook fallback: prompt once for this kernel only.
-                from getpass import getpass
-
-                if not os.getenv("OPENAI_API_KEY"):
-                    token = getpass("OpenAI API key: ").strip()
-                    if not token:
-                        raise RuntimeError("OPENAI_API_KEY is required for provider='openai'.")
-                    os.environ["OPENAI_API_KEY"] = token
+                # No notebook-local credential prompt is needed here.
+                # `wellplot.agent` will load OpenAI credentials from the same
+                # ignored local sources as the rest of the package:
+                # `OPENAI_API_KEY`, `.env.local`, `.env`, `OPENAI_API_KEY.txt`,
+                # or `openai_api_key.txt` under the configured server root.
                 """
             ).strip(),
             dedent(
@@ -833,8 +831,8 @@ PYTHON_RECIPES: dict[str, PythonRecipe] = {
             ).strip(),
         ),
         adaptation_tips=(
-            "Prefer exporting `OPENAI_API_KEY` before launching Jupyter; the notebook also includes a one-cell `getpass()` fallback that keeps the key in memory only for the current kernel session.",
-            "Use `.env.local` under the repository or job root if you want one persistent local secret file that still stays out of version control.",
+            "Credentials are loaded through `wellplot.agent`, so the notebook works with any supported local source: `OPENAI_API_KEY`, `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt` under the repository or job root.",
+            "Use `.env.local` or `OPENAI_API_KEY.txt` when you want one persistent local secret that stays out of version control without editing notebook cells.",
             "Start from `forge16b_porosity_example` or another LAS-backed production packet first so the natural-language loop stays fast and reproducible.",
             "Treat the OpenAI model as the planner and `wellplot-mcp` as the deterministic executor; if the result is close but not right, rerun with a tighter goal or follow up with `revise_plot_from_feedback(...)` through the MCP prompt layer.",
         ),
@@ -1443,6 +1441,9 @@ def _render_logfile_figures(
     section_id: str | None = None,
 ) -> list[object]:
     """Render one logfile to in-memory Matplotlib figures."""
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
     from wellplot.logfile import (
         build_documents_for_logfile,
         load_datasets_for_logfile,
@@ -4803,6 +4804,421 @@ def _python_notebook(recipe: PythonRecipe) -> dict[str, object]:
     return _notebook(cells)
 
 
+def _agent_user_notebook_path() -> Path:
+    """Return the path for the credentialed step-by-step agent notebook."""
+    return USER_NOTEBOOKS_DIR / f"{AGENT_USER_NOTEBOOK_STEM}.ipynb"
+
+
+def _agent_user_intro_markdown() -> str:
+    """Return the intro markdown for the credentialed agent user notebook."""
+    return _join_markdown_lines(
+        [
+            "# Example 7: Agent-Assisted LAS Packet Walkthrough",
+            "",
+            "This notebook is the detailed end-user recipe for building an open-hole",
+            "packet one step at a time through the public `wellplot.agent` API.",
+            "",
+            "Unlike the YAML-first user notebooks, this one is credentialed and manual:",
+            "",
+            "- it uses a live hosted model through `wellplot.agent`",
+            "- it runs the local `wellplot-mcp` server under the hood",
+            "- it starts from a tiny starter logfile and revises the same draft in steps",
+            "- it shows a preview image after each major authoring cell",
+            "",
+            "What you will do:",
+            "",
+            "1. point the draft at your own LAS file",
+            "2. generate the first-page header and add remarks",
+            "3. add one track at a time",
+            "4. preview the evolving section after each step",
+            "5. render the final PDF through the public agent session helper",
+            "",
+            "Prerequisites:",
+            "",
+            '- `python -m pip install "wellplot[agent,las,notebook]"`',
+            "- one supported OpenAI credential source under the repository or job root:",
+            "  `OPENAI_API_KEY`, `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or",
+            "  `openai_api_key.txt`",
+            "- run the notebook from a checkout of this repository so the example data and",
+            "  workspace folders are available",
+            "",
+            "This notebook is intentionally unexecuted in git because it depends on a live",
+            "model, local credentials, and your chosen LAS file.",
+        ]
+    )
+
+
+def _agent_user_setup_code() -> str:
+    """Return the setup cell for the credentialed agent walkthrough."""
+    return dedent(
+        """
+        import shutil
+        from pathlib import Path
+        from textwrap import dedent
+
+        from IPython.display import Code, Image, display
+        from wellplot.agent import AuthoringSession
+
+        MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
+        SEED_MAX_ROUNDS = 12
+        REVISION_MAX_ROUNDS = 18
+        TUTORIAL_DIR = REPO_ROOT / "workspace" / "tutorials" / "agent_las_step_by_step"
+        TUTORIAL_DIR.mkdir(parents=True, exist_ok=True)
+
+        SAMPLE_LAS_PATH = REPO_ROOT / "workspace" / "data" / "30-23a-3 8117_d.las"
+        USER_LAS_PATH = TUTORIAL_DIR / "user_input.las"
+        STARTER_LOGFILE = TUTORIAL_DIR / "agent_starter.log.yaml"
+        DRAFT_LOGFILE = TUTORIAL_DIR / "agent_open_hole_draft.log.yaml"
+        FINAL_PDF = TUTORIAL_DIR / "agent_open_hole_draft.pdf"
+
+        if not USER_LAS_PATH.exists():
+            shutil.copyfile(SAMPLE_LAS_PATH, USER_LAS_PATH)
+
+        def repo_relative(path: str | Path) -> str:
+            raw = Path(path)
+            absolute = raw if raw.is_absolute() else (REPO_ROOT / raw)
+            return absolute.resolve().relative_to(REPO_ROOT).as_posix()
+
+        def show_agent_result(title: str, result, *, preview: str = "section") -> None:
+            print(title)
+            print("Draft:", result.draft_logfile)
+            print("Tool trace:", [item.name for item in result.tool_trace])
+            for line in result.change_summary.get("summary_lines", []):
+                print(" -", line)
+            image_bytes = (
+                result.report_preview_png if preview == "report" else result.section_preview_png
+            )
+            display(Image(data=image_bytes))
+
+        session = AuthoringSession.from_local_mcp(
+            provider="openai",
+            model=MODEL,
+            server_root=REPO_ROOT,
+        )
+
+        print("Model:", MODEL)
+        print("Tutorial folder:", repo_relative(TUTORIAL_DIR))
+        print("User LAS path:", repo_relative(USER_LAS_PATH))
+        print("Draft logfile:", repo_relative(DRAFT_LOGFILE))
+        print("Final PDF:", repo_relative(FINAL_PDF))
+        """
+    ).strip()
+
+
+def _agent_user_starter_code() -> str:
+    """Return the starter-logfile creation cell for the agent walkthrough."""
+    return dedent(
+        """
+        starter_source = Path(os.path.relpath(SAMPLE_LAS_PATH, start=TUTORIAL_DIR)).as_posix()
+        starter_yaml = dedent(
+            f'''
+            version: 1
+            name: Agent LAS Starter
+            render:
+              backend: matplotlib
+              output_path: ./agent_open_hole_draft.pdf
+              dpi: 144
+            document:
+              page:
+                size: A4
+                orientation: portrait
+                continuous: false
+                bottom_track_header_enabled: true
+                track_gap_mm: 0
+                track_header_height_mm: 24
+              depth:
+                unit: ft
+                scale: 240
+              layout:
+                heading:
+                  enabled: true
+                  provider_name: Company
+                  general_fields:
+                    - key: company
+                      label: Company
+                      source_key: COMP
+                    - key: well
+                      label: Well
+                      source_key: WELL
+                    - key: field
+                      label: Field
+                      source_key: FLD
+                    - key: service_company
+                      label: Service Company
+                      source_key: SRVC
+                  service_titles:
+                    - value: Open Hole Quicklook
+                      alignment: center
+                      bold: true
+                  detail:
+                    kind: open_hole
+                    title: Open Hole Metadata
+                    rows:
+                      - label: Date
+                        values:
+                          - source_key: DATE
+                          - ""
+                      - label_cells:
+                          - UWI
+                          - Province
+                        columns:
+                          - cells:
+                              - source_key: UWI
+                          - cells:
+                              - source_key: PROV
+                log_sections:
+                  - id: main
+                    title: Main Review
+                    subtitle: Placeholder starter source
+                    depth_range:
+                      - 8400
+                      - 9300
+                    data:
+                      source_path: {starter_source}
+                      source_format: las
+                    tracks:
+                      - id: gr_sp
+                        title: GR/SP
+                        kind: normal
+                        width_mm: 32
+                        position: 1
+                      - id: depth
+                        title: Depth
+                        kind: reference
+                        width_mm: 18
+                        position: 2
+                        reference:
+                          axis: depth
+                          define_layout: true
+                          unit: ft
+                          scale_ratio: 240
+                          major_step: 100
+                          secondary_grid:
+                            display: true
+                            line_count: 4
+              bindings:
+                on_missing: skip
+                channels:
+                  - channel: GR
+                    track_id: gr_sp
+                    kind: curve
+                    label: GR
+                    style:
+                      color: "#2e7d32"
+            '''
+        ).strip() + "\\n"
+
+        STARTER_LOGFILE.write_text(starter_yaml, encoding="utf-8")
+        display(Code(starter_yaml, language="yaml"))
+        """
+    ).strip()
+
+
+def _agent_user_notebook() -> dict[str, object]:
+    """Build the credentialed step-by-step user notebook for agent authoring."""
+    cells = [
+        markdown_cell(_agent_user_intro_markdown()),
+        code_cell(_repo_setup_code()),
+        code_cell(_agent_user_setup_code()),
+        markdown_cell(
+            "## 1. Write A Minimal Starter Logfile\n\n"
+            "This starter keeps one compact overview track, one reference depth "
+            "track, and a source-key-backed heading. The first agent pass will "
+            "switch the section over to your own LAS file and keep the draft "
+            "intentionally sparse."
+        ),
+        code_cell(_agent_user_starter_code()),
+        markdown_cell(
+            "## 2. Create The Initial Draft\n\n"
+            "The first natural-language request clones the starter, changes the "
+            "section data source to `USER_LAS_PATH`, updates the subtitle, and keeps "
+            "only the seeded overview track plus the depth track while the packet is "
+            "still sparse."
+        ),
+        code_cell(
+            dedent(
+                """
+                seed_result = await session.run(
+                    goal=dedent(
+                        f'''
+                        Start from the existing starter logfile and create the initial open-hole draft.
+
+                        - Change the only section data source to `{repo_relative(USER_LAS_PATH)}`.
+                        - Keep the section id `main`.
+                        - Set the section subtitle to the LAS filename.
+                        - Keep the seeded `gr_sp` overview track before the depth track.
+                        - Do not add any additional tracks yet.
+                        - Keep the source-key-backed heading fields.
+                        - Set the first service title to `Open Hole Quicklook`.
+                        - Do not add remarks yet.
+                        '''
+                    ).strip(),
+                    source_logfile_path=repo_relative(STARTER_LOGFILE),
+                    output_logfile=repo_relative(DRAFT_LOGFILE),
+                    max_rounds=SEED_MAX_ROUNDS,
+                )
+
+                show_agent_result("Initial draft", seed_result, preview="report")
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 3. Add The Remarks Block\n\n"
+            "Revise the same draft with one short remarks block that explains what "
+            "the packet is for and keeps the public-data framing concise."
+        ),
+        code_cell(
+            dedent(
+                """
+                remarks_result = await session.revise(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    feedback=dedent(
+                        '''
+                        Add one concise remarks block to the first page.
+
+                        - Keep it short and readable.
+                        - Mention that this is an open-hole quicklook built from a user-supplied LAS file.
+                        - Mention that only channels confirmed through the source inspection should be plotted.
+                        - Mention that this packet is an iterative interpretation artifact, not a vendor-issued original.
+                        '''
+                    ).strip(),
+                    max_rounds=REVISION_MAX_ROUNDS,
+                )
+
+                show_agent_result("Remarks added", remarks_result, preview="report")
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 4. Refine The GR/SP Overview Track\n\n"
+            "Ask the model to refine the seeded overview track and to bind curves "
+            "only when they actually exist in the LAS file."
+        ),
+        code_cell(
+            dedent(
+                """
+                gr_sp_result = await session.revise(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    feedback=dedent(
+                        '''
+                        Revise the existing draft.
+
+                        - Revise the existing `gr_sp` overview track before the depth track.
+                        - If both GR and SP are available, bind both to this track.
+                        - If SP is missing, keep a GR-only overview.
+                        - Use a readable green gamma-ray curve and conventional linear scaling.
+                        '''
+                    ).strip(),
+                    max_rounds=REVISION_MAX_ROUNDS,
+                )
+
+                show_agent_result("GR/SP overview track", gr_sp_result)
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 5. Add The Resistivity Track\n\n"
+            "The next revision adds one log-scale resistivity track and prefers the "
+            "deepest curve visually if several resistivity channels are available."
+        ),
+        code_cell(
+            dedent(
+                """
+                resistivity_result = await session.revise(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    feedback=dedent(
+                        '''
+                        Revise the existing draft.
+
+                        - Add one resistivity track after the depth track.
+                        - Use a logarithmic scale from 0.2 to 2000 ohm.m.
+                        - Bind the deep, medium, and shallow resistivity curves that are available.
+                        - Keep the deepest resistivity curve visually strongest.
+                        '''
+                    ).strip(),
+                    max_rounds=REVISION_MAX_ROUNDS,
+                )
+
+                show_agent_result("Resistivity track", resistivity_result)
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 6. Add The Porosity Overlay Track\n\n"
+            "Now add the density-neutron overlay and ask the model to create a "
+            "crossover fill only when both channels are available."
+        ),
+        code_cell(
+            dedent(
+                """
+                porosity_result = await session.revise(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    feedback=dedent(
+                        '''
+                        Revise the existing draft.
+
+                        - Add one porosity track after the resistivity track.
+                        - If RHOB and NPHI are available, overlay them in the same track.
+                        - Reverse the neutron scale so crossover reads naturally.
+                        - Add a crossover fill only when both RHOB and NPHI are present.
+                        '''
+                    ).strip(),
+                    max_rounds=REVISION_MAX_ROUNDS,
+                )
+
+                show_agent_result("Porosity overlay track", porosity_result)
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 7. Add A Narrow QC Track\n\n"
+            "Finish the log section by adding a small QC track for supporting curves "
+            "such as caliper, PEF, or DRHO when the source contains them."
+        ),
+        code_cell(
+            dedent(
+                """
+                qc_result = await session.revise(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    feedback=dedent(
+                        '''
+                        Revise the existing draft.
+
+                        - Add one narrow QC track after the porosity track.
+                        - Bind supporting curves such as CALI, PEF, and DRHO only when they are available.
+                        - Keep the track readable and lighter-weight than the main interpretation tracks.
+                        '''
+                    ).strip(),
+                    max_rounds=REVISION_MAX_ROUNDS,
+                )
+
+                show_agent_result("QC track", qc_result)
+                """
+            ).strip()
+        ),
+        markdown_cell(
+            "## 8. Render The Final PDF\n\n"
+            "Once the section preview looks right, render the full draft through the "
+            "public agent session helper so the notebook still uses the MCP-backed path."
+        ),
+        code_cell(
+            dedent(
+                """
+                render_result = await session.render_logfile_to_file(
+                    logfile_path=repo_relative(DRAFT_LOGFILE),
+                    output_path=repo_relative(FINAL_PDF),
+                    overwrite=True,
+                )
+
+                print("Rendered PDF:", render_result["output_path"])
+                print("Pages:", render_result["page_count"])
+                """
+            ).strip()
+        ),
+    ]
+    return _notebook(cells)
+
+
 def _yaml_notebook(path: Path, mapping: dict[str, object]) -> dict[str, object]:
     """Build one logfile-YAML walkthrough notebook."""
     title = str(mapping.get("name", path.name)).strip()
@@ -5083,6 +5499,7 @@ def _root_readme_text() -> str:
     user_entries = sorted(
         _user_notebook_path(recipe.package_name).name for recipe in USER_PRODUCTION_RECIPES.values()
     )
+    agent_user_entry = _agent_user_notebook_path().name
     computed_numpy_entries = sorted(
         _computed_notebook_path("numpy", recipe.package_name).name
         for recipe in USER_PRODUCTION_RECIPES.values()
@@ -5114,6 +5531,7 @@ def _root_readme_text() -> str:
     ]
     for entry in user_entries:
         parts.append(f"- `user/{entry}`")
+    parts.append(f"- `user/{agent_user_entry}`")
     for entry in computed_numpy_entries:
         parts.append(f"- `user/computed_numpy/{entry}`")
     for entry in computed_pandas_entries:
@@ -5183,8 +5601,9 @@ def _developer_readme_text() -> str:
                     "",
                     "- install `wellplot[agent,notebook,las]`",
                     "- run it from a repository checkout so the example data and YAML files resolve",
-                    "- prefer `OPENAI_API_KEY` in the shell or `.env.local`; the notebook",
-                    "  also includes a one-cell `getpass()` fallback for the current kernel",
+                    "- `wellplot.agent` loads provider credentials from ignored local sources",
+                    "  such as `OPENAI_API_KEY`, `.env.local`, `.env`, or",
+                    "  `OPENAI_API_KEY.txt` under the repository root",
                     "- treat it as a manual/opt-in integration notebook, not as a deterministic CI",
                     "  artifact",
                 ]
@@ -5225,6 +5644,18 @@ def _user_readme_text() -> str:
     for recipe in USER_PRODUCTION_RECIPES.values():
         parts.append(f"- `{_user_notebook_path(recipe.package_name).name}`")
         parts.append(f"  - {recipe.subtitle}")
+    parts.extend(
+        [
+            "",
+            "### Agent-Assisted Manual Recipe",
+            "",
+            f"- `{_agent_user_notebook_path().name}`",
+            "  - build one open-hole packet from a user LAS file through the public",
+            "    `wellplot.agent` API, revising the same draft cell by cell",
+            "  - manual and credentialed: requires `wellplot[agent,las,notebook]`",
+            "    plus an OpenAI API key at runtime",
+        ]
+    )
     parts.extend(
         [
             "",
@@ -5389,6 +5820,11 @@ def generate(*, check: bool = False) -> int:
         changes += asset_changes
         if _write_notebook(output_path, notebook, check=check):
             changes += 1
+
+    agent_user_notebook_path = _agent_user_notebook_path()
+    expected_files.add(agent_user_notebook_path)
+    if _write_notebook(agent_user_notebook_path, _agent_user_notebook(), check=check):
+        changes += 1
 
     for series in ("numpy", "pandas"):
         for recipe in USER_PRODUCTION_RECIPES.values():

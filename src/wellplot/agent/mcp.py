@@ -22,7 +22,7 @@
 from __future__ import annotations
 
 import base64
-import shutil
+import os
 import sys
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -39,10 +39,33 @@ if TYPE_CHECKING:
 
 def _server_command() -> tuple[str, list[str]]:
     """Return the preferred command for launching the local stdio MCP server."""
-    entry_point = shutil.which("wellplot-mcp")
-    if entry_point is not None:
-        return entry_point, []
+    sibling_entry_point = Path(sys.executable).with_name("wellplot-mcp")
+    if sibling_entry_point.exists():
+        return str(sibling_entry_point), []
     return sys.executable, ["-m", "wellplot.mcp.server"]
+
+
+def _server_env() -> dict[str, str]:
+    """Build one child environment that preserves the current import resolution."""
+    env = dict(os.environ)
+    pythonpath_entries: list[str] = []
+    for entry in sys.path:
+        if not entry:
+            continue
+        try:
+            resolved = str(Path(entry).resolve())
+        except OSError:
+            continue
+        if resolved not in pythonpath_entries:
+            pythonpath_entries.append(resolved)
+    existing_pythonpath = env.get("PYTHONPATH")
+    if existing_pythonpath:
+        for entry in existing_pythonpath.split(os.pathsep):
+            if entry and entry not in pythonpath_entries:
+                pythonpath_entries.append(entry)
+    if pythonpath_entries:
+        env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    return env
 
 
 def _load_mcp_runtime() -> tuple[type[object], type[object], object]:
@@ -78,6 +101,7 @@ class LocalStdioMcpRuntime:
         server = StdioServerParameters(
             command=command,
             args=args,
+            env=_server_env(),
             cwd=str(self.server_root),
         )
         async with stdio_client(server) as streams, ClientSession(*streams) as session:

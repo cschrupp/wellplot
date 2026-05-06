@@ -54,6 +54,11 @@ The examples are grouped by workflow rather than by isolated feature.
 - [Example 6: Porosity Computed Channels With pandas](example-6-porosity-computed-pandas.md)
   - computes porosity and gas-crossover curves from the LAS-backed example with pandas
   - is the table-oriented companion to Example 4
+- [Example 7: Agent-Assisted LAS Packet Walkthrough](example-7-agent-las-step-by-step.md)
+  - builds one open-hole packet from a user LAS file through the public
+    `wellplot.agent` API
+  - uses a live model plus local `wellplot-mcp` to revise the same draft one
+    cell at a time
 
 ## Programmatic API examples
 
@@ -86,13 +91,21 @@ The examples are grouped by workflow rather than by isolated feature.
   - notebook companion to the same `wellplot.agent` workflow that recreates a
     LAS-backed production packet variant through local MCP tool execution
   - requires a repository checkout and `wellplot[agent,notebook,las]`
-  - prefers `OPENAI_API_KEY` in the shell, but includes a safe notebook
-    `getpass()` fallback and also honors `.env.local`
+  - uses the same credential loading as `wellplot.agent`: `OPENAI_API_KEY`,
+    `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`
   - should be treated as a manual or opt-in integration example rather than a
     deterministic CI notebook
 - `examples/notebooks/developer/mcp_workflow_demo.ipynb`
   - notebook companion to the same MCP walkthrough, generated into the
     developer notebook set
+- `examples/notebooks/user/agent_las_step_by_step.ipynb`
+  - detailed user walkthrough that starts from a tiny starter logfile, switches
+    to a user LAS file, and adds header, remarks, tracks, and bindings one step
+    at a time through `wellplot.agent`
+  - manual and credentialed: requires `wellplot[agent,notebook,las]` plus an
+    OpenAI API key at runtime
+  - working first-pass notebook: expect to tune prompts, model choice, and
+    revision round budgets for production-quality packet styling
 
 ## YAML/report examples
 

@@ -100,8 +100,9 @@ Current provider support:
 Credential guidance:
 
 - prefer `OPENAI_API_KEY` in the shell for OpenAI sessions
-- for notebooks, prompt once with `getpass()` and keep the key only in the
-  current kernel
+- `wellplot.agent` also loads ignored local credential files under the job or
+  repository root: `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or
+  `openai_api_key.txt`
 - use `.env.local` in the job or repository root when you want a local
   persistent secret file that stays out of version control
 - for loopback-compatible endpoints such as `http://localhost:11434/v1`,

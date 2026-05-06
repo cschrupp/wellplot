@@ -275,6 +275,34 @@ Notes:
 - channel discovery is best-effort and depends on the referenced data source
   and optional format dependencies being available
 
+### `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
+
+Purpose: point one existing draft section at a different LAS or DLIS source.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `source_path`
+- `source_format`
+- `title`
+- `subtitle`
+- `available_channels`
+- `metadata_keys`
+- `depth_unit`
+- `depth_min`
+- `depth_max`
+- `sample_count`
+
+Behavior:
+
+- validates that `section_id` exists in the target draft
+- validates that the new source resolves inside the server root
+- detects LAS vs DLIS when `source_format="auto"`
+- persists normalized YAML immediately after the source change
+- is the preferred edit when one starter draft should be repointed at a user
+  LAS file before track bindings are added
+
 ### `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 
 Purpose: append one track to a draft logfile and persist the validated result.
@@ -751,16 +779,18 @@ For draft authoring:
    workflow starts from raw LAS/DLIS data
 2. `create_logfile_draft(...)`
 3. `summarize_logfile_draft(...)`
-4. `parse_key_value_text(...)` when the input starts as copied header text
-5. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+4. `set_section_data_source(...)` when a starter draft should be repointed at a
+   different LAS or DLIS file
+5. `parse_key_value_text(...)` when the input starts as copied header text
+6. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-6. `preview_header_mapping(...)` before mutating header/report values
-7. `apply_header_values(...)` when the previewed mapping should be persisted
-8. `inspect_authoring_vocab(...)`
-9. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+7. `preview_header_mapping(...)` before mutating header/report values
+8. `apply_header_values(...)` when the previewed mapping should be persisted
+9. `inspect_authoring_vocab(...)`
+10. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
-10. `summarize_logfile_changes(...)` when the client retained a previous YAML
+11. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-11. preview with a narrow PNG tool
-12. render or save only after review
+12. preview with a narrow PNG tool
+13. render or save only after review

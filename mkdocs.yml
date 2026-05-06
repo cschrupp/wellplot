@@ -61,6 +61,7 @@ nav:
       - "Example 4: Porosity Computed Channels With NumPy": guides/example-4-porosity-computed-numpy.md
       - "Example 5: CBL Computed Channels With pandas": guides/example-5-cbl-computed-pandas.md
       - "Example 6: Porosity Computed Channels With pandas": guides/example-6-porosity-computed-pandas.md
+      - "Example 7: Agent-Assisted LAS Packet Walkthrough": guides/example-7-agent-las-step-by-step.md
   - Reference:
       - Overview: reference/index.md
       - Python API: reference/python-api.md

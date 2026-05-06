@@ -204,21 +204,24 @@ Current `0.5.0` progress:
 - the next step is release/docs closure for the completed `0.5.0` MCP
   workflow slice
 
-Planned `0.6.0` scope:
+Delivered `0.6.0` branch baseline (2026-05-06):
 
-- move natural-language orchestration glue out of notebooks and into a public
+- natural-language orchestration glue is now moved into the public
   host-side `wellplot.agent` layer
-- keep `wellplot-mcp` deterministic, reviewable, and provider-agnostic
-- add a provider-neutral orchestration core plus thin provider adapters
-- support OpenAI first, then one OpenAI-compatible path, then Anthropic
-- shrink the natural-language notebook so it imports public `wellplot` APIs
-  instead of embedding MCP/provider session helpers
+- `wellplot-mcp` remains deterministic, reviewable, and provider-agnostic
+- the shared orchestration core plus thin provider adapters are implemented for:
+  - OpenAI
+  - one OpenAI-compatible path
+- the natural-language notebook now imports public `wellplot` APIs instead of
+  embedding MCP/provider session helpers
+- Anthropic is explicitly deferred as a separate follow-on adapter task
 
 Why this matters:
 
-- the current notebook proves the workflow, but the helper cell is too large
-  and too provider-specific for a real user-facing example
-- the missing product layer is orchestration, not more notebook glue
+- the original notebook prototype proved the workflow, but the helper cell was
+  too large and too provider-specific for a real user-facing example
+- the delivered product layer is host-side orchestration, not more notebook
+  glue
 
 Key constraint:
 

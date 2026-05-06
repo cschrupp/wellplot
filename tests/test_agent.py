@@ -21,17 +21,30 @@
 
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
 import anyio
 
-from wellplot.agent import AuthoringRequest, AuthoringResult, AuthoringSession, AuthoringToolCall
-from wellplot.agent.core import FunctionToolDefinition, run_authoring_request
+from wellplot.agent import (
+    AuthoringRequest,
+    AuthoringResult,
+    AuthoringSession,
+    AuthoringToolCall,
+    RevisionRequest,
+)
+from wellplot.agent.core import (
+    FunctionToolDefinition,
+    revise_authoring_request,
+    run_authoring_request,
+)
+from wellplot.agent.mcp import _server_command, _server_env
 from wellplot.agent.providers import load_openai_compatible_api_key
 
 
@@ -91,14 +104,25 @@ class FakeMcpSession:
     def __init__(self, root: Path) -> None:
         """Initialize one fake session rooted at a temporary directory."""
         self.root = root
+        self.tool_calls: list[tuple[str, dict[str, object]]] = []
+        self.prompt_calls: list[tuple[str, dict[str, object]]] = []
 
     async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
         """Return deterministic payloads for the MCP tools used by the core."""
+        self.tool_calls.append((name, dict(arguments)))
         if name == "create_logfile_draft":
             output_path = self.root / str(arguments["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("name: Demo Draft\n", encoding="utf-8")
-            return SimpleNamespace(structuredContent={"created": True, "example_id": "demo"})
+            seed_kind = "example" if arguments.get("example_id") is not None else "logfile"
+            seed_value = str(arguments.get("example_id") or arguments.get("source_logfile_path"))
+            return SimpleNamespace(
+                structuredContent={
+                    "created": True,
+                    "seed_kind": seed_kind,
+                    "seed_value": seed_value,
+                }
+            )
         if name == "summarize_logfile_draft":
             return SimpleNamespace(
                 structuredContent={
@@ -108,6 +132,8 @@ class FakeMcpSession:
                             "track_ids": ["gamma"],
                             "track_kinds": ["curve"],
                             "available_channels": ["GR"],
+                            "source_path": "workspace/data/demo.las",
+                            "source_format": "las",
                         }
                     ]
                 }
@@ -133,10 +159,22 @@ class FakeMcpSession:
             return SimpleNamespace(content=[SimpleNamespace(data=b"report-preview")])
         if name == "preview_section_png":
             return SimpleNamespace(content=[SimpleNamespace(data=b"section-preview")])
+        if name == "render_logfile_to_file":
+            output_path = self.root / str(arguments["output_path"])
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("fake pdf output", encoding="utf-8")
+            return SimpleNamespace(
+                structuredContent={
+                    "backend": "matplotlib",
+                    "page_count": 1,
+                    "output_path": str(output_path),
+                }
+            )
         raise AssertionError(f"Unexpected MCP tool call: {name}")
 
     async def get_prompt(self, name: str, arguments: dict[str, object]) -> object:
         """Return one fake authoring prompt payload."""
+        self.prompt_calls.append((name, dict(arguments)))
         self._assert_prompt_args(name, arguments)
         return SimpleNamespace(
             messages=[SimpleNamespace(content=SimpleNamespace(text="authoring prompt"))]
@@ -160,11 +198,15 @@ class FakeMcpSession:
         )
 
     def _assert_prompt_args(self, name: str, arguments: dict[str, object]) -> None:
-        self_name = "author_plot_from_request"
-        if name != self_name:
-            raise AssertionError(f"Unexpected prompt request: {name}")
-        if arguments.get("example_id") != "forge16b_porosity_example":
-            raise AssertionError("Unexpected example id in prompt arguments.")
+        if name == "author_plot_from_request":
+            if arguments.get("logfile_path") != "workspace/demo.log.yaml":
+                raise AssertionError("Unexpected logfile path in authoring prompt arguments.")
+            return
+        if name == "revise_plot_from_feedback":
+            if arguments.get("logfile_path") != "workspace/demo.log.yaml":
+                raise AssertionError("Unexpected logfile path in revision prompt arguments.")
+            return
+        raise AssertionError(f"Unexpected prompt request: {name}")
 
 
 class FakeRuntime:
@@ -173,11 +215,14 @@ class FakeRuntime:
     def __init__(self, root: Path) -> None:
         """Initialize one fake runtime rooted at a temporary directory."""
         self.server_root = root
+        self.last_session: FakeMcpSession | None = None
 
     @asynccontextmanager
     async def open_session(self) -> object:
         """Yield one fake MCP session."""
-        yield FakeMcpSession(self.server_root)
+        session = FakeMcpSession(self.server_root)
+        self.last_session = session
+        yield session
 
     def build_tool_definitions(
         self,
@@ -212,6 +257,68 @@ class FakeRuntime:
         return {"structured": dict(result.structuredContent)}
 
 
+class MissingDraftMcpSession(FakeMcpSession):
+    """Fake MCP session that reports draft creation without writing the file."""
+
+    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+        """Skip the draft write so the core can surface a clearer error."""
+        self.tool_calls.append((name, dict(arguments)))
+        if name == "create_logfile_draft":
+            return SimpleNamespace(
+                structuredContent={
+                    "created": True,
+                    "seed_kind": "example",
+                    "seed_value": str(arguments.get("example_id")),
+                    "output_path": str(self.root / str(arguments["output_path"])),
+                }
+            )
+        return await super().call_tool(name, arguments)
+
+
+class MissingDraftRuntime(FakeRuntime):
+    """Runtime that exposes one missing-draft MCP session."""
+
+    @asynccontextmanager
+    async def open_session(self) -> object:
+        """Yield one fake session that never persists the created draft."""
+        session = MissingDraftMcpSession(self.server_root)
+        self.last_session = session
+        yield session
+
+
+class ToolErrorMcpSession(FakeMcpSession):
+    """Fake MCP session that reports one tool error payload."""
+
+    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+        """Return one MCP-style error result for draft creation."""
+        self.tool_calls.append((name, dict(arguments)))
+        if name == "create_logfile_draft":
+            return SimpleNamespace(
+                isError=True,
+                content=[
+                    SimpleNamespace(
+                        text=(
+                            "Logfile schema validation failed:\n"
+                            "- $.document: 'bindings' is a required property"
+                        )
+                    )
+                ],
+                structuredContent=None,
+            )
+        return await super().call_tool(name, arguments)
+
+
+class ToolErrorRuntime(FakeRuntime):
+    """Runtime that exposes one MCP tool error during draft creation."""
+
+    @asynccontextmanager
+    async def open_session(self) -> object:
+        """Yield one fake session that returns an MCP error result."""
+        session = ToolErrorMcpSession(self.server_root)
+        self.last_session = session
+        yield session
+
+
 class AgentTests(unittest.TestCase):
     """Verify the public host-side authoring session."""
 
@@ -220,20 +327,24 @@ class AgentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             backend = FakeBackend()
-            session = AuthoringSession(backend=backend, runtime=FakeRuntime(root))
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
 
             result = anyio.run(
                 session.run_request,
                 AuthoringRequest(
                     goal="Simplify the heading.",
-                    example_id="forge16b_porosity_example",
                     output_logfile="workspace/demo.log.yaml",
+                    example_id="forge16b_porosity_example",
                 ),
             )
 
             self.assertEqual(result.provider, "fake")
             self.assertEqual(result.model, "fake-model")
             self.assertEqual(result.credential_source, "fake credential")
+            self.assertEqual(result.request_kind, "author")
+            self.assertEqual(result.example_id, "forge16b_porosity_example")
+            self.assertIsNone(result.source_logfile_path)
             self.assertEqual(result.validation["valid"], True)
             self.assertEqual(result.inspect_summary["section_ids"], ["main"])
             self.assertEqual(
@@ -247,16 +358,194 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(backend.tool_names, ["set_heading_content"])
             self.assertEqual(backend.tool_payload, {"structured": {"applied": 1}})
             self.assertIn("Simplify the heading.", backend.initial_user_message)
+            self.assertIn(
+                "packaged example `forge16b_porosity_example`",
+                backend.initial_user_message,
+            )
             self.assertIn("authoring prompt", backend.instructions)
+            self.assertIsNotNone(runtime.last_session)
+            assert runtime.last_session is not None
+            self.assertEqual(runtime.last_session.prompt_calls[0][0], "author_plot_from_request")
 
             preview_paths = result.write_preview_artifacts()
             self.assertEqual(preview_paths["report_preview"].read_bytes(), b"report-preview")
             self.assertEqual(preview_paths["section_preview"].read_bytes(), b"section-preview")
 
+    def test_authoring_session_can_seed_from_starter_logfile(self) -> None:
+        """Support source_logfile_path as the seed for the initial authoring pass."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                partial(
+                    session.run,
+                    goal="Point the starter at a new LAS source.",
+                    output_logfile="workspace/demo.log.yaml",
+                    source_logfile_path="examples/starter.log.yaml",
+                )
+            )
+
+            self.assertEqual(result.request_kind, "author")
+            self.assertIsNone(result.example_id)
+            self.assertEqual(result.source_logfile_path, "examples/starter.log.yaml")
+            self.assertIn(
+                "starter logfile `examples/starter.log.yaml`",
+                backend.initial_user_message,
+            )
+            assert runtime.last_session is not None
+            create_call = runtime.last_session.tool_calls[0]
+            self.assertEqual(create_call[0], "create_logfile_draft")
+            self.assertEqual(create_call[1]["source_logfile_path"], "examples/starter.log.yaml")
+
+    def test_revision_request_reuses_existing_draft_without_recreation(self) -> None:
+        """Run one provider-backed revision against an existing draft logfile."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="Add one short remarks block.",
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            self.assertEqual(result.request_kind, "revise")
+            self.assertIsNone(result.example_id)
+            self.assertIsNone(result.source_logfile_path)
+            self.assertIn("Add one short remarks block.", backend.initial_user_message)
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertNotIn("create_logfile_draft", tool_names)
+            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+
+    def test_authoring_session_surfaces_missing_seed_draft_clearly(self) -> None:
+        """Raise one actionable error when the MCP server reports success without a file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = FakeBackend()
+            runtime = MissingDraftRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "create_logfile_draft reported success but no draft file was written",
+            ):
+                anyio.run(
+                    session.run_request,
+                    AuthoringRequest(
+                        goal="Simplify the heading.",
+                        output_logfile="workspace/demo.log.yaml",
+                        example_id="forge16b_porosity_example",
+                    ),
+                )
+
+    def test_authoring_session_surfaces_mcp_tool_errors_clearly(self) -> None:
+        """Propagate one explicit MCP tool error instead of a follow-on filesystem failure."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = FakeBackend()
+            runtime = ToolErrorRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "create_logfile_draft failed:\nLogfile schema validation failed",
+            ):
+                anyio.run(
+                    session.run_request,
+                    AuthoringRequest(
+                        goal="Simplify the heading.",
+                        output_logfile="workspace/demo.log.yaml",
+                        example_id="forge16b_porosity_example",
+                    ),
+                )
+
+    def test_render_logfile_to_file_uses_public_agent_helper(self) -> None:
+        """Render one draft through the public session helper instead of raw MCP plumbing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+
+            result = anyio.run(
+                partial(
+                    session.render_logfile_to_file,
+                    logfile_path="workspace/demo.log.yaml",
+                    output_path="workspace/demo.pdf",
+                    overwrite=True,
+                )
+            )
+
+            self.assertEqual(result["page_count"], 1)
+            self.assertTrue((root / "workspace" / "demo.pdf").exists())
+            assert runtime.last_session is not None
+            self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile_to_file")
+
     def test_from_local_mcp_rejects_unknown_provider(self) -> None:
         """Reject unsupported providers before optional imports happen."""
         with self.assertRaisesRegex(ValueError, "Unsupported authoring provider"):
             AuthoringSession.from_local_mcp(provider="anthropic", model="demo")
+
+    def test_run_authoring_request_helper_delegates_to_session(self) -> None:
+        """Expose the high-level helper for starter requests."""
+        fake_result = mock.Mock(spec=AuthoringResult)
+        with mock.patch.object(AuthoringSession, "from_local_mcp") as factory:
+            factory.return_value.run = mock.AsyncMock(return_value=fake_result)
+            result = anyio.run(
+                partial(
+                    run_authoring_request,
+                    goal="Build a starter packet.",
+                    output_logfile="workspace/demo.log.yaml",
+                    source_logfile_path="examples/starter.log.yaml",
+                    provider="openai",
+                    model="demo-model",
+                )
+            )
+
+        self.assertIs(result, fake_result)
+        factory.return_value.run.assert_awaited_once_with(
+            goal="Build a starter packet.",
+            example_id=None,
+            source_logfile_path="examples/starter.log.yaml",
+            output_logfile="workspace/demo.log.yaml",
+            max_rounds=12,
+        )
+
+    def test_revise_authoring_request_helper_delegates_to_session(self) -> None:
+        """Expose the high-level helper for iterative revisions."""
+        fake_result = mock.Mock(spec=AuthoringResult)
+        with mock.patch.object(AuthoringSession, "from_local_mcp") as factory:
+            factory.return_value.revise = mock.AsyncMock(return_value=fake_result)
+            result = anyio.run(
+                partial(
+                    revise_authoring_request,
+                    feedback="Move GR left of resistivity.",
+                    logfile_path="workspace/demo.log.yaml",
+                    provider="openai",
+                    model="demo-model",
+                )
+            )
+
+        self.assertIs(result, fake_result)
+        factory.return_value.revise.assert_awaited_once_with(
+            feedback="Move GR left of resistivity.",
+            logfile_path="workspace/demo.log.yaml",
+            max_rounds=12,
+        )
 
     def test_from_local_mcp_builds_openai_backend(self) -> None:
         """Construct the OpenAI backend through the public session factory."""
@@ -357,13 +646,39 @@ class AgentTests(unittest.TestCase):
                 base_url="https://example-hosted-compat.test/v1",
             )
 
+    def test_server_command_prefers_sibling_entry_point(self) -> None:
+        """Prefer the MCP entry point beside the active interpreter over PATH lookup."""
+        with (
+            mock.patch("wellplot.agent.mcp.sys.executable", "/tmp/demo/bin/python3"),
+            mock.patch("wellplot.agent.mcp.Path.exists", return_value=True),
+        ):
+            command, args = _server_command()
+
+        self.assertEqual(command, "/tmp/demo/bin/wellplot-mcp")
+        self.assertEqual(args, [])
+
+    def test_server_env_propagates_current_pythonpath(self) -> None:
+        """Preserve the current import resolution for the child MCP server process."""
+        fake_path_entries = ["/tmp/project/src", "/tmp/project/.venv/lib/python3.12/site-packages"]
+        with (
+            mock.patch.dict(os.environ, {"PYTHONPATH": "/tmp/existing"}, clear=False),
+            mock.patch("wellplot.agent.mcp.sys.path", ["", *fake_path_entries]),
+        ):
+            env = _server_env()
+
+        pythonpath_entries = env["PYTHONPATH"].split(os.pathsep)
+        self.assertEqual(pythonpath_entries[0:2], fake_path_entries)
+        self.assertIn("/tmp/existing", pythonpath_entries)
+
     def test_run_authoring_request_uses_public_factory(self) -> None:
         """Delegate the convenience helper through the public session factory."""
         result = AuthoringResult(
             provider="openai",
             model="gpt-5.4-mini",
             credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
             example_id="forge16b_porosity_example",
+            source_logfile_path=None,
             goal="Simplify the heading.",
             draft_logfile="workspace/demo.log.yaml",
             server_root=Path("/tmp"),
@@ -399,6 +714,7 @@ class AgentTests(unittest.TestCase):
             goal="Simplify the heading.",
             example_id="forge16b_porosity_example",
             output_logfile="workspace/demo.log.yaml",
+            source_logfile_path=None,
             max_rounds=12,
         )
 

@@ -178,6 +178,7 @@ The MCP tool surface currently supports:
 - `render_logfile_to_file`
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
+- `set_section_data_source`
 - `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
 - `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`,
@@ -206,16 +207,23 @@ Current provider support:
 
 Recommended credential setup:
 - prefer `OPENAI_API_KEY` in the shell for OpenAI sessions
-- for notebooks, prompt once with `getpass()` and keep the key only in the
-  current kernel
-- use `.env.local` in the job or repository root when you want one local
-  persistent secret file that stays out of version control
+- `wellplot.agent` also loads from ignored local files under the job or
+  repository root: `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or
+  `openai_api_key.txt`
+- use `.env.local` or `OPENAI_API_KEY.txt` when you want one local persistent
+  secret that stays out of version control without editing notebook cells
 - loopback OpenAI-compatible endpoints such as `http://localhost:11434/v1`
   receive an automatic placeholder token when no key is configured
 
 The main entry points are:
 - `from wellplot.agent import AuthoringSession`
 - `from wellplot.agent import run_authoring_request`
+- `from wellplot.agent import revise_authoring_request`
+
+Typical iterative flow:
+- `await session.run(...)` for the first seeded draft pass
+- `await session.revise(...)` for later cell-by-cell edits
+- `await session.render_logfile_to_file(...)` for the final MCP-backed PDF render
 
 ## Contributor Development Workflow
 
@@ -342,8 +350,15 @@ Current examples:
 - [examples/notebooks/developer/mcp_natural_language_demo.ipynb](examples/notebooks/developer/mcp_natural_language_demo.ipynb)
   - notebook companion to the same workflow; run from a repository checkout
     with `wellplot[agent,notebook,las]`
-  - prefers `OPENAI_API_KEY` in the shell, but includes a safe notebook
-    `getpass()` fallback and also honors `.env.local`
+  - uses the same credential loading as `wellplot.agent`: `OPENAI_API_KEY`,
+    `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`
+- [examples/notebooks/user/agent_las_step_by_step.ipynb](examples/notebooks/user/agent_las_step_by_step.ipynb)
+  - credentialed end-user walkthrough that starts from a tiny starter logfile,
+    switches to the user LAS file, and adds header, remarks, tracks, and
+    bindings one step at a time through `wellplot.agent`
+  - working first-pass agent workflow: functional, but intentionally less
+    curated than the deterministic production notebooks and may still need
+    prompt/model tuning for final visual polish
 - [examples/notebooks/developer/mcp_workflow_demo.ipynb](examples/notebooks/developer/mcp_workflow_demo.ipynb)
 
 Important current boundary:

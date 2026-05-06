@@ -594,6 +594,24 @@ class LogfileDraftSummaryResult:
 
 
 @dataclass(slots=True)
+class SectionDataSourceResult:
+    """Structured result for changing one section's source dataset."""
+
+    logfile_path: str
+    section_id: str
+    source_path: str
+    source_format: str
+    title: str
+    subtitle: str
+    available_channels: list[str]
+    metadata_keys: list[str]
+    depth_unit: str | None
+    depth_min: float | None
+    depth_max: float | None
+    sample_count: int | None
+
+
+@dataclass(slots=True)
 class AddedTrackResult:
     """Structured result for appending one track to a draft logfile."""
 
@@ -3205,6 +3223,72 @@ def summarize_logfile_draft(
     )
 
 
+def set_section_data_source(
+    logfile_path: str,
+    *,
+    section_id: str,
+    source_path: str,
+    source_format: str = "auto",
+    title: str | None = None,
+    subtitle: str | None = None,
+    root: str | Path | None = None,
+) -> SectionDataSourceResult:
+    """Replace one section data source and persist the validated draft."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_section(current_spec, section_id)
+    dataset, resolved_source_path, detected_format = _load_dataset_from_source_path(
+        source_path,
+        source_format=source_format,
+        root=server_root,
+    )
+    section = _logfile_mapping_section(mapping, section_id)
+    section_data = section.get("data")
+    if not isinstance(section_data, dict):
+        section_data = {}
+        section["data"] = section_data
+    section_data["source_path"] = Path(
+        os.path.relpath(resolved_source_path, start=resolved_logfile.parent)
+    ).as_posix()
+    section_data["source_format"] = detected_format
+    if title is not None:
+        section["title"] = str(title)
+    if subtitle is not None:
+        section["subtitle"] = str(subtitle)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    resolved_sources = resolve_section_data_sources_for_logfile(
+        saved_spec,
+        base_dir=resolved_logfile.parent,
+        allowed_root=server_root,
+    )
+    saved_source_path, saved_source_format = resolved_sources[section_id]
+    index = _dataset_index_summary(dataset)
+    return SectionDataSourceResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        source_path=str(saved_source_path),
+        source_format=saved_source_format,
+        title=str(saved_section.get("title", "")),
+        subtitle=str(saved_section.get("subtitle", "")),
+        available_channels=list(dataset.channels),
+        metadata_keys=sorted(str(key) for key in dataset.well_metadata),
+        depth_unit=index.depth_unit,
+        depth_min=index.depth_min,
+        depth_max=index.depth_max,
+        sample_count=index.sample_count,
+    )
+
+
 def add_track(
     logfile_path: str,
     *,
@@ -4418,22 +4502,24 @@ def author_plot_from_request_prompt(
         "1. If the request starts from a raw LAS/DLIS source, call "
         "inspect_data_source(source_path) and check_channel_availability(...) "
         "before you create bindings.\n"
-        "2. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "3. If the request includes report-header or remarks content from text, call "
+        "2. If you are adapting one starter draft to a different LAS/DLIS file, call "
+        "set_section_data_source(...) before adding or revising bindings.\n"
+        "3. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "4. If the request includes report-header or remarks content from text, call "
         "parse_key_value_text(source_text, format_hint=None) first.\n"
-        "4. If the request includes report-header or remarks content, call "
+        "5. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "5. If the request is mainly about visual conventions, call "
+        "6. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "6. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "7. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
+        "7. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "8. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
         "update_curve_binding(...), move_track(...), set_heading_content(...), and "
         "set_remarks_content(...).\n"
-        "8. Preview the affected section, track, or window before recommending a final render.\n"
-        "9. If you captured the previous YAML text before editing, call "
+        "9. Preview the affected section, track, or window before recommending a final render.\n"
+        "10. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "10. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "11. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -4446,11 +4532,13 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "Workflow:\n"
         "1. Call summarize_logfile_draft(logfile_path).\n"
         "2. Call inspect_authoring_vocab(logfile_path=logfile_path).\n"
-        "3. Choose the smallest edit sequence that addresses the feedback.\n"
-        "4. Preview the affected section, track, or depth window after the edits.\n"
-        "5. If the client retained the previous YAML text, call "
+        "3. If the feedback changes the underlying LAS/DLIS file, call "
+        "set_section_data_source(...) before rebinding curves.\n"
+        "4. Choose the smallest edit sequence that addresses the feedback.\n"
+        "5. Preview the affected section, track, or depth window after the edits.\n"
+        "6. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "6. Validate or save only after the preview looks correct.\n"
+        "7. Validate or save only after the preview looks correct.\n"
     )
 
 

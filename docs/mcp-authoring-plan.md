@@ -581,6 +581,30 @@ Move the natural-language orchestration glue out of notebooks and into a
 public, host-side `wellplot` API while keeping `wellplot-mcp` deterministic and
 provider-agnostic.
 
+### Status (2026-05-06)
+
+Current branch status:
+
+- branch in use: `codex/release-mcp-launcher-fix`
+- public host-side API is implemented under `wellplot.agent`
+- the shared core now owns request/result models, local stdio MCP runtime
+  access, tool replay, previews, validation capture, and change summaries
+- the natural-language notebook and companion example now import the public API
+  instead of embedding provider + MCP orchestration glue
+- OpenAI support is implemented as the reference adapter
+- one OpenAI-compatible adapter path is implemented through
+  `provider="openai_compat"` plus `base_url=...`
+- loopback-compatible endpoints such as `http://localhost:11434/v1` now receive
+  an automatic placeholder token when no real key is configured
+- docs now recommend `OPENAI_API_KEY` or notebook `getpass()` as the primary
+  credential flows, with `.env.local` as the local persistent fallback
+
+Anthropic status:
+
+- explicitly deferred from this branch
+- the adapter contract remains separate by design
+- deferral is intentional, not an untracked gap in the shared-core work
+
 ### Problem Statement
 
 The current natural-language notebook proves the workflow, but it exposes too
@@ -786,6 +810,12 @@ tool-loop internals.
 7. add the Anthropic adapter
 8. document provider capabilities and limitations explicitly
 
+Implementation snapshot:
+
+- steps 1 through 6 are complete on `codex/release-mcp-launcher-fix`
+- step 7 is explicitly deferred
+- step 8 is complete for the currently supported providers
+
 ## Release 0.6.0 Acceptance
 
 `0.6.0` is complete when:
@@ -798,6 +828,15 @@ tool-loop internals.
 - Anthropic support is either implemented or explicitly deferred with a
   documented adapter contract
 - the MCP server itself remains deterministic and unchanged in role
+
+Acceptance snapshot (2026-05-06):
+
+- satisfied: the notebook no longer embeds large MCP/provider helper cells
+- satisfied: the notebook imports public `wellplot` APIs
+- satisfied: OpenAI works through the shared core
+- satisfied: an OpenAI-compatible path works through the same core
+- satisfied: Anthropic is now explicitly deferred in this plan
+- satisfied: `wellplot-mcp` remains deterministic and unchanged in role
 
 ## First Five Operations
 
@@ -1080,14 +1119,13 @@ Docs to add or update:
 
 ## Immediate Next Step
 
-Implement the `0.6.0` provider-neutral agent layer on top of the completed
-`0.5.0` MCP authoring and ingestion surface.
+The next step is no longer core extraction.
 
-That means:
+The immediate follow-up is release/documentation closure for the implemented
+agent slice:
 
-1. extract the notebook orchestration glue into a host-side `wellplot.agent`
-   prototype
-2. define the shared request/result/event model
-3. build the OpenAI adapter first
-4. refactor the natural-language notebook to import the new public API
-5. follow with one OpenAI-compatible adapter path
+1. keep the branch docs aligned with the shipped `wellplot.agent` surface
+2. merge or rebase the branch back onto `main`
+3. decide whether to add one explicit `openai_compat` example before the next
+   release cut
+4. revisit Anthropic only as a separate follow-on adapter task
