@@ -257,6 +257,79 @@ class AgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unsupported authoring provider"):
             AuthoringSession.from_local_mcp(provider="anthropic", model="demo")
 
+    def test_from_local_mcp_builds_openai_backend(self) -> None:
+        """Construct the OpenAI backend through the public session factory."""
+        runtime = SimpleNamespace(server_root=Path("/tmp/openai-root"))
+        backend = SimpleNamespace(provider="openai", model="demo", credential_source=None)
+
+        with (
+            mock.patch(
+                "wellplot.agent.mcp.LocalStdioMcpRuntime",
+                return_value=runtime,
+            ) as runtime_factory,
+            mock.patch(
+                "wellplot.agent.providers.openai.OpenAIAuthoringBackend.from_local_configuration",
+                return_value=backend,
+            ) as backend_factory,
+        ):
+            session = AuthoringSession.from_local_mcp(
+                provider="openai",
+                model="demo-model",
+                server_root="/tmp/openai-root",
+                api_key="demo-token",
+            )
+
+        runtime_factory.assert_called_once_with(server_root="/tmp/openai-root")
+        backend_factory.assert_called_once_with(
+            model="demo-model",
+            server_root=runtime.server_root,
+            api_key="demo-token",
+        )
+        self.assertIs(session.backend, backend)
+        self.assertIs(session.runtime, runtime)
+
+    def test_from_local_mcp_builds_openai_compat_backend(self) -> None:
+        """Construct the OpenAI-compatible backend with the required base URL."""
+        runtime = SimpleNamespace(server_root=Path("/tmp/compat-root"))
+        backend = SimpleNamespace(
+            provider="openai_compat",
+            model="demo",
+            credential_source=None,
+        )
+
+        with (
+            mock.patch(
+                "wellplot.agent.mcp.LocalStdioMcpRuntime",
+                return_value=runtime,
+            ) as runtime_factory,
+            mock.patch(
+                "wellplot.agent.providers.openai_compat.OpenAICompatibleAuthoringBackend.from_local_configuration",
+                return_value=backend,
+            ) as backend_factory,
+        ):
+            session = AuthoringSession.from_local_mcp(
+                provider="openai_compat",
+                model="demo-model",
+                server_root="/tmp/compat-root",
+                api_key="compat-token",
+                base_url="http://localhost:11434/v1",
+            )
+
+        runtime_factory.assert_called_once_with(server_root="/tmp/compat-root")
+        backend_factory.assert_called_once_with(
+            model="demo-model",
+            server_root=runtime.server_root,
+            api_key="compat-token",
+            base_url="http://localhost:11434/v1",
+        )
+        self.assertIs(session.backend, backend)
+        self.assertIs(session.runtime, runtime)
+
+    def test_from_local_mcp_requires_base_url_for_openai_compat(self) -> None:
+        """Reject the compatibility provider when no base URL is supplied."""
+        with self.assertRaisesRegex(ValueError, "base_url"):
+            AuthoringSession.from_local_mcp(provider="openai_compat", model="demo")
+
     def test_run_authoring_request_uses_public_factory(self) -> None:
         """Delegate the convenience helper through the public session factory."""
         result = AuthoringResult(
@@ -293,6 +366,7 @@ class AgentTests(unittest.TestCase):
             model="gpt-5.4-mini",
             server_root=None,
             api_key=None,
+            base_url=None,
         )
         stub_session.run.assert_awaited_once_with(
             goal="Simplify the heading.",

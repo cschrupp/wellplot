@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""OpenAI provider adapter for the public wellplot authoring API."""
+"""OpenAI-compatible provider adapter for the public wellplot authoring API."""
 
 from __future__ import annotations
 
@@ -32,33 +32,42 @@ from ._openai_responses import (
 )
 
 
-def load_openai_api_key(
+def load_openai_compatible_api_key(
     *,
     server_root: str | Path,
     api_key: str | None = None,
 ) -> tuple[str, str]:
-    """Load one OpenAI API key from explicit input or local ignored sources."""
+    """Load one OpenAI-compatible API key from explicit input or local sources."""
     return load_api_key_from_sources(
         server_root=server_root,
         api_key=api_key,
-        env_var_names=("OPENAI_API_KEY",),
-        env_file_keys=("OPENAI_API_KEY",),
-        text_file_names=("OPENAI_API_KEY.txt", "openai_api_key.txt"),
+        env_var_names=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
+        env_file_keys=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
+        text_file_names=(
+            "OPENAI_COMPAT_API_KEY.txt",
+            "openai_compat_api_key.txt",
+            "OPENAI_API_KEY.txt",
+            "openai_api_key.txt",
+        ),
         missing_message=(
-            "Set OPENAI_API_KEY, pass api_key=..., or create one of .env.local, .env, "
-            "OPENAI_API_KEY.txt, or openai_api_key.txt under the configured server root."
+            "Pass api_key=..., set OPENAI_COMPAT_API_KEY or OPENAI_API_KEY, or create "
+            "one of OPENAI_COMPAT_API_KEY.txt, openai_compat_api_key.txt, "
+            "OPENAI_API_KEY.txt, or openai_api_key.txt under the configured server "
+            "root. For local no-auth OpenAI-compatible endpoints, any non-empty "
+            "placeholder token is acceptable."
         ),
     )
 
 
 @dataclass(frozen=True)
-class OpenAIAuthoringBackend:
-    """Thin OpenAI Responses API adapter for the public authoring session."""
+class OpenAICompatibleAuthoringBackend:
+    """Thin OpenAI-compatible Responses API adapter for the public session."""
 
     model: str
     client: object
+    base_url: str
     credential_source: str | None = None
-    provider: str = field(default="openai", init=False)
+    provider: str = field(default="openai_compat", init=False)
 
     @classmethod
     def from_local_configuration(
@@ -66,13 +75,21 @@ class OpenAIAuthoringBackend:
         *,
         model: str,
         server_root: str | Path,
+        base_url: str,
         api_key: str | None = None,
-    ) -> OpenAIAuthoringBackend:
+    ) -> OpenAICompatibleAuthoringBackend:
         """Build one backend from explicit args plus local ignored key sources."""
-        token, token_source = load_openai_api_key(server_root=server_root, api_key=api_key)
+        normalized_base_url = base_url.strip()
+        if not normalized_base_url:
+            raise ValueError("OpenAI-compatible authoring requires a non-empty base_url.")
+        token, token_source = load_openai_compatible_api_key(
+            server_root=server_root,
+            api_key=api_key,
+        )
         return cls(
             model=model,
-            client=load_openai_client(api_key=token),
+            client=load_openai_client(api_key=token, base_url=normalized_base_url),
+            base_url=normalized_base_url,
             credential_source=token_source,
         )
 
@@ -85,11 +102,11 @@ class OpenAIAuthoringBackend:
         tool_caller: ToolCaller,
         max_rounds: int,
     ) -> ProviderRunResult:
-        """Run one OpenAI Responses API loop and replay tool calls through MCP."""
+        """Run one OpenAI-compatible Responses loop through the shared adapter."""
         return await run_responses_authoring_loop(
             client=self.client,
             model=self.model,
-            provider_label="OpenAI",
+            provider_label="OpenAI-compatible",
             instructions=instructions,
             initial_user_message=initial_user_message,
             tool_definitions=tool_definitions,

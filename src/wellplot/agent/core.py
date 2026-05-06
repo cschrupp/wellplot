@@ -276,19 +276,33 @@ class AuthoringSession:
         model: str,
         server_root: str | Path | None = None,
         api_key: str | None = None,
+        base_url: str | None = None,
     ) -> AuthoringSession:
         """Create one public authoring session backed by local stdio MCP."""
         from .mcp import LocalStdioMcpRuntime
         from .providers.openai import OpenAIAuthoringBackend
+        from .providers.openai_compat import OpenAICompatibleAuthoringBackend
 
         runtime = LocalStdioMcpRuntime(server_root=server_root)
-        if provider != "openai":
-            raise ValueError("Unsupported authoring provider. Supported values: 'openai'.")
-        backend = OpenAIAuthoringBackend.from_local_configuration(
-            model=model,
-            server_root=runtime.server_root,
-            api_key=api_key,
-        )
+        if provider == "openai":
+            backend = OpenAIAuthoringBackend.from_local_configuration(
+                model=model,
+                server_root=runtime.server_root,
+                api_key=api_key,
+            )
+        elif provider == "openai_compat":
+            if base_url is None or not base_url.strip():
+                raise ValueError("provider='openai_compat' requires a non-empty base_url.")
+            backend = OpenAICompatibleAuthoringBackend.from_local_configuration(
+                model=model,
+                server_root=runtime.server_root,
+                api_key=api_key,
+                base_url=base_url,
+            )
+        else:
+            raise ValueError(
+                "Unsupported authoring provider. Supported values: 'openai', 'openai_compat'."
+            )
         return cls(backend=backend, runtime=runtime)
 
     async def run_request(self, request: AuthoringRequest) -> AuthoringResult:
@@ -466,6 +480,7 @@ async def run_authoring_request(
     model: str,
     server_root: str | Path | None = None,
     api_key: str | None = None,
+    base_url: str | None = None,
     max_rounds: int = 12,
 ) -> AuthoringResult:
     """Run one high-level authoring request against local stdio MCP."""
@@ -474,6 +489,7 @@ async def run_authoring_request(
         model=model,
         server_root=server_root,
         api_key=api_key,
+        base_url=base_url,
     )
     return await session.run(
         goal=goal,

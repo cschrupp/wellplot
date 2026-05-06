@@ -20,5 +20,14 @@
 """Provider adapters for the public wellplot authoring API."""
 
 from .openai import OpenAIAuthoringBackend, load_openai_api_key
+from .openai_compat import (
+    OpenAICompatibleAuthoringBackend,
+    load_openai_compatible_api_key,
+)
 
-__all__ = ["OpenAIAuthoringBackend", "load_openai_api_key"]
+__all__ = [
+    "OpenAIAuthoringBackend",
+    "OpenAICompatibleAuthoringBackend",
+    "load_openai_api_key",
+    "load_openai_compatible_api_key",
+]
