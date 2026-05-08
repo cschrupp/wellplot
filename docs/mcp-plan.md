@@ -50,6 +50,7 @@ for, and what still requires maintainer action outside the repo.
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
 - `remove_curve_fill(logfile_path, section_id, track_id, channel)`
+- `clear_track_bindings(logfile_path, section_id, track_id)`
 - `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
@@ -255,15 +256,11 @@ Next up:
 - decide whether to add one explicit `openai_compat` example before the next
   release cut
 
-Remaining broader authoring surface after the current foundation:
-
-- convenience destructive helpers such as clear-track-bindings operations
-
 Next highest-value MCP slice:
 
-1. convenience destructive helpers such as clear-track-bindings operations
-2. broader section/page convenience helpers where repetition still appears in notebooks
-3. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
+1. broader section/page convenience helpers where repetition still appears in notebooks
+2. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
+3. grouped removal/update helpers only where iterative notebook usage still exposes friction
 
 Scope note:
 

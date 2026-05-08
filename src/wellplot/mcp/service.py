@@ -929,6 +929,19 @@ class RemovedRasterBindingResult:
 
 
 @dataclass(slots=True)
+class ClearedTrackBindingsResult:
+    """Structured result for clearing all bindings that target one track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    removed_curve_binding_count: int
+    removed_raster_binding_count: int
+    remaining_curve_binding_count: int
+    remaining_raster_binding_count: int
+
+
+@dataclass(slots=True)
 class MovedTrackResult:
     """Structured result for reordering one track inside a draft logfile."""
 
@@ -5026,6 +5039,74 @@ def remove_raster_binding(
     )
 
 
+def clear_track_bindings(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    root: str | Path | None = None,
+) -> ClearedTrackBindingsResult:
+    """Remove all curve and raster bindings that target one track."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+
+    retained_bindings: list[dict[str, object]] = []
+    removed_curve_binding_count = 0
+    removed_raster_binding_count = 0
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            retained_bindings.append(binding)
+            continue
+        if not _binding_targets_track(
+            current_spec,
+            binding,
+            section_id=section_id,
+            track_id=track_id,
+        ):
+            retained_bindings.append(binding)
+            continue
+        kind = str(binding.get("kind", "curve")).strip().lower()
+        if kind == "raster":
+            removed_raster_binding_count += 1
+        else:
+            removed_curve_binding_count += 1
+
+    if (
+        removed_curve_binding_count == 0
+        and removed_raster_binding_count == 0
+    ):
+        raise TemplateValidationError(
+            f"Track {track_id!r} in section {section_id!r} does not have any bindings to clear."
+        )
+
+    binding_container = mapping.setdefault("document", {}).setdefault("bindings", {})
+    if not isinstance(binding_container, dict):
+        raise RuntimeError("Expected document.bindings to be a mapping.")
+    binding_container["channels"] = retained_bindings
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    binding_counts = _binding_counts_by_section(saved_spec)[section_id]
+    return ClearedTrackBindingsResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        removed_curve_binding_count=removed_curve_binding_count,
+        removed_raster_binding_count=removed_raster_binding_count,
+        remaining_curve_binding_count=binding_counts["curve"],
+        remaining_raster_binding_count=binding_counts["raster"],
+    )
+
+
 def move_track(
     logfile_path: str,
     *,
@@ -6065,7 +6146,8 @@ def author_plot_from_request_prompt(
         "bind_curve(...), add_curve_fill(...), remove_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
-        "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
+        "remove_curve_binding(...), remove_raster_binding(...), "
+        "clear_track_bindings(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
         "12. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
@@ -6101,6 +6183,8 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "8. Choose the smallest edit sequence that addresses the feedback. "
         "Use add_curve_fill(...) for explicit crossover or baseline fill requests, "
         "and remove_curve_fill(...) when the request explicitly clears one existing fill. "
+        "Use clear_track_bindings(...) when the request replaces all curves or rasters on one "
+        "track before rebinding them.\n"
         "Prefer update_section(...), set_page_layout(...), update_track(...), remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"

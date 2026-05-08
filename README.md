@@ -182,7 +182,7 @@ The MCP tool surface currently supports:
 - `add_track`, `update_track`, `add_annotation_object`, `update_annotation_object`,
   `remove_annotation_object`, `remove_track`, `bind_curve`, `bind_raster`,
   `add_curve_fill`, `remove_curve_fill`, `update_curve_binding`, `update_raster_binding`, `remove_curve_binding`,
-  `remove_raster_binding`, and `move_track`
+  `remove_raster_binding`, `clear_track_bindings`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
 - `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`,
   `parse_key_value_text`, and `inspect_style_presets`

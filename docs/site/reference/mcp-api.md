@@ -711,6 +711,28 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `clear_track_bindings(logfile_path, section_id, track_id)`
+
+Purpose: remove all curve and raster bindings that currently target one track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `removed_curve_binding_count`
+- `removed_raster_binding_count`
+- `remaining_curve_binding_count`
+- `remaining_raster_binding_count`
+
+Behavior:
+
+- finds every curve or raster binding that currently targets the requested
+  section/track pair
+- removes all of them in one deterministic edit
+- rejects requests when the target track does not currently have bindings
+- validates the mutated draft before saving
+
 ### `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
 
 Purpose: reorder one track inside a draft logfile.
@@ -1136,7 +1158,7 @@ For draft authoring:
    `add_annotation_object(...)`, `update_annotation_object(...)`, `remove_annotation_object(...)`,
    `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `remove_curve_fill(...)`, `bind_raster(...)`,
    `update_curve_binding(...)`, `update_raster_binding(...)`, `remove_curve_binding(...)`,
-   `remove_raster_binding(...)`, `move_track(...)`, `set_heading_content(...)`,
+   `remove_raster_binding(...)`, `clear_track_bindings(...)`, `move_track(...)`, `set_heading_content(...)`,
    and `set_remarks_content(...)`
 14. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot

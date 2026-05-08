@@ -646,6 +646,22 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def clear_track_bindings(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+    ) -> dict[str, object]:
+        """Remove all curve and raster bindings that target one track."""
+        return asdict(
+            service.clear_track_bindings(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def move_track(
         logfile_path: str,
         section_id: str,

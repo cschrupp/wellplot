@@ -161,6 +161,7 @@ Concrete `0.4.0` foundation set:
 - `bind_raster(...)`
 - `add_curve_fill(...)`
 - `remove_curve_fill(...)`
+- `clear_track_bindings(...)`
 - `set_depth_axis(...)`
 - `set_page_layout(...)`
 - `update_curve_binding(...)`
@@ -248,15 +249,17 @@ Out of scope for this slice:
 
 Next authoring broadening slice:
 
-- add convenience destructive helpers such as clear-track-bindings operations
+- add broader section/page convenience helpers where notebook workflows still
+  repeat the same low-level edits
 
 Why these are next:
 
 - the current surface now covers draft creation, track/binding mutation,
   section metadata editing, page/output defaults, annotation-object editing,
-  header/remarks editing, depth-axis control, and style/fill creation
+  header/remarks editing, depth-axis control, style/fill creation, and
+  per-track binding clearing
 - the remaining friction in real iterative authoring is now concentrated in
-  convenience destructive edits and repeated notebook-facing workflow cleanup
+  repeated section/page setup edits and notebook-facing workflow cleanup
 
 Detailed plan:
 

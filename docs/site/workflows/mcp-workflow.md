@@ -183,6 +183,7 @@ Main tools:
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
 - `remove_curve_binding(logfile_path, section_id, track_id, channel)`
 - `remove_raster_binding(logfile_path, section_id, track_id, channel)`
+- `clear_track_bindings(logfile_path, section_id, track_id)`
 - `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
 - `set_heading_content(logfile_path, patch)`
 - `set_remarks_content(logfile_path, remarks)`
@@ -227,7 +228,7 @@ Recommended split:
   `update_annotation_object(...)`, `remove_annotation_object(...)`,
   `remove_track(...)`, `update_section(...)`, `set_depth_axis(...)`,
   `set_page_layout(...)`, `bind_curve(...)`, `add_curve_fill(...)`,
-  `remove_curve_fill(...)`,
+  `remove_curve_fill(...)`, `clear_track_bindings(...)`,
   `bind_raster(...)`, `update_curve_binding(...)`,
   `update_raster_binding(...)`, `remove_curve_binding(...)`,
   `remove_raster_binding(...)`, and `move_track(...)` for the deterministic

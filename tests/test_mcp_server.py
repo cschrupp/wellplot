@@ -407,6 +407,14 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "channel": "GR",
                 },
             )
+            cleared_track_bindings = await session.call_tool(
+                "clear_track_bindings",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "rt",
+                },
+            )
             removed_track = await session.call_tool(
                 "remove_track",
                 {
@@ -579,6 +587,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "update_raster_binding",
                 "remove_curve_binding",
                 "remove_raster_binding",
+                "clear_track_bindings",
                 "move_track",
                 "set_heading_content",
                 "set_remarks_content",
@@ -745,6 +754,10 @@ class McpServerIntegrationTests(unittest.TestCase):
             ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt", "notes"],
         )
         self.assertEqual(removed_curve_binding.structuredContent["binding_count"], 5)
+        self.assertGreaterEqual(
+            cleared_track_bindings.structuredContent["removed_curve_binding_count"],
+            1,
+        )
         self.assertEqual(removed_track.structuredContent["track_count"], 7)
         self.assertEqual(
             removed_track.structuredContent["track_ids"],
@@ -824,7 +837,7 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertTrue(change_summary.structuredContent["remarks_changed"])
         self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
-            5,
+            4,
         )
         self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["track_ids"][1],

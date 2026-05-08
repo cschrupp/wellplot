@@ -1616,6 +1616,101 @@ class McpServiceTests(unittest.TestCase):
             )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_clear_track_bindings_removes_curve_and_raster_bindings(self) -> None:
+        """Clear all bindings for one track in one deterministic call."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="array_notes",
+                title="Array Notes",
+                kind="array",
+                width_mm=24.0,
+                root=REPO_ROOT,
+            )
+
+            with unittest.mock.patch.object(
+                service,
+                "_persist_validated_logfile_mapping",
+                side_effect=self._persist_without_render_validation,
+            ):
+                service.bind_raster(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="array_notes",
+                    channel="VDL",
+                    root=REPO_ROOT,
+                )
+                curve_result = service.clear_track_bindings(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="gr",
+                    root=REPO_ROOT,
+                )
+                raster_result = service.clear_track_bindings(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="array_notes",
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(curve_result.removed_curve_binding_count, 1)
+            self.assertEqual(curve_result.removed_raster_binding_count, 0)
+            self.assertEqual(raster_result.removed_curve_binding_count, 0)
+            self.assertEqual(raster_result.removed_raster_binding_count, 1)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            self.assertFalse(
+                any(
+                    binding.get("track_id") == "gr"
+                    and str(binding.get("section", "main")) == "main"
+                    for binding in bindings
+                )
+            )
+            self.assertFalse(
+                any(
+                    binding.get("track_id") == "array_notes"
+                    and str(binding.get("section", "main")) == "main"
+                    for binding in bindings
+                )
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_clear_track_bindings_requires_existing_bindings(self) -> None:
+        """Reject clear requests for tracks that do not currently have bindings."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="notes",
+                title="Notes",
+                kind="annotation",
+                width_mm=18.0,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.clear_track_bindings(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="notes",
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_rejects_unknown_patch_key(self) -> None:
         """Reject curve-binding patches outside the supported editable surface."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2486,6 +2581,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("remove_curve_fill(...)", prompt)
+        self.assertIn("clear_track_bindings(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -2506,6 +2602,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("remove_curve_fill(...)", prompt)
+        self.assertIn("clear_track_bindings(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:

@@ -141,12 +141,12 @@ Candidate tools:
 - `set_remarks_content(...)`
 - `set_section_data_source(...)`
 - `remove_curve_fill(...)`
+- `clear_track_bindings(...)`
 
 Remaining broader authoring surface after the current foundation:
 
-- convenience destructive helpers:
-  - `clear_track_bindings(...)`
-  - possible grouped removal helpers for repeated notebook workflows
+- possible grouped removal helpers for repeated notebook workflows beyond the
+  now-implemented per-track binding clear operation
 
 ### 3. Authoring Vocabulary And Discovery
 
@@ -205,8 +205,8 @@ Optional later helper:
 After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
-1. convenience destructive helpers such as track-binding clear operations
-2. additional notebook-facing ergonomics where repeated project/setup patterns remain
+1. additional notebook-facing ergonomics where repeated project/setup patterns remain
+2. broader section/page convenience helpers where repetitive edits still appear
 3. any remaining agent-facing cleanup exposed by iterative notebook usage
 
 These additions matter because iterative user workflows are now blocked less by
