@@ -358,6 +358,50 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def bind_raster(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+        label: str | None = None,
+        style: dict[str, object] | None = None,
+        profile: str | None = None,
+        normalization: str | None = None,
+        waveform_normalization: str | None = None,
+        clip_percentiles: list[float] | None = None,
+        interpolation: str | None = None,
+        show_raster: bool | None = None,
+        raster_alpha: float | None = None,
+        color_limits: list[float] | None = None,
+        colorbar: dict[str, object] | bool | None = None,
+        sample_axis: dict[str, object] | bool | None = None,
+        waveform: dict[str, object] | bool | None = None,
+    ) -> dict[str, object]:
+        """Bind one raster/image channel to an array track in a draft logfile."""
+        return asdict(
+            service.bind_raster(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                label=label,
+                style=style,
+                profile=profile,
+                normalization=normalization,
+                waveform_normalization=waveform_normalization,
+                clip_percentiles=clip_percentiles,
+                interpolation=interpolation,
+                show_raster=show_raster,
+                raster_alpha=raster_alpha,
+                color_limits=color_limits,
+                colorbar=colorbar,
+                sample_axis=sample_axis,
+                waveform=waveform,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def update_curve_binding(
         logfile_path: str,
         section_id: str,
@@ -378,6 +422,26 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def update_raster_binding(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Patch one existing raster binding inside a draft logfile."""
+        return asdict(
+            service.update_raster_binding(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def remove_curve_binding(
         logfile_path: str,
         section_id: str,
@@ -387,6 +451,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         """Remove one existing curve binding inside a draft logfile."""
         return asdict(
             service.remove_curve_binding(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def remove_raster_binding(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+    ) -> dict[str, object]:
+        """Remove one existing raster binding inside a draft logfile."""
+        return asdict(
+            service.remove_raster_binding(
                 logfile_path,
                 section_id=section_id,
                 track_id=track_id,

@@ -397,6 +397,42 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `bind_raster(logfile_path, section_id, track_id, channel, ...)`
+
+Purpose: add one raster or image-style binding to an existing array track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding_kind`
+- `binding_count`
+
+High-value optional fields:
+
+- `label`
+- `style`
+- `profile`
+- `normalization`
+- `waveform_normalization`
+- `clip_percentiles`
+- `interpolation`
+- `show_raster`
+- `raster_alpha`
+- `color_limits`
+- `colorbar`
+- `sample_axis`
+- `waveform`
+
+Behavior:
+
+- resolves the requested channel against the target section dataset
+- rejects duplicate raster bindings for the same section, track, and channel
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 
 Purpose: patch one existing curve binding inside a draft logfile.
@@ -429,6 +465,42 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
+
+Purpose: patch one existing raster binding inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding`
+
+Supported patch keys:
+
+- `label`
+- `style`
+- `profile`
+- `normalization`
+- `waveform_normalization`
+- `clip_percentiles`
+- `interpolation`
+- `show_raster`
+- `raster_alpha`
+- `color_limits`
+- `colorbar`
+- `sample_axis`
+- `waveform`
+
+Behavior:
+
+- deep-merges nested mapping updates
+- removes optional properties when their patch value is `null`
+- rejects unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `remove_curve_binding(logfile_path, section_id, track_id, channel)`
 
 Purpose: remove one existing curve binding inside a draft logfile.
@@ -445,6 +517,25 @@ Returns:
 Behavior:
 
 - removes the matching section/track/channel curve binding
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `remove_raster_binding(logfile_path, section_id, track_id, channel)`
+
+Purpose: remove one existing raster binding inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding_kind`
+- `binding_count`
+
+Behavior:
+
+- removes the matching section/track/channel raster binding
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
@@ -677,6 +768,7 @@ Returns:
 - `heading_patch_keys`
 - `track_patch_keys`
 - `curve_binding_patch_keys`
+- `raster_binding_patch_keys`
 - `move_track_selectors`
 - `heading_field_catalog`
 - `track_archetypes`
@@ -862,9 +954,10 @@ For draft authoring:
 8. `apply_header_values(...)` when the previewed mapping should be persisted
 9. `inspect_authoring_vocab(...)`
 10. apply `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-   `bind_curve(...)`, `update_curve_binding(...)`, `remove_curve_binding(...)`,
-   `move_track(...)`, `set_heading_content(...)`, and
-   `set_remarks_content(...)`
+   `bind_curve(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+   `update_raster_binding(...)`, `remove_curve_binding(...)`,
+   `remove_raster_binding(...)`, `move_track(...)`,
+   `set_heading_content(...)`, and `set_remarks_content(...)`
 11. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
 12. preview with a narrow PNG tool

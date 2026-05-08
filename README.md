@@ -179,8 +179,9 @@ The MCP tool surface currently supports:
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `set_section_data_source`
-- `add_track`, `update_track`, `remove_track`, `bind_curve`,
-  `update_curve_binding`, `remove_curve_binding`, and `move_track`
+- `add_track`, `update_track`, `remove_track`, `bind_curve`, `bind_raster`,
+  `update_curve_binding`, `update_raster_binding`, `remove_curve_binding`,
+  `remove_raster_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
 - `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`,
   `parse_key_value_text`, and `inspect_style_presets`

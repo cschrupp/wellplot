@@ -170,8 +170,11 @@ Main tools:
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
+- `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
 - `remove_curve_binding(logfile_path, section_id, track_id, channel)`
+- `remove_raster_binding(logfile_path, section_id, track_id, channel)`
 - `move_track(logfile_path, section_id, track_id, before_track_id=None, after_track_id=None, position=None)`
 - `set_heading_content(logfile_path, patch)`
 - `set_remarks_content(logfile_path, remarks)`
@@ -207,8 +210,10 @@ Recommended split:
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft
 - use `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-  `bind_curve(...)`, `update_curve_binding(...)`, `remove_curve_binding(...)`,
-  and `move_track(...)` for the deterministic track/layout edit loop
+  `bind_curve(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+  `update_raster_binding(...)`, `remove_curve_binding(...)`,
+  `remove_raster_binding(...)`, and `move_track(...)` for the deterministic
+  track/layout edit loop
 - use `set_heading_content(...)` and `set_remarks_content(...)` for first-page
   report text and summary-block edits
 - use `summarize_logfile_changes(...)` when the client kept the prior YAML text

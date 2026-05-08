@@ -26,6 +26,7 @@ import json
 import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import yaml
@@ -117,6 +118,22 @@ class McpServiceTests(unittest.TestCase):
             },
             root=REPO_ROOT,
         )
+
+    @staticmethod
+    def _persist_without_render_validation(
+        mapping: dict[str, object],
+        *,
+        logfile_path: Path,
+        root: Path,
+    ) -> object:
+        """Persist one logfile mapping without dataset/render compatibility checks."""
+        _ = root
+        spec = service.logfile_from_mapping(mapping)
+        normalized_yaml = service.report_to_yaml(spec)
+        if not isinstance(normalized_yaml, str):
+            raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
+        logfile_path.write_text(normalized_yaml, encoding="utf-8")
+        return spec
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_validate_logfile_success(self) -> None:
@@ -901,6 +918,185 @@ class McpServiceTests(unittest.TestCase):
             )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_bind_raster_adds_array_track_binding(self) -> None:
+        """Add one raster binding to an array track and persist the result."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with unittest.mock.patch.object(
+                service,
+                "_persist_validated_logfile_mapping",
+                side_effect=self._persist_without_render_validation,
+            ):
+                service.update_track(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    patch={"kind": "array"},
+                    root=REPO_ROOT,
+                )
+                result = service.bind_raster(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    channel="VDL",
+                    profile="vdl",
+                    sample_axis={
+                        "enabled": True,
+                        "unit": "us",
+                        "min": 200.0,
+                        "max": 1200.0,
+                    },
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "vdl")
+            self.assertEqual(result.channel, "VDL")
+            self.assertEqual(result.binding_kind, "raster")
+            self.assertEqual(result.binding_count, 1)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("section") == "main"
+                and binding.get("track_id") == "vdl"
+                and binding.get("channel") == "VDL"
+                and binding.get("kind") == "raster"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["profile"], "vdl")
+            self.assertEqual(matching[0]["sample_axis"]["max"], 1200.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_raster_binding_merges_patch_and_persists(self) -> None:
+        """Patch one raster binding and persist the normalized result."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with unittest.mock.patch.object(
+                service,
+                "_persist_validated_logfile_mapping",
+                side_effect=self._persist_without_render_validation,
+            ):
+                service.update_track(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    patch={"kind": "array"},
+                    root=REPO_ROOT,
+                )
+                service.bind_raster(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    channel="VDL",
+                    root=REPO_ROOT,
+                )
+                result = service.update_raster_binding(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    channel="VDL",
+                    patch={
+                        "raster_alpha": 0.45,
+                        "colorbar": {
+                            "enabled": True,
+                            "label": "VDL amp",
+                        },
+                    },
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "vdl")
+            self.assertEqual(result.channel, "VDL")
+            self.assertEqual(result.binding["raster_alpha"], 0.45)
+            self.assertEqual(result.binding["colorbar"]["label"], "VDL amp")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "vdl"
+                and binding.get("channel") == "VDL"
+                and binding.get("kind") == "raster"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["raster_alpha"], 0.45)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_raster_binding_deletes_one_binding(self) -> None:
+        """Remove one raster binding so array tracks can be rebuilt cleanly."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with unittest.mock.patch.object(
+                service,
+                "_persist_validated_logfile_mapping",
+                side_effect=self._persist_without_render_validation,
+            ):
+                service.update_track(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    patch={"kind": "array"},
+                    root=REPO_ROOT,
+                )
+                service.bind_raster(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    channel="VDL",
+                    root=REPO_ROOT,
+                )
+                result = service.remove_raster_binding(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="vdl",
+                    channel="VDL",
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "vdl")
+            self.assertEqual(result.channel, "VDL")
+            self.assertEqual(result.binding_kind, "raster")
+            self.assertEqual(result.binding_count, 0)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            self.assertFalse(
+                any(
+                    binding.get("track_id") == "vdl"
+                    and str(binding.get("channel", "")).upper() == "VDL"
+                    and binding.get("kind") == "raster"
+                    for binding in bindings
+                )
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_rejects_unknown_patch_key(self) -> None:
         """Reject curve-binding patches outside the supported editable surface."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -1491,6 +1687,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("provider_name", result.heading_patch_keys)
         self.assertIn("width_mm", result.track_patch_keys)
         self.assertIn("fill", result.curve_binding_patch_keys)
+        self.assertIn("sample_axis", result.raster_binding_patch_keys)
         self.assertIn("after_track_id", result.move_track_selectors)
         self.assertTrue(result.track_archetypes)
         self.assertIn(

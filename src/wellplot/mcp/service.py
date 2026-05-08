@@ -106,6 +106,21 @@ AUTHORING_CURVE_BINDING_PATCH_KEYS = (
     "wrap",
     "render_mode",
 )
+AUTHORING_RASTER_BINDING_PATCH_KEYS = (
+    "label",
+    "style",
+    "profile",
+    "normalization",
+    "waveform_normalization",
+    "clip_percentiles",
+    "interpolation",
+    "show_raster",
+    "raster_alpha",
+    "color_limits",
+    "colorbar",
+    "sample_axis",
+    "waveform",
+)
 AUTHORING_MOVE_TRACK_SELECTORS = ("before_track_id", "after_track_id", "position")
 AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/schema/patch.json",
@@ -667,6 +682,18 @@ class BoundCurveResult:
 
 
 @dataclass(slots=True)
+class BoundRasterResult:
+    """Structured result for adding one raster binding to a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding_kind: str
+    binding_count: int
+
+
+@dataclass(slots=True)
 class UpdatedCurveBindingResult:
     """Structured result for updating one curve binding in a draft logfile."""
 
@@ -678,8 +705,31 @@ class UpdatedCurveBindingResult:
 
 
 @dataclass(slots=True)
+class UpdatedRasterBindingResult:
+    """Structured result for updating one raster binding in a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding: dict[str, object]
+
+
+@dataclass(slots=True)
 class RemovedCurveBindingResult:
     """Structured result for removing one curve binding from a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding_kind: str
+    binding_count: int
+
+
+@dataclass(slots=True)
+class RemovedRasterBindingResult:
+    """Structured result for removing one raster binding from a draft logfile."""
 
     logfile_path: str
     section_id: str
@@ -813,6 +863,7 @@ class AuthoringVocabularyResult:
     heading_patch_keys: list[str]
     track_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
+    raster_binding_patch_keys: list[str]
     move_track_selectors: list[str]
     heading_field_catalog: dict[str, object]
     track_archetypes: list[dict[str, object]]
@@ -1185,6 +1236,31 @@ def _find_curve_binding_index(
             return index
     raise TemplateValidationError(
         f"Curve binding for channel {channel!r} was not found on track {track_id!r} "
+        f"in section {section_id!r}."
+    )
+
+
+def _find_raster_binding_index(
+    bindings: list[dict[str, object]],
+    *,
+    spec: LogFileSpec,
+    section_id: str,
+    track_id: str,
+    channel: str,
+) -> int:
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "")).strip().lower() != "raster":
+            continue
+        if _binding_target_section_id(spec, binding) != section_id:
+            continue
+        if str(binding.get("track_id", "")) != track_id:
+            continue
+        if str(binding.get("channel", "")).upper() == channel.upper():
+            return index
+    raise TemplateValidationError(
+        f"Raster binding for channel {channel!r} was not found on track {track_id!r} "
         f"in section {section_id!r}."
     )
 
@@ -1677,6 +1753,7 @@ def _authoring_patch_schema() -> dict[str, object]:
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
         "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
+        "raster_binding_patch_keys": list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
         "move_track_target_selectors": list(AUTHORING_MOVE_TRACK_SELECTORS),
         "remarks_entry_fields": ["title", "lines", "alignment"],
     }
@@ -3648,6 +3725,109 @@ def bind_curve(
     )
 
 
+def bind_raster(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    label: str | None = None,
+    style: dict[str, object] | None = None,
+    profile: str | None = None,
+    normalization: str | None = None,
+    waveform_normalization: str | None = None,
+    clip_percentiles: list[float] | tuple[float, float] | None = None,
+    interpolation: str | None = None,
+    show_raster: bool | None = None,
+    raster_alpha: float | None = None,
+    color_limits: list[float] | tuple[float, float] | None = None,
+    colorbar: dict[str, object] | bool | None = None,
+    sample_axis: dict[str, object] | bool | None = None,
+    waveform: dict[str, object] | bool | None = None,
+    root: str | Path | None = None,
+) -> BoundRasterResult:
+    """Add one raster binding to a draft logfile and persist the validated result."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    resolved_channel = _resolve_section_channel_name(
+        current_spec,
+        logfile_path=resolved_logfile,
+        root=server_root,
+        section_id=section_id,
+        channel=channel,
+    )
+    bindings = _logfile_mapping_bindings(mapping)
+    try:
+        _ = _find_raster_binding_index(
+            bindings,
+            spec=current_spec,
+            section_id=section_id,
+            track_id=track_id,
+            channel=resolved_channel,
+        )
+    except TemplateValidationError:
+        pass
+    else:
+        raise TemplateValidationError(
+            f"Raster binding for channel {resolved_channel!r} already exists on "
+            f"track {track_id!r} in section {section_id!r}."
+        )
+
+    binding: dict[str, object] = {
+        "section": section_id,
+        "track_id": track_id,
+        "channel": resolved_channel,
+        "kind": "raster",
+    }
+    if label is not None:
+        binding["label"] = label
+    if style is not None:
+        binding["style"] = deepcopy(style)
+    if profile is not None:
+        binding["profile"] = str(profile)
+    if normalization is not None:
+        binding["normalization"] = str(normalization)
+    if waveform_normalization is not None:
+        binding["waveform_normalization"] = str(waveform_normalization)
+    if clip_percentiles is not None:
+        binding["clip_percentiles"] = list(clip_percentiles)
+    if interpolation is not None:
+        binding["interpolation"] = str(interpolation)
+    if show_raster is not None:
+        binding["show_raster"] = bool(show_raster)
+    if raster_alpha is not None:
+        binding["raster_alpha"] = float(raster_alpha)
+    if color_limits is not None:
+        binding["color_limits"] = list(color_limits)
+    if colorbar is not None:
+        binding["colorbar"] = deepcopy(colorbar)
+    if sample_axis is not None:
+        binding["sample_axis"] = deepcopy(sample_axis)
+    if waveform is not None:
+        binding["waveform"] = deepcopy(waveform)
+    bindings.append(binding)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    binding_count = _binding_counts_by_section(saved_spec)[section_id]["raster"]
+    return BoundRasterResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+        binding_kind="raster",
+        binding_count=binding_count,
+    )
+
+
 def update_curve_binding(
     logfile_path: str,
     *,
@@ -3720,6 +3900,68 @@ def update_curve_binding(
     )
 
 
+def update_raster_binding(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedRasterBindingResult:
+    """Patch one raster binding in a draft logfile and persist the validated result."""
+    invalid = sorted(key for key in patch if key not in AUTHORING_RASTER_BINDING_PATCH_KEYS)
+    if invalid:
+        raise TemplateValidationError(
+            f"Unsupported raster-binding patch keys {invalid}. "
+            f"Allowed keys: {sorted(AUTHORING_RASTER_BINDING_PATCH_KEYS)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_raster_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping raster binding entry.")
+    bindings[binding_index] = _merge_optional_patch(binding, patch)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_bindings = _logfile_mapping_bindings(report_to_dict(saved_spec))
+    saved_binding_index = _find_raster_binding_index(
+        saved_bindings,
+        spec=saved_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    saved_binding = saved_bindings[saved_binding_index]
+    if not isinstance(saved_binding, dict):
+        raise RuntimeError("Expected a mapping raster binding entry.")
+    return UpdatedRasterBindingResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=str(saved_binding.get("channel", channel)),
+        binding=deepcopy(saved_binding),
+    )
+
+
 def remove_curve_binding(
     logfile_path: str,
     *,
@@ -3762,6 +4004,52 @@ def remove_curve_binding(
         track_id=track_id,
         channel=removed_channel,
         binding_kind="curve",
+        binding_count=binding_count,
+    )
+
+
+def remove_raster_binding(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    root: str | Path | None = None,
+) -> RemovedRasterBindingResult:
+    """Remove one existing raster binding from a draft logfile."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_raster_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping raster binding entry.")
+    removed_channel = str(binding.get("channel", channel))
+    bindings.pop(binding_index)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    binding_count = _binding_counts_by_section(saved_spec)[section_id]["raster"]
+    return RemovedRasterBindingResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=removed_channel,
+        binding_kind="raster",
         binding_count=binding_count,
     )
 
@@ -4404,6 +4692,7 @@ def inspect_authoring_vocab(
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
         track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
+        raster_binding_patch_keys=list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
         move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
         heading_field_catalog=_heading_field_catalog(),
         track_archetypes=_track_archetypes_catalog(),
@@ -4771,8 +5060,9 @@ def author_plot_from_request_prompt(
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
         "7. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
         "8. Plan the smallest explicit edit sequence using add_track(...), "
-        "update_track(...), remove_track(...), bind_curve(...), "
-        "update_curve_binding(...), remove_curve_binding(...), move_track(...), "
+        "update_track(...), remove_track(...), bind_curve(...), bind_raster(...), "
+        "update_curve_binding(...), update_raster_binding(...), "
+        "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
         "9. Preview the affected section, track, or window before recommending a final render.\n"
         "10. If you captured the previous YAML text before editing, call "
@@ -4793,8 +5083,9 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "3. If the feedback changes the underlying LAS/DLIS file, call "
         "set_section_data_source(...) before rebinding curves.\n"
         "4. Choose the smallest edit sequence that addresses the feedback. "
-        "Prefer update_track(...), remove_track(...), and remove_curve_binding(...) "
-        "when the request says to replace or remove existing content.\n"
+        "Prefer update_track(...), remove_track(...), remove_curve_binding(...), "
+        "and remove_raster_binding(...) when the request says to replace or "
+        "remove existing content.\n"
         "5. Preview the affected section, track, or depth window after the edits.\n"
         "6. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"

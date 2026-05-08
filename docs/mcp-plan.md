@@ -42,8 +42,11 @@ for, and what still requires maintainer action outside the repo.
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
+- `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
 - `remove_curve_binding(logfile_path, section_id, track_id, channel)`
+- `remove_raster_binding(logfile_path, section_id, track_id, channel)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
 - `save_logfile_text(yaml_text, output_path, overwrite=False, base_dir=None)`
@@ -150,8 +153,11 @@ Concrete `0.4.0` foundation tools:
 - `update_track(...)`
 - `remove_track(...)`
 - `bind_curve(...)`
+- `bind_raster(...)`
 - `update_curve_binding(...)`
+- `update_raster_binding(...)`
 - `remove_curve_binding(...)`
+- `remove_raster_binding(...)`
 - `move_track(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
