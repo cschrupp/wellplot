@@ -607,6 +607,50 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(summary.sections[0].source_format, "las")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_depth_axis_updates_document_depth(self) -> None:
+        """Persist one document-level depth-axis update for later previews and renders."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_depth_axis(
+                str(draft_path),
+                unit="ft",
+                scale=240.0,
+                major_step=10.0,
+                minor_step=2.0,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.depth_axis["unit"], "ft")
+            self.assertEqual(result.depth_axis["scale"], 240.0)
+            self.assertEqual(result.depth_axis["major_step"], 10.0)
+            self.assertEqual(result.depth_axis["minor_step"], 2.0)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved_mapping["document"]["depth"]["unit"], "ft")
+            self.assertEqual(saved_mapping["document"]["depth"]["scale"], 240.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_depth_axis_requires_one_value(self) -> None:
+        """Reject empty depth-axis edits before mutating a draft."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_depth_axis(str(draft_path), root=REPO_ROOT)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_add_track_appends_one_track_to_draft(self) -> None:
         """Append one track to a cloned draft and persist the updated order."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -829,6 +873,48 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(len(matching), 1)
             self.assertEqual(matching[0]["label"], "Gamma")
             self.assertEqual(matching[0]["style"]["color"], "#008000")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_curve_fill_persists_fill_spec(self) -> None:
+        """Add one explicit curve fill to an existing binding and persist it."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.add_curve_fill(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                channel="GR",
+                kind="to_lower_limit",
+                label="Gamma Fill",
+                color="#8fd19e",
+                alpha=0.22,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "gr")
+            self.assertEqual(result.channel, "GR")
+            self.assertEqual(result.fill["kind"], "to_lower_limit")
+            self.assertEqual(result.fill["label"], "Gamma Fill")
+            self.assertEqual(result.fill["color"], "#8fd19e")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "gr" and binding.get("channel") == "GR"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["fill"]["kind"], "to_lower_limit")
+            self.assertEqual(matching[0]["fill"]["alpha"], 0.22)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_merges_patch_and_persists(self) -> None:
@@ -1684,6 +1770,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("between_curves", result.curve_fill_kinds)
         self.assertIn("open_hole", result.report_detail_kinds)
         self.assertIn("title", result.track_header_object_kinds)
+        self.assertIn("unit", result.depth_axis_patch_keys)
         self.assertIn("provider_name", result.heading_patch_keys)
         self.assertIn("width_mm", result.track_patch_keys)
         self.assertIn("fill", result.curve_binding_patch_keys)
@@ -1909,6 +1996,7 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertEqual(patch_resource.mime_type, "application/json")
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("depth_axis_patch_keys", json.loads(patch_resource.text))
         self.assertEqual(fill_resource.mime_type, "application/json")
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(style_resource.mime_type, "application/json")
@@ -1943,11 +2031,13 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("inspect_data_source(source_path)", prompt)
         self.assertIn("check_channel_availability(...)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
+        self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
         self.assertIn("apply_header_values(...)", prompt)
         self.assertIn("inspect_style_presets(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
+        self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -1960,6 +2050,8 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
         self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
+        self.assertIn("set_depth_axis(...)", prompt)
+        self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:

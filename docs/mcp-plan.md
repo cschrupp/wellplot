@@ -38,10 +38,12 @@ for, and what still requires maintainer action outside the repo.
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
 - `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
@@ -70,6 +72,9 @@ Packaged example ids:
 - `review_logfile(logfile_path)`
 - `preview_logfile(logfile_path, focus=None)`
 - `start_from_example(example_id, goal)`
+- `author_plot_from_request(goal, logfile_path=None, example_id=None)`
+- `revise_plot_from_feedback(logfile_path, feedback)`
+- `ingest_header_text(logfile_path, source_text, source_description=None)`
 
 ## Behavior and Safety Notes
 
@@ -82,9 +87,22 @@ Packaged example ids:
   - `render_logfile_to_file(...)`
   - `export_example_bundle(...)`
   - `create_logfile_draft(...)`
+  - `set_section_data_source(...)`
+  - `set_depth_axis(...)`
   - `add_track(...)`
+  - `update_track(...)`
+  - `remove_track(...)`
   - `bind_curve(...)`
+  - `add_curve_fill(...)`
+  - `bind_raster(...)`
   - `update_curve_binding(...)`
+  - `update_raster_binding(...)`
+  - `remove_curve_binding(...)`
+  - `remove_raster_binding(...)`
+  - `move_track(...)`
+  - `set_heading_content(...)`
+  - `set_remarks_content(...)`
+  - `apply_header_values(...)`
   - `save_logfile_text(...)`
 - `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` accept unsaved full logfile YAML text. When
@@ -154,6 +172,7 @@ Concrete `0.4.0` foundation tools:
 - `remove_track(...)`
 - `bind_curve(...)`
 - `bind_raster(...)`
+- `set_depth_axis(...)`
 - `update_curve_binding(...)`
 - `update_raster_binding(...)`
 - `remove_curve_binding(...)`

@@ -155,6 +155,8 @@ Concrete `0.4.0` foundation set:
 - `remove_track(...)`
 - `bind_curve(...)`
 - `bind_raster(...)`
+- `add_curve_fill(...)`
+- `set_depth_axis(...)`
 - `update_curve_binding(...)`
 - `update_raster_binding(...)`
 - `remove_curve_binding(...)`

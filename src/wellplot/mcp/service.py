@@ -95,6 +95,12 @@ AUTHORING_TRACK_PATCH_KEYS = (
     "reference",
     "annotations",
 )
+AUTHORING_DEPTH_AXIS_PATCH_KEYS = (
+    "unit",
+    "scale",
+    "major_step",
+    "minor_step",
+)
 AUTHORING_CURVE_BINDING_PATCH_KEYS = (
     "label",
     "style",
@@ -637,6 +643,14 @@ class SectionDataSourceResult:
 
 
 @dataclass(slots=True)
+class DepthAxisResult:
+    """Structured result for updating document depth-axis settings."""
+
+    logfile_path: str
+    depth_axis: dict[str, object]
+
+
+@dataclass(slots=True)
 class AddedTrackResult:
     """Structured result for appending one track to a draft logfile."""
 
@@ -679,6 +693,17 @@ class BoundCurveResult:
     channel: str
     binding_kind: str
     binding_count: int
+
+
+@dataclass(slots=True)
+class CurveFillResult:
+    """Structured result for adding or replacing one curve fill specification."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    fill: dict[str, object]
 
 
 @dataclass(slots=True)
@@ -860,6 +885,7 @@ class AuthoringVocabularyResult:
     curve_fill_kinds: list[str]
     report_detail_kinds: list[str]
     track_header_object_kinds: list[str]
+    depth_axis_patch_keys: list[str]
     heading_patch_keys: list[str]
     track_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
@@ -1111,10 +1137,15 @@ def _logfile_mapping_sections(mapping: dict[str, object]) -> list[dict[str, obje
     return sections
 
 
-def _logfile_mapping_layout(mapping: dict[str, object]) -> dict[str, object]:
+def _logfile_mapping_document(mapping: dict[str, object]) -> dict[str, object]:
     document = mapping.get("document")
     if not isinstance(document, dict):
         raise TemplateValidationError("Logfile mapping is missing document configuration.")
+    return document
+
+
+def _logfile_mapping_layout(mapping: dict[str, object]) -> dict[str, object]:
+    document = _logfile_mapping_document(mapping)
     layout = document.get("layout")
     if not isinstance(layout, dict):
         raise TemplateValidationError("Logfile mapping is missing document.layout configuration.")
@@ -1122,9 +1153,7 @@ def _logfile_mapping_layout(mapping: dict[str, object]) -> dict[str, object]:
 
 
 def _logfile_mapping_bindings(mapping: dict[str, object]) -> list[dict[str, object]]:
-    document = mapping.get("document")
-    if not isinstance(document, dict):
-        raise TemplateValidationError("Logfile mapping is missing document configuration.")
+    document = _logfile_mapping_document(mapping)
     bindings = document.get("bindings")
     if not isinstance(bindings, dict):
         raise TemplateValidationError("Logfile mapping is missing document.bindings configuration.")
@@ -1750,6 +1779,7 @@ def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]
 
 def _authoring_patch_schema() -> dict[str, object]:
     return {
+        "depth_axis_patch_keys": list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
         "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -3441,6 +3471,51 @@ def set_section_data_source(
     )
 
 
+def set_depth_axis(
+    logfile_path: str,
+    *,
+    unit: str | None = None,
+    scale: float | None = None,
+    major_step: float | None = None,
+    minor_step: float | None = None,
+    root: str | Path | None = None,
+) -> DepthAxisResult:
+    """Update one draft logfile's document-level depth-axis settings."""
+    if unit is None and scale is None and major_step is None and minor_step is None:
+        raise TemplateValidationError("Provide at least one depth-axis setting to update.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    document = _logfile_mapping_document(mapping)
+    depth_mapping = document.get("depth")
+    if not isinstance(depth_mapping, dict):
+        depth_mapping = {}
+        document["depth"] = depth_mapping
+
+    if unit is not None:
+        depth_mapping["unit"] = str(unit)
+    if scale is not None:
+        depth_mapping["scale"] = float(scale)
+    if major_step is not None:
+        depth_mapping["major_step"] = float(major_step)
+    if minor_step is not None:
+        depth_mapping["minor_step"] = float(minor_step)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    return DepthAxisResult(
+        logfile_path=str(resolved_logfile),
+        depth_axis=deepcopy(dict(saved_spec.document.get("depth", {}))),
+    )
+
+
 def add_track(
     logfile_path: str,
     *,
@@ -3722,6 +3797,94 @@ def bind_curve(
         channel=resolved_channel,
         binding_kind="curve",
         binding_count=binding_count,
+    )
+
+
+def add_curve_fill(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    kind: str,
+    other_channel: str | None = None,
+    other_element_id: str | None = None,
+    baseline: dict[str, object] | None = None,
+    label: str | None = None,
+    color: str | None = None,
+    alpha: float | None = None,
+    crossover: dict[str, object] | None = None,
+    root: str | Path | None = None,
+) -> CurveFillResult:
+    """Add or replace one curve-fill specification on an existing curve binding."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    resolved_channel = _resolve_section_channel_name(
+        current_spec,
+        logfile_path=resolved_logfile,
+        root=server_root,
+        section_id=section_id,
+        channel=channel,
+    )
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_curve_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+
+    fill: dict[str, object] = {"kind": str(kind)}
+    if other_channel is not None:
+        fill["other_channel"] = str(other_channel)
+    if other_element_id is not None:
+        fill["other_element_id"] = str(other_element_id)
+    if baseline is not None:
+        fill["baseline"] = deepcopy(baseline)
+    if label is not None:
+        fill["label"] = str(label)
+    if color is not None:
+        fill["color"] = str(color)
+    if alpha is not None:
+        fill["alpha"] = float(alpha)
+    if crossover is not None:
+        fill["crossover"] = deepcopy(crossover)
+    binding["fill"] = fill
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_bindings = _logfile_mapping_bindings(report_to_dict(saved_spec))
+    saved_binding_index = _find_curve_binding_index(
+        saved_bindings,
+        spec=saved_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+    )
+    saved_binding = saved_bindings[saved_binding_index]
+    if not isinstance(saved_binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    saved_fill = saved_binding.get("fill")
+    if not isinstance(saved_fill, dict):
+        raise RuntimeError("Expected a mapping curve fill after saving.")
+    return CurveFillResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+        fill=deepcopy(saved_fill),
     )
 
 
@@ -4689,6 +4852,7 @@ def inspect_authoring_vocab(
         curve_fill_kinds=_enum_values(CurveFillKind),
         report_detail_kinds=_enum_values(ReportDetailKind),
         track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
+        depth_axis_patch_keys=list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
         track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -5050,24 +5214,27 @@ def author_plot_from_request_prompt(
         "before you create bindings.\n"
         "2. If you are adapting one starter draft to a different LAS/DLIS file, call "
         "set_section_data_source(...) before adding or revising bindings.\n"
-        "3. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "4. If the request includes report-header or remarks content from text, call "
+        "3. If the request changes report scale or depth-grid behavior, call "
+        "set_depth_axis(...).\n"
+        "4. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "5. If the request includes report-header or remarks content from text, call "
         "parse_key_value_text(source_text, format_hint=None) first.\n"
-        "5. If the request includes report-header or remarks content, call "
+        "6. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "6. If the request is mainly about visual conventions, call "
+        "7. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "7. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "8. Plan the smallest explicit edit sequence using add_track(...), "
-        "update_track(...), remove_track(...), bind_curve(...), bind_raster(...), "
+        "8. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "9. Plan the smallest explicit edit sequence using set_depth_axis(...), add_track(...), "
+        "update_track(...), remove_track(...), bind_curve(...), add_curve_fill(...), "
+        "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
-        "9. Preview the affected section, track, or window before recommending a final render.\n"
-        "10. If you captured the previous YAML text before editing, call "
+        "10. Preview the affected section, track, or window before recommending a final render.\n"
+        "11. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "11. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "12. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -5082,14 +5249,17 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "2. Call inspect_authoring_vocab(logfile_path=logfile_path).\n"
         "3. If the feedback changes the underlying LAS/DLIS file, call "
         "set_section_data_source(...) before rebinding curves.\n"
-        "4. Choose the smallest edit sequence that addresses the feedback. "
+        "4. If the feedback changes report scale or depth grid spacing, call "
+        "set_depth_axis(...).\n"
+        "5. Choose the smallest edit sequence that addresses the feedback. "
+        "Use add_curve_fill(...) for explicit crossover or baseline fill requests. "
         "Prefer update_track(...), remove_track(...), remove_curve_binding(...), "
         "and remove_raster_binding(...) when the request says to replace or "
         "remove existing content.\n"
-        "5. Preview the affected section, track, or depth window after the edits.\n"
-        "6. If the client retained the previous YAML text, call "
+        "6. Preview the affected section, track, or depth window after the edits.\n"
+        "7. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "7. Validate or save only after the preview looks correct.\n"
+        "8. Validate or save only after the preview looks correct.\n"
     )
 
 

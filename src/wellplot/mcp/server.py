@@ -264,6 +264,26 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def set_depth_axis(
+        logfile_path: str,
+        unit: str | None = None,
+        scale: float | None = None,
+        major_step: float | None = None,
+        minor_step: float | None = None,
+    ) -> dict[str, object]:
+        """Update one draft logfile's document-level depth axis."""
+        return asdict(
+            service.set_depth_axis(
+                logfile_path,
+                unit=unit,
+                scale=scale,
+                major_step=major_step,
+                minor_step=minor_step,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def add_track(
         logfile_path: str,
         section_id: str,
@@ -353,6 +373,40 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 style=style,
                 scale=scale,
                 header_display=header_display,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def add_curve_fill(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+        kind: str,
+        other_channel: str | None = None,
+        other_element_id: str | None = None,
+        baseline: dict[str, object] | None = None,
+        label: str | None = None,
+        color: str | None = None,
+        alpha: float | None = None,
+        crossover: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Add or replace one curve fill on an existing curve binding."""
+        return asdict(
+            service.add_curve_fill(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                kind=kind,
+                other_channel=other_channel,
+                other_element_id=other_element_id,
+                baseline=baseline,
+                label=label,
+                color=color,
+                alpha=alpha,
+                crossover=crossover,
                 root=server_root,
             )
         )

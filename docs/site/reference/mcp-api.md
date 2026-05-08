@@ -303,6 +303,23 @@ Behavior:
 - is the preferred edit when one starter draft should be repointed at a user
   LAS file before track bindings are added
 
+### `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
+
+Purpose: update one draft logfile's document-level depth axis.
+
+Returns:
+
+- `logfile_path`
+- `depth_axis`
+
+Behavior:
+
+- updates `document.depth` in the target draft
+- supports `unit`, `scale`, `major_step`, and `minor_step`
+- rejects empty edits that provide no changed depth settings
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 
 Purpose: append one track to a draft logfile and persist the validated result.
@@ -396,6 +413,35 @@ Behavior:
 - rejects duplicate curve bindings for the same section, track, and channel
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
+
+### `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
+
+Purpose: add or replace one explicit fill specification on an existing curve binding.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `fill`
+
+High-value optional fields:
+
+- `other_channel`
+- `other_element_id`
+- `baseline`
+- `label`
+- `color`
+- `alpha`
+- `crossover`
+
+Behavior:
+
+- finds the existing curve binding for the requested section, track, and channel
+- persists a validated `fill` block on that binding
+- supports the same fill kinds exposed by `inspect_authoring_vocab(...)`
+- is the preferred edit for explicit crossover and baseline-fill requests
 
 ### `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 
@@ -765,6 +811,7 @@ Returns:
 - `curve_fill_kinds`
 - `report_detail_kinds`
 - `track_header_object_kinds`
+- `depth_axis_patch_keys`
 - `heading_patch_keys`
 - `track_patch_keys`
 - `curve_binding_patch_keys`
@@ -947,18 +994,20 @@ For draft authoring:
 3. `summarize_logfile_draft(...)`
 4. `set_section_data_source(...)` when a starter draft should be repointed at a
    different LAS or DLIS file
-5. `parse_key_value_text(...)` when the input starts as copied header text
-6. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+5. `set_depth_axis(...)` when the request changes document scale, unit, or grid
+   spacing
+6. `parse_key_value_text(...)` when the input starts as copied header text
+7. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-7. `preview_header_mapping(...)` before mutating header/report values
-8. `apply_header_values(...)` when the previewed mapping should be persisted
-9. `inspect_authoring_vocab(...)`
-10. apply `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-   `bind_curve(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+8. `preview_header_mapping(...)` before mutating header/report values
+9. `apply_header_values(...)` when the previewed mapping should be persisted
+10. `inspect_authoring_vocab(...)`
+11. apply `set_depth_axis(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
+   `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
    `update_raster_binding(...)`, `remove_curve_binding(...)`,
    `remove_raster_binding(...)`, `move_track(...)`,
    `set_heading_content(...)`, and `set_remarks_content(...)`
-11. `summarize_logfile_changes(...)` when the client retained a previous YAML
+12. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-12. preview with a narrow PNG tool
-13. render or save only after review
+13. preview with a narrow PNG tool
+14. render or save only after review

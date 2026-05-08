@@ -160,6 +160,7 @@ Main tools:
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
 - `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
+- `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
@@ -170,6 +171,7 @@ Main tools:
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
+- `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
 - `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
@@ -192,6 +194,8 @@ Recommended split:
   want a file-backed authoring target that an MCP client can revise in steps
 - use `set_section_data_source(...)` when a starter draft should be switched to
   one user LAS/DLIS file before you start adding tracks and bindings
+- use `set_depth_axis(...)` when the request changes document scale, depth
+  labels, or grid spacing before you start fine-grained track edits
 - use `parse_key_value_text(...)` when the source material is a copied header
   packet, tabular note block, or other simple key-value text
 - use `inspect_heading_slots(...)` when the next task is filling provider
@@ -210,7 +214,7 @@ Recommended split:
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft
 - use `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-  `bind_curve(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+  `set_depth_axis(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
   `update_raster_binding(...)`, `remove_curve_binding(...)`,
   `remove_raster_binding(...)`, and `move_track(...)` for the deterministic
   track/layout edit loop

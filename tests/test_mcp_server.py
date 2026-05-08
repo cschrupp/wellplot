@@ -206,6 +206,29 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "subtitle": "Replacement LAS Source",
                 },
             )
+            updated_depth = await session.call_tool(
+                "set_depth_axis",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "unit": "ft",
+                    "scale": 240.0,
+                    "major_step": 10.0,
+                    "minor_step": 2.0,
+                },
+            )
+            added_fill = await session.call_tool(
+                "add_curve_fill",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "gr",
+                    "channel": "GR",
+                    "kind": "to_lower_limit",
+                    "label": "Gamma Fill",
+                    "color": "#8fd19e",
+                    "alpha": 0.22,
+                },
+            )
             previous_draft_text = draft_logfile.read_text(encoding="utf-8")
             draft_summary = await session.call_tool(
                 "summarize_logfile_draft",
@@ -461,10 +484,12 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "create_logfile_draft",
                 "summarize_logfile_draft",
                 "set_section_data_source",
+                "set_depth_axis",
                 "add_track",
                 "update_track",
                 "remove_track",
                 "bind_curve",
+                "add_curve_fill",
                 "bind_raster",
                 "update_curve_binding",
                 "update_raster_binding",
@@ -579,6 +604,10 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(updated_source.structuredContent["source_path"], str(replacement_las))
         self.assertEqual(updated_source.structuredContent["source_format"], "las")
         self.assertEqual(updated_source.structuredContent["subtitle"], "Replacement LAS Source")
+        self.assertEqual(updated_depth.structuredContent["depth_axis"]["unit"], "ft")
+        self.assertEqual(updated_depth.structuredContent["depth_axis"]["scale"], 240.0)
+        self.assertEqual(added_fill.structuredContent["fill"]["kind"], "to_lower_limit")
+        self.assertEqual(added_fill.structuredContent["fill"]["label"], "Gamma Fill")
         self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(draft_summary.structuredContent["section_count"], 1)
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
