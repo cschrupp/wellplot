@@ -179,7 +179,8 @@ The MCP tool surface currently supports:
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `set_section_data_source`
-- `add_track`, `bind_curve`, `update_curve_binding`, and `move_track`
+- `add_track`, `update_track`, `remove_track`, `bind_curve`,
+  `update_curve_binding`, `remove_curve_binding`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
 - `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`,
   `parse_key_value_text`, and `inspect_style_presets`
@@ -219,6 +220,15 @@ The main entry points are:
 - `from wellplot.agent import AuthoringSession`
 - `from wellplot.agent import run_authoring_request`
 - `from wellplot.agent import revise_authoring_request`
+- `from wellplot.agent import create_project_session`
+- `from wellplot.agent import display_authoring_result`
+- `from wellplot.agent import relative_path`
+
+Notebook-facing project helpers:
+- `create_project_session(...)` to bootstrap one reusable project-scoped agent session
+- `session.add_data_file(...)` to stage LAS or DLIS sources into the project folder
+- `session.create_starter(...)` to generate one starter template/logfile pair from a shipped preset
+- `session.configure_rounds(...)` and `session.configure_paths(...)` to keep later notebook cells short
 
 Typical iterative flow:
 - `await session.run(...)` for the first seeded draft pass
@@ -353,8 +363,9 @@ Current examples:
   - uses the same credential loading as `wellplot.agent`: `OPENAI_API_KEY`,
     `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`
 - [examples/notebooks/user/agent_las_step_by_step.ipynb](examples/notebooks/user/agent_las_step_by_step.ipynb)
-  - credentialed end-user walkthrough that starts from a tiny starter logfile,
-    switches to the user LAS file, and adds header, remarks, tracks, and
+  - credentialed end-user walkthrough that bootstraps a project session,
+    stages a user LAS file, generates a reusable starter scaffold through
+    `session.create_starter(...)`, and adds header, remarks, tracks, and
     bindings one step at a time through `wellplot.agent`
   - working first-pass agent workflow: functional, but intentionally less
     curated than the deterministic production notebooks and may still need

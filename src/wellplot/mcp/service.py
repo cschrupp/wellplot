@@ -85,6 +85,16 @@ AUTHORING_HEADING_PATCH_KEYS = (
     "detail",
     "tail_enabled",
 )
+AUTHORING_TRACK_PATCH_KEYS = (
+    "title",
+    "kind",
+    "width_mm",
+    "x_scale",
+    "grid",
+    "track_header",
+    "reference",
+    "annotations",
+)
 AUTHORING_CURVE_BINDING_PATCH_KEYS = (
     "label",
     "style",
@@ -623,6 +633,28 @@ class AddedTrackResult:
 
 
 @dataclass(slots=True)
+class UpdatedTrackResult:
+    """Structured result for updating one track in a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track: dict[str, object]
+
+
+@dataclass(slots=True)
+class RemovedTrackResult:
+    """Structured result for removing one track from a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track_ids: list[str]
+    track_count: int
+    removed_binding_count: int
+
+
+@dataclass(slots=True)
 class BoundCurveResult:
     """Structured result for adding one curve binding to a draft logfile."""
 
@@ -643,6 +675,18 @@ class UpdatedCurveBindingResult:
     track_id: str
     channel: str
     binding: dict[str, object]
+
+
+@dataclass(slots=True)
+class RemovedCurveBindingResult:
+    """Structured result for removing one curve binding from a draft logfile."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+    binding_kind: str
+    binding_count: int
 
 
 @dataclass(slots=True)
@@ -767,6 +811,7 @@ class AuthoringVocabularyResult:
     report_detail_kinds: list[str]
     track_header_object_kinds: list[str]
     heading_patch_keys: list[str]
+    track_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
     move_track_selectors: list[str]
     heading_field_catalog: dict[str, object]
@@ -1141,6 +1186,35 @@ def _find_curve_binding_index(
     raise TemplateValidationError(
         f"Curve binding for channel {channel!r} was not found on track {track_id!r} "
         f"in section {section_id!r}."
+    )
+
+
+def _find_track_index(
+    tracks: list[dict[str, object]],
+    *,
+    section_id: str,
+    track_id: str,
+) -> int:
+    for index, track in enumerate(tracks):
+        if not isinstance(track, dict):
+            continue
+        if str(track.get("id", "")) == track_id:
+            return index
+    raise TemplateValidationError(
+        f"Track {track_id!r} was not found in section {section_id!r}."
+    )
+
+
+def _binding_targets_track(
+    spec: LogFileSpec,
+    binding: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+) -> bool:
+    return (
+        _binding_target_section_id(spec, binding) == section_id
+        and str(binding.get("track_id", "")) == track_id
     )
 
 
@@ -1601,6 +1675,7 @@ def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]
 def _authoring_patch_schema() -> dict[str, object]:
     return {
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
+        "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         "move_track_target_selectors": list(AUTHORING_MOVE_TRACK_SELECTORS),
         "remarks_entry_fields": ["title", "lines", "alignment"],
@@ -3362,6 +3437,141 @@ def add_track(
     )
 
 
+def update_track(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedTrackResult:
+    """Patch one existing track in a draft logfile and persist the validated result."""
+    invalid = sorted(key for key in patch if key not in AUTHORING_TRACK_PATCH_KEYS)
+    if invalid:
+        raise TemplateValidationError(
+            f"Unsupported track patch keys {invalid}. "
+            f"Allowed keys: {sorted(AUTHORING_TRACK_PATCH_KEYS)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+    track = tracks[track_index]
+    if not isinstance(track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+
+    updated_track = deepcopy(track)
+    for key, value in patch.items():
+        if key in {"title", "kind"}:
+            if value is None:
+                updated_track.pop(key, None)
+            else:
+                updated_track[key] = str(value)
+            continue
+        if key == "width_mm":
+            if value is None:
+                updated_track.pop(key, None)
+            else:
+                updated_track[key] = float(value)
+            continue
+        if value is None:
+            updated_track.pop(key, None)
+            continue
+        existing = updated_track.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            updated_track[key] = _merge_optional_patch(existing, value)
+            continue
+        updated_track[key] = deepcopy(value)
+
+    tracks[track_index] = updated_track
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    saved_tracks = list(saved_section.get("tracks", []))
+    saved_track_index = _find_track_index(saved_tracks, section_id=section_id, track_id=track_id)
+    saved_track = saved_tracks[saved_track_index]
+    if not isinstance(saved_track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+    return UpdatedTrackResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track=deepcopy(saved_track),
+    )
+
+
+def remove_track(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    remove_bindings: bool = True,
+    root: str | Path | None = None,
+) -> RemovedTrackResult:
+    """Remove one track from a draft logfile and optionally remove its bindings."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+    bindings = _logfile_mapping_bindings(mapping)
+    matching_binding_indexes = [
+        index
+        for index, binding in enumerate(bindings)
+        if isinstance(binding, dict)
+        and _binding_targets_track(current_spec, binding, section_id=section_id, track_id=track_id)
+    ]
+    if matching_binding_indexes and not remove_bindings:
+        raise TemplateValidationError(
+            f"Track {track_id!r} in section {section_id!r} still has "
+            f"{len(matching_binding_indexes)} bindings. Pass remove_bindings=True to remove them."
+        )
+
+    tracks.pop(track_index)
+    _renumber_section_track_positions(tracks)
+    removed_binding_count = 0
+    if matching_binding_indexes:
+        removed_binding_count = len(matching_binding_indexes)
+        for binding_index in reversed(matching_binding_indexes):
+            bindings.pop(binding_index)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    saved_track_ids = [
+        str(track.get("id", ""))
+        for track in list(saved_section.get("tracks", []))
+        if isinstance(track, dict)
+    ]
+    return RemovedTrackResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track_ids=saved_track_ids,
+        track_count=len(saved_track_ids),
+        removed_binding_count=removed_binding_count,
+    )
+
+
 def bind_curve(
     logfile_path: str,
     *,
@@ -3507,6 +3717,52 @@ def update_curve_binding(
         track_id=track_id,
         channel=str(saved_binding.get("channel", channel)),
         binding=deepcopy(saved_binding),
+    )
+
+
+def remove_curve_binding(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    root: str | Path | None = None,
+) -> RemovedCurveBindingResult:
+    """Remove one existing curve binding from a draft logfile."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_curve_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    removed_channel = str(binding.get("channel", channel))
+    bindings.pop(binding_index)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    binding_count = _binding_counts_by_section(saved_spec)[section_id]["curve"]
+    return RemovedCurveBindingResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=removed_channel,
+        binding_kind="curve",
+        binding_count=binding_count,
     )
 
 
@@ -4146,6 +4402,7 @@ def inspect_authoring_vocab(
         report_detail_kinds=_enum_values(ReportDetailKind),
         track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
+        track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
         heading_field_catalog=_heading_field_catalog(),
@@ -4513,9 +4770,10 @@ def author_plot_from_request_prompt(
         "6. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
         "7. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "8. Plan the smallest explicit edit sequence using add_track(...), bind_curve(...), "
-        "update_curve_binding(...), move_track(...), set_heading_content(...), and "
-        "set_remarks_content(...).\n"
+        "8. Plan the smallest explicit edit sequence using add_track(...), "
+        "update_track(...), remove_track(...), bind_curve(...), "
+        "update_curve_binding(...), remove_curve_binding(...), move_track(...), "
+        "set_heading_content(...), and set_remarks_content(...).\n"
         "9. Preview the affected section, track, or window before recommending a final render.\n"
         "10. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
@@ -4534,7 +4792,9 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "2. Call inspect_authoring_vocab(logfile_path=logfile_path).\n"
         "3. If the feedback changes the underlying LAS/DLIS file, call "
         "set_section_data_source(...) before rebinding curves.\n"
-        "4. Choose the smallest edit sequence that addresses the feedback.\n"
+        "4. Choose the smallest edit sequence that addresses the feedback. "
+        "Prefer update_track(...), remove_track(...), and remove_curve_binding(...) "
+        "when the request says to replace or remove existing content.\n"
         "5. Preview the affected section, track, or depth window after the edits.\n"
         "6. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"

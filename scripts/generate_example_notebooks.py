@@ -4852,55 +4852,46 @@ def _agent_user_setup_code() -> str:
     """Return the setup cell for the credentialed agent walkthrough."""
     return dedent(
         """
-        import shutil
-        from pathlib import Path
-        from textwrap import dedent
+        import os
 
-        from IPython.display import Code, Image, display
-        from wellplot.agent import AuthoringSession
-
-        MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
-        SEED_MAX_ROUNDS = 12
-        REVISION_MAX_ROUNDS = 18
-        TUTORIAL_DIR = REPO_ROOT / "workspace" / "tutorials" / "agent_las_step_by_step"
-        TUTORIAL_DIR.mkdir(parents=True, exist_ok=True)
-
-        SAMPLE_LAS_PATH = REPO_ROOT / "workspace" / "data" / "30-23a-3 8117_d.las"
-        USER_LAS_PATH = TUTORIAL_DIR / "user_input.las"
-        STARTER_LOGFILE = TUTORIAL_DIR / "agent_starter.log.yaml"
-        DRAFT_LOGFILE = TUTORIAL_DIR / "agent_open_hole_draft.log.yaml"
-        FINAL_PDF = TUTORIAL_DIR / "agent_open_hole_draft.pdf"
-
-        if not USER_LAS_PATH.exists():
-            shutil.copyfile(SAMPLE_LAS_PATH, USER_LAS_PATH)
-
-        def repo_relative(path: str | Path) -> str:
-            raw = Path(path)
-            absolute = raw if raw.is_absolute() else (REPO_ROOT / raw)
-            return absolute.resolve().relative_to(REPO_ROOT).as_posix()
-
-        def show_agent_result(title: str, result, *, preview: str = "section") -> None:
-            print(title)
-            print("Draft:", result.draft_logfile)
-            print("Tool trace:", [item.name for item in result.tool_trace])
-            for line in result.change_summary.get("summary_lines", []):
-                print(" -", line)
-            image_bytes = (
-                result.report_preview_png if preview == "report" else result.section_preview_png
-            )
-            display(Image(data=image_bytes))
-
-        session = AuthoringSession.from_local_mcp(
-            provider="openai",
-            model=MODEL,
-            server_root=REPO_ROOT,
+        from wellplot.agent import (
+            create_project_session,
+            display_authoring_result,
+            relative_path,
         )
 
+        MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4")
+        PROJECT_DIR = REPO_ROOT / "workspace" / "tutorials" / "agent_las_step_by_step"
+        session, paths = create_project_session(
+            server_root=REPO_ROOT,
+            project_dir=PROJECT_DIR,
+            model=MODEL,
+        )
+        session.configure_rounds(run_max_rounds=12, revise_max_rounds=18)
+        SAMPLE_LAS_PATH = REPO_ROOT / "workspace" / "data" / "30-23a-3 8117_d.las"
+        USER_LAS_PATH = session.add_data_file(
+            SAMPLE_LAS_PATH,
+            destination_name="user_input.las",
+            keep_existing=True,
+        )
+        DRAFT_LOGFILE = paths.path("agent_open_hole_draft.log.yaml")
+        FINAL_PDF = paths.path("agent_open_hole_draft.pdf")
+        session.configure_paths(
+            draft_logfile=DRAFT_LOGFILE,
+            render_output_path=FINAL_PDF,
+        )
+        # Optional: replace the copied sample with your own file before continuing.
+        # USER_LAS_PATH = session.add_data_file(
+        #     "/absolute/path/to/your.las",
+        #     destination_name="user_input.las",
+        #     overwrite=True,
+        # )
+
         print("Model:", MODEL)
-        print("Tutorial folder:", repo_relative(TUTORIAL_DIR))
-        print("User LAS path:", repo_relative(USER_LAS_PATH))
-        print("Draft logfile:", repo_relative(DRAFT_LOGFILE))
-        print("Final PDF:", repo_relative(FINAL_PDF))
+        print("Project folder:", relative_path(paths.project_dir, root=REPO_ROOT))
+        print("User LAS path:", relative_path(USER_LAS_PATH, root=REPO_ROOT))
+        print("Draft logfile:", relative_path(DRAFT_LOGFILE, root=REPO_ROOT))
+        print("Final PDF:", relative_path(FINAL_PDF, root=REPO_ROOT))
         """
     ).strip()
 
@@ -4909,107 +4900,17 @@ def _agent_user_starter_code() -> str:
     """Return the starter-logfile creation cell for the agent walkthrough."""
     return dedent(
         """
-        starter_source = Path(os.path.relpath(SAMPLE_LAS_PATH, start=TUTORIAL_DIR)).as_posix()
-        starter_yaml = dedent(
-            f'''
-            version: 1
-            name: Agent LAS Starter
-            render:
-              backend: matplotlib
-              output_path: ./agent_open_hole_draft.pdf
-              dpi: 144
-            document:
-              page:
-                size: A4
-                orientation: portrait
-                continuous: false
-                bottom_track_header_enabled: true
-                track_gap_mm: 0
-                track_header_height_mm: 24
-              depth:
-                unit: ft
-                scale: 240
-              layout:
-                heading:
-                  enabled: true
-                  provider_name: Company
-                  general_fields:
-                    - key: company
-                      label: Company
-                      source_key: COMP
-                    - key: well
-                      label: Well
-                      source_key: WELL
-                    - key: field
-                      label: Field
-                      source_key: FLD
-                    - key: service_company
-                      label: Service Company
-                      source_key: SRVC
-                  service_titles:
-                    - value: Open Hole Quicklook
-                      alignment: center
-                      bold: true
-                  detail:
-                    kind: open_hole
-                    title: Open Hole Metadata
-                    rows:
-                      - label: Date
-                        values:
-                          - source_key: DATE
-                          - ""
-                      - label_cells:
-                          - UWI
-                          - Province
-                        columns:
-                          - cells:
-                              - source_key: UWI
-                          - cells:
-                              - source_key: PROV
-                log_sections:
-                  - id: main
-                    title: Main Review
-                    subtitle: Placeholder starter source
-                    depth_range:
-                      - 8400
-                      - 9300
-                    data:
-                      source_path: {starter_source}
-                      source_format: las
-                    tracks:
-                      - id: gr_sp
-                        title: GR/SP
-                        kind: normal
-                        width_mm: 32
-                        position: 1
-                      - id: depth
-                        title: Depth
-                        kind: reference
-                        width_mm: 18
-                        position: 2
-                        reference:
-                          axis: depth
-                          define_layout: true
-                          unit: ft
-                          scale_ratio: 240
-                          major_step: 100
-                          secondary_grid:
-                            display: true
-                            line_count: 4
-              bindings:
-                on_missing: skip
-                channels:
-                  - channel: GR
-                    track_id: gr_sp
-                    kind: curve
-                    label: GR
-                    style:
-                      color: "#2e7d32"
-            '''
-        ).strip() + "\\n"
-
-        STARTER_LOGFILE.write_text(starter_yaml, encoding="utf-8")
-        display(Code(starter_yaml, language="yaml"))
+        starter = session.create_starter(
+            kind="open_hole_quicklook",
+            data_file=USER_LAS_PATH,
+            title="Main Review",
+            subtitle="Placeholder starter source",
+            depth_range=(8400, 9300),
+            starter_name="Agent LAS Starter",
+        )
+        STARTER_TEMPLATE = starter.template_path
+        STARTER_LOGFILE = starter.logfile_path
+        starter.display_yaml()
         """
     ).strip()
 
@@ -5021,44 +4922,39 @@ def _agent_user_notebook() -> dict[str, object]:
         code_cell(_repo_setup_code()),
         code_cell(_agent_user_setup_code()),
         markdown_cell(
-            "## 1. Write A Minimal Starter Logfile\n\n"
-            "This starter keeps one compact overview track, one reference depth "
-            "track, and a source-key-backed heading. The first agent pass will "
-            "switch the section over to your own LAS file and keep the draft "
-            "intentionally sparse."
+            "## 1. Create A Starter Scaffold\n\n"
+            "This cell uses `session.create_starter(...)` to write a reusable "
+            "base template plus one small starter logfile under the project folder. "
+            "The preset keeps the visual system and report chrome in the template, "
+            "while the starter logfile holds only the draft-specific section, track, "
+            "and seed binding state."
         ),
         code_cell(_agent_user_starter_code()),
         markdown_cell(
             "## 2. Create The Initial Draft\n\n"
-            "The first natural-language request clones the starter, changes the "
-            "section data source to `USER_LAS_PATH`, updates the subtitle, and keeps "
-            "only the seeded overview track plus the depth track while the packet is "
-            "still sparse."
+            "The first natural-language request clones the starter, updates the "
+            "subtitle, and keeps only the seeded overview track plus the depth track "
+            "while the packet is still sparse."
         ),
         code_cell(
             dedent(
                 """
                 seed_result = await session.run(
-                    goal=dedent(
-                        f'''
+                    goal=f'''
                         Start from the existing starter logfile and create the initial open-hole draft.
 
-                        - Change the only section data source to `{repo_relative(USER_LAS_PATH)}`.
                         - Keep the section id `main`.
-                        - Set the section subtitle to the LAS filename.
+                        - Set the section subtitle to `Interactive LAS tutorial draft`.
                         - Keep the seeded `gr_sp` overview track before the depth track.
                         - Do not add any additional tracks yet.
                         - Keep the source-key-backed heading fields.
                         - Set the first service title to `Open Hole Quicklook`.
                         - Do not add remarks yet.
-                        '''
-                    ).strip(),
-                    source_logfile_path=repo_relative(STARTER_LOGFILE),
-                    output_logfile=repo_relative(DRAFT_LOGFILE),
-                    max_rounds=SEED_MAX_ROUNDS,
+                    ''',
+                    source_logfile_path=STARTER_LOGFILE,
                 )
 
-                show_agent_result("Initial draft", seed_result, preview="report")
+                display_authoring_result("Initial draft", seed_result, preview="report")
                 """
             ).strip()
         ),
@@ -5071,21 +4967,17 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 remarks_result = await session.revise(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    feedback=dedent(
-                        '''
+                    feedback='''
                         Add one concise remarks block to the first page.
 
                         - Keep it short and readable.
                         - Mention that this is an open-hole quicklook built from a user-supplied LAS file.
                         - Mention that only channels confirmed through the source inspection should be plotted.
                         - Mention that this packet is an iterative interpretation artifact, not a vendor-issued original.
-                        '''
-                    ).strip(),
-                    max_rounds=REVISION_MAX_ROUNDS,
+                    ''',
                 )
 
-                show_agent_result("Remarks added", remarks_result, preview="report")
+                display_authoring_result("Remarks added", remarks_result, preview="report")
                 """
             ).strip()
         ),
@@ -5098,21 +4990,17 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 gr_sp_result = await session.revise(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    feedback=dedent(
-                        '''
+                    feedback='''
                         Revise the existing draft.
 
                         - Revise the existing `gr_sp` overview track before the depth track.
                         - If both GR and SP are available, bind both to this track.
                         - If SP is missing, keep a GR-only overview.
                         - Use a readable green gamma-ray curve and conventional linear scaling.
-                        '''
-                    ).strip(),
-                    max_rounds=REVISION_MAX_ROUNDS,
+                    ''',
                 )
 
-                show_agent_result("GR/SP overview track", gr_sp_result)
+                display_authoring_result("GR/SP overview track", gr_sp_result)
                 """
             ).strip()
         ),
@@ -5125,21 +5013,17 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 resistivity_result = await session.revise(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    feedback=dedent(
-                        '''
+                    feedback='''
                         Revise the existing draft.
 
                         - Add one resistivity track after the depth track.
                         - Use a logarithmic scale from 0.2 to 2000 ohm.m.
                         - Bind the deep, medium, and shallow resistivity curves that are available.
                         - Keep the deepest resistivity curve visually strongest.
-                        '''
-                    ).strip(),
-                    max_rounds=REVISION_MAX_ROUNDS,
+                    ''',
                 )
 
-                show_agent_result("Resistivity track", resistivity_result)
+                display_authoring_result("Resistivity track", resistivity_result)
                 """
             ).strip()
         ),
@@ -5152,21 +5036,17 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 porosity_result = await session.revise(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    feedback=dedent(
-                        '''
+                    feedback='''
                         Revise the existing draft.
 
                         - Add one porosity track after the resistivity track.
                         - If RHOB and NPHI are available, overlay them in the same track.
                         - Reverse the neutron scale so crossover reads naturally.
                         - Add a crossover fill only when both RHOB and NPHI are present.
-                        '''
-                    ).strip(),
-                    max_rounds=REVISION_MAX_ROUNDS,
+                    ''',
                 )
 
-                show_agent_result("Porosity overlay track", porosity_result)
+                display_authoring_result("Porosity overlay track", porosity_result)
                 """
             ).strip()
         ),
@@ -5179,20 +5059,16 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 qc_result = await session.revise(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    feedback=dedent(
-                        '''
+                    feedback='''
                         Revise the existing draft.
 
                         - Add one narrow QC track after the porosity track.
                         - Bind supporting curves such as CALI, PEF, and DRHO only when they are available.
                         - Keep the track readable and lighter-weight than the main interpretation tracks.
-                        '''
-                    ).strip(),
-                    max_rounds=REVISION_MAX_ROUNDS,
+                    ''',
                 )
 
-                show_agent_result("QC track", qc_result)
+                display_authoring_result("QC track", qc_result)
                 """
             ).strip()
         ),
@@ -5205,8 +5081,6 @@ def _agent_user_notebook() -> dict[str, object]:
             dedent(
                 """
                 render_result = await session.render_logfile_to_file(
-                    logfile_path=repo_relative(DRAFT_LOGFILE),
-                    output_path=repo_relative(FINAL_PDF),
                     overwrite=True,
                 )
 

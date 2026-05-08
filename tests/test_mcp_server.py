@@ -248,6 +248,18 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "width_mm": 32.0,
                 },
             )
+            updated_track = await session.call_tool(
+                "update_track",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
+                    "patch": {
+                        "title": "Density / Neutron",
+                        "width_mm": 30.0,
+                    },
+                },
+            )
             bound_curve = await session.call_tool(
                 "bind_curve",
                 {
@@ -283,6 +295,23 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "section_id": "main",
                     "track_id": "porosity",
                     "after_track_id": "depth",
+                },
+            )
+            removed_curve_binding = await session.call_tool(
+                "remove_curve_binding",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
+                    "channel": "GR",
+                },
+            )
+            removed_track = await session.call_tool(
+                "remove_track",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "porosity",
                 },
             )
             updated_heading = await session.call_tool(
@@ -433,8 +462,11 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "summarize_logfile_draft",
                 "set_section_data_source",
                 "add_track",
+                "update_track",
+                "remove_track",
                 "bind_curve",
                 "update_curve_binding",
+                "remove_curve_binding",
                 "move_track",
                 "set_heading_content",
                 "set_remarks_content",
@@ -566,6 +598,8 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(added_track.structuredContent["track_id"], "porosity")
         self.assertEqual(added_track.structuredContent["track_count"], 7)
         self.assertEqual(added_track.structuredContent["track_ids"][-1], "porosity")
+        self.assertEqual(updated_track.structuredContent["track"]["title"], "Density / Neutron")
+        self.assertEqual(updated_track.structuredContent["track"]["width_mm"], 30.0)
         self.assertEqual(bound_curve.structuredContent["channel"], "GR")
         self.assertEqual(bound_curve.structuredContent["binding_kind"], "curve")
         self.assertEqual(bound_curve.structuredContent["binding_count"], 6)
@@ -577,6 +611,12 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(
             moved_track.structuredContent["track_ids"],
             ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt"],
+        )
+        self.assertEqual(removed_curve_binding.structuredContent["binding_count"], 5)
+        self.assertEqual(removed_track.structuredContent["track_count"], 6)
+        self.assertEqual(
+            removed_track.structuredContent["track_ids"],
+            ["depth", "cbl", "vdl", "gr", "cali", "rt"],
         )
         self.assertEqual(
             updated_heading.structuredContent["heading"]["provider_name"],
@@ -652,11 +692,11 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertTrue(change_summary.structuredContent["remarks_changed"])
         self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
-            6,
+            5,
         )
         self.assertEqual(
             updated_draft_summary.structuredContent["sections"][0]["track_ids"][1],
-            "porosity",
+            "cbl",
         )
         self.assertEqual(updated_draft_summary.structuredContent["has_tail"], True)
         self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")

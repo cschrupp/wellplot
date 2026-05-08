@@ -151,8 +151,11 @@ Concrete `0.4.0` foundation set:
 - `create_logfile_draft(...)`
 - `summarize_logfile_draft(...)`
 - `add_track(...)`
+- `update_track(...)`
+- `remove_track(...)`
 - `bind_curve(...)`
 - `update_curve_binding(...)`
+- `remove_curve_binding(...)`
 - `move_track(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`

@@ -323,6 +323,60 @@ Behavior:
 - validates the mutated draft through the normal renderable logfile path before
   saving
 
+### `update_track(logfile_path, section_id, track_id, patch)`
+
+Purpose: patch one existing track inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track`
+
+Supported patch keys:
+
+- `title`
+- `kind`
+- `width_mm`
+- `x_scale`
+- `grid`
+- `track_header`
+- `reference`
+- `annotations`
+
+Behavior:
+
+- deep-merges nested mapping updates such as `x_scale` and `grid`
+- removes optional properties when their patch value is `null`
+- rejects unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
+
+Purpose: remove one existing track from a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track_ids`
+- `track_count`
+- `removed_binding_count`
+
+Behavior:
+
+- removes the target track from the section track list
+- renumbers the remaining track positions before saving
+- removes all bindings that target the removed track when
+  `remove_bindings=True`
+- rejects the removal when bindings still target that track and
+  `remove_bindings=False`
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 
 Purpose: add one scalar curve binding to an existing draft track.
@@ -372,6 +426,25 @@ Behavior:
 - deep-merges nested mapping updates
 - removes optional properties when their patch value is `null`
 - rejects unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `remove_curve_binding(logfile_path, section_id, track_id, channel)`
+
+Purpose: remove one existing curve binding inside a draft logfile.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+- `binding_kind`
+- `binding_count`
+
+Behavior:
+
+- removes the matching section/track/channel curve binding
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
@@ -602,6 +675,7 @@ Returns:
 - `report_detail_kinds`
 - `track_header_object_kinds`
 - `heading_patch_keys`
+- `track_patch_keys`
 - `curve_binding_patch_keys`
 - `move_track_selectors`
 - `heading_field_catalog`
@@ -787,7 +861,8 @@ For draft authoring:
 7. `preview_header_mapping(...)` before mutating header/report values
 8. `apply_header_values(...)` when the previewed mapping should be persisted
 9. `inspect_authoring_vocab(...)`
-10. apply `add_track(...)`, `bind_curve(...)`, `update_curve_binding(...)`,
+10. apply `add_track(...)`, `update_track(...)`, `remove_track(...)`,
+   `bind_curve(...)`, `update_curve_binding(...)`, `remove_curve_binding(...)`,
    `move_track(...)`, `set_heading_content(...)`, and
    `set_remarks_content(...)`
 11. `summarize_logfile_changes(...)` when the client retained a previous YAML

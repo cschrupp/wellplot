@@ -46,8 +46,11 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "inspect_style_presets",
     "inspect_authoring_vocab",
     "add_track",
+    "update_track",
+    "remove_track",
     "bind_curve",
     "update_curve_binding",
+    "remove_curve_binding",
     "move_track",
     "set_heading_content",
     "set_remarks_content",
@@ -136,6 +139,27 @@ class AuthoringResult:
     def draft_path(self) -> Path:
         """Return the absolute path to the generated draft logfile."""
         return self.server_root / self.draft_logfile
+
+    @property
+    def summary_lines(self) -> tuple[str, ...]:
+        """Return the normalized change-summary lines for notebook/UI display."""
+        lines = self.change_summary.get("summary_lines", [])
+        if not isinstance(lines, list):
+            return ()
+        normalized: list[str] = []
+        for line in lines:
+            if isinstance(line, str) and line.strip():
+                normalized.append(line)
+        return tuple(normalized)
+
+    def preview_bytes(self, kind: str = "section") -> bytes:
+        """Return one preview payload by logical kind."""
+        normalized_kind = str(kind).strip().lower()
+        if normalized_kind == "section":
+            return self.section_preview_png
+        if normalized_kind == "report":
+            return self.report_preview_png
+        raise ValueError("preview kind must be either 'section' or 'report'.")
 
     def write_preview_artifacts(
         self,

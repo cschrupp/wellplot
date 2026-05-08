@@ -22,22 +22,30 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 import unittest
 from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from unittest import mock
 
 import anyio
+import yaml
 
 from wellplot.agent import (
     AuthoringRequest,
     AuthoringResult,
     AuthoringSession,
     AuthoringToolCall,
+    ProjectPaths,
+    ProjectSession,
+    ProjectStarter,
     RevisionRequest,
+    create_project_session,
+    display_authoring_result,
+    relative_path,
 )
 from wellplot.agent.core import (
     FunctionToolDefinition,
@@ -494,6 +502,442 @@ class AgentTests(unittest.TestCase):
             self.assertTrue((root / "workspace" / "demo.pdf").exists())
             assert runtime.last_session is not None
             self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile_to_file")
+
+    def test_authoring_result_exposes_summary_lines_and_preview_selection(self) -> None:
+        """Expose compact display helpers directly on the public result object."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id="forge16b_porosity_example",
+            source_logfile_path=None,
+            goal="Simplify the heading.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main"]},
+            change_summary={"summary_lines": ["Updated heading.", "", 123]},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"report-preview",
+            section_preview_png=b"section-preview",
+        )
+
+        self.assertEqual(result.summary_lines, ("Updated heading.",))
+        self.assertEqual(result.preview_bytes("report"), b"report-preview")
+        self.assertEqual(result.preview_bytes("section"), b"section-preview")
+        with self.assertRaisesRegex(ValueError, "preview kind"):
+            result.preview_bytes("thumbnail")
+
+    def test_relative_path_formats_paths_under_root(self) -> None:
+        """Expose one reusable notebook path helper in the public agent layer."""
+        root = Path("/tmp/project")
+        self.assertEqual(
+            relative_path(root / "workspace" / "demo.log.yaml", root=root),
+            "workspace/demo.log.yaml",
+        )
+        self.assertEqual(
+            relative_path("workspace/demo.log.yaml", root=root),
+            "workspace/demo.log.yaml",
+        )
+
+    def test_display_authoring_result_uses_ipython_image(self) -> None:
+        """Wrap notebook display behavior in one public helper instead of local glue code."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id="forge16b_porosity_example",
+            source_logfile_path=None,
+            goal="Simplify the heading.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(AuthoringToolCall(round=1, name="set_heading_content", arguments={}),),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main"]},
+            change_summary={"summary_lines": ["Updated heading."]},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"report-preview",
+            section_preview_png=b"section-preview",
+        )
+        display_calls: list[object] = []
+
+        class FakeImage:
+            def __init__(self, *, data: bytes) -> None:
+                self.data = data
+
+        fake_display_module = ModuleType("IPython.display")
+        fake_display_module.Image = FakeImage
+        fake_display_module.display = display_calls.append
+
+        with mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}):
+            output = display_authoring_result("Demo", result, preview="report")
+
+        self.assertIsNone(output)
+        self.assertEqual(len(display_calls), 1)
+        image = display_calls[0]
+        self.assertIsInstance(image, FakeImage)
+        self.assertEqual(image.data, b"report-preview")
+        self.assertEqual(display_calls, [image])
+
+    def test_display_authoring_result_can_return_image_explicitly(self) -> None:
+        """Allow callers to opt into the display object when they actually need it."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id="forge16b_porosity_example",
+            source_logfile_path=None,
+            goal="Simplify the heading.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(AuthoringToolCall(round=1, name="set_heading_content", arguments={}),),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main"]},
+            change_summary={"summary_lines": ["Updated heading."]},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"report-preview",
+            section_preview_png=b"section-preview",
+        )
+        display_calls: list[object] = []
+
+        class FakeImage:
+            def __init__(self, *, data: bytes) -> None:
+                self.data = data
+
+        fake_display_module = ModuleType("IPython.display")
+        fake_display_module.Image = FakeImage
+        fake_display_module.display = display_calls.append
+
+        with mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}):
+            image = display_authoring_result(
+                "Demo",
+                result,
+                preview="report",
+                return_image=True,
+            )
+
+        self.assertIsInstance(image, FakeImage)
+        self.assertEqual(display_calls, [image])
+
+    def test_create_project_session_builds_project_scoped_wrapper(self) -> None:
+        """Create one generic project session rooted under the configured server root."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            fake_session = mock.Mock(spec=AuthoringSession)
+            with mock.patch.object(
+                AuthoringSession,
+                "from_local_mcp",
+                return_value=fake_session,
+            ) as factory:
+                session, paths = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    model="demo-model",
+                )
+            self.assertIsInstance(session, ProjectSession)
+            self.assertIs(session.authoring_session, fake_session)
+            self.assertIsInstance(paths, ProjectPaths)
+            self.assertEqual(paths.server_root, repo_root.resolve())
+            self.assertEqual(paths.project_dir, (repo_root / "workspace/demo-job").resolve())
+            self.assertTrue(paths.project_dir.exists())
+            self.assertEqual(paths.path("draft.log.yaml"), paths.project_dir / "draft.log.yaml")
+            factory.assert_called_once_with(
+                provider="openai",
+                model="demo-model",
+                server_root=paths.server_root,
+                api_key=None,
+                base_url=None,
+            )
+            self.assertEqual(session.run_max_rounds, 12)
+            self.assertEqual(session.revise_max_rounds, 12)
+
+    def test_project_session_add_data_file_stages_one_input(self) -> None:
+        """Expose one session method for staging user data into the project directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            replacement_path = repo_root / "incoming" / "replacement.las"
+            replacement_path.parent.mkdir(parents=True, exist_ok=True)
+            replacement_path.write_text("replacement", encoding="utf-8")
+
+            with mock.patch.object(
+                AuthoringSession,
+                "from_local_mcp",
+                return_value=mock.Mock(spec=AuthoringSession),
+            ):
+                session, paths = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    model="demo-model",
+                )
+                copied_path = session.add_data_file(
+                    replacement_path,
+                    destination_name="data/user_input.las",
+                    overwrite=True,
+                )
+            self.assertEqual(copied_path, paths.path("data", "user_input.las"))
+            self.assertEqual(copied_path.read_text(encoding="utf-8"), "replacement")
+
+    def test_project_session_add_data_file_can_keep_existing_target(self) -> None:
+        """Allow rerunnable notebook setup cells to preserve an existing staged file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            replacement_path = repo_root / "incoming" / "replacement.las"
+            replacement_path.parent.mkdir(parents=True, exist_ok=True)
+            replacement_path.write_text("replacement", encoding="utf-8")
+
+            with mock.patch.object(
+                AuthoringSession,
+                "from_local_mcp",
+                return_value=mock.Mock(spec=AuthoringSession),
+            ):
+                session, paths = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    model="demo-model",
+                )
+                existing_path = paths.path("user_input.las")
+                existing_path.write_text("keep-me", encoding="utf-8")
+                copied_path = session.add_data_file(
+                    replacement_path,
+                    destination_name="user_input.las",
+                    keep_existing=True,
+                )
+            self.assertEqual(copied_path, existing_path)
+            self.assertEqual(copied_path.read_text(encoding="utf-8"), "keep-me")
+
+    def test_project_paths_reject_escape_segments(self) -> None:
+        """Keep helper-generated project paths inside the configured project directory."""
+        paths = ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job")
+        with self.assertRaisesRegex(ValueError, "project directory"):
+            paths.path("..", "outside.log.yaml")
+
+    def test_project_session_run_normalizes_text_and_uses_configured_rounds(self) -> None:
+        """Hide dedent/strip boilerplate and round defaults inside the project helper."""
+        authoring_session = mock.Mock(spec=AuthoringSession)
+        authoring_session.run = mock.AsyncMock(return_value=mock.Mock(spec=AuthoringResult))
+        session = ProjectSession(
+            authoring_session=authoring_session,
+            paths=ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job"),
+            run_max_rounds=18,
+            revise_max_rounds=24,
+        )
+
+        anyio.run(
+            partial(
+                session.run,
+                goal="""
+                    Build one open-hole draft.
+                """,
+                source_logfile_path="workspace/demo-job/starter.log.yaml",
+                output_logfile="workspace/demo-job/draft.log.yaml",
+            )
+        )
+
+        authoring_session.run.assert_awaited_once_with(
+            goal="Build one open-hole draft.",
+            output_logfile="workspace/demo-job/draft.log.yaml",
+            example_id=None,
+            source_logfile_path="workspace/demo-job/starter.log.yaml",
+            max_rounds=18,
+        )
+
+    def test_project_session_revise_normalizes_text_and_can_update_defaults(self) -> None:
+        """Allow round budgets to be configured once in notebook setup code."""
+        authoring_session = mock.Mock(spec=AuthoringSession)
+        authoring_session.revise = mock.AsyncMock(return_value=mock.Mock(spec=AuthoringResult))
+        session = ProjectSession(
+            authoring_session=authoring_session,
+            paths=ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job"),
+        )
+
+        configured = session.configure_rounds(run_max_rounds=14, revise_max_rounds=22)
+        self.assertIs(configured, session)
+
+        anyio.run(
+            partial(
+                session.revise,
+                feedback="""
+                    Add one QC track.
+                """,
+                logfile_path="workspace/demo-job/draft.log.yaml",
+            )
+        )
+
+        authoring_session.revise.assert_awaited_once_with(
+            feedback="Add one QC track.",
+            logfile_path="workspace/demo-job/draft.log.yaml",
+            max_rounds=22,
+        )
+
+    def test_project_session_configure_paths_sets_defaults_for_run_revise_and_render(self) -> None:
+        """Allow notebook setup code to define one default draft and render target."""
+        authoring_session = mock.Mock(spec=AuthoringSession)
+        authoring_session.run = mock.AsyncMock(return_value=mock.Mock(spec=AuthoringResult))
+        authoring_session.revise = mock.AsyncMock(return_value=mock.Mock(spec=AuthoringResult))
+        authoring_session.render_logfile_to_file = mock.AsyncMock(
+            return_value={"output_path": "workspace/demo-job/final.pdf", "page_count": 1}
+        )
+        session = ProjectSession(
+            authoring_session=authoring_session,
+            paths=ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job"),
+        )
+        session.configure_paths(
+            draft_logfile="workspace/demo-job/draft.log.yaml",
+            render_output_path="workspace/demo-job/final.pdf",
+        )
+
+        anyio.run(
+            partial(
+                session.run,
+                goal="Build one open-hole draft.",
+                source_logfile_path="workspace/demo-job/starter.log.yaml",
+            )
+        )
+        anyio.run(partial(session.revise, feedback="Add one QC track."))
+        render_result = anyio.run(partial(session.render_logfile_to_file, overwrite=True))
+
+        authoring_session.run.assert_awaited_once_with(
+            goal="Build one open-hole draft.",
+            output_logfile="workspace/demo-job/draft.log.yaml",
+            example_id=None,
+            source_logfile_path="workspace/demo-job/starter.log.yaml",
+            max_rounds=12,
+        )
+        authoring_session.revise.assert_awaited_once_with(
+            feedback="Add one QC track.",
+            logfile_path="workspace/demo-job/draft.log.yaml",
+            max_rounds=12,
+        )
+        authoring_session.render_logfile_to_file.assert_awaited_once_with(
+            logfile_path="workspace/demo-job/draft.log.yaml",
+            output_path="workspace/demo-job/final.pdf",
+            overwrite=True,
+        )
+        self.assertEqual(render_result["page_count"], 1)
+
+    def test_project_session_requires_configured_paths_when_omitted(self) -> None:
+        """Raise a clear error if notebook code omits paths before configuring them."""
+        session = ProjectSession(
+            authoring_session=mock.Mock(spec=AuthoringSession),
+            paths=ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job"),
+        )
+
+        with self.assertRaisesRegex(ValueError, "draft_logfile"):
+            anyio.run(partial(session.revise, feedback="Add one QC track."))
+        session.configure_paths(draft_logfile="workspace/demo-job/draft.log.yaml")
+        with self.assertRaisesRegex(ValueError, "render_output_path"):
+            anyio.run(partial(session.render_logfile_to_file))
+
+    def test_project_session_create_starter_writes_template_and_logfile(self) -> None:
+        """Replace raw notebook YAML scaffolding with one starter preset helper."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            data_file = repo_root / "workspace" / "demo-job" / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+                render_output_path="workspace/demo-job/final.pdf",
+            )
+
+            starter = session.create_starter(
+                kind="open_hole_quicklook",
+                data_file=data_file,
+                title="Main Review",
+                subtitle="Starter subtitle",
+                depth_range=(8400, 9300),
+                starter_logfile="starter.log.yaml",
+                template_path="base.template.yaml",
+                starter_name="Agent LAS Starter",
+            )
+
+            self.assertIsInstance(starter, ProjectStarter)
+            self.assertEqual(starter.template_path, session.paths.path("base.template.yaml"))
+            self.assertEqual(starter.logfile_path, session.paths.path("starter.log.yaml"))
+            self.assertEqual(starter.render_output_path, session.paths.path("final.pdf"))
+            self.assertTrue(starter.template_path.exists())
+            self.assertTrue(starter.logfile_path.exists())
+            template_payload = yaml.safe_load(starter.template_yaml)
+            logfile_payload = yaml.safe_load(starter.logfile_yaml)
+            self.assertEqual(template_payload["document"]["layout"]["heading"]["enabled"], True)
+            self.assertEqual(logfile_payload["name"], "Agent LAS Starter")
+            section = logfile_payload["document"]["layout"]["log_sections"][0]
+            self.assertEqual(section["title"], "Main Review")
+            self.assertEqual(section["subtitle"], "Starter subtitle")
+            self.assertEqual(section["depth_range"], [8400, 9300])
+            self.assertEqual(section["data"]["source_format"], "las")
+            self.assertEqual(logfile_payload["render"]["output_path"], "final.pdf")
+
+    def test_project_session_create_starter_accepts_absolute_project_paths(self) -> None:
+        """Allow notebook code to pass absolute project-scoped paths directly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            project_dir = repo_root / "workspace" / "demo-job"
+            data_file = project_dir / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            template_path = project_dir / "base.template.yaml"
+            starter_logfile = project_dir / "agent_starter.log.yaml"
+            final_pdf = project_dir / "agent_open_hole_draft.pdf"
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, project_dir),
+                render_output_path=final_pdf,
+            )
+
+            starter = session.create_starter(
+                kind="open_hole_quicklook",
+                data_file=data_file,
+                title="Main Review",
+                subtitle="Starter subtitle",
+                depth_range=(8400, 9300),
+                template_path=template_path,
+                starter_logfile=starter_logfile,
+            )
+
+            logfile_payload = yaml.safe_load(starter.logfile_yaml)
+            self.assertEqual(starter.template_path, template_path.resolve())
+            self.assertEqual(starter.logfile_path, starter_logfile.resolve())
+            self.assertEqual(starter.render_output_path, final_pdf.resolve())
+            self.assertEqual(
+                logfile_payload["template"]["path"],
+                "base.template.yaml",
+            )
+            self.assertEqual(
+                logfile_payload["render"]["output_path"],
+                "agent_open_hole_draft.pdf",
+            )
+
+    def test_project_session_create_starter_requires_supported_kind(self) -> None:
+        """Reject unknown starter presets instead of leaking low-level schema details."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            data_file = repo_root / "workspace" / "demo-job" / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+            )
+
+            with self.assertRaisesRegex(ValueError, "Supported starter kinds"):
+                session.create_starter(
+                    kind="unknown",
+                    data_file=data_file,
+                    title="Main Review",
+                    subtitle="Starter subtitle",
+                )
 
     def test_from_local_mcp_rejects_unknown_provider(self) -> None:
         """Reject unsupported providers before optional imports happen."""

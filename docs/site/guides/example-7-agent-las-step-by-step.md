@@ -17,20 +17,24 @@ example from scratch each time.
 
 The flow is:
 
-1. write a tiny starter logfile with one reference depth track
-2. point that draft at the user LAS file
+1. stage the user LAS file into the project folder
+2. generate a reusable starter scaffold from a shipped preset
 3. let the LAS header populate the first-page metadata fields
 4. add remarks
-5. add one track at a time
+5. refine the overview track and then add one track at a time
 6. preview after each step
 7. render the final PDF through the public agent session helper
 
 The notebook uses these public APIs directly:
 
-- `AuthoringSession.from_local_mcp(...)`
+- `create_project_session(...)`
+- `session.add_data_file(...)`
+- `session.create_starter(...)`
 - `await session.run(...)`
 - `await session.revise(...)`
 - `await session.render_logfile_to_file(...)`
+- `display_authoring_result(...)`
+- `relative_path(...)`
 
 ## Runtime requirements
 
@@ -76,8 +80,14 @@ That is why it lives in the `user/` notebook set but remains unexecuted in git.
 Start with the default copied LAS file once so the full workflow is known to
 work in your environment.
 
-Then replace `workspace/tutorials/agent_las_step_by_step/user_input.las` with
-your own LAS file and rerun the notebook from the top.
+Then point `session.add_data_file(...)` at your own LAS file so the project
+folder gets a staged `user_input.las` before rerunning from the top.
+
+The starter scaffold step is intentionally higher level than the YAML-first
+user notebooks. Instead of hand-writing the full template and starter logfile
+schema in the notebook, this walkthrough uses `session.create_starter(...)` to
+materialize the same files from a shipped preset, then shows the generated YAML
+so the user can still inspect what the agent will revise.
 
 The safest iteration pattern is:
 

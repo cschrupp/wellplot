@@ -296,6 +296,42 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def update_track(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Patch one existing track inside a draft logfile."""
+        return asdict(
+            service.update_track(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def remove_track(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        remove_bindings: bool = True,
+    ) -> dict[str, object]:
+        """Remove one existing track from a draft logfile."""
+        return asdict(
+            service.remove_track(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                remove_bindings=remove_bindings,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def bind_curve(
         logfile_path: str,
         section_id: str,
@@ -337,6 +373,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 track_id=track_id,
                 channel=channel,
                 patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def remove_curve_binding(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+    ) -> dict[str, object]:
+        """Remove one existing curve binding inside a draft logfile."""
+        return asdict(
+            service.remove_curve_binding(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
                 root=server_root,
             )
         )

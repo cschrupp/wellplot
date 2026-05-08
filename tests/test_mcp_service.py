@@ -644,6 +644,126 @@ class McpServiceTests(unittest.TestCase):
                 )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_track_merges_patch_and_persists(self) -> None:
+        """Patch one existing track without forcing the agent to add a replacement."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.update_track(
+                str(draft_path),
+                section_id="main",
+                track_id="rt",
+                patch={
+                    "title": "Resistivity",
+                    "width_mm": 30.0,
+                    "x_scale": {
+                        "kind": "log",
+                        "min": 0.2,
+                        "max": 2000.0,
+                    },
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "rt")
+            self.assertEqual(result.track["title"], "Resistivity")
+            self.assertEqual(result.track["width_mm"], 30.0)
+            self.assertEqual(result.track["x_scale"]["kind"], "log")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "rt")
+            self.assertEqual(saved_track["title"], "Resistivity")
+            self.assertEqual(saved_track["x_scale"]["max"], 2000.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_track_rejects_unknown_patch_key(self) -> None:
+        """Reject track patches outside the supported editable surface."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.update_track(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="rt",
+                    patch={"unsupported": True},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_track_removes_track_and_bindings(self) -> None:
+        """Remove one track and any bindings that target it by default."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.remove_track(
+                str(draft_path),
+                section_id="main",
+                track_id="rt",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "rt")
+            self.assertEqual(result.track_ids, ["depth", "cbl", "vdl", "gr", "cali"])
+            self.assertEqual(result.track_count, 5)
+            self.assertGreaterEqual(result.removed_binding_count, 1)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            self.assertEqual(
+                [track["id"] for track in tracks],
+                ["depth", "cbl", "vdl", "gr", "cali"],
+            )
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            self.assertFalse(
+                any(
+                    binding.get("track_id") == "rt"
+                    and str(binding.get("section", "main")) == "main"
+                    for binding in bindings
+                )
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_track_can_require_explicit_binding_cleanup(self) -> None:
+        """Fail clearly when a destructive removal would orphan bindings."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.remove_track(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="rt",
+                    remove_bindings=False,
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_bind_curve_adds_section_scoped_binding(self) -> None:
         """Add one curve binding to a draft track and persist the result."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -743,6 +863,42 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(matching[0]["label"], "Gamma Ray")
             self.assertEqual(matching[0]["style"]["line_width"], 1.6)
             self.assertEqual(matching[0]["scale"]["max"], 150.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_curve_binding_deletes_one_binding(self) -> None:
+        """Remove one curve binding so later revisions can rebuild the track cleanly."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.remove_curve_binding(
+                str(draft_path),
+                section_id="main",
+                track_id="rt",
+                channel="RT",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "rt")
+            self.assertEqual(result.channel, "RT")
+            self.assertEqual(result.binding_kind, "curve")
+            self.assertEqual(result.binding_count, 4)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            self.assertFalse(
+                any(
+                    binding.get("track_id") == "rt"
+                    and str(binding.get("channel", "")).upper() == "RT"
+                    for binding in bindings
+                )
+            )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_rejects_unknown_patch_key(self) -> None:
@@ -1333,6 +1489,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("open_hole", result.report_detail_kinds)
         self.assertIn("title", result.track_header_object_kinds)
         self.assertIn("provider_name", result.heading_patch_keys)
+        self.assertIn("width_mm", result.track_patch_keys)
         self.assertIn("fill", result.curve_binding_patch_keys)
         self.assertIn("after_track_id", result.move_track_selectors)
         self.assertTrue(result.track_archetypes)

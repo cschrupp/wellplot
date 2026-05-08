@@ -28,13 +28,27 @@ from .core import (
     revise_authoring_request,
     run_authoring_request,
 )
+from .notebook import (
+    ProjectPaths,
+    ProjectSession,
+    ProjectStarter,
+    create_project_session,
+    display_authoring_result,
+    relative_path,
+)
 
 __all__ = [
     "AuthoringRequest",
     "AuthoringResult",
     "AuthoringSession",
     "AuthoringToolCall",
+    "ProjectPaths",
+    "ProjectSession",
+    "ProjectStarter",
     "RevisionRequest",
+    "create_project_session",
+    "display_authoring_result",
+    "relative_path",
     "revise_authoring_request",
     "run_authoring_request",
 ]

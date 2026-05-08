@@ -99,9 +99,10 @@ The examples are grouped by workflow rather than by isolated feature.
   - notebook companion to the same MCP walkthrough, generated into the
     developer notebook set
 - `examples/notebooks/user/agent_las_step_by_step.ipynb`
-  - detailed user walkthrough that starts from a tiny starter logfile, switches
-    to a user LAS file, and adds header, remarks, tracks, and bindings one step
-    at a time through `wellplot.agent`
+  - detailed user walkthrough that bootstraps a reusable project session with
+    `create_project_session(...)`, stages a LAS file, generates a starter
+    scaffold through `session.create_starter(...)`, and adds header, remarks,
+    tracks, and bindings one step at a time through `wellplot.agent`
   - manual and credentialed: requires `wellplot[agent,notebook,las]` plus an
     OpenAI API key at runtime
   - working first-pass notebook: expect to tune prompts, model choice, and
