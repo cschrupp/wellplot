@@ -508,6 +508,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def remove_curve_fill(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        channel: str,
+    ) -> dict[str, object]:
+        """Remove one explicit curve fill from an existing curve binding."""
+        return asdict(
+            service.remove_curve_fill(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                channel=channel,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def bind_raster(
         logfile_path: str,
         section_id: str,

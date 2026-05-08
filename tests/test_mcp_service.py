@@ -1285,6 +1285,71 @@ class McpServiceTests(unittest.TestCase):
             )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_curve_fill_clears_existing_fill(self) -> None:
+        """Remove one explicit curve fill without patching the whole binding."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_curve_fill(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                channel="GR",
+                kind="to_lower_limit",
+                label="Gamma Fill",
+                color="#8fd19e",
+                alpha=0.22,
+                root=REPO_ROOT,
+            )
+
+            result = service.remove_curve_fill(
+                str(draft_path),
+                section_id="main",
+                track_id="gr",
+                channel="GR",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "gr")
+            self.assertEqual(result.channel, "GR")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "gr" and binding.get("channel") == "GR"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertNotIn("fill", matching[0])
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_curve_fill_requires_existing_fill(self) -> None:
+        """Reject fill-removal requests when the target binding has no fill."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.remove_curve_fill(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="gr",
+                    channel="GR",
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_merges_patch_and_persists(self) -> None:
         """Patch one existing curve binding and persist the normalized result."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2420,6 +2485,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("update_annotation_object(...)", prompt)
         self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
+        self.assertIn("remove_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -2439,6 +2505,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("update_annotation_object(...)", prompt)
         self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
+        self.assertIn("remove_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:

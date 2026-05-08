@@ -255,6 +255,15 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "alpha": 0.22,
                 },
             )
+            removed_fill = await session.call_tool(
+                "remove_curve_fill",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "gr",
+                    "channel": "GR",
+                },
+            )
             previous_draft_text = draft_logfile.read_text(encoding="utf-8")
             draft_summary = await session.call_tool(
                 "summarize_logfile_draft",
@@ -564,6 +573,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "remove_track",
                 "bind_curve",
                 "add_curve_fill",
+                "remove_curve_fill",
                 "bind_raster",
                 "update_curve_binding",
                 "update_raster_binding",
@@ -693,6 +703,7 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(updated_page_layout.structuredContent["render"]["dpi"], 200)
         self.assertEqual(added_fill.structuredContent["fill"]["kind"], "to_lower_limit")
         self.assertEqual(added_fill.structuredContent["fill"]["label"], "Gamma Fill")
+        self.assertEqual(removed_fill.structuredContent["channel"], "GR")
         self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")
         self.assertEqual(draft_summary.structuredContent["section_count"], 1)
         self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])

@@ -160,6 +160,7 @@ Concrete `0.4.0` foundation set:
 - `bind_curve(...)`
 - `bind_raster(...)`
 - `add_curve_fill(...)`
+- `remove_curve_fill(...)`
 - `set_depth_axis(...)`
 - `set_page_layout(...)`
 - `update_curve_binding(...)`
@@ -247,13 +248,7 @@ Out of scope for this slice:
 
 Next authoring broadening slice:
 
-- add explicit fill removal or clear helpers
-
-Current workaround:
-
-- fill removal can still be expressed through
-  `update_curve_binding(..., patch={"fill": None})`, but that should be
-  replaced by clearer destructive verbs in the next MCP authoring slice.
+- add convenience destructive helpers such as clear-track-bindings operations
 
 Why these are next:
 
@@ -261,7 +256,7 @@ Why these are next:
   section metadata editing, page/output defaults, annotation-object editing,
   header/remarks editing, depth-axis control, and style/fill creation
 - the remaining friction in real iterative authoring is now concentrated in
-  fill cleanup and convenience destructive edits
+  convenience destructive edits and repeated notebook-facing workflow cleanup
 
 Detailed plan:
 

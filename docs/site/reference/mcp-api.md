@@ -551,6 +551,24 @@ Behavior:
 - supports the same fill kinds exposed by `inspect_authoring_vocab(...)`
 - is the preferred edit for explicit crossover and baseline-fill requests
 
+### `remove_curve_fill(logfile_path, section_id, track_id, channel)`
+
+Purpose: remove one explicit fill specification from an existing curve binding.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `channel`
+
+Behavior:
+
+- finds the existing curve binding for the requested section, track, and channel
+- rejects requests when that binding does not currently define `fill`
+- removes only the fill spec and leaves the curve binding itself intact
+- validates the mutated draft before saving
+
 ### `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 
 Purpose: add one raster or image-style binding to an existing array track.
@@ -1116,7 +1134,7 @@ For draft authoring:
 12. `inspect_authoring_vocab(...)`
 13. apply `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`,
    `add_annotation_object(...)`, `update_annotation_object(...)`, `remove_annotation_object(...)`,
-   `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`,
+   `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `remove_curve_fill(...)`, `bind_raster(...)`,
    `update_curve_binding(...)`, `update_raster_binding(...)`, `remove_curve_binding(...)`,
    `remove_raster_binding(...)`, `move_track(...)`, `set_heading_content(...)`,
    and `set_remarks_content(...)`

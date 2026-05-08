@@ -861,6 +861,16 @@ class CurveFillResult:
 
 
 @dataclass(slots=True)
+class RemovedCurveFillResult:
+    """Structured result for removing one curve fill specification."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    channel: str
+
+
+@dataclass(slots=True)
 class BoundRasterResult:
     """Structured result for adding one raster binding to a draft logfile."""
 
@@ -4626,6 +4636,67 @@ def add_curve_fill(
     )
 
 
+def remove_curve_fill(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    root: str | Path | None = None,
+) -> RemovedCurveFillResult:
+    """Remove one explicit curve-fill specification from an existing curve binding."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    bindings = _logfile_mapping_bindings(mapping)
+    binding_index = _find_curve_binding_index(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    if "fill" not in binding:
+        raise TemplateValidationError(
+            f"Curve binding for channel {channel!r} on track {track_id!r} in "
+            f"section {section_id!r} does not define a fill."
+        )
+    removed_channel = str(binding.get("channel", channel))
+    binding.pop("fill", None)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_bindings = _logfile_mapping_bindings(report_to_dict(saved_spec))
+    saved_binding_index = _find_curve_binding_index(
+        saved_bindings,
+        spec=saved_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=removed_channel,
+    )
+    saved_binding = saved_bindings[saved_binding_index]
+    if not isinstance(saved_binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    if "fill" in saved_binding:
+        raise RuntimeError("Expected the curve fill to be removed after saving.")
+    return RemovedCurveFillResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        channel=removed_channel,
+    )
+
+
 def bind_raster(
     logfile_path: str,
     *,
@@ -5991,7 +6062,7 @@ def author_plot_from_request_prompt(
         "update_track(...), remove_track(...), "
         "add_annotation_object(...), update_annotation_object(...), "
         "remove_annotation_object(...), "
-        "bind_curve(...), add_curve_fill(...), "
+        "bind_curve(...), add_curve_fill(...), remove_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
@@ -6028,7 +6099,8 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "values and then call add_annotation_object(...), update_annotation_object(...), "
         "or remove_annotation_object(...).\n"
         "8. Choose the smallest edit sequence that addresses the feedback. "
-        "Use add_curve_fill(...) for explicit crossover or baseline fill requests. "
+        "Use add_curve_fill(...) for explicit crossover or baseline fill requests, "
+        "and remove_curve_fill(...) when the request explicitly clears one existing fill. "
         "Prefer update_section(...), set_page_layout(...), update_track(...), remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"

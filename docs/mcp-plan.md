@@ -49,6 +49,7 @@ for, and what still requires maintainer action outside the repo.
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
+- `remove_curve_fill(logfile_path, section_id, track_id, channel)`
 - `bind_raster(logfile_path, section_id, track_id, channel, ...)`
 - `update_curve_binding(logfile_path, section_id, track_id, channel, patch)`
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
@@ -256,19 +257,13 @@ Next up:
 
 Remaining broader authoring surface after the current foundation:
 
-- explicit fill removal or clear helpers
-
-Current workaround:
-
-- fill removal can still be expressed through
-  `update_curve_binding(..., patch={"fill": None})`, but that is weaker than a
-  dedicated destructive authoring tool.
+- convenience destructive helpers such as clear-track-bindings operations
 
 Next highest-value MCP slice:
 
-1. explicit fill removal or clear helpers
-2. convenience destructive helpers such as clear-track-bindings operations
-3. broader section/page convenience helpers where repetition still appears in notebooks
+1. convenience destructive helpers such as clear-track-bindings operations
+2. broader section/page convenience helpers where repetition still appears in notebooks
+3. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
 
 Scope note:
 

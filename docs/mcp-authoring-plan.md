@@ -140,17 +140,13 @@ Candidate tools:
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
 - `set_section_data_source(...)`
+- `remove_curve_fill(...)`
 
 Remaining broader authoring surface after the current foundation:
 
-- explicit fill removal or clear helpers:
-  - `remove_curve_fill(...)` or `clear_curve_fill(...)`
-
-Current workaround:
-
-- fill removal can still be expressed through
-  `update_curve_binding(..., patch={"fill": None})`, but that is weaker than a
-  first-class destructive authoring verb.
+- convenience destructive helpers:
+  - `clear_track_bindings(...)`
+  - possible grouped removal helpers for repeated notebook workflows
 
 ### 3. Authoring Vocabulary And Discovery
 
@@ -209,9 +205,9 @@ Optional later helper:
 After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
-1. explicit fill removal or clear helpers
-2. convenience destructive helpers such as track-binding clear operations
-3. additional notebook-facing ergonomics where repeated project/setup patterns remain
+1. convenience destructive helpers such as track-binding clear operations
+2. additional notebook-facing ergonomics where repeated project/setup patterns remain
+3. any remaining agent-facing cleanup exposed by iterative notebook usage
 
 These additions matter because iterative user workflows are now blocked less by
 curve/track creation and more by the remaining layout and cleanup operations
