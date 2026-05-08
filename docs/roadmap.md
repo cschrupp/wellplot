@@ -158,6 +158,7 @@ Concrete `0.4.0` foundation set:
 - `bind_raster(...)`
 - `add_curve_fill(...)`
 - `set_depth_axis(...)`
+- `set_page_layout(...)`
 - `update_curve_binding(...)`
 - `update_raster_binding(...)`
 - `remove_curve_binding(...)`
@@ -243,11 +244,6 @@ Out of scope for this slice:
 
 Next authoring broadening slice:
 
-- add page/output settings tools:
-  - page size
-  - orientation
-  - continuous layout
-  - output defaults
 - add finer-grained annotation editing:
   - add/update/remove annotation objects without patching whole tracks
 - add explicit fill removal or clear helpers
@@ -261,11 +257,10 @@ Current workaround:
 Why these are next:
 
 - the current surface now covers draft creation, track/binding mutation,
-  section metadata editing, header/remarks editing, depth-axis control, and
-  style/fill creation
+  section metadata editing, page/output defaults, header/remarks editing,
+  depth-axis control, and style/fill creation
 - the remaining friction in real iterative authoring is now concentrated in
-  section layout cleanup, page/output defaults, and finer-grained annotation
-  maintenance
+  annotation maintenance, fill cleanup, and convenience destructive edits
 
 Detailed plan:
 

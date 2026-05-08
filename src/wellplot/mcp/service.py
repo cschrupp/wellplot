@@ -97,6 +97,25 @@ AUTHORING_SECTION_PATCH_KEYS = (
     "depth_range",
     "depth_range_unit",
 )
+AUTHORING_PAGE_PATCH_KEYS = (
+    "size",
+    "orientation",
+    "continuous",
+    "bottom_track_header_enabled",
+    "margin_left_mm",
+    "margin_right_mm",
+    "margin_top_mm",
+    "margin_bottom_mm",
+    "header_height_mm",
+    "track_header_height_mm",
+    "footer_height_mm",
+    "track_gap_mm",
+)
+AUTHORING_RENDER_PATCH_KEYS = (
+    "output_path",
+    "dpi",
+    "continuous_strip_page_height_mm",
+)
 AUTHORING_TRACK_PATCH_KEYS = (
     "title",
     "kind",
@@ -684,6 +703,15 @@ class DepthAxisResult:
 
 
 @dataclass(slots=True)
+class PageLayoutResult:
+    """Structured result for updating page and render layout settings."""
+
+    logfile_path: str
+    page: dict[str, object]
+    render: dict[str, object]
+
+
+@dataclass(slots=True)
 class AddedTrackResult:
     """Structured result for appending one track to a draft logfile."""
 
@@ -920,6 +948,8 @@ class AuthoringVocabularyResult:
     track_header_object_kinds: list[str]
     depth_axis_patch_keys: list[str]
     section_patch_keys: list[str]
+    page_patch_keys: list[str]
+    render_patch_keys: list[str]
     heading_patch_keys: list[str]
     track_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
@@ -959,6 +989,22 @@ def resolve_server_root(root: str | Path | None = None) -> Path:
 def _resolve_user_path(path_value: str | Path, *, root: Path, context: str) -> Path:
     path = Path(path_value).expanduser()
     path = (root / path).resolve() if not path.is_absolute() else path.resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise PathAccessError(f"{context} must resolve inside the server root {root}.") from exc
+    return path
+
+
+def _resolve_logfile_relative_user_path(
+    path_value: str | Path,
+    *,
+    logfile_path: Path,
+    root: Path,
+    context: str,
+) -> Path:
+    path = Path(path_value).expanduser()
+    path = (logfile_path.parent / path).resolve() if not path.is_absolute() else path.resolve()
     try:
         path.relative_to(root)
     except ValueError as exc:
@@ -1185,6 +1231,13 @@ def _logfile_mapping_document(mapping: dict[str, object]) -> dict[str, object]:
     if not isinstance(document, dict):
         raise TemplateValidationError("Logfile mapping is missing document configuration.")
     return document
+
+
+def _logfile_mapping_render(mapping: dict[str, object]) -> dict[str, object]:
+    render = mapping.get("render")
+    if not isinstance(render, dict):
+        raise TemplateValidationError("Logfile mapping is missing render configuration.")
+    return render
 
 
 def _logfile_mapping_layout(mapping: dict[str, object]) -> dict[str, object]:
@@ -1898,6 +1951,8 @@ def _authoring_patch_schema() -> dict[str, object]:
     return {
         "depth_axis_patch_keys": list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         "section_patch_keys": list(AUTHORING_SECTION_PATCH_KEYS),
+        "page_patch_keys": list(AUTHORING_PAGE_PATCH_KEYS),
+        "render_patch_keys": list(AUTHORING_RENDER_PATCH_KEYS),
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
         "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -3653,6 +3708,98 @@ def update_section(
     )
 
 
+def set_page_layout(
+    logfile_path: str,
+    *,
+    page_patch: dict[str, object] | None = None,
+    render_patch: dict[str, object] | None = None,
+    root: str | Path | None = None,
+) -> PageLayoutResult:
+    """Update one draft logfile's page and render layout settings."""
+    if page_patch is None and render_patch is None:
+        raise TemplateValidationError("Provide page_patch or render_patch.")
+    page_patch = {} if page_patch is None else dict(page_patch)
+    render_patch = {} if render_patch is None else dict(render_patch)
+    if not page_patch and not render_patch:
+        raise TemplateValidationError("Provide at least one page or render setting to update.")
+
+    invalid_page = sorted(key for key in page_patch if key not in AUTHORING_PAGE_PATCH_KEYS)
+    if invalid_page:
+        raise TemplateValidationError(
+            f"Unsupported page patch keys {invalid_page}. "
+            f"Allowed keys: {sorted(AUTHORING_PAGE_PATCH_KEYS)}."
+        )
+    invalid_render = sorted(key for key in render_patch if key not in AUTHORING_RENDER_PATCH_KEYS)
+    if invalid_render:
+        raise TemplateValidationError(
+            f"Unsupported render patch keys {invalid_render}. "
+            f"Allowed keys: {sorted(AUTHORING_RENDER_PATCH_KEYS)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    document = _logfile_mapping_document(mapping)
+    page_mapping = document.get("page")
+    if not isinstance(page_mapping, dict):
+        page_mapping = {}
+        document["page"] = page_mapping
+    render_mapping = _logfile_mapping_render(mapping)
+
+    for key, value in page_patch.items():
+        if key in {
+            "margin_left_mm",
+            "margin_right_mm",
+            "margin_top_mm",
+            "margin_bottom_mm",
+            "header_height_mm",
+            "track_header_height_mm",
+            "footer_height_mm",
+            "track_gap_mm",
+        }:
+            page_mapping[key] = float(value)
+        elif key in {"continuous", "bottom_track_header_enabled"}:
+            page_mapping[key] = bool(value)
+        else:
+            page_mapping[key] = str(value)
+
+    for key, value in render_patch.items():
+        if key == "output_path":
+            resolved_output = _resolve_logfile_relative_user_path(
+                str(value),
+                logfile_path=resolved_logfile,
+                root=server_root,
+                context="render_patch.output_path",
+            )
+            render_mapping[key] = Path(
+                os.path.relpath(resolved_output, start=resolved_logfile.parent)
+            ).as_posix()
+            continue
+        if key == "dpi":
+            render_mapping[key] = int(value)
+            continue
+        if key == "continuous_strip_page_height_mm":
+            if value is None:
+                render_mapping.pop(key, None)
+            else:
+                render_mapping[key] = float(value)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    return PageLayoutResult(
+        logfile_path=str(resolved_logfile),
+        page=deepcopy(dict(saved_mapping.get("document", {}).get("page", {}))),
+        render=deepcopy(dict(saved_mapping.get("render", {}))),
+    )
+
+
 def set_depth_axis(
     logfile_path: str,
     *,
@@ -5083,6 +5230,8 @@ def inspect_authoring_vocab(
         track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
         depth_axis_patch_keys=list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         section_patch_keys=list(AUTHORING_SECTION_PATCH_KEYS),
+        page_patch_keys=list(AUTHORING_PAGE_PATCH_KEYS),
+        render_patch_keys=list(AUTHORING_RENDER_PATCH_KEYS),
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
         track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -5446,31 +5595,34 @@ def author_plot_from_request_prompt(
         "set_section_data_source(...) before adding or revising bindings.\n"
         "3. If the request changes section title, subtitle, or depth window, call "
         "update_section(...).\n"
-        "4. If the request changes report scale or depth-grid behavior, call "
+        "4. If the request changes page size, orientation, continuous layout, or "
+        "render defaults, call set_page_layout(...).\n"
+        "5. If the request changes report scale or depth-grid behavior, call "
         "set_depth_axis(...).\n"
-        "5. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "6. If the request includes report-header or remarks content from text, call "
+        "6. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "7. If the request includes report-header or remarks content from text, call "
         "parse_key_value_text(source_text, format_hint=None) first.\n"
-        "7. If the request includes report-header or remarks content, call "
+        "8. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "8. If the request is mainly about visual conventions, call "
+        "9. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "9. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "10. Plan the smallest explicit edit sequence using update_section(...), "
-        "set_depth_axis(...), add_track(...), update_track(...), remove_track(...), "
+        "10. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "11. Plan the smallest explicit edit sequence using update_section(...), "
+        "set_page_layout(...), set_depth_axis(...), add_track(...), "
+        "update_track(...), remove_track(...), "
         "bind_curve(...), add_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
-        "11. For density-neutron overlays with crossover fill, prefer "
+        "12. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "12. Preview the affected section, track, or window before recommending a final render.\n"
-        "13. If you captured the previous YAML text before editing, call "
+        "13. Preview the affected section, track, or window before recommending a final render.\n"
+        "14. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "14. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "15. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -5487,20 +5639,22 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "set_section_data_source(...) before rebinding curves.\n"
         "4. If the feedback changes section title, subtitle, or depth window, call "
         "update_section(...).\n"
-        "5. If the feedback changes report scale or depth grid spacing, call "
+        "5. If the feedback changes page size, orientation, continuous layout, or "
+        "render defaults, call set_page_layout(...).\n"
+        "6. If the feedback changes report scale or depth grid spacing, call "
         "set_depth_axis(...).\n"
-        "6. Choose the smallest edit sequence that addresses the feedback. "
+        "7. Choose the smallest edit sequence that addresses the feedback. "
         "Use add_curve_fill(...) for explicit crossover or baseline fill requests. "
-        "Prefer update_section(...), update_track(...), remove_track(...), "
+        "Prefer update_section(...), set_page_layout(...), update_track(...), remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"
-        "7. For density-neutron overlays with crossover fill, prefer "
+        "8. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "8. Preview the affected section, track, or depth window after the edits.\n"
-        "9. If the client retained the previous YAML text, call "
+        "9. Preview the affected section, track, or depth window after the edits.\n"
+        "10. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "10. Validate or save only after the preview looks correct.\n"
+        "11. Validate or save only after the preview looks correct.\n"
     )
 
 

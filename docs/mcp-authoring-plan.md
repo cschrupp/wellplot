@@ -133,15 +133,13 @@ Candidate tools:
 - `remove_curve_binding(...)`
 - `add_curve_fill(...)`
 - `set_depth_axis(...)`
+- `set_page_layout(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
 - `set_section_data_source(...)`
 
 Remaining broader authoring surface after the current foundation:
 
-- page/output settings edits:
-  - `set_page_layout(...)` or equivalent helpers for page size, orientation,
-    continuous layout, and output defaults
 - finer-grained annotation editing:
   - `add_annotation_object(...)`
   - `update_annotation_object(...)`
@@ -212,10 +210,9 @@ Optional later helper:
 After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
-1. `set_page_layout(...)` for page/output defaults and continuous-layout
-   controls
-2. annotation-object editing without patching whole tracks
-3. explicit fill removal or clear helpers
+1. annotation-object editing without patching whole tracks
+2. explicit fill removal or clear helpers
+3. convenience destructive helpers such as track-binding clear operations
 
 These additions matter because iterative user workflows are now blocked less by
 curve/track creation and more by the remaining layout and cleanup operations

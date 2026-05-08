@@ -713,6 +713,87 @@ class McpServiceTests(unittest.TestCase):
                 service.set_depth_axis(str(draft_path), root=REPO_ROOT)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_page_layout_updates_page_and_render_settings(self) -> None:
+        """Persist page and render layout changes for later preview and render steps."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_page_layout(
+                str(draft_path),
+                page_patch={
+                    "size": "Letter",
+                    "orientation": "landscape",
+                    "continuous": True,
+                    "track_header_height_mm": 24.0,
+                },
+                render_patch={
+                    "dpi": 200,
+                    "output_path": "./updated-render.pdf",
+                    "continuous_strip_page_height_mm": 350.0,
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.page["size"], "Letter")
+            self.assertEqual(result.page["orientation"], "landscape")
+            self.assertEqual(result.page["continuous"], True)
+            self.assertEqual(result.page["track_header_height_mm"], 24.0)
+            self.assertEqual(result.render["dpi"], 200)
+            self.assertEqual(result.render["output_path"], "updated-render.pdf")
+            self.assertEqual(result.render["continuous_strip_page_height_mm"], 350.0)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            self.assertEqual(saved_mapping["document"]["page"]["size"], "Letter")
+            self.assertEqual(saved_mapping["document"]["page"]["orientation"], "landscape")
+            self.assertEqual(saved_mapping["render"]["dpi"], 200)
+            self.assertEqual(saved_mapping["render"]["output_path"], "updated-render.pdf")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_page_layout_rejects_empty_or_unknown_patches(self) -> None:
+        """Reject empty layout edits and unsupported patch keys."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_page_layout(str(draft_path), root=REPO_ROOT)
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_page_layout(
+                    str(draft_path),
+                    page_patch={"unknown": 1},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_page_layout_blocks_output_path_outside_root(self) -> None:
+        """Reject render output defaults that escape the configured server root."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(PathAccessError):
+                service.set_page_layout(
+                    str(draft_path),
+                    render_patch={"output_path": "../../../outside.pdf"},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_add_track_appends_one_track_to_draft(self) -> None:
         """Append one track to a cloned draft and persist the updated order."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2140,6 +2221,8 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertIn("depth_axis_patch_keys", json.loads(patch_resource.text))
         self.assertIn("section_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("page_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("render_patch_keys", json.loads(patch_resource.text))
         self.assertEqual(fill_resource.mime_type, "application/json")
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(style_resource.mime_type, "application/json")
@@ -2176,6 +2259,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("update_section(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
+        self.assertIn("set_page_layout(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
         self.assertIn("apply_header_values(...)", prompt)
@@ -2196,6 +2280,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("update_section(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
+        self.assertIn("set_page_layout(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 

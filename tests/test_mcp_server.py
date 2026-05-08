@@ -227,6 +227,21 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "minor_step": 2.0,
                 },
             )
+            updated_page_layout = await session.call_tool(
+                "set_page_layout",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "page_patch": {
+                        "size": "Letter",
+                        "orientation": "landscape",
+                        "continuous": True,
+                    },
+                    "render_patch": {
+                        "dpi": 200,
+                        "output_path": "./updated-render.pdf",
+                    },
+                },
+            )
             added_fill = await session.call_tool(
                 "add_curve_fill",
                 {
@@ -497,6 +512,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "set_section_data_source",
                 "update_section",
                 "set_depth_axis",
+                "set_page_layout",
                 "add_track",
                 "update_track",
                 "remove_track",
@@ -623,6 +639,12 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(updated_source.structuredContent["subtitle"], "Replacement LAS Source")
         self.assertEqual(updated_depth.structuredContent["depth_axis"]["unit"], "ft")
         self.assertEqual(updated_depth.structuredContent["depth_axis"]["scale"], 240.0)
+        self.assertEqual(updated_page_layout.structuredContent["page"]["size"], "Letter")
+        self.assertEqual(
+            updated_page_layout.structuredContent["page"]["orientation"],
+            "landscape",
+        )
+        self.assertEqual(updated_page_layout.structuredContent["render"]["dpi"], 200)
         self.assertEqual(added_fill.structuredContent["fill"]["kind"], "to_lower_limit")
         self.assertEqual(added_fill.structuredContent["fill"]["label"], "Gamma Fill")
         self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")

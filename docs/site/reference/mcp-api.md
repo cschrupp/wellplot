@@ -346,6 +346,28 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
+
+Purpose: update one draft logfile's page settings and render defaults.
+
+Returns:
+
+- `logfile_path`
+- `page`
+- `render`
+
+Behavior:
+
+- supports explicit `page_patch` keys for page size, orientation, continuous
+  layout, margins, and header/footer/track spacing
+- supports explicit `render_patch` keys for `output_path`, `dpi`, and
+  `continuous_strip_page_height_mm`
+- resolves `render_patch.output_path` relative to the draft logfile and blocks
+  paths that escape the server root
+- rejects empty edits and unsupported patch keys
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 
 Purpose: append one track to a draft logfile and persist the validated result.
@@ -1024,18 +1046,20 @@ For draft authoring:
    depth window without changing the source file
 6. `set_depth_axis(...)` when the request changes document scale, unit, or grid
    spacing
-7. `parse_key_value_text(...)` when the input starts as copied header text
-8. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+7. `set_page_layout(...)` when the request changes page size, orientation,
+   continuous layout, or render defaults
+8. `parse_key_value_text(...)` when the input starts as copied header text
+9. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-9. `preview_header_mapping(...)` before mutating header/report values
-10. `apply_header_values(...)` when the previewed mapping should be persisted
-11. `inspect_authoring_vocab(...)`
-12. apply `update_section(...)`, `set_depth_axis(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
+10. `preview_header_mapping(...)` before mutating header/report values
+11. `apply_header_values(...)` when the previewed mapping should be persisted
+12. `inspect_authoring_vocab(...)`
+13. apply `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
    `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
    `update_raster_binding(...)`, `remove_curve_binding(...)`,
    `remove_raster_binding(...)`, `move_track(...)`,
    `set_heading_content(...)`, and `set_remarks_content(...)`
-13. `summarize_logfile_changes(...)` when the client retained a previous YAML
+14. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-14. preview with a narrow PNG tool
-15. render or save only after review
+15. preview with a narrow PNG tool
+16. render or save only after review

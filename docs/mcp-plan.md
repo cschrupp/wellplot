@@ -40,6 +40,7 @@ for, and what still requires maintainer action outside the repo.
 - `summarize_logfile_draft(logfile_path)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
+- `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
@@ -91,6 +92,7 @@ Packaged example ids:
   - `set_section_data_source(...)`
   - `update_section(...)`
   - `set_depth_axis(...)`
+  - `set_page_layout(...)`
   - `add_track(...)`
   - `update_track(...)`
   - `remove_track(...)`
@@ -176,6 +178,7 @@ Concrete `0.4.0` foundation tools:
 - `bind_curve(...)`
 - `bind_raster(...)`
 - `set_depth_axis(...)`
+- `set_page_layout(...)`
 - `update_curve_binding(...)`
 - `update_raster_binding(...)`
 - `remove_curve_binding(...)`
@@ -250,11 +253,6 @@ Next up:
 
 Remaining broader authoring surface after the current foundation:
 
-- page/output settings edits:
-  - page size
-  - orientation
-  - continuous layout
-  - output defaults
 - finer-grained annotation editing without patching whole tracks
 - explicit fill removal or clear helpers
 
@@ -266,9 +264,9 @@ Current workaround:
 
 Next highest-value MCP slice:
 
-1. `set_page_layout(...)` or equivalent page/output settings control
-2. annotation-object editing as first-class add/update/remove tools
-3. explicit fill removal or clear helpers
+1. annotation-object editing as first-class add/update/remove tools
+2. explicit fill removal or clear helpers
+3. convenience destructive helpers such as clear-track-bindings operations
 
 Scope note:
 

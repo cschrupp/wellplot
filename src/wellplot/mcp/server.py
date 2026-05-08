@@ -306,6 +306,22 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def set_page_layout(
+        logfile_path: str,
+        page_patch: dict[str, object] | None = None,
+        render_patch: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Update one draft logfile's page and render layout settings."""
+        return asdict(
+            service.set_page_layout(
+                logfile_path,
+                page_patch=page_patch,
+                render_patch=render_patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def add_track(
         logfile_path: str,
         section_id: str,

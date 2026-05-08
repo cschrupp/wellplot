@@ -162,6 +162,7 @@ Main tools:
 - `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
+- `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
@@ -199,6 +200,8 @@ Recommended split:
   or depth window without changing the underlying source
 - use `set_depth_axis(...)` when the request changes document scale, depth
   labels, or grid spacing before you start fine-grained track edits
+- use `set_page_layout(...)` when the request changes page size, orientation,
+  continuous layout, or render defaults
 - use `parse_key_value_text(...)` when the source material is a copied header
   packet, tabular note block, or other simple key-value text
 - use `inspect_heading_slots(...)` when the next task is filling provider
@@ -217,7 +220,7 @@ Recommended split:
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft
 - use `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-  `update_section(...)`, `set_depth_axis(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+  `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
   `update_raster_binding(...)`, `remove_curve_binding(...)`,
   `remove_raster_binding(...)`, and `move_track(...)` for the deterministic
   track/layout edit loop
