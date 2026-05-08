@@ -1,6 +1,6 @@
 # MCP Rollout Status
 
-Last updated: 2026-05-01
+Last updated: 2026-05-08
 
 ## Purpose
 
@@ -244,6 +244,30 @@ Next up:
 - merge or rebase the branch back onto `main`
 - decide whether to add one explicit `openai_compat` example before the next
   release cut
+
+Remaining broader authoring surface after the current foundation:
+
+- section-level patching beyond data-source replacement
+- first-class title/subtitle/depth-range edits
+- page/output settings edits:
+  - page size
+  - orientation
+  - continuous layout
+  - output defaults
+- finer-grained annotation editing without patching whole tracks
+- explicit fill removal or clear helpers
+
+Current workaround:
+
+- fill removal can still be expressed through
+  `update_curve_binding(..., patch={"fill": None})`, but that is weaker than a
+  dedicated destructive authoring tool.
+
+Next highest-value MCP slice:
+
+1. `update_section(...)` for title, subtitle, and depth range
+2. `set_page_layout(...)` or equivalent page/output settings control
+3. annotation-object editing as first-class add/update/remove tools
 
 Scope note:
 

@@ -1,6 +1,6 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-05-01
+Last updated: 2026-05-08
 
 ## Summary
 
@@ -136,6 +136,27 @@ Candidate tools:
 - `set_remarks_content(...)`
 - `set_section_data_source(...)`
 
+Remaining broader authoring surface after the current foundation:
+
+- first-class section patching beyond data-source replacement:
+  - `update_section(...)` for title, subtitle, depth range, and related section
+    metadata
+- page/output settings edits:
+  - `set_page_layout(...)` or equivalent helpers for page size, orientation,
+    continuous layout, and output defaults
+- finer-grained annotation editing:
+  - `add_annotation_object(...)`
+  - `update_annotation_object(...)`
+  - `remove_annotation_object(...)`
+- explicit fill removal or clear helpers:
+  - `remove_curve_fill(...)` or `clear_curve_fill(...)`
+
+Current workaround:
+
+- fill removal can still be expressed through
+  `update_curve_binding(..., patch={"fill": None})`, but that is weaker than a
+  first-class destructive authoring verb.
+
 ### 3. Authoring Vocabulary And Discovery
 
 The MCP client needs to know what is legal before it plans edits.
@@ -187,6 +208,20 @@ Optional later helper:
 
 - deterministic key-value parser for plain text or CSV-like blocks when the
   source format is simple enough to parse without an LLM
+
+## Next Authoring Broadening Slice
+
+After the current track, binding, header, depth-axis, and style-editing
+foundation, the next highest-value additions are:
+
+1. `update_section(...)` for title, subtitle, and depth-range edits
+2. `set_page_layout(...)` for page/output defaults and continuous-layout
+   controls
+3. annotation-object editing without patching whole tracks
+
+These additions matter because iterative user workflows are now blocked less by
+curve/track creation and more by the remaining layout and cleanup operations
+that still require broad patching or manual YAML edits.
 
 ### 5. Review Loop For Safe Authoring
 

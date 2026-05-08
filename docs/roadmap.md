@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-05-01
+Last updated: 2026-05-08
 
 ## Scope Summary
 
@@ -239,6 +239,33 @@ Key constraint:
 Out of scope for this slice:
 
 - LIS ingestion/support
+
+Next authoring broadening slice:
+
+- add first-class section patching beyond data-source swap:
+  - `update_section(...)` for title, subtitle, and depth range
+- add page/output settings tools:
+  - page size
+  - orientation
+  - continuous layout
+  - output defaults
+- add finer-grained annotation editing:
+  - add/update/remove annotation objects without patching whole tracks
+- add explicit fill removal or clear helpers
+
+Current workaround:
+
+- fill removal can still be expressed through
+  `update_curve_binding(..., patch={"fill": None})`, but that should be
+  replaced by clearer destructive verbs in the next MCP authoring slice.
+
+Why these are next:
+
+- the current surface now covers draft creation, track/binding mutation,
+  header/remarks editing, depth-axis control, and style/fill creation
+- the remaining friction in real iterative authoring is now concentrated in
+  section layout cleanup, page/output defaults, and finer-grained annotation
+  maintenance
 
 Detailed plan:
 
