@@ -917,6 +917,86 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(matching[0]["fill"]["alpha"], 0.22)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_curve_fill_between_instances_can_target_other_channel(self) -> None:
+        """Allow between_instances fills to resolve a sibling curve binding by channel."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="GR",
+                label="GR Proxy",
+                scale={"kind": "linear", "min": 0.45, "max": -0.15},
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="RT",
+                label="Proxy Density",
+                scale={"kind": "linear", "min": 1.95, "max": 2.95},
+                root=REPO_ROOT,
+            )
+
+            result = service.add_curve_fill(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="GR",
+                kind="between_instances",
+                other_channel="RT",
+                label="Gas Crossover",
+                color="#d1d5db",
+                alpha=0.18,
+                crossover={
+                    "enabled": True,
+                    "left_color": "#bfdbfe",
+                    "right_color": "#fed7aa",
+                    "alpha": 0.28,
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.fill["kind"], "between_instances")
+            self.assertIn("other_element_id", result.fill)
+            self.assertNotIn("other_channel", result.fill)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            gr_binding = next(
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "porosity" and binding.get("channel") == "GR"
+            )
+            rt_binding = next(
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "porosity" and binding.get("channel") == "RT"
+            )
+            self.assertTrue(gr_binding.get("id"))
+            self.assertTrue(rt_binding.get("id"))
+            self.assertEqual(
+                gr_binding["fill"]["other_element_id"],
+                rt_binding["id"],
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_merges_patch_and_persists(self) -> None:
         """Patch one existing curve binding and persist the normalized result."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:

@@ -5043,6 +5043,8 @@ def _agent_user_notebook() -> dict[str, object]:
                         - If RHOB and NPHI are available, overlay them in the same track.
                         - Reverse the neutron scale so crossover reads naturally.
                         - Add a crossover fill only when both RHOB and NPHI are present.
+                        - For that crossover fill, prefer the between_instances pattern
+                          against the RHOB overlay instead of between_curves.
                     ''',
                 )
 

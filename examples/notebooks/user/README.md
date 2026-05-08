@@ -22,9 +22,7 @@ They differ from the developer notebooks in three ways:
 
 - `agent_las_step_by_step.ipynb`
   - build one open-hole packet from a user LAS file through the public
-    `wellplot.agent` API, starting from `create_project_session(...)`,
-    `session.add_data_file(...)`, and `session.create_starter(...)` before
-    revising the same draft cell by cell
+    `wellplot.agent` API, revising the same draft cell by cell
   - manual and credentialed: requires `wellplot[agent,las,notebook]`
     plus an OpenAI API key at runtime
 

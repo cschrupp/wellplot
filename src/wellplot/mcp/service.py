@@ -210,17 +210,25 @@ AUTHORING_STYLE_PRESETS = (
                 "scale": {"kind": "linear", "min": 0.45, "max": -0.15},
                 "style": {"color": "#1d4ed8", "line_width": 1.1},
                 "fill": {
-                    "kind": "between_curves",
-                    "target_channel": "RHOB",
-                    "left_color": "#bfdbfe",
-                    "right_color": "#fed7aa",
-                    "alpha": 0.35,
+                    "kind": "between_instances",
+                    "other_channel": "RHOB",
+                    "label": "Gas Crossover",
+                    "color": "#d1d5db",
+                    "alpha": 0.18,
+                    "crossover": {
+                        "enabled": True,
+                        "left_color": "#bfdbfe",
+                        "right_color": "#fed7aa",
+                        "alpha": 0.28,
+                    },
                 },
             },
         ],
         "notes": [
             "Use one shared track for RHOB and NPHI.",
             "Reverse the neutron scale so low porosity plots to the right.",
+            "Prefer add_curve_fill(kind='between_instances', "
+            "other_channel='RHOB') for crossover fill.",
         ],
     },
     {
@@ -1292,6 +1300,44 @@ def _find_raster_binding_index(
         f"Raster binding for channel {channel!r} was not found on track {track_id!r} "
         f"in section {section_id!r}."
     )
+
+
+def _binding_element_id_seed(track_id: str, channel: str) -> str:
+    seed = f"{track_id}_{channel}_overlay".lower()
+    normalized = "".join(character if character.isalnum() else "_" for character in seed)
+    collapsed = "_".join(part for part in normalized.split("_") if part)
+    return collapsed or "curve_overlay"
+
+
+def _ensure_curve_binding_element_id(
+    bindings: list[dict[str, object]],
+    *,
+    binding_index: int,
+    track_id: str,
+    channel: str,
+) -> str:
+    binding = bindings[binding_index]
+    if not isinstance(binding, dict):
+        raise RuntimeError("Expected a mapping curve binding entry.")
+    existing_id = str(binding.get("id", "")).strip()
+    if existing_id:
+        return existing_id
+
+    taken_ids = {
+        str(candidate.get("id", "")).strip()
+        for index, candidate in enumerate(bindings)
+        if index != binding_index
+        and isinstance(candidate, dict)
+        and str(candidate.get("id", "")).strip()
+    }
+    base_id = _binding_element_id_seed(track_id, channel)
+    candidate_id = base_id
+    suffix = 2
+    while candidate_id in taken_ids:
+        candidate_id = f"{base_id}_{suffix}"
+        suffix += 1
+    binding["id"] = candidate_id
+    return candidate_id
 
 
 def _find_track_index(
@@ -3843,11 +3889,58 @@ def add_curve_fill(
     if not isinstance(binding, dict):
         raise RuntimeError("Expected a mapping curve binding entry.")
 
-    fill: dict[str, object] = {"kind": str(kind)}
-    if other_channel is not None:
-        fill["other_channel"] = str(other_channel)
-    if other_element_id is not None:
-        fill["other_element_id"] = str(other_element_id)
+    normalized_kind = str(kind).strip().lower()
+    fill: dict[str, object] = {"kind": normalized_kind}
+    if normalized_kind == "between_instances":
+        if other_element_id is not None and other_channel is not None:
+            raise TemplateValidationError(
+                "Provide either other_element_id or other_channel "
+                "for between_instances fills, not both."
+            )
+        if other_element_id is not None:
+            fill["other_element_id"] = str(other_element_id).strip()
+        elif other_channel is not None:
+            resolved_other_channel = _resolve_section_channel_name(
+                current_spec,
+                logfile_path=resolved_logfile,
+                root=server_root,
+                section_id=section_id,
+                channel=other_channel,
+            )
+            other_binding_index = _find_curve_binding_index(
+                bindings,
+                spec=current_spec,
+                section_id=section_id,
+                track_id=track_id,
+                channel=resolved_other_channel,
+            )
+            _ = _ensure_curve_binding_element_id(
+                bindings,
+                binding_index=binding_index,
+                track_id=track_id,
+                channel=resolved_channel,
+            )
+            fill["other_element_id"] = _ensure_curve_binding_element_id(
+                bindings,
+                binding_index=other_binding_index,
+                track_id=track_id,
+                channel=resolved_other_channel,
+            )
+        else:
+            raise TemplateValidationError(
+                "between_instances fills require other_element_id or other_channel."
+            )
+    else:
+        if other_channel is not None:
+            fill["other_channel"] = _resolve_section_channel_name(
+                current_spec,
+                logfile_path=resolved_logfile,
+                root=server_root,
+                section_id=section_id,
+                channel=other_channel,
+            )
+        if other_element_id is not None:
+            fill["other_element_id"] = str(other_element_id)
     if baseline is not None:
         fill["baseline"] = deepcopy(baseline)
     if label is not None:
@@ -5231,10 +5324,13 @@ def author_plot_from_request_prompt(
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
-        "10. Preview the affected section, track, or window before recommending a final render.\n"
-        "11. If you captured the previous YAML text before editing, call "
+        "10. For density-neutron overlays with crossover fill, prefer "
+        "add_curve_fill(kind='between_instances', other_channel=...) instead of "
+        "between_curves unless the effective scales already match.\n"
+        "11. Preview the affected section, track, or window before recommending a final render.\n"
+        "12. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "12. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "13. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -5256,10 +5352,13 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "Prefer update_track(...), remove_track(...), remove_curve_binding(...), "
         "and remove_raster_binding(...) when the request says to replace or "
         "remove existing content.\n"
-        "6. Preview the affected section, track, or depth window after the edits.\n"
-        "7. If the client retained the previous YAML text, call "
+        "6. For density-neutron overlays with crossover fill, prefer "
+        "add_curve_fill(kind='between_instances', other_channel=...) instead of "
+        "between_curves unless the effective scales already match.\n"
+        "7. Preview the affected section, track, or depth window after the edits.\n"
+        "8. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "8. Validate or save only after the preview looks correct.\n"
+        "9. Validate or save only after the preview looks correct.\n"
     )
 
 
