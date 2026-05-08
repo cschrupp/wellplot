@@ -309,6 +309,49 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            added_annotation_track = await session.call_tool(
+                "add_track",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "id": "notes",
+                    "title": "Notes",
+                    "kind": "annotation",
+                    "width_mm": 18.0,
+                },
+            )
+            added_annotation = await session.call_tool(
+                "add_annotation_object",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "notes",
+                    "annotation": {
+                        "kind": "text",
+                        "depth": 1008.0,
+                        "text": "Top pay",
+                    },
+                },
+            )
+            updated_annotation = await session.call_tool(
+                "update_annotation_object",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "notes",
+                    "annotation_index": 0,
+                    "patch": {"text": "Updated pay"},
+                },
+            )
+            removed_annotation = await session.call_tool(
+                "remove_annotation_object",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "notes",
+                    "annotation_index": 0,
+                },
+            )
             bound_curve = await session.call_tool(
                 "bind_curve",
                 {
@@ -515,6 +558,9 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "set_page_layout",
                 "add_track",
                 "update_track",
+                "add_annotation_object",
+                "update_annotation_object",
+                "remove_annotation_object",
                 "remove_track",
                 "bind_curve",
                 "add_curve_fill",
@@ -671,6 +717,10 @@ class McpServerIntegrationTests(unittest.TestCase):
         self.assertEqual(added_track.structuredContent["track_ids"][-1], "porosity")
         self.assertEqual(updated_track.structuredContent["track"]["title"], "Density / Neutron")
         self.assertEqual(updated_track.structuredContent["track"]["width_mm"], 30.0)
+        self.assertEqual(added_annotation_track.structuredContent["track_id"], "notes")
+        self.assertEqual(added_annotation.structuredContent["annotation_index"], 0)
+        self.assertEqual(updated_annotation.structuredContent["annotation"]["text"], "Updated pay")
+        self.assertEqual(removed_annotation.structuredContent["annotation_count"], 0)
         self.assertEqual(bound_curve.structuredContent["channel"], "GR")
         self.assertEqual(bound_curve.structuredContent["binding_kind"], "curve")
         self.assertEqual(bound_curve.structuredContent["binding_count"], 6)
@@ -681,13 +731,13 @@ class McpServerIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             moved_track.structuredContent["track_ids"],
-            ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt"],
+            ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt", "notes"],
         )
         self.assertEqual(removed_curve_binding.structuredContent["binding_count"], 5)
-        self.assertEqual(removed_track.structuredContent["track_count"], 6)
+        self.assertEqual(removed_track.structuredContent["track_count"], 7)
         self.assertEqual(
             removed_track.structuredContent["track_ids"],
-            ["depth", "cbl", "vdl", "gr", "cali", "rt"],
+            ["depth", "cbl", "vdl", "gr", "cali", "rt", "notes"],
         )
         self.assertEqual(
             updated_heading.structuredContent["heading"]["provider_name"],

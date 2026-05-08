@@ -418,6 +418,66 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
+
+Purpose: append or insert one annotation object inside an annotation track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `annotation_index`
+- `annotation_count`
+- `annotation`
+
+Behavior:
+
+- requires `track_id` to refer to an `annotation` track
+- appends by default, or inserts at a zero-based `position` when provided
+- validates the inserted object through the normal logfile schema path before
+  saving
+
+### `update_annotation_object(logfile_path, section_id, track_id, annotation_index, patch)`
+
+Purpose: patch one existing annotation object without rewriting the whole
+annotation track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `annotation_index`
+- `annotation_count`
+- `annotation`
+
+Behavior:
+
+- requires `track_id` to refer to an `annotation` track
+- selects the target object by zero-based `annotation_index`
+- rejects unsupported patch keys
+- deep-merges optional fields and removes keys when a patch value is `null`
+- validates the mutated draft before saving
+
+### `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`
+
+Purpose: remove one annotation object from an annotation track.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `annotation_index`
+- `annotation_count`
+
+Behavior:
+
+- requires `track_id` to refer to an `annotation` track
+- removes the object at the zero-based `annotation_index`
+- validates the mutated draft before saving
+
 ### `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 
 Purpose: remove one existing track from a draft logfile.
@@ -1054,11 +1114,12 @@ For draft authoring:
 10. `preview_header_mapping(...)` before mutating header/report values
 11. `apply_header_values(...)` when the previewed mapping should be persisted
 12. `inspect_authoring_vocab(...)`
-13. apply `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-   `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
-   `update_raster_binding(...)`, `remove_curve_binding(...)`,
-   `remove_raster_binding(...)`, `move_track(...)`,
-   `set_heading_content(...)`, and `set_remarks_content(...)`
+13. apply `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`,
+   `add_annotation_object(...)`, `update_annotation_object(...)`, `remove_annotation_object(...)`,
+   `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`,
+   `update_curve_binding(...)`, `update_raster_binding(...)`, `remove_curve_binding(...)`,
+   `remove_raster_binding(...)`, `move_track(...)`, `set_heading_content(...)`,
+   and `set_remarks_content(...)`
 14. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
 15. preview with a narrow PNG tool

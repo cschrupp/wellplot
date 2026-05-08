@@ -372,6 +372,64 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def add_annotation_object(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        annotation: dict[str, object],
+        position: int | None = None,
+    ) -> dict[str, object]:
+        """Append or insert one annotation object inside an annotation track."""
+        return asdict(
+            service.add_annotation_object(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                annotation=annotation,
+                position=position,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def update_annotation_object(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        annotation_index: int,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Patch one annotation object inside an annotation track."""
+        return asdict(
+            service.update_annotation_object(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                annotation_index=annotation_index,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def remove_annotation_object(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        annotation_index: int,
+    ) -> dict[str, object]:
+        """Remove one annotation object from an annotation track."""
+        return asdict(
+            service.remove_annotation_object(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                annotation_index=annotation_index,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def remove_track(
         logfile_path: str,
         section_id: str,

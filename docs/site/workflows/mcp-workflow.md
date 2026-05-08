@@ -171,6 +171,9 @@ Main tools:
 - `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
+- `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
+- `update_annotation_object(logfile_path, section_id, track_id, annotation_index, patch)`
+- `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
@@ -217,10 +220,13 @@ Recommended split:
   conventions such as color, fill, contrast, scale defaults, or common
   CBL/VDL, porosity, gamma-ray, and resistivity layouts
 - use `inspect_authoring_vocab(...)` before major edits so the client sees the
-  valid track kinds, fill kinds, heading fields, and any available channels in
-  the current draft
-- use `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-  `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+  valid track kinds, fill kinds, heading fields, annotation indexes, and any
+  available channels in the current draft
+- use `add_track(...)`, `update_track(...)`, `add_annotation_object(...)`,
+  `update_annotation_object(...)`, `remove_annotation_object(...)`,
+  `remove_track(...)`, `update_section(...)`, `set_depth_axis(...)`,
+  `set_page_layout(...)`, `bind_curve(...)`, `add_curve_fill(...)`,
+  `bind_raster(...)`, `update_curve_binding(...)`,
   `update_raster_binding(...)`, `remove_curve_binding(...)`,
   `remove_raster_binding(...)`, and `move_track(...)` for the deterministic
   track/layout edit loop

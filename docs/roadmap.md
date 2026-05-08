@@ -153,6 +153,9 @@ Concrete `0.4.0` foundation set:
 - `update_section(...)`
 - `add_track(...)`
 - `update_track(...)`
+- `add_annotation_object(...)`
+- `update_annotation_object(...)`
+- `remove_annotation_object(...)`
 - `remove_track(...)`
 - `bind_curve(...)`
 - `bind_raster(...)`
@@ -244,8 +247,6 @@ Out of scope for this slice:
 
 Next authoring broadening slice:
 
-- add finer-grained annotation editing:
-  - add/update/remove annotation objects without patching whole tracks
 - add explicit fill removal or clear helpers
 
 Current workaround:
@@ -257,10 +258,10 @@ Current workaround:
 Why these are next:
 
 - the current surface now covers draft creation, track/binding mutation,
-  section metadata editing, page/output defaults, header/remarks editing,
-  depth-axis control, and style/fill creation
+  section metadata editing, page/output defaults, annotation-object editing,
+  header/remarks editing, depth-axis control, and style/fill creation
 - the remaining friction in real iterative authoring is now concentrated in
-  annotation maintenance, fill cleanup, and convenience destructive edits
+  fill cleanup and convenience destructive edits
 
 Detailed plan:
 

@@ -158,6 +158,64 @@ AUTHORING_RASTER_BINDING_PATCH_KEYS = (
     "sample_axis",
     "waveform",
 )
+AUTHORING_ANNOTATION_OBJECT_KINDS = (
+    "interval",
+    "text",
+    "marker",
+    "arrow",
+    "glyph",
+)
+AUTHORING_ANNOTATION_PATCH_KEYS = (
+    "kind",
+    "top",
+    "base",
+    "text",
+    "lane_start",
+    "lane_end",
+    "fill_color",
+    "fill_alpha",
+    "border_color",
+    "border_linewidth",
+    "border_style",
+    "text_color",
+    "text_orientation",
+    "text_wrap",
+    "horizontal_alignment",
+    "vertical_alignment",
+    "font_size",
+    "font_weight",
+    "font_style",
+    "padding",
+    "depth",
+    "color",
+    "background_color",
+    "wrap",
+    "x",
+    "shape",
+    "size",
+    "line_width",
+    "label",
+    "text_side",
+    "text_x",
+    "depth_offset",
+    "arrow",
+    "arrow_style",
+    "arrow_linewidth",
+    "priority",
+    "label_mode",
+    "label_lane_start",
+    "label_lane_end",
+    "start_depth",
+    "end_depth",
+    "start_x",
+    "end_x",
+    "line_style",
+    "label_x",
+    "label_depth",
+    "glyph",
+    "edge_color",
+    "rotation",
+)
 AUTHORING_MOVE_TRACK_SELECTORS = ("before_track_id", "after_track_id", "position")
 AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/schema/patch.json",
@@ -733,6 +791,41 @@ class UpdatedTrackResult:
 
 
 @dataclass(slots=True)
+class AddedAnnotationObjectResult:
+    """Structured result for appending one annotation object to a draft track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    annotation_index: int
+    annotation_count: int
+    annotation: dict[str, object]
+
+
+@dataclass(slots=True)
+class UpdatedAnnotationObjectResult:
+    """Structured result for updating one annotation object in a draft track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    annotation_index: int
+    annotation_count: int
+    annotation: dict[str, object]
+
+
+@dataclass(slots=True)
+class RemovedAnnotationObjectResult:
+    """Structured result for removing one annotation object from a draft track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    annotation_index: int
+    annotation_count: int
+
+
+@dataclass(slots=True)
 class RemovedTrackResult:
     """Structured result for removing one track from a draft logfile."""
 
@@ -946,12 +1039,14 @@ class AuthoringVocabularyResult:
     curve_fill_kinds: list[str]
     report_detail_kinds: list[str]
     track_header_object_kinds: list[str]
+    annotation_object_kinds: list[str]
     depth_axis_patch_keys: list[str]
     section_patch_keys: list[str]
     page_patch_keys: list[str]
     render_patch_keys: list[str]
     heading_patch_keys: list[str]
     track_patch_keys: list[str]
+    annotation_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
     raster_binding_patch_keys: list[str]
     move_track_selectors: list[str]
@@ -1442,6 +1537,50 @@ def _find_track_index(
     raise TemplateValidationError(f"Track {track_id!r} was not found in section {section_id!r}.")
 
 
+def _annotation_track_entry(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+) -> tuple[dict[str, object], list[dict[str, object]]]:
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+    track = tracks[track_index]
+    if not isinstance(track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+    if str(track.get("kind", "normal")).strip().lower() != "annotation":
+        raise TemplateValidationError(
+            f"Track {track_id!r} in section {section_id!r} is not an annotation track."
+        )
+    annotations = track.get("annotations")
+    if annotations is None:
+        annotations = []
+        track["annotations"] = annotations
+    if not isinstance(annotations, list):
+        raise RuntimeError("Expected track annotations to be a list.")
+    return track, annotations
+
+
+def _annotation_at_index(
+    annotations: list[dict[str, object]],
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+) -> dict[str, object]:
+    if annotation_index < 0 or annotation_index >= len(annotations):
+        raise TemplateValidationError(
+            f"annotation_index {annotation_index} is out of range for track "
+            f"{track_id!r} in section {section_id!r}. Available indexes: "
+            f"0..{max(len(annotations) - 1, 0)}."
+        )
+    annotation = annotations[annotation_index]
+    if not isinstance(annotation, dict):
+        raise RuntimeError("Expected a mapping annotation entry.")
+    return annotation
+
+
 def _binding_targets_track(
     spec: LogFileSpec,
     binding: dict[str, object],
@@ -1906,6 +2045,64 @@ def _section_track_ids_from_mapping(mapping: dict[str, object]) -> dict[str, lis
     return track_ids_by_section
 
 
+def _annotation_track_summaries_from_mapping(
+    mapping: dict[str, object],
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    summaries: dict[str, dict[str, list[dict[str, object]]]] = {}
+    for section in _logfile_mapping_sections(mapping):
+        if not isinstance(section, dict):
+            continue
+        section_id = str(section.get("id", "")).strip()
+        if not section_id:
+            continue
+        section_summary: dict[str, list[dict[str, object]]] = {}
+        tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+        for track in tracks:
+            if not isinstance(track, dict):
+                continue
+            if str(track.get("kind", "normal")).strip().lower() != "annotation":
+                continue
+            track_id = str(track.get("id", "")).strip()
+            if not track_id:
+                continue
+            annotations = track.get("annotations", [])
+            if not isinstance(annotations, list):
+                continue
+            section_summary[track_id] = [
+                _annotation_summary(annotation, annotation_index=index)
+                for index, annotation in enumerate(annotations)
+                if isinstance(annotation, dict)
+            ]
+        if section_summary:
+            summaries[section_id] = section_summary
+    return summaries
+
+
+def _annotation_summary(
+    annotation: dict[str, object],
+    *,
+    annotation_index: int,
+) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "annotation_index": annotation_index,
+        "kind": str(annotation.get("kind", "text")).strip().lower() or "text",
+    }
+    for key in (
+        "text",
+        "label",
+        "glyph",
+        "depth",
+        "top",
+        "base",
+        "start_depth",
+        "end_depth",
+    ):
+        value = annotation.get(key)
+        if value is not None and value != "":
+            summary[key] = deepcopy(value)
+    return summary
+
+
 def _reordered_track_ids(previous_ids: list[str], current_ids: list[str]) -> list[str]:
     reordered: list[str] = []
     matcher = SequenceMatcher(a=previous_ids, b=current_ids, autojunk=False)
@@ -1949,12 +2146,14 @@ def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]
 
 def _authoring_patch_schema() -> dict[str, object]:
     return {
+        "annotation_object_kinds": list(AUTHORING_ANNOTATION_OBJECT_KINDS),
         "depth_axis_patch_keys": list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         "section_patch_keys": list(AUTHORING_SECTION_PATCH_KEYS),
         "page_patch_keys": list(AUTHORING_PAGE_PATCH_KEYS),
         "render_patch_keys": list(AUTHORING_RENDER_PATCH_KEYS),
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
         "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
+        "annotation_patch_keys": list(AUTHORING_ANNOTATION_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         "raster_binding_patch_keys": list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
         "move_track_target_selectors": list(AUTHORING_MOVE_TRACK_SELECTORS),
@@ -3992,6 +4191,169 @@ def update_track(
     )
 
 
+def add_annotation_object(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    annotation: dict[str, object],
+    position: int | None = None,
+    root: str | Path | None = None,
+) -> AddedAnnotationObjectResult:
+    """Append or insert one annotation object inside an annotation track."""
+    if not annotation:
+        raise TemplateValidationError("annotation must be a non-empty mapping.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    _, annotations = _annotation_track_entry(mapping, section_id=section_id, track_id=track_id)
+    insert_index = len(annotations) if position is None else int(position)
+    if insert_index < 0 or insert_index > len(annotations):
+        raise TemplateValidationError(
+            f"position {insert_index} is out of range for track {track_id!r} in "
+            f"section {section_id!r}. Valid positions: 0..{len(annotations)}."
+        )
+    annotations.insert(insert_index, deepcopy(annotation))
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    _, saved_annotations = _annotation_track_entry(
+        saved_mapping,
+        section_id=section_id,
+        track_id=track_id,
+    )
+    saved_annotation = _annotation_at_index(
+        saved_annotations,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=insert_index,
+    )
+    return AddedAnnotationObjectResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=insert_index,
+        annotation_count=len(saved_annotations),
+        annotation=deepcopy(saved_annotation),
+    )
+
+
+def update_annotation_object(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedAnnotationObjectResult:
+    """Patch one annotation object inside an annotation track."""
+    if not patch:
+        raise TemplateValidationError("patch must contain at least one annotation field.")
+    invalid = sorted(key for key in patch if key not in AUTHORING_ANNOTATION_PATCH_KEYS)
+    if invalid:
+        raise TemplateValidationError(
+            f"Unsupported annotation patch keys {invalid}. "
+            f"Allowed keys: {sorted(AUTHORING_ANNOTATION_PATCH_KEYS)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    _, annotations = _annotation_track_entry(mapping, section_id=section_id, track_id=track_id)
+    annotation_mapping = _annotation_at_index(
+        annotations,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+    )
+    annotations[annotation_index] = _merge_optional_patch(annotation_mapping, patch)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    _, saved_annotations = _annotation_track_entry(
+        saved_mapping,
+        section_id=section_id,
+        track_id=track_id,
+    )
+    saved_annotation = _annotation_at_index(
+        saved_annotations,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+    )
+    return UpdatedAnnotationObjectResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+        annotation_count=len(saved_annotations),
+        annotation=deepcopy(saved_annotation),
+    )
+
+
+def remove_annotation_object(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+    root: str | Path | None = None,
+) -> RemovedAnnotationObjectResult:
+    """Remove one annotation object from an annotation track."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    _, annotations = _annotation_track_entry(mapping, section_id=section_id, track_id=track_id)
+    _ = _annotation_at_index(
+        annotations,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+    )
+    annotations.pop(annotation_index)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    _, saved_annotations = _annotation_track_entry(
+        saved_mapping,
+        section_id=section_id,
+        track_id=track_id,
+    )
+    return RemovedAnnotationObjectResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+        annotation_count=len(saved_annotations),
+    )
+
+
 def remove_track(
     logfile_path: str,
     *,
@@ -5185,6 +5547,7 @@ def inspect_authoring_vocab(
             allowed_root=server_root,
         )
         layout = _logfile_mapping_layout(mapping)
+        annotation_summaries = _annotation_track_summaries_from_mapping(mapping)
         target_summary = {
             "target_kind": "logfile",
             "target_path": str(resolved_logfile),
@@ -5192,6 +5555,11 @@ def inspect_authoring_vocab(
             "track_ids_by_section": {
                 section.id: list(section.track_ids) for section in summary.sections
             },
+            "annotation_track_ids_by_section": {
+                section_id: sorted(track_map)
+                for section_id, track_map in annotation_summaries.items()
+            },
+            "annotations_by_track": annotation_summaries,
             "available_channels_by_section": {
                 section.id: list(section.available_channels) for section in summary.sections
             },
@@ -5211,11 +5579,17 @@ def inspect_authoring_vocab(
         )
         mapping = _raw_yaml_mapping_from_path(resolved_template)
         layout = _logfile_mapping_layout(mapping)
+        annotation_summaries = _annotation_track_summaries_from_mapping(mapping)
         target_summary = {
             "target_kind": "template",
             "target_path": str(resolved_template),
             "section_ids": list(_section_track_ids_from_mapping(mapping)),
             "track_ids_by_section": _section_track_ids_from_mapping(mapping),
+            "annotation_track_ids_by_section": {
+                section_id: sorted(track_map)
+                for section_id, track_map in annotation_summaries.items()
+            },
+            "annotations_by_track": annotation_summaries,
             "heading_general_field_keys": _heading_general_field_keys_from_layout(layout),
             "has_heading": bool(layout.get("heading")),
             "has_remarks": bool(layout.get("remarks")),
@@ -5228,12 +5602,14 @@ def inspect_authoring_vocab(
         curve_fill_kinds=_enum_values(CurveFillKind),
         report_detail_kinds=_enum_values(ReportDetailKind),
         track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
+        annotation_object_kinds=list(AUTHORING_ANNOTATION_OBJECT_KINDS),
         depth_axis_patch_keys=list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
         section_patch_keys=list(AUTHORING_SECTION_PATCH_KEYS),
         page_patch_keys=list(AUTHORING_PAGE_PATCH_KEYS),
         render_patch_keys=list(AUTHORING_RENDER_PATCH_KEYS),
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
         track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
+        annotation_patch_keys=list(AUTHORING_ANNOTATION_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         raster_binding_patch_keys=list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
         move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
@@ -5607,10 +5983,14 @@ def author_plot_from_request_prompt(
         "apply_header_values(...) before generic heading patches.\n"
         "9. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "10. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "10. Call inspect_authoring_vocab(...) with the same logfile_path when possible. "
+        "Use its annotations_by_track summaries when you need to edit existing annotation "
+        "objects by index.\n"
         "11. Plan the smallest explicit edit sequence using update_section(...), "
         "set_page_layout(...), set_depth_axis(...), add_track(...), "
         "update_track(...), remove_track(...), "
+        "add_annotation_object(...), update_annotation_object(...), "
+        "remove_annotation_object(...), "
         "bind_curve(...), add_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
@@ -5643,18 +6023,22 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "render defaults, call set_page_layout(...).\n"
         "6. If the feedback changes report scale or depth grid spacing, call "
         "set_depth_axis(...).\n"
-        "7. Choose the smallest edit sequence that addresses the feedback. "
+        "7. If the feedback changes zone notes, markers, arrows, glyphs, or interval "
+        "annotations, use inspect_authoring_vocab(...) to find existing annotation_index "
+        "values and then call add_annotation_object(...), update_annotation_object(...), "
+        "or remove_annotation_object(...).\n"
+        "8. Choose the smallest edit sequence that addresses the feedback. "
         "Use add_curve_fill(...) for explicit crossover or baseline fill requests. "
         "Prefer update_section(...), set_page_layout(...), update_track(...), remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"
-        "8. For density-neutron overlays with crossover fill, prefer "
+        "9. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "9. Preview the affected section, track, or depth window after the edits.\n"
-        "10. If the client retained the previous YAML text, call "
+        "10. Preview the affected section, track, or depth window after the edits.\n"
+        "11. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "11. Validate or save only after the preview looks correct.\n"
+        "12. Validate or save only after the preview looks correct.\n"
     )
 
 

@@ -43,6 +43,9 @@ for, and what still requires maintainer action outside the repo.
 - `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
+- `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
+- `update_annotation_object(logfile_path, section_id, track_id, annotation_index, patch)`
+- `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
 - `bind_curve(logfile_path, section_id, track_id, channel, label=None, style=None, scale=None, header_display=None)`
 - `add_curve_fill(logfile_path, section_id, track_id, channel, kind, ...)`
@@ -253,7 +256,6 @@ Next up:
 
 Remaining broader authoring surface after the current foundation:
 
-- finer-grained annotation editing without patching whole tracks
 - explicit fill removal or clear helpers
 
 Current workaround:
@@ -264,9 +266,9 @@ Current workaround:
 
 Next highest-value MCP slice:
 
-1. annotation-object editing as first-class add/update/remove tools
-2. explicit fill removal or clear helpers
-3. convenience destructive helpers such as clear-track-bindings operations
+1. explicit fill removal or clear helpers
+2. convenience destructive helpers such as clear-track-bindings operations
+3. broader section/page convenience helpers where repetition still appears in notebooks
 
 Scope note:
 

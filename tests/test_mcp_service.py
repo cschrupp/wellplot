@@ -908,6 +908,151 @@ class McpServiceTests(unittest.TestCase):
                 )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_annotation_object_persists_one_annotation(self) -> None:
+        """Append one annotation object to an annotation track and persist it."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="notes",
+                title="Notes",
+                kind="annotation",
+                width_mm=18.0,
+                root=REPO_ROOT,
+            )
+
+            result = service.add_annotation_object(
+                str(draft_path),
+                section_id="main",
+                track_id="notes",
+                annotation={
+                    "kind": "text",
+                    "depth": 1008.0,
+                    "text": "Top pay",
+                    "lane_start": 0.0,
+                    "lane_end": 1.0,
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.annotation_index, 0)
+            self.assertEqual(result.annotation_count, 1)
+            self.assertEqual(result.annotation["kind"], "text")
+            self.assertEqual(result.annotation["text"], "Top pay")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "notes")
+            self.assertEqual(saved_track["annotations"][0]["text"], "Top pay")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_annotation_object_merges_patch_and_persists(self) -> None:
+        """Patch one annotation object without rewriting the whole track."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="notes",
+                title="Notes",
+                kind="annotation",
+                width_mm=18.0,
+                annotations=[{"kind": "text", "depth": 1008.0, "text": "Top pay"}],
+                root=REPO_ROOT,
+            )
+
+            result = service.update_annotation_object(
+                str(draft_path),
+                section_id="main",
+                track_id="notes",
+                annotation_index=0,
+                patch={"text": "Updated pay", "font_size": 8.5},
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.annotation_index, 0)
+            self.assertEqual(result.annotation_count, 1)
+            self.assertEqual(result.annotation["text"], "Updated pay")
+            self.assertEqual(result.annotation["font_size"], 8.5)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "notes")
+            self.assertEqual(saved_track["annotations"][0]["text"], "Updated pay")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_remove_annotation_object_deletes_one_annotation(self) -> None:
+        """Remove one annotation object so notes can be rebuilt cleanly."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="notes",
+                title="Notes",
+                kind="annotation",
+                width_mm=18.0,
+                annotations=[
+                    {"kind": "text", "depth": 1008.0, "text": "Top pay"},
+                    {"kind": "text", "depth": 1012.0, "text": "Base pay"},
+                ],
+                root=REPO_ROOT,
+            )
+
+            result = service.remove_annotation_object(
+                str(draft_path),
+                section_id="main",
+                track_id="notes",
+                annotation_index=0,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.annotation_index, 0)
+            self.assertEqual(result.annotation_count, 1)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "notes")
+            self.assertEqual(len(saved_track["annotations"]), 1)
+            self.assertEqual(saved_track["annotations"][0]["text"], "Base pay")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_annotation_object_requires_annotation_track(self) -> None:
+        """Reject annotation-object edits on non-annotation tracks."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.add_annotation_object(
+                    str(draft_path),
+                    section_id="main",
+                    track_id="gr",
+                    annotation={"kind": "text", "depth": 1008.0, "text": "Bad track"},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_remove_track_removes_track_and_bindings(self) -> None:
         """Remove one track and any bindings that target it by default."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -1993,9 +2138,11 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("between_curves", result.curve_fill_kinds)
         self.assertIn("open_hole", result.report_detail_kinds)
         self.assertIn("title", result.track_header_object_kinds)
+        self.assertIn("text", result.annotation_object_kinds)
         self.assertIn("unit", result.depth_axis_patch_keys)
         self.assertIn("provider_name", result.heading_patch_keys)
         self.assertIn("width_mm", result.track_patch_keys)
+        self.assertIn("text", result.annotation_patch_keys)
         self.assertIn("fill", result.curve_binding_patch_keys)
         self.assertIn("sample_axis", result.raster_binding_patch_keys)
         self.assertIn("after_track_id", result.move_track_selectors)
@@ -2030,6 +2177,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(result.target_summary["section_ids"], ["main"])
         self.assertIn("gr", result.target_summary["track_ids_by_section"]["main"])
         self.assertIn("GR", result.target_summary["available_channels_by_section"]["main"])
+        self.assertEqual(result.target_summary["annotation_track_ids_by_section"], {})
 
     def test_inspect_authoring_vocab_with_template_exposes_heading_context(self) -> None:
         """Expose heading-field expectations from one packaged example template."""
@@ -2041,6 +2189,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(result.target_summary["target_kind"], "template")
         self.assertTrue(result.target_summary["has_heading"])
         self.assertIn("company", result.target_summary["heading_general_field_keys"])
+        self.assertEqual(result.target_summary["annotation_track_ids_by_section"], {})
 
     def test_summarize_logfile_changes_without_previous_text_returns_hint(self) -> None:
         """Explain how to use change summaries when no prior snapshot is provided."""
@@ -2219,6 +2368,8 @@ class McpServiceTests(unittest.TestCase):
 
         self.assertEqual(patch_resource.mime_type, "application/json")
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("annotation_object_kinds", json.loads(patch_resource.text))
+        self.assertIn("annotation_patch_keys", json.loads(patch_resource.text))
         self.assertIn("depth_axis_patch_keys", json.loads(patch_resource.text))
         self.assertIn("section_patch_keys", json.loads(patch_resource.text))
         self.assertIn("page_patch_keys", json.loads(patch_resource.text))
@@ -2265,6 +2416,9 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("apply_header_values(...)", prompt)
         self.assertIn("inspect_style_presets(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
+        self.assertIn("add_annotation_object(...)", prompt)
+        self.assertIn("update_annotation_object(...)", prompt)
+        self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
@@ -2281,6 +2435,9 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("update_section(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("set_page_layout(...)", prompt)
+        self.assertIn("add_annotation_object(...)", prompt)
+        self.assertIn("update_annotation_object(...)", prompt)
+        self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 

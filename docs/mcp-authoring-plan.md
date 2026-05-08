@@ -127,6 +127,9 @@ Candidate tools:
 - `update_section(...)`
 - `add_track(...)`
 - `update_track(...)`
+- `add_annotation_object(...)`
+- `update_annotation_object(...)`
+- `remove_annotation_object(...)`
 - `remove_track(...)`
 - `bind_curve(...)`
 - `update_curve_binding(...)`
@@ -140,10 +143,6 @@ Candidate tools:
 
 Remaining broader authoring surface after the current foundation:
 
-- finer-grained annotation editing:
-  - `add_annotation_object(...)`
-  - `update_annotation_object(...)`
-  - `remove_annotation_object(...)`
 - explicit fill removal or clear helpers:
   - `remove_curve_fill(...)` or `clear_curve_fill(...)`
 
@@ -210,9 +209,9 @@ Optional later helper:
 After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
-1. annotation-object editing without patching whole tracks
-2. explicit fill removal or clear helpers
-3. convenience destructive helpers such as track-binding clear operations
+1. explicit fill removal or clear helpers
+2. convenience destructive helpers such as track-binding clear operations
+3. additional notebook-facing ergonomics where repeated project/setup patterns remain
 
 These additions matter because iterative user workflows are now blocked less by
 curve/track creation and more by the remaining layout and cleanup operations
