@@ -124,6 +124,7 @@ Preferred v1 shape:
 
 Candidate tools:
 
+- `update_section(...)`
 - `add_track(...)`
 - `update_track(...)`
 - `remove_track(...)`
@@ -138,9 +139,6 @@ Candidate tools:
 
 Remaining broader authoring surface after the current foundation:
 
-- first-class section patching beyond data-source replacement:
-  - `update_section(...)` for title, subtitle, depth range, and related section
-    metadata
 - page/output settings edits:
   - `set_page_layout(...)` or equivalent helpers for page size, orientation,
     continuous layout, and output defaults
@@ -214,10 +212,10 @@ Optional later helper:
 After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
-1. `update_section(...)` for title, subtitle, and depth-range edits
-2. `set_page_layout(...)` for page/output defaults and continuous-layout
+1. `set_page_layout(...)` for page/output defaults and continuous-layout
    controls
-3. annotation-object editing without patching whole tracks
+2. annotation-object editing without patching whole tracks
+3. explicit fill removal or clear helpers
 
 These additions matter because iterative user workflows are now blocked less by
 curve/track creation and more by the remaining layout and cleanup operations

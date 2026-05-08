@@ -264,6 +264,28 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def update_section(
+        logfile_path: str,
+        section_id: str,
+        title: str | None = None,
+        subtitle: str | None = None,
+        depth_range: tuple[float, float] | None = None,
+        depth_range_unit: str | None = None,
+    ) -> dict[str, object]:
+        """Update one draft section's title, subtitle, or depth window."""
+        return asdict(
+            service.update_section(
+                logfile_path,
+                section_id=section_id,
+                title=title,
+                subtitle=subtitle,
+                depth_range=depth_range,
+                depth_range_unit=depth_range_unit,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def set_depth_axis(
         logfile_path: str,
         unit: str | None = None,

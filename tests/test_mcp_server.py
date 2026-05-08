@@ -197,6 +197,17 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "source_logfile_path": fixture_paths.single_logfile_relative,
                 },
             )
+            updated_section = await session.call_tool(
+                "update_section",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "title": "Main Review",
+                    "subtitle": "Focused Review Window",
+                    "depth_range": [1004.0, 1014.0],
+                    "depth_range_unit": "m",
+                },
+            )
             updated_source = await session.call_tool(
                 "set_section_data_source",
                 {
@@ -484,6 +495,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "create_logfile_draft",
                 "summarize_logfile_draft",
                 "set_section_data_source",
+                "update_section",
                 "set_depth_axis",
                 "add_track",
                 "update_track",
@@ -601,6 +613,11 @@ class McpServerIntegrationTests(unittest.TestCase):
             created_draft.structuredContent["seed_value"],
             str(fixture_paths.single_logfile),
         )
+        self.assertEqual(updated_section.structuredContent["section_id"], "main")
+        self.assertEqual(updated_section.structuredContent["title"], "Main Review")
+        self.assertEqual(updated_section.structuredContent["subtitle"], "Focused Review Window")
+        self.assertEqual(updated_section.structuredContent["depth_range"], [1004.0, 1014.0])
+        self.assertEqual(updated_section.structuredContent["depth_range_unit"], "m")
         self.assertEqual(updated_source.structuredContent["source_path"], str(replacement_las))
         self.assertEqual(updated_source.structuredContent["source_format"], "las")
         self.assertEqual(updated_source.structuredContent["subtitle"], "Replacement LAS Source")

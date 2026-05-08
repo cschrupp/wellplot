@@ -39,6 +39,7 @@ for, and what still requires maintainer action outside the repo.
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
+- `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `remove_track(logfile_path, section_id, track_id, remove_bindings=True)`
@@ -88,6 +89,7 @@ Packaged example ids:
   - `export_example_bundle(...)`
   - `create_logfile_draft(...)`
   - `set_section_data_source(...)`
+  - `update_section(...)`
   - `set_depth_axis(...)`
   - `add_track(...)`
   - `update_track(...)`
@@ -167,6 +169,7 @@ Concrete `0.4.0` foundation tools:
 
 - `create_logfile_draft(...)`
 - `summarize_logfile_draft(...)`
+- `update_section(...)`
 - `add_track(...)`
 - `update_track(...)`
 - `remove_track(...)`
@@ -247,8 +250,6 @@ Next up:
 
 Remaining broader authoring surface after the current foundation:
 
-- section-level patching beyond data-source replacement
-- first-class title/subtitle/depth-range edits
 - page/output settings edits:
   - page size
   - orientation
@@ -265,9 +266,9 @@ Current workaround:
 
 Next highest-value MCP slice:
 
-1. `update_section(...)` for title, subtitle, and depth range
-2. `set_page_layout(...)` or equivalent page/output settings control
-3. annotation-object editing as first-class add/update/remove tools
+1. `set_page_layout(...)` or equivalent page/output settings control
+2. annotation-object editing as first-class add/update/remove tools
+3. explicit fill removal or clear helpers
 
 Scope note:
 

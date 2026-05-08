@@ -41,7 +41,12 @@ from ..api.render import (
     render_window_png,
 )
 from ..api.serialize import report_to_dict, report_to_yaml
-from ..errors import DependencyUnavailableError, PathAccessError, TemplateValidationError
+from ..errors import (
+    DependencyUnavailableError,
+    PathAccessError,
+    TemplateValidationError,
+    UnitConversionError,
+)
 from ..io import load_dlis, load_las
 from ..logfile import (
     LogFileSpec,
@@ -62,6 +67,7 @@ from ..model.document import (
     TrackKind,
 )
 from ..pipeline import prepare_logfile_render, render_prepared_logfile
+from ..units import DEFAULT_UNITS
 
 ASSET_PACKAGE = "wellplot.mcp.assets"
 PRODUCTION_EXAMPLE_IDS = ("cbl_log_example", "forge16b_porosity_example")
@@ -84,6 +90,12 @@ AUTHORING_HEADING_PATCH_KEYS = (
     "service_titles",
     "detail",
     "tail_enabled",
+)
+AUTHORING_SECTION_PATCH_KEYS = (
+    "title",
+    "subtitle",
+    "depth_range",
+    "depth_range_unit",
 )
 AUTHORING_TRACK_PATCH_KEYS = (
     "title",
@@ -651,6 +663,19 @@ class SectionDataSourceResult:
 
 
 @dataclass(slots=True)
+class UpdatedSectionResult:
+    """Structured result for updating one draft section's metadata."""
+
+    logfile_path: str
+    section_id: str
+    title: str
+    subtitle: str
+    depth_range: list[float] | None
+    depth_range_unit: str | None
+    track_ids: list[str]
+
+
+@dataclass(slots=True)
 class DepthAxisResult:
     """Structured result for updating document depth-axis settings."""
 
@@ -894,6 +919,7 @@ class AuthoringVocabularyResult:
     report_detail_kinds: list[str]
     track_header_object_kinds: list[str]
     depth_axis_patch_keys: list[str]
+    section_patch_keys: list[str]
     heading_patch_keys: list[str]
     track_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
@@ -1017,6 +1043,15 @@ def _document_default_depth_range(spec: LogFileSpec) -> list[float] | None:
     if not isinstance(depth_range, list) or len(depth_range) != 2:
         return None
     return [float(depth_range[0]), float(depth_range[1])]
+
+
+def _document_depth_unit(mapping: dict[str, object]) -> str | None:
+    document = _logfile_mapping_document(mapping)
+    depth = document.get("depth")
+    if not isinstance(depth, dict):
+        return None
+    unit = str(depth.get("unit", "")).strip()
+    return unit or None
 
 
 def _section_depth_range(
@@ -1351,9 +1386,7 @@ def _find_track_index(
             continue
         if str(track.get("id", "")) == track_id:
             return index
-    raise TemplateValidationError(
-        f"Track {track_id!r} was not found in section {section_id!r}."
-    )
+    raise TemplateValidationError(f"Track {track_id!r} was not found in section {section_id!r}.")
 
 
 def _binding_targets_track(
@@ -1411,6 +1444,44 @@ def _validate_preview_parameters(
         raise ValueError("track_ids filtering requires a section_id.")
     if depth_range is not None and float(depth_range[0]) == float(depth_range[1]):
         raise ValueError("depth_range values must differ.")
+
+
+def _normalized_section_depth_range(
+    depth_range: tuple[float, float],
+    *,
+    depth_range_unit: str | None,
+    target_unit: str | None,
+) -> tuple[list[float], str | None]:
+    _validate_preview_parameters(
+        page_index=0,
+        dpi=1,
+        section_id=None,
+        track_ids=None,
+        depth_range=depth_range,
+    )
+    top, base = float(depth_range[0]), float(depth_range[1])
+    normalized_target_unit = DEFAULT_UNITS.normalize(target_unit)
+    normalized_source_unit = (
+        normalized_target_unit
+        if depth_range_unit is None
+        else DEFAULT_UNITS.normalize(depth_range_unit)
+    )
+    if normalized_target_unit and normalized_source_unit:
+        try:
+            converted_top = DEFAULT_UNITS.convert(
+                top,
+                normalized_source_unit,
+                normalized_target_unit,
+            )
+            converted_base = DEFAULT_UNITS.convert(
+                base,
+                normalized_source_unit,
+                normalized_target_unit,
+            )
+        except UnitConversionError as exc:
+            raise TemplateValidationError(str(exc)) from exc
+        return [converted_top, converted_base], normalized_target_unit
+    return [top, base], normalized_source_unit or normalized_target_unit or None
 
 
 def _validate_logfile_spec_renderable(
@@ -1826,6 +1897,7 @@ def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]
 def _authoring_patch_schema() -> dict[str, object]:
     return {
         "depth_axis_patch_keys": list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
+        "section_patch_keys": list(AUTHORING_SECTION_PATCH_KEYS),
         "heading_patch_keys": list(AUTHORING_HEADING_PATCH_KEYS),
         "track_patch_keys": list(AUTHORING_TRACK_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -3517,6 +3589,70 @@ def set_section_data_source(
     )
 
 
+def update_section(
+    logfile_path: str,
+    *,
+    section_id: str,
+    title: str | None = None,
+    subtitle: str | None = None,
+    depth_range: tuple[float, float] | None = None,
+    depth_range_unit: str | None = None,
+    root: str | Path | None = None,
+) -> UpdatedSectionResult:
+    """Update one draft section's title, subtitle, or depth range."""
+    if title is None and subtitle is None and depth_range is None and depth_range_unit is None:
+        raise TemplateValidationError("Provide at least one section setting to update.")
+    if depth_range is None and depth_range_unit is not None:
+        raise TemplateValidationError("depth_range_unit requires depth_range.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_section(current_spec, section_id)
+    section = _logfile_mapping_section(mapping, section_id)
+
+    if title is not None:
+        section["title"] = str(title)
+    if subtitle is not None:
+        section["subtitle"] = str(subtitle)
+    if depth_range is not None:
+        normalized_range, _ = _normalized_section_depth_range(
+            depth_range,
+            depth_range_unit=depth_range_unit,
+            target_unit=_document_depth_unit(mapping),
+        )
+        section["depth_range"] = normalized_range
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    saved_track_ids = [
+        str(track.get("id", ""))
+        for track in list(saved_section.get("tracks", []))
+        if isinstance(track, dict)
+    ]
+    return UpdatedSectionResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        title=str(saved_section.get("title", "")),
+        subtitle=str(saved_section.get("subtitle", "")),
+        depth_range=_section_depth_range(
+            saved_section,
+            default_depth_range=_document_default_depth_range(saved_spec),
+        ),
+        depth_range_unit=_normalized_depth_unit_text(
+            dict(saved_spec.document.get("depth", {})).get("unit")
+        ),
+        track_ids=saved_track_ids,
+    )
+
+
 def set_depth_axis(
     logfile_path: str,
     *,
@@ -4946,6 +5082,7 @@ def inspect_authoring_vocab(
         report_detail_kinds=_enum_values(ReportDetailKind),
         track_header_object_kinds=_enum_values(TrackHeaderObjectKind),
         depth_axis_patch_keys=list(AUTHORING_DEPTH_AXIS_PATCH_KEYS),
+        section_patch_keys=list(AUTHORING_SECTION_PATCH_KEYS),
         heading_patch_keys=list(AUTHORING_HEADING_PATCH_KEYS),
         track_patch_keys=list(AUTHORING_TRACK_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
@@ -5307,30 +5444,33 @@ def author_plot_from_request_prompt(
         "before you create bindings.\n"
         "2. If you are adapting one starter draft to a different LAS/DLIS file, call "
         "set_section_data_source(...) before adding or revising bindings.\n"
-        "3. If the request changes report scale or depth-grid behavior, call "
+        "3. If the request changes section title, subtitle, or depth window, call "
+        "update_section(...).\n"
+        "4. If the request changes report scale or depth-grid behavior, call "
         "set_depth_axis(...).\n"
-        "4. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
-        "5. If the request includes report-header or remarks content from text, call "
+        "5. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
+        "6. If the request includes report-header or remarks content from text, call "
         "parse_key_value_text(source_text, format_hint=None) first.\n"
-        "6. If the request includes report-header or remarks content, call "
+        "7. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "7. If the request is mainly about visual conventions, call "
+        "8. If the request is mainly about visual conventions, call "
         "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "8. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
-        "9. Plan the smallest explicit edit sequence using set_depth_axis(...), add_track(...), "
-        "update_track(...), remove_track(...), bind_curve(...), add_curve_fill(...), "
+        "9. Call inspect_authoring_vocab(...) with the same logfile_path when possible.\n"
+        "10. Plan the smallest explicit edit sequence using update_section(...), "
+        "set_depth_axis(...), add_track(...), update_track(...), remove_track(...), "
+        "bind_curve(...), add_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), move_track(...), "
         "set_heading_content(...), and set_remarks_content(...).\n"
-        "10. For density-neutron overlays with crossover fill, prefer "
+        "11. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "11. Preview the affected section, track, or window before recommending a final render.\n"
-        "12. If you captured the previous YAML text before editing, call "
+        "12. Preview the affected section, track, or window before recommending a final render.\n"
+        "13. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "13. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "14. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -5345,20 +5485,22 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "2. Call inspect_authoring_vocab(logfile_path=logfile_path).\n"
         "3. If the feedback changes the underlying LAS/DLIS file, call "
         "set_section_data_source(...) before rebinding curves.\n"
-        "4. If the feedback changes report scale or depth grid spacing, call "
+        "4. If the feedback changes section title, subtitle, or depth window, call "
+        "update_section(...).\n"
+        "5. If the feedback changes report scale or depth grid spacing, call "
         "set_depth_axis(...).\n"
-        "5. Choose the smallest edit sequence that addresses the feedback. "
+        "6. Choose the smallest edit sequence that addresses the feedback. "
         "Use add_curve_fill(...) for explicit crossover or baseline fill requests. "
-        "Prefer update_track(...), remove_track(...), remove_curve_binding(...), "
-        "and remove_raster_binding(...) when the request says to replace or "
-        "remove existing content.\n"
-        "6. For density-neutron overlays with crossover fill, prefer "
+        "Prefer update_section(...), update_track(...), remove_track(...), "
+        "remove_curve_binding(...), and remove_raster_binding(...) when the request "
+        "says to replace or remove existing content.\n"
+        "7. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "7. Preview the affected section, track, or depth window after the edits.\n"
-        "8. If the client retained the previous YAML text, call "
+        "8. Preview the affected section, track, or depth window after the edits.\n"
+        "9. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "9. Validate or save only after the preview looks correct.\n"
+        "10. Validate or save only after the preview looks correct.\n"
     )
 
 

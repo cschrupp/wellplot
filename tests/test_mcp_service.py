@@ -607,6 +607,68 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(summary.sections[0].source_format, "las")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_section_persists_title_subtitle_and_depth_range(self) -> None:
+        """Patch one section's display metadata and normalize the depth range."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.multi_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.update_section(
+                str(draft_path),
+                section_id="repeat_pass",
+                title="Repeat Review",
+                subtitle="Focused Window",
+                depth_range=(100400.0, 101400.0),
+                depth_range_unit="cm",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "repeat_pass")
+            self.assertEqual(result.title, "Repeat Review")
+            self.assertEqual(result.subtitle, "Focused Window")
+            self.assertEqual(result.depth_range, [1004.0, 1014.0])
+            self.assertEqual(result.depth_range_unit, "m")
+            self.assertIn("depth", result.track_ids)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            sections = saved_mapping["document"]["layout"]["log_sections"]
+            saved_section = next(section for section in sections if section["id"] == "repeat_pass")
+            self.assertEqual(saved_section["title"], "Repeat Review")
+            self.assertEqual(saved_section["subtitle"], "Focused Window")
+            self.assertEqual(saved_section["depth_range"], [1004.0, 1014.0])
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_section_requires_actual_section_edits(self) -> None:
+        """Reject empty section updates and unit-only depth requests."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.update_section(
+                    str(draft_path),
+                    section_id="main",
+                    root=REPO_ROOT,
+                )
+
+            with self.assertRaises(TemplateValidationError):
+                service.update_section(
+                    str(draft_path),
+                    section_id="main",
+                    depth_range_unit="ft",
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_set_depth_axis_updates_document_depth(self) -> None:
         """Persist one document-level depth-axis update for later previews and renders."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2077,6 +2139,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(patch_resource.mime_type, "application/json")
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertIn("depth_axis_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("section_patch_keys", json.loads(patch_resource.text))
         self.assertEqual(fill_resource.mime_type, "application/json")
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(style_resource.mime_type, "application/json")
@@ -2111,6 +2174,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("inspect_data_source(source_path)", prompt)
         self.assertIn("check_channel_availability(...)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
+        self.assertIn("update_section(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
@@ -2130,6 +2194,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
         self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
+        self.assertIn("update_section(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)

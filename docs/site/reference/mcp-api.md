@@ -303,6 +303,32 @@ Behavior:
 - is the preferred edit when one starter draft should be repointed at a user
   LAS file before track bindings are added
 
+### `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
+
+Purpose: update one existing draft section's display metadata without changing
+its underlying source.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `title`
+- `subtitle`
+- `depth_range`
+- `depth_range_unit`
+- `track_ids`
+
+Behavior:
+
+- validates that `section_id` exists in the target draft
+- supports first-class edits for `title`, `subtitle`, and `depth_range`
+- normalizes `depth_range` into the document depth unit when
+  `depth_range_unit` is provided
+- rejects empty edits and rejects `depth_range_unit` when no `depth_range` is
+  provided
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 
 Purpose: update one draft logfile's document-level depth axis.
@@ -994,20 +1020,22 @@ For draft authoring:
 3. `summarize_logfile_draft(...)`
 4. `set_section_data_source(...)` when a starter draft should be repointed at a
    different LAS or DLIS file
-5. `set_depth_axis(...)` when the request changes document scale, unit, or grid
+5. `update_section(...)` when the request changes section title, subtitle, or
+   depth window without changing the source file
+6. `set_depth_axis(...)` when the request changes document scale, unit, or grid
    spacing
-6. `parse_key_value_text(...)` when the input starts as copied header text
-7. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+7. `parse_key_value_text(...)` when the input starts as copied header text
+8. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-8. `preview_header_mapping(...)` before mutating header/report values
-9. `apply_header_values(...)` when the previewed mapping should be persisted
-10. `inspect_authoring_vocab(...)`
-11. apply `set_depth_axis(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
+9. `preview_header_mapping(...)` before mutating header/report values
+10. `apply_header_values(...)` when the previewed mapping should be persisted
+11. `inspect_authoring_vocab(...)`
+12. apply `update_section(...)`, `set_depth_axis(...)`, `add_track(...)`, `update_track(...)`, `remove_track(...)`,
    `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
    `update_raster_binding(...)`, `remove_curve_binding(...)`,
    `remove_raster_binding(...)`, `move_track(...)`,
    `set_heading_content(...)`, and `set_remarks_content(...)`
-12. `summarize_logfile_changes(...)` when the client retained a previous YAML
+13. `summarize_logfile_changes(...)` when the client retained a previous YAML
    snapshot
-13. preview with a narrow PNG tool
-14. render or save only after review
+14. preview with a narrow PNG tool
+15. render or save only after review

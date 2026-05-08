@@ -160,6 +160,7 @@ Main tools:
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
 - `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
+- `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
@@ -194,6 +195,8 @@ Recommended split:
   want a file-backed authoring target that an MCP client can revise in steps
 - use `set_section_data_source(...)` when a starter draft should be switched to
   one user LAS/DLIS file before you start adding tracks and bindings
+- use `update_section(...)` when the request changes section title, subtitle,
+  or depth window without changing the underlying source
 - use `set_depth_axis(...)` when the request changes document scale, depth
   labels, or grid spacing before you start fine-grained track edits
 - use `parse_key_value_text(...)` when the source material is a copied header
@@ -214,7 +217,7 @@ Recommended split:
   valid track kinds, fill kinds, heading fields, and any available channels in
   the current draft
 - use `add_track(...)`, `update_track(...)`, `remove_track(...)`,
-  `set_depth_axis(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
+  `update_section(...)`, `set_depth_axis(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `bind_raster(...)`, `update_curve_binding(...)`,
   `update_raster_binding(...)`, `remove_curve_binding(...)`,
   `remove_raster_binding(...)`, and `move_track(...)` for the deterministic
   track/layout edit loop

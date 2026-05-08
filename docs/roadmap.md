@@ -150,6 +150,7 @@ Concrete `0.4.0` foundation set:
 
 - `create_logfile_draft(...)`
 - `summarize_logfile_draft(...)`
+- `update_section(...)`
 - `add_track(...)`
 - `update_track(...)`
 - `remove_track(...)`
@@ -242,8 +243,6 @@ Out of scope for this slice:
 
 Next authoring broadening slice:
 
-- add first-class section patching beyond data-source swap:
-  - `update_section(...)` for title, subtitle, and depth range
 - add page/output settings tools:
   - page size
   - orientation
@@ -262,7 +261,8 @@ Current workaround:
 Why these are next:
 
 - the current surface now covers draft creation, track/binding mutation,
-  header/remarks editing, depth-axis control, and style/fill creation
+  section metadata editing, header/remarks editing, depth-axis control, and
+  style/fill creation
 - the remaining friction in real iterative authoring is now concentrated in
   section layout cleanup, page/output defaults, and finer-grained annotation
   maintenance
