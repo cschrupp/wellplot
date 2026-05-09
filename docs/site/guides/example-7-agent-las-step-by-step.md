@@ -28,8 +28,7 @@ The flow is:
 The notebook uses these public APIs directly:
 
 - `create_project_session(...)`
-- `session.add_data_file(...)`
-- `session.create_starter(...)`
+- `session.bootstrap_starter(...)`
 - `await session.run(...)`
 - `await session.revise(...)`
 - `await session.render_logfile_to_file(...)`
@@ -80,14 +79,17 @@ That is why it lives in the `user/` notebook set but remains unexecuted in git.
 Start with the default copied LAS file once so the full workflow is known to
 work in your environment.
 
-Then point `session.add_data_file(...)` at your own LAS file so the project
-folder gets a staged `user_input.las` before rerunning from the top.
+Then point `session.bootstrap_starter(...)` at your own LAS file so the project
+folder gets a staged `user_input.las`, refreshed starter files, and the same
+default draft/render targets before rerunning from the top.
 
 The starter scaffold step is intentionally higher level than the YAML-first
 user notebooks. Instead of hand-writing the full template and starter logfile
-schema in the notebook, this walkthrough uses `session.create_starter(...)` to
-materialize the same files from a shipped preset, then shows the generated YAML
-so the user can still inspect what the agent will revise.
+schema in the notebook, this walkthrough uses
+`session.bootstrap_starter(...)` to stage the data source, configure the
+project defaults, materialize the same files from a shipped preset, and then
+show the generated YAML so the user can still inspect what the agent will
+revise.
 
 The safest iteration pattern is:
 

@@ -31,6 +31,10 @@ import yaml
 
 from .core import AuthoringResult, AuthoringSession
 
+OPENAI_PROVIDER_NAME = "openai"
+OPENAI_COMPAT_PROVIDER_NAME = "openai_compat"
+OLLAMA_PROVIDER_NAME = "ollama"
+
 
 @dataclass(frozen=True)
 class ProjectPaths:
@@ -650,6 +654,109 @@ class ProjectSession:
             logfile_yaml=logfile_yaml,
         )
 
+    def bootstrap_starter(
+        self,
+        *,
+        kind: str,
+        source_data_file: str | Path,
+        title: str,
+        subtitle: str,
+        depth_range: tuple[float, float] | None = None,
+        staged_data_name: str | Path | None = None,
+        template_path: str | Path = "base.template.yaml",
+        starter_logfile: str | Path = "starter.log.yaml",
+        draft_logfile: str | Path = "draft.log.yaml",
+        render_output_path: str | Path = "report.pdf",
+        source_format: str | None = None,
+        section_id: str = "main",
+        starter_name: str = "Project Starter",
+        seed_tracks: tuple[str, ...] = ("gr_sp", "depth"),
+        overwrite_starter: bool = True,
+        overwrite_data: bool = False,
+        keep_existing_data: bool = True,
+    ) -> ProjectStarter:
+        """Stage one data file, configure output defaults, and create a starter scaffold."""
+        staged_data_file = self.add_data_file(
+            source_data_file,
+            destination_name=staged_data_name,
+            overwrite=overwrite_data,
+            keep_existing=keep_existing_data,
+        )
+        self.configure_paths(
+            draft_logfile=self._resolve_project_file(
+                draft_logfile,
+                field_name="draft_logfile",
+            ),
+            render_output_path=self._resolve_project_file(
+                render_output_path,
+                field_name="render_output_path",
+            ),
+        )
+        return self.create_starter(
+            kind=kind,
+            data_file=staged_data_file,
+            title=title,
+            subtitle=subtitle,
+            depth_range=depth_range,
+            template_path=template_path,
+            starter_logfile=starter_logfile,
+            render_output_path=self.render_output_path,
+            source_format=source_format,
+            section_id=section_id,
+            starter_name=starter_name,
+            seed_tracks=seed_tracks,
+            overwrite=overwrite_starter,
+        )
+
+
+def _first_env_value(*names: str) -> str | None:
+    """Return the first non-empty environment value among the given names."""
+    for name in names:
+        value = os.getenv(name)
+        if value is not None and value.strip():
+            return value.strip()
+    return None
+
+
+def _resolve_provider_defaults(
+    *,
+    provider: str,
+    model: str | None,
+    base_url: str | None,
+) -> tuple[str, str, str | None]:
+    """Resolve one notebook-facing provider name into a core provider config."""
+    normalized_provider = provider.strip().lower()
+    if normalized_provider == OPENAI_PROVIDER_NAME:
+        resolved_model = model or _first_env_value("OPENAI_MODEL") or "gpt-5.4"
+        return OPENAI_PROVIDER_NAME, resolved_model, None
+
+    if normalized_provider == OPENAI_COMPAT_PROVIDER_NAME:
+        resolved_model = (
+            model
+            or _first_env_value("OPENAI_COMPAT_MODEL", "OPENAI_MODEL")
+            or "gpt-5.4"
+        )
+        resolved_base_url = base_url or _first_env_value("OPENAI_COMPAT_BASE_URL")
+        return OPENAI_COMPAT_PROVIDER_NAME, resolved_model, resolved_base_url
+
+    if normalized_provider == OLLAMA_PROVIDER_NAME:
+        resolved_model = (
+            model
+            or _first_env_value("OLLAMA_MODEL", "OPENAI_COMPAT_MODEL")
+            or "llama3.2"
+        )
+        resolved_base_url = (
+            base_url
+            or _first_env_value("OLLAMA_BASE_URL", "OPENAI_COMPAT_BASE_URL")
+            or "http://localhost:11434/v1"
+        )
+        return OPENAI_COMPAT_PROVIDER_NAME, resolved_model, resolved_base_url
+
+    raise ValueError(
+        "Unsupported notebook provider. Supported values: "
+        "'openai', 'openai_compat', 'ollama'."
+    )
+
 
 def create_project_session(
     *,
@@ -665,13 +772,17 @@ def create_project_session(
     """Create one notebook-ready authoring session scoped to a project directory."""
     project_paths = ProjectPaths.under_root(server_root=server_root, project_dir=project_dir)
     project_paths.project_dir.mkdir(parents=True, exist_ok=True)
-    resolved_model = model or os.getenv("OPENAI_MODEL", "gpt-5.4")
-    authoring_session = AuthoringSession.from_local_mcp(
+    resolved_provider, resolved_model, resolved_base_url = _resolve_provider_defaults(
         provider=provider,
+        model=model,
+        base_url=base_url,
+    )
+    authoring_session = AuthoringSession.from_local_mcp(
+        provider=resolved_provider,
         model=resolved_model,
         server_root=project_paths.server_root,
         api_key=api_key,
-        base_url=base_url,
+        base_url=resolved_base_url,
     )
     return (
         ProjectSession(

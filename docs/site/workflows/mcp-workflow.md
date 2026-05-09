@@ -23,6 +23,8 @@ Current `wellplot.agent` provider support:
 - OpenAI
 - OpenAI-compatible endpoints through `provider="openai_compat"` plus
   `base_url=...`
+- local Ollama through `provider="ollama"` with a default
+  `http://localhost:11434/v1` base URL
 
 ## Agent Credentials
 
@@ -49,6 +51,8 @@ Guidance:
 - for `provider="openai_compat"`, loopback endpoints such as
   `http://localhost:11434/v1` receive an automatic placeholder token when no
   key is configured
+- `provider="ollama"` is a notebook-facing convenience alias over the same
+  OpenAI-compatible backend and automatically uses that loopback base URL
 - non-loopback OpenAI-compatible endpoints still require a real key through
   `api_key=...`, `OPENAI_COMPAT_API_KEY`, `OPENAI_API_KEY`, or `.env.local`
 

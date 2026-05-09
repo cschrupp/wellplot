@@ -661,6 +661,64 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(session.run_max_rounds, 12)
             self.assertEqual(session.revise_max_rounds, 12)
 
+    def test_create_project_session_uses_openai_compat_env_defaults(self) -> None:
+        """Resolve OpenAI-compatible model and base URL defaults from env vars."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            fake_session = mock.Mock(spec=AuthoringSession)
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "OPENAI_COMPAT_MODEL": "compat-model",
+                        "OPENAI_COMPAT_BASE_URL": "https://compat.example.test/v1",
+                    },
+                    clear=False,
+                ),
+                mock.patch.object(
+                    AuthoringSession,
+                    "from_local_mcp",
+                    return_value=fake_session,
+                ) as factory,
+            ):
+                session, _ = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    provider="openai_compat",
+                )
+            self.assertIs(session.authoring_session, fake_session)
+            factory.assert_called_once_with(
+                provider="openai_compat",
+                model="compat-model",
+                server_root=repo_root.resolve(),
+                api_key=None,
+                base_url="https://compat.example.test/v1",
+            )
+
+    def test_create_project_session_supports_ollama_alias_defaults(self) -> None:
+        """Provide a notebook-facing Ollama alias over the OpenAI-compatible backend."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            fake_session = mock.Mock(spec=AuthoringSession)
+            with mock.patch.object(
+                AuthoringSession,
+                "from_local_mcp",
+                return_value=fake_session,
+            ) as factory:
+                session, _ = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    provider="ollama",
+                )
+            self.assertIs(session.authoring_session, fake_session)
+            factory.assert_called_once_with(
+                provider="openai_compat",
+                model="llama3.2",
+                server_root=repo_root.resolve(),
+                api_key=None,
+                base_url="http://localhost:11434/v1",
+            )
+
     def test_project_session_add_data_file_stages_one_input(self) -> None:
         """Expose one session method for staging user data into the project directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -917,6 +975,56 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(
                 logfile_payload["render"]["output_path"],
                 "agent_open_hole_draft.pdf",
+            )
+
+    def test_project_session_bootstrap_starter_stages_data_and_configures_paths(self) -> None:
+        """Collapse repeated notebook setup into one generic project bootstrap helper."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            incoming_las = repo_root / "incoming" / "replacement.las"
+            incoming_las.parent.mkdir(parents=True, exist_ok=True)
+            incoming_las.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+            )
+
+            starter = session.bootstrap_starter(
+                kind="open_hole_quicklook",
+                source_data_file=incoming_las,
+                staged_data_name="data/user_input.las",
+                draft_logfile="drafts/agent_open_hole_draft.log.yaml",
+                render_output_path="renders/agent_open_hole_draft.pdf",
+                starter_logfile="drafts/agent_starter.log.yaml",
+                template_path="drafts/base.template.yaml",
+                title="Main Review",
+                subtitle="Starter subtitle",
+                depth_range=(8400, 9300),
+                starter_name="Agent LAS Starter",
+            )
+
+            self.assertEqual(starter.data_file, session.paths.path("data", "user_input.las"))
+            self.assertTrue(starter.data_file.exists())
+            self.assertEqual(
+                session.draft_logfile,
+                session.paths.path("drafts", "agent_open_hole_draft.log.yaml"),
+            )
+            self.assertEqual(
+                session.render_output_path,
+                session.paths.path("renders", "agent_open_hole_draft.pdf"),
+            )
+            self.assertEqual(
+                starter.logfile_path,
+                session.paths.path("drafts", "agent_starter.log.yaml"),
+            )
+            self.assertEqual(
+                starter.template_path,
+                session.paths.path("drafts", "base.template.yaml"),
+            )
+            logfile_payload = yaml.safe_load(starter.logfile_yaml)
+            self.assertEqual(
+                logfile_payload["render"]["output_path"],
+                "../renders/agent_open_hole_draft.pdf",
             )
 
     def test_project_session_create_starter_requires_supported_kind(self) -> None:

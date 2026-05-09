@@ -4869,29 +4869,10 @@ def _agent_user_setup_code() -> str:
         )
         session.configure_rounds(run_max_rounds=12, revise_max_rounds=18)
         SAMPLE_LAS_PATH = REPO_ROOT / "workspace" / "data" / "30-23a-3 8117_d.las"
-        USER_LAS_PATH = session.add_data_file(
-            SAMPLE_LAS_PATH,
-            destination_name="user_input.las",
-            keep_existing=True,
-        )
-        DRAFT_LOGFILE = paths.path("agent_open_hole_draft.log.yaml")
-        FINAL_PDF = paths.path("agent_open_hole_draft.pdf")
-        session.configure_paths(
-            draft_logfile=DRAFT_LOGFILE,
-            render_output_path=FINAL_PDF,
-        )
-        # Optional: replace the copied sample with your own file before continuing.
-        # USER_LAS_PATH = session.add_data_file(
-        #     "/absolute/path/to/your.las",
-        #     destination_name="user_input.las",
-        #     overwrite=True,
-        # )
 
         print("Model:", MODEL)
         print("Project folder:", relative_path(paths.project_dir, root=REPO_ROOT))
-        print("User LAS path:", relative_path(USER_LAS_PATH, root=REPO_ROOT))
-        print("Draft logfile:", relative_path(DRAFT_LOGFILE, root=REPO_ROOT))
-        print("Final PDF:", relative_path(FINAL_PDF, root=REPO_ROOT))
+        print("Sample LAS source:", relative_path(SAMPLE_LAS_PATH, root=REPO_ROOT))
         """
     ).strip()
 
@@ -4900,16 +4881,41 @@ def _agent_user_starter_code() -> str:
     """Return the starter-logfile creation cell for the agent walkthrough."""
     return dedent(
         """
-        starter = session.create_starter(
+        starter = session.bootstrap_starter(
             kind="open_hole_quicklook",
-            data_file=USER_LAS_PATH,
+            source_data_file=SAMPLE_LAS_PATH,
+            staged_data_name="user_input.las",
+            draft_logfile="agent_open_hole_draft.log.yaml",
+            render_output_path="agent_open_hole_draft.pdf",
+            starter_logfile="agent_starter.log.yaml",
             title="Main Review",
             subtitle="Placeholder starter source",
             depth_range=(8400, 9300),
             starter_name="Agent LAS Starter",
         )
+        USER_LAS_PATH = starter.data_file
         STARTER_TEMPLATE = starter.template_path
         STARTER_LOGFILE = starter.logfile_path
+        DRAFT_LOGFILE = session.draft_logfile
+        FINAL_PDF = session.render_output_path
+
+        # Optional: replace the staged file with your own LAS before continuing.
+        # starter = session.bootstrap_starter(
+        #     kind="open_hole_quicklook",
+        #     source_data_file="/absolute/path/to/your.las",
+        #     staged_data_name="user_input.las",
+        #     draft_logfile="agent_open_hole_draft.log.yaml",
+        #     render_output_path="agent_open_hole_draft.pdf",
+        #     starter_logfile="agent_starter.log.yaml",
+        #     title="Main Review",
+        #     subtitle="Placeholder starter source",
+        #     depth_range=(8400, 9300),
+        #     overwrite_data=True,
+        # )
+
+        print("User LAS path:", relative_path(USER_LAS_PATH, root=REPO_ROOT))
+        print("Draft logfile:", relative_path(DRAFT_LOGFILE, root=REPO_ROOT))
+        print("Final PDF:", relative_path(FINAL_PDF, root=REPO_ROOT))
         starter.display_yaml()
         """
     ).strip()
@@ -4923,7 +4929,8 @@ def _agent_user_notebook() -> dict[str, object]:
         code_cell(_agent_user_setup_code()),
         markdown_cell(
             "## 1. Create A Starter Scaffold\n\n"
-            "This cell uses `session.create_starter(...)` to write a reusable "
+            "This cell uses `session.bootstrap_starter(...)` to stage the data "
+            "source, configure the default draft/render paths, and write a reusable "
             "base template plus one small starter logfile under the project folder. "
             "The preset keeps the visual system and report chrome in the template, "
             "while the starter logfile holds only the draft-specific section, track, "

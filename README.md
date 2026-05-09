@@ -208,6 +208,8 @@ Current provider support:
 - OpenAI through `wellplot.agent`
 - OpenAI-compatible endpoints through `provider="openai_compat"` plus
   `base_url=...`
+- local Ollama through `provider="ollama"` with a default
+  `http://localhost:11434/v1` base URL
 
 Recommended credential setup:
 - prefer `OPENAI_API_KEY` in the shell for OpenAI sessions
@@ -218,6 +220,8 @@ Recommended credential setup:
   secret that stays out of version control without editing notebook cells
 - loopback OpenAI-compatible endpoints such as `http://localhost:11434/v1`
   receive an automatic placeholder token when no key is configured
+- `provider="ollama"` is a notebook-facing convenience alias over the same
+  OpenAI-compatible backend and automatically uses the loopback base URL above
 
 The main entry points are:
 - `from wellplot.agent import AuthoringSession`
@@ -230,6 +234,8 @@ The main entry points are:
 Notebook-facing project helpers:
 - `create_project_session(...)` to bootstrap one reusable project-scoped agent session
 - `session.add_data_file(...)` to stage LAS or DLIS sources into the project folder
+- `session.bootstrap_starter(...)` to stage data, configure default draft/render
+  paths, and materialize one starter scaffold in one call
 - `session.create_starter(...)` to generate one starter template/logfile pair from a shipped preset
 - `session.configure_rounds(...)` and `session.configure_paths(...)` to keep later notebook cells short
 
@@ -368,7 +374,7 @@ Current examples:
 - [examples/notebooks/user/agent_las_step_by_step.ipynb](examples/notebooks/user/agent_las_step_by_step.ipynb)
   - credentialed end-user walkthrough that bootstraps a project session,
     stages a user LAS file, generates a reusable starter scaffold through
-    `session.create_starter(...)`, and adds header, remarks, tracks, and
+    `session.bootstrap_starter(...)`, and adds header, remarks, tracks, and
     bindings one step at a time through `wellplot.agent`
   - working first-pass agent workflow: functional, but intentionally less
     curated than the deterministic production notebooks and may still need
