@@ -713,6 +713,97 @@ class McpServiceTests(unittest.TestCase):
                 service.set_depth_axis(str(draft_path), root=REPO_ROOT)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_section_view_updates_section_depth_axis_and_page_layout(self) -> None:
+        """Persist one composite section-view edit through one validated save."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_section_view(
+                str(draft_path),
+                section_id="main",
+                title="Composite Review",
+                subtitle="Focused Window",
+                depth_range=(3300.0, 3320.0),
+                depth_range_unit="ft",
+                unit="ft",
+                scale=240.0,
+                major_step=20.0,
+                minor_step=5.0,
+                page_patch={
+                    "size": "Letter",
+                    "orientation": "landscape",
+                    "continuous": True,
+                },
+                render_patch={
+                    "dpi": 200,
+                    "output_path": "./section-view.pdf",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.title, "Composite Review")
+            self.assertEqual(result.subtitle, "Focused Window")
+            self.assertEqual(result.depth_range, [3300.0, 3320.0])
+            self.assertEqual(result.depth_range_unit, "ft")
+            self.assertEqual(result.depth_axis["unit"], "ft")
+            self.assertEqual(result.depth_axis["scale"], 240.0)
+            self.assertEqual(result.page["size"], "Letter")
+            self.assertEqual(result.page["orientation"], "landscape")
+            self.assertEqual(result.page["continuous"], True)
+            self.assertEqual(result.render["dpi"], 200)
+            self.assertEqual(result.render["output_path"], "section-view.pdf")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            saved_section = saved_mapping["document"]["layout"]["log_sections"][0]
+            self.assertEqual(saved_section["title"], "Composite Review")
+            self.assertEqual(saved_section["subtitle"], "Focused Window")
+            self.assertEqual(saved_section["depth_range"], [3300.0, 3320.0])
+            self.assertEqual(saved_mapping["document"]["depth"]["unit"], "ft")
+            self.assertEqual(saved_mapping["document"]["page"]["size"], "Letter")
+            self.assertEqual(saved_mapping["render"]["output_path"], "section-view.pdf")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_section_view_requires_actual_or_supported_patches(self) -> None:
+        """Reject empty composite edits and unsupported nested patch keys."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_section_view(
+                    str(draft_path),
+                    section_id="main",
+                    root=REPO_ROOT,
+                )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_section_view(
+                    str(draft_path),
+                    section_id="main",
+                    depth_range_unit="ft",
+                    root=REPO_ROOT,
+                )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_section_view(
+                    str(draft_path),
+                    section_id="main",
+                    page_patch={"unknown": 1},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_set_page_layout_updates_page_and_render_settings(self) -> None:
         """Persist page and render layout changes for later preview and render steps."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2569,6 +2660,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("check_channel_availability(...)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("update_section(...)", prompt)
+        self.assertIn("set_section_view(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("set_page_layout(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
@@ -2595,6 +2687,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
         self.assertIn("set_section_data_source(...)", prompt)
         self.assertIn("update_section(...)", prompt)
+        self.assertIn("set_section_view(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("set_page_layout(...)", prompt)
         self.assertIn("add_annotation_object(...)", prompt)

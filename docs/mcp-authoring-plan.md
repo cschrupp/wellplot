@@ -137,6 +137,7 @@ Candidate tools:
 - `add_curve_fill(...)`
 - `set_depth_axis(...)`
 - `set_page_layout(...)`
+- `set_section_view(...)`
 - `set_heading_content(...)`
 - `set_remarks_content(...)`
 - `set_section_data_source(...)`
@@ -206,7 +207,7 @@ After the current track, binding, header, depth-axis, and style-editing
 foundation, the next highest-value additions are:
 
 1. additional notebook-facing ergonomics where repeated project/setup patterns remain
-2. broader section/page convenience helpers where repetitive edits still appear
+2. preset-oriented section/page helpers only where repetitive edits still appear
 3. any remaining agent-facing cleanup exposed by iterative notebook usage
 
 These additions matter because iterative user workflows are now blocked less by

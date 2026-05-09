@@ -368,6 +368,36 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
+
+Purpose: update one section window together with document depth-axis settings
+and optional page/render defaults in one deterministic save.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `title`
+- `subtitle`
+- `depth_range`
+- `depth_range_unit`
+- `depth_axis`
+- `page`
+- `render`
+
+Behavior:
+
+- validates that `section_id` exists in the target draft
+- supports the same section window fields as `update_section(...)`
+- supports the same depth-axis fields as `set_depth_axis(...)`
+- supports the same page/render patch keys as `set_page_layout(...)`
+- normalizes `depth_range` into the final document depth unit when `unit`
+  and `depth_range_unit` are provided together
+- rejects empty edits, unsupported nested patch keys, and unit-only
+  `depth_range` requests
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 
 Purpose: append one track to a draft logfile and persist the validated result.
@@ -1154,7 +1184,7 @@ For draft authoring:
 10. `preview_header_mapping(...)` before mutating header/report values
 11. `apply_header_values(...)` when the previewed mapping should be persisted
 12. `inspect_authoring_vocab(...)`
-13. apply `update_section(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`,
+13. apply `update_section(...)`, `set_section_view(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`,
    `add_annotation_object(...)`, `update_annotation_object(...)`, `remove_annotation_object(...)`,
    `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `remove_curve_fill(...)`, `bind_raster(...)`,
    `update_curve_binding(...)`, `update_raster_binding(...)`, `remove_curve_binding(...)`,

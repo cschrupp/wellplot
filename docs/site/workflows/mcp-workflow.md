@@ -163,6 +163,7 @@ Main tools:
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
+- `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
@@ -203,6 +204,9 @@ Recommended split:
   one user LAS/DLIS file before you start adding tracks and bindings
 - use `update_section(...)` when the request changes section title, subtitle,
   or depth window without changing the underlying source
+- use `set_section_view(...)` when the request combines section title/subtitle
+  or depth-window edits with document scale, depth-grid, or page/render
+  defaults in one step
 - use `set_depth_axis(...)` when the request changes document scale, depth
   labels, or grid spacing before you start fine-grained track edits
 - use `set_page_layout(...)` when the request changes page size, orientation,
@@ -226,7 +230,8 @@ Recommended split:
   available channels in the current draft
 - use `add_track(...)`, `update_track(...)`, `add_annotation_object(...)`,
   `update_annotation_object(...)`, `remove_annotation_object(...)`,
-  `remove_track(...)`, `update_section(...)`, `set_depth_axis(...)`,
+  `remove_track(...)`, `update_section(...)`, `set_section_view(...)`,
+  `set_depth_axis(...)`,
   `set_page_layout(...)`, `bind_curve(...)`, `add_curve_fill(...)`,
   `remove_curve_fill(...)`, `clear_track_bindings(...)`,
   `bind_raster(...)`, `update_curve_binding(...)`,

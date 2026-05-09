@@ -41,6 +41,7 @@ for, and what still requires maintainer action outside the repo.
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
+- `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
 - `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
@@ -258,9 +259,9 @@ Next up:
 
 Next highest-value MCP slice:
 
-1. broader section/page convenience helpers where repetition still appears in notebooks
-2. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
-3. grouped removal/update helpers only where iterative notebook usage still exposes friction
+1. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
+2. grouped removal/update helpers only where iterative notebook usage still exposes friction
+3. preset-oriented layout helpers only where notebook workflows still repeat the same setup
 
 Scope note:
 

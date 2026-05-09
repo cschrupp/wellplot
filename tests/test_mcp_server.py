@@ -242,6 +242,26 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            section_view = await session.call_tool(
+                "set_section_view",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "title": "Composite Review",
+                    "subtitle": "Unified Section View",
+                    "depth_range": [3300.0, 3320.0],
+                    "depth_range_unit": "ft",
+                    "scale": 300.0,
+                    "major_step": 20.0,
+                    "minor_step": 5.0,
+                    "page_patch": {
+                        "track_header_height_mm": 26.0,
+                    },
+                    "render_patch": {
+                        "dpi": 180,
+                    },
+                },
+            )
             added_fill = await session.call_tool(
                 "add_curve_fill",
                 {
@@ -573,6 +593,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "update_section",
                 "set_depth_axis",
                 "set_page_layout",
+                "set_section_view",
                 "add_track",
                 "update_track",
                 "add_annotation_object",
@@ -710,6 +731,17 @@ class McpServerIntegrationTests(unittest.TestCase):
             "landscape",
         )
         self.assertEqual(updated_page_layout.structuredContent["render"]["dpi"], 200)
+        self.assertEqual(section_view.structuredContent["section_id"], "main")
+        self.assertEqual(section_view.structuredContent["title"], "Composite Review")
+        self.assertEqual(section_view.structuredContent["subtitle"], "Unified Section View")
+        self.assertEqual(section_view.structuredContent["depth_range"], [3300.0, 3320.0])
+        self.assertEqual(section_view.structuredContent["depth_range_unit"], "ft")
+        self.assertEqual(section_view.structuredContent["depth_axis"]["scale"], 300.0)
+        self.assertEqual(
+            section_view.structuredContent["page"]["track_header_height_mm"],
+            26.0,
+        )
+        self.assertEqual(section_view.structuredContent["render"]["dpi"], 180)
         self.assertEqual(added_fill.structuredContent["fill"]["kind"], "to_lower_limit")
         self.assertEqual(added_fill.structuredContent["fill"]["label"], "Gamma Fill")
         self.assertEqual(removed_fill.structuredContent["channel"], "GR")

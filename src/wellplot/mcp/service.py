@@ -770,6 +770,21 @@ class PageLayoutResult:
 
 
 @dataclass(slots=True)
+class SectionViewResult:
+    """Structured result for updating section, depth-axis, and page-view settings."""
+
+    logfile_path: str
+    section_id: str
+    title: str
+    subtitle: str
+    depth_range: list[float] | None
+    depth_range_unit: str | None
+    depth_axis: dict[str, object]
+    page: dict[str, object]
+    render: dict[str, object]
+
+
+@dataclass(slots=True)
 class AddedTrackResult:
     """Structured result for appending one track to a draft logfile."""
 
@@ -4067,6 +4082,161 @@ def set_depth_axis(
     )
 
 
+def set_section_view(
+    logfile_path: str,
+    *,
+    section_id: str,
+    title: str | None = None,
+    subtitle: str | None = None,
+    depth_range: tuple[float, float] | None = None,
+    depth_range_unit: str | None = None,
+    unit: str | None = None,
+    scale: float | None = None,
+    major_step: float | None = None,
+    minor_step: float | None = None,
+    page_patch: dict[str, object] | None = None,
+    render_patch: dict[str, object] | None = None,
+    root: str | Path | None = None,
+) -> SectionViewResult:
+    """Update one section window together with document view defaults in one save."""
+    if (
+        title is None
+        and subtitle is None
+        and depth_range is None
+        and depth_range_unit is None
+        and unit is None
+        and scale is None
+        and major_step is None
+        and minor_step is None
+        and page_patch is None
+        and render_patch is None
+    ):
+        raise TemplateValidationError(
+            "Provide at least one section, depth-axis, or page/render setting to update."
+        )
+    if depth_range is None and depth_range_unit is not None:
+        raise TemplateValidationError("depth_range_unit requires depth_range.")
+
+    page_patch = {} if page_patch is None else dict(page_patch)
+    render_patch = {} if render_patch is None else dict(render_patch)
+    invalid_page = sorted(key for key in page_patch if key not in AUTHORING_PAGE_PATCH_KEYS)
+    if invalid_page:
+        raise TemplateValidationError(
+            f"Unsupported page patch keys {invalid_page}. "
+            f"Allowed keys: {sorted(AUTHORING_PAGE_PATCH_KEYS)}."
+        )
+    invalid_render = sorted(key for key in render_patch if key not in AUTHORING_RENDER_PATCH_KEYS)
+    if invalid_render:
+        raise TemplateValidationError(
+            f"Unsupported render patch keys {invalid_render}. "
+            f"Allowed keys: {sorted(AUTHORING_RENDER_PATCH_KEYS)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_section(current_spec, section_id)
+    section = _logfile_mapping_section(mapping, section_id)
+    document = _logfile_mapping_document(mapping)
+    depth_mapping = document.get("depth")
+    if not isinstance(depth_mapping, dict):
+        depth_mapping = {}
+        document["depth"] = depth_mapping
+    page_mapping = document.get("page")
+    if not isinstance(page_mapping, dict):
+        page_mapping = {}
+        document["page"] = page_mapping
+    render_mapping = _logfile_mapping_render(mapping)
+
+    target_depth_unit = str(unit) if unit is not None else _document_depth_unit(mapping)
+
+    if title is not None:
+        section["title"] = str(title)
+    if subtitle is not None:
+        section["subtitle"] = str(subtitle)
+    if depth_range is not None:
+        normalized_range, _ = _normalized_section_depth_range(
+            depth_range,
+            depth_range_unit=depth_range_unit,
+            target_unit=target_depth_unit,
+        )
+        section["depth_range"] = normalized_range
+
+    if unit is not None:
+        depth_mapping["unit"] = str(unit)
+    if scale is not None:
+        depth_mapping["scale"] = float(scale)
+    if major_step is not None:
+        depth_mapping["major_step"] = float(major_step)
+    if minor_step is not None:
+        depth_mapping["minor_step"] = float(minor_step)
+
+    for key, value in page_patch.items():
+        if key in {
+            "margin_left_mm",
+            "margin_right_mm",
+            "margin_top_mm",
+            "margin_bottom_mm",
+            "header_height_mm",
+            "track_header_height_mm",
+            "footer_height_mm",
+            "track_gap_mm",
+        }:
+            page_mapping[key] = float(value)
+        elif key in {"continuous", "bottom_track_header_enabled"}:
+            page_mapping[key] = bool(value)
+        else:
+            page_mapping[key] = str(value)
+
+    for key, value in render_patch.items():
+        if key == "output_path":
+            resolved_output = _resolve_logfile_relative_user_path(
+                str(value),
+                logfile_path=resolved_logfile,
+                root=server_root,
+                context="render_patch.output_path",
+            )
+            render_mapping[key] = Path(
+                os.path.relpath(resolved_output, start=resolved_logfile.parent)
+            ).as_posix()
+            continue
+        if key == "dpi":
+            render_mapping[key] = int(value)
+            continue
+        if key == "continuous_strip_page_height_mm":
+            if value is None:
+                render_mapping.pop(key, None)
+            else:
+                render_mapping[key] = float(value)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    saved_section = _section_map_from_spec(saved_spec)[section_id]
+    return SectionViewResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        title=str(saved_section.get("title", "")),
+        subtitle=str(saved_section.get("subtitle", "")),
+        depth_range=_section_depth_range(
+            saved_section,
+            default_depth_range=_document_default_depth_range(saved_spec),
+        ),
+        depth_range_unit=_normalized_depth_unit_text(
+            dict(saved_spec.document.get("depth", {})).get("unit")
+        ),
+        depth_axis=deepcopy(dict(saved_spec.document.get("depth", {}))),
+        page=deepcopy(dict(saved_mapping.get("document", {}).get("page", {}))),
+        render=deepcopy(dict(saved_mapping.get("render", {}))),
+    )
+
+
 def add_track(
     logfile_path: str,
     *,
@@ -6123,6 +6293,8 @@ def author_plot_from_request_prompt(
         "set_section_data_source(...) before adding or revising bindings.\n"
         "3. If the request changes section title, subtitle, or depth window, call "
         "update_section(...).\n"
+        "3a. If the request changes section window/title together with page or depth-axis "
+        "defaults, prefer set_section_view(...).\n"
         "4. If the request changes page size, orientation, continuous layout, or "
         "render defaults, call set_page_layout(...).\n"
         "5. If the request changes report scale or depth-grid behavior, call "
@@ -6139,7 +6311,7 @@ def author_plot_from_request_prompt(
         "Use its annotations_by_track summaries when you need to edit existing annotation "
         "objects by index.\n"
         "11. Plan the smallest explicit edit sequence using update_section(...), "
-        "set_page_layout(...), set_depth_axis(...), add_track(...), "
+        "set_section_view(...), set_page_layout(...), set_depth_axis(...), add_track(...), "
         "update_track(...), remove_track(...), "
         "add_annotation_object(...), update_annotation_object(...), "
         "remove_annotation_object(...), "
@@ -6172,6 +6344,8 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "set_section_data_source(...) before rebinding curves.\n"
         "4. If the feedback changes section title, subtitle, or depth window, call "
         "update_section(...).\n"
+        "4a. If the feedback combines section window/title edits with depth-axis or page "
+        "defaults, prefer set_section_view(...).\n"
         "5. If the feedback changes page size, orientation, continuous layout, or "
         "render defaults, call set_page_layout(...).\n"
         "6. If the feedback changes report scale or depth grid spacing, call "
@@ -6185,7 +6359,8 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "and remove_curve_fill(...) when the request explicitly clears one existing fill. "
         "Use clear_track_bindings(...) when the request replaces all curves or rasters on one "
         "track before rebinding them.\n"
-        "Prefer update_section(...), set_page_layout(...), update_track(...), remove_track(...), "
+        "Prefer update_section(...), set_section_view(...), set_page_layout(...), "
+        "update_track(...), remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"
         "9. For density-neutron overlays with crossover fill, prefer "

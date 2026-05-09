@@ -322,6 +322,40 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def set_section_view(
+        logfile_path: str,
+        section_id: str,
+        title: str | None = None,
+        subtitle: str | None = None,
+        depth_range: tuple[float, float] | None = None,
+        depth_range_unit: str | None = None,
+        unit: str | None = None,
+        scale: float | None = None,
+        major_step: float | None = None,
+        minor_step: float | None = None,
+        page_patch: dict[str, object] | None = None,
+        render_patch: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """Update one section window together with depth-axis and page defaults."""
+        return asdict(
+            service.set_section_view(
+                logfile_path,
+                section_id=section_id,
+                title=title,
+                subtitle=subtitle,
+                depth_range=depth_range,
+                depth_range_unit=depth_range_unit,
+                unit=unit,
+                scale=scale,
+                major_step=major_step,
+                minor_step=minor_step,
+                page_patch=page_patch,
+                render_patch=render_patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def add_track(
         logfile_path: str,
         section_id: str,

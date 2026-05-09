@@ -178,7 +178,8 @@ The MCP tool surface currently supports:
 - `render_logfile_to_file`
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
-- `set_section_data_source`, `update_section`, `set_depth_axis`, and `set_page_layout`
+- `set_section_data_source`, `update_section`, `set_depth_axis`, `set_page_layout`,
+  and `set_section_view`
 - `add_track`, `update_track`, `add_annotation_object`, `update_annotation_object`,
   `remove_annotation_object`, `remove_track`, `bind_curve`, `bind_raster`,
   `add_curve_fill`, `remove_curve_fill`, `update_curve_binding`, `update_raster_binding`, `remove_curve_binding`,
