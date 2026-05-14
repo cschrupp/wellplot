@@ -1429,6 +1429,7 @@ def _persist_validated_logfile_mapping(
     logfile_path: Path,
     root: Path,
 ) -> LogFileSpec:
+    _normalize_between_instance_fill_references(mapping)
     spec = logfile_from_mapping(mapping)
     _validate_logfile_spec_renderable(
         spec,
@@ -1559,6 +1560,78 @@ def _ensure_curve_binding_element_id(
         suffix += 1
     binding["id"] = candidate_id
     return candidate_id
+
+
+def _normalize_between_instance_fill_references(mapping: dict[str, object]) -> None:
+    """Rewrite shorthand between_instances references to real sibling curve ids."""
+    spec = logfile_from_mapping(mapping)
+    bindings = _logfile_mapping_bindings(mapping)
+
+    binding_indexes_by_id: dict[tuple[str, str, str], int] = {}
+    binding_indexes_by_channel: dict[tuple[str, str, str], list[int]] = {}
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "curve")).strip().lower() != "curve":
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            continue
+        track_id = str(binding.get("track_id", "")).strip()
+        channel = str(binding.get("channel", "")).strip()
+        if not track_id or not channel:
+            continue
+        binding_indexes_by_channel.setdefault((section_id, track_id, channel.upper()), []).append(
+            index
+        )
+        existing_id = str(binding.get("id", "")).strip()
+        if existing_id:
+            binding_indexes_by_id[(section_id, track_id, existing_id)] = index
+
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "curve")).strip().lower() != "curve":
+            continue
+        fill = binding.get("fill")
+        if not isinstance(fill, dict):
+            continue
+        if str(fill.get("kind", "")).strip().lower() != "between_instances":
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            continue
+        track_id = str(binding.get("track_id", "")).strip()
+        if not track_id:
+            continue
+        other_element_id = str(fill.get("other_element_id", "")).strip()
+        if not other_element_id:
+            continue
+        if (section_id, track_id, other_element_id) in binding_indexes_by_id:
+            continue
+
+        matching_indexes = binding_indexes_by_channel.get(
+            (section_id, track_id, other_element_id.upper()),
+            [],
+        )
+        if len(matching_indexes) != 1:
+            continue
+
+        _ = _ensure_curve_binding_element_id(
+            bindings,
+            binding_index=index,
+            track_id=track_id,
+            channel=str(binding.get("channel", "")),
+        )
+        other_binding_index = matching_indexes[0]
+        resolved_other_id = _ensure_curve_binding_element_id(
+            bindings,
+            binding_index=other_binding_index,
+            track_id=track_id,
+            channel=str(bindings[other_binding_index].get("channel", "")),
+        )
+        fill["other_element_id"] = resolved_other_id
+        binding_indexes_by_id[(section_id, track_id, resolved_other_id)] = other_binding_index
 
 
 def _find_track_index(
@@ -5247,10 +5320,7 @@ def clear_track_bindings(
         else:
             removed_curve_binding_count += 1
 
-    if (
-        removed_curve_binding_count == 0
-        and removed_raster_binding_count == 0
-    ):
+    if removed_curve_binding_count == 0 and removed_raster_binding_count == 0:
         raise TemplateValidationError(
             f"Track {track_id!r} in section {section_id!r} does not have any bindings to clear."
         )

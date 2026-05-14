@@ -1492,6 +1492,87 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(matching[0]["scale"]["max"], 150.0)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_curve_binding_normalizes_between_instances_fill_reference(self) -> None:
+        """Rewrite shorthand between_instances references to persisted sibling curve ids."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="porosity",
+                title="Porosity",
+                kind="normal",
+                width_mm=32.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="GR",
+                label="RHOB Proxy",
+                scale={"kind": "linear", "min": 1.95, "max": 2.95},
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="RT",
+                label="NPHI Proxy",
+                scale={"kind": "linear", "min": 0.45, "max": -0.15},
+                root=REPO_ROOT,
+            )
+
+            result = service.update_curve_binding(
+                str(draft_path),
+                section_id="main",
+                track_id="porosity",
+                channel="RT",
+                patch={
+                    "fill": {
+                        "kind": "between_instances",
+                        "other_element_id": "GR",
+                        "label": "Crossover",
+                        "color": "#ffd54f",
+                        "alpha": 0.35,
+                    }
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.binding["fill"]["kind"], "between_instances")
+            self.assertNotEqual(result.binding["fill"]["other_element_id"], "GR")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            gr_binding = next(
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "porosity" and binding.get("channel") == "GR"
+            )
+            rt_binding = next(
+                binding
+                for binding in bindings
+                if binding.get("track_id") == "porosity" and binding.get("channel") == "RT"
+            )
+            self.assertTrue(gr_binding.get("id"))
+            self.assertTrue(rt_binding.get("id"))
+            self.assertEqual(rt_binding["fill"]["other_element_id"], gr_binding["id"])
+
+            png_bytes = service.preview_logfile_png(
+                str(draft_path),
+                dpi=96,
+                root=REPO_ROOT,
+            )
+            self.assertTrue(png_bytes.startswith(b"\x89PNG\r\n\x1a\n"))
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_remove_curve_binding_deletes_one_binding(self) -> None:
         """Remove one curve binding so later revisions can rebuild the track cleanly."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
