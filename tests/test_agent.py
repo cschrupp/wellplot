@@ -146,11 +146,77 @@ class FakeMcpSession:
                     ]
                 }
             )
+        if name == "inspect_heading_slots":
+            return SimpleNamespace(
+                structuredContent={
+                    "has_heading": True,
+                    "slots": [
+                        {
+                            "target_key": "RMF @ Measured Temp",
+                            "display_label": "RMF @ Measured Temp",
+                        }
+                    ],
+                }
+            )
+        if name == "parse_key_value_text":
+            pairs: list[dict[str, object]] = []
+            for line_number, raw_line in enumerate(
+                str(arguments.get("source_text", "")).splitlines(),
+                start=1,
+            ):
+                line = raw_line.strip()
+                if not line or ":" not in line:
+                    continue
+                key, value = line.split(":", 1)
+                pairs.append(
+                    {
+                        "key": key.strip(),
+                        "value": value.strip(),
+                        "line_number": line_number,
+                        "normalized_key": key.strip().upper(),
+                    }
+                )
+            return SimpleNamespace(
+                structuredContent={
+                    "format_detected": "colon",
+                    "pairs": pairs,
+                    "unparsed_lines": [],
+                    "warnings": [],
+                }
+            )
+        if name == "preview_header_mapping":
+            values = dict(arguments.get("values", {}))
+            return SimpleNamespace(
+                structuredContent={
+                    "resolved_assignments": [
+                        {"request_key": key, "value": value} for key, value in values.items()
+                    ],
+                    "skipped_assignments": [],
+                    "warnings": [],
+                }
+            )
+        if name == "apply_header_values":
+            values = dict(arguments.get("values", {}))
+            return SimpleNamespace(
+                structuredContent={
+                    "applied_assignments": [
+                        {"request_key": key, "value": value} for key, value in values.items()
+                    ],
+                    "skipped_assignments": [],
+                    "warnings": [],
+                }
+            )
         if name == "inspect_authoring_vocab":
             return SimpleNamespace(
                 structuredContent={
                     "heading_patch_keys": ["provider_name"],
                     "curve_binding_patch_keys": ["label"],
+                }
+            )
+        if name == "set_matplotlib_style":
+            return SimpleNamespace(
+                structuredContent={
+                    "style": dict(arguments.get("style_patch", {})),
                 }
             )
         if name == "set_heading_content":
@@ -408,6 +474,67 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(create_call[0], "create_logfile_draft")
             self.assertEqual(create_call[1]["source_logfile_path"], "examples/starter.log.yaml")
 
+    def test_authoring_session_routes_header_fill_requests_to_deterministic_tools(self) -> None:
+        """Bypass the freeform provider loop for narrow header-value requests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.run_request,
+                AuthoringRequest(
+                    goal="""
+                        Fill the following header fields with the following values:
+                        - Rmf: 0.01 @ 25
+                        - Rmc: 0.2 @ 25
+                        - Rm: 0.005 @ 35
+                    """,
+                    output_logfile="workspace/demo.log.yaml",
+                    example_id="forge16b_porosity_example",
+                ),
+            )
+
+            backend.run_authoring.assert_not_awaited()
+            self.assertIn("deterministic header value assignment", result.final_text)
+            self.assertEqual(
+                [item.name for item in result.tool_trace],
+                [
+                    "inspect_heading_slots",
+                    "parse_key_value_text",
+                    "preview_header_mapping",
+                    "apply_header_values",
+                ],
+            )
+            assert runtime.last_session is not None
+            self.assertEqual(runtime.last_session.prompt_calls, [])
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(
+                tool_names[:5],
+                [
+                    "create_logfile_draft",
+                    "inspect_heading_slots",
+                    "parse_key_value_text",
+                    "preview_header_mapping",
+                    "apply_header_values",
+                ],
+            )
+            preview_call = runtime.last_session.tool_calls[3]
+            self.assertEqual(preview_call[1]["overwrite_policy"], "replace")
+            self.assertEqual(
+                preview_call[1]["values"],
+                {
+                    "Rmf": "0.01 @ 25",
+                    "Rmc": "0.2 @ 25",
+                    "Rm": "0.005 @ 35",
+                },
+            )
+
     def test_revision_request_reuses_existing_draft_without_recreation(self) -> None:
         """Run one provider-backed revision against an existing draft logfile."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -434,6 +561,184 @@ class AgentTests(unittest.TestCase):
             assert runtime.last_session is not None
             tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
             self.assertNotIn("create_logfile_draft", tool_names)
+            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+
+    def test_revision_request_routes_header_fill_requests_to_deterministic_tools(self) -> None:
+        """Reuse one existing draft and bypass the provider loop for header-only edits."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="Fill header RMF value as 0.5",
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            backend.run_authoring.assert_not_awaited()
+            self.assertEqual(result.request_kind, "revise")
+            self.assertIn("deterministic header value assignment", result.final_text)
+            assert runtime.last_session is not None
+            self.assertEqual(runtime.last_session.prompt_calls, [])
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(
+                tool_names[:4],
+                [
+                    "inspect_heading_slots",
+                    "parse_key_value_text",
+                    "preview_header_mapping",
+                    "apply_header_values",
+                ],
+            )
+            apply_call = runtime.last_session.tool_calls[3]
+            self.assertEqual(
+                apply_call[1]["values"],
+                {"RMF": "0.5"},
+            )
+
+    def test_revision_request_routes_copied_header_packet_to_deterministic_tools(self) -> None:
+        """Treat copied header packets as deterministic header ingestion, not freeform authoring."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="""
+                        Use the following values to complete the relevant header fields:
+
+                        LOG / SERVICE
+                        - Cement Bond Log
+                        - Variable Density Log
+                        - Gamma Ray - CCL
+
+                        COMPANY / WELL IDENTIFICATION
+                        - Company: University of Utah
+                        - Well: FORGE 16B (78)-32
+                        - Field: Utah Forge
+                        - County: Beaver
+
+                        LOCATION
+                        - Section: NWSW 32
+                        - Township: 26
+                        - Range: 9
+                    """,
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            backend.run_authoring.assert_not_awaited()
+            self.assertIn("deterministic header value assignment", result.final_text)
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(
+                tool_names[:4],
+                [
+                    "inspect_heading_slots",
+                    "parse_key_value_text",
+                    "preview_header_mapping",
+                    "apply_header_values",
+                ],
+            )
+            apply_call = runtime.last_session.tool_calls[3]
+            self.assertEqual(
+                apply_call[1]["values"],
+                {
+                    "service_title_1": "Cement Bond Log",
+                    "service_title_2": "Variable Density Log",
+                    "service_title_3": "Gamma Ray - CCL",
+                    "Company": "University of Utah",
+                    "Well": "FORGE 16B (78)-32",
+                    "Field": "Utah Forge",
+                    "County": "Beaver",
+                    "Section": "NWSW 32",
+                    "Township": "26",
+                    "Range": "9",
+                },
+            )
+
+    def test_revision_request_does_not_route_mixed_scope_requests_to_header_ingestion(self) -> None:
+        """Reject deterministic header routing when the request also asks for track edits."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="""
+                        Fill header company as University of Utah.
+                        Add one QC track.
+                    """,
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertNotIn("apply_header_values", tool_names)
+            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+
+    def test_revision_request_applies_grid_style_preflight_before_provider_loop(self) -> None:
+        """Apply deterministic report-style edits before the broader revision loop."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="""
+                        Revise the existing draft.
+                        - Make darker grid lines
+                        - Add one short remarks block.
+                    """,
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            self.assertEqual(result.request_kind, "revise")
+            self.assertEqual(
+                [item.name for item in result.tool_trace],
+                ["set_matplotlib_style", "set_heading_content"],
+            )
+            self.assertIn("Add one short remarks block.", backend.initial_user_message)
+            self.assertNotIn("darker grid lines", backend.initial_user_message.lower())
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(tool_names[0], "set_matplotlib_style")
+            self.assertIn("summarize_logfile_draft", tool_names)
             self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
 
     def test_authoring_session_surfaces_missing_seed_draft_clearly(self) -> None:
@@ -896,6 +1201,53 @@ class AgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "render_output_path"):
             anyio.run(partial(session.render_logfile_to_file))
 
+    def test_project_session_exposes_direct_header_value_helpers(self) -> None:
+        """Allow notebooks to fill known header values without routing through the LLM loop."""
+        authoring_session = mock.Mock(spec=AuthoringSession)
+        authoring_session.inspect_heading_slots = mock.AsyncMock(return_value={"has_heading": True})
+        authoring_session.preview_header_mapping = mock.AsyncMock(
+            return_value={"resolved_assignments": []}
+        )
+        authoring_session.apply_header_values = mock.AsyncMock(
+            return_value={"applied_assignments": []}
+        )
+        session = ProjectSession(
+            authoring_session=authoring_session,
+            paths=ProjectPaths.under_root("/tmp/server-root", "workspace/demo-job"),
+            draft_logfile="workspace/demo-job/draft.log.yaml",
+        )
+
+        inspect_result = anyio.run(session.inspect_heading_slots)
+        preview_result = anyio.run(
+            partial(
+                session.preview_header_mapping,
+                values={"rmf": "0.01 @ 25"},
+            )
+        )
+        apply_result = anyio.run(
+            partial(
+                session.apply_header_values,
+                values={"rmf": "0.01 @ 25"},
+            )
+        )
+
+        self.assertEqual(inspect_result["has_heading"], True)
+        self.assertEqual(preview_result["resolved_assignments"], [])
+        self.assertEqual(apply_result["applied_assignments"], [])
+        authoring_session.inspect_heading_slots.assert_awaited_once_with(
+            logfile_path="workspace/demo-job/draft.log.yaml",
+        )
+        authoring_session.preview_header_mapping.assert_awaited_once_with(
+            logfile_path="workspace/demo-job/draft.log.yaml",
+            values={"rmf": "0.01 @ 25"},
+            overwrite_policy="fill_empty",
+        )
+        authoring_session.apply_header_values.assert_awaited_once_with(
+            logfile_path="workspace/demo-job/draft.log.yaml",
+            values={"rmf": "0.01 @ 25"},
+            overwrite_policy="fill_empty",
+        )
+
     def test_project_session_create_starter_writes_template_and_logfile(self) -> None:
         """Replace raw notebook YAML scaffolding with one starter preset helper."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -929,6 +1281,18 @@ class AgentTests(unittest.TestCase):
             template_payload = yaml.safe_load(starter.template_yaml)
             logfile_payload = yaml.safe_load(starter.logfile_yaml)
             self.assertEqual(template_payload["document"]["layout"]["heading"]["enabled"], True)
+            self.assertEqual(
+                template_payload["document"]["layout"]["heading"]["detail"]["kind"],
+                "open_hole",
+            )
+            self.assertIn(
+                "RMF @ Measured Temp",
+                [
+                    row["label"]
+                    for row in template_payload["document"]["layout"]["heading"]["detail"]["rows"]
+                    if isinstance(row, dict) and "label" in row
+                ],
+            )
             self.assertEqual(logfile_payload["name"], "Agent LAS Starter")
             section = logfile_payload["document"]["layout"]["log_sections"][0]
             self.assertEqual(section["title"], "Main Review")
@@ -975,6 +1339,37 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(
                 logfile_payload["render"]["output_path"],
                 "agent_open_hole_draft.pdf",
+            )
+
+    def test_project_session_create_starter_supports_cased_hole_quicklook(self) -> None:
+        """Allow users to start from the deterministic cased-hole header scaffold too."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            data_file = repo_root / "workspace" / "demo-job" / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+                render_output_path="workspace/demo-job/final.pdf",
+            )
+
+            starter = session.create_starter(
+                kind="cased_hole_quicklook",
+                data_file=data_file,
+                title="Main Review",
+                subtitle="Starter subtitle",
+                depth_range=(8400, 9300),
+            )
+
+            template_payload = yaml.safe_load(starter.template_yaml)
+            self.assertEqual(
+                template_payload["document"]["layout"]["heading"]["detail"]["kind"],
+                "cased_hole",
+            )
+            self.assertEqual(
+                template_payload["document"]["layout"]["heading"]["service_titles"][0]["value"],
+                "Cased Hole Quicklook",
             )
 
     def test_project_session_bootstrap_starter_stages_data_and_configures_paths(self) -> None:

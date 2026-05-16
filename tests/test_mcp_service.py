@@ -559,6 +559,9 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(section.raster_binding_count, 0)
         self.assertIn("depth", section.track_ids)
         self.assertIn("gr", section.track_ids)
+        self.assertIn("gr", section.bindings_by_track)
+        self.assertEqual(section.bindings_by_track["gr"][0]["channel"], "GR")
+        self.assertEqual(section.bindings_by_track["rt"][0]["channel"], "RT")
         if HAS_LAS:
             self.assertTrue(section.dataset_loaded)
             self.assertEqual(section.dataset_message, "")
@@ -885,6 +888,61 @@ class McpServiceTests(unittest.TestCase):
                 )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_matplotlib_style_updates_report_wide_grid_style(self) -> None:
+        """Persist one report-wide Matplotlib style patch for later previews and renders."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.set_matplotlib_style(
+                str(draft_path),
+                style_patch={
+                    "grid": {
+                        "depth_major_color": "#555555",
+                        "depth_minor_color": "#9a9a9a",
+                        "x_major_linewidth": 0.8,
+                        "x_minor_linewidth": 0.45,
+                    }
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.logfile_path, str(draft_path))
+            self.assertEqual(result.style["grid"]["depth_major_color"], "#555555")
+            self.assertEqual(result.style["grid"]["depth_minor_color"], "#9a9a9a")
+            self.assertEqual(result.style["grid"]["x_major_linewidth"], 0.8)
+            self.assertEqual(result.style["grid"]["x_minor_linewidth"], 0.45)
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            saved_style = saved_mapping["render"]["matplotlib"]["style"]
+            self.assertEqual(saved_style["grid"]["depth_major_color"], "#555555")
+            self.assertEqual(saved_style["grid"]["depth_minor_color"], "#9a9a9a")
+            self.assertEqual(saved_style["grid"]["x_major_linewidth"], 0.8)
+            self.assertEqual(saved_style["grid"]["x_minor_linewidth"], 0.45)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_matplotlib_style_rejects_empty_patch(self) -> None:
+        """Reject empty report-wide style edits before mutating a draft."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaises(TemplateValidationError):
+                service.set_matplotlib_style(
+                    str(draft_path),
+                    style_patch={},
+                    root=REPO_ROOT,
+                )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_add_track_appends_one_track_to_draft(self) -> None:
         """Append one track to a cloned draft and persist the updated order."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -997,6 +1055,176 @@ class McpServiceTests(unittest.TestCase):
                     patch={"unsupported": True},
                     root=REPO_ROOT,
                 )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_inspect_track_bindings_returns_explicit_binding_inventory(self) -> None:
+        """Expose current bindings and scales for one existing track."""
+        result = service.inspect_track_bindings(
+            self._fixture_paths.single_logfile_relative,
+            section_id="main",
+            track_id="rt",
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.section_id, "main")
+        self.assertEqual(result.track_id, "rt")
+        self.assertEqual(result.track["title"], "RT")
+        self.assertEqual(result.curve_binding_count, 1)
+        self.assertEqual(result.raster_binding_count, 0)
+        self.assertEqual(result.bindings[0]["channel"], "RT")
+        self.assertEqual(result.bindings[0]["kind"], "curve")
+        self.assertIn("RT", result.available_channels)
+        self.assertTrue(result.dataset_loaded)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_track_scales_updates_track_and_multiple_curve_scales(self) -> None:
+        """Update one track x_scale and multiple curve scales in one deterministic call."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="qc",
+                title="QC",
+                kind="normal",
+                width_mm=24.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="qc",
+                channel="GR",
+                scale={"kind": "linear", "min": 0.0, "max": 150.0},
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="qc",
+                channel="CALI",
+                scale={"kind": "linear", "min": 6.0, "max": 16.0},
+                root=REPO_ROOT,
+            )
+
+            result = service.set_track_scales(
+                str(draft_path),
+                section_id="main",
+                track_id="qc",
+                x_scale={"kind": "linear", "min": 0.0, "max": 200.0},
+                curve_scale={"kind": "linear", "min": 0.0, "max": 100.0},
+                channel_scales={
+                    "CALI": {"kind": "linear", "min": 5.0, "max": 15.0},
+                    "GR": {"kind": "linear", "min": 10.0, "max": 110.0},
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.track["x_scale"]["max"], 200.0)
+            self.assertEqual(result.updated_channels, ["CALI", "GR"])
+            binding_by_channel = {binding["channel"]: binding for binding in result.bindings}
+            self.assertEqual(binding_by_channel["CALI"]["scale"]["min"], 5.0)
+            self.assertEqual(binding_by_channel["GR"]["scale"]["max"], 110.0)
+            self.assertEqual(
+                result.track["grid"]["vertical"]["main"]["spacing_mode"],
+                "count",
+            )
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "qc")
+            self.assertEqual(saved_track["x_scale"]["max"], 200.0)
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["scale"], "linear")
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["spacing_mode"], "count")
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["scale"],
+                "linear",
+            )
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["spacing_mode"],
+                "count",
+            )
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            saved_qc_bindings = {
+                binding["channel"]: binding
+                for binding in bindings
+                if binding.get("section") == "main" and binding.get("track_id") == "qc"
+            }
+            self.assertEqual(saved_qc_bindings["CALI"]["scale"]["min"], 5.0)
+            self.assertEqual(saved_qc_bindings["GR"]["scale"]["max"], 110.0)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_set_track_scales_syncs_vertical_grid_for_log_tracks(self) -> None:
+        """Log-scale track updates should also switch the vertical grid convention to scale/log."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="res",
+                title="Resistivity",
+                kind="normal",
+                width_mm=28.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="res",
+                channel="RT",
+                scale={"kind": "log", "min": 0.2, "max": 2000.0},
+                root=REPO_ROOT,
+            )
+
+            result = service.set_track_scales(
+                str(draft_path),
+                section_id="main",
+                track_id="res",
+                x_scale={"kind": "log", "min": 2.0, "max": 200.0},
+                curve_scale={"kind": "log", "min": 2.0, "max": 200.0},
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.track["x_scale"]["kind"], "log")
+            self.assertEqual(result.track["grid"]["vertical"]["main"]["scale"], "logarithmic")
+            self.assertEqual(
+                result.track["grid"]["vertical"]["main"]["spacing_mode"],
+                "scale",
+            )
+            self.assertEqual(
+                result.track["grid"]["vertical"]["secondary"]["scale"],
+                "logarithmic",
+            )
+            self.assertEqual(
+                result.track["grid"]["vertical"]["secondary"]["spacing_mode"],
+                "scale",
+            )
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
+            saved_track = next(track for track in tracks if track["id"] == "res")
+            self.assertEqual(saved_track["x_scale"]["min"], 2.0)
+            self.assertEqual(saved_track["x_scale"]["max"], 200.0)
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["scale"], "logarithmic")
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["spacing_mode"], "scale")
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["scale"],
+                "logarithmic",
+            )
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["spacing_mode"],
+                "scale",
+            )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_add_annotation_object_persists_one_annotation(self) -> None:
@@ -2111,9 +2339,10 @@ class McpServiceTests(unittest.TestCase):
         self.assertTrue(result.has_remarks)
         self.assertTrue(result.has_tail)
         self.assertEqual(result.provider_slots[0]["current_value"], "Company")
-        self.assertEqual(result.general_field_slots[0]["key"], "company")
+        company_slot = next(slot for slot in result.general_field_slots if slot["key"] == "company")
+        self.assertEqual(company_slot["key"], "company")
         self.assertEqual(
-            result.general_field_slots[0]["value_slot"]["source_key"],
+            company_slot["value_slot"]["source_key"],
             "COMP",
         )
         self.assertEqual(result.service_title_slots[0]["value_slot"]["value"], "Open Hole Density")
@@ -2123,6 +2352,199 @@ class McpServiceTests(unittest.TestCase):
             result.detail_slots["rows"][0]["column_slots"][0][0]["source_key"],
             "DATE",
         )
+
+    def test_inspect_header_archetypes_exposes_open_and_cased_hole_catalogs(self) -> None:
+        """Expose the shipped deterministic header archetypes for agent-guided authoring."""
+        result = service.inspect_header_archetypes()
+
+        self.assertIsNone(result.selected_archetype_id)
+        archetype_ids = [entry["id"] for entry in result.archetypes]
+        self.assertEqual(archetype_ids, ["open_hole", "cased_hole"])
+        self.assertIn(
+            "wellplot://authoring/catalog/header-archetypes.json",
+            result.resource_uris,
+        )
+
+        selected = service.inspect_header_archetypes(archetype_id="open_hole")
+        self.assertEqual(selected.selected_archetype_id, "open_hole")
+        self.assertEqual(selected.archetypes[0]["detail_kind"], "open_hole")
+        self.assertIn("RMF @ Measured Temp", selected.archetypes[0]["detail_row_labels"])
+        self.assertIn("heading", selected.archetypes[0])
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_apply_header_archetype_preserves_literal_values_and_enables_rmf_aliases(self) -> None:
+        """Apply one richer open-hole scaffold and allow short aliases like RMF to fill it."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            result = service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="open_hole",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.archetype_id, "open_hole")
+            self.assertGreaterEqual(result.preserved_assignment_count, 1)
+            self.assertEqual(
+                result.heading_summary["current_values"]["heading"]["service_titles"][0]["value"],
+                "Legacy Title",
+            )
+
+            preview = service.preview_header_mapping(
+                str(draft_path),
+                values={"rmf": "0.5"},
+                root=REPO_ROOT,
+            )
+            self.assertEqual(
+                [entry["target_key"] for entry in preview.resolved_assignments],
+                ["RMF @ Measured Temp"],
+            )
+            rmf_row_index = next(
+                index
+                for index, row in enumerate(preview.predicted_heading_patch["detail"]["rows"])
+                if row.get("label") == "RMF @ Measured Temp"
+            )
+            self.assertEqual(
+                preview.predicted_heading_patch["detail"]["rows"][rmf_row_index]["columns"][0][
+                    "cells"
+                ][0],
+                "0.5",
+            )
+
+            applied = service.apply_header_values(
+                str(draft_path),
+                values={"rmf": "0.01 @ 25"},
+                root=REPO_ROOT,
+            )
+            self.assertEqual(
+                applied.applied_assignments[0]["target_key"],
+                "RMF @ Measured Temp",
+            )
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            rmf_row_index = next(
+                index
+                for index, row in enumerate(
+                    saved_mapping["document"]["layout"]["heading"]["detail"]["rows"]
+                )
+                if row.get("label") == "RMF @ Measured Temp"
+            )
+            cells = saved_mapping["document"]["layout"]["heading"]["detail"]["rows"][rmf_row_index][
+                "columns"
+            ][0]["cells"]
+            self.assertEqual(cells[0], "0.01")
+            self.assertEqual(cells[2], "25")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_open_hole_archetype_resolves_common_ticket_aliases_without_rebuilding_layout(
+        self,
+    ) -> None:
+        """Map copied packet keys onto the richer open-hole scaffold and ignore the rest."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+            service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="open_hole",
+                root=REPO_ROOT,
+            )
+
+            preview = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "service_title_1": "Cement Bond Log",
+                    "service_title_2": "Variable Density Log",
+                    "service_title_3": "Gamma Ray - CCL",
+                    "Section": "NWSW 32",
+                    "Township": "26",
+                    "Range": "9",
+                    "Footage": "972' FSL & 523' FWL",
+                    "Latitude": "38.501242",
+                    "Longitude": "-112.882661",
+                    "K.B.": "5445.50 ft",
+                    "G.L.": "5415.00 ft",
+                    "D.F.": "5445.00 ft",
+                    "Log Measured From": "Kelly Bushing",
+                    "Drilling Measured From": "Kelly Bushing",
+                    "Run Number": "ONE",
+                    "Depth Driller": "4980.00 ft",
+                    "Max Recorded Temperature": "177.2 degF",
+                    "Recorded By": "D. May / D. Jones",
+                    "Unit Number": "TAM",
+                    "Unit Location": "Fort Morgan, CO",
+                },
+                overwrite_policy="replace",
+                root=REPO_ROOT,
+            )
+
+            resolved_target_keys = {entry["target_key"] for entry in preview.resolved_assignments}
+            self.assertTrue(
+                {
+                    "service_title_1",
+                    "service_title_2",
+                    "service_title_3",
+                    "section",
+                    "township",
+                    "range",
+                    "footage",
+                    "latitude",
+                    "longitude",
+                    "elevation_kb",
+                    "elevation_gl",
+                    "elevation_df",
+                    "log_measured_from",
+                    "measured_from",
+                    "Run",
+                    "Driller Depth",
+                    "Maximum Temperature",
+                    "Logged By",
+                    "Equipment No.",
+                    "Base",
+                }.issubset(resolved_target_keys)
+            )
+
+            applied = service.apply_header_values(
+                str(draft_path),
+                values={
+                    "Section": "NWSW 32",
+                    "Township": "26",
+                    "Range": "9",
+                    "Footage": "972' FSL & 523' FWL",
+                    "Latitude": "38.501242",
+                    "Longitude": "-112.882661",
+                    "K.B.": "5445.50 ft",
+                    "G.L.": "5415.00 ft",
+                    "D.F.": "5445.00 ft",
+                    "Log Measured From": "Kelly Bushing",
+                    "Drilling Measured From": "Kelly Bushing",
+                    "Run Number": "ONE",
+                    "Depth Driller": "4980.00 ft",
+                    "Max Recorded Temperature": "177.2 degF",
+                    "Recorded By": "D. May / D. Jones",
+                    "Unit Number": "TAM",
+                    "Unit Location": "Fort Morgan, CO",
+                },
+                overwrite_policy="replace",
+                root=REPO_ROOT,
+            )
+
+            heading = applied.heading_summary["current_values"]["heading"]
+            general_fields = {
+                item["key"]: item.get("value")
+                for item in heading["general_fields"]
+                if isinstance(item, dict) and "key" in item
+            }
+            self.assertEqual(general_fields["section"], "NWSW 32")
+            self.assertEqual(general_fields["township"], "26")
+            self.assertEqual(general_fields["range"], "9")
+            self.assertEqual(general_fields["footage"], "972' FSL & 523' FWL")
+            self.assertEqual(general_fields["latitude"], "38.501242")
+            self.assertEqual(general_fields["longitude"], "-112.882661")
+            self.assertEqual(general_fields["elevation_kb"], "5445.50 ft")
+            self.assertEqual(general_fields["elevation_gl"], "5415.00 ft")
+            self.assertEqual(general_fields["elevation_df"], "5445.00 ft")
+            self.assertEqual(general_fields["log_measured_from"], "Kelly Bushing")
+            self.assertEqual(general_fields["measured_from"], "Kelly Bushing")
 
     def test_inspect_heading_slots_rejects_conflicting_targets(self) -> None:
         """Reject simultaneous logfile and template targets."""
@@ -2436,6 +2858,11 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("report_page_styles", result.available_families)
         self.assertIsNone(result.selected_family)
         self.assertTrue(result.presets)
+        resistivity = next(
+            preset for preset in result.presets if preset.get("id") == "triple_combo_resistivity"
+        )
+        self.assertEqual(resistivity["track_patch"]["x_scale"]["kind"], "log")
+        self.assertEqual(resistivity["track_patch"]["x_scale"]["min"], 0.2)
         self.assertIn("wellplot://authoring/catalog/style-presets.json", result.resource_uris)
 
     def test_inspect_style_presets_can_filter_one_family(self) -> None:
@@ -2456,6 +2883,107 @@ class McpServiceTests(unittest.TestCase):
         """Reject unsupported preset-family filters."""
         with self.assertRaises(ValueError):
             service.inspect_style_presets(preset_family="unknown")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_apply_style_preset_applies_resistivity_convention_to_track(self) -> None:
+        """Apply one resistivity preset in one deterministic save."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="res",
+                title="Resistivity",
+                kind="normal",
+                width_mm=28.0,
+                root=REPO_ROOT,
+            )
+
+            result = service.apply_style_preset(
+                str(draft_path),
+                preset_id="triple_combo_resistivity",
+                section_id="main",
+                track_id="res",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.preset_id, "triple_combo_resistivity")
+            self.assertEqual(result.section_id, "main")
+            self.assertEqual(result.track_id, "res")
+            assert result.track is not None
+            self.assertEqual(result.track["x_scale"]["kind"], "log")
+            self.assertEqual(result.track["x_scale"]["max"], 2000.0)
+            self.assertEqual(len(result.applied_bindings), 1)
+            self.assertEqual(result.applied_bindings[0]["alias_id"], "deep_resistivity")
+            self.assertEqual(result.applied_bindings[0]["channel"], "RT")
+            self.assertEqual(result.applied_bindings[0]["action"], "created")
+            self.assertEqual(
+                {item["alias_id"] for item in result.skipped_templates},
+                {"medium_resistivity", "shallow_resistivity"},
+            )
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            section = saved_mapping["document"]["layout"]["log_sections"][0]
+            saved_track = next(track for track in section["tracks"] if track.get("id") == "res")
+            self.assertEqual(saved_track["x_scale"]["kind"], "log")
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["scale"], "logarithmic")
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["spacing_mode"], "scale")
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["scale"],
+                "logarithmic",
+            )
+            self.assertEqual(
+                saved_track["grid"]["vertical"]["secondary"]["spacing_mode"],
+                "scale",
+            )
+            bindings = saved_mapping["document"]["bindings"]["channels"]
+            matching = [
+                binding
+                for binding in bindings
+                if binding.get("section") == "main"
+                and binding.get("track_id") == "res"
+                and binding.get("channel") == "RT"
+            ]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["style"]["color"], "#111827")
+            self.assertEqual(matching[0]["style"]["line_width"], 1.3)
+            self.assertEqual(matching[0]["scale"]["kind"], "log")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_apply_style_preset_can_apply_report_page_preset_without_track_target(self) -> None:
+        """Apply heading and remarks patches from one report-page style preset."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            result = service.apply_style_preset(
+                str(draft_path),
+                preset_id="report_header_clean",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.preset_family, "report_page_styles")
+            self.assertEqual(result.section_id, None)
+            self.assertEqual(result.track_id, None)
+            self.assertEqual(result.heading_applied, True)
+            self.assertEqual(result.remarks_applied, True)
+            self.assertEqual(result.track, None)
+            self.assertEqual(result.applied_bindings, [])
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            heading = saved_mapping["document"]["layout"]["heading"]
+            remarks = saved_mapping["document"]["layout"]["remarks"]
+            self.assertEqual(heading["service_titles"][0]["value"], "Primary Interpretation")
+            self.assertTrue(remarks)
 
     def test_inspect_authoring_vocab_returns_static_catalogs(self) -> None:
         """Expose stable authoring vocabularies even without a target draft."""
@@ -2488,6 +3016,10 @@ class McpServiceTests(unittest.TestCase):
             result.resource_uris,
         )
         self.assertIn(
+            "wellplot://authoring/catalog/header-archetypes.json",
+            result.resource_uris,
+        )
+        self.assertIn(
             "wellplot://authoring/catalog/style-presets.json",
             result.resource_uris,
         )
@@ -2495,6 +3027,7 @@ class McpServiceTests(unittest.TestCase):
             "wellplot://authoring/catalog/channel-aliases.json",
             result.resource_uris,
         )
+        self.assertTrue(result.header_archetypes)
         self.assertIsNone(result.target_summary)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
@@ -2509,6 +3042,10 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(result.target_summary["section_ids"], ["main"])
         self.assertIn("gr", result.target_summary["track_ids_by_section"]["main"])
         self.assertIn("GR", result.target_summary["available_channels_by_section"]["main"])
+        self.assertEqual(
+            result.target_summary["bindings_by_track"]["main"]["gr"][0]["channel"],
+            "GR",
+        )
         self.assertEqual(result.target_summary["annotation_track_ids_by_section"], {})
 
     def test_inspect_authoring_vocab_with_template_exposes_heading_context(self) -> None:
@@ -2694,6 +3231,7 @@ class McpServiceTests(unittest.TestCase):
         patch_resource = service.authoring_patch_schema_resource()
         fill_resource = service.authoring_fill_kinds_resource()
         style_resource = service.authoring_style_presets_resource()
+        header_archetype_resource = service.authoring_header_archetypes_resource()
         header_resource = service.authoring_header_fields_resource()
         header_alias_resource = service.authoring_header_key_aliases_resource()
         channel_alias_resource = service.authoring_channel_aliases_resource()
@@ -2710,6 +3248,8 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(style_resource.mime_type, "application/json")
         self.assertIn("style_presets", json.loads(style_resource.text))
+        self.assertEqual(header_archetype_resource.mime_type, "application/json")
+        self.assertIn("header_archetypes", json.loads(header_archetype_resource.text))
         self.assertEqual(header_resource.mime_type, "application/json")
         self.assertIn("general_field_keys", json.loads(header_resource.text))
         self.assertEqual(header_alias_resource.mime_type, "application/json")
@@ -2744,10 +3284,15 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("set_section_view(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("set_page_layout(...)", prompt)
+        self.assertIn("inspect_header_archetypes(...)", prompt)
+        self.assertIn("apply_header_archetype(...)", prompt)
         self.assertIn("inspect_heading_slots(...)", prompt)
         self.assertIn("preview_header_mapping(...)", prompt)
         self.assertIn("apply_header_values(...)", prompt)
         self.assertIn("inspect_style_presets(...)", prompt)
+        self.assertIn("apply_style_preset(...)", prompt)
+        self.assertIn("inspect_track_bindings(...)", prompt)
+        self.assertIn("set_track_scales(...)", prompt)
         self.assertIn("inspect_authoring_vocab(...)", prompt)
         self.assertIn("add_annotation_object(...)", prompt)
         self.assertIn("update_annotation_object(...)", prompt)
@@ -2755,6 +3300,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("remove_curve_fill(...)", prompt)
         self.assertIn("clear_track_bindings(...)", prompt)
+        self.assertIn("apply_style_preset(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -2771,12 +3317,16 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("set_section_view(...)", prompt)
         self.assertIn("set_depth_axis(...)", prompt)
         self.assertIn("set_page_layout(...)", prompt)
+        self.assertIn("inspect_header_archetypes(...)", prompt)
+        self.assertIn("apply_header_archetype(...)", prompt)
         self.assertIn("add_annotation_object(...)", prompt)
         self.assertIn("update_annotation_object(...)", prompt)
         self.assertIn("remove_annotation_object(...)", prompt)
         self.assertIn("add_curve_fill(...)", prompt)
         self.assertIn("remove_curve_fill(...)", prompt)
         self.assertIn("clear_track_bindings(...)", prompt)
+        self.assertIn("inspect_track_bindings(...)", prompt)
+        self.assertIn("set_track_scales(...)", prompt)
         self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
 
     def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:
@@ -2788,6 +3338,8 @@ class McpServiceTests(unittest.TestCase):
         )
 
         self.assertIn("Copied contractor header packet", prompt)
+        self.assertIn("inspect_header_archetypes(...)", prompt)
+        self.assertIn("apply_header_archetype(...)", prompt)
         self.assertIn("inspect_heading_slots(logfile_path=logfile_path)", prompt)
         self.assertIn("parse_key_value_text(source_text, format_hint=None)", prompt)
         self.assertIn(

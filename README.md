@@ -179,14 +179,15 @@ The MCP tool surface currently supports:
 - `export_example_bundle`
 - `create_logfile_draft` and `summarize_logfile_draft`
 - `set_section_data_source`, `update_section`, `set_depth_axis`, `set_page_layout`,
-  and `set_section_view`
-- `add_track`, `update_track`, `add_annotation_object`, `update_annotation_object`,
+  `set_matplotlib_style`, and `set_section_view`
+- `add_track`, `update_track`, `inspect_track_bindings`, `set_track_scales`,
+  `add_annotation_object`, `update_annotation_object`,
   `remove_annotation_object`, `remove_track`, `bind_curve`, `bind_raster`,
   `add_curve_fill`, `remove_curve_fill`, `update_curve_binding`, `update_raster_binding`, `remove_curve_binding`,
   `remove_raster_binding`, `clear_track_bindings`, and `move_track`
 - `set_heading_content` and `set_remarks_content`
 - `inspect_heading_slots`, `preview_header_mapping`, `apply_header_values`,
-  `parse_key_value_text`, and `inspect_style_presets`
+  `parse_key_value_text`, `inspect_style_presets`, and `apply_style_preset`
 - `inspect_authoring_vocab` and `summarize_logfile_changes`
 - `validate_logfile_text`, `format_logfile_text`, and `save_logfile_text`
 
@@ -239,10 +240,19 @@ Notebook-facing project helpers:
 - `session.create_starter(...)` to generate one starter template/logfile pair from a shipped preset
 - `session.configure_rounds(...)` and `session.configure_paths(...)` to keep later notebook cells short
 
+Starter scaffolds now pull their `open_hole` and `cased_hole` heading payloads
+from packaged YAML archetype assets. That keeps the semantic first-page
+structure deterministic while still letting the agent fill matching values
+later.
+
 Typical iterative flow:
 - `await session.run(...)` for the first seeded draft pass
 - `await session.revise(...)` for later cell-by-cell edits
 - `await session.render_logfile_to_file(...)` for the final MCP-backed PDF render
+
+When the request is really “fill these known header values,” the agent routes
+through deterministic heading tools and preserves the existing scaffold instead
+of redesigning the header around the copied packet text.
 
 ## Contributor Development Workflow
 
@@ -376,6 +386,9 @@ Current examples:
     stages a user LAS file, generates a reusable starter scaffold through
     `session.bootstrap_starter(...)`, and adds header, remarks, tracks, and
     bindings one step at a time through `wellplot.agent`
+  - narrow header-only requests such as "fill RMF as 0.01 @ 25" are routed
+    automatically through deterministic heading tools instead of the broad
+    freeform authoring loop
   - working first-pass agent workflow: functional, but intentionally less
     curated than the deterministic production notebooks and may still need
     prompt/model tuning for final visual polish

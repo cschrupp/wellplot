@@ -69,6 +69,9 @@ This notebook is different:
 - it depends on a live model
 - it is intended for real user adaptation, not only for replaying a shipped
   repository example
+- narrow header-only requests are routed automatically through deterministic
+  heading tools, so prompts like `Fill header RMF as 0.01 @ 25` do not need to
+  go through the broader freeform authoring loop
 - it is a working first pass, so prompt wording, model choice, and revision
   round budgets may still need tuning for final packet polish
 
@@ -90,6 +93,12 @@ schema in the notebook, this walkthrough uses
 project defaults, materialize the same files from a shipped preset, and then
 show the generated YAML so the user can still inspect what the agent will
 revise.
+
+That shipped preset now pulls its heading scaffold from packaged header
+archetype assets. The agent is expected to preserve that open-hole or
+cased-hole scaffold and fill matching values into it, not rebuild the first
+page when the user pastes ticket text or asks for a few specific header
+values.
 
 The safest iteration pattern is:
 

@@ -167,15 +167,19 @@ Main tools:
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
+- `set_matplotlib_style(logfile_path, style_patch)`
 - `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
 - `parse_key_value_text(source_text, format_hint=None)`
 - `inspect_heading_slots(logfile_path=None, template_path=None)`
 - `preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")`
 - `apply_header_values(logfile_path, values, overwrite_policy="fill_empty")`
 - `inspect_style_presets(preset_family=None)`
+- `apply_style_preset(logfile_path, preset_id, section_id=None, track_id=None, channel_overrides=None, clear_existing_bindings=False)`
 - `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
+- `inspect_track_bindings(logfile_path, section_id, track_id)`
+- `set_track_scales(logfile_path, section_id, track_id, x_scale=None, curve_scale=None, channel_scales=None, sync_grid_to_scale=True)`
 - `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
 - `update_annotation_object(logfile_path, section_id, track_id, annotation_index, patch)`
 - `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`
@@ -215,8 +219,14 @@ Recommended split:
   labels, or grid spacing before you start fine-grained track edits
 - use `set_page_layout(...)` when the request changes page size, orientation,
   continuous layout, or render defaults
+- use `set_matplotlib_style(...)` when the request changes report-wide visual
+  defaults such as darker grid lines, lighter grid lines, or broader
+  Matplotlib style overrides that should apply across the rendered page
 - use `parse_key_value_text(...)` when the source material is a copied header
   packet, tabular note block, or other simple key-value text
+- use `inspect_header_archetypes(...)` and `apply_header_archetype(...)` before
+  value filling when the draft still needs the correct semantic scaffold, such
+  as `open_hole` or `cased_hole`
 - use `inspect_heading_slots(...)` when the next task is filling provider
   fields, general report fields, service titles, detail-table cells, or
   remarks content from external text
@@ -226,13 +236,26 @@ Recommended split:
 - use `apply_header_values(...)` only after the preview looks right; it writes
   the same deterministic mapping result back into the draft and returns the
   saved heading summary
+- copied job tickets and header packets should fill matching slots on the
+  current scaffold; they should not trigger a redesign of the heading layout
 - use `inspect_style_presets(...)` when the request is mostly about visual
   conventions such as color, fill, contrast, scale defaults, or common
   CBL/VDL, porosity, gamma-ray, and resistivity layouts
+- use `apply_style_preset(...)` when one curated convention already matches the
+  requested layout, especially for shared log-scale resistivity overlays,
+  porosity overlay defaults, or CBL/VDL screen-vs-print variants
+- use `inspect_track_bindings(...)` before revising one existing track's scales,
+  labels, fills, or curve mix; it exposes the current bindings and scales
+- use `set_track_scales(...)` when the request changes one shared track scale
+  together with multiple curve scales on that same track; by default it also
+  syncs the vertical grid convention to the chosen scale so log tracks render
+  like log tracks instead of retaining evenly spaced count-based divisions
 - use `inspect_authoring_vocab(...)` before major edits so the client sees the
   valid track kinds, fill kinds, heading fields, annotation indexes, and any
   available channels in the current draft
 - use `add_track(...)`, `update_track(...)`, `add_annotation_object(...)`,
+  `inspect_track_bindings(...)`, `set_track_scales(...)`,
+  `set_matplotlib_style(...)`,
   `update_annotation_object(...)`, `remove_annotation_object(...)`,
   `remove_track(...)`, `update_section(...)`, `set_section_view(...)`,
   `set_depth_axis(...)`,

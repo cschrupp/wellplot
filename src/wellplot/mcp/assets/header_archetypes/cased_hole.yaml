@@ -1,0 +1,239 @@
+id: cased_hole
+label: Cased Hole
+detail_kind: cased_hole
+starter_kinds:
+  - cased_hole_quicklook
+notes:
+  - Cased-hole scaffold with service-title slots suited to CBL, VDL, and allied service packets.
+  - Literal fills should preserve the scaffold and only populate matching slots.
+heading:
+  enabled: true
+  provider_name: Company
+  general_fields:
+    - key: archive_no
+      label: Archive No.
+      value: ""
+    - key: api_no
+      label: API No.
+      value: ""
+    - key: version
+      label: Version
+      value: ""
+    - key: company
+      label: Company
+      source_key: COMP
+    - key: well
+      label: Well
+      source_key: WELL
+    - key: field
+      label: Field
+      source_key: FLD
+    - key: county
+      label: County
+      source_key: CNTY
+    - key: country
+      label: Country
+      source_key: CTRY
+    - key: location
+      label: Location
+      source_key: LOC
+    - key: section
+      label: Section
+      value: ""
+    - key: township
+      label: Township
+      value: ""
+    - key: range
+      label: Range
+      value: ""
+    - key: footage
+      label: Footage
+      value: ""
+    - key: latitude
+      label: Latitude
+      source_key: LATI
+    - key: longitude
+      label: Longitude
+      source_key: LONG
+    - key: logging_date
+      label: Logging Date
+      source_key: DATE
+    - key: scale
+      label: Scale
+      value: ft 1:240
+    - key: measured_from
+      label: Measured From
+      value: ""
+    - key: log_measured_from
+      label: Log Measured From
+      source_key: LMF
+    - key: perforation_measured_from
+      label: Perforation Measured From
+      value: ""
+    - key: elevation_kb
+      label: KB
+      source_key: EKB
+    - key: elevation_gl
+      label: GL
+      source_key: EGL
+    - key: elevation_df
+      label: DF
+      source_key: EDF
+    - key: top_log_interval
+      label: Top Log Interval
+      source_key: STRT
+    - key: bottom_log_interval
+      label: Bottom Log Interval
+      source_key: STOP
+    - key: fluid_type
+      label: Fluid Type
+      value: ""
+    - key: service_company
+      label: Service Company
+      source_key: SRVC
+  service_titles:
+    - value: Cased Hole Information
+      alignment: center
+      bold: true
+    - value: ""
+      alignment: center
+    - value: ""
+      alignment: center
+  detail:
+    kind: cased_hole
+    title: Cased Hole Metadata
+    rows:
+      - label: Date
+        values:
+          - source_key: DATE
+          - ""
+      - label_cells:
+          - Run
+          - Direction
+        columns:
+          - cells:
+              - ""
+          - cells:
+              - ""
+      - label: Service Order
+        values:
+          - ""
+          - ""
+      - label: Driller Depth
+        columns:
+          - cells:
+              - ""
+              - ft
+          - cells:
+              - ""
+      - label: Logged Depth
+        columns:
+          - cells:
+              - ""
+              - ft
+          - cells:
+              - ""
+      - label: First Reading (Bottom)
+        columns:
+          - cells:
+              - source_key: STOP
+              - ft
+          - cells:
+              - ""
+      - label: Last Reading
+        columns:
+          - cells:
+              - source_key: STRT
+              - ft
+          - cells:
+              - ""
+      - label: Start Time
+        values:
+          - ""
+          - ""
+      - label: End Time
+        values:
+          - ""
+          - ""
+      - label: Drill Time
+        values:
+          - ""
+          - ""
+      - label: Injection Type
+        values:
+          - ""
+          - ""
+      - label: Fluid Density
+        values:
+          - ""
+          - ""
+      - label: Fluid Salinity
+        values:
+          - ""
+          - ""
+      - label: Fluid Level
+        columns:
+          - cells:
+              - ""
+              - ft
+          - cells:
+              - ""
+      - label: Cement Top
+        columns:
+          - cells:
+              - ""
+              - ft
+          - cells:
+              - ""
+      - label: Head Pressure
+        columns:
+          - cells:
+              - ""
+              - psi
+          - cells:
+              - ""
+      - label: Maximum Deviation
+        columns:
+          - cells:
+              - ""
+              - deg
+          - cells:
+              - ""
+      - label: Nominal Speed
+        columns:
+          - cells:
+              - ""
+              - ft/min
+          - cells:
+              - ""
+      - label: Bottom Temperature
+        columns:
+          - cells:
+              - ""
+              - degF
+          - cells:
+              - ""
+      - label: Reference Log
+        values:
+          - ""
+          - ""
+      - label: Reference Date
+        values:
+          - ""
+          - ""
+      - label_cells:
+          - Equipment No.
+          - Base
+        columns:
+          - cells:
+              - ""
+          - cells:
+              - ""
+      - label: Logged By
+        values:
+          - ""
+          - ""
+      - label: Witnessed By
+        values:
+          - ""
+          - ""

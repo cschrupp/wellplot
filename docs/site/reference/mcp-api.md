@@ -265,6 +265,7 @@ Each section record contains:
 - `track_kinds`
 - `curve_binding_count`
 - `raster_binding_count`
+- `bindings_by_track`
 - `available_channels`
 - `dataset_loaded`
 - `dataset_message`
@@ -274,6 +275,8 @@ Notes:
 - this is the preferred inspect-first tool for draft authoring flows
 - channel discovery is best-effort and depends on the referenced data source
   and optional format dependencies being available
+- `bindings_by_track` gives the current per-track binding inventory, including
+  binding kinds, channels, and any saved scale/style/fill details
 
 ### `set_section_data_source(logfile_path, section_id, source_path, source_format="auto", title=None, subtitle=None)`
 
@@ -368,6 +371,32 @@ Behavior:
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 
+### `set_matplotlib_style(logfile_path, style_patch)`
+
+Purpose: deep-merge one report-wide Matplotlib style patch under
+`render.matplotlib.style`.
+
+Returns:
+
+- `logfile_path`
+- `style`
+
+Behavior:
+
+- accepts one nested `style_patch` mapping and merges it into any existing
+  `render.matplotlib.style` overrides
+- is the preferred edit for report-wide appearance requests such as darker grid
+  lines, thicker grid lines, or other Matplotlib style-default adjustments
+- common grid keys live under `style_patch.grid`, including:
+  - `depth_major_color`
+  - `depth_minor_color`
+  - `x_major_linewidth`
+  - `x_minor_linewidth`
+- preserves unrelated style sections that already exist in the draft
+- rejects empty patches
+- writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
 ### `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
 
 Purpose: update one section window together with document depth-axis settings
@@ -446,6 +475,65 @@ Behavior:
 - removes optional properties when their patch value is `null`
 - rejects unsupported patch keys
 - writes back to the explicit `logfile_path`
+- validates the mutated draft before saving
+
+### `inspect_track_bindings(logfile_path, section_id, track_id)`
+
+Purpose: inspect one existing track's current curve and raster bindings before
+you revise scales, fills, labels, or overlays.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track`
+- `curve_binding_count`
+- `raster_binding_count`
+- `bindings`
+- `available_channels`
+- `dataset_loaded`
+- `dataset_message`
+
+Behavior:
+
+- validates that `section_id` and `track_id` exist in the target draft
+- returns the current saved track mapping, including `x_scale` when present
+- returns the current binding inventory for that one track, including saved
+  `scale`, `style`, and `fill` blocks
+- is the preferred inspect step before multi-binding track revisions
+
+### `set_track_scales(logfile_path, section_id, track_id, x_scale=None, curve_scale=None, channel_scales=None, sync_grid_to_scale=True)`
+
+Purpose: update one track's shared `x_scale` and one or more curve-binding
+scales in one deterministic save.
+
+Returns:
+
+- `logfile_path`
+- `section_id`
+- `track_id`
+- `track`
+- `updated_channels`
+- `bindings`
+
+Behavior:
+
+- requires at least one of:
+  - `x_scale`
+  - `curve_scale`
+  - `channel_scales`
+- updates the track `x_scale` when provided
+- by default, when `x_scale` is provided, also synchronizes the target track's
+  vertical grid convention to match that scale:
+  - `log` -> logarithmic/scale spacing
+  - `linear` -> linear/count spacing
+  - `tangential` -> tangential/scale spacing
+- applies `curve_scale` to every curve binding that currently targets the track
+- applies per-channel overrides from `channel_scales`
+- rejects requests for channels that are not currently bound to the target track
+- is the preferred edit when one request changes a shared resistivity scale and
+  the bound curve scales together
 - validates the mutated draft before saving
 
 ### `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
@@ -883,6 +971,8 @@ Behavior:
 - requires a draft/logfile target
 - matches extracted keys against provider, general-field, service-title, and
   detail-row slots exposed by `inspect_heading_slots(...)`
+- preserves the existing heading scaffold; it previews value placement into the
+  current archetype instead of reshaping the first page around the copied text
 - accepts these overwrite policies:
   - `fill_empty`
   - `replace`
@@ -915,6 +1005,8 @@ Behavior:
   `preview_header_mapping(...)`
 - writes only the predicted heading patch; it does not mutate unrelated draft
   sections
+- fills matching slots on the existing heading scaffold and leaves unmatched
+  packet fields ignored rather than redesigning the scaffold
 - returns `applied_assignments` only for actual saved changes
 - returns `skipped_assignments` for unchanged, unmatched, or conflicting
   inputs, each with a status and reason
@@ -977,6 +1069,43 @@ Behavior:
 - points clients at `wellplot://authoring/catalog/style-presets.json` for the
   full packaged catalog payload
 
+### `apply_style_preset(logfile_path, preset_id, section_id=None, track_id=None, channel_overrides=None, clear_existing_bindings=False)`
+
+Purpose: apply one curated style preset directly to a draft instead of manually
+translating its track patch, binding templates, or heading/remarks patches.
+
+Returns:
+
+- `logfile_path`
+- `preset_id`
+- `preset_family`
+- `section_id`
+- `track_id`
+- `clear_existing_bindings`
+- `heading_applied`
+- `remarks_applied`
+- `track`
+- `applied_bindings`
+- `skipped_templates`
+- `warnings`
+
+Behavior:
+
+- accepts presets that only affect heading/remarks content, such as report-page
+  cleanup presets, without a track target
+- requires `section_id` and `track_id` for presets that include `track_patch`
+  or `binding_templates`
+- resolves each binding template's `alias_id` against the actual available
+  channels in the target section before creating or updating bindings
+- can optionally clear all existing curve/raster bindings on the target track
+- presets such as `triple_combo_resistivity` can also define the correct shared
+  grid convention for log-scale tracks, not only the bounds and line styles
+  before applying the preset
+- applies multi-curve resistivity conventions with a shared track `x_scale`, so
+  the resulting track does not depend on per-binding scale guesses alone
+- returns `skipped_templates` and `warnings` when one preset binding template
+  cannot be resolved unambiguously against the available channels
+
 ### `inspect_authoring_vocab(logfile_path=None, template_path=None)`
 
 Purpose: expose deterministic authoring vocabularies plus optional draft or
@@ -1008,6 +1137,9 @@ Behavior:
 - without a target, still returns the static authoring catalogs
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
+- with `logfile_path`, `target_summary.bindings_by_track` exposes the current
+  per-track binding inventory so clients can plan deterministic scale and
+  rebinding edits
 - with `template_path`, includes heading-field and section/track context from
   the referenced template mapping
 
@@ -1106,10 +1238,19 @@ Static resources:
 - `wellplot://authoring/catalog/track-kinds.json`
 - `wellplot://authoring/catalog/fill-kinds.json`
 - `wellplot://authoring/catalog/track-archetypes.json`
+- `wellplot://authoring/catalog/header-archetypes.json`
 - `wellplot://authoring/catalog/header-fields.json`
 - `wellplot://authoring/catalog/header-key-aliases.json`
 - `wellplot://authoring/catalog/channel-aliases.json`
 - `wellplot://authoring/catalog/style-presets.json`
+
+Notes:
+
+- `wellplot://authoring/catalog/header-archetypes.json` is backed by packaged
+  YAML assets rather than hard-coded Python literals
+- the shipped `open_hole` and `cased_hole` archetypes define fixed semantic
+  scaffolds; later header-value fills should populate matching slots on those
+  scaffolds instead of inventing a new first-page layout
 
 Resource templates:
 
@@ -1178,13 +1319,16 @@ For draft authoring:
    spacing
 7. `set_page_layout(...)` when the request changes page size, orientation,
    continuous layout, or render defaults
-8. `parse_key_value_text(...)` when the input starts as copied header text
-9. `inspect_heading_slots(...)` when the next step is header-value ingestion or
+8. `set_matplotlib_style(...)` when the request changes report-wide visual
+   defaults such as darker grid lines or thicker grid lines
+9. `parse_key_value_text(...)` when the input starts as copied header text
+10. `inspect_heading_slots(...)` when the next step is header-value ingestion or
    remarks-aware report-page edits
-10. `preview_header_mapping(...)` before mutating header/report values
-11. `apply_header_values(...)` when the previewed mapping should be persisted
-12. `inspect_authoring_vocab(...)`
-13. apply `update_section(...)`, `set_section_view(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `add_track(...)`, `update_track(...)`,
+11. `preview_header_mapping(...)` before mutating header/report values
+12. `apply_header_values(...)` when the previewed mapping should be persisted
+13. `inspect_authoring_vocab(...)`
+14. apply `update_section(...)`, `set_section_view(...)`, `set_depth_axis(...)`, `set_page_layout(...)`, `set_matplotlib_style(...)`, `add_track(...)`, `update_track(...)`,
+   `inspect_track_bindings(...)`, `set_track_scales(...)`,
    `add_annotation_object(...)`, `update_annotation_object(...)`, `remove_annotation_object(...)`,
    `remove_track(...)`, `bind_curve(...)`, `add_curve_fill(...)`, `remove_curve_fill(...)`, `bind_raster(...)`,
    `update_curve_binding(...)`, `update_raster_binding(...)`, `remove_curve_binding(...)`,

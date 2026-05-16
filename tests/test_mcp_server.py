@@ -242,6 +242,19 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            updated_matplotlib_style = await session.call_tool(
+                "set_matplotlib_style",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "style_patch": {
+                        "grid": {
+                            "depth_major_color": "#555555",
+                            "depth_minor_color": "#9a9a9a",
+                            "x_major_linewidth": 0.8,
+                        }
+                    },
+                },
+            )
             section_view = await session.call_tool(
                 "set_section_view",
                 {
@@ -409,6 +422,34 @@ class McpServerIntegrationTests(unittest.TestCase):
                     },
                 },
             )
+            inspected_track_bindings = await session.call_tool(
+                "inspect_track_bindings",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "rt",
+                },
+            )
+            scaled_track = await session.call_tool(
+                "set_track_scales",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "rt",
+                    "x_scale": {
+                        "kind": "log",
+                        "min": 2.0,
+                        "max": 200.0,
+                    },
+                    "channel_scales": {
+                        "RT": {
+                            "kind": "log",
+                            "min": 2.0,
+                            "max": 200.0,
+                        }
+                    },
+                },
+            )
             moved_track = await session.call_tool(
                 "move_track",
                 {
@@ -537,6 +578,13 @@ class McpServerIntegrationTests(unittest.TestCase):
                     "preset_family": "cbl_vdl_variants",
                 },
             )
+            applied_style_preset = await session.call_tool(
+                "apply_style_preset",
+                {
+                    "logfile_path": str(draft_logfile),
+                    "preset_id": "report_header_clean",
+                },
+            )
             updated_remarks = await session.call_tool(
                 "set_remarks_content",
                 {
@@ -593,9 +641,12 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "update_section",
                 "set_depth_axis",
                 "set_page_layout",
+                "set_matplotlib_style",
                 "set_section_view",
                 "add_track",
                 "update_track",
+                "inspect_track_bindings",
+                "set_track_scales",
                 "add_annotation_object",
                 "update_annotation_object",
                 "remove_annotation_object",
@@ -612,11 +663,14 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "move_track",
                 "set_heading_content",
                 "set_remarks_content",
+                "inspect_header_archetypes",
+                "apply_header_archetype",
                 "inspect_heading_slots",
                 "preview_header_mapping",
                 "apply_header_values",
                 "parse_key_value_text",
                 "inspect_style_presets",
+                "apply_style_preset",
                 "inspect_authoring_vocab",
                 "summarize_logfile_changes",
                 "validate_logfile_text",
@@ -633,6 +687,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://authoring/catalog/track-kinds.json",
                 "wellplot://authoring/catalog/fill-kinds.json",
                 "wellplot://authoring/catalog/track-archetypes.json",
+                "wellplot://authoring/catalog/header-archetypes.json",
                 "wellplot://authoring/catalog/style-presets.json",
                 "wellplot://authoring/catalog/header-fields.json",
                 "wellplot://authoring/catalog/header-key-aliases.json",
@@ -731,6 +786,14 @@ class McpServerIntegrationTests(unittest.TestCase):
             "landscape",
         )
         self.assertEqual(updated_page_layout.structuredContent["render"]["dpi"], 200)
+        self.assertEqual(
+            updated_matplotlib_style.structuredContent["style"]["grid"]["depth_major_color"],
+            "#555555",
+        )
+        self.assertEqual(
+            updated_matplotlib_style.structuredContent["style"]["grid"]["x_major_linewidth"],
+            0.8,
+        )
         self.assertEqual(section_view.structuredContent["section_id"], "main")
         self.assertEqual(section_view.structuredContent["title"], "Composite Review")
         self.assertEqual(section_view.structuredContent["subtitle"], "Unified Section View")
@@ -781,6 +844,20 @@ class McpServerIntegrationTests(unittest.TestCase):
             updated_binding.structuredContent["binding"]["scale"]["max"],
             150.0,
         )
+        self.assertEqual(inspected_track_bindings.structuredContent["track_id"], "rt")
+        self.assertEqual(inspected_track_bindings.structuredContent["curve_binding_count"], 1)
+        self.assertEqual(inspected_track_bindings.structuredContent["bindings"][0]["channel"], "RT")
+        self.assertEqual(scaled_track.structuredContent["track"]["x_scale"]["max"], 200.0)
+        self.assertEqual(
+            scaled_track.structuredContent["track"]["grid"]["vertical"]["main"]["scale"],
+            "logarithmic",
+        )
+        self.assertEqual(
+            scaled_track.structuredContent["track"]["grid"]["vertical"]["main"]["spacing_mode"],
+            "scale",
+        )
+        self.assertEqual(scaled_track.structuredContent["updated_channels"], ["RT"])
+        self.assertEqual(scaled_track.structuredContent["bindings"][0]["scale"]["min"], 2.0)
         self.assertEqual(
             moved_track.structuredContent["track_ids"],
             ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt", "notes"],
@@ -859,6 +936,9 @@ class McpServerIntegrationTests(unittest.TestCase):
             {preset["id"] for preset in style_presets.structuredContent["presets"]},
             {"cbl_vdl_high_contrast", "cbl_vdl_print_safe"},
         )
+        self.assertEqual(applied_style_preset.structuredContent["preset_id"], "report_header_clean")
+        self.assertEqual(applied_style_preset.structuredContent["heading_applied"], True)
+        self.assertEqual(applied_style_preset.structuredContent["remarks_applied"], True)
         self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
         self.assertEqual(
             updated_remarks.structuredContent["remarks"][0]["title"],

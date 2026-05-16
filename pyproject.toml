@@ -112,6 +112,7 @@ version = {attr = "wellplot._version.__version__"}
 [tool.setuptools.package-data]
 "wellplot.renderers" = ["*.yaml"]
 "wellplot.mcp.assets" = [
+  "header_archetypes/*.yaml",
   "production/*/*.md",
   "production/*/*.yaml",
 ]

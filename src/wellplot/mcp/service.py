@@ -68,6 +68,10 @@ from ..model.document import (
 )
 from ..pipeline import prepare_logfile_render, render_prepared_logfile
 from ..units import DEFAULT_UNITS
+from .header_archetypes import (
+    header_archetype_catalog,
+    header_archetype_heading,
+)
 
 ASSET_PACKAGE = "wellplot.mcp.assets"
 PRODUCTION_EXAMPLE_IDS = ("cbl_log_example", "forge16b_porosity_example")
@@ -222,6 +226,7 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/catalog/track-kinds.json",
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
+    "wellplot://authoring/catalog/header-archetypes.json",
     "wellplot://authoring/catalog/header-fields.json",
     "wellplot://authoring/catalog/header-key-aliases.json",
     "wellplot://authoring/catalog/channel-aliases.json",
@@ -284,7 +289,7 @@ AUTHORING_STYLE_PRESETS = (
         "track_patch": {
             "kind": "normal",
             "width_mm": 32.0,
-            "grid": {"enabled": True, "vertical": {"minor_count": 4}},
+            "grid": {"display": True, "vertical": {"secondary": {"line_count": 4}}},
         },
         "binding_templates": [
             {
@@ -329,7 +334,7 @@ AUTHORING_STYLE_PRESETS = (
         "track_patch": {
             "kind": "normal",
             "width_mm": 28.0,
-            "grid": {"enabled": True},
+            "grid": {"display": True},
         },
         "binding_templates": [
             {
@@ -354,31 +359,40 @@ AUTHORING_STYLE_PRESETS = (
         "track_patch": {
             "kind": "normal",
             "width_mm": 32.0,
-            "grid": {"enabled": True, "horizontal": {"enabled": True}},
+            "x_scale": {"kind": "log", "min": 0.2, "max": 2000.0},
+            "grid": {
+                "display": True,
+                "horizontal": {"display": True},
+                "vertical": {
+                    "main": {"scale": "logarithmic", "spacing_mode": "scale"},
+                    "secondary": {"scale": "logarithmic", "spacing_mode": "scale"},
+                },
+            },
         },
         "binding_templates": [
             {
                 "alias_id": "shallow_resistivity",
                 "label": "RSH",
                 "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#2563eb", "line_width": 1.0},
+                "style": {"color": "#dc2626", "line_width": 0.9, "line_style": ":"},
             },
             {
                 "alias_id": "medium_resistivity",
                 "label": "RME",
                 "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#7c3aed", "line_width": 1.0},
+                "style": {"color": "#16a34a", "line_width": 1.0},
             },
             {
                 "alias_id": "deep_resistivity",
                 "label": "RDEEP",
                 "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#dc2626", "line_width": 1.2},
+                "style": {"color": "#111827", "line_width": 1.3},
             },
         ],
         "notes": [
             "Keep all resistivity curves on the same logarithmic scale.",
             "Use the deepest investigation curve with the strongest visual weight.",
+            "Use a red dotted shallow curve and a conventional green medium curve.",
         ],
     },
     {
@@ -485,10 +499,16 @@ AUTHORING_CHANNEL_ALIASES = (
         "mnemonics": ["RT", "RESD", "RDEP", "ILD", "AT90"],
     },
     {
+        "id": "medium_resistivity",
+        "label": "Medium Resistivity",
+        "aliases": ["medium resistivity"],
+        "mnemonics": ["RMED", "ILM", "AT60"],
+    },
+    {
         "id": "shallow_resistivity",
         "label": "Shallow Resistivity",
-        "aliases": ["shallow resistivity", "medium resistivity"],
-        "mnemonics": ["RS", "RMED", "ILM", "AT30"],
+        "aliases": ["shallow resistivity"],
+        "mnemonics": ["RS", "RSH", "RXO", "AT30"],
     },
     {
         "id": "caliper",
@@ -701,6 +721,7 @@ class LogfileDraftSectionSummary:
     track_kinds: list[str]
     curve_binding_count: int
     raster_binding_count: int
+    bindings_by_track: dict[str, list[dict[str, object]]]
     available_channels: list[str]
     dataset_loaded: bool
     dataset_message: str
@@ -770,6 +791,14 @@ class PageLayoutResult:
 
 
 @dataclass(slots=True)
+class MatplotlibStyleResult:
+    """Structured result for updating report-wide Matplotlib style overrides."""
+
+    logfile_path: str
+    style: dict[str, object]
+
+
+@dataclass(slots=True)
 class SectionViewResult:
     """Structured result for updating section, depth-axis, and page-view settings."""
 
@@ -803,6 +832,34 @@ class UpdatedTrackResult:
     section_id: str
     track_id: str
     track: dict[str, object]
+
+
+@dataclass(slots=True)
+class TrackBindingsInspectionResult:
+    """Structured binding inventory for one draft track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track: dict[str, object]
+    curve_binding_count: int
+    raster_binding_count: int
+    bindings: list[dict[str, object]]
+    available_channels: list[str]
+    dataset_loaded: bool
+    dataset_message: str
+
+
+@dataclass(slots=True)
+class TrackScaleResult:
+    """Structured result for updating shared and per-curve scales on one track."""
+
+    logfile_path: str
+    section_id: str
+    track_id: str
+    track: dict[str, object]
+    updated_channels: list[str]
+    bindings: list[dict[str, object]]
 
 
 @dataclass(slots=True)
@@ -987,6 +1044,25 @@ class RemarksContentResult:
 
 
 @dataclass(slots=True)
+class HeaderArchetypesResult:
+    """Structured catalog payload for deterministic header archetypes."""
+
+    selected_archetype_id: str | None
+    archetypes: list[dict[str, object]]
+    resource_uris: list[str]
+
+
+@dataclass(slots=True)
+class AppliedHeaderArchetypeResult:
+    """Structured result for applying one deterministic header archetype."""
+
+    logfile_path: str
+    archetype_id: str
+    preserved_assignment_count: int
+    heading_summary: dict[str, object]
+
+
+@dataclass(slots=True)
 class HeadingSlotsResult:
     """Structured heading/report slot inspection payload for MCP ingestion flows."""
 
@@ -1050,6 +1126,24 @@ class StylePresetsResult:
 
 
 @dataclass(slots=True)
+class AppliedStylePresetResult:
+    """Structured result for applying one curated style preset."""
+
+    logfile_path: str
+    preset_id: str
+    preset_family: str
+    section_id: str | None
+    track_id: str | None
+    clear_existing_bindings: bool
+    heading_applied: bool
+    remarks_applied: bool
+    track: dict[str, object] | None
+    applied_bindings: list[dict[str, object]]
+    skipped_templates: list[dict[str, object]]
+    warnings: list[str]
+
+
+@dataclass(slots=True)
 class _HeaderAssignmentTarget:
     """Internal target descriptor for one previewable heading assignment slot."""
 
@@ -1089,6 +1183,7 @@ class AuthoringVocabularyResult:
     raster_binding_patch_keys: list[str]
     move_track_selectors: list[str]
     heading_field_catalog: dict[str, object]
+    header_archetypes: list[dict[str, object]]
     track_archetypes: list[dict[str, object]]
     resource_uris: list[str]
     target_summary: dict[str, object] | None
@@ -1394,6 +1489,77 @@ def _logfile_mapping_bindings(mapping: dict[str, object]) -> list[dict[str, obje
     return channels
 
 
+def _binding_summary_entry(binding: dict[str, object]) -> dict[str, object]:
+    summary = {
+        "kind": str(binding.get("kind", "curve")).strip().lower(),
+        "channel": str(binding.get("channel", "")),
+    }
+    for key in (
+        "id",
+        "label",
+        "scale",
+        "style",
+        "fill",
+        "header_display",
+        "reference_overlay",
+        "value_labels",
+        "wrap",
+        "render_mode",
+        "profile",
+        "normalization",
+        "waveform_normalization",
+        "clip_percentiles",
+        "interpolation",
+        "show_raster",
+        "raster_alpha",
+        "color_limits",
+        "colorbar",
+        "sample_axis",
+        "waveform",
+    ):
+        if key in binding:
+            summary[key] = deepcopy(binding[key])
+    return summary
+
+
+def _binding_summaries_by_track(
+    spec: LogFileSpec,
+    bindings: list[dict[str, object]],
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    summaries: dict[str, dict[str, list[dict[str, object]]]] = {}
+    for section_id in _section_ids_from_spec(spec):
+        section = _section_map_from_spec(spec)[section_id]
+        tracks = list(section.get("tracks", []))
+        summaries[section_id] = {
+            str(track.get("id", "")): []
+            for track in tracks
+            if isinstance(track, dict) and str(track.get("id", "")).strip()
+        }
+
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            continue
+        track_id = str(binding.get("track_id", "")).strip()
+        if not track_id:
+            continue
+        summaries.setdefault(section_id, {}).setdefault(track_id, []).append(
+            _binding_summary_entry(binding)
+        )
+
+    for track_map in summaries.values():
+        for entries in track_map.values():
+            entries.sort(
+                key=lambda entry: (
+                    str(entry.get("kind", "")),
+                    str(entry.get("channel", "")),
+                )
+            )
+    return summaries
+
+
 def _logfile_mapping_section(
     mapping: dict[str, object],
     section_id: str,
@@ -1522,6 +1688,29 @@ def _find_raster_binding_index(
         f"Raster binding for channel {channel!r} was not found on track {track_id!r} "
         f"in section {section_id!r}."
     )
+
+
+def _curve_binding_indexes_for_track(
+    bindings: list[dict[str, object]],
+    *,
+    spec: LogFileSpec,
+    section_id: str,
+    track_id: str,
+) -> dict[str, int]:
+    indexes: dict[str, int] = {}
+    for index, binding in enumerate(bindings):
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("kind", "curve")).strip().lower() != "curve":
+            continue
+        if _binding_target_section_id(spec, binding) != section_id:
+            continue
+        if str(binding.get("track_id", "")).strip() != track_id:
+            continue
+        channel = str(binding.get("channel", "")).strip()
+        if channel:
+            indexes[channel.upper()] = index
+    return indexes
 
 
 def _binding_element_id_seed(track_id: str, channel: str) -> str:
@@ -1720,6 +1909,44 @@ def _merge_optional_patch(
             continue
         merged[key] = deepcopy(value)
     return merged
+
+
+def _sync_track_grid_to_x_scale(track: dict[str, object], x_scale: dict[str, object]) -> None:
+    kind = str(x_scale.get("kind", "")).strip().lower()
+    if not kind:
+        return
+
+    if kind == "log":
+        grid_scale = "logarithmic"
+        spacing_mode = "scale"
+    elif kind == "tangential":
+        grid_scale = "tangential"
+        spacing_mode = "scale"
+    else:
+        grid_scale = "linear"
+        spacing_mode = "count"
+
+    grid = track.get("grid")
+    if not isinstance(grid, dict):
+        grid = {}
+        track["grid"] = grid
+    vertical = grid.get("vertical")
+    if not isinstance(vertical, dict):
+        vertical = {}
+        grid["vertical"] = vertical
+    main = vertical.get("main")
+    if not isinstance(main, dict):
+        main = {}
+        vertical["main"] = main
+    secondary = vertical.get("secondary")
+    if not isinstance(secondary, dict):
+        secondary = {}
+        vertical["secondary"] = secondary
+
+    main["scale"] = grid_scale
+    main["spacing_mode"] = spacing_mode
+    secondary["scale"] = grid_scale
+    secondary["spacing_mode"] = spacing_mode
 
 
 def _layout_has_tail(layout: dict[str, object]) -> bool:
@@ -2156,6 +2383,57 @@ def _section_track_ids_from_mapping(mapping: dict[str, object]) -> dict[str, lis
     return track_ids_by_section
 
 
+def _binding_summaries_from_mapping(
+    mapping: dict[str, object],
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    try:
+        track_ids_by_section = _section_track_ids_from_mapping(mapping)
+        bindings = _logfile_mapping_bindings(mapping)
+    except TemplateValidationError:
+        return {}
+
+    track_to_sections: dict[str, list[str]] = {}
+    summaries = {
+        section_id: {track_id: [] for track_id in track_ids}
+        for section_id, track_ids in track_ids_by_section.items()
+    }
+    for section_id, track_ids in track_ids_by_section.items():
+        for track_id in track_ids:
+            track_to_sections.setdefault(track_id, []).append(section_id)
+
+    only_section_id = (
+        next(iter(track_ids_by_section), None) if len(track_ids_by_section) == 1 else None
+    )
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        section_id = str(binding.get("section", "")).strip() or None
+        track_id = str(binding.get("track_id", "")).strip()
+        if not track_id:
+            continue
+        if section_id is None:
+            candidates = track_to_sections.get(track_id, [])
+            if len(candidates) == 1:
+                section_id = candidates[0]
+            elif only_section_id is not None:
+                section_id = only_section_id
+        if section_id is None:
+            continue
+        summaries.setdefault(section_id, {}).setdefault(track_id, []).append(
+            _binding_summary_entry(binding)
+        )
+
+    for track_map in summaries.values():
+        for entries in track_map.values():
+            entries.sort(
+                key=lambda entry: (
+                    str(entry.get("kind", "")),
+                    str(entry.get("channel", "")),
+                )
+            )
+    return summaries
+
+
 def _annotation_track_summaries_from_mapping(
     mapping: dict[str, object],
 ) -> dict[str, dict[str, list[dict[str, object]]]]:
@@ -2313,6 +2591,13 @@ def _header_key_alias_catalog() -> dict[str, object]:
         "general_field_prefixes": ["general_field.<key>", "field.<key>"],
         "service_title_patterns": ["service_title_<1-based-index>", "title_<1-based-index>"],
         "detail_prefixes": ["detail.<row label>", "detail.row_<row-index>.col_<column-index>"],
+        "detail_short_alias_rules": [
+            (
+                "Uppercase abbreviations at the start of one detail label also match "
+                "the first value cell."
+            ),
+            "Examples: `RMF` and `RMF value` both resolve to `RMF @ Measured Temp`.",
+        ],
         "overwrite_policies": list(AUTHORING_HEADER_OVERWRITE_POLICIES),
         "notes": [
             "General fields match by canonical key and visible label text.",
@@ -2320,6 +2605,65 @@ def _header_key_alias_catalog() -> dict[str, object]:
             "When a label matches multiple slots, use an explicit prefixed key to disambiguate.",
         ],
     }
+
+
+GENERAL_FIELD_LOOKUP_ALIASES: dict[str, tuple[str, ...]] = {
+    "archive_no": ("archive no", "archive number"),
+    "api_no": ("api no", "api number"),
+    "version": ("version",),
+    "county": ("county",),
+    "country": ("country", "state"),
+    "location": ("location",),
+    "section": ("section",),
+    "township": ("township", "twp"),
+    "range": ("range",),
+    "footage": ("footage",),
+    "latitude": ("latitude", "lat"),
+    "longitude": ("longitude", "long", "lon"),
+    "logging_date": ("logging date", "date"),
+    "run_number": ("run number",),
+    "scale": ("scale",),
+    "measured_from": ("measured from", "drilling measured from"),
+    "log_measured_from": ("log measured from", "logging measured from"),
+    "perforation_measured_from": ("perforation measured from",),
+    "elevation_kb": ("kb", "k.b.", "elev kb", "elev. kelly bushing"),
+    "elevation_gl": ("gl", "g.l.", "ground level", "ground level elevation", "elev. ground level"),
+    "elevation_df": ("df", "d.f.", "drill floor", "drill floor elevation", "elev. drill floor"),
+    "top_log_interval": ("top log interval",),
+    "bottom_log_interval": ("bottom log interval",),
+    "fluid_type": ("fluid type", "casing fluid type"),
+    "service_company": ("service company",),
+}
+
+DETAIL_FIELD_LOOKUP_ALIASES: dict[str, tuple[str, ...]] = {
+    _normalize_channel_token("Run"): ("run number",),
+    _normalize_channel_token("Driller Depth"): ("depth driller",),
+    _normalize_channel_token("Logged Depth"): ("schlumberger depth", "logger depth"),
+    _normalize_channel_token("Logging Measured From"): (
+        "log measured from",
+        "logging measured from",
+    ),
+    _normalize_channel_token("Elev. Kelly Bushing"): ("k.b.", "kb", "elevation kb"),
+    _normalize_channel_token("Elev. Drill Floor"): ("d.f.", "df", "elevation df"),
+    _normalize_channel_token("Elev. Ground Level"): ("g.l.", "gl", "ground level elevation"),
+    _normalize_channel_token("Above Perm Datum"): ("above permanent datum", "kelly bushing"),
+    _normalize_channel_token("Hole Diameter"): ("bit size",),
+    _normalize_channel_token("Equipment No."): ("unit number", "equipment number"),
+    _normalize_channel_token("Base"): ("unit location",),
+    _normalize_channel_token("Logged By"): ("recorded by",),
+    _normalize_channel_token("Maximum Temperature"): ("max recorded temperature",),
+}
+
+MIRRORED_HEADER_LOOKUP_KEYS: set[str] = {
+    _normalize_channel_token("latitude"),
+    _normalize_channel_token("longitude"),
+    _normalize_channel_token("k.b."),
+    _normalize_channel_token("g.l."),
+    _normalize_channel_token("d.f."),
+    _normalize_channel_token("ground level elevation"),
+    _normalize_channel_token("log measured from"),
+    _normalize_channel_token("logging measured from"),
+}
 
 
 def _normalize_header_lookup(value: object) -> str:
@@ -2390,6 +2734,49 @@ def _header_slot_lookup_keys(*values: object) -> list[str]:
     return normalized
 
 
+def _general_field_lookup_keys(key: str, label: str) -> list[str]:
+    """Return lookup aliases for one general-field slot."""
+    alias_values = GENERAL_FIELD_LOOKUP_ALIASES.get(str(key).strip().lower(), ())
+    return _header_slot_lookup_keys(
+        key,
+        label,
+        f"general_field.{key}",
+        f"field.{key}",
+        *alias_values,
+    )
+
+
+def _detail_label_lookup_keys(label_text: str, *, row_index: int) -> list[str]:
+    """Return lookup aliases for one detail-row label."""
+    lookup_values: list[object] = [
+        label_text,
+        f"detail.{label_text}",
+        f"detail.row_{row_index + 1}.col_1",
+    ]
+    lookup_values.extend(DETAIL_FIELD_LOOKUP_ALIASES.get(_normalize_header_lookup(label_text), ()))
+    shortened = label_text.split("@", 1)[0].split("(", 1)[0].strip()
+    if shortened and shortened != label_text and shortened.upper() == shortened:
+        lookup_values.extend(
+            [
+                shortened,
+                f"{shortened} value",
+                f"detail.{shortened}",
+                f"detail.{shortened} value",
+            ]
+        )
+    return _header_slot_lookup_keys(*lookup_values)
+
+
+def _should_mirror_header_matches(
+    lookup_key: str,
+    matches: list[_HeaderAssignmentTarget],
+) -> bool:
+    """Return whether one multi-target header key should apply to all matched slots."""
+    if lookup_key not in MIRRORED_HEADER_LOOKUP_KEYS:
+        return False
+    return {match.target_kind for match in matches}.issubset({"general_field", "detail_field"})
+
+
 def _heading_target_descriptors(
     heading: dict[str, object],
     *,
@@ -2426,12 +2813,7 @@ def _heading_target_descriptors(
                     target_key=key,
                     display_label=label or key,
                     slot_path=f"{slot_prefix}.general_fields[{index}].value",
-                    lookup_keys=_header_slot_lookup_keys(
-                        key,
-                        label,
-                        f"general_field.{key}",
-                        f"field.{key}",
-                    ),
+                    lookup_keys=_general_field_lookup_keys(key, label),
                     current_mode=_heading_value_slot_mode(slot_value),
                     current_value=_header_value_text(slot_value),
                     general_field_index=index,
@@ -2496,8 +2878,7 @@ def _heading_target_descriptors(
                             ".cells[0]"
                         ),
                         lookup_keys=_header_slot_lookup_keys(
-                            label_text,
-                            f"detail.{label_text}",
+                            *_detail_label_lookup_keys(label_text, row_index=row_index),
                             f"detail.row_{row_index + 1}.col_{column_index + 1}",
                         ),
                         current_mode=_heading_value_slot_mode(cell_value),
@@ -2521,11 +2902,7 @@ def _heading_target_descriptors(
                     target_key=label_text,
                     display_label=label_text,
                     slot_path=f"{slot_prefix}.detail.rows[{row_index}].values[0]",
-                    lookup_keys=_header_slot_lookup_keys(
-                        label_text,
-                        f"detail.{label_text}",
-                        f"detail.row_{row_index + 1}.col_1",
-                    ),
+                    lookup_keys=_detail_label_lookup_keys(label_text, row_index=row_index),
                     current_mode=_heading_value_slot_mode(cell_value),
                     current_value=_header_value_text(cell_value),
                     detail_row_index=row_index,
@@ -2549,11 +2926,7 @@ def _heading_target_descriptors(
                     target_key=label_text,
                     display_label=label_text,
                     slot_path=f"{slot_prefix}.detail.rows[{row_index}].columns[0].cells[0]",
-                    lookup_keys=_header_slot_lookup_keys(
-                        label_text,
-                        f"detail.{label_text}",
-                        f"detail.row_{row_index + 1}.col_1",
-                    ),
+                    lookup_keys=_detail_label_lookup_keys(label_text, row_index=row_index),
                     current_mode=_heading_value_slot_mode(cell_value),
                     current_value=_header_value_text(cell_value),
                     detail_row_index=row_index,
@@ -2619,6 +2992,22 @@ def _apply_header_target_value(
     cells = column.get("cells")
     assert isinstance(cells, list)
     assert target.detail_cell_index is not None
+    measured_value_parts = None
+    if target.detail_cell_index == 0 and len(cells) >= 3:
+        middle_cell = cells[1]
+        middle_text = (
+            _coerce_header_assignment_value(middle_cell.get("value"))
+            if isinstance(middle_cell, dict)
+            else _coerce_header_assignment_value(middle_cell)
+        )
+        if middle_text == "@":
+            left_text, separator, right_text = value.partition("@")
+            if separator and left_text.strip() and right_text.strip():
+                measured_value_parts = (left_text.strip(), right_text.strip())
+    if measured_value_parts is not None:
+        cells[0] = measured_value_parts[0]
+        cells[2] = measured_value_parts[1]
+        return
     cells[target.detail_cell_index] = value
 
 
@@ -3020,10 +3409,15 @@ def _remarks_capabilities(layout: dict[str, object]) -> dict[str, object]:
 
 def _heading_slot_resource_uris() -> list[str]:
     return [
+        "wellplot://authoring/catalog/header-archetypes.json",
         "wellplot://authoring/catalog/header-fields.json",
         "wellplot://authoring/catalog/header-key-aliases.json",
         "wellplot://authoring/schema/patch.json",
     ]
+
+
+def _header_archetypes_catalog() -> list[dict[str, object]]:
+    return deepcopy(header_archetype_catalog())
 
 
 def _track_archetypes_catalog() -> list[dict[str, object]]:
@@ -3106,6 +3500,16 @@ def authoring_track_archetypes_resource() -> ResourceContent:
     """Return curated draft-authoring track archetypes as JSON text."""
     payload = json.dumps(
         {"track_archetypes": _track_archetypes_catalog()},
+        indent=2,
+        sort_keys=True,
+    )
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_header_archetypes_resource() -> ResourceContent:
+    """Return curated deterministic header archetypes as JSON text."""
+    payload = json.dumps(
+        {"header_archetypes": _header_archetypes_catalog()},
         indent=2,
         sort_keys=True,
     )
@@ -3830,6 +4234,8 @@ def summarize_logfile_draft(
     )
     default_depth_range = _document_default_depth_range(spec)
     binding_counts = _binding_counts_by_section(spec)
+    mapping = report_to_dict(spec)
+    bindings_by_track = _binding_summaries_by_track(spec, _logfile_mapping_bindings(mapping))
 
     available_channels_by_section = {section_id: [] for section_id in _section_ids_from_spec(spec)}
     dataset_loaded = False
@@ -3869,6 +4275,7 @@ def summarize_logfile_draft(
                 track_kinds=[str(track.get("kind", "")) for track in tracks],
                 curve_binding_count=counts["curve"],
                 raster_binding_count=counts["raster"],
+                bindings_by_track=deepcopy(bindings_by_track.get(section_id, {})),
                 available_channels=available_channels_by_section[section_id],
                 dataset_loaded=dataset_loaded,
                 dataset_message=dataset_message,
@@ -4107,6 +4514,50 @@ def set_page_layout(
         logfile_path=str(resolved_logfile),
         page=deepcopy(dict(saved_mapping.get("document", {}).get("page", {}))),
         render=deepcopy(dict(saved_mapping.get("render", {}))),
+    )
+
+
+def set_matplotlib_style(
+    logfile_path: str,
+    *,
+    style_patch: dict[str, object],
+    root: str | Path | None = None,
+) -> MatplotlibStyleResult:
+    """Deep-merge one report-wide Matplotlib style patch into a draft logfile."""
+    if not style_patch:
+        raise TemplateValidationError("Provide at least one Matplotlib style setting to update.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    render_mapping = _logfile_mapping_render(mapping)
+    matplotlib_mapping = render_mapping.get("matplotlib")
+    if not isinstance(matplotlib_mapping, dict):
+        matplotlib_mapping = {}
+        render_mapping["matplotlib"] = matplotlib_mapping
+    style_mapping = matplotlib_mapping.get("style")
+    if not isinstance(style_mapping, dict):
+        style_mapping = {}
+    matplotlib_mapping["style"] = _merge_optional_patch(style_mapping, style_patch)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_render = _logfile_mapping_render(report_to_dict(saved_spec))
+    saved_matplotlib = saved_render.get("matplotlib")
+    if not isinstance(saved_matplotlib, dict):
+        saved_matplotlib = {}
+    saved_style = saved_matplotlib.get("style")
+    if not isinstance(saved_style, dict):
+        saved_style = {}
+    return MatplotlibStyleResult(
+        logfile_path=str(resolved_logfile),
+        style=deepcopy(saved_style),
     )
 
 
@@ -4454,6 +4905,162 @@ def update_track(
         section_id=section_id,
         track_id=track_id,
         track=deepcopy(saved_track),
+    )
+
+
+def inspect_track_bindings(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    root: str | Path | None = None,
+) -> TrackBindingsInspectionResult:
+    """Return one track's current binding inventory and scale state."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    spec = load_logfile(resolved_logfile, allowed_root=server_root)
+    _ensure_known_track_ids(spec, section_id, [track_id])
+    mapping = report_to_dict(spec)
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track = tracks[_find_track_index(tracks, section_id=section_id, track_id=track_id)]
+    if not isinstance(track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+
+    bindings_by_track = _binding_summaries_by_track(spec, _logfile_mapping_bindings(mapping))
+    bindings = deepcopy(bindings_by_track.get(section_id, {}).get(track_id, []))
+    curve_binding_count = sum(1 for binding in bindings if binding.get("kind") == "curve")
+    raster_binding_count = sum(1 for binding in bindings if binding.get("kind") == "raster")
+
+    available_channels: list[str] = []
+    dataset_loaded = False
+    dataset_message = ""
+    try:
+        datasets_by_section, _ = load_datasets_for_logfile(
+            spec,
+            base_dir=resolved_logfile.parent,
+            allowed_root=server_root,
+        )
+    except (DependencyUnavailableError, FileNotFoundError, OSError, TemplateValidationError) as exc:
+        dataset_message = str(exc)
+    else:
+        dataset_loaded = True
+        dataset = datasets_by_section.get(section_id)
+        if dataset is not None:
+            available_channels = list(dataset.channels)
+
+    return TrackBindingsInspectionResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track=deepcopy(track),
+        curve_binding_count=curve_binding_count,
+        raster_binding_count=raster_binding_count,
+        bindings=bindings,
+        available_channels=available_channels,
+        dataset_loaded=dataset_loaded,
+        dataset_message=dataset_message,
+    )
+
+
+def set_track_scales(
+    logfile_path: str,
+    *,
+    section_id: str,
+    track_id: str,
+    x_scale: dict[str, object] | None = None,
+    curve_scale: dict[str, object] | None = None,
+    channel_scales: dict[str, dict[str, object]] | None = None,
+    sync_grid_to_scale: bool = True,
+    root: str | Path | None = None,
+) -> TrackScaleResult:
+    """Update one track x_scale and one or more curve-binding scales in one save."""
+    if x_scale is None and curve_scale is None and not channel_scales:
+        raise ValueError("Provide at least one of x_scale, curve_scale, or channel_scales.")
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_track_ids(current_spec, section_id, [track_id])
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+    track = tracks[track_index]
+    if not isinstance(track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+
+    if x_scale is not None:
+        track["x_scale"] = deepcopy(x_scale)
+        if sync_grid_to_scale:
+            _sync_track_grid_to_x_scale(track, x_scale)
+
+    bindings = _logfile_mapping_bindings(mapping)
+    curve_indexes = _curve_binding_indexes_for_track(
+        bindings,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+    )
+    if (curve_scale is not None or channel_scales) and not curve_indexes:
+        raise TemplateValidationError(
+            f"Track {track_id!r} in section {section_id!r} does not currently have curve bindings."
+        )
+
+    updated_channels: set[str] = set()
+    if curve_scale is not None:
+        for channel, binding_index in curve_indexes.items():
+            bindings[binding_index]["scale"] = deepcopy(curve_scale)
+            updated_channels.add(channel)
+
+    if channel_scales:
+        missing = [
+            channel
+            for channel in channel_scales
+            if str(channel).strip().upper() not in curve_indexes
+        ]
+        if missing:
+            raise TemplateValidationError(
+                f"Curve bindings {missing} were not found on track {track_id!r} in "
+                f"section {section_id!r}. Available bound channels: {sorted(curve_indexes)}."
+            )
+        for channel, scale_patch in channel_scales.items():
+            normalized_channel = str(channel).strip().upper()
+            bindings[curve_indexes[normalized_channel]]["scale"] = deepcopy(scale_patch)
+            updated_channels.add(normalized_channel)
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_mapping = report_to_dict(saved_spec)
+    saved_section = _logfile_mapping_section(saved_mapping, section_id)
+    saved_tracks = _logfile_mapping_section_tracks(saved_section, section_id=section_id)
+    saved_track = saved_tracks[
+        _find_track_index(saved_tracks, section_id=section_id, track_id=track_id)
+    ]
+    if not isinstance(saved_track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+    saved_bindings_by_track = _binding_summaries_by_track(
+        saved_spec,
+        _logfile_mapping_bindings(saved_mapping),
+    )
+    saved_bindings = [
+        binding
+        for binding in saved_bindings_by_track.get(section_id, {}).get(track_id, [])
+        if str(binding.get("channel", "")).upper() in updated_channels
+    ]
+    saved_bindings.sort(key=lambda binding: str(binding.get("channel", "")))
+    return TrackScaleResult(
+        logfile_path=str(resolved_logfile),
+        section_id=section_id,
+        track_id=track_id,
+        track=deepcopy(saved_track),
+        updated_channels=sorted(updated_channels),
+        bindings=deepcopy(saved_bindings),
     )
 
 
@@ -5505,6 +6112,132 @@ def set_remarks_content(
     )
 
 
+def _preserve_literal_heading_values(
+    previous_heading: dict[str, object],
+    next_heading: dict[str, object],
+) -> int:
+    """Copy literal heading values into one replacement heading scaffold when possible."""
+    previous_targets = _heading_target_descriptors(
+        previous_heading,
+        slot_prefix="document.layout.heading",
+    )
+    next_targets = _heading_target_descriptors(
+        next_heading,
+        slot_prefix="document.layout.heading",
+    )
+    next_by_identity = {
+        (target.target_kind, _normalize_header_lookup(target.target_key)): target
+        for target in next_targets
+    }
+    next_by_lookup: dict[str, list[_HeaderAssignmentTarget]] = {}
+    for target in next_targets:
+        for lookup_key in target.lookup_keys:
+            next_by_lookup.setdefault(lookup_key, []).append(target)
+
+    preserved = 0
+    for previous_target in previous_targets:
+        if not _header_slot_is_filled(
+            previous_target.current_mode,
+            previous_target.current_value,
+        ):
+            continue
+        if previous_target.current_value is None:
+            continue
+        matching_target = next_by_identity.get(
+            (
+                previous_target.target_kind,
+                _normalize_header_lookup(previous_target.target_key),
+            )
+        )
+        if matching_target is None:
+            lookup_matches: list[_HeaderAssignmentTarget] = []
+            for lookup_key in previous_target.lookup_keys:
+                lookup_matches.extend(next_by_lookup.get(lookup_key, []))
+            unique_matches = []
+            seen_ids: set[int] = set()
+            for candidate in lookup_matches:
+                candidate_id = id(candidate)
+                if candidate_id in seen_ids:
+                    continue
+                seen_ids.add(candidate_id)
+                unique_matches.append(candidate)
+            if len(unique_matches) == 1:
+                matching_target = unique_matches[0]
+        if matching_target is None:
+            continue
+        _apply_header_target_value(next_heading, matching_target, previous_target.current_value)
+        matching_target.current_mode = "literal"
+        matching_target.current_value = previous_target.current_value
+        preserved += 1
+    return preserved
+
+
+def inspect_header_archetypes(
+    *,
+    archetype_id: str | None = None,
+) -> HeaderArchetypesResult:
+    """Return one deterministic header-archetype catalog or a single selected entry."""
+    if archetype_id is None:
+        archetypes = _header_archetypes_catalog()
+        selected_archetype_id = None
+    else:
+        selected_heading = header_archetype_heading(archetype_id)
+        catalog_entry = next(
+            entry
+            for entry in _header_archetypes_catalog()
+            if str(entry.get("id", "")).strip().lower() == str(archetype_id).strip().lower()
+        )
+        catalog_entry["heading"] = selected_heading
+        archetypes = [catalog_entry]
+        selected_archetype_id = str(catalog_entry["id"])
+    return HeaderArchetypesResult(
+        selected_archetype_id=selected_archetype_id,
+        archetypes=archetypes,
+        resource_uris=[
+            "wellplot://authoring/catalog/header-archetypes.json",
+            "wellplot://authoring/catalog/header-fields.json",
+            "wellplot://authoring/catalog/header-key-aliases.json",
+        ],
+    )
+
+
+def apply_header_archetype(
+    logfile_path: str,
+    *,
+    archetype_id: str,
+    preserve_existing_values: bool = True,
+    root: str | Path | None = None,
+) -> AppliedHeaderArchetypeResult:
+    """Replace one draft heading scaffold with a shipped deterministic archetype."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    layout = _logfile_mapping_layout(mapping)
+    current_heading_raw = layout.get("heading")
+    current_heading = dict(current_heading_raw) if isinstance(current_heading_raw, dict) else {}
+    next_heading = header_archetype_heading(archetype_id)
+    preserved_assignment_count = 0
+    if preserve_existing_values and current_heading:
+        preserved_assignment_count = _preserve_literal_heading_values(current_heading, next_heading)
+    layout["heading"] = next_heading
+
+    _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    heading_slots = inspect_heading_slots(logfile_path=str(resolved_logfile), root=server_root)
+    return AppliedHeaderArchetypeResult(
+        logfile_path=str(resolved_logfile),
+        archetype_id=str(archetype_id).strip(),
+        preserved_assignment_count=preserved_assignment_count,
+        heading_summary=_heading_summary_payload(heading_slots),
+    )
+
+
 def inspect_heading_slots(
     *,
     logfile_path: str | None = None,
@@ -5643,7 +6376,7 @@ def preview_header_mapping(
             )
             continue
 
-        if len(matches) > 1:
+        if len(matches) > 1 and not _should_mirror_header_matches(lookup_key, matches):
             conflicting_values.append(
                 {
                     "input_key": str(input_key),
@@ -5661,8 +6394,41 @@ def preview_header_mapping(
             )
             continue
 
-        target = matches[0]
-        if target.current_value == input_value:
+        for target in matches:
+            if target.current_value == input_value:
+                resolved_assignments.append(
+                    {
+                        "input_key": str(input_key),
+                        "input_value": input_value,
+                        "target_kind": target.target_kind,
+                        "target_key": target.target_key,
+                        "slot_path": target.slot_path,
+                        "previous_mode": target.current_mode,
+                        "previous_value": target.current_value,
+                        "action": "unchanged",
+                    }
+                )
+                continue
+
+            if effective_policy == "fill_empty" and _header_slot_is_filled(
+                target.current_mode,
+                target.current_value,
+            ):
+                conflicting_values.append(
+                    {
+                        "input_key": str(input_key),
+                        "input_value": input_value,
+                        "target_kind": target.target_kind,
+                        "target_key": target.target_key,
+                        "slot_path": target.slot_path,
+                        "existing_value": target.current_value,
+                        "reason": "Target already has an explicit literal value.",
+                    }
+                )
+                continue
+
+            action = "replace" if target.current_value not in (None, "") else "set"
+            _apply_header_target_value(predicted_heading, target, input_value)
             resolved_assignments.append(
                 {
                     "input_key": str(input_key),
@@ -5672,44 +6438,11 @@ def preview_header_mapping(
                     "slot_path": target.slot_path,
                     "previous_mode": target.current_mode,
                     "previous_value": target.current_value,
-                    "action": "unchanged",
+                    "action": action,
                 }
             )
-            continue
-
-        if effective_policy == "fill_empty" and _header_slot_is_filled(
-            target.current_mode,
-            target.current_value,
-        ):
-            conflicting_values.append(
-                {
-                    "input_key": str(input_key),
-                    "input_value": input_value,
-                    "target_kind": target.target_kind,
-                    "target_key": target.target_key,
-                    "slot_path": target.slot_path,
-                    "existing_value": target.current_value,
-                    "reason": "Target already has an explicit literal value.",
-                }
-            )
-            continue
-
-        action = "replace" if target.current_value not in (None, "") else "set"
-        _apply_header_target_value(predicted_heading, target, input_value)
-        resolved_assignments.append(
-            {
-                "input_key": str(input_key),
-                "input_value": input_value,
-                "target_kind": target.target_kind,
-                "target_key": target.target_key,
-                "slot_path": target.slot_path,
-                "previous_mode": target.current_mode,
-                "previous_value": target.current_value,
-                "action": action,
-            }
-        )
-        target.current_mode = "literal"
-        target.current_value = input_value
+            target.current_mode = "literal"
+            target.current_value = input_value
 
     if not targets:
         warnings.append("The draft does not expose any heading slots that can receive values.")
@@ -5917,6 +6650,343 @@ def inspect_style_presets(
     )
 
 
+def _style_preset_entry(preset_id: str) -> dict[str, object]:
+    normalized_preset_id = str(preset_id).strip()
+    for preset in AUTHORING_STYLE_PRESETS:
+        if str(preset.get("id", "")).strip() == normalized_preset_id:
+            return deepcopy(dict(preset))
+    available = [str(preset.get("id", "")) for preset in AUTHORING_STYLE_PRESETS]
+    raise ValueError(f"preset_id must be one of {available}, got {preset_id!r}.")
+
+
+def _channel_alias_entry_by_id(alias_id: str) -> dict[str, object]:
+    normalized_alias_id = str(alias_id).strip().lower()
+    for entry in AUTHORING_CHANNEL_ALIASES:
+        if str(entry.get("id", "")).strip().lower() == normalized_alias_id:
+            return deepcopy(dict(entry))
+    raise TemplateValidationError(f"Unknown channel alias id {alias_id!r}.")
+
+
+def _dataset_available_channels_for_section(
+    *,
+    spec: LogFileSpec,
+    logfile_path: Path,
+    section_id: str,
+    root: Path,
+) -> list[str]:
+    (
+        dataset,
+        _resolved_source,
+        _detected_format,
+        _resolved_logfile,
+        resolved_section_id,
+        _warnings,
+    ) = _logfile_channel_target(
+        str(logfile_path),
+        section_id=section_id,
+        root=root,
+    )
+    if resolved_section_id != section_id:
+        raise RuntimeError("Resolved section id did not match the requested section.")
+    return list(dataset.channels)
+
+
+def _resolve_preset_template_channel(
+    *,
+    template: dict[str, object],
+    available_channels: list[str],
+    channel_overrides: dict[str, str],
+) -> tuple[str | None, dict[str, object] | None]:
+    alias_id = str(template.get("alias_id", "")).strip()
+    if not alias_id:
+        return None, {"reason": "missing_alias_id"}
+
+    override = channel_overrides.get(alias_id)
+    if override is not None:
+        normalized_override = _normalize_channel_token(override)
+        matching_channels = [
+            channel
+            for channel in available_channels
+            if _normalize_channel_token(channel) == normalized_override
+        ]
+        if len(matching_channels) == 1:
+            return matching_channels[0], None
+        return None, {
+            "alias_id": alias_id,
+            "reason": "invalid_override",
+            "requested_channel": override,
+            "available_channels": available_channels,
+        }
+
+    alias_entry = _channel_alias_entry_by_id(alias_id)
+    mnemonics = {
+        _normalize_channel_token(str(value))
+        for value in alias_entry.get("mnemonics", [])
+        if str(value).strip()
+    }
+    matching_channels = [
+        channel for channel in available_channels if _normalize_channel_token(channel) in mnemonics
+    ]
+    if len(matching_channels) == 1:
+        return matching_channels[0], None
+    if len(matching_channels) > 1:
+        return None, {
+            "alias_id": alias_id,
+            "reason": "ambiguous_channel_match",
+            "matched_channels": matching_channels,
+        }
+    return None, {
+        "alias_id": alias_id,
+        "reason": "channel_not_found",
+        "available_channels": available_channels,
+    }
+
+
+def _binding_template_kind(template: dict[str, object]) -> str:
+    render_mode = str(template.get("render_mode", "")).strip().lower()
+    if render_mode == "raster":
+        return "raster"
+    return str(template.get("kind", "curve")).strip().lower() or "curve"
+
+
+def _apply_style_template_fill_channels(
+    fill: dict[str, object],
+    *,
+    current_spec: LogFileSpec,
+    logfile_path: Path,
+    root: Path,
+    section_id: str,
+) -> dict[str, object]:
+    patched_fill = deepcopy(fill)
+    other_channel = patched_fill.get("other_channel")
+    if isinstance(other_channel, str) and other_channel.strip():
+        patched_fill["other_channel"] = _resolve_section_channel_name(
+            current_spec,
+            logfile_path=logfile_path,
+            root=root,
+            section_id=section_id,
+            channel=other_channel,
+        )
+    return patched_fill
+
+
+def apply_style_preset(
+    logfile_path: str,
+    *,
+    preset_id: str,
+    section_id: str | None = None,
+    track_id: str | None = None,
+    channel_overrides: dict[str, str] | None = None,
+    clear_existing_bindings: bool = False,
+    root: str | Path | None = None,
+) -> AppliedStylePresetResult:
+    """Apply one curated style preset to a draft, optionally targeting one track."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    preset = _style_preset_entry(preset_id)
+    track_patch = preset.get("track_patch")
+    binding_templates = preset.get("binding_templates")
+    heading_patch = preset.get("heading_patch")
+    remarks_patch = preset.get("remarks_patch")
+
+    requires_track_target = track_patch is not None or binding_templates is not None
+    if requires_track_target and (section_id is None or track_id is None):
+        raise TemplateValidationError(
+            "section_id and track_id are required for presets that modify track or binding state."
+        )
+    if not requires_track_target and clear_existing_bindings:
+        raise TemplateValidationError(
+            "clear_existing_bindings is only supported for presets that target one track."
+        )
+
+    channel_overrides = {} if channel_overrides is None else dict(channel_overrides)
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    warnings: list[str] = []
+    skipped_templates: list[dict[str, object]] = []
+    applied_bindings: list[dict[str, object]] = []
+    saved_track: dict[str, object] | None = None
+
+    if heading_patch is not None:
+        layout = _logfile_mapping_layout(mapping)
+        heading = layout.get("heading")
+        if not isinstance(heading, dict):
+            heading = {}
+            layout["heading"] = heading
+        layout["heading"] = _merge_optional_patch(heading, deepcopy(dict(heading_patch)))
+
+    if remarks_patch is not None:
+        layout = _logfile_mapping_layout(mapping)
+        layout["remarks"] = deepcopy(list(remarks_patch))
+
+    bindings = _logfile_mapping_bindings(mapping)
+    if requires_track_target:
+        assert section_id is not None and track_id is not None
+        _ensure_known_track_ids(current_spec, section_id, [track_id])
+        section = _logfile_mapping_section(mapping, section_id)
+        tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+        track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+        track = tracks[track_index]
+        if not isinstance(track, dict):
+            raise RuntimeError("Expected a mapping track entry.")
+        if isinstance(track_patch, dict):
+            tracks[track_index] = _merge_optional_patch(track, deepcopy(track_patch))
+
+        if clear_existing_bindings:
+            retained_bindings: list[object] = []
+            for binding in bindings:
+                if not isinstance(binding, dict):
+                    retained_bindings.append(binding)
+                    continue
+                if _binding_targets_track(
+                    current_spec,
+                    binding,
+                    section_id=section_id,
+                    track_id=track_id,
+                ):
+                    continue
+                retained_bindings.append(binding)
+            binding_container = mapping.setdefault("document", {}).setdefault("bindings", {})
+            if not isinstance(binding_container, dict):
+                raise RuntimeError("Expected document.bindings to be a mapping.")
+            binding_container["channels"] = retained_bindings
+            bindings = _logfile_mapping_bindings(mapping)
+
+        if isinstance(binding_templates, list):
+            available_channels = _dataset_available_channels_for_section(
+                spec=current_spec,
+                logfile_path=resolved_logfile,
+                section_id=section_id,
+                root=server_root,
+            )
+            for template in binding_templates:
+                if not isinstance(template, dict):
+                    continue
+                resolved_channel, skip = _resolve_preset_template_channel(
+                    template=template,
+                    available_channels=available_channels,
+                    channel_overrides=channel_overrides,
+                )
+                if resolved_channel is None:
+                    if skip is not None:
+                        skipped_templates.append(skip)
+                        alias_id = skip.get("alias_id")
+                        if isinstance(alias_id, str):
+                            warnings.append(
+                                f"Preset template for alias {alias_id!r} could not be resolved: "
+                                f"{skip.get('reason', 'unknown_reason')}."
+                            )
+                    continue
+
+                binding_kind = _binding_template_kind(template)
+                template_patch = {
+                    key: deepcopy(value)
+                    for key, value in template.items()
+                    if key not in {"alias_id", "render_mode", "kind"}
+                }
+                if binding_kind == "curve" and isinstance(template_patch.get("fill"), dict):
+                    template_patch["fill"] = _apply_style_template_fill_channels(
+                        template_patch["fill"],
+                        current_spec=current_spec,
+                        logfile_path=resolved_logfile,
+                        root=server_root,
+                        section_id=section_id,
+                    )
+
+                if binding_kind == "raster":
+                    try:
+                        binding_index = _find_raster_binding_index(
+                            bindings,
+                            spec=current_spec,
+                            section_id=section_id,
+                            track_id=track_id,
+                            channel=resolved_channel,
+                        )
+                    except TemplateValidationError:
+                        new_binding: dict[str, object] = {
+                            "section": section_id,
+                            "track_id": track_id,
+                            "channel": resolved_channel,
+                            "kind": "raster",
+                        }
+                        new_binding.update(template_patch)
+                        bindings.append(new_binding)
+                        action = "created"
+                    else:
+                        binding = bindings[binding_index]
+                        if not isinstance(binding, dict):
+                            raise RuntimeError("Expected a mapping raster binding entry.")
+                        bindings[binding_index] = _merge_optional_patch(binding, template_patch)
+                        action = "updated"
+                else:
+                    try:
+                        binding_index = _find_curve_binding_index(
+                            bindings,
+                            spec=current_spec,
+                            section_id=section_id,
+                            track_id=track_id,
+                            channel=resolved_channel,
+                        )
+                    except TemplateValidationError:
+                        new_binding = {
+                            "section": section_id,
+                            "track_id": track_id,
+                            "channel": resolved_channel,
+                            "kind": "curve",
+                        }
+                        new_binding.update(template_patch)
+                        bindings.append(new_binding)
+                        action = "created"
+                    else:
+                        binding = bindings[binding_index]
+                        if not isinstance(binding, dict):
+                            raise RuntimeError("Expected a mapping curve binding entry.")
+                        bindings[binding_index] = _merge_optional_patch(binding, template_patch)
+                        action = "updated"
+
+                applied_bindings.append(
+                    {
+                        "alias_id": str(template.get("alias_id", "")),
+                        "channel": resolved_channel,
+                        "binding_kind": binding_kind,
+                        "action": action,
+                    }
+                )
+
+    saved_spec = _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    if requires_track_target:
+        assert section_id is not None and track_id is not None
+        saved_section = _section_map_from_spec(saved_spec)[section_id]
+        saved_tracks = list(saved_section.get("tracks", []))
+        saved_track_index = _find_track_index(
+            saved_tracks,
+            section_id=section_id,
+            track_id=track_id,
+        )
+        saved_track = deepcopy(saved_tracks[saved_track_index])
+
+    return AppliedStylePresetResult(
+        logfile_path=str(resolved_logfile),
+        preset_id=str(preset.get("id", preset_id)),
+        preset_family=str(preset.get("family", "")),
+        section_id=section_id,
+        track_id=track_id,
+        clear_existing_bindings=bool(clear_existing_bindings),
+        heading_applied=isinstance(heading_patch, dict),
+        remarks_applied=isinstance(remarks_patch, list),
+        track=saved_track,
+        applied_bindings=applied_bindings,
+        skipped_templates=skipped_templates,
+        warnings=warnings,
+    )
+
+
 def inspect_authoring_vocab(
     *,
     logfile_path: str | None = None,
@@ -5946,6 +7016,9 @@ def inspect_authoring_vocab(
             "section_ids": list(summary.section_ids),
             "track_ids_by_section": {
                 section.id: list(section.track_ids) for section in summary.sections
+            },
+            "bindings_by_track": {
+                section.id: deepcopy(section.bindings_by_track) for section in summary.sections
             },
             "annotation_track_ids_by_section": {
                 section_id: sorted(track_map)
@@ -5977,6 +7050,7 @@ def inspect_authoring_vocab(
             "target_path": str(resolved_template),
             "section_ids": list(_section_track_ids_from_mapping(mapping)),
             "track_ids_by_section": _section_track_ids_from_mapping(mapping),
+            "bindings_by_track": _binding_summaries_from_mapping(mapping),
             "annotation_track_ids_by_section": {
                 section_id: sorted(track_map)
                 for section_id, track_map in annotation_summaries.items()
@@ -6006,6 +7080,7 @@ def inspect_authoring_vocab(
         raster_binding_patch_keys=list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
         move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
         heading_field_catalog=_heading_field_catalog(),
+        header_archetypes=_header_archetypes_catalog(),
         track_archetypes=_track_archetypes_catalog(),
         resource_uris=list(AUTHORING_RESOURCE_URIS),
         target_summary=target_summary,
@@ -6367,37 +7442,54 @@ def author_plot_from_request_prompt(
         "defaults, prefer set_section_view(...).\n"
         "4. If the request changes page size, orientation, continuous layout, or "
         "render defaults, call set_page_layout(...).\n"
+        "4a. If the request changes report-wide Matplotlib style defaults such as grid "
+        "line colors or line widths, call set_matplotlib_style(...). Common grid keys "
+        "live under style_patch.grid, including depth_major_color, depth_minor_color, "
+        "x_major_linewidth, and x_minor_linewidth.\n"
         "5. If the request changes report scale or depth-grid behavior, call "
         "set_depth_axis(...).\n"
         "6. If you have a draft logfile, call summarize_logfile_draft(logfile_path).\n"
         "7. If the request includes report-header or remarks content from text, call "
         "parse_key_value_text(source_text, format_hint=None) first.\n"
-        "8. If the request includes report-header or remarks content, call "
+        "8. If the request needs a specific open-hole or cased-hole packet header, call "
+        "inspect_header_archetypes(...) and apply_header_archetype(...) before you fill values.\n"
+        "9. If the request includes report-header or remarks content, call "
         "inspect_heading_slots(...), preview_header_mapping(...), and "
         "apply_header_values(...) before generic heading patches.\n"
-        "9. If the request is mainly about visual conventions, call "
-        "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales.\n"
-        "10. Call inspect_authoring_vocab(...) with the same logfile_path when possible. "
+        "9a. If the request only fills existing header values, do not rewrite heading "
+        "structure or add remarks.\n"
+        "10. If the request is mainly about visual conventions, call "
+        "inspect_style_presets(...) before inventing ad hoc colors, fills, or scales. "
+        "If one preset already matches the intent, prefer apply_style_preset(...).\n"
+        "10a. If the request changes scales, labels, or fills on an existing track, call "
+        "inspect_track_bindings(...) before patching bindings.\n"
+        "10b. If the request changes one shared track scale together with multiple curve "
+        "scales on that track, prefer set_track_scales(...); it can also synchronize the "
+        "track's vertical grid convention to the chosen axis scale.\n"
+        "11. Call inspect_authoring_vocab(...) with the same logfile_path when possible. "
         "Use its annotations_by_track summaries when you need to edit existing annotation "
         "objects by index.\n"
-        "11. Plan the smallest explicit edit sequence using update_section(...), "
-        "set_section_view(...), set_page_layout(...), set_depth_axis(...), add_track(...), "
-        "update_track(...), remove_track(...), "
+        "12. Plan the smallest explicit edit sequence using update_section(...), "
+        "set_section_view(...), set_page_layout(...), set_matplotlib_style(...), "
+        "set_depth_axis(...), add_track(...), "
+        "update_track(...), inspect_track_bindings(...), set_track_scales(...), "
+        "remove_track(...), "
         "add_annotation_object(...), update_annotation_object(...), "
         "remove_annotation_object(...), "
         "bind_curve(...), add_curve_fill(...), remove_curve_fill(...), "
         "bind_raster(...), "
         "update_curve_binding(...), update_raster_binding(...), "
         "remove_curve_binding(...), remove_raster_binding(...), "
-        "clear_track_bindings(...), move_track(...), "
-        "set_heading_content(...), and set_remarks_content(...).\n"
-        "12. For density-neutron overlays with crossover fill, prefer "
+        "clear_track_bindings(...), move_track(...), apply_style_preset(...), "
+        "set_heading_content(...), set_remarks_content(...), and "
+        "apply_header_archetype(...).\n"
+        "13. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "13. Preview the affected section, track, or window before recommending a final render.\n"
-        "14. If you captured the previous YAML text before editing, call "
+        "14. Preview the affected section, track, or window before recommending a final render.\n"
+        "15. If you captured the previous YAML text before editing, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final summary.\n"
-        "15. Prefer explicit, reviewable mutations over full-file rewrites.\n"
+        "16. Prefer explicit, reviewable mutations over full-file rewrites.\n"
     )
 
 
@@ -6418,28 +7510,44 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "defaults, prefer set_section_view(...).\n"
         "5. If the feedback changes page size, orientation, continuous layout, or "
         "render defaults, call set_page_layout(...).\n"
+        "5a. If the feedback changes report-wide Matplotlib style defaults such as grid "
+        "line colors or line widths, call set_matplotlib_style(...). Common grid keys "
+        "live under style_patch.grid, including depth_major_color, depth_minor_color, "
+        "x_major_linewidth, and x_minor_linewidth.\n"
         "6. If the feedback changes report scale or depth grid spacing, call "
         "set_depth_axis(...).\n"
-        "7. If the feedback changes zone notes, markers, arrows, glyphs, or interval "
+        "7. If the feedback requests a different packet-style header layout, call "
+        "inspect_header_archetypes(...) and apply_header_archetype(...) before filling values.\n"
+        "7a. If the feedback only fills existing header values, do not rewrite heading "
+        "structure or add remarks.\n"
+        "8. If the feedback changes zone notes, markers, arrows, glyphs, or interval "
         "annotations, use inspect_authoring_vocab(...) to find existing annotation_index "
         "values and then call add_annotation_object(...), update_annotation_object(...), "
         "or remove_annotation_object(...).\n"
-        "8. Choose the smallest edit sequence that addresses the feedback. "
+        "8a. If the feedback changes scales, labels, fills, or overlays on one existing "
+        "track, call inspect_track_bindings(...).\n"
+        "8b. If the feedback changes one shared track scale together with multiple curve "
+        "scales on that track, prefer set_track_scales(...); it can also synchronize the "
+        "track's vertical grid convention to the chosen axis scale.\n"
+        "9. Choose the smallest edit sequence that addresses the feedback. "
         "Use add_curve_fill(...) for explicit crossover or baseline fill requests, "
         "and remove_curve_fill(...) when the request explicitly clears one existing fill. "
         "Use clear_track_bindings(...) when the request replaces all curves or rasters on one "
-        "track before rebinding them.\n"
+        "track before rebinding them. When one curated convention already matches the "
+        "requested layout, prefer apply_style_preset(...).\n"
         "Prefer update_section(...), set_section_view(...), set_page_layout(...), "
-        "update_track(...), remove_track(...), "
+        "set_matplotlib_style(...), "
+        "update_track(...), inspect_track_bindings(...), set_track_scales(...), "
+        "remove_track(...), "
         "remove_curve_binding(...), and remove_raster_binding(...) when the request "
         "says to replace or remove existing content.\n"
-        "9. For density-neutron overlays with crossover fill, prefer "
+        "10. For density-neutron overlays with crossover fill, prefer "
         "add_curve_fill(kind='between_instances', other_channel=...) instead of "
         "between_curves unless the effective scales already match.\n"
-        "10. Preview the affected section, track, or depth window after the edits.\n"
-        "11. If the client retained the previous YAML text, call "
+        "11. Preview the affected section, track, or depth window after the edits.\n"
+        "12. If the client retained the previous YAML text, call "
         "summarize_logfile_changes(logfile_path, previous_text=...) before the final explanation.\n"
-        "12. Validate or save only after the preview looks correct.\n"
+        "13. Validate or save only after the preview looks correct.\n"
     )
 
 
@@ -6463,22 +7571,24 @@ def ingest_header_text_prompt(
         f"{source_text}\n"
         "```\n\n"
         "Workflow:\n"
-        "1. Call inspect_heading_slots(logfile_path=logfile_path) to see the exact provider, "
+        "1. If the draft needs a specific packet-style header scaffold first, call "
+        "inspect_header_archetypes(...) and apply_header_archetype(...).\n"
+        "2. Call inspect_heading_slots(logfile_path=logfile_path) to see the exact provider, "
         "general-field, service-title, detail-row, and remarks targets.\n"
-        "2. Call parse_key_value_text(source_text, format_hint=None) before inventing any "
+        "3. Call parse_key_value_text(source_text, format_hint=None) before inventing any "
         "mapping.\n"
-        "3. If the parsed output leaves important lines unparsed, explain that instead of "
+        "4. If the parsed output leaves important lines unparsed, explain that instead of "
         "guessing values.\n"
-        "4. Build the smallest explicit values mapping you can, using disambiguated keys like "
+        "5. Build the smallest explicit values mapping you can, using disambiguated keys like "
         "general_field.company, detail.date, or service_title_1 when needed.\n"
-        '5. Call preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty") '
+        '6. Call preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty") '
         "before any mutation.\n"
-        "6. If preview_header_mapping(...) reports ambiguities or conflicts, resolve them before "
+        "7. If preview_header_mapping(...) reports ambiguities or conflicts, resolve them before "
         "apply_header_values(...).\n"
-        "7. Call apply_header_values(logfile_path, values, overwrite_policy=...) only after the "
+        "8. Call apply_header_values(logfile_path, values, overwrite_policy=...) only after the "
         "preview looks correct.\n"
-        "8. If the source text includes freeform note blocks that do not belong in heading "
+        "9. If the source text includes freeform note blocks that do not belong in heading "
         "slots, use set_remarks_content(...) separately.\n"
-        "9. Summarize the saved heading state and recommend a first-page preview before any "
+        "10. Summarize the saved heading state and recommend a first-page preview before any "
         "final render.\n"
     )

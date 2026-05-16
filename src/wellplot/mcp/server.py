@@ -322,6 +322,20 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def set_matplotlib_style(
+        logfile_path: str,
+        style_patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Deep-merge one report-wide Matplotlib style patch into a draft logfile."""
+        return asdict(
+            service.set_matplotlib_style(
+                logfile_path,
+                style_patch=style_patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def set_section_view(
         logfile_path: str,
         section_id: str,
@@ -401,6 +415,46 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def inspect_track_bindings(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+    ) -> dict[str, object]:
+        """Inspect one track's current curve/raster bindings and scales."""
+        return asdict(
+            service.inspect_track_bindings(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def set_track_scales(
+        logfile_path: str,
+        section_id: str,
+        track_id: str,
+        x_scale: dict[str, object] | None = None,
+        curve_scale: dict[str, object] | None = None,
+        channel_scales: dict[str, dict[str, object]] | None = None,
+        sync_grid_to_scale: bool = True,
+    ) -> dict[str, object]:
+        """Update one track x_scale and one or more curve scales in one call."""
+        return asdict(
+            service.set_track_scales(
+                logfile_path,
+                section_id=section_id,
+                track_id=track_id,
+                x_scale=x_scale,
+                curve_scale=curve_scale,
+                channel_scales=channel_scales,
+                sync_grid_to_scale=sync_grid_to_scale,
                 root=server_root,
             )
         )
@@ -746,6 +800,27 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def inspect_header_archetypes(archetype_id: str | None = None) -> dict[str, object]:
+        """Inspect deterministic open-hole and cased-hole header archetypes."""
+        return asdict(service.inspect_header_archetypes(archetype_id=archetype_id))
+
+    @mcp.tool()
+    def apply_header_archetype(
+        logfile_path: str,
+        archetype_id: str,
+        preserve_existing_values: bool = True,
+    ) -> dict[str, object]:
+        """Apply one deterministic header archetype to a mutable draft logfile."""
+        return asdict(
+            service.apply_header_archetype(
+                logfile_path,
+                archetype_id=archetype_id,
+                preserve_existing_values=preserve_existing_values,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def inspect_heading_slots(
         logfile_path: str | None = None,
         template_path: str | None = None,
@@ -812,6 +887,28 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return asdict(
             service.inspect_style_presets(
                 preset_family=preset_family,
+            )
+        )
+
+    @mcp.tool()
+    def apply_style_preset(
+        logfile_path: str,
+        preset_id: str,
+        section_id: str | None = None,
+        track_id: str | None = None,
+        channel_overrides: dict[str, str] | None = None,
+        clear_existing_bindings: bool = False,
+    ) -> dict[str, object]:
+        """Apply one curated style preset to a draft or one specific track."""
+        return asdict(
+            service.apply_style_preset(
+                logfile_path,
+                preset_id=preset_id,
+                section_id=section_id,
+                track_id=track_id,
+                channel_overrides=channel_overrides,
+                clear_existing_bindings=clear_existing_bindings,
+                root=server_root,
             )
         )
 
@@ -962,6 +1059,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_track_archetypes_resource() -> str:
         """Return curated draft-authoring track archetypes."""
         return service.authoring_track_archetypes_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/header-archetypes.json",
+        mime_type="application/json",
+    )
+    def authoring_header_archetypes_resource() -> str:
+        """Return curated deterministic header archetypes."""
+        return service.authoring_header_archetypes_resource().text
 
     @mcp.resource(
         "wellplot://authoring/catalog/style-presets.json",

@@ -29,6 +29,11 @@ from textwrap import dedent
 
 import yaml
 
+from ..mcp.header_archetypes import (
+    default_header_archetype_for_starter_kind,
+    default_service_title_for_starter_kind,
+    header_archetype_heading,
+)
 from .core import AuthoringResult, AuthoringSession
 
 OPENAI_PROVIDER_NAME = "openai"
@@ -189,13 +194,32 @@ class ProjectSession:
         if suffix == ".dlis":
             return "dlis"
         raise ValueError(
-            "Unable to infer source_format from data_file. "
-            "Supported extensions: .las, .dlis"
+            "Unable to infer source_format from data_file. Supported extensions: .las, .dlis"
         )
 
     @staticmethod
-    def _open_hole_quicklook_template_mapping() -> dict[str, object]:
-        """Return the shipped starter template preset for one open-hole quicklook packet."""
+    def _starter_template_mapping(
+        *,
+        header_archetype_id: str,
+        service_title: str,
+    ) -> dict[str, object]:
+        """Return the shipped starter template preset for one project starter packet."""
+        heading = header_archetype_heading(header_archetype_id)
+        service_titles = heading.get("service_titles")
+        if isinstance(service_titles, list) and service_titles:
+            first_title = service_titles[0]
+            if isinstance(first_title, dict):
+                first_title["value"] = service_title
+            elif isinstance(first_title, str):
+                service_titles[0] = {"value": service_title}
+        else:
+            heading["service_titles"] = [
+                {
+                    "value": service_title,
+                    "alignment": "center",
+                    "bold": True,
+                }
+            ]
         return {
             "render": {
                 "backend": "matplotlib",
@@ -267,47 +291,7 @@ class ProjectSession:
                     "minor_step": 2,
                 },
                 "layout": {
-                    "heading": {
-                        "enabled": True,
-                        "provider_name": "Company",
-                        "general_fields": [
-                            {"key": "company", "label": "Company", "source_key": "COMP"},
-                            {"key": "well", "label": "Well", "source_key": "WELL"},
-                            {"key": "field", "label": "Field", "source_key": "FLD"},
-                            {
-                                "key": "service_company",
-                                "label": "Service Company",
-                                "source_key": "SRVC",
-                            },
-                        ],
-                        "service_titles": [
-                            {
-                                "value": "Open Hole Quicklook",
-                                "alignment": "center",
-                                "bold": True,
-                            }
-                        ],
-                        "detail": {
-                            "kind": "open_hole",
-                            "title": "Open Hole Metadata",
-                            "rows": [
-                                {
-                                    "label": "Date",
-                                    "values": [
-                                        {"source_key": "DATE"},
-                                        "",
-                                    ],
-                                },
-                                {
-                                    "label_cells": ["UWI", "Province"],
-                                    "columns": [
-                                        {"cells": [{"source_key": "UWI"}]},
-                                        {"cells": [{"source_key": "PROV"}]},
-                                    ],
-                                },
-                            ],
-                        },
-                    },
+                    "heading": heading,
                     "remarks": [
                         {
                             "title": "Public Data and IP Notice",
@@ -497,6 +481,56 @@ class ProjectSession:
             overwrite=overwrite,
         )
 
+    async def inspect_heading_slots(
+        self,
+        *,
+        logfile_path: str | Path | None = None,
+    ) -> dict[str, object]:
+        """Inspect heading slots for the configured draft without the freeform agent loop."""
+        resolved_logfile = self._require_default_path(
+            self.draft_logfile if logfile_path is None else logfile_path,
+            field_name="draft_logfile",
+        )
+        return await self.authoring_session.inspect_heading_slots(
+            logfile_path=resolved_logfile,
+        )
+
+    async def preview_header_mapping(
+        self,
+        *,
+        values: dict[str, object],
+        logfile_path: str | Path | None = None,
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Dry-run deterministic heading-value assignment without the freeform agent loop."""
+        resolved_logfile = self._require_default_path(
+            self.draft_logfile if logfile_path is None else logfile_path,
+            field_name="draft_logfile",
+        )
+        return await self.authoring_session.preview_header_mapping(
+            logfile_path=resolved_logfile,
+            values=values,
+            overwrite_policy=overwrite_policy,
+        )
+
+    async def apply_header_values(
+        self,
+        *,
+        values: dict[str, object],
+        logfile_path: str | Path | None = None,
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Persist deterministic heading-value assignment without the freeform agent loop."""
+        resolved_logfile = self._require_default_path(
+            self.draft_logfile if logfile_path is None else logfile_path,
+            field_name="draft_logfile",
+        )
+        return await self.authoring_session.apply_header_values(
+            logfile_path=resolved_logfile,
+            values=values,
+            overwrite_policy=overwrite_policy,
+        )
+
     def add_data_file(
         self,
         source_path: str | Path,
@@ -547,6 +581,7 @@ class ProjectSession:
         title: str,
         subtitle: str,
         depth_range: tuple[float, float] | None = None,
+        header_archetype: str | None = None,
         template_path: str | Path = "base.template.yaml",
         starter_logfile: str | Path = "starter.log.yaml",
         render_output_path: str | Path | None = None,
@@ -557,8 +592,13 @@ class ProjectSession:
         overwrite: bool = True,
     ) -> ProjectStarter:
         """Create one starter template/logfile pair from one shipped preset."""
-        if kind != "open_hole_quicklook":
-            raise ValueError("Supported starter kinds: 'open_hole_quicklook'.")
+        resolved_kind = str(kind).strip().lower()
+        resolved_header_archetype = (
+            default_header_archetype_for_starter_kind(resolved_kind)
+            if header_archetype is None
+            else str(header_archetype).strip().lower()
+        )
+        starter_service_title = default_service_title_for_starter_kind(resolved_kind)
 
         resolved_data_file = self._resolve_server_file(data_file, field_name="data_file")
         if not resolved_data_file.exists():
@@ -621,7 +661,10 @@ class ProjectSession:
         if depth_range is not None:
             section_mapping["depth_range"] = [depth_range[0], depth_range[1]]
 
-        template_mapping = self._open_hole_quicklook_template_mapping()
+        template_mapping = self._starter_template_mapping(
+            header_archetype_id=resolved_header_archetype,
+            service_title=starter_service_title,
+        )
         starter_mapping = {
             "template": {"path": relative_template_path},
             "version": 1,
@@ -662,6 +705,7 @@ class ProjectSession:
         title: str,
         subtitle: str,
         depth_range: tuple[float, float] | None = None,
+        header_archetype: str | None = None,
         staged_data_name: str | Path | None = None,
         template_path: str | Path = "base.template.yaml",
         starter_logfile: str | Path = "starter.log.yaml",
@@ -698,6 +742,7 @@ class ProjectSession:
             title=title,
             subtitle=subtitle,
             depth_range=depth_range,
+            header_archetype=header_archetype,
             template_path=template_path,
             starter_logfile=starter_logfile,
             render_output_path=self.render_output_path,
@@ -732,18 +777,14 @@ def _resolve_provider_defaults(
 
     if normalized_provider == OPENAI_COMPAT_PROVIDER_NAME:
         resolved_model = (
-            model
-            or _first_env_value("OPENAI_COMPAT_MODEL", "OPENAI_MODEL")
-            or "gpt-5.4"
+            model or _first_env_value("OPENAI_COMPAT_MODEL", "OPENAI_MODEL") or "gpt-5.4"
         )
         resolved_base_url = base_url or _first_env_value("OPENAI_COMPAT_BASE_URL")
         return OPENAI_COMPAT_PROVIDER_NAME, resolved_model, resolved_base_url
 
     if normalized_provider == OLLAMA_PROVIDER_NAME:
         resolved_model = (
-            model
-            or _first_env_value("OLLAMA_MODEL", "OPENAI_COMPAT_MODEL")
-            or "llama3.2"
+            model or _first_env_value("OLLAMA_MODEL", "OPENAI_COMPAT_MODEL") or "llama3.2"
         )
         resolved_base_url = (
             base_url
@@ -753,8 +794,7 @@ def _resolve_provider_defaults(
         return OPENAI_COMPAT_PROVIDER_NAME, resolved_model, resolved_base_url
 
     raise ValueError(
-        "Unsupported notebook provider. Supported values: "
-        "'openai', 'openai_compat', 'ollama'."
+        "Unsupported notebook provider. Supported values: 'openai', 'openai_compat', 'ollama'."
     )
 
 

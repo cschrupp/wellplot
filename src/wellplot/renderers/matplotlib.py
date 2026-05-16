@@ -1217,8 +1217,30 @@ class MatplotlibRenderer(Renderer):
             return []
         return [item for item in remarks if isinstance(item, dict)]
 
-    def _report_location_lines(self, value: str) -> tuple[str, str, str]:
-        text = value.strip()
+    def _report_location_lines(self, fields: dict[str, str]) -> tuple[str, str, str]:
+        latitude = fields.get("latitude", "").strip()
+        longitude = fields.get("longitude", "").strip()
+        section = fields.get("section", "").strip()
+        township = fields.get("township", "").strip()
+        range_value = fields.get("range", "").strip()
+        footage = fields.get("footage", "").strip()
+        if any((latitude, longitude, section, township, range_value, footage)):
+            location_tokens: list[str] = []
+            if section:
+                location_tokens.append(section)
+            if township:
+                location_tokens.append(f"Township {township}")
+            if range_value:
+                location_tokens.append(f"Range {range_value}")
+            if footage:
+                location_tokens.append(footage)
+            return (
+                f"Lat: {latitude}" if latitude else "",
+                f"Long: {longitude}" if longitude else "",
+                ", ".join(location_tokens),
+            )
+
+        text = fields.get("location", "").strip()
         if not text:
             return ("", "", "")
         match = re.search(
@@ -1469,7 +1491,7 @@ class MatplotlibRenderer(Renderer):
                 **text_kwargs,
             )
 
-        lat_line, long_line, third_line = self._report_location_lines(fields.get("location", ""))
+        lat_line, long_line, third_line = self._report_location_lines(fields)
         ax.text(
             coords_box[0] + 0.012,
             coords_box[1] + coords_box[3] - 0.12 * coords_box[3],
@@ -3611,13 +3633,13 @@ class MatplotlibRenderer(Renderer):
         tick_count = int(track_header_style.get("division_tick_count", 5))
         tick_count = max(2, tick_count)
         if scale_kind == ScaleKind.LOG:
-            if left <= 0 or right <= 0:
+            tick_sets = self._log_scale_tick_values(left, right)
+            if tick_sets is None:
                 return
-            tick_values = np.geomspace(left, right, tick_count)
+            tick_values = np.asarray(tick_sets[0], dtype=float)
+            tick_count = len(tick_values)
             left_log = np.log10(left)
             right_log = np.log10(right)
-            if np.isclose(left_log, right_log):
-                return
             tick_fractions = (np.log10(tick_values) - left_log) / (right_log - left_log)
         elif scale_kind == ScaleKind.TANGENTIAL:
             tick_values = np.linspace(left, right, tick_count)
@@ -4097,6 +4119,67 @@ class MatplotlibRenderer(Renderer):
         denominator = np.tan(0.5 * spread)
         return 0.5 + np.tan((points - 0.5) * spread) / (2.0 * denominator)
 
+    def _log_scale_tick_values(
+        self,
+        left: float,
+        right: float,
+    ) -> tuple[list[float], list[float]] | None:
+        low = min(left, right)
+        high = max(left, right)
+        if low <= 0 or high <= 0 or np.isclose(low, high):
+            return None
+
+        low_log = float(np.log10(low))
+        high_log = float(np.log10(high))
+        if np.isclose(low_log, high_log):
+            return None
+
+        low_decade = int(np.floor(low_log))
+        high_decade = int(np.floor(high_log))
+        low_mantissa = low / (10.0**low_decade)
+        high_mantissa = high / (10.0**high_decade)
+        anchored_major = np.isclose(low_mantissa, high_mantissa, rtol=1e-6, atol=1e-6)
+
+        major_values: list[float] = [low]
+        if anchored_major:
+            anchor = low_mantissa
+            for decade in range(low_decade + 1, high_decade + 1):
+                major_values.append(anchor * (10.0**decade))
+        else:
+            min_decade = int(np.floor(low_log))
+            max_decade = int(np.ceil(high_log))
+            for decade in range(min_decade, max_decade + 1):
+                value = 10.0**decade
+                if low < value < high:
+                    major_values.append(value)
+        major_values.append(high)
+
+        deduped_major: list[float] = []
+        for value in sorted(major_values):
+            if deduped_major and np.isclose(value, deduped_major[-1], rtol=1e-6, atol=1e-9):
+                continue
+            deduped_major.append(float(value))
+
+        min_decade = int(np.floor(low_log))
+        max_decade = int(np.ceil(high_log))
+        minor_candidates: list[float] = []
+        for decade in range(min_decade, max_decade + 1):
+            base = 10.0**decade
+            for multiplier in range(1, 10):
+                minor_candidates.append(multiplier * base)
+
+        minor_values: list[float] = []
+        for value in sorted(minor_candidates):
+            if value <= low or value >= high:
+                continue
+            if any(np.isclose(value, major, rtol=1e-6, atol=1e-9) for major in deduped_major):
+                continue
+            if any(np.isclose(value, existing, rtol=1e-6, atol=1e-9) for existing in minor_values):
+                continue
+            minor_values.append(float(value))
+
+        return deduped_major, minor_values
+
     def _log_scale_grid_fractions(
         self,
         track: TrackSpec,
@@ -4110,23 +4193,13 @@ class MatplotlibRenderer(Renderer):
             return None
         low = min(left, right)
         high = max(left, right)
-        if low <= 0 or high <= 0 or np.isclose(low, high):
-            return None
         reverse = left > right
+        tick_values = self._log_scale_tick_values(left, right)
+        if tick_values is None:
+            return None
+        major_values, minor_values = tick_values
         low_log = float(np.log10(low))
         high_log = float(np.log10(high))
-        if np.isclose(low_log, high_log):
-            return None
-
-        min_decade = int(np.floor(low_log))
-        max_decade = int(np.ceil(high_log))
-        major_values: list[float] = []
-        minor_values: list[float] = []
-        for decade in range(min_decade, max_decade + 1):
-            decade_base = 10.0**decade
-            major_values.append(decade_base)
-            for multiplier in range(2, 10):
-                minor_values.append(multiplier * decade_base)
 
         def _to_fractions(values: list[float]) -> list[float]:
             fractions: list[float] = []

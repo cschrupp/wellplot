@@ -103,6 +103,8 @@ The examples are grouped by workflow rather than by isolated feature.
     `create_project_session(...)`, stages a LAS file and starter scaffold
     through `session.bootstrap_starter(...)`, and adds header, remarks, tracks,
     and bindings one step at a time through `wellplot.agent`
+  - header-only fill requests are routed automatically onto deterministic
+    heading tools instead of the broader freeform authoring loop
   - manual and credentialed: requires `wellplot[agent,notebook,las]` plus an
     OpenAI API key at runtime
   - working first-pass notebook: expect to tune prompts, model choice, and

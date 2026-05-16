@@ -960,6 +960,39 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         self.assertFalse(np.allclose(linear, logarithmic))
         self.assertFalse(np.allclose(linear, tangential))
 
+    def test_log_scale_tick_values_anchor_to_matching_mantissa_bounds(self) -> None:
+        """Log cycles should anchor major ticks to matching endpoint mantissas when possible."""
+        renderer = MatplotlibRenderer()
+        tick_values = renderer._log_scale_tick_values(0.2, 200.0)
+        assert tick_values is not None
+        major_values, minor_values = tick_values
+
+        self.assertEqual(major_values, [0.2, 2.0, 20.0, 200.0])
+        self.assertIn(1.0, minor_values)
+        self.assertIn(10.0, minor_values)
+        self.assertIn(100.0, minor_values)
+
+    def test_report_location_lines_support_discrete_location_fields(self) -> None:
+        """Render header coordinate lines directly from discrete scaffold fields."""
+        renderer = MatplotlibRenderer()
+        lat_line, long_line, third_line = renderer._report_location_lines(
+            {
+                "section": "NWSW 32",
+                "township": "26",
+                "range": "9",
+                "footage": "972' FSL & 523' FWL",
+                "latitude": "38.501242",
+                "longitude": "-112.882661",
+            }
+        )
+
+        self.assertEqual(lat_line, "Lat: 38.501242")
+        self.assertEqual(long_line, "Long: -112.882661")
+        self.assertIn("NWSW 32", third_line)
+        self.assertIn("Township 26", third_line)
+        self.assertIn("Range 9", third_line)
+        self.assertIn("972' FSL & 523' FWL", third_line)
+
     def test_normalize_curve_values_supports_tangential_scale(self) -> None:
         """Verify normalize curve values supports tangential scale."""
         renderer = MatplotlibRenderer()
@@ -2181,7 +2214,7 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         )
         renderer = MatplotlibRenderer()
         main_lines, secondary_lines = renderer._vertical_grid_fractions(document.tracks[0], dataset)
-        self.assertEqual(len(main_lines), 3)
+        self.assertEqual(len(main_lines), 2)
         self.assertGreater(len(secondary_lines), 3)
 
     def test_render_documents_auto_uses_strip_pages_for_multisection_pdf(self) -> None:

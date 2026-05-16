@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,18 +37,24 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "summarize_logfile_draft",
     "set_section_data_source",
     "set_depth_axis",
+    "set_matplotlib_style",
     "validate_logfile",
     "inspect_logfile",
     "inspect_data_source",
     "check_channel_availability",
+    "inspect_header_archetypes",
+    "apply_header_archetype",
     "inspect_heading_slots",
     "parse_key_value_text",
     "preview_header_mapping",
     "apply_header_values",
     "inspect_style_presets",
+    "apply_style_preset",
     "inspect_authoring_vocab",
     "add_track",
     "update_track",
+    "inspect_track_bindings",
+    "set_track_scales",
     "remove_track",
     "bind_curve",
     "add_curve_fill",
@@ -255,6 +262,25 @@ class ProviderBackendProtocol(Protocol):
         """Run one authoring loop and replay provider tool calls."""
 
 
+@dataclass(frozen=True)
+class _HeaderFillIntent:
+    """Deterministic header-value assignment extracted from one request."""
+
+    values: tuple[tuple[str, str], ...]
+    overwrite_policy: str = "replace"
+
+    def as_mapping(self) -> dict[str, str]:
+        """Return the extracted key/value pairs as one ordered mapping."""
+        return dict(self.values)
+
+
+@dataclass(frozen=True)
+class _MatplotlibStyleIntent:
+    """Deterministic report-wide Matplotlib style patch extracted from one request."""
+
+    style_patch: dict[str, object]
+
+
 def _relative_logfile_path(root: Path, output_logfile: str | Path) -> str:
     """Return one logfile path relative to the configured server root."""
     raw = Path(output_logfile)
@@ -328,6 +354,259 @@ def _existing_draft_path(
     )
 
 
+def _trim_bullet_prefix(line: str) -> str:
+    """Remove one leading list/bullet prefix from a freeform request line."""
+    return re.sub(r"^\s*(?:[-*+]\s*|\d+\.\s*)", "", line).strip()
+
+
+def _header_fill_overwrite_policy(text: str) -> str:
+    """Infer the safest overwrite policy for one deterministic header-fill request."""
+    lowered = text.lower()
+    fill_empty_markers = (
+        "fill empty",
+        "only if empty",
+        "leave existing",
+        "preserve existing",
+        "if blank",
+    )
+    if any(marker in lowered for marker in fill_empty_markers):
+        return "fill_empty"
+    return "replace"
+
+
+def _parse_inline_header_assignment(line: str) -> tuple[str, str] | None:
+    """Parse one explicit header assignment from a natural-language line."""
+    inline_match = re.match(
+        r"(?is)^(?:please\s+)?(?:fill|set|update|populate|apply)\s+"
+        r"(?:the\s+)?(?:header|heading)\s+(?P<key>.+?)\s+"
+        r"(?:(?:field|value)\s+)?(?:as|to)\s+(?P<value>.+)$",
+        line,
+    )
+    if inline_match is None:
+        return None
+    key = inline_match.group("key").strip().removesuffix(":")
+    value = inline_match.group("value").strip()
+    if not key or not value:
+        return None
+    if key.lower().endswith(" value"):
+        key = key[:-6].strip()
+    if key.lower().endswith(" field"):
+        key = key[:-6].strip()
+    return key, value
+
+
+def _is_header_intro_line(line: str) -> bool:
+    """Return whether one line is framing text for a header-ingestion block."""
+    return bool(
+        re.match(
+            r"(?is)^(?:please\s+)?(?:fill|set|update|populate|apply|use)\s+"
+            r"(?:the\s+following\s+)?(?:header|heading)(?:\s+(?:fields?|values?))?"
+            r"(?:\s+with(?:\s+the\s+following\s+values?)?)?[:.]?$",
+            line,
+        )
+        or re.match(
+            r"(?is)^use\s+the\s+following\s+values\s+to\s+complete\s+the\s+relevant\s+"
+            r"(?:header|heading)\s+fields[:.]?$",
+            line,
+        )
+        or re.match(r"(?is)^revise\s+the\s+existing\s+draft[.:]?$", line)
+    )
+
+
+def _is_header_category_line(line: str) -> bool:
+    """Return whether one line is a category heading inside copied header text."""
+    if ":" in line or "=" in line:
+        return False
+    if len(line) > 80:
+        return False
+    return bool(re.match(r"^[A-Z0-9 /()&'.,+-]+$", line))
+
+
+def _is_service_title_category_line(line: str) -> bool:
+    """Return whether one copied header category introduces one service-title block."""
+    normalized = re.sub(r"[^a-z0-9]+", "", line.lower())
+    return normalized in {"logservice", "services", "service"}
+
+
+def _looks_like_non_header_edit_instruction(line: str) -> bool:
+    """Return whether one line asks for broader non-header authoring edits."""
+    lowered = line.lower()
+    action_verbs = (
+        "add",
+        "remove",
+        "change",
+        "update",
+        "set",
+        "make",
+        "move",
+        "bind",
+        "clear",
+        "replace",
+        "render",
+        "preview",
+    )
+    scope_markers = (
+        "track",
+        "curve",
+        "raster",
+        "annotation",
+        "remarks",
+        "remark",
+        "page ",
+        "layout",
+        "pdf",
+        "render",
+        "preview",
+        "depth range",
+        "output path",
+    )
+    return any(verb in lowered for verb in action_verbs) and any(
+        marker in lowered for marker in scope_markers
+    )
+
+
+def _extract_header_fill_intent(text: str) -> _HeaderFillIntent | None:
+    """Return one deterministic header-fill intent when the request is narrowly scoped."""
+    lowered = text.lower()
+    if "header" not in lowered and "heading" not in lowered:
+        return None
+
+    values: list[tuple[str, str]] = []
+    in_service_title_block = False
+    next_service_title_index = 1
+    for raw_line in text.splitlines():
+        line = _trim_bullet_prefix(raw_line)
+        if not line:
+            continue
+        if _is_header_intro_line(line):
+            continue
+        if _is_header_category_line(line):
+            in_service_title_block = _is_service_title_category_line(line)
+            continue
+        if in_service_title_block and ":" not in line and "=" not in line:
+            values.append((f"service_title_{next_service_title_index}", line))
+            next_service_title_index += 1
+            continue
+        parsed = _parse_inline_header_assignment(line)
+        if parsed is not None:
+            values.append(parsed)
+            continue
+        if ":" in line:
+            key, value = line.split(":", 1)
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                values.append((key, value))
+                continue
+        if "=" in line:
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip()
+            if key and value:
+                values.append((key, value))
+                continue
+        if _is_header_category_line(line):
+            continue
+        if _looks_like_non_header_edit_instruction(line):
+            return None
+    if not values:
+        return None
+    return _HeaderFillIntent(
+        values=tuple(values),
+        overwrite_policy=_header_fill_overwrite_policy(text),
+    )
+
+
+def _merge_optional_mapping(
+    original: dict[str, object],
+    patch: dict[str, object],
+) -> dict[str, object]:
+    """Deep-merge one nested mapping patch without mutating either input."""
+    merged = dict(original)
+    for key, value in patch.items():
+        existing = merged.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            merged[key] = _merge_optional_mapping(existing, value)
+            continue
+        merged[key] = value
+    return merged
+
+
+def _grid_style_patch_for_line(line: str) -> dict[str, object] | None:
+    """Return one deterministic report-grid style patch for a natural-language line."""
+    lowered = line.lower()
+    if "grid" not in lowered:
+        return None
+
+    grid_patch: dict[str, object] = {}
+    if any(token in lowered for token in ("darker", "darken", "stronger", "more visible")):
+        grid_patch.update(
+            {
+                "depth_major_color": "#555555",
+                "depth_minor_color": "#9a9a9a",
+                "depth_major_linewidth": 0.8,
+                "depth_minor_linewidth": 0.45,
+                "x_major_linewidth": 0.8,
+                "x_minor_linewidth": 0.45,
+            }
+        )
+    elif any(token in lowered for token in ("lighter", "lighten", "fainter", "less visible")):
+        grid_patch.update(
+            {
+                "depth_major_color": "#c0c7d2",
+                "depth_minor_color": "#dde3ea",
+                "depth_major_linewidth": 0.5,
+                "depth_minor_linewidth": 0.28,
+                "x_major_linewidth": 0.5,
+                "x_minor_linewidth": 0.28,
+            }
+        )
+
+    if any(token in lowered for token in ("thicker", "heavier", "bolder")):
+        grid_patch.update(
+            {
+                "depth_major_linewidth": 0.9,
+                "depth_minor_linewidth": 0.5,
+                "x_major_linewidth": 0.9,
+                "x_minor_linewidth": 0.5,
+            }
+        )
+    elif any(token in lowered for token in ("thinner", "finer")):
+        grid_patch.update(
+            {
+                "depth_major_linewidth": 0.45,
+                "depth_minor_linewidth": 0.24,
+                "x_major_linewidth": 0.45,
+                "x_minor_linewidth": 0.24,
+            }
+        )
+
+    if not grid_patch:
+        return None
+    return {"grid": grid_patch}
+
+
+def _extract_matplotlib_style_intent(text: str) -> tuple[_MatplotlibStyleIntent | None, str]:
+    """Extract one deterministic report-style patch and return the remaining request text."""
+    style_patch: dict[str, object] = {}
+    remaining_lines: list[str] = []
+    for raw_line in text.splitlines():
+        line = _trim_bullet_prefix(raw_line)
+        if not line:
+            remaining_lines.append(raw_line)
+            continue
+        line_patch = _grid_style_patch_for_line(line)
+        if line_patch is None:
+            remaining_lines.append(raw_line)
+            continue
+        style_patch = _merge_optional_mapping(style_patch, line_patch)
+
+    remaining_text = "\n".join(remaining_lines).strip()
+    if not style_patch:
+        return None, text
+    return _MatplotlibStyleIntent(style_patch=style_patch), remaining_text
+
+
 def _authoring_bootstrap_message(
     *,
     goal: str,
@@ -350,17 +629,13 @@ def _authoring_bootstrap_message(
     return (
         f"A starter draft already exists at `{logfile_path}`. It was seeded from "
         f"{seed_label}. Do not call create_logfile_draft again. Use MCP mutation "
-        "tools only, and make real changes before you finish. At minimum, apply one "
-        "heading patch and one concise remarks replacement that satisfy the goal.\n\n"
+        "tools only, and make only the changes needed to satisfy the goal.\n\n"
         "Draft context:\n"
         f"{json.dumps(bootstrap_context, indent=2)}\n\n"
-        "Mutation call examples:\n"
-        f'- set_heading_content({{"logfile_path": "{logfile_path}", "patch": '
-        '{"provider_name": "OpenAI Demo", "service_titles": [{"value": '
-        '"Simplified Porosity Review", "alignment": "center", "bold": true}]}})\n'
-        f'- set_remarks_content({{"logfile_path": "{logfile_path}", "remarks": '
-        '[{"title": "Simplified reconstruction", "lines": ["Short QC note."], '
-        '"alignment": "left"}]}})\n\n'
+        "If the goal only fills existing header values, preserve the current heading "
+        "structure and prefer inspect_heading_slots(...), preview_header_mapping(...), "
+        "and apply_header_values(...). Do not add remarks unless the goal explicitly "
+        "asks for remarks.\n\n"
         "Use MCP tools only; do not rewrite YAML in prose.\n\n"
         f"Goal:\n{goal}"
     )
@@ -383,7 +658,10 @@ def _revision_bootstrap_message(
     }
     return (
         f"A draft already exists at `{logfile_path}`. Do not call create_logfile_draft. "
-        "Use the smallest reviewable MCP mutations that address the feedback.\n\n"
+        "Use the smallest reviewable MCP mutations that address the feedback. If the "
+        "feedback only fills existing header values, preserve the current heading "
+        "structure and prefer inspect_heading_slots(...), preview_header_mapping(...), "
+        "and apply_header_values(...).\n\n"
         "Draft context:\n"
         f"{json.dumps(revision_context, indent=2)}\n\n"
         "Use MCP tools only; do not rewrite YAML in prose.\n\n"
@@ -548,6 +826,149 @@ class AuthoringSession:
             section_preview_png=self.runtime.image_bytes(section_preview_result),
         )
 
+    async def _run_deterministic_header_fill(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        intent: _HeaderFillIntent,
+    ) -> AuthoringResult:
+        """Apply one narrow header-fill request without entering the provider loop."""
+        inspect_heading_result = await session.call_tool(
+            "inspect_heading_slots",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(inspect_heading_result, action="inspect_heading_slots")
+        inspect_payload = _structured_content(inspect_heading_result)
+        if not bool(inspect_payload.get("has_heading", False)):
+            raise RuntimeError(
+                "Header fill routing requires an existing heading structure in the draft."
+            )
+
+        normalized_source_text = "\n".join(f"{key}: {value}" for key, value in intent.values)
+        parse_result = await session.call_tool(
+            "parse_key_value_text",
+            {
+                "source_text": normalized_source_text,
+                "format_hint": "colon",
+            },
+        )
+        _require_mcp_success(parse_result, action="parse_key_value_text")
+        parse_payload = _structured_content(parse_result)
+        parsed_values: dict[str, str] = {}
+        for pair in parse_payload.get("pairs", []):
+            if not isinstance(pair, dict):
+                continue
+            key = pair.get("key")
+            value = pair.get("value")
+            if isinstance(key, str) and key.strip() and isinstance(value, str):
+                parsed_values[key.strip()] = value
+        if not parsed_values:
+            parsed_values = intent.as_mapping()
+
+        preview_result = await session.call_tool(
+            "preview_header_mapping",
+            {
+                "logfile_path": draft_logfile,
+                "values": parsed_values,
+                "overwrite_policy": intent.overwrite_policy,
+            },
+        )
+        _require_mcp_success(preview_result, action="preview_header_mapping")
+        apply_result = await session.call_tool(
+            "apply_header_values",
+            {
+                "logfile_path": draft_logfile,
+                "values": parsed_values,
+                "overwrite_policy": intent.overwrite_policy,
+            },
+        )
+        _require_mcp_success(apply_result, action="apply_header_values")
+        apply_payload = _structured_content(apply_result)
+        applied_assignments = apply_payload.get("applied_assignments", [])
+        applied_count = len(applied_assignments) if isinstance(applied_assignments, list) else 0
+        skipped_assignments = apply_payload.get("skipped_assignments", [])
+        skipped_count = len(skipped_assignments) if isinstance(skipped_assignments, list) else 0
+        provider_result = ProviderRunResult(
+            final_text=(
+                "Applied deterministic header value assignment"
+                f" ({applied_count} applied, {skipped_count} skipped)."
+            ),
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="inspect_heading_slots",
+                    arguments={"logfile_path": draft_logfile},
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="parse_key_value_text",
+                    arguments={
+                        "source_text": normalized_source_text,
+                        "format_hint": "colon",
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="preview_header_mapping",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "values": parsed_values,
+                        "overwrite_policy": intent.overwrite_policy,
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="apply_header_values",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "values": parsed_values,
+                        "overwrite_policy": intent.overwrite_policy,
+                    },
+                ),
+            ),
+        )
+        return await self._finalize_result(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=goal,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            baseline_draft_text=baseline_draft_text,
+            provider_result=provider_result,
+        )
+
+    async def _apply_deterministic_matplotlib_style(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        intent: _MatplotlibStyleIntent,
+    ) -> AuthoringToolCall:
+        """Apply one deterministic report-wide Matplotlib style patch."""
+        result = await session.call_tool(
+            "set_matplotlib_style",
+            {
+                "logfile_path": draft_logfile,
+                "style_patch": intent.style_patch,
+            },
+        )
+        _require_mcp_success(result, action="set_matplotlib_style")
+        return AuthoringToolCall(
+            round=1,
+            name="set_matplotlib_style",
+            arguments={
+                "logfile_path": draft_logfile,
+                "style_patch": intent.style_patch,
+            },
+        )
+
     async def run_request(self, request: AuthoringRequest) -> AuthoringResult:
         """Run one authoring request from the provider-neutral request model."""
         relative_output_logfile = _relative_logfile_path(
@@ -579,6 +1000,52 @@ class AuthoringSession:
             relative_output_logfile = _relative_logfile_path(self.runtime.server_root, output_path)
             baseline_draft_text = output_path.read_text(encoding="utf-8")
 
+            preflight_tool_trace: tuple[AuthoringToolCall, ...] = ()
+            style_intent, remaining_goal = _extract_matplotlib_style_intent(request.goal)
+            effective_goal = remaining_goal if remaining_goal else request.goal
+            if style_intent is not None:
+                style_tool_call = await self._apply_deterministic_matplotlib_style(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    intent=style_intent,
+                )
+                preflight_tool_trace = (style_tool_call,)
+                if not remaining_goal.strip():
+                    provider_result = ProviderRunResult(
+                        final_text="Applied deterministic Matplotlib style update.",
+                        tool_trace=preflight_tool_trace,
+                    )
+                    return await self._finalize_result(
+                        session=session,
+                        draft_logfile=relative_output_logfile,
+                        request_kind="author",
+                        goal=request.goal,
+                        example_id=request.example_id,
+                        source_logfile_path=relative_source_logfile,
+                        baseline_draft_text=baseline_draft_text,
+                        provider_result=provider_result,
+                    )
+
+            deterministic_header_fill = _extract_header_fill_intent(effective_goal)
+            if deterministic_header_fill is not None:
+                result = await self._run_deterministic_header_fill(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_kind="author",
+                    goal=request.goal,
+                    example_id=request.example_id,
+                    source_logfile_path=relative_source_logfile,
+                    baseline_draft_text=baseline_draft_text,
+                    intent=deterministic_header_fill,
+                )
+                if preflight_tool_trace:
+                    object.__setattr__(
+                        result,
+                        "tool_trace",
+                        preflight_tool_trace + result.tool_trace,
+                    )
+                return result
+
             bootstrap_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": relative_output_logfile},
@@ -590,7 +1057,7 @@ class AuthoringSession:
             )
             _require_mcp_success(bootstrap_vocab_result, action="inspect_authoring_vocab")
             prompt_arguments: dict[str, object] = {
-                "goal": request.goal,
+                "goal": effective_goal,
                 "logfile_path": relative_output_logfile,
             }
             if request.example_id is not None:
@@ -620,7 +1087,7 @@ class AuthoringSession:
             provider_result = await self.backend.run_authoring(
                 instructions=authoring_prompt,
                 initial_user_message=_authoring_bootstrap_message(
-                    goal=request.goal,
+                    goal=effective_goal,
                     seed_label=_request_seed_label(request),
                     logfile_path=relative_output_logfile,
                     seed_result=_structured_content(baseline_result),
@@ -634,6 +1101,11 @@ class AuthoringSession:
                 tool_caller=call_mcp_tool,
                 max_rounds=request.max_rounds,
             )
+            if preflight_tool_trace:
+                provider_result = ProviderRunResult(
+                    final_text=provider_result.final_text,
+                    tool_trace=preflight_tool_trace + provider_result.tool_trace,
+                )
             return await self._finalize_result(
                 session=session,
                 draft_logfile=relative_output_logfile,
@@ -654,6 +1126,52 @@ class AuthoringSession:
 
         async with self.runtime.open_session() as session:
             baseline_draft_text = output_path.read_text(encoding="utf-8")
+
+            preflight_tool_trace: tuple[AuthoringToolCall, ...] = ()
+            style_intent, remaining_feedback = _extract_matplotlib_style_intent(request.feedback)
+            effective_feedback = remaining_feedback if remaining_feedback else request.feedback
+            if style_intent is not None:
+                style_tool_call = await self._apply_deterministic_matplotlib_style(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    intent=style_intent,
+                )
+                preflight_tool_trace = (style_tool_call,)
+                if not remaining_feedback.strip():
+                    provider_result = ProviderRunResult(
+                        final_text="Applied deterministic Matplotlib style update.",
+                        tool_trace=preflight_tool_trace,
+                    )
+                    return await self._finalize_result(
+                        session=session,
+                        draft_logfile=relative_logfile,
+                        request_kind="revise",
+                        goal=request.feedback,
+                        example_id=None,
+                        source_logfile_path=None,
+                        baseline_draft_text=baseline_draft_text,
+                        provider_result=provider_result,
+                    )
+
+            deterministic_header_fill = _extract_header_fill_intent(effective_feedback)
+            if deterministic_header_fill is not None:
+                result = await self._run_deterministic_header_fill(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    goal=request.feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    intent=deterministic_header_fill,
+                )
+                if preflight_tool_trace:
+                    object.__setattr__(
+                        result,
+                        "tool_trace",
+                        preflight_tool_trace + result.tool_trace,
+                    )
+                return result
             bootstrap_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": relative_logfile},
@@ -668,7 +1186,7 @@ class AuthoringSession:
                 "revise_plot_from_feedback",
                 {
                     "logfile_path": relative_logfile,
-                    "feedback": request.feedback,
+                    "feedback": effective_feedback,
                 },
             )
             revision_prompt = self.runtime.prompt_text(prompt_result)
@@ -692,7 +1210,7 @@ class AuthoringSession:
             provider_result = await self.backend.run_authoring(
                 instructions=revision_prompt,
                 initial_user_message=_revision_bootstrap_message(
-                    feedback=request.feedback,
+                    feedback=effective_feedback,
                     logfile_path=relative_logfile,
                     sections=sections,
                     heading_patch_keys=list(bootstrap_vocab.get("heading_patch_keys", [])),
@@ -704,6 +1222,11 @@ class AuthoringSession:
                 tool_caller=call_mcp_tool,
                 max_rounds=request.max_rounds,
             )
+            if preflight_tool_trace:
+                provider_result = ProviderRunResult(
+                    final_text=provider_result.final_text,
+                    tool_trace=preflight_tool_trace + provider_result.tool_trace,
+                )
             return await self._finalize_result(
                 session=session,
                 draft_logfile=relative_logfile,
@@ -779,6 +1302,71 @@ class AuthoringSession:
                 },
             )
             _require_mcp_success(result, action="render_logfile_to_file")
+        return _structured_content(result)
+
+    async def inspect_heading_slots(
+        self,
+        *,
+        logfile_path: str | Path,
+    ) -> dict[str, object]:
+        """Inspect deterministic heading slots for one draft logfile."""
+        async with self.runtime.open_session() as session:
+            result = await session.call_tool(
+                "inspect_heading_slots",
+                {
+                    "logfile_path": _relative_logfile_path(
+                        self.runtime.server_root,
+                        logfile_path,
+                    ),
+                },
+            )
+            _require_mcp_success(result, action="inspect_heading_slots")
+        return _structured_content(result)
+
+    async def preview_header_mapping(
+        self,
+        *,
+        logfile_path: str | Path,
+        values: dict[str, object],
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Dry-run deterministic heading-value assignment for one draft logfile."""
+        async with self.runtime.open_session() as session:
+            result = await session.call_tool(
+                "preview_header_mapping",
+                {
+                    "logfile_path": _relative_logfile_path(
+                        self.runtime.server_root,
+                        logfile_path,
+                    ),
+                    "values": values,
+                    "overwrite_policy": overwrite_policy,
+                },
+            )
+            _require_mcp_success(result, action="preview_header_mapping")
+        return _structured_content(result)
+
+    async def apply_header_values(
+        self,
+        *,
+        logfile_path: str | Path,
+        values: dict[str, object],
+        overwrite_policy: str = "fill_empty",
+    ) -> dict[str, object]:
+        """Persist deterministic heading-value assignment for one draft logfile."""
+        async with self.runtime.open_session() as session:
+            result = await session.call_tool(
+                "apply_header_values",
+                {
+                    "logfile_path": _relative_logfile_path(
+                        self.runtime.server_root,
+                        logfile_path,
+                    ),
+                    "values": values,
+                    "overwrite_policy": overwrite_policy,
+                },
+            )
+            _require_mcp_success(result, action="apply_header_values")
         return _structured_content(result)
 
 

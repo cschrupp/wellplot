@@ -4939,9 +4939,10 @@ def _agent_user_notebook() -> dict[str, object]:
         code_cell(_agent_user_starter_code()),
         markdown_cell(
             "## 2. Create The Initial Draft\n\n"
-            "The first natural-language request clones the starter, updates the "
-            "subtitle, and keeps only the seeded overview track plus the depth track "
-            "while the packet is still sparse."
+            "The first natural-language request clones the starter, keeps the "
+            "deterministic open-hole header scaffold, fills any values it can from the "
+            "LAS metadata, and keeps only the seeded overview track plus the depth "
+            "track while the packet is still sparse."
         ),
         code_cell(
             dedent(
@@ -4954,7 +4955,9 @@ def _agent_user_notebook() -> dict[str, object]:
                         - Set the section subtitle to `Interactive LAS tutorial draft`.
                         - Keep the seeded `gr_sp` overview track before the depth track.
                         - Do not add any additional tracks yet.
-                        - Keep the source-key-backed heading fields.
+                        - Keep the existing open-hole header archetype structure.
+                        - Fill any available header values from the LAS metadata.
+                        - If some open-hole header labels do not have values yet, keep the blank placeholders.
                         - Set the first service title to `Open Hole Quicklook`.
                         - Do not add remarks yet.
                     ''',
