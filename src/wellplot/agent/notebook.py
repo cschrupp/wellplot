@@ -864,9 +864,11 @@ def display_authoring_result(
 
     print(title)
     print("Draft:", result.draft_logfile)
+    for label, items in result.user_report.sections():
+        print(f"{label}:")
+        for item in items:
+            print(" -", item)
     print("Tool trace:", [item.name for item in result.tool_trace])
-    for line in result.summary_lines:
-        print(" -", line)
     image = Image(data=result.preview_bytes(preview))
     display(image)
     if return_image:

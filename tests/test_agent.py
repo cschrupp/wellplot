@@ -39,6 +39,7 @@ from wellplot.agent import (
     AuthoringResult,
     AuthoringSession,
     AuthoringToolCall,
+    AuthoringUserReport,
     ProjectPaths,
     ProjectSession,
     ProjectStarter,
@@ -534,6 +535,8 @@ class AgentTests(unittest.TestCase):
                     "Rm": "0.005 @ 35",
                 },
             )
+            self.assertIn("Filled `Rmf`.", result.user_report.done)
+            self.assertEqual(result.user_report.could_not_do, ())
 
     def test_revision_request_reuses_existing_draft_without_recreation(self) -> None:
         """Run one provider-backed revision against an existing draft logfile."""
@@ -606,6 +609,29 @@ class AgentTests(unittest.TestCase):
                 apply_call[1]["values"],
                 {"RMF": "0.5"},
             )
+
+    def test_revision_request_reports_missing_curve_inconsistency(self) -> None:
+        """Report explicit missing curve references against the current draft context."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="Change the PEF curve scale to 0 to 1.2.",
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            self.assertTrue(result.user_report.request_inconsistencies)
+            self.assertIn("PEF", result.user_report.request_inconsistencies[0])
+            self.assertTrue(result.user_report.next_help)
 
     def test_revision_request_routes_copied_header_packet_to_deterministic_tools(self) -> None:
         """Treat copied header packets as deterministic header ingestion, not freeform authoring."""
@@ -836,6 +862,41 @@ class AgentTests(unittest.TestCase):
         self.assertEqual(result.preview_bytes("section"), b"section-preview")
         with self.assertRaisesRegex(ValueError, "preview kind"):
             result.preview_bytes("thumbnail")
+
+    def test_authoring_result_exposes_user_report_text(self) -> None:
+        """Expose the deterministic operator report directly on the public result."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id="forge16b_porosity_example",
+            source_logfile_path=None,
+            goal="Simplify the heading.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main"]},
+            change_summary={"summary_lines": []},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"report-preview",
+            section_preview_png=b"section-preview",
+            user_report=AuthoringUserReport(
+                done=("Updated heading.",),
+                could_not_do=("Did not apply `RMF`.",),
+                why_not=("The current scaffold did not expose a matching slot.",),
+                warnings_or_errors=("1 packet field was ignored.",),
+                request_inconsistencies=("Requested curve `PEF` is not available.",),
+                next_help=("I can inspect the draft context next.",),
+            ),
+        )
+
+        self.assertIn("Done:", result.user_report_text)
+        self.assertIn("Updated heading.", result.user_report_text)
+        self.assertIn("Request inconsistencies:", result.user_report_text)
 
     def test_relative_path_formats_paths_under_root(self) -> None:
         """Expose one reusable notebook path helper in the public agent layer."""

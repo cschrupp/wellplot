@@ -72,6 +72,9 @@ This notebook is different:
 - narrow header-only requests are routed automatically through deterministic
   heading tools, so prompts like `Fill header RMF as 0.01 @ 25` do not need to
   go through the broader freeform authoring loop
+- `display_authoring_result(...)` now prints a concise deterministic operator
+  report before the preview image, so each notebook step shows what changed,
+  what did not, and what the agent can help with next
 - it is a working first pass, so prompt wording, model choice, and revision
   round budgets may still need tuning for final packet polish
 
@@ -103,9 +106,9 @@ values.
 The safest iteration pattern is:
 
 1. create the first draft with `session.run(...)`
-2. inspect the preview image
+2. inspect the operator report and preview image
 3. make the next change with `session.revise(...)`
-4. inspect the preview again
+4. inspect the report again, especially any skipped work or inconsistencies
 5. render the final PDF only after the section preview looks right
 
 ## Related references

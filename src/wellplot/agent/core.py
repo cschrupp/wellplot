@@ -122,6 +122,42 @@ class ProviderRunResult:
 
     final_text: str
     tool_trace: tuple[AuthoringToolCall, ...]
+    report_facts: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AuthoringUserReport:
+    """Concise deterministic operator report for one authoring run."""
+
+    done: tuple[str, ...] = ()
+    could_not_do: tuple[str, ...] = ()
+    why_not: tuple[str, ...] = ()
+    warnings_or_errors: tuple[str, ...] = ()
+    request_inconsistencies: tuple[str, ...] = ()
+    next_help: tuple[str, ...] = ()
+
+    def sections(self) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Return the non-empty report sections in display order."""
+        return tuple(
+            (label, items)
+            for label, items in (
+                ("Done", self.done),
+                ("Could not do", self.could_not_do),
+                ("Why not", self.why_not),
+                ("Warnings/errors", self.warnings_or_errors),
+                ("Request inconsistencies", self.request_inconsistencies),
+                ("Next help", self.next_help),
+            )
+            if items
+        )
+
+    def to_text(self) -> str:
+        """Render the operator report as concise plain text."""
+        lines: list[str] = []
+        for label, items in self.sections():
+            lines.append(f"{label}:")
+            lines.extend(f"- {item}" for item in items)
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -146,6 +182,7 @@ class AuthoringResult:
     draft_text: str
     report_preview_png: bytes = field(repr=False)
     section_preview_png: bytes = field(repr=False)
+    user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
 
     @property
     def draft_path(self) -> Path:
@@ -172,6 +209,11 @@ class AuthoringResult:
         if normalized_kind == "report":
             return self.report_preview_png
         raise ValueError("preview kind must be either 'section' or 'report'.")
+
+    @property
+    def user_report_text(self) -> str:
+        """Return the concise operator report as plain text."""
+        return self.user_report.to_text()
 
     def write_preview_artifacts(
         self,
@@ -357,6 +399,232 @@ def _existing_draft_path(
 def _trim_bullet_prefix(line: str) -> str:
     """Remove one leading list/bullet prefix from a freeform request line."""
     return re.sub(r"^\s*(?:[-*+]\s*|\d+\.\s*)", "", line).strip()
+
+
+def _normalize_request_token(value: object) -> str:
+    """Normalize one request token for track/channel comparisons."""
+    return re.sub(r"[^a-z0-9]+", "", str(value).strip().lower())
+
+
+def _dedupe_text_items(items: list[str]) -> tuple[str, ...]:
+    """Return one de-duplicated ordered string tuple."""
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for item in items:
+        normalized = item.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered.append(normalized)
+    return tuple(ordered)
+
+
+def _extract_section_context(
+    draft_summary: dict[str, object],
+) -> tuple[set[str], set[str], set[str]]:
+    """Return bound channels, available channels, and track ids from one draft summary."""
+    bound_channels: set[str] = set()
+    available_channels: set[str] = set()
+    track_ids: set[str] = set()
+    sections = draft_summary.get("sections", [])
+    if not isinstance(sections, list):
+        return bound_channels, available_channels, track_ids
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        for track_id in section.get("track_ids", []):
+            if isinstance(track_id, str) and track_id.strip():
+                track_ids.add(track_id.strip().lower())
+        for channel in section.get("available_channels", []):
+            if isinstance(channel, str) and channel.strip():
+                available_channels.add(channel.strip().upper())
+        bindings_by_track = section.get("bindings_by_track", {})
+        if not isinstance(bindings_by_track, dict):
+            continue
+        for bindings in bindings_by_track.values():
+            if not isinstance(bindings, list):
+                continue
+            for binding in bindings:
+                if not isinstance(binding, dict):
+                    continue
+                channel = binding.get("channel")
+                if isinstance(channel, str) and channel.strip():
+                    bound_channels.add(channel.strip().upper())
+    return bound_channels, available_channels, track_ids
+
+
+def _request_curve_targets(text: str) -> list[str]:
+    """Return explicitly referenced existing curve/channel targets from one request."""
+    targets: list[str] = []
+    pattern = re.compile(
+        r"(?i)\b(?:change|update|set|remove|clear)\b.*?\b([A-Z][A-Z0-9_]{1,12})\b\s+"
+        r"(?:curve|channel)\b"
+    )
+    for raw_line in text.splitlines():
+        line = _trim_bullet_prefix(raw_line)
+        if not line:
+            continue
+        match = pattern.search(line)
+        if match is None:
+            continue
+        targets.append(match.group(1).strip().upper())
+    return targets
+
+
+def _request_track_targets(text: str) -> list[str]:
+    """Return explicitly referenced existing track targets from one request."""
+    targets: list[str] = []
+    pattern = re.compile(
+        r"(?i)\b(?:change|update|set|remove|clear)\b.*?(?:the\s+)?"
+        r"([a-z][a-z0-9 _/-]{0,32}?)\s+track\b"
+    )
+    for raw_line in text.splitlines():
+        line = _trim_bullet_prefix(raw_line)
+        if not line:
+            continue
+        match = pattern.search(line)
+        if match is None:
+            continue
+        target = match.group(1).strip().lower()
+        if target:
+            targets.append(target)
+    return targets
+
+
+def _assignment_label(entry: object) -> str | None:
+    """Return one best-effort human label for a structured assignment entry."""
+    if not isinstance(entry, dict):
+        return None
+    for key in ("target_key", "display_label", "request_key", "channel", "track_id"):
+        value = entry.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _summarize_request_inconsistencies(
+    *,
+    request_text: str,
+    draft_summary: dict[str, object],
+) -> tuple[str, ...]:
+    """Return concise request inconsistencies provable from the current draft context."""
+    bound_channels, available_channels, track_ids = _extract_section_context(draft_summary)
+    issues: list[str] = []
+
+    for channel in _request_curve_targets(request_text):
+        if channel in bound_channels:
+            continue
+        if channel in available_channels:
+            issues.append(
+                f"Requested curve `{channel}` is available in the source data but is not "
+                "currently bound in the draft."
+            )
+            continue
+        issues.append(
+            f"Requested curve `{channel}` is not available in the current draft or source data."
+        )
+
+    normalized_track_ids = {_normalize_request_token(track_id) for track_id in track_ids}
+    for track_name in _request_track_targets(request_text):
+        normalized_name = _normalize_request_token(track_name)
+        if not normalized_name:
+            continue
+        if normalized_name in normalized_track_ids:
+            continue
+        issues.append(f"Requested track `{track_name}` does not exist in the current draft.")
+
+    return _dedupe_text_items(issues)
+
+
+def _build_user_report(
+    *,
+    request_text: str,
+    validation: dict[str, object],
+    draft_summary: dict[str, object],
+    change_summary: dict[str, object],
+    tool_trace: tuple[AuthoringToolCall, ...],
+    report_facts: dict[str, object],
+) -> AuthoringUserReport:
+    """Build one concise deterministic operator report from execution facts."""
+    done: list[str] = []
+    could_not_do: list[str] = []
+    why_not: list[str] = []
+    warnings_or_errors: list[str] = []
+    next_help: list[str] = []
+
+    summary_lines = change_summary.get("summary_lines", [])
+    if isinstance(summary_lines, list):
+        for line in summary_lines:
+            if isinstance(line, str) and line.strip():
+                done.append(line.strip())
+
+    for entry in report_facts.get("completed", []):
+        if isinstance(entry, str) and entry.strip():
+            done.append(entry.strip())
+
+    for entry in report_facts.get("not_done", []):
+        if isinstance(entry, str) and entry.strip():
+            could_not_do.append(entry.strip())
+
+    for entry in report_facts.get("reasons", []):
+        if isinstance(entry, str) and entry.strip():
+            why_not.append(entry.strip())
+
+    for entry in report_facts.get("warnings", []):
+        if isinstance(entry, str) and entry.strip():
+            warnings_or_errors.append(entry.strip())
+
+    for entry in report_facts.get("next_help", []):
+        if isinstance(entry, str) and entry.strip():
+            next_help.append(entry.strip())
+
+    if validation.get("valid") is False:
+        message = validation.get("message")
+        if isinstance(message, str) and message.strip():
+            warnings_or_errors.append(message.strip())
+        else:
+            warnings_or_errors.append("The resulting draft did not validate cleanly.")
+
+    inconsistencies = _summarize_request_inconsistencies(
+        request_text=request_text,
+        draft_summary=draft_summary,
+    )
+    if inconsistencies:
+        could_not_do.extend(inconsistencies)
+        why_not.append(
+            "Some requested edits referenced tracks or curves the current draft cannot verify."
+        )
+        next_help.append(
+            "I can inspect the current draft to show valid track ids, bound curves, "
+            "and available channels."
+        )
+
+    if not done and tool_trace:
+        done.append(
+            "Executed deterministic tools: "
+            + ", ".join(item.name for item in tool_trace[:3])
+            + ("." if len(tool_trace) <= 3 else ", ...")
+        )
+
+    if could_not_do and not why_not:
+        why_not.append("The draft or source context did not support every requested edit.")
+
+    if not next_help:
+        if could_not_do:
+            next_help.append(
+                "I can inspect the draft context and suggest the smallest valid follow-up edit."
+            )
+        else:
+            next_help.append("I can help with the next draft revision or render the final PDF.")
+
+    return AuthoringUserReport(
+        done=_dedupe_text_items(done),
+        could_not_do=_dedupe_text_items(could_not_do),
+        why_not=_dedupe_text_items(why_not),
+        warnings_or_errors=_dedupe_text_items(warnings_or_errors),
+        request_inconsistencies=inconsistencies,
+        next_help=_dedupe_text_items(next_help),
+    )
 
 
 def _header_fill_overwrite_policy(text: str) -> str:
@@ -805,6 +1073,9 @@ class AuthoringSession:
             },
         )
         _require_mcp_success(section_preview_result, action="preview_section_png")
+        validation_payload = _structured_content(validation_result)
+        draft_summary_payload = _structured_content(draft_summary_result)
+        change_summary_payload = _structured_content(change_summary_result)
         return AuthoringResult(
             provider=self.backend.provider,
             model=self.backend.model,
@@ -817,13 +1088,21 @@ class AuthoringSession:
             server_root=self.runtime.server_root,
             tool_trace=provider_result.tool_trace,
             final_text=provider_result.final_text,
-            validation=_structured_content(validation_result),
-            draft_summary=_structured_content(draft_summary_result),
+            validation=validation_payload,
+            draft_summary=draft_summary_payload,
             inspect_summary=inspect_summary,
-            change_summary=_structured_content(change_summary_result),
+            change_summary=change_summary_payload,
             draft_text=output_path.read_text(encoding="utf-8"),
             report_preview_png=self.runtime.image_bytes(report_preview_result),
             section_preview_png=self.runtime.image_bytes(section_preview_result),
+            user_report=_build_user_report(
+                request_text=goal,
+                validation=validation_payload,
+                draft_summary=draft_summary_payload,
+                change_summary=change_summary_payload,
+                tool_trace=provider_result.tool_trace,
+                report_facts=getattr(provider_result, "report_facts", {}),
+            ),
         )
 
     async def _run_deterministic_header_fill(
@@ -894,6 +1173,38 @@ class AuthoringSession:
         applied_count = len(applied_assignments) if isinstance(applied_assignments, list) else 0
         skipped_assignments = apply_payload.get("skipped_assignments", [])
         skipped_count = len(skipped_assignments) if isinstance(skipped_assignments, list) else 0
+        completed: list[str] = []
+        if isinstance(applied_assignments, list):
+            for entry in applied_assignments:
+                label = _assignment_label(entry)
+                if label is None:
+                    continue
+                completed.append(f"Filled `{label}`.")
+        not_done: list[str] = []
+        reasons: list[str] = []
+        if isinstance(skipped_assignments, list):
+            for entry in skipped_assignments:
+                if not isinstance(entry, dict):
+                    continue
+                label = _assignment_label(entry)
+                if label is not None:
+                    not_done.append(f"Did not apply `{label}`.")
+                reason = entry.get("reason")
+                if isinstance(reason, str) and reason.strip():
+                    reasons.append(reason.strip())
+                else:
+                    status = entry.get("status")
+                    if isinstance(status, str) and status.strip():
+                        reasons.append(f"Status: {status.strip()}.")
+        warnings: list[str] = []
+        for source_payload in (parse_payload, _structured_content(preview_result), apply_payload):
+            payload_warnings = source_payload.get("warnings", [])
+            if isinstance(payload_warnings, list):
+                warnings.extend(
+                    warning.strip()
+                    for warning in payload_warnings
+                    if isinstance(warning, str) and warning.strip()
+                )
         provider_result = ProviderRunResult(
             final_text=(
                 "Applied deterministic header value assignment"
@@ -932,6 +1243,21 @@ class AuthoringSession:
                     },
                 ),
             ),
+            report_facts={
+                "completed": completed,
+                "not_done": not_done,
+                "reasons": reasons,
+                "warnings": warnings,
+                "next_help": [
+                    "I can inspect the remaining header slots or preview a more "
+                    "explicit mapping for any skipped values."
+                ]
+                if skipped_count
+                else [
+                    "I can continue filling the remaining header slots or move on "
+                    "to tracks, remarks, or rendering."
+                ],
+            },
         )
         return await self._finalize_result(
             session=session,

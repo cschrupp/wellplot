@@ -105,6 +105,9 @@ The examples are grouped by workflow rather than by isolated feature.
     and bindings one step at a time through `wellplot.agent`
   - header-only fill requests are routed automatically onto deterministic
     heading tools instead of the broader freeform authoring loop
+  - each cell result prints a concise deterministic operator report before the
+    preview image, including skipped work and request inconsistencies when they
+    can be proven from the current draft context
   - manual and credentialed: requires `wellplot[agent,notebook,las]` plus an
     OpenAI API key at runtime
   - working first-pass notebook: expect to tune prompts, model choice, and

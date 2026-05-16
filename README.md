@@ -239,6 +239,8 @@ Notebook-facing project helpers:
   paths, and materialize one starter scaffold in one call
 - `session.create_starter(...)` to generate one starter template/logfile pair from a shipped preset
 - `session.configure_rounds(...)` and `session.configure_paths(...)` to keep later notebook cells short
+- `display_authoring_result(...)` to print a concise operator report and show
+  the current preview image
 
 Starter scaffolds now pull their `open_hole` and `cased_hole` heading payloads
 from packaged YAML archetype assets. That keeps the semantic first-page
@@ -253,6 +255,16 @@ Typical iterative flow:
 When the request is really “fill these known header values,” the agent routes
 through deterministic heading tools and preserves the existing scaffold instead
 of redesigning the header around the copied packet text.
+
+Every authoring result now includes a concise deterministic operator report
+with:
+
+- what was done
+- what could not be done
+- why not
+- warnings or errors
+- request inconsistencies the current draft or source data can prove
+- what the agent can help with next
 
 ## Contributor Development Workflow
 
