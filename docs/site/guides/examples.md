@@ -99,7 +99,8 @@ The examples are grouped by workflow rather than by isolated feature.
   - notebook companion to the same MCP walkthrough, generated into the
     developer notebook set
 - `examples/notebooks/user/agent_las_step_by_step.ipynb`
-  - detailed user walkthrough that bootstraps a reusable project session with
+  - canonical end-user MCP example: detailed walkthrough that bootstraps a
+    reusable project session with
     `create_project_session(...)`, stages a LAS file and starter scaffold
     through `session.bootstrap_starter(...)`, and adds header, remarks, tracks,
     and bindings one step at a time through `wellplot.agent`

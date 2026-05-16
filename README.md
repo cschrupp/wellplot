@@ -394,7 +394,8 @@ Current examples:
   - uses the same credential loading as `wellplot.agent`: `OPENAI_API_KEY`,
     `.env.local`, `.env`, `OPENAI_API_KEY.txt`, or `openai_api_key.txt`
 - [examples/notebooks/user/agent_las_step_by_step.ipynb](examples/notebooks/user/agent_las_step_by_step.ipynb)
-  - credentialed end-user walkthrough that bootstraps a project session,
+  - canonical end-user MCP walkthrough for this repository: bootstraps a
+    project session,
     stages a user LAS file, generates a reusable starter scaffold through
     `session.bootstrap_starter(...)`, and adds header, remarks, tracks, and
     bindings one step at a time through `wellplot.agent`

@@ -1,4 +1,4 @@
-# Example 7: Agent-Assisted LAS Packet Walkthrough
+# Example 7: Canonical MCP User Walkthrough
 
 This guide documents the detailed step-by-step notebook for building an
 open-hole packet from a user LAS file through the public `wellplot.agent` API.
@@ -9,6 +9,8 @@ Notebook:
 
 Use this walkthrough when you want the model to help with authoring decisions,
 but you still want the edits to stay explicit, reviewable, and preview-driven.
+This is the primary user-facing MCP example for the project and the notebook
+that should be mirrored in the Read the Docs flow.
 
 ## What this notebook teaches
 
@@ -34,6 +36,22 @@ The notebook uses these public APIs directly:
 - `await session.render_logfile_to_file(...)`
 - `display_authoring_result(...)`
 - `relative_path(...)`
+
+## Why this is the canonical MCP example
+
+This notebook is the best current summary of the project direction because it
+shows the intended production split:
+
+- `wellplot` core owns deterministic layout, validation, rendering, and domain
+  semantics
+- `wellplot-mcp` exposes those semantics through inspect/apply/update/remove
+  tools, resources, and prompts
+- `wellplot.agent` routes natural-language requests onto deterministic MCP
+  operations whenever the task is narrow enough to prove safely
+
+That makes this notebook a better publication example than a pure YAML demo or
+one large natural-language prompt. It shows the iterative workflow that real
+users are expected to follow.
 
 ## Runtime requirements
 

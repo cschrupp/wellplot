@@ -289,6 +289,7 @@ Recommended split:
 This is the pattern used by the step-by-step user notebook:
 
 - `examples/notebooks/user/agent_las_step_by_step.ipynb`
+  - canonical end-user MCP example for the repository
 
 ## `base_dir` Semantics
 
