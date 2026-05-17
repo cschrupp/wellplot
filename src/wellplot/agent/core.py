@@ -24,9 +24,12 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Awaitable, Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
+
+from ..mcp.packet_blueprints import match_packet_blueprint, packet_blueprint_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -43,6 +46,8 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "inspect_data_source",
     "check_channel_availability",
     "inspect_header_archetypes",
+    "inspect_packet_blueprints",
+    "replicate_section_structure",
     "apply_header_archetype",
     "inspect_heading_slots",
     "parse_key_value_text",
@@ -126,6 +131,68 @@ class ProviderRunResult:
 
 
 @dataclass(frozen=True)
+class AuthoringPlanPhase:
+    """One planned authoring phase for a structured packet or draft workflow."""
+
+    id: str
+    kind: str
+    summary: str
+    instructions: str
+    tool_families: tuple[str, ...] = ()
+    preconditions: tuple[str, ...] = ()
+    success_checks: tuple[str, ...] = ()
+    success_check_specs: tuple[dict[str, object], ...] = ()
+    max_rounds: int | None = None
+    metadata: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AuthoringRunState:
+    """Structured per-run state captured during one authoring workflow."""
+
+    objectives: tuple[str, ...] = ()
+    completed_objectives: tuple[str, ...] = ()
+    blocked_objectives: tuple[str, ...] = ()
+    discovered_sections: tuple[str, ...] = ()
+    discovered_tracks_by_section: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    discovered_binding_ids_by_track: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    available_channels_by_section: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    last_verification: dict[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AuthoringPlanResult:
+    """Structured planning output for one authoring request."""
+
+    mode: str
+    packet_blueprint_id: str | None
+    phases: tuple[AuthoringPlanPhase, ...]
+    blocked: bool
+    blocked_reasons: tuple[str, ...] = ()
+    run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
+
+
+@dataclass(frozen=True)
+class ExecutedAuthoringPhase:
+    """Recorded execution outcome for one planned authoring phase."""
+
+    id: str
+    kind: str
+    summary: str
+    status: str
+    tool_trace: tuple[AuthoringToolCall, ...]
+    verification: dict[str, object]
+    blocked_reasons: tuple[str, ...] = ()
+    preview_kind: str | None = None
+    preview_target: str | None = None
+    preview_png: bytes | None = field(default=None, repr=False)
+
+    def preview_bytes(self) -> bytes | None:
+        """Return the optional captured phase preview bytes."""
+        return self.preview_png
+
+
+@dataclass(frozen=True)
 class AuthoringUserReport:
     """Concise deterministic operator report for one authoring run."""
 
@@ -182,6 +249,9 @@ class AuthoringResult:
     draft_text: str
     report_preview_png: bytes = field(repr=False)
     section_preview_png: bytes = field(repr=False)
+    plan: AuthoringPlanResult | None = None
+    phase_summaries: tuple[ExecutedAuthoringPhase, ...] = ()
+    run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
     user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
 
     @property
@@ -875,6 +945,82 @@ def _extract_matplotlib_style_intent(text: str) -> tuple[_MatplotlibStyleIntent 
     return _MatplotlibStyleIntent(style_patch=style_patch), remaining_text
 
 
+def _extract_named_block(text: str, *, headings: tuple[str, ...]) -> list[str]:
+    """Return the indented/body lines that belong to one named prompt block."""
+    normalized_headings = {
+        re.sub(r"[^a-z0-9]+", "", heading.lower()): heading for heading in headings
+    }
+    block_lines: list[str] = []
+    capturing = False
+    for raw_line in text.splitlines():
+        stripped = raw_line.strip()
+        normalized = re.sub(r"[^a-z0-9]+", "", stripped.lower())
+        if normalized in normalized_headings:
+            capturing = True
+            continue
+        if capturing and stripped.endswith(":") and not stripped.startswith("-"):
+            break
+        if capturing:
+            block_lines.append(raw_line)
+    return block_lines
+
+
+def _parse_source_slot_mapping(text: str) -> dict[str, str]:
+    """Parse one simple packet data-source block into named source slots."""
+    values: dict[str, str] = {}
+    for raw_line in _extract_named_block(
+        text, headings=("data sources:", "source data:", "sources:")
+    ):
+        line = _trim_bullet_prefix(raw_line)
+        if not line or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        slot = key.strip().lower()
+        source_path = value.strip()
+        if slot and source_path:
+            values[slot] = source_path
+    return values
+
+
+def _extract_packet_header_fill_intent(text: str) -> _HeaderFillIntent | None:
+    """Extract one packet header-value block without mixing in broader packet prose."""
+    block_lines = _extract_named_block(
+        text,
+        headings=("header values:", "header:", "header fields:"),
+    )
+    block_text = "\n".join(block_lines).strip()
+    if not block_text:
+        return _extract_header_fill_intent(text)
+    return _extract_header_fill_intent(block_text)
+
+
+def _extract_packet_remarks(text: str) -> list[dict[str, object]]:
+    """Extract one deterministic remarks payload from a structured prompt block."""
+    block_lines = _extract_named_block(text, headings=("remarks:", "notes:"))
+    remarks: list[dict[str, object]] = []
+    current: dict[str, object] | None = None
+    current_lines: list[str] = []
+    for raw_line in block_lines:
+        line = raw_line.strip()
+        if not line:
+            continue
+        trimmed = _trim_bullet_prefix(raw_line)
+        if trimmed.lower().startswith("title:"):
+            if current is not None and current_lines:
+                current["lines"] = list(current_lines)
+                remarks.append(current)
+            current = {"title": trimmed.split(":", 1)[1].strip(), "alignment": "left"}
+            current_lines = []
+            continue
+        if current is None:
+            current = {"title": "Notes", "alignment": "left"}
+        current_lines.append(trimmed)
+    if current is not None and current_lines:
+        current["lines"] = list(current_lines)
+        remarks.append(current)
+    return remarks
+
+
 def _authoring_bootstrap_message(
     *,
     goal: str,
@@ -1020,6 +1166,9 @@ class AuthoringSession:
         source_logfile_path: str | None,
         baseline_draft_text: str,
         provider_result: ProviderRunResult,
+        plan: AuthoringPlanResult | None = None,
+        phase_summaries: tuple[ExecutedAuthoringPhase, ...] = (),
+        run_state: AuthoringRunState | None = None,
     ) -> AuthoringResult:
         """Collect the standard validation/summary/preview outputs for one draft."""
         output_path = self.runtime.server_root / draft_logfile
@@ -1095,6 +1244,9 @@ class AuthoringSession:
             draft_text=output_path.read_text(encoding="utf-8"),
             report_preview_png=self.runtime.image_bytes(report_preview_result),
             section_preview_png=self.runtime.image_bytes(section_preview_result),
+            plan=plan,
+            phase_summaries=phase_summaries,
+            run_state=AuthoringRunState() if run_state is None else run_state,
             user_report=_build_user_report(
                 request_text=goal,
                 validation=validation_payload,
@@ -1104,6 +1256,10 @@ class AuthoringSession:
                 report_facts=getattr(provider_result, "report_facts", {}),
             ),
         )
+
+    def plan(self, *, text: str) -> AuthoringPlanResult:
+        """Return one dry-run structured plan for the supplied request text."""
+        return self._plan_from_text(text)
 
     async def _run_deterministic_header_fill(
         self,
@@ -1295,6 +1451,784 @@ class AuthoringSession:
             },
         )
 
+    def _plan_from_text(self, text: str) -> AuthoringPlanResult:
+        """Build one structured plan for the current request text."""
+        blueprint_id = match_packet_blueprint(text)
+        if blueprint_id is None:
+            return AuthoringPlanResult(
+                mode="freeform",
+                packet_blueprint_id=None,
+                phases=(),
+                blocked=False,
+            )
+        blueprint = packet_blueprint_spec(blueprint_id)
+        section_templates = {
+            str(section.get("id", "")): dict(section)
+            for section in blueprint.get("section_templates", [])
+            if isinstance(section, dict)
+        }
+        phases: list[AuthoringPlanPhase] = []
+        for raw_phase in blueprint.get("plan_phases", []):
+            if not isinstance(raw_phase, dict):
+                continue
+            phase_kind = str(raw_phase.get("kind", "")).strip()
+            metadata: dict[str, object] = {
+                "blueprint_id": blueprint_id,
+                "header_archetype": blueprint.get("header_archetype"),
+                "unsupported_features": list(blueprint.get("unsupported_features", [])),
+                "remarks_templates": deepcopy(list(blueprint.get("remarks_templates", []))),
+                "raster_binding_defaults": deepcopy(
+                    dict(blueprint.get("raster_binding_defaults", {}))
+                ),
+            }
+            if phase_kind == "section_scaffold":
+                primary_section = next(iter(section_templates.values()), None)
+                if isinstance(primary_section, dict):
+                    metadata["section_template"] = deepcopy(primary_section)
+            elif phase_kind == "section_replication":
+                target_template = next(
+                    (
+                        section
+                        for section in section_templates.values()
+                        if isinstance(section, dict) and section.get("replicates_from")
+                    ),
+                    None,
+                )
+                if isinstance(target_template, dict):
+                    metadata["section_template"] = deepcopy(target_template)
+            phases.append(
+                AuthoringPlanPhase(
+                    id=str(raw_phase.get("id", "")).strip(),
+                    kind=phase_kind,
+                    summary=str(raw_phase.get("summary", "")).strip(),
+                    instructions=str(raw_phase.get("instructions", "")).strip(),
+                    tool_families=tuple(
+                        str(item).strip()
+                        for item in raw_phase.get("tool_families", [])
+                        if isinstance(item, str) and item.strip()
+                    ),
+                    preconditions=tuple(
+                        str(item).strip()
+                        for item in raw_phase.get("preconditions", [])
+                        if isinstance(item, str) and item.strip()
+                    ),
+                    success_checks=tuple(
+                        str(item).strip()
+                        for item in raw_phase.get("success_checks", [])
+                        if isinstance(item, str) and item.strip()
+                    ),
+                    success_check_specs=tuple(
+                        dict(spec)
+                        for spec in raw_phase.get("success_check_specs", [])
+                        if isinstance(spec, dict)
+                    ),
+                    max_rounds=(
+                        None
+                        if raw_phase.get("max_rounds") is None
+                        else int(raw_phase.get("max_rounds"))
+                    ),
+                    metadata=metadata,
+                )
+            )
+        return AuthoringPlanResult(
+            mode="packet",
+            packet_blueprint_id=blueprint_id,
+            phases=tuple(phases),
+            blocked=False,
+            run_state=AuthoringRunState(
+                objectives=tuple(phase.summary for phase in phases),
+            ),
+        )
+
+    def _run_state_from_summary(
+        self,
+        *,
+        draft_summary: dict[str, object],
+        objectives: tuple[str, ...],
+        completed_objectives: tuple[str, ...],
+        blocked_objectives: tuple[str, ...],
+        last_verification: dict[str, object],
+    ) -> AuthoringRunState:
+        """Build one structured run-state snapshot from the current draft summary."""
+        discovered_sections: list[str] = []
+        discovered_tracks_by_section: dict[str, tuple[str, ...]] = {}
+        discovered_binding_ids_by_track: dict[str, tuple[str, ...]] = {}
+        available_channels_by_section: dict[str, tuple[str, ...]] = {}
+        for section in draft_summary.get("sections", []):
+            if not isinstance(section, dict):
+                continue
+            section_id = str(section.get("id", "")).strip()
+            if not section_id:
+                continue
+            discovered_sections.append(section_id)
+            track_ids = tuple(
+                str(track_id).strip()
+                for track_id in section.get("track_ids", [])
+                if isinstance(track_id, str) and track_id.strip()
+            )
+            discovered_tracks_by_section[section_id] = track_ids
+            available_channels_by_section[section_id] = tuple(
+                str(channel).strip()
+                for channel in section.get("available_channels", [])
+                if isinstance(channel, str) and channel.strip()
+            )
+            bindings_by_track = section.get("bindings_by_track", {})
+            if not isinstance(bindings_by_track, dict):
+                continue
+            for track_id, bindings in bindings_by_track.items():
+                if not isinstance(track_id, str) or not isinstance(bindings, list):
+                    continue
+                binding_ids = tuple(
+                    str(binding.get("id", "")).strip()
+                    for binding in bindings
+                    if isinstance(binding, dict) and str(binding.get("id", "")).strip()
+                )
+                discovered_binding_ids_by_track[f"{section_id}/{track_id}"] = binding_ids
+        return AuthoringRunState(
+            objectives=objectives,
+            completed_objectives=completed_objectives,
+            blocked_objectives=blocked_objectives,
+            discovered_sections=tuple(discovered_sections),
+            discovered_tracks_by_section=discovered_tracks_by_section,
+            discovered_binding_ids_by_track=discovered_binding_ids_by_track,
+            available_channels_by_section=available_channels_by_section,
+            last_verification=deepcopy(last_verification),
+        )
+
+    def _phase_success_state(
+        self,
+        *,
+        phase: AuthoringPlanPhase,
+        draft_summary: dict[str, object],
+        validation: dict[str, object] | None = None,
+        preview_renderable: bool = False,
+    ) -> dict[str, object]:
+        """Evaluate one phase's machine-checkable success state."""
+        sections = {
+            str(section.get("id", "")): section
+            for section in draft_summary.get("sections", [])
+            if isinstance(section, dict)
+        }
+        checks: list[dict[str, object]] = []
+        for spec in phase.success_check_specs:
+            kind = str(spec.get("kind", "")).strip()
+            ok = False
+            detail: str | None = None
+            if kind == "heading_exists":
+                ok = bool(draft_summary.get("has_heading", False))
+            elif kind == "remarks_exists":
+                ok = bool(draft_summary.get("has_remarks", False))
+            elif kind == "section_exists":
+                ok = str(spec.get("section_id", "")) in sections
+            elif kind == "track_exists":
+                section = sections.get(str(spec.get("section_id", "")), {})
+                track_ids = section.get("track_ids", [])
+                ok = (
+                    str(spec.get("track_id", "")) in track_ids
+                    if isinstance(track_ids, list)
+                    else False
+                )
+            elif kind == "binding_channel_exists":
+                section = sections.get(str(spec.get("section_id", "")), {})
+                bindings_by_track = section.get("bindings_by_track", {})
+                bindings = (
+                    bindings_by_track.get(str(spec.get("track_id", "")), [])
+                    if isinstance(bindings_by_track, dict)
+                    else []
+                )
+                count = sum(
+                    1
+                    for binding in bindings
+                    if isinstance(binding, dict)
+                    and str(binding.get("channel", "")).upper()
+                    == str(spec.get("channel", "")).upper()
+                )
+                min_count = int(spec.get("min_count", 1))
+                ok = count >= min_count
+                detail = f"count={count}, min_count={min_count}"
+            elif kind == "validation_valid":
+                ok = bool(validation and validation.get("valid") is True)
+            elif kind == "preview_renderable":
+                ok = preview_renderable
+            else:
+                ok = False
+                detail = "Unsupported success-check kind."
+            checks.append(
+                {
+                    "kind": kind,
+                    "ok": ok,
+                    "spec": deepcopy(spec),
+                    "detail": detail,
+                }
+            )
+        return {
+            "ok": all(bool(item.get("ok")) for item in checks) if checks else True,
+            "checks": checks,
+        }
+
+    async def _capture_phase_preview(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        phase: AuthoringPlanPhase,
+        draft_summary: dict[str, object],
+    ) -> tuple[str | None, str | None, bytes | None]:
+        """Capture one checkpoint preview for the executed phase when possible."""
+        preferred_section_id = None
+        section_ids = draft_summary.get("section_ids", [])
+        if isinstance(section_ids, list):
+            for candidate in ("main_pass", "main", "repeat_pass"):
+                if candidate in section_ids:
+                    preferred_section_id = candidate
+                    break
+            if preferred_section_id is None and section_ids:
+                first_section = section_ids[0]
+                preferred_section_id = first_section if isinstance(first_section, str) else None
+
+        if phase.kind in {"header_scaffold", "header_fill", "remarks", "verification"}:
+            preview_result = await session.call_tool(
+                "preview_logfile_png",
+                {
+                    "logfile_path": draft_logfile,
+                    "page_index": 0,
+                    "dpi": 72,
+                    "include_report_pages": True,
+                },
+            )
+            _require_mcp_success(preview_result, action="preview_logfile_png")
+            return "report", None, self.runtime.image_bytes(preview_result)
+
+        if preferred_section_id is None:
+            return None, None, None
+        preview_result = await session.call_tool(
+            "preview_section_png",
+            {
+                "logfile_path": draft_logfile,
+                "section_id": preferred_section_id,
+                "dpi": 72,
+            },
+        )
+        _require_mcp_success(preview_result, action="preview_section_png")
+        return "section", preferred_section_id, self.runtime.image_bytes(preview_result)
+
+    async def _apply_packet_header_fill(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_text: str,
+    ) -> ProviderRunResult:
+        """Apply one packet header-fill phase deterministically when possible."""
+        intent = _extract_packet_header_fill_intent(request_text)
+        if intent is None:
+            return ProviderRunResult(
+                final_text="No deterministic packet header-value block was found.",
+                tool_trace=(),
+                report_facts={
+                    "warnings": ["No explicit packet header block was found to fill."],
+                },
+            )
+        inspect_heading_result = await session.call_tool(
+            "inspect_heading_slots",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(inspect_heading_result, action="inspect_heading_slots")
+        parse_result = await session.call_tool(
+            "parse_key_value_text",
+            {
+                "source_text": "\n".join(f"{key}: {value}" for key, value in intent.values),
+                "format_hint": "colon",
+            },
+        )
+        _require_mcp_success(parse_result, action="parse_key_value_text")
+        parsed_payload = _structured_content(parse_result)
+        parsed_values: dict[str, str] = {}
+        for pair in parsed_payload.get("pairs", []):
+            if not isinstance(pair, dict):
+                continue
+            key = pair.get("key")
+            value = pair.get("value")
+            if isinstance(key, str) and key.strip() and isinstance(value, str):
+                parsed_values[key.strip()] = value
+        if not parsed_values:
+            parsed_values = intent.as_mapping()
+        preview_result = await session.call_tool(
+            "preview_header_mapping",
+            {
+                "logfile_path": draft_logfile,
+                "values": parsed_values,
+                "overwrite_policy": intent.overwrite_policy,
+            },
+        )
+        _require_mcp_success(preview_result, action="preview_header_mapping")
+        apply_result = await session.call_tool(
+            "apply_header_values",
+            {
+                "logfile_path": draft_logfile,
+                "values": parsed_values,
+                "overwrite_policy": intent.overwrite_policy,
+            },
+        )
+        _require_mcp_success(apply_result, action="apply_header_values")
+        apply_payload = _structured_content(apply_result)
+        return ProviderRunResult(
+            final_text="Applied deterministic packet header values.",
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="inspect_heading_slots",
+                    arguments={"logfile_path": draft_logfile},
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="parse_key_value_text",
+                    arguments={
+                        "source_text": "\n".join(f"{key}: {value}" for key, value in intent.values),
+                        "format_hint": "colon",
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="preview_header_mapping",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "values": parsed_values,
+                        "overwrite_policy": intent.overwrite_policy,
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="apply_header_values",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "values": parsed_values,
+                        "overwrite_policy": intent.overwrite_policy,
+                    },
+                ),
+            ),
+            report_facts={
+                "completed": ["Filled matching packet header values."],
+                "warnings": list(apply_payload.get("warnings", []))
+                if isinstance(apply_payload.get("warnings"), list)
+                else [],
+            },
+        )
+
+    async def _apply_packet_remarks(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_text: str,
+    ) -> ProviderRunResult:
+        """Apply one packet remarks phase deterministically when possible."""
+        remarks = _extract_packet_remarks(request_text)
+        if not remarks:
+            return ProviderRunResult(
+                final_text="No explicit packet remarks block was found.",
+                tool_trace=(),
+            )
+        result = await session.call_tool(
+            "set_remarks_content",
+            {
+                "logfile_path": draft_logfile,
+                "remarks": remarks,
+            },
+        )
+        _require_mcp_success(result, action="set_remarks_content")
+        return ProviderRunResult(
+            final_text="Applied deterministic packet remarks block.",
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="set_remarks_content",
+                    arguments={"logfile_path": draft_logfile, "remarks": remarks},
+                ),
+            ),
+            report_facts={"completed": ["Updated the remarks block from the packet prompt."]},
+        )
+
+    async def _apply_packet_raster_defaults(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        blueprint: dict[str, object],
+    ) -> tuple[AuthoringToolCall, ...]:
+        """Replay deterministic raster defaults declared by the packet blueprint."""
+        defaults = blueprint.get("raster_binding_defaults", {})
+        if not isinstance(defaults, dict) or not defaults:
+            return ()
+        summary_result = await session.call_tool(
+            "summarize_logfile_draft",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(summary_result, action="summarize_logfile_draft")
+        summary_payload = _structured_content(summary_result)
+        section_templates = {
+            str(section.get("id", "")): section
+            for section in blueprint.get("section_templates", [])
+            if isinstance(section, dict)
+        }
+        tool_calls: list[AuthoringToolCall] = []
+        for section in summary_payload.get("sections", []):
+            if not isinstance(section, dict):
+                continue
+            section_id = str(section.get("id", "")).strip()
+            template = section_templates.get(section_id)
+            if not isinstance(template, dict):
+                continue
+            expected_by_track = template.get("expected_bindings_by_track", {})
+            if not isinstance(expected_by_track, dict):
+                continue
+            for track_id, patch in defaults.items():
+                if not isinstance(track_id, str) or not isinstance(patch, dict):
+                    continue
+                expected_channels = expected_by_track.get(track_id, [])
+                if not isinstance(expected_channels, list) or not expected_channels:
+                    continue
+                channel = str(expected_channels[0]).strip()
+                if not channel:
+                    continue
+                inspect_result = await session.call_tool(
+                    "inspect_track_bindings",
+                    {
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "track_id": track_id,
+                    },
+                )
+                _require_mcp_success(inspect_result, action="inspect_track_bindings")
+                inspect_payload = _structured_content(inspect_result)
+                bindings = inspect_payload.get("bindings", [])
+                if not isinstance(bindings, list):
+                    continue
+                if not any(
+                    isinstance(binding, dict)
+                    and str(binding.get("kind", "")).lower() == "raster"
+                    and str(binding.get("channel", "")).upper() == channel.upper()
+                    for binding in bindings
+                ):
+                    continue
+                result = await session.call_tool(
+                    "update_raster_binding",
+                    {
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "track_id": track_id,
+                        "channel": channel,
+                        "patch": patch,
+                    },
+                )
+                _require_mcp_success(result, action="update_raster_binding")
+                tool_calls.append(
+                    AuthoringToolCall(
+                        round=1,
+                        name="update_raster_binding",
+                        arguments={
+                            "logfile_path": draft_logfile,
+                            "section_id": section_id,
+                            "track_id": track_id,
+                            "channel": channel,
+                            "patch": patch,
+                        },
+                    )
+                )
+        return tuple(tool_calls)
+
+    async def _execute_packet_plan(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_text: str,
+        plan: AuthoringPlanResult,
+        prompt_text: str,
+        tool_definitions: list[FunctionToolDefinition],
+        request_max_rounds: int,
+    ) -> tuple[ProviderRunResult, tuple[ExecutedAuthoringPhase, ...], AuthoringRunState]:
+        """Execute one staged packet plan and verify each phase deterministically."""
+        blueprint = (
+            {}
+            if plan.packet_blueprint_id is None
+            else packet_blueprint_spec(plan.packet_blueprint_id)
+        )
+        phase_summaries: list[ExecutedAuthoringPhase] = []
+        flattened_tool_trace: list[AuthoringToolCall] = []
+        completed_objectives: list[str] = []
+        blocked_objectives: list[str] = []
+        last_verification: dict[str, object] = {}
+
+        async def call_mcp_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
+            tool_result = await session.call_tool(name, arguments)
+            return self.runtime.tool_result_payload(tool_result)
+
+        for phase in plan.phases:
+            summary_result = await session.call_tool(
+                "summarize_logfile_draft",
+                {"logfile_path": draft_logfile},
+            )
+            _require_mcp_success(summary_result, action="summarize_logfile_draft")
+            current_summary = _structured_content(summary_result)
+            before_state = self._phase_success_state(
+                phase=phase,
+                draft_summary=current_summary,
+            )
+            if before_state["ok"]:
+                preview_kind, preview_target, preview_png = await self._capture_phase_preview(
+                    session=session,
+                    draft_logfile=draft_logfile,
+                    phase=phase,
+                    draft_summary=current_summary,
+                )
+                phase_summaries.append(
+                    ExecutedAuthoringPhase(
+                        id=phase.id,
+                        kind=phase.kind,
+                        summary=phase.summary,
+                        status="completed",
+                        tool_trace=(),
+                        verification=before_state,
+                        preview_kind=preview_kind,
+                        preview_target=preview_target,
+                        preview_png=preview_png,
+                    )
+                )
+                completed_objectives.append(phase.summary)
+                last_verification = before_state
+                continue
+
+            phase_result: ProviderRunResult | None = None
+            blocked_reasons: tuple[str, ...] = ()
+            try:
+                if phase.kind == "header_scaffold":
+                    archetype_id = str(phase.metadata.get("header_archetype", "")).strip()
+                    if archetype_id:
+                        result = await session.call_tool(
+                            "apply_header_archetype",
+                            {
+                                "logfile_path": draft_logfile,
+                                "archetype_id": archetype_id,
+                                "preserve_existing_values": True,
+                            },
+                        )
+                        _require_mcp_success(result, action="apply_header_archetype")
+                        phase_result = ProviderRunResult(
+                            final_text="Applied deterministic packet header scaffold.",
+                            tool_trace=(
+                                AuthoringToolCall(
+                                    round=1,
+                                    name="apply_header_archetype",
+                                    arguments={
+                                        "logfile_path": draft_logfile,
+                                        "archetype_id": archetype_id,
+                                        "preserve_existing_values": True,
+                                    },
+                                ),
+                            ),
+                        )
+                elif phase.kind == "header_fill":
+                    phase_result = await self._apply_packet_header_fill(
+                        session=session,
+                        draft_logfile=draft_logfile,
+                        request_text=request_text,
+                    )
+                elif phase.kind == "remarks":
+                    phase_result = await self._apply_packet_remarks(
+                        session=session,
+                        draft_logfile=draft_logfile,
+                        request_text=request_text,
+                    )
+                elif phase.kind == "section_replication":
+                    section_template = phase.metadata.get("section_template", {})
+                    source_slot_mapping = _parse_source_slot_mapping(request_text)
+                    if not isinstance(section_template, dict):
+                        blocked_reasons = ("No section template was available for replication.",)
+                    else:
+                        source_path = source_slot_mapping.get(
+                            str(section_template.get("source_slot", "")).strip().lower()
+                        )
+                        result = await session.call_tool(
+                            "replicate_section_structure",
+                            {
+                                "logfile_path": draft_logfile,
+                                "source_section_id": str(
+                                    section_template.get("replicates_from", "")
+                                ).strip(),
+                                "target_section_id": str(section_template.get("id", "")).strip(),
+                                "source_path": source_path,
+                                "title": section_template.get("title"),
+                                "subtitle": section_template.get("subtitle"),
+                                "include_bindings": False,
+                                "overwrite": True,
+                            },
+                        )
+                        _require_mcp_success(result, action="replicate_section_structure")
+                        phase_result = ProviderRunResult(
+                            final_text="Replicated the packet section scaffold.",
+                            tool_trace=(
+                                AuthoringToolCall(
+                                    round=1,
+                                    name="replicate_section_structure",
+                                    arguments={
+                                        "logfile_path": draft_logfile,
+                                        "source_section_id": str(
+                                            section_template.get("replicates_from", "")
+                                        ).strip(),
+                                        "target_section_id": str(
+                                            section_template.get("id", "")
+                                        ).strip(),
+                                        "source_path": source_path,
+                                        "title": section_template.get("title"),
+                                        "subtitle": section_template.get("subtitle"),
+                                        "include_bindings": False,
+                                        "overwrite": True,
+                                    },
+                                ),
+                            ),
+                        )
+                elif phase.kind == "verification":
+                    phase_result = ProviderRunResult(
+                        final_text="Verified the packet draft state.",
+                        tool_trace=(),
+                    )
+                else:
+                    phase_budget = phase.max_rounds or request_max_rounds
+                    phase_result = await self.backend.run_authoring(
+                        instructions=prompt_text,
+                        initial_user_message=(
+                            f"Packet phase `{phase.id}`.\n"
+                            f"Phase summary: {phase.summary}\n"
+                            f"Phase instructions:\n{phase.instructions}\n\n"
+                            "Complete only this phase. Do not redesign already-complete "
+                            "packet parts. Use MCP tools only.\n\n"
+                            f"Current draft context:\n{json.dumps(current_summary, indent=2)}\n\n"
+                            f"Original request:\n{request_text}"
+                        ),
+                        tool_definitions=tool_definitions,
+                        tool_caller=call_mcp_tool,
+                        max_rounds=phase_budget,
+                    )
+                    if phase.kind == "bindings_raster":
+                        raster_defaults_trace = await self._apply_packet_raster_defaults(
+                            session=session,
+                            draft_logfile=draft_logfile,
+                            blueprint=blueprint,
+                        )
+                        if raster_defaults_trace:
+                            phase_result = ProviderRunResult(
+                                final_text=phase_result.final_text,
+                                tool_trace=phase_result.tool_trace + raster_defaults_trace,
+                                report_facts=phase_result.report_facts,
+                            )
+            except RuntimeError as exc:
+                if "exceeded" in str(exc).lower():
+                    blocked_reasons = (
+                        f"Phase `{phase.id}` exceeded its round budget before verification passed.",
+                    )
+                    phase_result = ProviderRunResult(
+                        final_text=f"Phase `{phase.id}` blocked on round budget exhaustion.",
+                        tool_trace=(),
+                    )
+                else:
+                    raise
+
+            post_summary_result = await session.call_tool(
+                "summarize_logfile_draft",
+                {"logfile_path": draft_logfile},
+            )
+            _require_mcp_success(post_summary_result, action="summarize_logfile_draft")
+            post_summary = _structured_content(post_summary_result)
+            validation_payload: dict[str, object] | None = None
+            if any(
+                str(spec.get("kind", "")).strip() == "validation_valid"
+                for spec in phase.success_check_specs
+            ):
+                validation_result = await session.call_tool(
+                    "validate_logfile",
+                    {"logfile_path": draft_logfile},
+                )
+                _require_mcp_success(validation_result, action="validate_logfile")
+                validation_payload = _structured_content(validation_result)
+            preview_kind, preview_target, preview_png = await self._capture_phase_preview(
+                session=session,
+                draft_logfile=draft_logfile,
+                phase=phase,
+                draft_summary=post_summary,
+            )
+            after_state = self._phase_success_state(
+                phase=phase,
+                draft_summary=post_summary,
+                validation=validation_payload,
+                preview_renderable=preview_png is not None,
+            )
+            if not after_state["ok"] and not blocked_reasons:
+                before_snapshot = json.dumps(before_state["checks"], sort_keys=True, default=str)
+                after_snapshot = json.dumps(after_state["checks"], sort_keys=True, default=str)
+                if before_snapshot == after_snapshot:
+                    blocked_reasons = (
+                        "Phase made no verifiable progress toward its success checks.",
+                    )
+                else:
+                    blocked_reasons = tuple(
+                        f"Unmet success check `{check.get('kind', '')}`."
+                        for check in after_state["checks"]
+                        if not bool(check.get("ok"))
+                    )
+
+            status = "completed" if after_state["ok"] and not blocked_reasons else "blocked"
+            tool_trace = () if phase_result is None else phase_result.tool_trace
+            phase_summary = ExecutedAuthoringPhase(
+                id=phase.id,
+                kind=phase.kind,
+                summary=phase.summary,
+                status=status,
+                tool_trace=tool_trace,
+                verification=after_state,
+                blocked_reasons=blocked_reasons,
+                preview_kind=preview_kind,
+                preview_target=preview_target,
+                preview_png=preview_png,
+            )
+            phase_summaries.append(phase_summary)
+            flattened_tool_trace.extend(tool_trace)
+            last_verification = after_state
+            if status == "completed":
+                completed_objectives.append(phase.summary)
+                continue
+            blocked_objectives.append(phase.summary)
+            break
+
+        run_state = self._run_state_from_summary(
+            draft_summary=post_summary if "post_summary" in locals() else current_summary,
+            objectives=plan.run_state.objectives,
+            completed_objectives=tuple(completed_objectives),
+            blocked_objectives=tuple(blocked_objectives),
+            last_verification=last_verification,
+        )
+        report_facts = {
+            "completed": [
+                phase.summary for phase in phase_summaries if phase.status == "completed"
+            ],
+            "not_done": [phase.summary for phase in phase_summaries if phase.status == "blocked"],
+            "reasons": [reason for phase in phase_summaries for reason in phase.blocked_reasons],
+        }
+        final_text = (
+            "Packet plan completed."
+            if not blocked_objectives
+            else "Packet plan stopped on a blocked phase."
+        )
+        return (
+            ProviderRunResult(
+                final_text=final_text,
+                tool_trace=tuple(flattened_tool_trace),
+                report_facts=report_facts,
+            ),
+            tuple(phase_summaries),
+            run_state,
+        )
+
     async def run_request(self, request: AuthoringRequest) -> AuthoringResult:
         """Run one authoring request from the provider-neutral request model."""
         relative_output_logfile = _relative_logfile_path(
@@ -1371,6 +2305,54 @@ class AuthoringSession:
                         preflight_tool_trace + result.tool_trace,
                     )
                 return result
+
+            packet_plan = self._plan_from_text(request.goal)
+            if packet_plan.mode == "packet":
+                prompt_arguments: dict[str, object] = {
+                    "goal": effective_goal,
+                    "logfile_path": relative_output_logfile,
+                }
+                if request.example_id is not None:
+                    prompt_arguments["example_id"] = request.example_id
+                prompt_result = await session.get_prompt(
+                    "author_plot_from_request",
+                    prompt_arguments,
+                )
+                authoring_prompt = self.runtime.prompt_text(prompt_result)
+                tools_result = await session.list_tools()
+                tool_definitions = self.runtime.build_tool_definitions(
+                    getattr(tools_result, "tools", []),
+                    allowed_names=set(self.allowed_tool_names),
+                    excluded_names={"create_logfile_draft"},
+                )
+                provider_result, phase_summaries, run_state = await self._execute_packet_plan(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_text=request.goal,
+                    plan=packet_plan,
+                    prompt_text=authoring_prompt,
+                    tool_definitions=tool_definitions,
+                    request_max_rounds=request.max_rounds,
+                )
+                if preflight_tool_trace:
+                    provider_result = ProviderRunResult(
+                        final_text=provider_result.final_text,
+                        tool_trace=preflight_tool_trace + provider_result.tool_trace,
+                        report_facts=provider_result.report_facts,
+                    )
+                return await self._finalize_result(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_kind="author",
+                    goal=request.goal,
+                    example_id=request.example_id,
+                    source_logfile_path=relative_source_logfile,
+                    baseline_draft_text=baseline_draft_text,
+                    provider_result=provider_result,
+                    plan=packet_plan,
+                    phase_summaries=phase_summaries,
+                    run_state=run_state,
+                )
 
             bootstrap_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
@@ -1498,6 +2480,51 @@ class AuthoringSession:
                         preflight_tool_trace + result.tool_trace,
                     )
                 return result
+
+            packet_plan = self._plan_from_text(request.feedback)
+            if packet_plan.mode == "packet":
+                prompt_result = await session.get_prompt(
+                    "revise_plot_from_feedback",
+                    {
+                        "logfile_path": relative_logfile,
+                        "feedback": effective_feedback,
+                    },
+                )
+                revision_prompt = self.runtime.prompt_text(prompt_result)
+                tools_result = await session.list_tools()
+                tool_definitions = self.runtime.build_tool_definitions(
+                    getattr(tools_result, "tools", []),
+                    allowed_names=set(self.allowed_tool_names),
+                    excluded_names={"create_logfile_draft"},
+                )
+                provider_result, phase_summaries, run_state = await self._execute_packet_plan(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_text=request.feedback,
+                    plan=packet_plan,
+                    prompt_text=revision_prompt,
+                    tool_definitions=tool_definitions,
+                    request_max_rounds=request.max_rounds,
+                )
+                if preflight_tool_trace:
+                    provider_result = ProviderRunResult(
+                        final_text=provider_result.final_text,
+                        tool_trace=preflight_tool_trace + provider_result.tool_trace,
+                        report_facts=provider_result.report_facts,
+                    )
+                return await self._finalize_result(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    goal=request.feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    provider_result=provider_result,
+                    plan=packet_plan,
+                    phase_summaries=phase_summaries,
+                    run_state=run_state,
+                )
             bootstrap_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": relative_logfile},

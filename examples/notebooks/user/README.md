@@ -28,6 +28,13 @@ They differ from the developer notebooks in three ways:
     or source data can prove them
   - manual and credentialed: requires `wellplot[agent,las,notebook]`
     plus an OpenAI API key at runtime
+- `agent_cbl_log_example_from_prompt.ipynb`
+  - experimental packet stress-test that asks the agent to reconstruct the
+    supported `cbl_log_example` packet from one structured prompt
+  - uses staged DLIS inputs, a cased-hole starter scaffold, and per-phase
+    preview checkpoints to expose where packet planning succeeds or blocks
+  - not the primary end-user tutorial; use it to test packet-scale behavior
+    while the planner is still stabilizing
 
 ### Computed-Channel NumPy Recipes
 

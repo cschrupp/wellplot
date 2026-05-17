@@ -20,11 +20,15 @@
 """Public host-side agent exports for LLM-driven wellplot authoring."""
 
 from .core import (
+    AuthoringPlanPhase,
+    AuthoringPlanResult,
     AuthoringRequest,
     AuthoringResult,
+    AuthoringRunState,
     AuthoringSession,
     AuthoringToolCall,
     AuthoringUserReport,
+    ExecutedAuthoringPhase,
     RevisionRequest,
     revise_authoring_request,
     run_authoring_request,
@@ -35,21 +39,27 @@ from .notebook import (
     ProjectStarter,
     create_project_session,
     display_authoring_result,
+    display_phase_previews,
     relative_path,
 )
 
 __all__ = [
     "AuthoringRequest",
+    "AuthoringPlanPhase",
+    "AuthoringPlanResult",
     "AuthoringResult",
+    "AuthoringRunState",
     "AuthoringSession",
     "AuthoringToolCall",
     "AuthoringUserReport",
+    "ExecutedAuthoringPhase",
     "ProjectPaths",
     "ProjectSession",
     "ProjectStarter",
     "RevisionRequest",
     "create_project_session",
     "display_authoring_result",
+    "display_phase_previews",
     "relative_path",
     "revise_authoring_request",
     "run_authoring_request",

@@ -72,6 +72,7 @@ from .header_archetypes import (
     header_archetype_catalog,
     header_archetype_heading,
 )
+from .packet_blueprints import packet_blueprint_catalog, packet_blueprint_spec
 
 ASSET_PACKAGE = "wellplot.mcp.assets"
 PRODUCTION_EXAMPLE_IDS = ("cbl_log_example", "forge16b_porosity_example")
@@ -227,6 +228,7 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
     "wellplot://authoring/catalog/header-archetypes.json",
+    "wellplot://authoring/catalog/packet-blueprints.json",
     "wellplot://authoring/catalog/header-fields.json",
     "wellplot://authoring/catalog/header-key-aliases.json",
     "wellplot://authoring/catalog/channel-aliases.json",
@@ -1053,6 +1055,15 @@ class HeaderArchetypesResult:
 
 
 @dataclass(slots=True)
+class PacketBlueprintsResult:
+    """Structured catalog payload for deterministic packet blueprints."""
+
+    selected_blueprint_id: str | None
+    blueprints: list[dict[str, object]]
+    resource_uris: list[str]
+
+
+@dataclass(slots=True)
 class AppliedHeaderArchetypeResult:
     """Structured result for applying one deterministic header archetype."""
 
@@ -1141,6 +1152,19 @@ class AppliedStylePresetResult:
     applied_bindings: list[dict[str, object]]
     skipped_templates: list[dict[str, object]]
     warnings: list[str]
+
+
+@dataclass(slots=True)
+class ReplicatedSectionStructureResult:
+    """Structured result for replicating one section layout into a new section."""
+
+    logfile_path: str
+    source_section_id: str
+    target_section_id: str
+    include_bindings: bool
+    copied_track_ids: list[str]
+    curve_binding_count: int
+    raster_binding_count: int
 
 
 @dataclass(slots=True)
@@ -1647,7 +1671,9 @@ def _find_curve_binding_index(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
 ) -> int:
+    matches: list[tuple[int, dict[str, object]]] = []
     for index, binding in enumerate(bindings):
         if not isinstance(binding, dict):
             continue
@@ -1658,7 +1684,23 @@ def _find_curve_binding_index(
         if str(binding.get("track_id", "")) != track_id:
             continue
         if str(binding.get("channel", "")).upper() == channel.upper():
-            return index
+            matches.append((index, binding))
+    if binding_id is not None:
+        normalized_binding_id = str(binding_id).strip()
+        for index, binding in matches:
+            if str(binding.get("id", "")).strip() == normalized_binding_id:
+                return index
+        raise TemplateValidationError(
+            f"Curve binding id {binding_id!r} for channel {channel!r} was not found on "
+            f"track {track_id!r} in section {section_id!r}."
+        )
+    if len(matches) == 1:
+        return matches[0][0]
+    if len(matches) > 1:
+        raise TemplateValidationError(
+            f"Multiple curve bindings for channel {channel!r} exist on track {track_id!r} "
+            f"in section {section_id!r}. Provide binding_id explicitly."
+        )
     raise TemplateValidationError(
         f"Curve binding for channel {channel!r} was not found on track {track_id!r} "
         f"in section {section_id!r}."
@@ -3516,6 +3558,16 @@ def authoring_header_archetypes_resource() -> ResourceContent:
     return ResourceContent(text=payload, mime_type="application/json")
 
 
+def authoring_packet_blueprints_resource() -> ResourceContent:
+    """Return curated packet blueprints as JSON text."""
+    payload = json.dumps(
+        {"packet_blueprints": packet_blueprint_catalog()},
+        indent=2,
+        sort_keys=True,
+    )
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
 def authoring_header_fields_resource() -> ResourceContent:
     """Return heading and remarks field guidance as JSON text."""
     payload = json.dumps(_heading_field_catalog(), indent=2, sort_keys=True)
@@ -4358,6 +4410,129 @@ def set_section_data_source(
         depth_min=index.depth_min,
         depth_max=index.depth_max,
         sample_count=index.sample_count,
+    )
+
+
+def replicate_section_structure(
+    logfile_path: str,
+    *,
+    source_section_id: str,
+    target_section_id: str,
+    source_path: str | None = None,
+    source_format: str = "auto",
+    title: str | None = None,
+    subtitle: str | None = None,
+    include_bindings: bool = True,
+    overwrite: bool = False,
+    root: str | Path | None = None,
+) -> ReplicatedSectionStructureResult:
+    """Copy one section scaffold, optional bindings, and optional new data source."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    current_spec, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    _ensure_known_section(current_spec, source_section_id)
+    if source_section_id == target_section_id:
+        raise TemplateValidationError("target_section_id must differ from source_section_id.")
+
+    sections = _logfile_mapping_sections(mapping)
+    source_section = deepcopy(_logfile_mapping_section(mapping, source_section_id))
+    existing_target_index: int | None = None
+    for index, section in enumerate(sections):
+        if not isinstance(section, dict):
+            continue
+        if str(section.get("id", "")) == target_section_id:
+            existing_target_index = index
+            break
+    if existing_target_index is not None and not overwrite:
+        raise TemplateValidationError(
+            f"Section {target_section_id!r} already exists. Pass overwrite=True to replace it."
+        )
+
+    bindings = _logfile_mapping_bindings(mapping)
+    if existing_target_index is not None:
+        sections.pop(existing_target_index)
+        remaining_bindings: list[dict[str, object]] = []
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                continue
+            if _binding_target_section_id(current_spec, binding) == target_section_id:
+                continue
+            remaining_bindings.append(binding)
+        bindings[:] = remaining_bindings
+
+    source_section["id"] = target_section_id
+    if title is not None:
+        source_section["title"] = str(title)
+    if subtitle is not None:
+        source_section["subtitle"] = str(subtitle)
+    if source_path is not None:
+        _, resolved_source_path, detected_format = _load_dataset_from_source_path(
+            source_path,
+            source_format=source_format,
+            root=server_root,
+        )
+        source_data = source_section.get("data")
+        if not isinstance(source_data, dict):
+            source_data = {}
+            source_section["data"] = source_data
+        source_data["source_path"] = Path(
+            os.path.relpath(resolved_source_path, start=resolved_logfile.parent)
+        ).as_posix()
+        source_data["source_format"] = detected_format
+    elif source_format != "auto":
+        source_data = source_section.get("data")
+        if not isinstance(source_data, dict):
+            source_data = {}
+            source_section["data"] = source_data
+        source_data["source_format"] = _normalize_source_format(source_format)
+
+    source_track_ids = [
+        str(track.get("id", ""))
+        for track in list(source_section.get("tracks", []))
+        if isinstance(track, dict)
+    ]
+    insert_index = next(
+        (
+            index + 1
+            for index, section in enumerate(sections)
+            if isinstance(section, dict) and str(section.get("id", "")) == source_section_id
+        ),
+        len(sections),
+    )
+    sections.insert(insert_index, source_section)
+
+    if include_bindings:
+        copied_bindings: list[dict[str, object]] = []
+        for binding in list(bindings):
+            if not isinstance(binding, dict):
+                continue
+            if _binding_target_section_id(current_spec, binding) != source_section_id:
+                continue
+            cloned_binding = deepcopy(binding)
+            cloned_binding["section"] = target_section_id
+            copied_bindings.append(cloned_binding)
+        bindings.extend(copied_bindings)
+
+    _persist_validated_logfile_mapping(
+        mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    saved_summary = summarize_logfile_draft(str(resolved_logfile), root=server_root)
+    saved_section = next(
+        section for section in saved_summary.sections if section.id == target_section_id
+    )
+    return ReplicatedSectionStructureResult(
+        logfile_path=str(resolved_logfile),
+        source_section_id=source_section_id,
+        target_section_id=target_section_id,
+        include_bindings=include_bindings,
+        copied_track_ids=source_track_ids,
+        curve_binding_count=saved_section.curve_binding_count,
+        raster_binding_count=saved_section.raster_binding_count,
     )
 
 
@@ -5294,6 +5469,7 @@ def bind_curve(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
     label: str | None = None,
     style: dict[str, object] | None = None,
     scale: dict[str, object] | None = None,
@@ -5316,21 +5492,34 @@ def bind_curve(
         channel=channel,
     )
     bindings = _logfile_mapping_bindings(mapping)
-    try:
-        _ = _find_curve_binding_index(
-            bindings,
-            spec=current_spec,
-            section_id=section_id,
-            track_id=track_id,
-            channel=resolved_channel,
-        )
-    except TemplateValidationError:
-        pass
-    else:
+    existing_matches = [
+        binding
+        for binding in bindings
+        if isinstance(binding, dict)
+        and str(binding.get("kind", "curve")).strip().lower() == "curve"
+        and _binding_target_section_id(current_spec, binding) == section_id
+        and str(binding.get("track_id", "")) == track_id
+        and str(binding.get("channel", "")).upper() == resolved_channel.upper()
+    ]
+    if existing_matches and binding_id is None:
         raise TemplateValidationError(
             f"Curve binding for channel {resolved_channel!r} already exists on "
             f"track {track_id!r} in section {section_id!r}."
         )
+    if binding_id is not None:
+        normalized_binding_id = str(binding_id).strip()
+        if not normalized_binding_id:
+            raise TemplateValidationError("binding_id must be non-empty when provided.")
+        if any(
+            isinstance(binding, dict)
+            and str(binding.get("id", "")).strip() == normalized_binding_id
+            for binding in bindings
+        ):
+            raise TemplateValidationError(
+                f"Curve binding id {normalized_binding_id!r} already exists in this draft."
+            )
+    else:
+        normalized_binding_id = None
 
     binding: dict[str, object] = {
         "section": section_id,
@@ -5338,6 +5527,8 @@ def bind_curve(
         "channel": resolved_channel,
         "kind": "curve",
     }
+    if normalized_binding_id is not None:
+        binding["id"] = normalized_binding_id
     if label is not None:
         binding["label"] = label
     if style is not None:
@@ -5370,6 +5561,7 @@ def add_curve_fill(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
     kind: str,
     other_channel: str | None = None,
     other_element_id: str | None = None,
@@ -5402,6 +5594,7 @@ def add_curve_fill(
         section_id=section_id,
         track_id=track_id,
         channel=resolved_channel,
+        binding_id=binding_id,
     )
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
@@ -5505,6 +5698,7 @@ def remove_curve_fill(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
     root: str | Path | None = None,
 ) -> RemovedCurveFillResult:
     """Remove one explicit curve-fill specification from an existing curve binding."""
@@ -5522,6 +5716,7 @@ def remove_curve_fill(
         section_id=section_id,
         track_id=track_id,
         channel=channel,
+        binding_id=binding_id,
     )
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
@@ -5546,6 +5741,7 @@ def remove_curve_fill(
         section_id=section_id,
         track_id=track_id,
         channel=removed_channel,
+        binding_id=binding_id,
     )
     saved_binding = saved_bindings[saved_binding_index]
     if not isinstance(saved_binding, dict):
@@ -5669,6 +5865,7 @@ def update_curve_binding(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
     patch: dict[str, object],
     root: str | Path | None = None,
 ) -> UpdatedCurveBindingResult:
@@ -5704,6 +5901,7 @@ def update_curve_binding(
         section_id=section_id,
         track_id=track_id,
         channel=channel,
+        binding_id=binding_id,
     )
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
@@ -5722,6 +5920,7 @@ def update_curve_binding(
         section_id=section_id,
         track_id=track_id,
         channel=channel,
+        binding_id=binding_id,
     )
     saved_binding = saved_bindings[saved_binding_index]
     if not isinstance(saved_binding, dict):
@@ -5803,6 +6002,7 @@ def remove_curve_binding(
     section_id: str,
     track_id: str,
     channel: str,
+    binding_id: str | None = None,
     root: str | Path | None = None,
 ) -> RemovedCurveBindingResult:
     """Remove one existing curve binding from a draft logfile."""
@@ -5820,6 +6020,7 @@ def remove_curve_binding(
         section_id=section_id,
         track_id=track_id,
         channel=channel,
+        binding_id=binding_id,
     )
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
@@ -6198,6 +6399,25 @@ def inspect_header_archetypes(
             "wellplot://authoring/catalog/header-fields.json",
             "wellplot://authoring/catalog/header-key-aliases.json",
         ],
+    )
+
+
+def inspect_packet_blueprints(
+    *,
+    blueprint_id: str | None = None,
+) -> PacketBlueprintsResult:
+    """Return one deterministic packet-blueprint catalog or a selected entry."""
+    if blueprint_id is None:
+        blueprints = packet_blueprint_catalog()
+        selected_blueprint_id = None
+    else:
+        selected_blueprint = packet_blueprint_spec(blueprint_id)
+        blueprints = [selected_blueprint]
+        selected_blueprint_id = str(selected_blueprint["id"])
+    return PacketBlueprintsResult(
+        selected_blueprint_id=selected_blueprint_id,
+        blueprints=blueprints,
+        resource_uris=["wellplot://authoring/catalog/packet-blueprints.json"],
     )
 
 

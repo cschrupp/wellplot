@@ -1,0 +1,148 @@
+id: open_hole_quicklook
+label: Open-Hole Quicklook Packet
+starter_kind: open_hole_quicklook
+header_archetype: open_hole
+source_formats:
+  - las
+use_cases:
+  - open hole
+  - quicklook
+  - las
+notes:
+  - Asset-backed staged packet blueprint for generic open-hole quicklook authoring.
+unsupported_features: []
+remarks_templates:
+  - title: Notes
+section_templates:
+  - id: main
+    title: Main Review
+    source_slot: main
+    track_templates:
+      - id: gr_sp
+        kind: normal
+      - id: depth
+        kind: reference
+    expected_bindings_by_track:
+      gr_sp:
+        - GR
+      depth: []
+plan_phases:
+  - id: header_scaffold
+    kind: header_scaffold
+    summary: Keep the open-hole scaffold intact.
+    max_rounds: 4
+    tool_families:
+      - heading
+      - archetype
+    preconditions:
+      - an open-hole starter draft exists
+    success_checks:
+      - heading exists
+    success_check_specs:
+      - kind: heading_exists
+    instructions: |
+      Preserve the open-hole scaffold. Fill matching fields instead of redesigning it.
+  - id: header_fill
+    kind: header_fill
+    summary: Fill matching open-hole header values from the copied source text.
+    max_rounds: 6
+    tool_families:
+      - heading_fill
+    preconditions:
+      - heading scaffold exists
+    success_checks:
+      - matching heading fields are filled or explicitly reported as unmatched
+    success_check_specs:
+      - kind: heading_exists
+    instructions: |
+      Fill only matching fields into the existing open-hole scaffold.
+  - id: remarks
+    kind: remarks
+    summary: Replace the remarks block with the requested quicklook notes.
+    max_rounds: 4
+    tool_families:
+      - remarks
+    preconditions:
+      - draft exists
+    success_checks:
+      - remarks block exists
+    success_check_specs:
+      - kind: remarks_exists
+    instructions: |
+      Keep remarks factual and compact.
+  - id: section_scaffold
+    kind: section_scaffold
+    summary: Build the main quicklook section.
+    max_rounds: 12
+    tool_families:
+      - sections
+      - tracks
+    preconditions:
+      - source data is staged
+    success_checks:
+      - section main exists
+      - gr_sp and depth tracks exist
+    success_check_specs:
+      - kind: section_exists
+        section_id: main
+      - kind: track_exists
+        section_id: main
+        track_id: gr_sp
+      - kind: track_exists
+        section_id: main
+        track_id: depth
+    instructions: |
+      Create the main quicklook section and its starter tracks before detailed styling.
+  - id: bindings_raster
+    kind: bindings_raster
+    summary: Bind confirmed scalar channels for the quicklook section.
+    max_rounds: 12
+    tool_families:
+      - bindings
+      - scale
+      - fills
+      - presets
+    preconditions:
+      - required section and tracks exist
+    success_checks:
+      - expected bindings exist on the quicklook tracks
+    success_check_specs:
+      - kind: binding_channel_exists
+        section_id: main
+        track_id: gr_sp
+        channel: GR
+    instructions: |
+      Bind only confirmed channels and prefer deterministic tools over manual YAML rewriting.
+  - id: styling
+    kind: styling
+    summary: Apply restrained quicklook styling after structure is stable.
+    max_rounds: 8
+    tool_families:
+      - presets
+      - matplotlib_style
+      - scale
+    preconditions:
+      - expected bindings exist on the main section
+    success_checks:
+      - draft validates
+    success_check_specs:
+      - kind: validation_valid
+    instructions: |
+      Apply any report-wide styling only after the quicklook structure is complete.
+  - id: verification
+    kind: verification
+    summary: Validate the packet and verify the first preview renders.
+    tool_families:
+      - inspect
+      - validate
+      - preview
+    preconditions:
+      - previous phases have finished or blocked
+    success_checks:
+      - draft validates
+      - report preview renders
+    success_check_specs:
+      - kind: validation_valid
+      - kind: preview_renderable
+    instructions: |
+      Stop once the supported quicklook packet validates and previews.

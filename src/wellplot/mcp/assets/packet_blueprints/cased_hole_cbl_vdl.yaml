@@ -1,0 +1,338 @@
+id: cased_hole_cbl_vdl
+label: Cased-Hole CBL/VDL Packet
+starter_kind: cased_hole_quicklook
+header_archetype: cased_hole
+example_id: cbl_log_example
+source_formats:
+  - dlis
+use_cases:
+  - cbl
+  - cbl_log_example
+  - cement bond
+  - variable density log
+  - vdl
+notes:
+  - Asset-backed packet blueprint for the supported portion of the production CBL/VDL reconstruction.
+  - Intended to guide staged packet planning, not to replace the underlying deterministic edit tools.
+unsupported_features:
+  - well diagram
+  - calibration pages
+  - vendor parameter tables
+  - proprietary disclaimer artwork
+raster_binding_defaults:
+  vdl:
+    profile: vdl
+    normalization: auto
+    waveform_normalization: trace_maxabs
+    style:
+      colormap: gray_r
+    show_raster: true
+    raster_alpha: 1.0
+    colorbar:
+      enabled: true
+      label: Amplitude
+      position: header
+    sample_axis:
+      enabled: true
+      unit: us
+      min: 200
+      max: 1200
+      source_origin: 40
+      source_step: 10
+      ticks: 7
+remarks_templates:
+  - title: Supported Reconstruction Scope
+  - title: Data Sources
+  - title: Public Data and IP Notice
+section_templates:
+  - id: main_pass
+    title: Main Pass
+    source_slot: main
+    track_templates:
+      - id: combo
+        kind: normal
+      - id: depth
+        kind: reference
+      - id: cbl
+        kind: normal
+      - id: vdl
+        kind: array
+    expected_bindings_by_track:
+      combo:
+        - ECGR_STGC
+        - TT
+        - TENS
+        - MTEM
+      depth:
+        - STIT
+        - TDSP
+        - VSEC
+      cbl:
+        - CBL
+        - CBL
+      vdl:
+        - VDL
+  - id: repeat_pass
+    title: Repeat Pass
+    source_slot: repeat
+    replicates_from: main_pass
+    track_templates:
+      - id: combo
+        kind: normal
+      - id: depth
+        kind: reference
+      - id: cbl
+        kind: normal
+      - id: vdl
+        kind: array
+    expected_bindings_by_track:
+      combo:
+        - ECGR_STGC
+        - TT
+        - TENS
+        - MTEM
+      depth:
+        - STIT
+        - TDSP
+        - VSEC
+      cbl:
+        - CBL
+        - CBL
+      vdl:
+        - VDL
+plan_phases:
+  - id: header_scaffold
+    kind: header_scaffold
+    summary: Keep the cased-hole scaffold and CBL/VDL service-title structure intact.
+    max_rounds: 4
+    tool_families:
+      - heading
+      - archetype
+    preconditions:
+      - a cased-hole starter draft exists
+    success_checks:
+      - heading exists
+      - the packet remains cased-hole oriented
+    success_check_specs:
+      - kind: heading_exists
+    instructions: |
+      Preserve the cased-hole scaffold. Do not redesign the first page; only fill matching
+      fields and service-title slots.
+  - id: header_fill
+    kind: header_fill
+    summary: Fill matching cased-hole header values from the copied ticket data.
+    max_rounds: 6
+    tool_families:
+      - heading_fill
+    preconditions:
+      - heading scaffold exists
+    success_checks:
+      - matching heading fields are filled or explicitly reported as unmatched
+    success_check_specs:
+      - kind: heading_exists
+    instructions: |
+      Use the existing cased-hole scaffold. Fill only fields that have a clear matching slot and
+      ignore unrelated ticket values instead of restructuring the layout.
+  - id: remarks
+    kind: remarks
+    summary: Replace the remarks block with the supported packet notes and data-source notes.
+    max_rounds: 4
+    tool_families:
+      - remarks
+    preconditions:
+      - draft exists
+    success_checks:
+      - remarks block exists with the expected supported-scope titles
+    success_check_specs:
+      - kind: remarks_exists
+    instructions: |
+      Keep the remarks factual and compact. Use the supported reconstruction scope, data-source
+      notes, and public-data/IP notice blocks when the request asks for them.
+  - id: section_scaffold
+    kind: section_scaffold
+    summary: Build the main CBL/VDL section layout before any duplication or detailed styling.
+    max_rounds: 12
+    tool_families:
+      - sections
+      - tracks
+    preconditions:
+      - source data is staged
+    success_checks:
+      - section main_pass exists
+      - tracks combo, depth, cbl, and vdl exist on main_pass
+    success_check_specs:
+      - kind: section_exists
+        section_id: main_pass
+      - kind: track_exists
+        section_id: main_pass
+        track_id: combo
+      - kind: track_exists
+        section_id: main_pass
+        track_id: depth
+      - kind: track_exists
+        section_id: main_pass
+        track_id: cbl
+      - kind: track_exists
+        section_id: main_pass
+        track_id: vdl
+    instructions: |
+      Create the main-pass section first. Focus on the expected four-track layout and data source
+      before attempting repeat-pass duplication or detailed styling.
+  - id: section_replication
+    kind: section_replication
+    summary: Replicate the main-pass section structure into the repeat-pass section.
+    max_rounds: 6
+    tool_families:
+      - sections
+      - tracks
+    preconditions:
+      - main_pass exists with the expected track layout
+    success_checks:
+      - section repeat_pass exists
+      - tracks combo, depth, cbl, and vdl exist on repeat_pass
+    success_check_specs:
+      - kind: section_exists
+        section_id: repeat_pass
+      - kind: track_exists
+        section_id: repeat_pass
+        track_id: combo
+      - kind: track_exists
+        section_id: repeat_pass
+        track_id: depth
+      - kind: track_exists
+        section_id: repeat_pass
+        track_id: cbl
+      - kind: track_exists
+        section_id: repeat_pass
+        track_id: vdl
+    instructions: |
+      Copy the main-pass structure into repeat_pass, then adjust the repeat source path and any
+      repeat-specific depth range.
+  - id: bindings_raster
+    kind: bindings_raster
+    summary: Bind the scalar, duplicate-CBL, and VDL raster channels for both sections.
+    max_rounds: 16
+    tool_families:
+      - bindings
+      - scale
+      - fills
+      - presets
+    preconditions:
+      - required sections and tracks exist
+      - channel availability has been checked against both DLIS sources
+    success_checks:
+      - expected bindings exist on combo, depth, cbl, and vdl for both sections
+    success_check_specs:
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: combo
+        channel: ECGR_STGC
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: combo
+        channel: TT
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: combo
+        channel: TENS
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: combo
+        channel: MTEM
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: depth
+        channel: STIT
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: depth
+        channel: TDSP
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: depth
+        channel: VSEC
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: cbl
+        channel: CBL
+        min_count: 2
+      - kind: binding_channel_exists
+        section_id: main_pass
+        track_id: vdl
+        channel: VDL
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: combo
+        channel: ECGR_STGC
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: combo
+        channel: TT
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: combo
+        channel: TENS
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: combo
+        channel: MTEM
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: depth
+        channel: STIT
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: depth
+        channel: TDSP
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: depth
+        channel: VSEC
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: cbl
+        channel: CBL
+        min_count: 2
+      - kind: binding_channel_exists
+        section_id: repeat_pass
+        track_id: vdl
+        channel: VDL
+    instructions: |
+      Bind only confirmed channels. Preserve duplicate CBL bindings on the cbl track and use
+      explicit binding ids when the same channel appears twice on one track.
+  - id: styling
+    kind: styling
+    summary: Apply restrained CBL/VDL styling and report-wide cleanup after structure is stable.
+    max_rounds: 8
+    tool_families:
+      - presets
+      - matplotlib_style
+      - scale
+    preconditions:
+      - expected bindings exist on both sections
+    success_checks:
+      - draft validates and the packet uses the requested CBL/VDL style conventions
+    success_check_specs:
+      - kind: validation_valid
+    instructions: |
+      Apply packet-wide styling only after both sections are structurally complete. Prefer
+      curated CBL/VDL presets and deterministic scale/style tools over manual patching.
+  - id: verification
+    kind: verification
+    summary: Validate the full packet and report any unsupported or skipped pieces.
+    tool_families:
+      - inspect
+      - validate
+      - preview
+    preconditions:
+      - previous phases have finished or blocked
+    success_checks:
+      - draft validates
+      - report preview renders
+      - unsupported items are explicitly reported instead of improvised
+    success_check_specs:
+      - kind: validation_valid
+      - kind: preview_renderable
+    instructions: |
+      Stop once the supported packet validates and previews. Report skipped unsupported features
+      such as the well diagram rather than attempting to improvise them.

@@ -264,6 +264,34 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def replicate_section_structure(
+        logfile_path: str,
+        source_section_id: str,
+        target_section_id: str,
+        source_path: str | None = None,
+        source_format: str = "auto",
+        title: str | None = None,
+        subtitle: str | None = None,
+        include_bindings: bool = True,
+        overwrite: bool = False,
+    ) -> dict[str, object]:
+        """Replicate one section scaffold and optional bindings into a target section."""
+        return asdict(
+            service.replicate_section_structure(
+                logfile_path,
+                source_section_id=source_section_id,
+                target_section_id=target_section_id,
+                source_path=source_path,
+                source_format=source_format,
+                title=title,
+                subtitle=subtitle,
+                include_bindings=include_bindings,
+                overwrite=overwrite,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def update_section(
         logfile_path: str,
         section_id: str,
@@ -541,6 +569,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         section_id: str,
         track_id: str,
         channel: str,
+        binding_id: str | None = None,
         label: str | None = None,
         style: dict[str, object] | None = None,
         scale: dict[str, object] | None = None,
@@ -553,6 +582,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 channel=channel,
+                binding_id=binding_id,
                 label=label,
                 style=style,
                 scale=scale,
@@ -568,6 +598,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         track_id: str,
         channel: str,
         kind: str,
+        binding_id: str | None = None,
         other_channel: str | None = None,
         other_element_id: str | None = None,
         baseline: dict[str, object] | None = None,
@@ -583,6 +614,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 channel=channel,
+                binding_id=binding_id,
                 kind=kind,
                 other_channel=other_channel,
                 other_element_id=other_element_id,
@@ -601,6 +633,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         section_id: str,
         track_id: str,
         channel: str,
+        binding_id: str | None = None,
     ) -> dict[str, object]:
         """Remove one explicit curve fill from an existing curve binding."""
         return asdict(
@@ -609,6 +642,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 channel=channel,
+                binding_id=binding_id,
                 root=server_root,
             )
         )
@@ -664,6 +698,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         track_id: str,
         channel: str,
         patch: dict[str, object],
+        binding_id: str | None = None,
     ) -> dict[str, object]:
         """Patch one existing curve binding inside a draft logfile."""
         return asdict(
@@ -672,6 +707,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 channel=channel,
+                binding_id=binding_id,
                 patch=patch,
                 root=server_root,
             )
@@ -703,6 +739,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         section_id: str,
         track_id: str,
         channel: str,
+        binding_id: str | None = None,
     ) -> dict[str, object]:
         """Remove one existing curve binding inside a draft logfile."""
         return asdict(
@@ -711,6 +748,7 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
                 section_id=section_id,
                 track_id=track_id,
                 channel=channel,
+                binding_id=binding_id,
                 root=server_root,
             )
         )
@@ -803,6 +841,11 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def inspect_header_archetypes(archetype_id: str | None = None) -> dict[str, object]:
         """Inspect deterministic open-hole and cased-hole header archetypes."""
         return asdict(service.inspect_header_archetypes(archetype_id=archetype_id))
+
+    @mcp.tool()
+    def inspect_packet_blueprints(blueprint_id: str | None = None) -> dict[str, object]:
+        """Inspect deterministic packet blueprints for staged packet workflows."""
+        return asdict(service.inspect_packet_blueprints(blueprint_id=blueprint_id))
 
     @mcp.tool()
     def apply_header_archetype(
@@ -1067,6 +1110,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_header_archetypes_resource() -> str:
         """Return curated deterministic header archetypes."""
         return service.authoring_header_archetypes_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/packet-blueprints.json",
+        mime_type="application/json",
+    )
+    def authoring_packet_blueprints_resource() -> str:
+        """Return curated packet blueprints for staged packet workflows."""
+        return service.authoring_packet_blueprints_resource().text
 
     @mcp.resource(
         "wellplot://authoring/catalog/style-presets.json",

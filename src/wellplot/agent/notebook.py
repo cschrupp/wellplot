@@ -339,14 +339,18 @@ class ProjectSession:
                 "title": "GR/SP",
                 "kind": "normal",
                 "width_mm": 32,
-                "position": 1,
+            },
+            "combo": {
+                "id": "combo",
+                "title": "Combo",
+                "kind": "normal",
+                "width_mm": 30,
             },
             "depth": {
                 "id": "depth",
                 "title": "Depth",
                 "kind": "reference",
                 "width_mm": 18,
-                "position": 2,
                 "reference": {
                     "axis": "depth",
                     "define_layout": True,
@@ -365,13 +369,27 @@ class ProjectSession:
             raise ValueError(
                 f"Unsupported seed_tracks for the shipped starter preset: {unknown_tracks}"
             )
-        tracks = [supported_tracks[name] for name in seed_tracks]
+        tracks: list[dict[str, object]] = []
+        for index, name in enumerate(seed_tracks, start=1):
+            track_mapping = dict(supported_tracks[name])
+            track_mapping["position"] = index
+            tracks.append(track_mapping)
         bindings: list[dict[str, object]] = []
         if "gr_sp" in seed_tracks:
             bindings.append(
                 {
                     "channel": "GR",
                     "track_id": "gr_sp",
+                    "kind": "curve",
+                    "label": "GR",
+                    "style": {"color": "#2e7d32"},
+                }
+            )
+        if "combo" in seed_tracks:
+            bindings.append(
+                {
+                    "channel": "ECGR_STGC",
+                    "track_id": "combo",
                     "kind": "curve",
                     "label": "GR",
                     "style": {"color": "#2e7d32"},
@@ -648,6 +666,11 @@ class ProjectSession:
         )
 
         tracks, bindings = self._starter_tracks(seed_tracks)
+        if not bindings:
+            raise ValueError(
+                "Starter seed_tracks must include at least one bindable track. "
+                "Use a selection such as ('gr_sp', 'depth') or ('combo', 'depth')."
+            )
         section_mapping: dict[str, object] = {
             "id": section_id,
             "title": title,
@@ -852,6 +875,7 @@ def display_authoring_result(
     result: AuthoringResult,
     *,
     preview: str = "section",
+    include_phase_previews: bool = False,
     return_image: bool = False,
 ) -> object | None:
     """Print one compact authoring summary and display one preview image."""
@@ -864,6 +888,10 @@ def display_authoring_result(
 
     print(title)
     print("Draft:", result.draft_logfile)
+    if result.phase_summaries:
+        print("Phases:")
+        for phase in result.phase_summaries:
+            print(f" - [{phase.status}] {phase.summary}")
     for label, items in result.user_report.sections():
         print(f"{label}:")
         for item in items:
@@ -871,6 +899,38 @@ def display_authoring_result(
     print("Tool trace:", [item.name for item in result.tool_trace])
     image = Image(data=result.preview_bytes(preview))
     display(image)
+    if include_phase_previews:
+        display_phase_previews(result)
     if return_image:
         return image
+    return None
+
+
+def display_phase_previews(
+    result: AuthoringResult,
+    *,
+    return_images: bool = False,
+) -> list[object] | None:
+    """Display one preview image for each executed phase that captured one checkpoint."""
+    try:
+        from IPython.display import Image, display
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Install `wellplot[notebook]` or add IPython to use notebook display helpers."
+        ) from exc
+
+    images: list[object] = []
+    for phase in result.phase_summaries:
+        preview_bytes = phase.preview_bytes()
+        if preview_bytes is None:
+            continue
+        label = phase.summary
+        if phase.preview_kind == "section" and phase.preview_target:
+            label += f" ({phase.preview_target})"
+        print(label)
+        image = Image(data=preview_bytes)
+        display(image)
+        images.append(image)
+    if return_images:
+        return images
     return None

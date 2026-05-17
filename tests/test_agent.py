@@ -40,12 +40,14 @@ from wellplot.agent import (
     AuthoringSession,
     AuthoringToolCall,
     AuthoringUserReport,
+    ExecutedAuthoringPhase,
     ProjectPaths,
     ProjectSession,
     ProjectStarter,
     RevisionRequest,
     create_project_session,
     display_authoring_result,
+    display_phase_previews,
     relative_path,
 )
 from wellplot.agent.core import (
@@ -135,6 +137,9 @@ class FakeMcpSession:
         if name == "summarize_logfile_draft":
             return SimpleNamespace(
                 structuredContent={
+                    "has_heading": True,
+                    "has_remarks": False,
+                    "section_ids": ["main"],
                     "sections": [
                         {
                             "id": "main",
@@ -143,8 +148,29 @@ class FakeMcpSession:
                             "available_channels": ["GR"],
                             "source_path": "workspace/data/demo.las",
                             "source_format": "las",
+                            "bindings_by_track": {},
                         }
                     ]
+                }
+            )
+        if name == "apply_header_archetype":
+            return SimpleNamespace(structuredContent={"applied": True})
+        if name == "inspect_packet_blueprints":
+            return SimpleNamespace(
+                structuredContent={
+                    "selected_blueprint_id": None,
+                    "blueprints": [],
+                    "resource_uris": ["wellplot://authoring/catalog/packet-blueprints.json"],
+                }
+            )
+        if name == "replicate_section_structure":
+            return SimpleNamespace(
+                structuredContent={
+                    "source_section_id": arguments["source_section_id"],
+                    "target_section_id": arguments["target_section_id"],
+                    "copied_track_ids": ["gamma"],
+                    "curve_binding_count": 0,
+                    "raster_binding_count": 0,
                 }
             )
         if name == "inspect_heading_slots":
@@ -834,6 +860,85 @@ class AgentTests(unittest.TestCase):
             assert runtime.last_session is not None
             self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile_to_file")
 
+    def test_authoring_session_plan_detects_packet_blueprint(self) -> None:
+        """Expose one public dry-run packet plan for structured packet requests."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+
+            plan = session.plan(
+                text="""
+                    Reconstruct one Cement Bond Log / Variable Density Log packet
+                    from two DLIS files with main-pass and repeat-pass sections.
+                """
+            )
+
+            self.assertEqual(plan.mode, "packet")
+            self.assertEqual(plan.packet_blueprint_id, "cased_hole_cbl_vdl")
+            self.assertTrue(plan.phases)
+            self.assertEqual(plan.phases[0].kind, "header_scaffold")
+
+    def test_display_phase_previews_renders_captured_images(self) -> None:
+        """Display packet phase previews through one public notebook helper."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id=None,
+            source_logfile_path=None,
+            goal="Build one packet.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main_pass"]},
+            change_summary={"summary_lines": []},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"report-preview",
+            section_preview_png=b"section-preview",
+            phase_summaries=(
+                ExecutedAuthoringPhase(
+                    id="header_fill",
+                    kind="header_fill",
+                    summary="Fill packet header values.",
+                    status="completed",
+                    tool_trace=(),
+                    verification={"ok": True, "checks": []},
+                    preview_kind="report",
+                    preview_png=b"phase-report",
+                ),
+                ExecutedAuthoringPhase(
+                    id="section_scaffold",
+                    kind="section_scaffold",
+                    summary="Build the main packet section.",
+                    status="completed",
+                    tool_trace=(),
+                    verification={"ok": True, "checks": []},
+                    preview_kind="section",
+                    preview_target="main_pass",
+                    preview_png=b"phase-section",
+                ),
+            ),
+        )
+        display_calls: list[object] = []
+
+        class FakeImage:
+            def __init__(self, *, data: bytes) -> None:
+                self.data = data
+
+        fake_display_module = ModuleType("IPython.display")
+        fake_display_module.Image = FakeImage
+        fake_display_module.display = display_calls.append
+
+        with mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}):
+            images = display_phase_previews(result, return_images=True)
+
+        assert images is not None
+        self.assertEqual([image.data for image in images], [b"phase-report", b"phase-section"])
+
     def test_authoring_result_exposes_summary_lines_and_preview_selection(self) -> None:
         """Expose compact display helpers directly on the public result object."""
         result = AuthoringResult(
@@ -1432,6 +1537,65 @@ class AgentTests(unittest.TestCase):
                 template_payload["document"]["layout"]["heading"]["service_titles"][0]["value"],
                 "Cased Hole Quicklook",
             )
+
+    def test_project_session_create_starter_supports_combo_seed_track(self) -> None:
+        """Allow minimal cased-hole starters to seed one valid combo/depth layout."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            data_file = repo_root / "workspace" / "demo-job" / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+                render_output_path="workspace/demo-job/final.pdf",
+            )
+
+            starter = session.create_starter(
+                kind="cased_hole_quicklook",
+                data_file=data_file,
+                title="Main Review",
+                subtitle="Starter subtitle",
+                depth_range=(8400, 9300),
+                seed_tracks=("combo", "depth"),
+            )
+
+            logfile_payload = yaml.safe_load(starter.logfile_yaml)
+            section = logfile_payload["document"]["layout"]["log_sections"][0]
+            self.assertEqual([track["id"] for track in section["tracks"]], ["combo", "depth"])
+            self.assertEqual(
+                logfile_payload["document"]["bindings"]["channels"],
+                [
+                    {
+                        "channel": "ECGR_STGC",
+                        "track_id": "combo",
+                        "kind": "curve",
+                        "label": "GR",
+                        "style": {"color": "#2e7d32"},
+                    }
+                ],
+            )
+
+    def test_project_session_create_starter_rejects_binding_free_seed_track_selection(self) -> None:
+        """Reject one starter seed selection that would fail schema validation later."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            data_file = repo_root / "workspace" / "demo-job" / "user_input.las"
+            data_file.parent.mkdir(parents=True, exist_ok=True)
+            data_file.write_text("~Version Information\nVERS. 2.0\n", encoding="utf-8")
+            session = ProjectSession(
+                authoring_session=mock.Mock(spec=AuthoringSession),
+                paths=ProjectPaths.under_root(repo_root, "workspace/demo-job"),
+            )
+
+            with self.assertRaisesRegex(ValueError, "must include at least one bindable track"):
+                session.create_starter(
+                    kind="cased_hole_quicklook",
+                    data_file=data_file,
+                    title="Main Review",
+                    subtitle="Starter subtitle",
+                    seed_tracks=("depth",),
+                )
 
     def test_project_session_bootstrap_starter_stages_data_and_configures_paths(self) -> None:
         """Collapse repeated notebook setup into one generic project bootstrap helper."""
