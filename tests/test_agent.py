@@ -1286,6 +1286,128 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(phase_summaries[0].status, "completed")
             self.assertIn("update_track", [call.name for call in phase_summaries[0].tool_trace])
 
+    def test_complete_packet_expected_bindings_fills_missing_repeat_combo_curves(self) -> None:
+        """Deterministically fill missing expected bindings that the provider loop skipped."""
+
+        class BindingCompletionSession(FakeMcpSession):
+            def __init__(self, root: Path) -> None:
+                super().__init__(root)
+                self.bindings_by_track: dict[tuple[str, str], list[dict[str, object]]] = {
+                    ("main_pass", "combo"): [
+                        {"kind": "curve", "channel": "ECGR_STGC", "label": "GR"},
+                        {"kind": "curve", "channel": "TT", "label": "TT"},
+                        {"kind": "curve", "channel": "TENS", "label": "TENS"},
+                        {"kind": "curve", "channel": "MTEM", "label": "MTEM"},
+                    ],
+                    ("repeat_pass", "combo"): [],
+                }
+
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "summarize_logfile_draft":
+                    return SimpleNamespace(
+                        structuredContent={
+                            "has_heading": True,
+                            "has_remarks": True,
+                            "section_ids": ["main_pass", "repeat_pass"],
+                            "sections": [
+                                {
+                                    "id": "main_pass",
+                                    "track_ids": ["combo"],
+                                    "track_kinds": ["normal"],
+                                    "available_channels": [],
+                                    "source_path": "workspace/data/main.dlis",
+                                    "source_format": "dlis",
+                                    "bindings_by_track": {
+                                        "combo": list(
+                                            self.bindings_by_track[("main_pass", "combo")]
+                                        )
+                                    },
+                                },
+                                {
+                                    "id": "repeat_pass",
+                                    "track_ids": ["combo"],
+                                    "track_kinds": ["normal"],
+                                    "available_channels": [],
+                                    "source_path": "workspace/data/repeat.dlis",
+                                    "source_format": "dlis",
+                                    "bindings_by_track": {
+                                        "combo": list(
+                                            self.bindings_by_track[("repeat_pass", "combo")]
+                                        )
+                                    },
+                                },
+                            ],
+                        }
+                    )
+                if name == "check_channel_availability":
+                    return SimpleNamespace(
+                        structuredContent={
+                            "found_channels": ["ECGR_STGC", "TT", "TENS", "MTEM"],
+                            "missing_channels": [],
+                        }
+                    )
+                if name == "inspect_track_bindings":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    return SimpleNamespace(
+                        structuredContent={
+                            "bindings": list(self.bindings_by_track.get((section_id, track_id), []))
+                        }
+                    )
+                if name == "bind_curve":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    channel = str(arguments["channel"])
+                    binding: dict[str, object] = {
+                        "kind": "curve",
+                        "channel": channel,
+                        "label": arguments.get("label", channel),
+                    }
+                    binding_id = arguments.get("binding_id")
+                    if binding_id is not None:
+                        binding["id"] = binding_id
+                    self.bindings_by_track.setdefault((section_id, track_id), []).append(binding)
+                    return SimpleNamespace(structuredContent={"channel": channel})
+                return await super().call_tool(name, arguments)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+            fake_mcp = BindingCompletionSession(root)
+            blueprint = {
+                "section_templates": [
+                    {
+                        "id": "main_pass",
+                        "expected_bindings_by_track": {
+                            "combo": ["ECGR_STGC", "TT", "TENS", "MTEM"]
+                        },
+                    },
+                    {
+                        "id": "repeat_pass",
+                        "expected_bindings_by_track": {
+                            "combo": ["ECGR_STGC", "TT", "TENS", "MTEM"]
+                        },
+                    },
+                ]
+            }
+
+            async def run_helper() -> tuple[AuthoringToolCall, ...]:
+                return await session._complete_packet_expected_bindings(  # type: ignore[attr-defined]
+                    session=fake_mcp,
+                    draft_logfile="workspace/demo.log.yaml",
+                    blueprint=blueprint,
+                )
+
+            tool_trace = anyio.run(run_helper)
+            self.assertEqual([call.name for call in tool_trace], ["bind_curve"] * 4)
+            self.assertEqual(
+                [
+                    binding["channel"]
+                    for binding in fake_mcp.bindings_by_track[("repeat_pass", "combo")]
+                ],
+                ["ECGR_STGC", "TT", "TENS", "MTEM"],
+            )
+
     def test_display_phase_previews_renders_captured_images(self) -> None:
         """Display packet phase previews through one public notebook helper."""
         result = AuthoringResult(

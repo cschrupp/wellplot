@@ -2136,6 +2136,179 @@ class AuthoringSession:
             )
         return tuple(tool_calls)
 
+    async def _complete_packet_expected_bindings(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        blueprint: dict[str, object],
+    ) -> tuple[AuthoringToolCall, ...]:
+        """Fill still-missing expected packet bindings deterministically."""
+        summary_result = await session.call_tool(
+            "summarize_logfile_draft",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(summary_result, action="summarize_logfile_draft")
+        summary_payload = _structured_content(summary_result)
+        sections = {
+            str(section.get("id", "")).strip(): section
+            for section in summary_payload.get("sections", [])
+            if isinstance(section, dict)
+        }
+        section_templates = [
+            section
+            for section in blueprint.get("section_templates", [])
+            if isinstance(section, dict)
+        ]
+        tool_calls: list[AuthoringToolCall] = []
+        for section_template in section_templates:
+            section_id = str(section_template.get("id", "")).strip()
+            section_payload = sections.get(section_id)
+            if not section_id or not isinstance(section_payload, dict):
+                continue
+            track_ids = section_payload.get("track_ids", [])
+            track_kinds = section_payload.get("track_kinds", [])
+            if not isinstance(track_ids, list) or not isinstance(track_kinds, list):
+                continue
+            track_kind_by_id = {
+                str(track_id).strip(): str(track_kind).strip()
+                for track_id, track_kind in zip(track_ids, track_kinds, strict=False)
+                if str(track_id).strip()
+            }
+            expected_by_track = section_template.get("expected_bindings_by_track", {})
+            if not isinstance(expected_by_track, dict):
+                continue
+            for track_id, expected_channels in expected_by_track.items():
+                if not isinstance(track_id, str) or not isinstance(expected_channels, list):
+                    continue
+                current_track_kind = track_kind_by_id.get(track_id)
+                if current_track_kind is None:
+                    continue
+                requested_channels = [
+                    str(channel).strip()
+                    for channel in expected_channels
+                    if str(channel).strip()
+                ]
+                if not requested_channels:
+                    continue
+                availability_result = await session.call_tool(
+                    "check_channel_availability",
+                    {
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "requested_channels": list(dict.fromkeys(requested_channels)),
+                    },
+                )
+                _require_mcp_success(
+                    availability_result,
+                    action="check_channel_availability",
+                )
+                availability_payload = _structured_content(availability_result)
+                found_channels = {
+                    str(channel).strip().upper()
+                    for channel in availability_payload.get("found_channels", [])
+                    if str(channel).strip()
+                }
+                inspect_result = await session.call_tool(
+                    "inspect_track_bindings",
+                    {
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "track_id": track_id,
+                    },
+                )
+                _require_mcp_success(inspect_result, action="inspect_track_bindings")
+                inspect_payload = _structured_content(inspect_result)
+                bindings = inspect_payload.get("bindings", [])
+                if not isinstance(bindings, list):
+                    bindings = []
+                current_counts: dict[str, int] = {}
+                current_labels: dict[str, str] = {}
+                for binding in bindings:
+                    if not isinstance(binding, dict):
+                        continue
+                    channel_name = str(binding.get("channel", "")).strip().upper()
+                    if not channel_name:
+                        continue
+                    current_counts[channel_name] = current_counts.get(channel_name, 0) + 1
+                    label = str(binding.get("label", "")).strip()
+                    if label and channel_name not in current_labels:
+                        current_labels[channel_name] = label
+                expected_counts: dict[str, int] = {}
+                for channel in requested_channels:
+                    normalized = channel.upper()
+                    expected_counts[normalized] = expected_counts.get(normalized, 0) + 1
+                for channel_name, expected_count in expected_counts.items():
+                    if channel_name not in found_channels:
+                        continue
+                    current_count = current_counts.get(channel_name, 0)
+                    missing_count = expected_count - current_count
+                    if missing_count <= 0:
+                        continue
+                    label = current_labels.get(channel_name, channel_name)
+                    for missing_index in range(missing_count):
+                        if current_track_kind == "array":
+                            result = await session.call_tool(
+                                "bind_raster",
+                                {
+                                    "logfile_path": draft_logfile,
+                                    "section_id": section_id,
+                                    "track_id": track_id,
+                                    "channel": channel_name,
+                                    "label": label,
+                                },
+                            )
+                            _require_mcp_success(result, action="bind_raster")
+                            tool_calls.append(
+                                AuthoringToolCall(
+                                    round=1,
+                                    name="bind_raster",
+                                    arguments={
+                                        "logfile_path": draft_logfile,
+                                        "section_id": section_id,
+                                        "track_id": track_id,
+                                        "channel": channel_name,
+                                        "label": label,
+                                    },
+                                )
+                            )
+                        else:
+                            binding_id = None
+                            if current_count + missing_index > 0:
+                                binding_id = (
+                                    f"{track_id}_{channel_name.lower()}_"
+                                    f"{current_count + missing_index + 1}"
+                                )
+                            result = await session.call_tool(
+                                "bind_curve",
+                                {
+                                    "logfile_path": draft_logfile,
+                                    "section_id": section_id,
+                                    "track_id": track_id,
+                                    "channel": channel_name,
+                                    "binding_id": binding_id,
+                                    "label": label,
+                                },
+                            )
+                            _require_mcp_success(result, action="bind_curve")
+                            arguments = {
+                                "logfile_path": draft_logfile,
+                                "section_id": section_id,
+                                "track_id": track_id,
+                                "channel": channel_name,
+                                "label": label,
+                            }
+                            if binding_id is not None:
+                                arguments["binding_id"] = binding_id
+                            tool_calls.append(
+                                AuthoringToolCall(
+                                    round=1,
+                                    name="bind_curve",
+                                    arguments=arguments,
+                                )
+                            )
+        return tuple(tool_calls)
+
     async def _execute_packet_plan(
         self,
         *,
@@ -2360,6 +2533,41 @@ class AuthoringSession:
                                 tool_trace=phase_result.tool_trace + reconcile_trace,
                                 report_facts=phase_result.report_facts,
                             )
+            if phase.kind == "bindings_raster":
+                completion_trace = await self._complete_packet_expected_bindings(
+                    session=session,
+                    draft_logfile=draft_logfile,
+                    blueprint=blueprint,
+                )
+                if completion_trace:
+                    if phase_result is None:
+                        phase_result = ProviderRunResult(
+                            final_text="Applied deterministic packet binding completion.",
+                            tool_trace=completion_trace,
+                        )
+                    else:
+                        phase_result = ProviderRunResult(
+                            final_text=phase_result.final_text,
+                            tool_trace=phase_result.tool_trace + completion_trace,
+                            report_facts=phase_result.report_facts,
+                        )
+                raster_defaults_trace = await self._apply_packet_raster_defaults(
+                    session=session,
+                    draft_logfile=draft_logfile,
+                    blueprint=blueprint,
+                )
+                if raster_defaults_trace:
+                    if phase_result is None:
+                        phase_result = ProviderRunResult(
+                            final_text="Applied deterministic packet raster defaults.",
+                            tool_trace=raster_defaults_trace,
+                        )
+                    else:
+                        phase_result = ProviderRunResult(
+                            final_text=phase_result.final_text,
+                            tool_trace=phase_result.tool_trace + raster_defaults_trace,
+                            report_facts=phase_result.report_facts,
+                        )
 
             post_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
