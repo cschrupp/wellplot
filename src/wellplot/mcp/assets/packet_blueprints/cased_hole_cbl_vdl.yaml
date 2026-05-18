@@ -130,6 +130,7 @@ plan_phases:
       - matching heading fields are filled or explicitly reported as unmatched
     success_check_specs:
       - kind: heading_exists
+      - kind: header_values_applied
     instructions: |
       Use the existing cased-hole scaffold. Fill only fields that have a clear matching slot and
       ignore unrelated ticket values instead of restructuring the layout.
@@ -145,6 +146,7 @@ plan_phases:
       - remarks block exists with the expected supported-scope titles
     success_check_specs:
       - kind: remarks_exists
+      - kind: remarks_match
     instructions: |
       Keep the remarks factual and compact. Use the supported reconstruction scope, data-source
       notes, and public-data/IP notice blocks when the request asks for them.
@@ -175,6 +177,10 @@ plan_phases:
       - kind: track_exists
         section_id: main_pass
         track_id: vdl
+      - kind: track_kind_is
+        section_id: main_pass
+        track_id: vdl
+        track_kind: array
     instructions: |
       Create the main-pass section first. Focus on the expected four-track layout and data source
       before attempting repeat-pass duplication or detailed styling.
@@ -205,6 +211,10 @@ plan_phases:
       - kind: track_exists
         section_id: repeat_pass
         track_id: vdl
+      - kind: track_kind_is
+        section_id: repeat_pass
+        track_id: vdl
+        track_kind: array
     instructions: |
       Copy the main-pass structure into repeat_pass, then adjust the repeat source path and any
       repeat-specific depth range.

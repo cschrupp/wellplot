@@ -51,7 +51,9 @@ from wellplot.agent import (
     relative_path,
 )
 from wellplot.agent.core import (
+    AuthoringPlanPhase,
     FunctionToolDefinition,
+    _extract_packet_header_fill_intent,
     revise_authoring_request,
     run_authoring_request,
 )
@@ -730,6 +732,40 @@ class AgentTests(unittest.TestCase):
                 },
             )
 
+    def test_extract_packet_header_fill_intent_parses_isolated_header_block(self) -> None:
+        """Keep packet header parsing working after the block is isolated from the outer prompt."""
+        intent = _extract_packet_header_fill_intent(
+            """
+            Reconstruct one cased-hole packet.
+
+            Header Values:
+            LOG / SERVICE
+            - Cement Bond Log
+            - Variable Density Log
+            - Gamma Ray - CCL
+
+            COMPANY / WELL IDENTIFICATION
+            - Company: University of Utah
+            - Well: FORGE 16B (78)-32
+            - Field: Utah Forge
+            - County: Beaver
+            """
+        )
+
+        assert intent is not None
+        self.assertEqual(
+            dict(intent.values),
+            {
+                "service_title_1": "Cement Bond Log",
+                "service_title_2": "Variable Density Log",
+                "service_title_3": "Gamma Ray - CCL",
+                "Company": "University of Utah",
+                "Well": "FORGE 16B (78)-32",
+                "Field": "Utah Forge",
+                "County": "Beaver",
+            },
+        )
+
     def test_revision_request_does_not_route_mixed_scope_requests_to_header_ingestion(self) -> None:
         """Reject deterministic header routing when the request also asks for track edits."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -877,6 +913,378 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(plan.packet_blueprint_id, "cased_hole_cbl_vdl")
             self.assertTrue(plan.phases)
             self.assertEqual(plan.phases[0].kind, "header_scaffold")
+
+    def test_phase_success_state_requires_persisted_header_values(self) -> None:
+        """Do not count header fill as complete when the scaffold still shows pending edits."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path(tmpdir)))
+            phase = AuthoringPlanPhase(
+                id="header_fill",
+                kind="header_fill",
+                summary="Fill header values.",
+                instructions="Fill matching header values.",
+                success_check_specs=(
+                    {"kind": "heading_exists"},
+                    {"kind": "header_values_applied"},
+                ),
+            )
+
+            before_state = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={"has_heading": True, "sections": []},
+                verification_context={
+                    "header_fill_intent_present": True,
+                    "header_mapping_preview": {
+                        "resolved_assignments": [
+                            {"input_key": "Company", "action": "set"},
+                        ],
+                        "unmatched_values": [],
+                        "conflicting_values": [],
+                    },
+                },
+            )
+            after_state = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={"has_heading": True, "sections": []},
+                verification_context={
+                    "header_fill_intent_present": True,
+                    "header_mapping_preview": {
+                        "resolved_assignments": [
+                            {"input_key": "Company", "action": "unchanged"},
+                        ],
+                        "unmatched_values": [],
+                        "conflicting_values": [],
+                    },
+                },
+            )
+
+            self.assertFalse(before_state["ok"])
+            self.assertTrue(after_state["ok"])
+
+    def test_phase_success_state_requires_matching_remarks_payload(self) -> None:
+        """Do not count remarks as complete when the persisted block does not match the request."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path(tmpdir)))
+            phase = AuthoringPlanPhase(
+                id="remarks",
+                kind="remarks",
+                summary="Apply remarks.",
+                instructions="Apply the requested remarks block.",
+                success_check_specs=(
+                    {"kind": "remarks_exists"},
+                    {"kind": "remarks_match"},
+                ),
+            )
+
+            mismatched_state = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={"has_remarks": True, "sections": []},
+                verification_context={
+                    "expected_remarks": [
+                        {"title": "Requested Notes", "alignment": "left", "lines": ["One", "Two"]}
+                    ],
+                    "heading_slots": {
+                        "current_values": {
+                            "remarks": [
+                                {"title": "Notes", "alignment": "left", "lines": ["Placeholder"]}
+                            ]
+                        }
+                    },
+                },
+            )
+            matched_state = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={"has_remarks": True, "sections": []},
+                verification_context={
+                    "expected_remarks": [
+                        {"title": "Requested Notes", "alignment": "left", "lines": ["One", "Two"]}
+                    ],
+                    "heading_slots": {
+                        "current_values": {
+                            "remarks": [
+                                {
+                                    "title": "Requested Notes",
+                                    "alignment": "left",
+                                    "lines": ["One", "Two"],
+                                }
+                            ]
+                        }
+                    },
+                },
+            )
+
+            self.assertFalse(mismatched_state["ok"])
+            self.assertTrue(matched_state["ok"])
+
+    def test_phase_success_state_can_require_track_kind(self) -> None:
+        """Allow packet phases to verify a specific track kind, not just track existence."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path(tmpdir)))
+            phase = AuthoringPlanPhase(
+                id="section_scaffold",
+                kind="section_scaffold",
+                summary="Build the main packet section.",
+                instructions="Create the main-pass section first.",
+                success_check_specs=(
+                    {
+                        "kind": "track_kind_is",
+                        "section_id": "main_pass",
+                        "track_id": "vdl",
+                        "track_kind": "array",
+                    },
+                ),
+            )
+
+            wrong_kind = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={
+                    "sections": [
+                        {"id": "main_pass", "track_ids": ["vdl"], "track_kinds": ["normal"]}
+                    ]
+                },
+            )
+            right_kind = session._phase_success_state(  # type: ignore[attr-defined]
+                phase=phase,
+                draft_summary={
+                    "sections": [
+                        {"id": "main_pass", "track_ids": ["vdl"], "track_kinds": ["array"]}
+                    ]
+                },
+            )
+
+            self.assertFalse(wrong_kind["ok"])
+            self.assertTrue(right_kind["ok"])
+
+    def test_packet_phase_completes_if_verification_passes_after_round_budget_exhaustion(
+        self,
+    ) -> None:
+        """Treat one phase as complete after budget exhaustion if checks already pass."""
+
+        class ExhaustedBackend(FakeBackend):
+            async def run_authoring(self, **_: object) -> SimpleNamespace:  # type: ignore[override]
+                raise RuntimeError("The fake authoring loop exceeded 8 rounds.")
+
+        class PacketSummarySession(FakeMcpSession):
+            def __init__(self, root: Path) -> None:
+                super().__init__(root)
+                self.summary_calls = 0
+
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "summarize_logfile_draft":
+                    self.summary_calls += 1
+                    if self.summary_calls == 1:
+                        return SimpleNamespace(
+                            structuredContent={
+                                "has_heading": True,
+                                "has_remarks": False,
+                                "section_ids": [],
+                                "sections": [],
+                            }
+                        )
+                    return SimpleNamespace(
+                        structuredContent={
+                            "has_heading": True,
+                            "has_remarks": False,
+                            "section_ids": ["main_pass"],
+                            "sections": [
+                                {
+                                    "id": "main_pass",
+                                    "track_ids": ["combo", "depth", "cbl", "vdl"],
+                                    "track_kinds": ["normal", "reference", "normal", "array"],
+                                    "available_channels": [],
+                                    "source_path": "workspace/data/main.dlis",
+                                    "source_format": "dlis",
+                                    "bindings_by_track": {},
+                                }
+                            ],
+                        }
+                    )
+                if name == "preview_section_png":
+                    return SimpleNamespace(content=[SimpleNamespace(data=b"section-preview")])
+                return await super().call_tool(name, arguments)
+
+        class PacketSummaryRuntime(FakeRuntime):
+            @asynccontextmanager
+            async def open_session(self) -> object:  # type: ignore[override]
+                session = PacketSummarySession(self.server_root)
+                self.last_session = session
+                yield session
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(
+                backend=ExhaustedBackend(),
+                runtime=PacketSummaryRuntime(root),
+            )
+            phase = AuthoringPlanPhase(
+                id="section_scaffold",
+                kind="section_scaffold",
+                summary="Build the main packet section.",
+                instructions="Create the main-pass section first.",
+                success_check_specs=(
+                    {"kind": "section_exists", "section_id": "main_pass"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "combo"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "depth"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "cbl"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "vdl"},
+                ),
+                max_rounds=2,
+            )
+            plan = session.plan(text="Reconstruct one cased-hole packet.")
+            plan = type(plan)(
+                mode="packet",
+                packet_blueprint_id=None,
+                phases=(phase,),
+                blocked=False,
+                run_state=plan.run_state,
+            )
+
+            async def run_plan() -> tuple[object, tuple[ExecutedAuthoringPhase, ...], object]:
+                async with session.runtime.open_session() as mcp_session:
+                    return await session._execute_packet_plan(  # type: ignore[attr-defined]
+                        session=mcp_session,
+                        draft_logfile="workspace/demo.log.yaml",
+                        request_text="Reconstruct one cased-hole packet.",
+                        plan=plan,
+                        prompt_text="authoring prompt",
+                        tool_definitions=[],
+                        request_max_rounds=8,
+                    )
+
+            _, phase_summaries, _ = anyio.run(run_plan)
+            self.assertEqual(len(phase_summaries), 1)
+            self.assertEqual(phase_summaries[0].status, "completed")
+            self.assertEqual(phase_summaries[0].blocked_reasons, ())
+
+    def test_section_scaffold_reconciles_track_kind_after_round_budget_exhaustion(self) -> None:
+        """Reconcile packet track kinds even if the provider loop stops on budget."""
+
+        class ExhaustedBackend(FakeBackend):
+            async def run_authoring(self, **_: object) -> SimpleNamespace:  # type: ignore[override]
+                raise RuntimeError("The fake authoring loop exceeded 8 rounds.")
+
+        class ReconcileSession(FakeMcpSession):
+            def __init__(self, root: Path) -> None:
+                super().__init__(root)
+                self.vdl_kind = "normal"
+                self.summary_calls = 0
+
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "summarize_logfile_draft":
+                    self.summary_calls += 1
+                    if self.summary_calls == 1:
+                        return SimpleNamespace(
+                            structuredContent={
+                                "has_heading": True,
+                                "has_remarks": False,
+                                "section_ids": [],
+                                "sections": [],
+                            }
+                        )
+                    return SimpleNamespace(
+                        structuredContent={
+                            "has_heading": True,
+                            "has_remarks": False,
+                            "section_ids": ["main_pass"],
+                            "sections": [
+                                {
+                                    "id": "main_pass",
+                                    "track_ids": ["combo", "depth", "cbl", "vdl"],
+                                    "track_kinds": [
+                                        "normal",
+                                        "reference",
+                                        "normal",
+                                        self.vdl_kind,
+                                    ],
+                                    "available_channels": [],
+                                    "source_path": "workspace/data/main.dlis",
+                                    "source_format": "dlis",
+                                    "bindings_by_track": {},
+                                }
+                            ],
+                        }
+                    )
+                if (
+                    name == "update_track"
+                    and arguments.get("section_id") == "main_pass"
+                    and arguments.get("track_id") == "vdl"
+                    and dict(arguments.get("patch", {})).get("kind") == "array"
+                ):
+                    self.vdl_kind = "array"
+                    return SimpleNamespace(structuredContent={"track_id": "vdl"})
+                if name == "preview_section_png":
+                    return SimpleNamespace(content=[SimpleNamespace(data=b"section-preview")])
+                return await super().call_tool(name, arguments)
+
+        class ReconcileRuntime(FakeRuntime):
+            @asynccontextmanager
+            async def open_session(self) -> object:  # type: ignore[override]
+                session = ReconcileSession(self.server_root)
+                self.last_session = session
+                yield session
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(
+                backend=ExhaustedBackend(),
+                runtime=ReconcileRuntime(root),
+            )
+            phase = AuthoringPlanPhase(
+                id="section_scaffold",
+                kind="section_scaffold",
+                summary="Build the main packet section.",
+                instructions="Create the main-pass section first.",
+                success_check_specs=(
+                    {"kind": "section_exists", "section_id": "main_pass"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "combo"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "depth"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "cbl"},
+                    {"kind": "track_exists", "section_id": "main_pass", "track_id": "vdl"},
+                    {
+                        "kind": "track_kind_is",
+                        "section_id": "main_pass",
+                        "track_id": "vdl",
+                        "track_kind": "array",
+                    },
+                ),
+                max_rounds=2,
+                metadata={
+                    "section_template": {
+                        "id": "main_pass",
+                        "track_templates": [
+                            {"id": "combo", "kind": "normal"},
+                            {"id": "depth", "kind": "reference"},
+                            {"id": "cbl", "kind": "normal"},
+                            {"id": "vdl", "kind": "array"},
+                        ],
+                    }
+                },
+            )
+            plan = session.plan(text="Reconstruct one cased-hole packet.")
+            plan = type(plan)(
+                mode="packet",
+                packet_blueprint_id=None,
+                phases=(phase,),
+                blocked=False,
+                run_state=plan.run_state,
+            )
+
+            async def run_plan() -> tuple[object, tuple[ExecutedAuthoringPhase, ...], object]:
+                async with session.runtime.open_session() as mcp_session:
+                    return await session._execute_packet_plan(  # type: ignore[attr-defined]
+                        session=mcp_session,
+                        draft_logfile="workspace/demo.log.yaml",
+                        request_text="Reconstruct one cased-hole packet.",
+                        plan=plan,
+                        prompt_text="authoring prompt",
+                        tool_definitions=[],
+                        request_max_rounds=8,
+                    )
+
+            _, phase_summaries, _ = anyio.run(run_plan)
+            self.assertEqual(len(phase_summaries), 1)
+            self.assertEqual(phase_summaries[0].status, "completed")
+            self.assertIn("update_track", [call.name for call in phase_summaries[0].tool_trace])
 
     def test_display_phase_previews_renders_captured_images(self) -> None:
         """Display packet phase previews through one public notebook helper."""
@@ -1099,6 +1507,75 @@ class AgentTests(unittest.TestCase):
 
         self.assertIsInstance(image, FakeImage)
         self.assertEqual(display_calls, [image])
+
+    def test_display_authoring_result_shows_phase_previews_before_final_preview(self) -> None:
+        """Render checkpoint previews before the final preview to preserve execution flow."""
+        result = AuthoringResult(
+            provider="openai",
+            model="gpt-5.4",
+            credential_source="environment variable OPENAI_API_KEY",
+            request_kind="author",
+            example_id=None,
+            source_logfile_path=None,
+            goal="Build one packet.",
+            draft_logfile="workspace/demo.log.yaml",
+            server_root=Path("/tmp"),
+            tool_trace=(),
+            final_text="done",
+            validation={"valid": True},
+            draft_summary={},
+            inspect_summary={"section_ids": ["main_pass"]},
+            change_summary={"summary_lines": []},
+            draft_text="name: Demo Draft\n",
+            report_preview_png=b"final-report",
+            section_preview_png=b"section-preview",
+            phase_summaries=(
+                ExecutedAuthoringPhase(
+                    id="header_fill",
+                    kind="header_fill",
+                    summary="Fill packet header values.",
+                    status="completed",
+                    tool_trace=(),
+                    verification={"ok": True, "checks": []},
+                    preview_kind="report",
+                    preview_png=b"phase-report",
+                ),
+                ExecutedAuthoringPhase(
+                    id="section_scaffold",
+                    kind="section_scaffold",
+                    summary="Build the main packet section.",
+                    status="completed",
+                    tool_trace=(),
+                    verification={"ok": True, "checks": []},
+                    preview_kind="section",
+                    preview_target="main_pass",
+                    preview_png=b"phase-section",
+                ),
+            ),
+        )
+        display_calls: list[object] = []
+
+        class FakeImage:
+            def __init__(self, *, data: bytes) -> None:
+                self.data = data
+
+        fake_display_module = ModuleType("IPython.display")
+        fake_display_module.Image = FakeImage
+        fake_display_module.display = display_calls.append
+
+        with mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}):
+            output = display_authoring_result(
+                "Demo",
+                result,
+                preview="report",
+                include_phase_previews=True,
+        )
+
+        self.assertIsNone(output)
+        self.assertEqual(
+            [image.data for image in display_calls],
+            [b"phase-report", b"phase-section", b"final-report"],
+        )
 
     def test_create_project_session_builds_project_scoped_wrapper(self) -> None:
         """Create one generic project session rooted under the configured server root."""

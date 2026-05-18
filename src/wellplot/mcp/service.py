@@ -2690,13 +2690,20 @@ DETAIL_FIELD_LOOKUP_ALIASES: dict[str, tuple[str, ...]] = {
     _normalize_channel_token("Elev. Ground Level"): ("g.l.", "gl", "ground level elevation"),
     _normalize_channel_token("Above Perm Datum"): ("above permanent datum", "kelly bushing"),
     _normalize_channel_token("Hole Diameter"): ("bit size",),
+    _normalize_channel_token("Fluid Density"): ("density", "fluid density"),
     _normalize_channel_token("Equipment No."): ("unit number", "equipment number"),
     _normalize_channel_token("Base"): ("unit location",),
     _normalize_channel_token("Logged By"): ("recorded by",),
     _normalize_channel_token("Maximum Temperature"): ("max recorded temperature",),
+    _normalize_channel_token("Bottom Temperature"): (
+        "max recorded temperature",
+        "maximum temperature",
+    ),
 }
 
 MIRRORED_HEADER_LOOKUP_KEYS: set[str] = {
+    _normalize_channel_token("date"),
+    _normalize_channel_token("logging date"),
     _normalize_channel_token("latitude"),
     _normalize_channel_token("longitude"),
     _normalize_channel_token("k.b."),
@@ -4452,6 +4459,42 @@ def replicate_section_structure(
         )
 
     bindings = _logfile_mapping_bindings(mapping)
+
+    # Once one section is replicated, track ids usually repeat across sections.
+    # Materialize explicit section ids on existing bindings first so previously
+    # valid single-section bindings remain unambiguous after replication.
+    track_sections: dict[str, list[str]] = {}
+    for section in sections:
+        if not isinstance(section, dict):
+            continue
+        section_name = str(section.get("id", "")).strip()
+        for track in list(section.get("tracks", [])):
+            if not isinstance(track, dict):
+                continue
+            track_id = str(track.get("id", "")).strip()
+            if not section_name or not track_id:
+                continue
+            track_sections.setdefault(track_id, []).append(section_name)
+    for binding in bindings:
+        if not isinstance(binding, dict):
+            continue
+        if str(binding.get("section", "")).strip():
+            continue
+        track_id = str(binding.get("track_id", "")).strip()
+        candidate_sections = track_sections.get(track_id, [])
+        if len(candidate_sections) == 1:
+            binding["section"] = candidate_sections[0]
+            continue
+        if not candidate_sections:
+            raise TemplateValidationError(
+                f"Binding for track_id {track_id!r} does not match any section track."
+            )
+        sections_text = ", ".join(candidate_sections)
+        raise TemplateValidationError(
+            f"track_id {track_id!r} exists in multiple sections ({sections_text}). "
+            "Set document.bindings.channels[].section explicitly."
+        )
+
     if existing_target_index is not None:
         sections.pop(existing_target_index)
         remaining_bindings: list[dict[str, object]] = []

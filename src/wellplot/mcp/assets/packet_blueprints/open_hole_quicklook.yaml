@@ -54,6 +54,7 @@ plan_phases:
       - matching heading fields are filled or explicitly reported as unmatched
     success_check_specs:
       - kind: heading_exists
+      - kind: header_values_applied
     instructions: |
       Fill only matching fields into the existing open-hole scaffold.
   - id: remarks
@@ -68,6 +69,7 @@ plan_phases:
       - remarks block exists
     success_check_specs:
       - kind: remarks_exists
+      - kind: remarks_match
     instructions: |
       Keep remarks factual and compact.
   - id: section_scaffold

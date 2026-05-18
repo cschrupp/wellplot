@@ -991,7 +991,7 @@ def _extract_packet_header_fill_intent(text: str) -> _HeaderFillIntent | None:
     block_text = "\n".join(block_lines).strip()
     if not block_text:
         return _extract_header_fill_intent(text)
-    return _extract_header_fill_intent(block_text)
+    return _extract_header_fill_intent(f"Header Values:\n{block_text}")
 
 
 def _extract_packet_remarks(text: str) -> list[dict[str, object]]:
@@ -1019,6 +1019,29 @@ def _extract_packet_remarks(text: str) -> list[dict[str, object]]:
         current["lines"] = list(current_lines)
         remarks.append(current)
     return remarks
+
+
+def _normalize_remarks_payload(
+    remarks: object,
+) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Return one normalized comparable remarks representation."""
+    if not isinstance(remarks, list):
+        return ()
+    normalized: list[tuple[str, tuple[str, ...]]] = []
+    for entry in remarks:
+        if not isinstance(entry, dict):
+            continue
+        title = str(entry.get("title", "")).strip()
+        lines_raw = entry.get("lines", [])
+        if not title or not isinstance(lines_raw, list):
+            continue
+        lines = tuple(
+            str(line).strip()
+            for line in lines_raw
+            if isinstance(line, str) and line.strip()
+        )
+        normalized.append((title, lines))
+    return tuple(normalized)
 
 
 def _authoring_bootstrap_message(
@@ -1602,6 +1625,7 @@ class AuthoringSession:
         draft_summary: dict[str, object],
         validation: dict[str, object] | None = None,
         preview_renderable: bool = False,
+        verification_context: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """Evaluate one phase's machine-checkable success state."""
         sections = {
@@ -1609,6 +1633,7 @@ class AuthoringSession:
             for section in draft_summary.get("sections", [])
             if isinstance(section, dict)
         }
+        context = verification_context or {}
         checks: list[dict[str, object]] = []
         for spec in phase.success_check_specs:
             kind = str(spec.get("kind", "")).strip()
@@ -1628,6 +1653,20 @@ class AuthoringSession:
                     if isinstance(track_ids, list)
                     else False
                 )
+            elif kind == "track_kind_is":
+                section = sections.get(str(spec.get("section_id", "")), {})
+                track_ids = section.get("track_ids", [])
+                track_kinds = section.get("track_kinds", [])
+                expected_track_id = str(spec.get("track_id", "")).strip()
+                expected_kind = str(spec.get("track_kind", "")).strip()
+                current_kind = None
+                if isinstance(track_ids, list) and isinstance(track_kinds, list):
+                    for track_id, track_kind in zip(track_ids, track_kinds, strict=False):
+                        if str(track_id).strip() == expected_track_id:
+                            current_kind = str(track_kind).strip()
+                            break
+                ok = current_kind == expected_kind and bool(expected_kind)
+                detail = f"current_kind={current_kind!r}, expected_kind={expected_kind!r}"
             elif kind == "binding_channel_exists":
                 section = sections.get(str(spec.get("section_id", "")), {})
                 bindings_by_track = section.get("bindings_by_track", {})
@@ -1646,6 +1685,57 @@ class AuthoringSession:
                 min_count = int(spec.get("min_count", 1))
                 ok = count >= min_count
                 detail = f"count={count}, min_count={min_count}"
+            elif kind == "header_values_applied":
+                intent_present = bool(context.get("header_fill_intent_present", False))
+                preview_payload = context.get("header_mapping_preview")
+                if not intent_present:
+                    ok = False
+                    detail = "No deterministic header-value block was available."
+                elif not isinstance(preview_payload, dict):
+                    ok = False
+                    detail = "No header mapping preview was captured for verification."
+                else:
+                    resolved_assignments = preview_payload.get("resolved_assignments", [])
+                    conflicts = preview_payload.get("conflicting_values", [])
+                    unmatched = preview_payload.get("unmatched_values", [])
+                    matched_count = (
+                        len(resolved_assignments)
+                        if isinstance(resolved_assignments, list)
+                        else 0
+                    )
+                    pending_count = (
+                        sum(
+                            1
+                            for entry in resolved_assignments
+                            if isinstance(entry, dict)
+                            and str(entry.get("action", "")).strip().lower() != "unchanged"
+                        )
+                        if isinstance(resolved_assignments, list)
+                        else 0
+                    )
+                    conflict_count = len(conflicts) if isinstance(conflicts, list) else 0
+                    unmatched_count = len(unmatched) if isinstance(unmatched, list) else 0
+                    ok = matched_count > 0 and pending_count == 0 and conflict_count == 0
+                    detail = (
+                        f"matched={matched_count}, pending={pending_count}, "
+                        f"unmatched={unmatched_count}, conflicts={conflict_count}"
+                    )
+            elif kind == "remarks_match":
+                expected_remarks = _normalize_remarks_payload(context.get("expected_remarks"))
+                heading_slots = context.get("heading_slots")
+                current_remarks = ()
+                if isinstance(heading_slots, dict):
+                    current_values = heading_slots.get("current_values", {})
+                    if isinstance(current_values, dict):
+                        current_remarks = _normalize_remarks_payload(
+                            current_values.get("remarks", [])
+                        )
+                ok = bool(expected_remarks) and current_remarks == expected_remarks
+                detail = (
+                    f"expected={len(expected_remarks)}, current={len(current_remarks)}"
+                    if expected_remarks
+                    else "No deterministic remarks block was available."
+                )
             elif kind == "validation_valid":
                 ok = bool(validation and validation.get("valid") is True)
             elif kind == "preview_renderable":
@@ -1665,6 +1755,44 @@ class AuthoringSession:
             "ok": all(bool(item.get("ok")) for item in checks) if checks else True,
             "checks": checks,
         }
+
+    async def _phase_verification_context(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        phase: AuthoringPlanPhase,
+        request_text: str,
+    ) -> dict[str, object]:
+        """Capture one deterministic verification context bundle for a packet phase."""
+        check_kinds = {
+            str(spec.get("kind", "")).strip() for spec in phase.success_check_specs
+        }
+        context: dict[str, object] = {}
+        if "header_values_applied" in check_kinds:
+            intent = _extract_packet_header_fill_intent(request_text)
+            context["header_fill_intent_present"] = bool(intent and intent.values)
+            if intent is not None and intent.values:
+                preview_result = await session.call_tool(
+                    "preview_header_mapping",
+                    {
+                        "logfile_path": draft_logfile,
+                        "values": intent.as_mapping(),
+                        "overwrite_policy": intent.overwrite_policy,
+                    },
+                )
+                _require_mcp_success(preview_result, action="preview_header_mapping")
+                context["header_mapping_preview"] = _structured_content(preview_result)
+        if "remarks_match" in check_kinds:
+            context["expected_remarks"] = _extract_packet_remarks(request_text)
+        if "remarks_match" in check_kinds or "remarks_exists" in check_kinds:
+            heading_slots_result = await session.call_tool(
+                "inspect_heading_slots",
+                {"logfile_path": draft_logfile},
+            )
+            _require_mcp_success(heading_slots_result, action="inspect_heading_slots")
+            context["heading_slots"] = _structured_content(heading_slots_result)
+        return context
 
     async def _capture_phase_preview(
         self,
@@ -1937,6 +2065,77 @@ class AuthoringSession:
                 )
         return tuple(tool_calls)
 
+    async def _reconcile_packet_section_template(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        section_template: dict[str, object],
+    ) -> tuple[AuthoringToolCall, ...]:
+        """Apply deterministic section-template repairs after scaffold edits."""
+        section_id = str(section_template.get("id", "")).strip()
+        if not section_id:
+            return ()
+        summary_result = await session.call_tool(
+            "summarize_logfile_draft",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(summary_result, action="summarize_logfile_draft")
+        summary_payload = _structured_content(summary_result)
+        section_payload = next(
+            (
+                section
+                for section in summary_payload.get("sections", [])
+                if isinstance(section, dict) and str(section.get("id", "")).strip() == section_id
+            ),
+            None,
+        )
+        if not isinstance(section_payload, dict):
+            return ()
+        current_track_ids = section_payload.get("track_ids", [])
+        current_track_kinds = section_payload.get("track_kinds", [])
+        if not isinstance(current_track_ids, list) or not isinstance(current_track_kinds, list):
+            return ()
+        current_kinds_by_track = {
+            str(track_id).strip(): str(track_kind).strip()
+            for track_id, track_kind in zip(current_track_ids, current_track_kinds, strict=False)
+            if str(track_id).strip()
+        }
+        tool_calls: list[AuthoringToolCall] = []
+        for track_template in section_template.get("track_templates", []):
+            if not isinstance(track_template, dict):
+                continue
+            track_id = str(track_template.get("id", "")).strip()
+            expected_kind = str(track_template.get("kind", "")).strip()
+            if not track_id or not expected_kind:
+                continue
+            current_kind = current_kinds_by_track.get(track_id)
+            if current_kind is None or current_kind == expected_kind:
+                continue
+            result = await session.call_tool(
+                "update_track",
+                {
+                    "logfile_path": draft_logfile,
+                    "section_id": section_id,
+                    "track_id": track_id,
+                    "patch": {"kind": expected_kind},
+                },
+            )
+            _require_mcp_success(result, action="update_track")
+            tool_calls.append(
+                AuthoringToolCall(
+                    round=1,
+                    name="update_track",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "track_id": track_id,
+                        "patch": {"kind": expected_kind},
+                    },
+                )
+            )
+        return tuple(tool_calls)
+
     async def _execute_packet_plan(
         self,
         *,
@@ -1971,9 +2170,16 @@ class AuthoringSession:
             )
             _require_mcp_success(summary_result, action="summarize_logfile_draft")
             current_summary = _structured_content(summary_result)
+            before_verification_context = await self._phase_verification_context(
+                session=session,
+                draft_logfile=draft_logfile,
+                phase=phase,
+                request_text=request_text,
+            )
             before_state = self._phase_success_state(
                 phase=phase,
                 draft_summary=current_summary,
+                verification_context=before_verification_context,
             )
             if before_state["ok"]:
                 preview_kind, preview_target, preview_png = await self._capture_phase_preview(
@@ -2134,6 +2340,27 @@ class AuthoringSession:
                 else:
                     raise
 
+            if phase.kind == "section_scaffold":
+                section_template = phase.metadata.get("section_template", {})
+                if isinstance(section_template, dict):
+                    reconcile_trace = await self._reconcile_packet_section_template(
+                        session=session,
+                        draft_logfile=draft_logfile,
+                        section_template=section_template,
+                    )
+                    if reconcile_trace:
+                        if phase_result is None:
+                            phase_result = ProviderRunResult(
+                                final_text="Applied deterministic section-template fixes.",
+                                tool_trace=reconcile_trace,
+                            )
+                        else:
+                            phase_result = ProviderRunResult(
+                                final_text=phase_result.final_text,
+                                tool_trace=phase_result.tool_trace + reconcile_trace,
+                                report_facts=phase_result.report_facts,
+                            )
+
             post_summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": draft_logfile},
@@ -2157,13 +2384,22 @@ class AuthoringSession:
                 phase=phase,
                 draft_summary=post_summary,
             )
+            after_verification_context = await self._phase_verification_context(
+                session=session,
+                draft_logfile=draft_logfile,
+                phase=phase,
+                request_text=request_text,
+            )
             after_state = self._phase_success_state(
                 phase=phase,
                 draft_summary=post_summary,
                 validation=validation_payload,
                 preview_renderable=preview_png is not None,
+                verification_context=after_verification_context,
             )
-            if not after_state["ok"] and not blocked_reasons:
+            if after_state["ok"]:
+                blocked_reasons = ()
+            elif not blocked_reasons:
                 before_snapshot = json.dumps(before_state["checks"], sort_keys=True, default=str)
                 after_snapshot = json.dumps(after_state["checks"], sort_keys=True, default=str)
                 if before_snapshot == after_snapshot:

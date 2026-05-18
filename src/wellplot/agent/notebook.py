@@ -897,10 +897,10 @@ def display_authoring_result(
         for item in items:
             print(" -", item)
     print("Tool trace:", [item.name for item in result.tool_trace])
-    image = Image(data=result.preview_bytes(preview))
-    display(image)
     if include_phase_previews:
         display_phase_previews(result)
+    image = Image(data=result.preview_bytes(preview))
+    display(image)
     if return_image:
         return image
     return None

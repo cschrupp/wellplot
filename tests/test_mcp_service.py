@@ -773,6 +773,41 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(saved_mapping["render"]["output_path"], "section-view.pdf")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_replicate_section_structure_backfills_section_on_existing_bindings(self) -> None:
+        """Replication should materialize explicit section ids on pre-existing bindings."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            initial_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            initial_bindings = initial_mapping["document"]["bindings"]["channels"]
+            self.assertTrue(any("section" not in binding for binding in initial_bindings))
+
+            result = service.replicate_section_structure(
+                str(draft_path),
+                source_section_id="main",
+                target_section_id="repeat",
+                include_bindings=False,
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.source_section_id, "main")
+            self.assertEqual(result.target_section_id, "repeat")
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            saved_bindings = saved_mapping["document"]["bindings"]["channels"]
+            self.assertTrue(saved_bindings)
+            self.assertTrue(all(binding.get("section") == "main" for binding in saved_bindings))
+            self.assertEqual(
+                [section["id"] for section in saved_mapping["document"]["layout"]["log_sections"]],
+                ["main", "repeat"],
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_set_section_view_requires_actual_or_supported_patches(self) -> None:
         """Reject empty composite edits and unsupported nested patch keys."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2545,6 +2580,39 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(general_fields["elevation_df"], "5445.00 ft")
             self.assertEqual(general_fields["log_measured_from"], "Kelly Bushing")
             self.assertEqual(general_fields["measured_from"], "Kelly Bushing")
+
+    def test_cased_hole_archetype_resolves_packet_date_density_and_temperature_aliases(
+        self,
+    ) -> None:
+        """Map common cased-hole packet keys without leaving date/density/temperature unresolved."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+            service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="cased_hole",
+                root=REPO_ROOT,
+            )
+
+            preview = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "Date": "08-May-2023",
+                    "Density": "8.4 lbm/gal",
+                    "Max Recorded Temperature": "177.2 degF",
+                },
+                overwrite_policy="replace",
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(preview.unmatched_values, [])
+            self.assertEqual(preview.conflicting_values, [])
+            resolved_target_keys = {entry["target_key"] for entry in preview.resolved_assignments}
+            self.assertTrue(
+                {"logging_date", "Date", "Fluid Density", "Bottom Temperature"}.issubset(
+                    resolved_target_keys
+                )
+            )
 
     def test_inspect_heading_slots_rejects_conflicting_targets(self) -> None:
         """Reject simultaneous logfile and template targets."""
