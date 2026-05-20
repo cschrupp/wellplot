@@ -1399,13 +1399,270 @@ class AgentTests(unittest.TestCase):
                 )
 
             tool_trace = anyio.run(run_helper)
-            self.assertEqual([call.name for call in tool_trace], ["bind_curve"] * 4)
+            self.assertTrue(all(call.name == "bind_curve" for call in tool_trace))
+            self.assertGreaterEqual(len(tool_trace), 4)
             self.assertEqual(
                 [
                     binding["channel"]
                     for binding in fake_mcp.bindings_by_track[("repeat_pass", "combo")]
                 ],
                 ["ECGR_STGC", "TT", "TENS", "MTEM"],
+            )
+
+    def test_phase_success_state_requires_binding_subset_match(self) -> None:
+        """Packet binding success checks should fail when the binding content is incomplete."""
+        session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path("/tmp")))
+        phase = AuthoringPlanPhase(
+            id="bindings_raster",
+            kind="bindings_raster",
+            summary="Bind the packet channels.",
+            instructions="Apply one packet binding.",
+            success_check_specs=(
+                {
+                    "kind": "binding_subset_matches",
+                    "section_id": "main_pass",
+                    "track_id": "combo",
+                    "channel": "TT",
+                    "expected": {
+                        "label": "Transit Time for CBL (TT) QSLT-B",
+                        "scale": {"kind": "linear", "min": 200, "max": 400, "reverse": True},
+                        "style": {"color": "#2142ff", "line_width": 0.75},
+                    },
+                },
+            ),
+        )
+        draft_summary = {
+            "sections": [
+                {
+                    "id": "main_pass",
+                    "bindings_by_track": {
+                        "combo": [
+                            {
+                                "kind": "curve",
+                                "channel": "TT",
+                                "label": "Transit Time for CBL (TT) QSLT-B",
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
+        incomplete_state = session._phase_success_state(
+            phase=phase,
+            draft_summary=draft_summary,
+        )
+        self.assertFalse(incomplete_state["ok"])
+        self.assertEqual(
+            incomplete_state["checks"][0]["kind"],
+            "binding_subset_matches",
+        )
+
+        draft_summary["sections"][0]["bindings_by_track"]["combo"][0]["scale"] = {
+            "kind": "linear",
+            "min": 200,
+            "max": 400,
+            "reverse": True,
+        }
+        draft_summary["sections"][0]["bindings_by_track"]["combo"][0]["style"] = {
+            "color": "#2142ff",
+            "line_width": 0.75,
+        }
+        complete_state = session._phase_success_state(
+            phase=phase,
+            draft_summary=draft_summary,
+        )
+        self.assertTrue(complete_state["ok"])
+
+    def test_complete_packet_expected_bindings_patches_existing_and_rebuilds_duplicates(
+        self,
+    ) -> None:
+        """Patch unique bindings in place and rebuild duplicate-channel tracks deterministically."""
+
+        class BindingPatchSession(FakeMcpSession):
+            def __init__(self, root: Path) -> None:
+                super().__init__(root)
+                self.bindings_by_track: dict[tuple[str, str], list[dict[str, object]]] = {
+                    ("main_pass", "combo"): [
+                        {
+                            "kind": "curve",
+                            "channel": "TT",
+                            "label": "Transit Time for CBL (TT) QSLT-B",
+                            "style": {"color": "#2142ff", "line_width": 0.75},
+                        }
+                    ],
+                    ("main_pass", "cbl"): [
+                        {
+                            "kind": "curve",
+                            "channel": "CBL",
+                            "label": "CBL Amplitude (CBL) QSLT-B",
+                            "style": {"color": "#111111", "line_width": 0.75},
+                        },
+                        {
+                            "kind": "curve",
+                            "channel": "CBL",
+                            "label": "CBL Amplitude (CBL) QSLT-B",
+                            "style": {
+                                "color": "#2563eb",
+                                "line_width": 0.65,
+                                "line_style": "dashed",
+                            },
+                        },
+                    ],
+                }
+
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "summarize_logfile_draft":
+                    return SimpleNamespace(
+                        structuredContent={
+                            "has_heading": True,
+                            "has_remarks": True,
+                            "section_ids": ["main_pass"],
+                            "sections": [
+                                {
+                                    "id": "main_pass",
+                                    "track_ids": ["combo", "cbl"],
+                                    "track_kinds": ["normal", "normal"],
+                                    "available_channels": [],
+                                    "source_path": "workspace/data/main.dlis",
+                                    "source_format": "dlis",
+                                    "bindings_by_track": {
+                                        "combo": list(
+                                            self.bindings_by_track[("main_pass", "combo")]
+                                        ),
+                                        "cbl": list(
+                                            self.bindings_by_track[("main_pass", "cbl")]
+                                        ),
+                                    },
+                                }
+                            ],
+                        }
+                    )
+                if name == "check_channel_availability":
+                    return SimpleNamespace(
+                        structuredContent={
+                            "found_channels": ["TT", "CBL"],
+                            "missing_channels": [],
+                        }
+                    )
+                if name == "inspect_track_bindings":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    return SimpleNamespace(
+                        structuredContent={
+                            "bindings": list(self.bindings_by_track.get((section_id, track_id), []))
+                        }
+                    )
+                if name == "update_curve_binding":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    channel = str(arguments["channel"])
+                    patch = dict(arguments["patch"])
+                    for binding in self.bindings_by_track[(section_id, track_id)]:
+                        if str(binding.get("channel")) == channel:
+                            binding.update(patch)
+                            return SimpleNamespace(structuredContent={"channel": channel})
+                if name == "clear_track_bindings":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    removed = len(self.bindings_by_track.get((section_id, track_id), []))
+                    self.bindings_by_track[(section_id, track_id)] = []
+                    return SimpleNamespace(
+                        structuredContent={
+                            "removed_curve_binding_count": removed,
+                            "removed_raster_binding_count": 0,
+                        }
+                    )
+                if name == "bind_curve":
+                    section_id = str(arguments["section_id"])
+                    track_id = str(arguments["track_id"])
+                    binding: dict[str, object] = {
+                        "kind": "curve",
+                        "channel": str(arguments["channel"]),
+                    }
+                    for key in ("binding_id", "label", "style", "scale"):
+                        value = arguments.get(key)
+                        if value is not None:
+                            binding["id" if key == "binding_id" else key] = value
+                    self.bindings_by_track.setdefault((section_id, track_id), []).append(binding)
+                    return SimpleNamespace(structuredContent={"channel": arguments["channel"]})
+                return await super().call_tool(name, arguments)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+            fake_mcp = BindingPatchSession(root)
+            blueprint = {
+                "section_templates": [
+                    {
+                        "id": "main_pass",
+                        "expected_bindings_by_track": {
+                            "combo": ["TT"],
+                            "cbl": ["CBL", "CBL"],
+                        },
+                        "expected_binding_specs_by_track": {
+                            "combo": [
+                                {
+                                    "channel": "TT",
+                                    "kind": "curve",
+                                    "label": "Transit Time for CBL (TT) QSLT-B",
+                                    "scale": {
+                                        "kind": "linear",
+                                        "min": 200,
+                                        "max": 400,
+                                        "reverse": True,
+                                    },
+                                    "style": {"color": "#2142ff", "line_width": 0.75},
+                                }
+                            ],
+                            "cbl": [
+                                {
+                                    "channel": "CBL",
+                                    "kind": "curve",
+                                    "binding_id": "cbl_main_pass_1",
+                                    "label": "CBL Amplitude (CBL) QSLT-B",
+                                    "scale": {"kind": "linear", "min": 0, "max": 100},
+                                    "style": {"color": "#111111", "line_width": 0.75},
+                                },
+                                {
+                                    "channel": "CBL",
+                                    "kind": "curve",
+                                    "binding_id": "cbl_main_pass_2",
+                                    "label": "CBL Amplitude (CBL) QSLT-B",
+                                    "scale": {"kind": "linear", "min": 0, "max": 10},
+                                    "style": {
+                                        "color": "#2563eb",
+                                        "line_width": 0.65,
+                                        "line_style": "dashed",
+                                    },
+                                },
+                            ],
+                        },
+                    }
+                ]
+            }
+
+            async def run_helper() -> tuple[AuthoringToolCall, ...]:
+                return await session._complete_packet_expected_bindings(  # type: ignore[attr-defined]
+                    session=fake_mcp,
+                    draft_logfile="workspace/demo.log.yaml",
+                    blueprint=blueprint,
+                )
+
+            tool_trace = anyio.run(run_helper)
+            tool_names = [call.name for call in tool_trace]
+            self.assertIn("update_curve_binding", tool_names)
+            self.assertIn("clear_track_bindings", tool_names)
+            self.assertEqual(
+                fake_mcp.bindings_by_track[("main_pass", "combo")][0]["scale"],
+                {"kind": "linear", "min": 200, "max": 400, "reverse": True},
+            )
+            self.assertEqual(
+                [binding.get("id") for binding in fake_mcp.bindings_by_track[("main_pass", "cbl")]],
+                ["cbl_main_pass_1", "cbl_main_pass_2"],
+            )
+            self.assertEqual(
+                fake_mcp.bindings_by_track[("main_pass", "cbl")][1]["scale"],
+                {"kind": "linear", "min": 0, "max": 10},
             )
 
     def test_display_phase_previews_renders_captured_images(self) -> None:

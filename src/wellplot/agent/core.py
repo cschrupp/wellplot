@@ -1618,6 +1618,105 @@ class AuthoringSession:
             last_verification=deepcopy(last_verification),
         )
 
+    @staticmethod
+    def _binding_expected_subset(spec: dict[str, object]) -> dict[str, object]:
+        """Return the persisted binding fields that should match one expected spec."""
+        nested_expected = spec.get("expected")
+        if isinstance(nested_expected, dict) and nested_expected:
+            return deepcopy(nested_expected)
+        subset: dict[str, object] = {}
+        for key in (
+            "label",
+            "scale",
+            "style",
+            "header_display",
+            "fill",
+            "profile",
+            "normalization",
+            "waveform_normalization",
+            "clip_percentiles",
+            "interpolation",
+            "show_raster",
+            "raster_alpha",
+            "color_limits",
+            "colorbar",
+            "sample_axis",
+            "waveform",
+        ):
+            if key in spec:
+                subset[key] = deepcopy(spec[key])
+        return subset
+
+    @staticmethod
+    def _subset_matches(actual: object, expected: object) -> bool:
+        """Return True when the actual value contains the expected subset exactly."""
+        if isinstance(expected, dict):
+            if not isinstance(actual, dict):
+                return False
+            for key, value in expected.items():
+                if key not in actual:
+                    return False
+                if not AuthoringSession._subset_matches(actual[key], value):
+                    return False
+            return True
+        if isinstance(expected, list):
+            return isinstance(actual, list) and actual == expected
+        return actual == expected
+
+    @staticmethod
+    def _matching_bindings_for_spec(
+        bindings: list[dict[str, object]],
+        spec: dict[str, object],
+    ) -> list[dict[str, object]]:
+        """Return bindings on one track that target the expected channel and kind."""
+        expected_channel = str(spec.get("channel", "")).strip().upper()
+        expected_kind = str(spec.get("kind", "")).strip().lower()
+        if expected_kind == "binding_subset_matches":
+            expected_kind = ""
+        matches: list[dict[str, object]] = []
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                continue
+            if str(binding.get("channel", "")).strip().upper() != expected_channel:
+                continue
+            if expected_kind and str(binding.get("kind", "")).strip().lower() != expected_kind:
+                continue
+            matches.append(binding)
+        return matches
+
+    @staticmethod
+    def _binding_matches_expected_spec(
+        bindings: list[dict[str, object]],
+        spec: dict[str, object],
+    ) -> tuple[bool, str | None]:
+        """Return whether one track already contains a binding that matches the spec."""
+        matches = AuthoringSession._matching_bindings_for_spec(bindings, spec)
+        binding_id = str(spec.get("binding_id", "")).strip()
+        if binding_id:
+            for binding in matches:
+                if str(binding.get("id", "")).strip() == binding_id:
+                    expected_subset = AuthoringSession._binding_expected_subset(spec)
+                    if AuthoringSession._subset_matches(binding, expected_subset):
+                        return True, None
+                    return False, f"binding_id={binding_id!r} does not match expected subset"
+            return False, f"binding_id={binding_id!r} is missing"
+        occurrence = spec.get("occurrence")
+        if isinstance(occurrence, int) and occurrence >= 1:
+            if len(matches) < occurrence:
+                return False, f"occurrence={occurrence} is missing"
+            binding = matches[occurrence - 1]
+            expected_subset = AuthoringSession._binding_expected_subset(spec)
+            if AuthoringSession._subset_matches(binding, expected_subset):
+                return True, None
+            return False, f"occurrence={occurrence} does not match expected subset"
+        expected_subset = AuthoringSession._binding_expected_subset(spec)
+        if not matches:
+            return False, "binding is missing"
+        for binding in matches:
+            if AuthoringSession._subset_matches(binding, expected_subset):
+                return True, None
+        return False, "no binding matched the expected subset"
+
     def _phase_success_state(
         self,
         *,
@@ -1685,6 +1784,17 @@ class AuthoringSession:
                 min_count = int(spec.get("min_count", 1))
                 ok = count >= min_count
                 detail = f"count={count}, min_count={min_count}"
+            elif kind == "binding_subset_matches":
+                section = sections.get(str(spec.get("section_id", "")), {})
+                bindings_by_track = section.get("bindings_by_track", {})
+                bindings = (
+                    bindings_by_track.get(str(spec.get("track_id", "")), [])
+                    if isinstance(bindings_by_track, dict)
+                    else []
+                )
+                if not isinstance(bindings, list):
+                    bindings = []
+                ok, detail = self._binding_matches_expected_spec(bindings, spec)
             elif kind == "header_values_applied":
                 intent_present = bool(context.get("header_fill_intent_present", False))
                 preview_payload = context.get("header_mapping_preview")
@@ -2110,7 +2220,18 @@ class AuthoringSession:
             if not track_id or not expected_kind:
                 continue
             current_kind = current_kinds_by_track.get(track_id)
-            if current_kind is None or current_kind == expected_kind:
+            if current_kind is None:
+                continue
+            patch: dict[str, object] = {}
+            if current_kind != expected_kind:
+                patch["kind"] = expected_kind
+            if "width_mm" in track_template:
+                patch["width_mm"] = track_template["width_mm"]
+            if "x_scale" in track_template:
+                patch["x_scale"] = deepcopy(track_template["x_scale"])
+            if "grid" in track_template:
+                patch["grid"] = deepcopy(track_template["grid"])
+            if not patch:
                 continue
             result = await session.call_tool(
                 "update_track",
@@ -2118,7 +2239,7 @@ class AuthoringSession:
                     "logfile_path": draft_logfile,
                     "section_id": section_id,
                     "track_id": track_id,
-                    "patch": {"kind": expected_kind},
+                    "patch": patch,
                 },
             )
             _require_mcp_success(result, action="update_track")
@@ -2130,11 +2251,174 @@ class AuthoringSession:
                         "logfile_path": draft_logfile,
                         "section_id": section_id,
                         "track_id": track_id,
-                        "patch": {"kind": expected_kind},
+                        "patch": patch,
                     },
                 )
             )
         return tuple(tool_calls)
+
+    @staticmethod
+    def _expected_binding_specs_for_track(
+        section_template: dict[str, object],
+        *,
+        track_id: str,
+        track_kind: str,
+    ) -> list[dict[str, object]]:
+        """Return normalized expected binding specs for one packet track."""
+        expected_specs_by_track = section_template.get("expected_binding_specs_by_track", {})
+        raw_specs = (
+            expected_specs_by_track.get(track_id, [])
+            if isinstance(expected_specs_by_track, dict)
+            else []
+        )
+        specs: list[dict[str, object]] = []
+        if isinstance(raw_specs, list):
+            for raw_spec in raw_specs:
+                if not isinstance(raw_spec, dict):
+                    continue
+                spec = deepcopy(raw_spec)
+                spec["kind"] = (
+                    str(spec.get("kind", "")).strip().lower()
+                    or ("raster" if track_kind == "array" else "curve")
+                )
+                specs.append(spec)
+        if specs:
+            return specs
+        expected_by_track = section_template.get("expected_bindings_by_track", {})
+        raw_channels = (
+            expected_by_track.get(track_id, [])
+            if isinstance(expected_by_track, dict)
+            else []
+        )
+        if not isinstance(raw_channels, list):
+            return []
+        for occurrence, channel in enumerate(raw_channels, start=1):
+            normalized_channel = str(channel).strip()
+            if not normalized_channel:
+                continue
+            spec: dict[str, object] = {
+                "channel": normalized_channel,
+                "kind": "raster" if track_kind == "array" else "curve",
+            }
+            if occurrence > 1:
+                spec["occurrence"] = occurrence
+            specs.append(spec)
+        return specs
+
+    async def _bind_expected_packet_binding(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        section_id: str,
+        track_id: str,
+        spec: dict[str, object],
+    ) -> AuthoringToolCall:
+        """Create one expected packet binding deterministically."""
+        channel = str(spec.get("channel", "")).strip()
+        if str(spec.get("kind", "curve")).strip().lower() == "raster":
+            arguments = {
+                "logfile_path": draft_logfile,
+                "section_id": section_id,
+                "track_id": track_id,
+                "channel": channel,
+            }
+            for key in (
+                "label",
+                "style",
+                "profile",
+                "normalization",
+                "waveform_normalization",
+                "clip_percentiles",
+                "interpolation",
+                "show_raster",
+                "raster_alpha",
+                "color_limits",
+                "colorbar",
+                "sample_axis",
+                "waveform",
+            ):
+                if key in spec:
+                    arguments[key] = deepcopy(spec[key])
+            result = await session.call_tool("bind_raster", arguments)
+            _require_mcp_success(result, action="bind_raster")
+            return AuthoringToolCall(round=1, name="bind_raster", arguments=arguments)
+
+        arguments = {
+            "logfile_path": draft_logfile,
+            "section_id": section_id,
+            "track_id": track_id,
+            "channel": channel,
+        }
+        for key in ("binding_id", "label", "style", "scale", "header_display"):
+            if key in spec:
+                arguments[key] = deepcopy(spec[key])
+        result = await session.call_tool("bind_curve", arguments)
+        _require_mcp_success(result, action="bind_curve")
+        return AuthoringToolCall(round=1, name="bind_curve", arguments=arguments)
+
+    async def _patch_expected_packet_binding(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        section_id: str,
+        track_id: str,
+        spec: dict[str, object],
+        bindings: list[dict[str, object]],
+    ) -> AuthoringToolCall | None:
+        """Patch one existing packet binding until it matches the expected subset."""
+        matches = self._matching_bindings_for_spec(bindings, spec)
+        if not matches:
+            return None
+        binding_id = str(spec.get("binding_id", "")).strip()
+        target_binding: dict[str, object] | None = None
+        if binding_id:
+            for binding in matches:
+                if str(binding.get("id", "")).strip() == binding_id:
+                    target_binding = binding
+                    break
+        else:
+            occurrence = spec.get("occurrence")
+            if isinstance(occurrence, int) and occurrence >= 1:
+                if len(matches) >= occurrence:
+                    target_binding = matches[occurrence - 1]
+            else:
+                target_binding = matches[0]
+        if not isinstance(target_binding, dict):
+            return None
+        expected_subset = self._binding_expected_subset(spec)
+        patch = {
+            key: deepcopy(value)
+            for key, value in expected_subset.items()
+            if not self._subset_matches(target_binding.get(key), value)
+        }
+        if not patch:
+            return None
+        channel = str(spec.get("channel", "")).strip()
+        if str(spec.get("kind", "curve")).strip().lower() == "raster":
+            arguments = {
+                "logfile_path": draft_logfile,
+                "section_id": section_id,
+                "track_id": track_id,
+                "channel": channel,
+                "patch": patch,
+            }
+            result = await session.call_tool("update_raster_binding", arguments)
+            _require_mcp_success(result, action="update_raster_binding")
+            return AuthoringToolCall(round=1, name="update_raster_binding", arguments=arguments)
+        arguments = {
+            "logfile_path": draft_logfile,
+            "section_id": section_id,
+            "track_id": track_id,
+            "channel": channel,
+            "patch": patch,
+        }
+        if binding_id:
+            arguments["binding_id"] = binding_id
+        result = await session.call_tool("update_curve_binding", arguments)
+        _require_mcp_success(result, action="update_curve_binding")
+        return AuthoringToolCall(round=1, name="update_curve_binding", arguments=arguments)
 
     async def _complete_packet_expected_bindings(
         self,
@@ -2143,7 +2427,7 @@ class AuthoringSession:
         draft_logfile: str,
         blueprint: dict[str, object],
     ) -> tuple[AuthoringToolCall, ...]:
-        """Fill still-missing expected packet bindings deterministically."""
+        """Fill or patch expected packet bindings deterministically."""
         summary_result = await session.call_tool(
             "summarize_logfile_draft",
             {"logfile_path": draft_logfile},
@@ -2175,28 +2459,30 @@ class AuthoringSession:
                 for track_id, track_kind in zip(track_ids, track_kinds, strict=False)
                 if str(track_id).strip()
             }
-            expected_by_track = section_template.get("expected_bindings_by_track", {})
-            if not isinstance(expected_by_track, dict):
-                continue
-            for track_id, expected_channels in expected_by_track.items():
-                if not isinstance(track_id, str) or not isinstance(expected_channels, list):
-                    continue
+            for track_id, current_track_kind in track_kind_by_id.items():
                 current_track_kind = track_kind_by_id.get(track_id)
                 if current_track_kind is None:
                     continue
-                requested_channels = [
-                    str(channel).strip()
-                    for channel in expected_channels
-                    if str(channel).strip()
-                ]
-                if not requested_channels:
+                expected_specs = self._expected_binding_specs_for_track(
+                    section_template,
+                    track_id=track_id,
+                    track_kind=current_track_kind,
+                )
+                if not expected_specs:
                     continue
+                requested_channels = list(
+                    dict.fromkeys(
+                        str(spec.get("channel", "")).strip()
+                        for spec in expected_specs
+                        if str(spec.get("channel", "")).strip()
+                    )
+                )
                 availability_result = await session.call_tool(
                     "check_channel_availability",
                     {
                         "logfile_path": draft_logfile,
                         "section_id": section_id,
-                        "requested_channels": list(dict.fromkeys(requested_channels)),
+                        "requested_channels": requested_channels,
                     },
                 )
                 _require_mcp_success(
@@ -2222,91 +2508,75 @@ class AuthoringSession:
                 bindings = inspect_payload.get("bindings", [])
                 if not isinstance(bindings, list):
                     bindings = []
-                current_counts: dict[str, int] = {}
-                current_labels: dict[str, str] = {}
-                for binding in bindings:
-                    if not isinstance(binding, dict):
-                        continue
-                    channel_name = str(binding.get("channel", "")).strip().upper()
-                    if not channel_name:
-                        continue
-                    current_counts[channel_name] = current_counts.get(channel_name, 0) + 1
-                    label = str(binding.get("label", "")).strip()
-                    if label and channel_name not in current_labels:
-                        current_labels[channel_name] = label
-                expected_counts: dict[str, int] = {}
-                for channel in requested_channels:
-                    normalized = channel.upper()
-                    expected_counts[normalized] = expected_counts.get(normalized, 0) + 1
-                for channel_name, expected_count in expected_counts.items():
+                needs_full_rebuild = len(
+                    {
+                        str(spec.get("channel", "")).strip().upper()
+                        for spec in expected_specs
+                        if str(spec.get("channel", "")).strip()
+                    }
+                ) < len(expected_specs)
+                if needs_full_rebuild:
+                    if bindings:
+                        clear_arguments = {
+                            "logfile_path": draft_logfile,
+                            "section_id": section_id,
+                            "track_id": track_id,
+                        }
+                        clear_result = await session.call_tool(
+                            "clear_track_bindings",
+                            clear_arguments,
+                        )
+                        _require_mcp_success(
+                            clear_result,
+                            action="clear_track_bindings",
+                        )
+                        tool_calls.append(
+                            AuthoringToolCall(
+                                round=1,
+                                name="clear_track_bindings",
+                                arguments=clear_arguments,
+                            )
+                        )
+                    for spec in expected_specs:
+                        channel_name = str(spec.get("channel", "")).strip().upper()
+                        if channel_name not in found_channels:
+                            continue
+                        tool_calls.append(
+                            await self._bind_expected_packet_binding(
+                                session=session,
+                                draft_logfile=draft_logfile,
+                                section_id=section_id,
+                                track_id=track_id,
+                                spec=spec,
+                            )
+                        )
+                    continue
+                for spec in expected_specs:
+                    channel_name = str(spec.get("channel", "")).strip().upper()
                     if channel_name not in found_channels:
                         continue
-                    current_count = current_counts.get(channel_name, 0)
-                    missing_count = expected_count - current_count
-                    if missing_count <= 0:
+                    ok, _ = self._binding_matches_expected_spec(bindings, spec)
+                    if ok:
                         continue
-                    label = current_labels.get(channel_name, channel_name)
-                    for missing_index in range(missing_count):
-                        if current_track_kind == "array":
-                            result = await session.call_tool(
-                                "bind_raster",
-                                {
-                                    "logfile_path": draft_logfile,
-                                    "section_id": section_id,
-                                    "track_id": track_id,
-                                    "channel": channel_name,
-                                    "label": label,
-                                },
-                            )
-                            _require_mcp_success(result, action="bind_raster")
-                            tool_calls.append(
-                                AuthoringToolCall(
-                                    round=1,
-                                    name="bind_raster",
-                                    arguments={
-                                        "logfile_path": draft_logfile,
-                                        "section_id": section_id,
-                                        "track_id": track_id,
-                                        "channel": channel_name,
-                                        "label": label,
-                                    },
-                                )
-                            )
-                        else:
-                            binding_id = None
-                            if current_count + missing_index > 0:
-                                binding_id = (
-                                    f"{track_id}_{channel_name.lower()}_"
-                                    f"{current_count + missing_index + 1}"
-                                )
-                            result = await session.call_tool(
-                                "bind_curve",
-                                {
-                                    "logfile_path": draft_logfile,
-                                    "section_id": section_id,
-                                    "track_id": track_id,
-                                    "channel": channel_name,
-                                    "binding_id": binding_id,
-                                    "label": label,
-                                },
-                            )
-                            _require_mcp_success(result, action="bind_curve")
-                            arguments = {
-                                "logfile_path": draft_logfile,
-                                "section_id": section_id,
-                                "track_id": track_id,
-                                "channel": channel_name,
-                                "label": label,
-                            }
-                            if binding_id is not None:
-                                arguments["binding_id"] = binding_id
-                            tool_calls.append(
-                                AuthoringToolCall(
-                                    round=1,
-                                    name="bind_curve",
-                                    arguments=arguments,
-                                )
-                            )
+                    patch_call = await self._patch_expected_packet_binding(
+                        session=session,
+                        draft_logfile=draft_logfile,
+                        section_id=section_id,
+                        track_id=track_id,
+                        spec=spec,
+                        bindings=bindings,
+                    )
+                    if patch_call is not None:
+                        tool_calls.append(patch_call)
+                        continue
+                    bind_call = await self._bind_expected_packet_binding(
+                        session=session,
+                        draft_logfile=draft_logfile,
+                        section_id=section_id,
+                        track_id=track_id,
+                        spec=spec,
+                    )
+                    tool_calls.append(bind_call)
         return tuple(tool_calls)
 
     async def _execute_packet_plan(

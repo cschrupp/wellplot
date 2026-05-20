@@ -106,6 +106,47 @@ def _validate_section_templates(entry: dict[str, object], *, context: str) -> No
                 field_name=f"expected_bindings_by_track.{track_id}",
                 context=section_context,
             )
+        expected_binding_specs = section.get("expected_binding_specs_by_track", {})
+        if expected_binding_specs:
+            if not isinstance(expected_binding_specs, dict):
+                raise ValueError(
+                    f"{section_context} expected_binding_specs_by_track must be a mapping."
+                )
+            for track_id, raw_specs in expected_binding_specs.items():
+                if not isinstance(track_id, str) or not track_id.strip():
+                    raise ValueError(
+                        f"{section_context} expected_binding_specs_by_track keys must be "
+                        "non-empty strings."
+                    )
+                if not isinstance(raw_specs, list) or not raw_specs:
+                    raise ValueError(
+                        f"{section_context} expected_binding_specs_by_track.{track_id} must "
+                        "be a non-empty list."
+                    )
+                for spec_index, raw_spec in enumerate(raw_specs):
+                    spec_context = (
+                        f"{section_context} expected_binding_specs_by_track."
+                        f"{track_id}[{spec_index}]"
+                    )
+                    spec = _require_mapping(raw_spec, context=spec_context)
+                    _require_non_empty_string(
+                        spec.get("channel"),
+                        field_name="channel",
+                        context=spec_context,
+                    )
+                    if "binding_id" in spec and spec["binding_id"] is not None:
+                        _require_non_empty_string(
+                            spec.get("binding_id"),
+                            field_name="binding_id",
+                            context=spec_context,
+                        )
+                    if "occurrence" in spec:
+                        occurrence = spec.get("occurrence")
+                        if not isinstance(occurrence, int) or occurrence < 1:
+                            raise ValueError(
+                                f"{spec_context} field 'occurrence' must be an integer "
+                                "greater than or equal to 1 when present."
+                            )
 
 
 def _validate_plan_phases(entry: dict[str, object], *, context: str) -> None:
@@ -163,6 +204,34 @@ def _validate_plan_phases(entry: dict[str, object], *, context: str) -> None:
                     if "min_count" in spec and not isinstance(spec.get("min_count"), int):
                         raise ValueError(
                             f"{spec_context} field 'min_count' must be an integer when present."
+                        )
+                if kind == "binding_subset_matches":
+                    _require_non_empty_string(
+                        spec.get("section_id"), field_name="section_id", context=spec_context
+                    )
+                    _require_non_empty_string(
+                        spec.get("track_id"), field_name="track_id", context=spec_context
+                    )
+                    _require_non_empty_string(
+                        spec.get("channel"), field_name="channel", context=spec_context
+                    )
+                    if "binding_id" in spec and spec["binding_id"] is not None:
+                        _require_non_empty_string(
+                            spec.get("binding_id"),
+                            field_name="binding_id",
+                            context=spec_context,
+                        )
+                    if "occurrence" in spec:
+                        occurrence = spec.get("occurrence")
+                        if not isinstance(occurrence, int) or occurrence < 1:
+                            raise ValueError(
+                                f"{spec_context} field 'occurrence' must be an integer "
+                                "greater than or equal to 1 when present."
+                            )
+                    expected = spec.get("expected", {})
+                    if not isinstance(expected, dict) or not expected:
+                        raise ValueError(
+                            f"{spec_context} field 'expected' must be a non-empty mapping."
                         )
 
 

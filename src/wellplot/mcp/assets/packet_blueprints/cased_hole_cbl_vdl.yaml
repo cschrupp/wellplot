@@ -51,12 +51,20 @@ section_templates:
     track_templates:
       - id: combo
         kind: normal
+        width_mm: 50
       - id: depth
         kind: reference
+        width_mm: 36
       - id: cbl
         kind: normal
+        width_mm: 44
       - id: vdl
         kind: array
+        width_mm: 48
+        x_scale:
+          kind: linear
+          min: 200
+          max: 1200
     expected_bindings_by_track:
       combo:
         - ECGR_STGC
@@ -72,6 +80,126 @@ section_templates:
         - CBL
       vdl:
         - VDL
+    expected_binding_specs_by_track:
+      combo:
+        - channel: ECGR_STGC
+          kind: curve
+          label: Gamma Ray (ECGR_STGC) QTGC-B
+          scale:
+            kind: linear
+            min: 0
+            max: 150
+          style:
+            color: "#16a34a"
+            line_width: 0.8
+        - channel: TT
+          kind: curve
+          label: Transit Time for CBL (TT) QSLT-B
+          scale:
+            kind: linear
+            min: 200
+            max: 400
+            reverse: true
+          style:
+            color: "#2142ff"
+            line_width: 0.75
+        - channel: TENS
+          kind: curve
+          label: Cable Tension (TENS)
+          scale:
+            kind: linear
+            min: 5000
+            max: 0
+          style:
+            color: "#111111"
+            line_width: 0.65
+            line_style: dashed
+        - channel: MTEM
+          kind: curve
+          label: Mud Temperature (MTEM) LEH-MT
+          scale:
+            kind: linear
+            min: 100
+            max: 500
+          style:
+            color: "#111111"
+            line_width: 0.9
+      depth:
+        - channel: STIT
+          kind: curve
+          label: Stuck Tool Indicator, Total (STIT)
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#111111"
+            line_width: 0.65
+        - channel: TDSP
+          kind: curve
+          label: Cable Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#92400e"
+            line_width: 0.65
+            line_style: dotted
+        - channel: VSEC
+          kind: curve
+          label: Tool_Tot. Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#1d4ed8"
+            line_width: 0.65
+            line_style: dashed
+      cbl:
+        - channel: CBL
+          kind: curve
+          binding_id: cbl_main_pass_1
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 100
+          style:
+            color: "#111111"
+            line_width: 0.75
+        - channel: CBL
+          kind: curve
+          binding_id: cbl_main_pass_2
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 10
+          style:
+            color: "#2563eb"
+            line_width: 0.65
+            line_style: dashed
+      vdl:
+        - channel: VDL
+          kind: raster
+          label: VDL VariableDensity (VDL) QSLT-B
+          style:
+            colormap: gray_r
+          profile: vdl
+          colorbar:
+            enabled: true
+            label: Amplitude
+            position: header
+          sample_axis:
+            enabled: true
+            unit: us
+            min: 200
+            max: 1200
+            source_origin: 40
+            source_step: 10
+            ticks: 7
   - id: repeat_pass
     title: Repeat Pass
     source_slot: repeat
@@ -79,12 +207,20 @@ section_templates:
     track_templates:
       - id: combo
         kind: normal
+        width_mm: 50
       - id: depth
         kind: reference
+        width_mm: 36
       - id: cbl
         kind: normal
+        width_mm: 44
       - id: vdl
         kind: array
+        width_mm: 48
+        x_scale:
+          kind: linear
+          min: 200
+          max: 1200
     expected_bindings_by_track:
       combo:
         - ECGR_STGC
@@ -100,6 +236,126 @@ section_templates:
         - CBL
       vdl:
         - VDL
+    expected_binding_specs_by_track:
+      combo:
+        - channel: ECGR_STGC
+          kind: curve
+          label: Gamma Ray (ECGR_STGC) QTGC-B
+          scale:
+            kind: linear
+            min: 0
+            max: 150
+          style:
+            color: "#16a34a"
+            line_width: 0.8
+        - channel: TT
+          kind: curve
+          label: Transit Time for CBL (TT) QSLT-B
+          scale:
+            kind: linear
+            min: 200
+            max: 400
+            reverse: true
+          style:
+            color: "#2142ff"
+            line_width: 0.75
+        - channel: TENS
+          kind: curve
+          label: Cable Tension (TENS)
+          scale:
+            kind: linear
+            min: 5000
+            max: 0
+          style:
+            color: "#111111"
+            line_width: 0.65
+            line_style: dashed
+        - channel: MTEM
+          kind: curve
+          label: Mud Temperature (MTEM) LEH-MT
+          scale:
+            kind: linear
+            min: 100
+            max: 500
+          style:
+            color: "#111111"
+            line_width: 0.9
+      depth:
+        - channel: STIT
+          kind: curve
+          label: Stuck Tool Indicator, Total (STIT)
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#111111"
+            line_width: 0.65
+        - channel: TDSP
+          kind: curve
+          label: Cable Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#92400e"
+            line_width: 0.65
+            line_style: dotted
+        - channel: VSEC
+          kind: curve
+          label: Tool_Tot. Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#1d4ed8"
+            line_width: 0.65
+            line_style: dashed
+      cbl:
+        - channel: CBL
+          kind: curve
+          binding_id: cbl_repeat_pass_1
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 100
+          style:
+            color: "#111111"
+            line_width: 0.75
+        - channel: CBL
+          kind: curve
+          binding_id: cbl_repeat_pass_2
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 10
+          style:
+            color: "#2563eb"
+            line_width: 0.65
+            line_style: dashed
+      vdl:
+        - channel: VDL
+          kind: raster
+          label: VDL VariableDensity (VDL) QSLT-B
+          style:
+            colormap: gray_r
+          profile: vdl
+          colorbar:
+            enabled: true
+            label: Amplitude
+            position: header
+          sample_axis:
+            enabled: true
+            unit: us
+            min: 200
+            max: 1200
+            source_origin: 40
+            source_step: 10
+            ticks: 7
 plan_phases:
   - id: header_scaffold
     kind: header_scaffold
@@ -237,76 +493,366 @@ plan_phases:
         section_id: main_pass
         track_id: combo
         channel: ECGR_STGC
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: combo
+        channel: ECGR_STGC
+        expected:
+          label: Gamma Ray (ECGR_STGC) QTGC-B
+          scale:
+            kind: linear
+            min: 0
+            max: 150
+          style:
+            color: "#16a34a"
+            line_width: 0.8
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: combo
         channel: TT
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: combo
+        channel: TT
+        expected:
+          label: Transit Time for CBL (TT) QSLT-B
+          scale:
+            kind: linear
+            min: 200
+            max: 400
+            reverse: true
+          style:
+            color: "#2142ff"
+            line_width: 0.75
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: combo
         channel: TENS
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: combo
+        channel: TENS
+        expected:
+          label: Cable Tension (TENS)
+          scale:
+            kind: linear
+            min: 5000
+            max: 0
+          style:
+            color: "#111111"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: combo
         channel: MTEM
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: combo
+        channel: MTEM
+        expected:
+          label: Mud Temperature (MTEM) LEH-MT
+          scale:
+            kind: linear
+            min: 100
+            max: 500
+          style:
+            color: "#111111"
+            line_width: 0.9
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: depth
         channel: STIT
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: depth
+        channel: STIT
+        expected:
+          label: Stuck Tool Indicator, Total (STIT)
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#111111"
+            line_width: 0.65
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: depth
         channel: TDSP
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: depth
+        channel: TDSP
+        expected:
+          label: Cable Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#92400e"
+            line_width: 0.65
+            line_style: dotted
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: depth
         channel: VSEC
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: depth
+        channel: VSEC
+        expected:
+          label: Tool_Tot. Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#1d4ed8"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: cbl
         channel: CBL
         min_count: 2
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: cbl
+        channel: CBL
+        binding_id: cbl_main_pass_1
+        expected:
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 100
+          style:
+            color: "#111111"
+            line_width: 0.75
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: cbl
+        channel: CBL
+        binding_id: cbl_main_pass_2
+        expected:
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 10
+          style:
+            color: "#2563eb"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: main_pass
         track_id: vdl
         channel: VDL
+      - kind: binding_subset_matches
+        section_id: main_pass
+        track_id: vdl
+        channel: VDL
+        expected:
+          label: VDL VariableDensity (VDL) QSLT-B
+          style:
+            colormap: gray_r
+          profile: vdl
+          colorbar:
+            enabled: true
+            label: Amplitude
+            position: header
+          sample_axis:
+            enabled: true
+            unit: us
+            min: 200
+            max: 1200
+            source_origin: 40
+            source_step: 10
+            ticks: 7
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: combo
         channel: ECGR_STGC
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: combo
+        channel: ECGR_STGC
+        expected:
+          label: Gamma Ray (ECGR_STGC) QTGC-B
+          scale:
+            kind: linear
+            min: 0
+            max: 150
+          style:
+            color: "#16a34a"
+            line_width: 0.8
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: combo
         channel: TT
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: combo
+        channel: TT
+        expected:
+          label: Transit Time for CBL (TT) QSLT-B
+          scale:
+            kind: linear
+            min: 200
+            max: 400
+            reverse: true
+          style:
+            color: "#2142ff"
+            line_width: 0.75
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: combo
         channel: TENS
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: combo
+        channel: TENS
+        expected:
+          label: Cable Tension (TENS)
+          scale:
+            kind: linear
+            min: 5000
+            max: 0
+          style:
+            color: "#111111"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: combo
         channel: MTEM
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: combo
+        channel: MTEM
+        expected:
+          label: Mud Temperature (MTEM) LEH-MT
+          scale:
+            kind: linear
+            min: 100
+            max: 500
+          style:
+            color: "#111111"
+            line_width: 0.9
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: depth
         channel: STIT
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: depth
+        channel: STIT
+        expected:
+          label: Stuck Tool Indicator, Total (STIT)
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#111111"
+            line_width: 0.65
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: depth
         channel: TDSP
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: depth
+        channel: TDSP
+        expected:
+          label: Cable Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#92400e"
+            line_width: 0.65
+            line_style: dotted
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: depth
         channel: VSEC
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: depth
+        channel: VSEC
+        expected:
+          label: Tool_Tot. Drag
+          scale:
+            kind: linear
+            min: 0
+            max: 50
+          style:
+            color: "#1d4ed8"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: cbl
         channel: CBL
         min_count: 2
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: cbl
+        channel: CBL
+        binding_id: cbl_repeat_pass_1
+        expected:
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 100
+          style:
+            color: "#111111"
+            line_width: 0.75
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: cbl
+        channel: CBL
+        binding_id: cbl_repeat_pass_2
+        expected:
+          label: CBL Amplitude (CBL) QSLT-B
+          scale:
+            kind: linear
+            min: 0
+            max: 10
+          style:
+            color: "#2563eb"
+            line_width: 0.65
+            line_style: dashed
       - kind: binding_channel_exists
         section_id: repeat_pass
         track_id: vdl
         channel: VDL
+      - kind: binding_subset_matches
+        section_id: repeat_pass
+        track_id: vdl
+        channel: VDL
+        expected:
+          label: VDL VariableDensity (VDL) QSLT-B
+          style:
+            colormap: gray_r
+          profile: vdl
+          colorbar:
+            enabled: true
+            label: Amplitude
+            position: header
+          sample_axis:
+            enabled: true
+            unit: us
+            min: 200
+            max: 1200
+            source_origin: 40
+            source_step: 10
+            ticks: 7
     instructions: |
       Bind only confirmed channels. Preserve duplicate CBL bindings on the cbl track and use
       explicit binding ids when the same channel appears twice on one track.
