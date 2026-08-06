@@ -2538,6 +2538,7 @@ dependencies = [
     { name = "jsonschema" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "pydantic" },
     { name = "pyyaml" },
 ]
 

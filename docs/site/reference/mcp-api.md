@@ -13,6 +13,11 @@ This page documents the experimental MCP server surface exposed by
   - the companion host-side Python authoring API now lives under
     `wellplot.agent`
 
+The current tool roster is functional but remains experimental. The `0.6.0`
+work is consolidating object fields, values, JSON Schema, Python operations, and
+MCP schemas behind one deterministic authoring contract. Until that release,
+tool breadth should not be interpreted as complete object-level CRUD parity.
+
 ## Root Policy
 
 The server root is the current working directory when `wellplot-mcp` starts.

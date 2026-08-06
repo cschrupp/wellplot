@@ -1,6 +1,6 @@
 # Programmatic API Plan
 
-Last updated: 2026-03-20
+Last updated: 2026-08-06
 
 ## Goal
 
@@ -40,16 +40,30 @@ Implemented:
 
 Still open:
 
+- one canonical typed authoring contract shared with YAML and MCP
+- complete deterministic inspection and editing of existing report objects
+- typed create/update models in place of loose YAML-shaped mappings
+- generated schema and cross-layer contract-parity tests
 - provenance/collision polish beyond the current merge-history baseline
 - notebook-first end-to-end examples if we decide to keep parity with the `.py` workflow demos
 
+Status clarification:
+
+- dataset ingestion and rendering APIs are mature
+- `LogBuilder` provides useful construction ergonomics
+- the authoring API is not complete while builders and editors still accept
+  loose mappings and do not expose full object-level CRUD
+
 ## Design Principles
 
-- The canonical configuration object is the in-memory model, not YAML.
+- The canonical configuration object is a strict typed in-memory authoring
+  model, not YAML and not builder-owned dictionaries.
 - YAML remains a first-class serialization format, not the core architecture.
 - Data ingestion, document composition, and rendering are separate layers.
 - Notebook usage must not require temporary YAML or LAS/DLIS files.
 - Added data must carry explicit reference-axis and unit information.
+- Python API and MCP operations must use the same deterministic authoring
+  service and value constraints.
 
 ## Target Layering
 
@@ -594,6 +608,38 @@ Minimum example content:
 4. build a report in Python
 5. render a full PDF and an inline PNG
 
+### Phase 13. Consolidate the deterministic authoring contract
+
+Goal: make Python the complete typed authoring surface rather than only a
+construction convenience over YAML-shaped dictionaries.
+
+Required work:
+
+- introduce strict canonical authoring models shared with YAML and MCP
+- preserve `WellDataset` and existing render dataclasses behind explicit
+  adapters
+- replace loose nested `Mapping[str, object]` inputs with typed value objects or
+  compatibility overloads that immediately validate into those objects
+- add deterministic `list`, `get`, `create`, `update`, `remove`, `move`, and
+  `validate` operations for persisted authoring objects
+- distinguish omitted patch fields from explicit `None`
+- generate JSON Schema and public field documentation from the same models
+- keep existing supported YAML and builder flows working through documented
+  compatibility adapters
+
+Acceptance:
+
+- Python users can inspect and revise an existing report without manipulating
+  YAML-shaped dictionaries
+- builder creation, object editing, YAML serialization, MCP tools, and rendering
+  enforce the same fields and value constraints
+- failed mutations are atomic and leave the original report unchanged
+- the contract-parity and compatibility test matrices pass
+
+Detailed object inventory:
+
+- [docs/authoring-contract-inventory.md](authoring-contract-inventory.md)
+
 ## Acceptance Criteria For The Whole Phase
 
 The API phase is successful if a user can:
@@ -606,6 +652,9 @@ The API phase is successful if a user can:
 6. render one section or one depth/time window
 7. display a PNG inline in Jupyter
 8. optionally save the document as YAML
+9. inspect and revise any supported authoring object through typed Python
+   operations
+10. obtain the same validation result through Python, YAML, and MCP
 
 ## Implementation Order
 
@@ -623,6 +672,7 @@ Recommended order:
 10. Phase 10
 11. Phase 11
 12. Phase 12
+13. Phase 13
 
 ## References
 

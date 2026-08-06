@@ -874,6 +874,12 @@ vendor-generated logs.
   data ingestion through rendering and YAML persistence.
 - [docs/programmatic-api-plan.md](docs/programmatic-api-plan.md): concrete checklist for dataset
   ingestion, programmatic composition, partial renders, and notebook outputs.
+- [docs/mcp-authoring-model.md](docs/mcp-authoring-model.md): canonical user-facing authoring
+  objects, precedence, and agent boundaries.
+- [docs/authoring-contract-inventory.md](docs/authoring-contract-inventory.md): implementation
+  inventory for deterministic authoring objects, values, and operations.
+- [docs/mcp-implementation-plan.md](docs/mcp-implementation-plan.md): approved `0.6.0`
+  deterministic contract slices and release gates.
 
 ## License
 

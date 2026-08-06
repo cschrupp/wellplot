@@ -1,6 +1,6 @@
 # MCP Rollout Status
 
-Last updated: 2026-05-08
+Last updated: 2026-08-06
 
 ## Purpose
 
@@ -11,20 +11,43 @@ The original extracted v1 plan has now been implemented and extended. This file
 tracks what is actually in the repository, what release it is being prepared
 for, and what still requires maintainer action outside the repo.
 
+## Strategic Direction
+
+The MCP surface is being corrected back toward the final-user product goal:
+
+- scientists should be able to describe and iteratively refine plots without
+  needing to know internal application mechanics
+- MCP should expose deterministic authoring objects and tools
+- defaults should fill missing details only
+- explicit user instructions should override defaults and scaffolds
+
+The canonical direction for this correction is documented in
+[docs/mcp-authoring-model.md](mcp-authoring-model.md).
+
+Implementation inventory and slice plan:
+
+- [docs/authoring-contract-inventory.md](authoring-contract-inventory.md)
+- [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
+
 ## Release Status
 
-- Repo target version: `0.3.0`
+- Published package metadata: `0.3.0`
+- Branch release target: `0.6.0`, not ready to publish
 - Public status: experimental
 - Transport: stdio-first through `wellplot-mcp`
 - Packaging:
   - optional extra: `wellplot[mcp]`
   - console entry point: `wellplot-mcp`
-- Release note boundary:
-  - the originally planned scoped-preview slice and writable-authoring slice
-    landed together in the current tree and are being released together as
-    `0.3.0`
+- Release boundary:
+  - post-`0.3.0` tool, ingestion, and agent capabilities are implemented in the
+    current branch
+  - `0.6.0` is blocked on canonical authoring contract, object CRUD, MCP parity,
+    defaults precedence, agent revalidation, and release closure
 
 ## Implemented Surface
+
+This section is a capability snapshot, not evidence that every object has a
+complete canonical contract.
 
 ### Tools
 
@@ -38,12 +61,19 @@ for, and what still requires maintainer action outside the repo.
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
+- `inspect_data_source(...)`
+- `check_channel_availability(...)`
+- `set_section_data_source(...)`
+- `replicate_section_structure(...)`
 - `set_depth_axis(logfile_path, unit=None, scale=None, major_step=None, minor_step=None)`
 - `update_section(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None)`
 - `set_page_layout(logfile_path, page_patch=None, render_patch=None)`
+- `set_matplotlib_style(...)`
 - `set_section_view(logfile_path, section_id, title=None, subtitle=None, depth_range=None, depth_range_unit=None, unit=None, scale=None, major_step=None, minor_step=None, page_patch=None, render_patch=None)`
 - `add_track(logfile_path, section_id, id, title, kind, width_mm, x_scale=None, grid=None, track_header=None, reference=None, annotations=None)`
 - `update_track(logfile_path, section_id, track_id, patch)`
+- `inspect_track_bindings(...)`
+- `set_track_scales(...)`
 - `add_annotation_object(logfile_path, section_id, track_id, annotation, position=None)`
 - `update_annotation_object(logfile_path, section_id, track_id, annotation_index, patch)`
 - `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`
@@ -57,6 +87,20 @@ for, and what still requires maintainer action outside the repo.
 - `update_raster_binding(logfile_path, section_id, track_id, channel, patch)`
 - `remove_curve_binding(logfile_path, section_id, track_id, channel)`
 - `remove_raster_binding(logfile_path, section_id, track_id, channel)`
+- `move_track(...)`
+- `set_heading_content(...)`
+- `set_remarks_content(...)`
+- `inspect_header_archetypes(...)`
+- `inspect_packet_blueprints(...)` (transitional discovery surface)
+- `apply_header_archetype(...)`
+- `inspect_heading_slots(...)`
+- `parse_key_value_text(...)`
+- `preview_header_mapping(...)`
+- `apply_header_values(...)`
+- `inspect_style_presets(...)`
+- `apply_style_preset(...)`
+- `inspect_authoring_vocab(...)`
+- `summarize_logfile_changes(...)`
 - `validate_logfile_text(yaml_text, base_dir=None)`
 - `format_logfile_text(yaml_text, base_dir=None)`
 - `save_logfile_text(yaml_text, output_path, overwrite=False, base_dir=None)`
@@ -69,6 +113,16 @@ for, and what still requires maintainer action outside the repo.
 - `wellplot://examples/production/{example_id}/base.template.yaml`
 - `wellplot://examples/production/{example_id}/full_reconstruction.log.yaml`
 - `wellplot://examples/production/{example_id}/data-notes.md`
+- `wellplot://authoring/schema/patch.json`
+- `wellplot://authoring/catalog/track-kinds.json`
+- `wellplot://authoring/catalog/fill-kinds.json`
+- `wellplot://authoring/catalog/track-archetypes.json`
+- `wellplot://authoring/catalog/header-archetypes.json`
+- `wellplot://authoring/catalog/packet-blueprints.json` (transitional)
+- `wellplot://authoring/catalog/style-presets.json`
+- `wellplot://authoring/catalog/header-fields.json`
+- `wellplot://authoring/catalog/header-key-aliases.json`
+- `wellplot://authoring/catalog/channel-aliases.json`
 
 Packaged example ids:
 
@@ -96,23 +150,34 @@ Packaged example ids:
   - `export_example_bundle(...)`
   - `create_logfile_draft(...)`
   - `set_section_data_source(...)`
+  - `replicate_section_structure(...)`
   - `update_section(...)`
   - `set_depth_axis(...)`
   - `set_page_layout(...)`
+  - `set_matplotlib_style(...)`
+  - `set_section_view(...)`
   - `add_track(...)`
   - `update_track(...)`
+  - `set_track_scales(...)`
+  - `add_annotation_object(...)`
+  - `update_annotation_object(...)`
+  - `remove_annotation_object(...)`
   - `remove_track(...)`
   - `bind_curve(...)`
   - `add_curve_fill(...)`
+  - `remove_curve_fill(...)`
   - `bind_raster(...)`
   - `update_curve_binding(...)`
   - `update_raster_binding(...)`
   - `remove_curve_binding(...)`
   - `remove_raster_binding(...)`
+  - `clear_track_bindings(...)`
   - `move_track(...)`
   - `set_heading_content(...)`
   - `set_remarks_content(...)`
   - `apply_header_values(...)`
+  - `apply_header_archetype(...)`
+  - `apply_style_preset(...)`
   - `save_logfile_text(...)`
 - `validate_logfile_text(...)`, `format_logfile_text(...)`, and
   `save_logfile_text(...)` accept unsaved full logfile YAML text. When
@@ -148,131 +213,76 @@ Primary coverage now includes:
 
 ## Remaining Maintainer Actions
 
-The following actions are intentionally outside this repo-local implementation
-document and still need to happen through the normal release flow:
+There is no immediate publish action. Before the normal release flow resumes:
 
-1. Run the GitHub `Release` workflow with `publish_target=verify-only`.
-2. Run a TestPyPI rehearsal for `0.3.0`.
-3. Publish `0.3.0` to PyPI.
-4. Let the merged documentation changes publish through the normal docs path to
-   Read the Docs and the GitHub Pages mirror.
+1. Complete deterministic contract slices `0.6-A` through `0.6-E`.
+2. Complete defaults/precedence and agent revalidation in `0.6-F` and `0.6-G`.
+3. Resolve the MCP stdio integration test that currently does not complete
+   reliably in the local release audit.
+4. Run unit, schema/MCP parity, agent, docs, notebook, and installed-wheel
+   acceptance gates.
+5. Update version, changelog, release notes, and public references to the actual
+   shipped surface.
+6. Resume verify-only, TestPyPI, and PyPI publishing through the documented
+   release workflow.
 
 ## Next Planned Slice
 
-After the `0.3.0` experimental release is out, the next MCP milestone should be
-natural-language-driven authoring.
+The next implementation slice is `0.6-A`: canonical contract inventory and
+ownership. Do not add provider features, packet-specific reconciliation, or
+convenience mutation verbs before this slice resolves the duplicated contract.
 
-Key direction:
+Required sequence:
 
-- keep freeform language understanding in the MCP client or host LLM
-- expand `wellplot-mcp` with deterministic authoring tools, vocabularies,
-  prompts, and draft workflows
-- avoid server-side opaque YAML rewrites from raw freeform text
+1. inventory objects, fields, constraints, relationships, and current owners
+2. implement strict canonical authoring models and generated schema
+3. add YAML compatibility and renderer adapters
+4. implement complete typed deterministic object operations
+5. route MCP through the object service and enforce contract parity
+6. add defaults with explicit precedence
+7. rebase the agent and close release acceptance
 
 Detailed plan:
 
-- [docs/mcp-authoring-plan.md](mcp-authoring-plan.md)
+- [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
 
-Concrete `0.4.0` foundation tools:
+## Product-Direction Risks In The Current Tree
 
-- `create_logfile_draft(...)`
-- `summarize_logfile_draft(...)`
-- `update_section(...)`
-- `add_track(...)`
-- `update_track(...)`
-- `remove_track(...)`
-- `bind_curve(...)`
-- `bind_raster(...)`
-- `set_depth_axis(...)`
-- `set_page_layout(...)`
-- `update_curve_binding(...)`
-- `update_raster_binding(...)`
-- `remove_curve_binding(...)`
-- `remove_raster_binding(...)`
-- `move_track(...)`
-- `set_heading_content(...)`
-- `set_remarks_content(...)`
-- `inspect_authoring_vocab(...)`
-- `summarize_logfile_changes(...)`
+The packet-planning experiment surfaced useful needs such as:
 
-The full `0.4.0` deterministic authoring foundation now exists in the
-repository, including:
+- phase planning
+- deterministic verification
+- explicit progress reporting
 
-- draft lifecycle tools
-- deterministic track/curve/heading/remarks edit tools
-- authoring vocabulary inspection plus catalog resources
-- structural change summaries
-- LLM-facing prompts for freeform authoring and revision
+But it also exposed a product risk:
 
-The next MCP-focused implementation slice should now move to the richer
-`0.5.0` ingestion and workflow ergonomics work described in
-[docs/mcp-authoring-plan.md](mcp-authoring-plan.md).
+- packet-specific blueprint reconciliation can become a hidden authority that
+  silently overrides explicit user instructions
 
-Planned `0.5.0` focus:
+That behavior does not match the intended user experience. Future MCP/agent
+cleanup should keep the useful planning and verification lessons while
+replacing hidden packet authority with explicit object-level edits plus
+fallback defaults.
 
-- `inspect_data_source(...)`
-- `check_channel_availability(...)`
-- `inspect_heading_slots(...)`
-- `preview_header_mapping(...)`
-- `apply_header_values(...)`
-- `parse_key_value_text(...)`
-- `inspect_style_presets(...)`
-- header/style catalog resources
-- `ingest_header_text(...)` prompt
+Additional deterministic risk:
 
-Scope note:
+- fields, defaults, enums, parsers, and patch keys are duplicated across model,
+  schema, builder, MCP, and agent layers
+- complete add/update/remove tool coverage does not exist for every persisted
+  object, and getter coverage is uneven
 
-- standalone source inspection in this phase is for LAS and DLIS only; LIS
-  support is not planned in this slice.
-
-Implemented so far in `0.5.0`:
-
-- `inspect_data_source(...)`
-- `check_channel_availability(...)`
-- `inspect_heading_slots(...)`
-- `preview_header_mapping(...)`
-- `apply_header_values(...)`
-- `parse_key_value_text(...)`
-- `inspect_style_presets(...)`
-- `ingest_header_text(...)` prompt
-- `wellplot://authoring/catalog/header-key-aliases.json`
-- `wellplot://authoring/catalog/style-presets.json`
-
-Current `0.6.0` status:
-
-- `wellplot.agent` is now implemented as the public host-side orchestration
-  layer
-- `wellplot-mcp` remains deterministic and provider-agnostic
-- the shared core plus thin adapters are implemented for:
-  - OpenAI
-  - one OpenAI-compatible provider path
-- the natural-language notebook now uses the public agent API instead of
-  embedded MCP/provider glue
-- Anthropic is explicitly deferred as a separate follow-on adapter task
-
-Next up:
-
-- keep release/docs closure aligned with the implemented agent slice
-- merge or rebase the branch back onto `main`
-- decide whether to add one explicit `openai_compat` example before the next
-  release cut
-
-Next highest-value MCP slice:
-
-1. any remaining provider-facing ergonomics exposed by the notebook/agent workflow
-2. grouped removal/update helpers only where iterative notebook usage still exposes friction
-3. preset-oriented layout helpers only where notebook workflows still repeat the same setup
-
-Scope note:
-
-- this is a host-side integration layer, not a redesign of the MCP server
-- provider-neutral does not mean provider-identical; adapter differences should
-  stay explicit
+The correction keeps MCP deterministic and provider-agnostic, but it does
+change the implementation foundation: MCP becomes a thin projection of one
+shared canonical object service rather than an independent dictionary-mutation
+layer.
 
 ## Implementation Checkpoint (2026-05-06)
 
 This section records the repo-local state after the `wellplot.agent`
 implementation landed on `codex/release-mcp-launcher-fix`.
+
+This is a historical checkpoint. Its recommended next steps are superseded by
+the current `0.6-A` through `0.6-G` contract program above.
 
 ### Latest Branch Boundary
 

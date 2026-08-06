@@ -1,6 +1,6 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-05-08
+Last updated: 2026-08-06
 
 ## Summary
 
@@ -10,6 +10,16 @@ Goal for the next version:
   savefiles and previews
 - keep the actual plot edits deterministic, schema-backed, and reviewable
 - support both greenfield authoring and iterative edit flows
+
+Mission reminder:
+
+- the final user should be able to plot and refine data with little or no
+  knowledge of internal `wellplot` structures
+- MCP should therefore expose stable authoring objects and deterministic edit
+  operations rather than hidden packet-specific orchestration rules
+
+The canonical direction is documented in
+[docs/mcp-authoring-model.md](mcp-authoring-model.md).
 
 Representative user requests:
 
@@ -35,9 +45,68 @@ Instead:
 This keeps the server portable across MCP hosts while still enabling
 natural-language workflows.
 
+## Authoring Model Direction
+
+The MCP/agent surface should align with one canonical object model:
+
+- form objects such as `report`, `section`, `track`, `heading`, `remarks`, and
+  `tail`
+- content objects such as `curve binding`, `raster binding`, `fill`, and
+  `annotation object`
+
+Track kinds remain form subtypes:
+
+- `reference`
+- `normal`
+- `array`
+- `annotation`
+
+This distinction matters because the natural-language layer should speak in
+user-meaningful objects:
+
+- add a track
+- bind a curve
+- set a scale
+- style a curve
+- fill header values
+
+rather than relying on hidden packet-specific reconstruction logic.
+
+### Precedence Rule
+
+The intended precedence order is:
+
+1. explicit user instruction
+2. explicit preservation of existing draft state
+3. defaults catalogs
+4. starter scaffolds and examples
+
+Defaults are fallback guidance. They must not silently override explicit user
+intent.
+
+### Defaults Instead Of Hidden Packet Authority
+
+Reusable guidance should increasingly live in defaults catalogs such as:
+
+- track-family defaults
+- curve-family defaults
+- raster-family defaults
+- header archetypes
+- starter scaffolds
+
+Examples and packet assets may remain useful as:
+
+- examples
+- starter scaffolds
+- regression fixtures
+
+But they should not become a second authoritative template system.
+
 ## API Readiness Assessment
 
-The current core is already strong enough to support this direction.
+The current data and render cores are strong enough to preserve. The public
+authoring boundary is not yet complete enough to support reliable generated
+authoring.
 
 What is already in place:
 
@@ -56,8 +125,14 @@ What is already in place:
 - the current MCP surface already provides safe validate, inspect, preview,
   format, and save loops under a fixed server root
 
-What is still missing is not a new rendering core. It is a deterministic
-mutation layer for draft authoring.
+What is still missing is not a new rendering core. It is:
+
+- one strict typed authoring contract shared by Python, YAML, MCP, and agent
+  verification
+- generated schema and discovery instead of duplicated field/value lists
+- complete deterministic object inspection and mutation
+- explicit compatibility adapters into the existing renderer
+- contract-parity tests that detect cross-layer drift
 
 ## Non-Goals For This Phase
 
@@ -66,20 +141,36 @@ mutation layer for draft authoring.
 - no hidden long-lived server state that cannot be serialized or inspected
 - no attempt to preserve YAML comments, anchors, or original formatting during
   normalized save flows
+- no rewrite of the working dataset/channel or renderer layers without a
+  demonstrated compatibility requirement
+- no new packet-specific blueprint authority
+- no provider or remote-transport expansion before deterministic contract parity
 
 ## Current Gaps
 
-The current MCP surface is strong for review, preview, export, validation, and
-normalized save. It is still weak for iterative authoring because it lacks:
+The current MCP surface has broad review and mutation capability. The remaining
+gaps are structural:
 
-- a first-class draft lifecycle for new plots
-- structured edit operations for tracks, bindings, fills, headings, and remarks
-- schema-backed authoring vocabularies for clients to discover
-- deterministic helpers for mapping extracted header values into the right
-  report fields
-- a patch/diff workflow that lets the user inspect what changed before saving
+- standard fields, values, defaults, and relationships are duplicated across
+  dataclasses, JSON Schema, parsers, builders, MCP allowlists, and agent checks
+- page, depth, header, footer, and the document mapping still permit arbitrary
+  extra properties in the hand-maintained schema
+- the Python builder accepts many loose nested mappings
+- object getter coverage is uneven, and several child objects lack stable ids
+  or complete CRUD
+- MCP tools mutate normalized dictionaries directly instead of calling one
+  canonical typed object service
+- packet-specific agent logic can compensate for missing semantics and override
+  explicit user values
 
-## Required Building Blocks
+The detailed inventory is
+[docs/authoring-contract-inventory.md](authoring-contract-inventory.md).
+
+## Implemented Capability Building Blocks (Historical)
+
+The following sections record how the current MCP roster was built. They are
+retained for tool history; the `0.6.0` contract program supersedes them as the
+active implementation order.
 
 ### 1. Draft Lifecycle
 
@@ -258,6 +349,11 @@ Prompt responsibilities:
 
 ### Release 0.4.0: Deterministic Authoring Foundation
 
+Historical interpretation: the planned deterministic tool roster was
+implemented. This slice did not establish one canonical field-level contract,
+so "foundation" here refers to capability breadth rather than final
+architecture.
+
 Deliver:
 
 - draft lifecycle tools
@@ -275,6 +371,10 @@ Acceptance:
   remarks, and save the result through MCP
 
 ### Release 0.5.0: Rich Ingestion And Workflow Ergonomics
+
+Historical interpretation: the planned ingestion and header workflow roster was
+implemented. Its request/result models still need consolidation under the
+`0.6.0` canonical contract.
 
 Deliver:
 
@@ -301,6 +401,27 @@ Concrete focus:
 - reduce prompt verbosity by exposing reusable style and archetype presets
 - keep freeform language in the MCP client while giving it better structured
   targets for ingestion and revision
+
+### Release 0.6.0: Canonical Deterministic Authoring Contract
+
+Deliver:
+
+- complete authoring object/field/constraint inventory
+- strict Pydantic v2 authoring models and generated JSON Schema
+- compatibility and render adapters
+- complete typed object inspection and mutation service
+- MCP/schema/API contract parity
+- defaults catalogs with explicit precedence
+- agent rebase onto deterministic object outcomes
+
+Acceptance:
+
+- every persisted authoring object and standard property has one canonical
+  owner
+- Python, YAML, MCP, and agent verification expose the same constraints
+- explicit user values survive defaults and scaffolds
+- generic workflows succeed without packet-specific authority
+- all release, docs, notebook, and installed-wheel gates pass
 
 ## Release 0.4.0 Concrete Tool Set
 
@@ -347,9 +468,9 @@ Implemented so far:
 
 `0.4.0` status:
 
-- complete in the repository-local MCP implementation
-- remaining work for that release is release/docs closure, not missing authoring
-  primitives
+- planned tool roster complete in the repository-local MCP implementation
+- superseded architectural interpretation: deterministic contract and object
+  operation completeness are now `0.6.0` release work
 
 ## Release 0.5.0 Concrete Tool Set
 
@@ -599,272 +720,100 @@ Recommended build order:
 - the MCP notebook/demo shows one end-to-end "header packet to rendered draft"
   workflow
 
-## Release 0.6.0: Provider-Neutral Agent Layer
+## Release 0.6.0: Canonical Deterministic Authoring Contract
 
 ### Goal
 
-Move the natural-language orchestration glue out of notebooks and into a
-public, host-side `wellplot` API while keeping `wellplot-mcp` deterministic and
-provider-agnostic.
+Complete the deterministic authoring framework before treating generated
+authoring as stable. Every persisted object, property, value constraint, and
+relationship must have one canonical typed definition and complete required
+read/write coverage.
 
-### Status (2026-05-06)
+### Current Status (2026-08-06)
 
-Current branch status:
+Implemented capability:
 
-- branch in use: `codex/release-mcp-launcher-fix`
-- public host-side API is implemented under `wellplot.agent`
-- the shared core now owns request/result models, local stdio MCP runtime
-  access, tool replay, previews, validation capture, and change summaries
-- the natural-language notebook and companion example now import the public API
-  instead of embedding provider + MCP orchestration glue
-- OpenAI support is implemented as the reference adapter
-- one OpenAI-compatible adapter path is implemented through
-  `provider="openai_compat"` plus `base_url=...`
-- loopback-compatible endpoints such as `http://localhost:11434/v1` now receive
-  an automatic placeholder token when no real key is configured
-- docs now recommend `OPENAI_API_KEY` or notebook `getpass()` as the primary
-  credential flows, with `.env.local` as the local persistent fallback
+- public host-side `wellplot.agent` API
+- local stdio MCP runtime and provider-neutral result/event handling
+- OpenAI and OpenAI-compatible provider paths
+- phase planning, deterministic checks, previews, and concise reports
+- broad MCP tools for draft, section, track, binding, report, and ingestion
+  workflows
 
-Anthropic status:
+Release blockers:
 
-- explicitly deferred from this branch
-- the adapter contract remains separate by design
-- deferral is intentional, not an untracked gap in the shared-core work
+- authoring rules remain duplicated across model, schema, parser, builder, MCP,
+  and agent layers
+- complete canonical getters/setters do not exist for every persisted object
+- several nested builder and MCP inputs remain loose mappings
+- packet-specific reconciliation can act as hidden authority
+- cross-layer schema/API/MCP parity is not enforced
 
-### Problem Statement
+### Architecture Boundary
 
-The current natural-language notebook proves the workflow, but it exposes too
-much infrastructure code to the user:
+- `wellplot` canonical authoring models: strict object/field/value contract
+- `wellplot` authoring service: deterministic object inspection and mutation
+- `wellplot.mcp`: thin provider-agnostic projection of that service
+- `wellplot.agent`: intent interpretation, planning, tool selection, and
+  read-after-write verification
+- existing channel/data and render dataclasses: preserved behind adapters
 
-- MCP stdio session setup
-- tool filtering and schema translation
-- provider-specific tool-loop control
-- API-key loading and environment setup
-- result aggregation for previews, validation, and change summaries
+Provider SDK clients, credentials, and provider-specific tool loops remain out
+of the MCP server.
 
-That notebook is acceptable as an integration proof, but it is too complex as a
-real end-user surface.
+### Required Slices
 
-### Product Decision
+1. `0.6-A`: contract inventory and ownership
+2. `0.6-B`: canonical Pydantic authoring models and generated schema
+3. `0.6-C`: compatibility and render adapters
+4. `0.6-D`: deterministic object service and complete CRUD
+5. `0.6-E`: MCP contract parity
+6. `0.6-F`: defaults and precedence
+7. `0.6-G`: agent rebase and release acceptance
 
-The agent layer should be provider-neutral at the core, but not provider-
-identical.
+Detailed contracts:
 
-The right boundary is:
-
-- `wellplot.mcp`: deterministic tools, prompts, resources, safety, validation
-- `wellplot.agent`: provider-neutral orchestration core
-- provider adapters:
-  - OpenAI
-  - OpenAI-compatible providers
-  - Anthropic
-
-This logic should not move into `wellplot-mcp`.
-
-### Keep In The MCP Server
-
-- deterministic tool implementations
-- deterministic prompts
-- deterministic resources
-- server-root/path safety
-- validation, preview, and normalized-save semantics
-
-### Keep Out Of The MCP Server
-
-- provider SDK clients
-- API-key loading as a server concern
-- provider-specific tool-loop behavior
-- notebook display code
-
-## Release 0.6.0 Architecture
-
-### Module Shape
-
-Recommended layout:
-
-- `wellplot.agent`
-- `wellplot.agent.core`
-- `wellplot.agent.mcp`
-- `wellplot.agent.providers.openai`
-- `wellplot.agent.providers.openai_compat`
-- `wellplot.agent.providers.anthropic`
-
-Exact names can change, but the split should remain.
-
-### Core Concepts
-
-#### 1. MCP Session Layer
-
-Responsibilities:
-
-- launch local `wellplot-mcp`
-- open and close stdio sessions
-- normalize MCP tools/prompts/resources for the agent core
-- later support remote MCP as a separate transport mode if needed
-
-Candidate types:
-
-- `LocalStdioMcpSession`
-- `McpToolRegistry`
-- `McpPromptRegistry`
-
-#### 2. Provider-Neutral Agent Core
-
-Responsibilities:
-
-- accept a natural-language authoring request
-- accept a deterministic MCP tool surface
-- run a provider adapter until completion or failure
-- collect tool trace, final text, previews, validation, and change summary in
-  one notebook-friendly result object
-
-Candidate types:
-
-- `AuthoringRequest`
-- `AuthoringResult`
-- `ToolCallEvent`
-- `ToolResultEvent`
-- `AgentBackend`
-
-#### 3. Provider Adapters
-
-Adapters translate provider APIs into the shared core contract.
-
-Planned first adapters:
-
-- `OpenAIResponsesBackend`
-- `OpenAICompatBackend`
-- `AnthropicMessagesBackend`
-
-Notes:
-
-- OpenAI-compatible providers can share a large part of the implementation
-- Anthropic should be separate from the beginning
-- Ollama should initially be supported only where the OpenAI-compatible path is
-  sufficient
-
-#### 4. Execution Modes
-
-Make these explicit:
-
-- local stdio MCP + provider tool loop
-- remote MCP + provider-native connector path later, where useful
-
-Do not force them into one fake abstraction too early.
-
-## Release 0.6.0 Provider Strategy
-
-### OpenAI
-
-- first-class
-- primary reference implementation
-
-### Hugging Face
-
-- second-wave support through the OpenAI-compatible adapter where practical
-
-### Ollama
-
-- OpenAI-compatible fallback path only
-- expect a more manual loop because stateful Responses semantics are weaker
-
-### Anthropic
-
-- separate adapter
-- do not hide its API shape behind an OpenAI-specific abstraction
-
-## Release 0.6.0 Public API Shape
-
-The notebook should eventually shrink to something like:
-
-```python
-from wellplot.agent import run_authoring_request
-
-result = await run_authoring_request(
-    goal="Recreate the porosity example with a simpler header.",
-    example_id="forge16b_porosity_example",
-    output_logfile="workspace/mcp_demo/openai_forge16b_recreated.log.yaml",
-    provider="openai",
-    model="gpt-5.4-mini",
-)
-```
-
-Or an explicit session:
-
-```python
-from wellplot.agent import AuthoringSession
-
-session = AuthoringSession.from_local_mcp(provider="openai", model="gpt-5.4-mini")
-result = await session.run(
-    goal="Add a porosity overlay track and shorten the remarks.",
-    example_id="forge16b_porosity_example",
-    output_logfile="workspace/mcp_demo/porosity_variant.log.yaml",
-)
-```
-
-The notebook should consume public `wellplot` interfaces, not embed provider
-tool-loop internals.
-
-## Release 0.6.0 Concrete Scope
+- [docs/authoring-contract-inventory.md](authoring-contract-inventory.md)
+- [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
 
 ### In Scope
 
-- public host-side agent API for local stdio `wellplot-mcp`
-- provider-neutral orchestration core
-- OpenAI adapter
-- one OpenAI-compatible adapter path
-- notebook refactor to use the new public API
-- tests around deterministic orchestration glue where possible
-- docs for credentials, optional installs, and supported providers
+- Pydantic v2 as a direct dependency for authoring-boundary models
+- strict standard fields and explicit extension points
+- generated JSON Schema and MCP discovery
+- typed create and patch models
+- complete deterministic object reads and writes
+- current YAML compatibility and renderer adapters
+- defaults precedence and packet-blueprint demotion
+- generic agent and notebook acceptance
 
 ### Out Of Scope
 
-- moving provider logic into `wellplot-mcp`
-- promising perfect feature parity across all providers
-- mandatory CI execution of live hosted-model notebooks
-- remote MCP transport in the same slice unless it becomes necessary for one
-  chosen adapter
+- renderer or channel-model rewrites without a demonstrated compatibility need
+- new packet-specific blueprints
+- additional hosted-model providers
+- remote HTTP/SSE MCP transport
+- persistent or vector memory
+- mandatory live-provider CI
 
-## Release 0.6.0 Implementation Order
-
-1. extract the current notebook glue into a private internal prototype module
-2. define the provider-neutral result and event model
-3. implement local stdio MCP session helpers
-4. implement the OpenAI adapter
-5. refactor the notebook to use the public agent API
-6. add the OpenAI-compatible adapter
-7. add the Anthropic adapter
-8. document provider capabilities and limitations explicitly
-
-Implementation snapshot:
-
-- steps 1 through 6 are complete on `codex/release-mcp-launcher-fix`
-- step 7 is explicitly deferred
-- step 8 is complete for the currently supported providers
-
-## Release 0.6.0 Acceptance
+### Release Acceptance
 
 `0.6.0` is complete when:
 
-- the natural-language notebook no longer embeds large MCP/provider helper
-  cells
-- the notebook imports public `wellplot` APIs and remains runnable
-- OpenAI works through the shared agent core
-- at least one OpenAI-compatible backend also works through the same core
-- Anthropic support is either implemented or explicitly deferred with a
-  documented adapter contract
-- the MCP server itself remains deterministic and unchanged in role
+- every inventory object and property has one canonical owner
+- generated schema replaces hand-maintained field/value duplication
+- Python, YAML, MCP, and agent verification enforce the same contract
+- all required deterministic object operations are implemented and atomic
+- legacy supported YAML round-trips without semantic regression
+- explicit user values override defaults and scaffolds
+- generic CBL, caliper, porosity, resistivity, annotation, and raster workflows
+  pass without packet-specific authority
+- MCP stdio integration, unit, agent, docs, notebook, and installed-wheel tests
+  all pass
+- package version, changelog, release notes, and public documentation describe
+  the shipped surface accurately
 
-Acceptance snapshot (2026-05-06):
-
-- satisfied: the notebook no longer embeds large MCP/provider helper cells
-- satisfied: the notebook imports public `wellplot` APIs
-- satisfied: OpenAI works through the shared core
-- satisfied: an OpenAI-compatible path works through the same core
-- satisfied: Anthropic is now explicitly deferred in this plan
-- satisfied: `wellplot-mcp` remains deterministic and unchanged in role
-
-## First Five Operations
+## First Five Operations (Historical `0.4.0` Design)
 
 These are the first five authoring operations that should be defined and built
 before anything else. Together they are enough to support a real "build a
@@ -1032,75 +981,45 @@ Why this is the key natural-language bridge:
 
 ## Internal Implementation Seams
 
-The current codebase does not need a new public core API, but it does need a
-small internal authoring layer.
+Required internal split:
 
-Recommended additions:
+1. canonical Pydantic authoring models
+2. YAML/template compatibility adapters
+3. renderer adapters into existing document dataclasses
+4. deterministic object service shared by Python and MCP
+5. generated JSON Schema, MCP discovery, and reference artifacts
+6. defaults resolver with explicit provenance and precedence
+7. agent planner/verifier consuming only deterministic service outcomes
 
-1. Mutable logfile-mapping helpers
-   - load one logfile into a normalized mapping
-   - locate sections, tracks, and bindings by stable identifiers
-   - write the mapping back through the existing canonical serializer
-2. Draft mutation service helpers
-   - implement edit operations in one internal module that MCP tools call
-   - keep all mutations path-based and stateless
-3. Shared post-mutation validation
-   - every write path should run:
-     - schema validation
-     - dataset resolution
-     - renderable document construction
-4. Shared authoring summaries
-   - draft summary and change summary should be built from one canonical
-     inspector shape
-5. Static authoring vocabulary resources
-   - keep the first pass hand-authored and explicit
-   - derive richer generated catalogs only after the authoring surface settles
+Raw mutable logfile mappings remain a compatibility implementation detail. They
+must not remain the source of truth or the public mutation contract.
 
 ## Implementation Order
 
-Recommended build order for `0.4.0`:
+Follow slices `0.6-A` through `0.6-G` without overlap that creates a second
+temporary contract. In particular:
 
-1. internal mutable draft mapping helpers
-2. `create_logfile_draft(...)`
-3. `summarize_logfile_draft(...)`
-4. `add_track(...)`
-5. `bind_curve(...)`
-6. `update_curve_binding(...)`
-7. `move_track(...)`
-8. `set_heading_content(...)`
-9. `set_remarks_content(...)`
-10. `inspect_authoring_vocab(...)`
-11. `summarize_logfile_changes(...)`
-12. prompts, notebook demo, docs, and release hardening
-
-This is enough for a first natural-language-driven workflow where the MCP host
-LLM can reliably satisfy requests like:
-
-- add a porosity track
-- bind RHOB and NPHI
-- set RHOB to red and NPHI to blue
-- fill neutron-density crossover in yellow
-- add a first-page remark block
-- set scales and colors
-- add a crossover fill
-- apply remarks
-- preview the section
-- save the draft
+- do not publish a new vocabulary before canonical models exist
+- do not migrate MCP mutations before compatibility and atomic service behavior
+  are tested
+- do not implement defaults before omitted/explicit/existing value provenance
+  is representable
+- do not resume agent optimization before MCP contract parity is complete
 
 ## Data Model Work Required
 
-Before the edit surface is ergonomic, we likely need some internal cleanup:
+Required work is tracked per object in
+[docs/authoring-contract-inventory.md](authoring-contract-inventory.md).
 
-- stable patchable identifiers for:
-  - sections
-  - tracks
-  - bindings
-  - heading blocks
-  - remark blocks
-- helper functions that mutate `LogFileSpec` / normalized mappings without
-  duplicating ad hoc YAML surgery across MCP tools
-- reusable validation paths for partial edit operations
-- explicit header-field key conventions so value mapping is deterministic
+Key model decisions:
+
+- strict standard fields with explicit extension points
+- discriminated unions for track, binding, annotation, and fill kinds
+- stable ids for independently editable child objects
+- typed create models and patch models
+- contextual validation for channel and object references
+- atomic document validation after every mutation
+- explicit adapters that preserve current channel and render models
 
 ## Testing And Evaluation
 
@@ -1109,15 +1028,15 @@ workflow starts from natural language.
 
 Required coverage:
 
-- unit tests for each new authoring tool
-- service-layer golden tests for:
-  - add track
-  - bind curves
-  - set scales/styles/fills
-  - set headings/remarks
-  - save and reload
+- generated-schema and model-validation parity
+- current YAML compatibility, normalization, and round trips
+- field, enum, default, and null/omitted behavior
+- complete object CRUD matrix and atomic rollback
+- parent/child compatibility and contextual-reference failures
+- Python API/MCP input and result parity
+- defaults precedence and explicit-value preservation
 - stdio integration tests for the main authoring flow
-- installed-wheel smoke extension once authoring tools are public
+- installed-wheel smoke coverage
 
 Suggested golden scenarios:
 
@@ -1126,32 +1045,41 @@ Suggested golden scenarios:
 - "add neutron-density crossover fill"
 - "apply these header values"
 - "insert this remark block"
+- "bind one channel twice with different ids, scales, colors, and line styles"
+- "create an array track and configure raster sample-axis presentation"
+- "reject a raster binding on a normal track"
+- "report a requested channel that is absent from the selected section source"
 
 ## Documentation Work
 
-When this slice lands, docs must explain the boundary clearly:
+When these slices land, docs must explain the boundary clearly:
 
 - the user speaks in natural language to an MCP client
 - the client turns that request into `wellplot-mcp` tool calls
-- the server applies deterministic edits and returns previews/results
+- the server applies canonical deterministic object operations and returns
+  inspectable objects, previews, and results
+- Python, YAML, and MCP share the same authoring contract
+- defaults never override explicit user values
 
 Docs to add or update:
 
 - `README.md`
 - `docs/mcp-plan.md`
+- `docs/authoring-contract-inventory.md`
+- `docs/programmatic-api-plan.md`
 - `docs/site/workflows/mcp-workflow.md`
 - `docs/site/reference/mcp-api.md`
+- generated public authoring-object reference
 - new authoring examples or notebooks
 
 ## Immediate Next Step
 
-The next step is no longer core extraction.
+Start `0.6-A` only:
 
-The immediate follow-up is release/documentation closure for the implemented
-agent slice:
+1. complete the field-level inventory from all current contract sources
+2. record every conflict and compatibility decision
+3. choose the canonical model package location
+4. define the first implementation boundary for `0.6-B`
 
-1. keep the branch docs aligned with the shipped `wellplot.agent` surface
-2. merge or rebase the branch back onto `main`
-3. decide whether to add one explicit `openai_compat` example before the next
-   release cut
-4. revisit Anthropic only as a separate follow-on adapter task
+Do not add new agent behavior or MCP convenience verbs during this slice unless
+they are required to represent a missing canonical object operation.

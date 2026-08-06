@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-05-08
+Last updated: 2026-08-06
 
 ## Scope Summary
 
@@ -11,6 +11,48 @@ Build and mature an open-source Python toolkit for high-quality well-log display
 - template-driven layout control
 
 Decision history is tracked in `docs/decision-log.md`.
+
+## Product Mission
+
+`wellplot` should allow scientists and technical users to plot their data in an
+easy and intuitive way with little or no knowledge of the application's
+internal structure.
+
+That mission applies to:
+
+- the Python API
+- YAML/savefile workflows
+- MCP-driven natural-language authoring
+- notebook/agent workflows
+
+The application should expose stable authoring objects and deterministic tools,
+not require users to understand hidden internal orchestration rules.
+
+The canonical MCP/agent direction for that mission is documented in
+[docs/mcp-authoring-model.md](mcp-authoring-model.md).
+
+## Current Release Assessment
+
+The repository contains substantial post-`0.3.0` capability, but `0.6.0` is not
+ready to publish.
+
+Current assessment:
+
+| Area | Status | Release interpretation |
+| --- | --- | --- |
+| dataset/channel model | mature | preserve |
+| renderer-facing document model | mature with known polish gaps | preserve and adapt |
+| logfile schema and parsing | broad but manually duplicated | consolidate |
+| Python construction API | implemented | retain with typed compatibility path |
+| Python object editing API | partial | complete before release |
+| MCP deterministic tools | broad capability roster | route through canonical object service |
+| provider-neutral agent | implemented but experimental | rebase after deterministic contract |
+| packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
+| release metadata | still `0.3.0` | bump only after all `0.6.0` gates pass |
+
+The `0.4.0` and `0.5.0` work remains delivered capability. Their previous
+"foundation complete" wording did not include cross-layer contract parity and
+is superseded by the approved `0.6.0` program below.
 
 ## Current Baseline
 
@@ -101,6 +143,39 @@ Decision history is tracked in `docs/decision-log.md`.
   - `layout.log_sections[*].data.source_path`
   - `layout.log_sections[*].data.source_format`
 
+## Approved `0.6.0` Deterministic Contract Program
+
+The immediate release program consolidates the deterministic authoring side
+before further agent expansion:
+
+1. `0.6-A`: complete the object/field/constraint inventory
+2. `0.6-B`: implement strict Pydantic v2 authoring models and generated schema
+3. `0.6-C`: add YAML compatibility and render adapters
+4. `0.6-D`: complete typed deterministic object CRUD
+5. `0.6-E`: route MCP through the shared service and enforce contract parity
+6. `0.6-F`: implement fallback defaults and explicit precedence
+7. `0.6-G`: rebase the agent, revalidate generic workflows, and close release
+
+Core direction:
+
+- the strict in-memory authoring contract is the source of truth
+- YAML is serialization, not a competing model
+- MCP and Python use one deterministic object service
+- generated intelligence interprets intent but does not invent missing object
+  semantics
+- defaults fill omissions only
+- explicit user instructions override existing defaults and scaffolds
+- packet assets are scaffolds or regression fixtures, not hidden authority
+
+Detailed plans:
+
+- [docs/authoring-contract-inventory.md](authoring-contract-inventory.md)
+- [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
+
+Release rule:
+
+- do not publish `0.6.0` until all seven slices pass their acceptance gates
+
 ## Completed Slice: Experimental MCP Server (2026-04-28)
 
 This slice is now part of the project baseline.
@@ -124,7 +199,7 @@ Detailed checklist and release status:
 
 - [docs/mcp-plan.md](mcp-plan.md)
 
-## Completed Slice: Natural-Language MCP Authoring Foundation (2026-04-29)
+## Implemented Capability Slice: Natural-Language MCP Authoring (2026-04-29)
 
 This is the next MCP-focused version target after the `0.3.0` release work is
 finished.
@@ -179,13 +254,13 @@ Concrete `0.4.0` foundation set:
 
 Current status:
 
-- the full deterministic `0.4.0` authoring foundation now exists in the
-  repo-local MCP implementation
+- the planned `0.4.0` deterministic tool roster exists in the repo-local MCP
+  implementation
 - local MCP clients can now create drafts, inspect authoring vocabularies,
   mutate tracks/bindings/report text, summarize structural changes, and follow
   authoring/revision prompt contracts without hand-editing YAML
-- the next MCP slice should move to `0.5.0` header-value ingestion and
-  workflow ergonomics
+- this is capability completion, not canonical contract completion; object
+  definitions and patch rules are still duplicated across layers
 
 Planned `0.5.0` scope:
 
@@ -217,10 +292,10 @@ Current `0.5.0` progress:
 - copied header-packet guidance is implemented through the
   `ingest_header_text(...)` prompt
 - the MCP notebook/demo now covers one end-to-end header ingestion flow
-- the next step is release/docs closure for the completed `0.5.0` MCP
-  workflow slice
+- the `0.5.0` ingestion roster is implemented, but its models and tools must be
+  brought under the canonical `0.6.0` contract before release
 
-Delivered `0.6.0` branch baseline (2026-05-06):
+Implemented experimental `0.6.0` branch baseline (2026-05-06):
 
 - natural-language orchestration glue is now moved into the public
   host-side `wellplot.agent` layer
@@ -231,6 +306,14 @@ Delivered `0.6.0` branch baseline (2026-05-06):
 - the natural-language notebook now imports public `wellplot` APIs instead of
   embedding MCP/provider session helpers
 - Anthropic is explicitly deferred as a separate follow-on adapter task
+
+Current interpretation:
+
+- provider extraction is implemented
+- agent behavior is not release-stable while deterministic object semantics
+  remain incomplete
+- the approved deterministic contract program supersedes provider expansion as
+  the immediate release work
 
 Why this matters:
 
@@ -248,19 +331,17 @@ Out of scope for this slice:
 
 - LIS ingestion/support
 
-Next authoring broadening slice:
+Immediate authoring slice:
 
-- add preset-oriented section/page helpers only where notebook workflows still
-  repeat the same low-level edits
+- complete `0.6-A` contract inventory and conflict decisions
+- implement `0.6-B` canonical typed authoring models before adding convenience
+  verbs or provider features
 
-Why these are next:
+Why this is next:
 
-- the current surface now covers draft creation, track/binding mutation,
-  section metadata editing, page/output defaults, annotation-object editing,
-  header/remarks editing, depth-axis control, style/fill creation, and
-  per-track binding clearing, plus one composite section-view helper
-- the remaining friction in real iterative authoring is now concentrated in
-  repeated section/page setup edits and notebook-facing workflow cleanup
+- the current tool breadth is useful, but duplicated fields, values, defaults,
+  and patch rules prevent it from being a complete deterministic framework
+- adding more helpers before consolidation would increase that duplication
 
 Detailed plan:
 
@@ -326,7 +407,7 @@ Delivered status:
     - persisted section `source_path` / `source_format`
   - notebook examples for dataset ingestion and layout rendering
   - coherent end-to-end workflow example:
-    - [examples/api_end_to_end_demo.py](examples/api_end_to_end_demo.py)
+    - [examples/api_end_to_end_demo.py](../examples/api_end_to_end_demo.py)
 - remaining polish that now belongs to production hardening:
   - dataset provenance/collision polish beyond the current merge-history baseline
   - notebook-first end-to-end demo parity if we decide to maintain full `.ipynb` coverage
@@ -439,9 +520,12 @@ Longer-term / UI-centric:
 
 ## Development Plan
 
-### Phase A: Production Hardening (current)
+### Phase A: Deterministic Authoring Contract And Production Hardening (current)
 
-- Keep package metadata, docs, and public exports aligned.
+- Complete `0.6-A` through `0.6-G` in order.
+- Keep package metadata, docs, generated schema, and public exports aligned.
+- Hold the `0.6.0` version bump and release until contract, CRUD, MCP parity,
+  agent, docs, notebook, and installed-wheel gates pass.
 - Continue staged lint/docstring tightening where signal remains high.
 
 ### Phase B: Rendering Quality
@@ -476,6 +560,14 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
+- Complete the `0.6-A` field-level inventory and record every conflict between
+  current dataclasses, schema, parsers, builders, MCP tools, and agent checks.
+- Implement `0.6-B` canonical Pydantic authoring models and generated schema.
+- Add compatibility adapters before moving existing Python or MCP entry points.
+- Build complete deterministic object CRUD before resuming defaults or agent
+  work.
+- Add contract-parity, round-trip, atomic-mutation, and contextual-reference
+  tests as release gates.
 - Maintain release hardening:
   - keep PyPI trusted publishing and post-release install verification healthy
   - clean up remaining workflow maintenance noise such as action runtime deprecation warnings
@@ -507,6 +599,10 @@ Longer-term / UI-centric:
 ## Working Principles
 
 - Treat each visual element as a typed object, not ad-hoc text.
+- Define each authoring field and constraint once, then generate derivative
+  schema, discovery, and reference surfaces.
+- Require deterministic inspection and mutation before asking an agent to use
+  an authoring capability.
 - Preserve physically meaningful layout dimensions.
 - Keep model decisions explicit and test-backed.
 - Prefer stable defaults, then add opt-in complexity.

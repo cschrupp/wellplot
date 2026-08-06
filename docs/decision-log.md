@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-03-20
+Last updated: 2026-08-06
 
 ## Purpose
 
@@ -189,3 +189,59 @@ When a decision changes, update this file with:
 - new decision
 - effective date
 - rationale
+
+## MCP Authoring Direction Revision
+
+- Previous decision:
+  - packet-level blueprints were allowed to grow into an execution authority
+    for staged MCP/agent packet reconstruction
+- New decision:
+  - MCP/agent authoring should remain user-first and object-first
+  - defaults catalogs are preferred over authoritative packet-blueprint
+    reconciliation
+  - explicit user instructions must override defaults and scaffolds
+  - packet/example assets should behave as starter scaffolds, demonstrations,
+    or regression fixtures, not hidden authority
+- Effective date:
+  - 2026-05-28
+- Rationale:
+  - the current packet-blueprint experiment improved planning and verification,
+    but it also exposed a UX problem: users can issue explicit requests and see
+    them silently overwritten by blueprint reconciliation
+  - that behavior conflicts with the product goal of helping scientists create
+    plots intuitively without needing internal implementation knowledge
+  - the MCP surface should speak in canonical authoring objects and use
+    defaults only as fallback guidance
+
+## Canonical Deterministic Authoring Contract
+
+- Previous decision:
+  - authoring rules were allowed to remain distributed across render
+    dataclasses, hand-maintained JSON Schema, manual logfile validation,
+    mapping builders, MCP patch allowlists, and agent verification
+  - a broad deterministic tool roster was treated as sufficient evidence that
+    the authoring foundation was complete
+- New decision:
+  - one strict in-memory authoring contract owns every standard persisted
+    authoring object, field, default, value constraint, and relationship
+  - Pydantic v2 will implement the authoring-boundary models and generate the
+    JSON Schema used by YAML validation and MCP discovery
+  - the current channel/dataset classes and renderer-facing dataclasses remain
+    in place and are connected through explicit adapters
+  - Python API and MCP mutations use one deterministic object service with
+    typed `list`, `get`, `create`, `update`, `remove`, `move`, and `validate`
+    operations as appropriate
+  - standard models reject unknown fields; deliberate extensibility uses an
+    explicit `extensions` mapping
+  - generated intelligence may interpret intent and order deterministic tools,
+    but it must not repair missing object semantics by rewriting raw mappings
+- Effective date:
+  - 2026-08-06
+- Rationale:
+  - duplicated contracts can drift even when each layer passes its own tests
+  - incomplete read/write coverage forces the agent to guess, improvise, or
+    rely on packet-specific reconciliation
+  - generated schema and shared typed operations make deterministic capability
+    discoverable and testable across YAML, Python, MCP, and agent workflows
+  - retaining the existing data and render layers limits migration risk while
+    correcting the public authoring boundary

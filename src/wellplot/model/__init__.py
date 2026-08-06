@@ -19,6 +19,58 @@
 
 """Public model types for datasets, channels, and log documents."""
 
+from .authoring import (
+    AnnotationArrowSpec as AuthoringAnnotationArrowSpec,
+)
+from .authoring import (
+    AnnotationGlyphSpec as AuthoringAnnotationGlyphSpec,
+)
+from .authoring import (
+    AnnotationIntervalSpec as AuthoringAnnotationIntervalSpec,
+)
+from .authoring import (
+    AnnotationMarkerSpec as AuthoringAnnotationMarkerSpec,
+)
+from .authoring import (
+    AnnotationTextSpec as AuthoringAnnotationTextSpec,
+)
+from .authoring import (
+    AnnotationTrackSpec as AuthoringAnnotationTrackSpec,
+)
+from .authoring import (
+    ArrayTrackSpec as AuthoringArrayTrackSpec,
+)
+from .authoring import (
+    AuthoringCurveFillKind,
+    AuthoringDataSource,
+    AuthoringDepthSpec,
+    AuthoringDocumentSpec,
+    AuthoringPageSpec,
+    AuthoringRasterNormalizationKind,
+    AuthoringRasterProfileKind,
+    AuthoringReferenceAxisKind,
+    AuthoringRemarkSpec,
+    AuthoringScale,
+    AuthoringScaleKind,
+    AuthoringSectionSpec,
+    AuthoringStyle,
+    authoring_json_schema,
+)
+from .authoring import (
+    CurveBindingSpec as AuthoringCurveBindingSpec,
+)
+from .authoring import (
+    CurveFillSpec as AuthoringCurveFillSpec,
+)
+from .authoring import (
+    NormalTrackSpec as AuthoringNormalTrackSpec,
+)
+from .authoring import (
+    RasterBindingSpec as AuthoringRasterBindingSpec,
+)
+from .authoring import (
+    ReferenceTrackSpec as AuthoringReferenceTrackSpec,
+)
 from .channels import ArrayChannel, BaseChannel, RasterChannel, ScalarChannel
 from .dataset import WellDataset
 from .document import (
@@ -81,6 +133,31 @@ from .document import (
 
 __all__ = [
     "ArrayChannel",
+    "AuthoringAnnotationArrowSpec",
+    "AuthoringAnnotationGlyphSpec",
+    "AuthoringAnnotationIntervalSpec",
+    "AuthoringAnnotationMarkerSpec",
+    "AuthoringAnnotationTextSpec",
+    "AuthoringAnnotationTrackSpec",
+    "AuthoringArrayTrackSpec",
+    "AuthoringCurveBindingSpec",
+    "AuthoringCurveFillKind",
+    "AuthoringCurveFillSpec",
+    "AuthoringDataSource",
+    "AuthoringDepthSpec",
+    "AuthoringDocumentSpec",
+    "AuthoringNormalTrackSpec",
+    "AuthoringPageSpec",
+    "AuthoringRasterNormalizationKind",
+    "AuthoringRasterBindingSpec",
+    "AuthoringRasterProfileKind",
+    "AuthoringReferenceTrackSpec",
+    "AuthoringReferenceAxisKind",
+    "AuthoringRemarkSpec",
+    "AuthoringScale",
+    "AuthoringScaleKind",
+    "AuthoringSectionSpec",
+    "AuthoringStyle",
     "AnnotationArrowSpec",
     "AnnotationGlyphSpec",
     "AnnotationIntervalSpec",
@@ -140,4 +217,5 @@ __all__ = [
     "TrackSpec",
     "WellDataset",
     "ZoneSpec",
+    "authoring_json_schema",
 ]

@@ -11,6 +11,10 @@ If you want hosted-model natural-language authoring from Python, use the public
 `wellplot.agent` layer on top of this server instead of re-implementing the
 provider + MCP tool loop yourself.
 
+Both surfaces are experimental. The agent interprets intent and selects tools;
+it does not replace deterministic authoring semantics. Explicit user values
+must take precedence over defaults and starter/example scaffolds.
+
 ## Install
 
 ```bash

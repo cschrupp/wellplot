@@ -41,5 +41,8 @@ For deeper implementation notes, use the repository documents:
 - `README.md`
 - `docs/rendering-workings.md`
 - `docs/programmatic-api-plan.md`
+- `docs/mcp-authoring-model.md`
+- `docs/authoring-contract-inventory.md`
+- `docs/mcp-implementation-plan.md`
 - `docs/decision-log.md`
 - `docs/roadmap.md`
