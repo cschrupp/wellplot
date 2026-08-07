@@ -2077,10 +2077,23 @@ class McpServiceTests(unittest.TestCase):
                     channel="VDL",
                     patch={
                         "raster_alpha": 0.45,
+                        "waveform_normalization": "trace_maxabs",
+                        "clip_percentiles": [1, 99],
+                        "interpolation": "bilinear",
+                        "show_raster": True,
+                        "color_limits": [-1, 1],
                         "colorbar": {
                             "enabled": True,
                             "label": "VDL amp",
                         },
+                        "sample_axis": {
+                            "enabled": True,
+                            "unit": "us",
+                            "min": 200,
+                            "max": 1200,
+                            "ticks": 7,
+                        },
+                        "waveform": {"enabled": True, "stride": 5},
                     },
                     root=REPO_ROOT,
                 )
@@ -2091,6 +2104,12 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(result.channel, "VDL")
             self.assertEqual(result.binding["raster_alpha"], 0.45)
             self.assertEqual(result.binding["colorbar"]["label"], "VDL amp")
+            self.assertEqual(result.binding["waveform_normalization"], "trace_maxabs")
+            self.assertEqual(result.binding["clip_percentiles"], [1.0, 99.0])
+            self.assertEqual(result.binding["interpolation"], "bilinear")
+            self.assertEqual(result.binding["color_limits"], [-1.0, 1.0])
+            self.assertEqual(result.binding["sample_axis"]["max"], 1200.0)
+            self.assertEqual(result.binding["waveform"]["stride"], 5)
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             bindings = saved_mapping["document"]["bindings"]["channels"]

@@ -42,8 +42,14 @@ from .model.authoring import (
     AuthoringGridPatch,
     AuthoringGridSpec,
     AuthoringPageSpec,
+    AuthoringRasterColorbarPatch,
+    AuthoringRasterColorbarSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
+    AuthoringRasterSampleAxisPatch,
+    AuthoringRasterSampleAxisSpec,
+    AuthoringRasterWaveformPatch,
+    AuthoringRasterWaveformSpec,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
     AuthoringScale,
@@ -187,7 +193,15 @@ class RasterBindingPatch(_OperationModel):
     style: AuthoringStylePatch | None = None
     profile: AuthoringRasterProfileKind | None = None
     normalization: AuthoringRasterNormalizationKind | None = None
+    waveform_normalization: AuthoringRasterNormalizationKind | None = None
+    clip_percentiles: tuple[float, float] | None = None
+    interpolation: str | None = Field(default=None, min_length=1)
+    show_raster: bool | None = None
     alpha: float | None = Field(default=None, ge=0, le=1)
+    color_limits: tuple[float, float] | None = None
+    colorbar: AuthoringRasterColorbarPatch | None = None
+    sample_axis: AuthoringRasterSampleAxisPatch | None = None
+    waveform: AuthoringRasterWaveformPatch | None = None
     extensions: dict[str, Any] | None = None
 
 
@@ -925,6 +939,33 @@ class AuthoringService:
                         update={
                             key: deepcopy(getattr(value, key)) for key in value.model_fields_set
                         }
+                    )
+                )
+            elif field_name == "colorbar":
+                binding.colorbar = (
+                    AuthoringRasterColorbarSpec()
+                    if value is None
+                    else AuthoringRasterColorbarSpec.model_validate(
+                        binding.colorbar.model_dump(mode="python")
+                        | value.model_dump(mode="python", exclude_unset=True)
+                    )
+                )
+            elif field_name == "sample_axis":
+                binding.sample_axis = (
+                    AuthoringRasterSampleAxisSpec()
+                    if value is None
+                    else AuthoringRasterSampleAxisSpec.model_validate(
+                        binding.sample_axis.model_dump(mode="python")
+                        | value.model_dump(mode="python", exclude_unset=True)
+                    )
+                )
+            elif field_name == "waveform":
+                binding.waveform = (
+                    AuthoringRasterWaveformSpec()
+                    if value is None
+                    else AuthoringRasterWaveformSpec.model_validate(
+                        binding.waveform.model_dump(mode="python")
+                        | value.model_dump(mode="python", exclude_unset=True)
                     )
                 )
             else:

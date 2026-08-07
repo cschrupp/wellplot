@@ -47,6 +47,9 @@ from ..authoring import (
     authoring_curve_header_display_to_mapping,
     authoring_curve_value_labels_to_mapping,
     authoring_grid_to_mapping,
+    authoring_raster_colorbar_to_mapping,
+    authoring_raster_sample_axis_to_mapping,
+    authoring_raster_waveform_to_mapping,
     authoring_reference_overlay_to_mapping,
     authoring_track_header_to_mapping,
 )
@@ -5133,7 +5136,21 @@ def _apply_canonical_raster_binding_update(
     patch: dict[str, object],
 ) -> bool:
     """Apply typed raster-binding fields and project them into legacy YAML."""
-    canonical_keys = {"label", "style", "profile", "normalization", "raster_alpha"}
+    canonical_keys = {
+        "label",
+        "style",
+        "profile",
+        "normalization",
+        "waveform_normalization",
+        "clip_percentiles",
+        "interpolation",
+        "show_raster",
+        "raster_alpha",
+        "color_limits",
+        "colorbar",
+        "sample_axis",
+        "waveform",
+    }
     if not set(patch).issubset(canonical_keys):
         return False
     canonical_patch = deepcopy(patch)
@@ -5144,6 +5161,22 @@ def _apply_canonical_raster_binding_update(
         canonical_patch["style"] = style_patch
     if "raster_alpha" in canonical_patch:
         canonical_patch["alpha"] = canonical_patch.pop("raster_alpha")
+    for nested_key in ("colorbar", "sample_axis", "waveform"):
+        if nested_key not in canonical_patch:
+            continue
+        nested_value = canonical_patch[nested_key]
+        if isinstance(nested_value, bool):
+            canonical_patch[nested_key] = {"enabled": nested_value}
+        elif isinstance(nested_value, dict):
+            nested_value = deepcopy(nested_value)
+            if nested_key == "sample_axis":
+                if "min" in nested_value:
+                    nested_value["minimum"] = nested_value.pop("min")
+                if "max" in nested_value:
+                    nested_value["maximum"] = nested_value.pop("max")
+                if "ticks" in nested_value:
+                    nested_value["tick_count"] = nested_value.pop("ticks")
+            canonical_patch[nested_key] = nested_value
 
     authoring = AuthoringService.from_mapping(mapping)
     binding_id = _canonical_raster_binding_ref(
@@ -5179,8 +5212,30 @@ def _apply_canonical_raster_binding_update(
         binding["profile"] = updated.profile.value
     if "normalization" in patch:
         binding["normalization"] = updated.normalization.value
+    if "waveform_normalization" in patch:
+        binding["waveform_normalization"] = updated.waveform_normalization.value
+    if "clip_percentiles" in patch:
+        if updated.clip_percentiles is None:
+            binding.pop("clip_percentiles", None)
+        else:
+            binding["clip_percentiles"] = list(updated.clip_percentiles)
+    if "interpolation" in patch:
+        binding["interpolation"] = updated.interpolation
+    if "show_raster" in patch:
+        binding["show_raster"] = updated.show_raster
     if "raster_alpha" in patch:
         binding["raster_alpha"] = updated.alpha
+    if "color_limits" in patch:
+        if updated.color_limits is None:
+            binding.pop("color_limits", None)
+        else:
+            binding["color_limits"] = list(updated.color_limits)
+    if "colorbar" in patch:
+        binding["colorbar"] = authoring_raster_colorbar_to_mapping(updated.colorbar)
+    if "sample_axis" in patch:
+        binding["sample_axis"] = authoring_raster_sample_axis_to_mapping(updated.sample_axis)
+    if "waveform" in patch:
+        binding["waveform"] = authoring_raster_waveform_to_mapping(updated.waveform)
     return True
 
 

@@ -58,6 +58,13 @@ class AuthoringRasterNormalizationKind(StrEnum):
     GLOBAL_MAXABS = "global_maxabs"
 
 
+class AuthoringRasterColorbarPosition(StrEnum):
+    """Supported positions for raster colorbars."""
+
+    RIGHT = "right"
+    HEADER = "header"
+
+
 class AuthoringReferenceAxisKind(StrEnum):
     """Reference-axis kinds exposed by the authoring contract."""
 
@@ -152,6 +159,91 @@ class AuthoringStyle(_AuthoringModel):
     fill_color: str | None = Field(default=None, min_length=1)
     fill_alpha: float = Field(default=0.2, ge=0, le=1)
     colormap: str = Field(default="viridis", min_length=1)
+
+
+class AuthoringRasterColorbarSpec(_AuthoringModel):
+    """Colorbar settings for one raster binding."""
+
+    enabled: bool = False
+    label: str | None = Field(default=None, min_length=1)
+    position: AuthoringRasterColorbarPosition = AuthoringRasterColorbarPosition.RIGHT
+
+
+class AuthoringRasterColorbarPatch(_AuthoringModel):
+    """Optional colorbar fields used by a partial raster update."""
+
+    enabled: bool | None = None
+    label: str | None = Field(default=None, min_length=1)
+    position: AuthoringRasterColorbarPosition | None = None
+
+
+class AuthoringRasterSampleAxisSpec(_AuthoringModel):
+    """Sample-axis settings for one raster binding."""
+
+    enabled: bool = False
+    label: str | None = Field(default=None, min_length=1)
+    unit: str | None = Field(default=None, min_length=1)
+    source_origin: float | None = None
+    source_step: float | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    tick_count: int = Field(default=5, ge=2)
+
+    @model_validator(mode="after")
+    def validate_axis_bounds(self) -> AuthoringRasterSampleAxisSpec:
+        """Require paired source and display bounds."""
+        if (self.source_origin is None) != (self.source_step is None):
+            raise ValueError("Sample-axis source_origin and source_step must be set together.")
+        if self.source_step is not None and self.source_step == 0:
+            raise ValueError("Sample-axis source_step must be non-zero.")
+        if (self.minimum is None) != (self.maximum is None):
+            raise ValueError("Sample-axis minimum and maximum must be set together.")
+        if self.minimum is not None and self.minimum == self.maximum:
+            raise ValueError("Sample-axis minimum and maximum must differ.")
+        return self
+
+
+class AuthoringRasterSampleAxisPatch(_AuthoringModel):
+    """Optional sample-axis fields used by a partial raster update."""
+
+    enabled: bool | None = None
+    label: str | None = Field(default=None, min_length=1)
+    unit: str | None = Field(default=None, min_length=1)
+    source_origin: float | None = None
+    source_step: float | None = None
+    minimum: float | None = None
+    maximum: float | None = None
+    tick_count: int | None = Field(default=None, ge=2)
+
+
+class AuthoringRasterWaveformSpec(_AuthoringModel):
+    """Waveform overlay settings for one raster binding."""
+
+    enabled: bool = False
+    stride: int = Field(default=1, ge=1)
+    amplitude_scale: float = Field(default=0.35, gt=0)
+    color: str = Field(default="#5b3f8c", min_length=1)
+    line_width: float = Field(default=0.3, gt=0)
+    fill: bool = True
+    positive_fill_color: str = Field(default="#000000", min_length=1)
+    negative_fill_color: str = Field(default="#ffffff", min_length=1)
+    invert_fill_polarity: bool = False
+    max_traces: int | None = Field(default=None, gt=0)
+
+
+class AuthoringRasterWaveformPatch(_AuthoringModel):
+    """Optional waveform fields used by a partial raster update."""
+
+    enabled: bool | None = None
+    stride: int | None = Field(default=None, ge=1)
+    amplitude_scale: float | None = Field(default=None, gt=0)
+    color: str | None = Field(default=None, min_length=1)
+    line_width: float | None = Field(default=None, gt=0)
+    fill: bool | None = None
+    positive_fill_color: str | None = Field(default=None, min_length=1)
+    negative_fill_color: str | None = Field(default=None, min_length=1)
+    invert_fill_polarity: bool | None = None
+    max_traces: int | None = Field(default=None, gt=0)
 
 
 class AuthoringGridSpec(_AuthoringModel):
@@ -411,7 +503,17 @@ class RasterBindingSpec(_AuthoringModel):
     style: AuthoringStyle = Field(default_factory=AuthoringStyle)
     profile: AuthoringRasterProfileKind = AuthoringRasterProfileKind.GENERIC
     normalization: AuthoringRasterNormalizationKind = AuthoringRasterNormalizationKind.AUTO
+    waveform_normalization: AuthoringRasterNormalizationKind = AuthoringRasterNormalizationKind.AUTO
+    clip_percentiles: tuple[float, float] | None = None
+    interpolation: str = Field(default="nearest", min_length=1)
+    show_raster: bool = True
     alpha: float = Field(default=1.0, ge=0, le=1)
+    color_limits: tuple[float, float] | None = None
+    colorbar: AuthoringRasterColorbarSpec = Field(default_factory=AuthoringRasterColorbarSpec)
+    sample_axis: AuthoringRasterSampleAxisSpec = Field(
+        default_factory=AuthoringRasterSampleAxisSpec
+    )
+    waveform: AuthoringRasterWaveformSpec = Field(default_factory=AuthoringRasterWaveformSpec)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -756,8 +858,15 @@ __all__ = [
     "AuthoringGridSpacingMode",
     "AuthoringGridSpec",
     "AuthoringPageSpec",
+    "AuthoringRasterColorbarPosition",
+    "AuthoringRasterColorbarPatch",
+    "AuthoringRasterColorbarSpec",
     "AuthoringRasterNormalizationKind",
     "AuthoringRasterProfileKind",
+    "AuthoringRasterSampleAxisPatch",
+    "AuthoringRasterSampleAxisSpec",
+    "AuthoringRasterWaveformPatch",
+    "AuthoringRasterWaveformSpec",
     "AuthoringReferenceAxisKind",
     "AuthoringReferenceOverlayMode",
     "AuthoringReferenceOverlaySpec",

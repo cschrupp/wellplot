@@ -103,7 +103,25 @@ def _legacy_mapping() -> dict[str, object]:
                         "kind": "raster",
                         "profile": "vdl",
                         "normalization": "none",
+                        "waveform_normalization": "trace_maxabs",
+                        "clip_percentiles": [1, 99],
+                        "interpolation": "nearest",
+                        "show_raster": True,
                         "raster_alpha": 0.8,
+                        "color_limits": [-1, 1],
+                        "colorbar": {
+                            "enabled": True,
+                            "label": "Amplitude",
+                            "position": "header",
+                        },
+                        "sample_axis": {
+                            "enabled": True,
+                            "unit": "us",
+                            "min": 200,
+                            "max": 1200,
+                            "ticks": 7,
+                        },
+                        "waveform": {"enabled": True, "stride": 5},
                     },
                 ]
             },
@@ -148,6 +166,18 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert rendered_gr.grid.vertical_main_color == "#222222"
     assert rendered_gr.header.objects[3].enabled is True
     assert rendered.tracks[1].elements[0].profile.value == "vdl"
+    raster = vdl_track.bindings[0]
+    assert raster.waveform_normalization.value == "trace_maxabs"
+    assert raster.clip_percentiles == (1.0, 99.0)
+    assert raster.color_limits == (-1.0, 1.0)
+    assert raster.colorbar.enabled is True
+    assert raster.sample_axis.maximum == 1200.0
+    assert raster.waveform.stride == 5
+
+    normalized = authoring_document_to_mapping(document)
+    raster_mapping = normalized["document"]["sections"][0]["tracks"][1]["bindings"][0]
+    assert raster_mapping["sample_axis"]["maximum"] == 1200.0
+    assert raster_mapping["waveform"]["stride"] == 5
 
 
 def test_legacy_binding_fill_round_trips_through_canonical_track() -> None:

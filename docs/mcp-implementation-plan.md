@@ -385,9 +385,8 @@ Implementation checkpoint:
   relations and projected back without losing renderer-specific fill fields
 - the legacy logfile mapping remains the persistence/render boundary, with a
   canonical validation gate on every persisted MCP mutation
-- advanced grid/header/overlay fields and renderer-only annotation/raster
-  fields remain compatibility-path fields until their canonical models and
-  service operations are added
+- renderer-only annotation fields remain compatibility-path fields until their
+  canonical models and service operations are added
 - `inspect_authoring_vocab` and the patch-schema resource expose generated
   `canonical_patch_keys` from the typed service models; legacy patch-key lists
   remain as compatibility catalogs while renderer-only fields are migrated
@@ -398,10 +397,13 @@ Implementation checkpoint:
   deterministic replacement semantics; renderer-only header styling remains
   outside this object contract
 - reference-curve overlay properties now have typed canonical validation and
-  binding-level update projection; value-label, callout, and raster waveform
-  controls remain separate renderer-specific fields
+  binding-level update projection; value-label, callout, and raster display
+  controls remain separate typed binding fields
 - curve render mode, value-label formatting, wrapping, and header visibility
   now have typed canonical binding fields with nested partial-update merging
+- raster normalization, clipping, interpolation, visibility, color limits,
+  colorbars, sample axes, and waveform overlays now have typed canonical
+  binding fields with nested partial-update merging
 
 ### Slice 0.6-F. Defaults And Precedence
 

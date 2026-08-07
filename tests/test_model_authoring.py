@@ -14,6 +14,8 @@ from wellplot.model import (
     AuthoringGridSpacingMode,
     AuthoringGridSpec,
     AuthoringRasterProfileKind,
+    AuthoringRasterSampleAxisSpec,
+    AuthoringRasterWaveformSpec,
     AuthoringReferenceOverlayMode,
     AuthoringReferenceOverlaySpec,
     AuthoringScale,
@@ -148,6 +150,31 @@ def test_array_track_accepts_raster_binding() -> None:
 
     assert track.bindings[0].kind == "raster"
     assert track.bindings[0].profile == AuthoringRasterProfileKind.VDL
+
+
+def test_raster_display_contract_validates_nested_controls() -> None:
+    """Raster presentation settings are typed rather than arbitrary mappings."""
+    raster = RasterBindingSpec(
+        binding_id="vdl_display",
+        channel="VDL",
+        profile=AuthoringRasterProfileKind.VDL,
+        clip_percentiles=(1, 99),
+        color_limits=(-1, 1),
+        sample_axis=AuthoringRasterSampleAxisSpec(
+            enabled=True,
+            unit="us",
+            minimum=200,
+            maximum=1200,
+            tick_count=7,
+        ),
+        waveform=AuthoringRasterWaveformSpec(enabled=True, stride=5),
+    )
+
+    assert raster.sample_axis.maximum == 1200
+    assert raster.waveform.stride == 5
+
+    with pytest.raises(ValidationError, match="source_step must be non-zero"):
+        AuthoringRasterSampleAxisSpec(source_origin=40, source_step=0)
 
 
 def test_grid_contract_validates_logarithmic_spacing_and_alpha() -> None:

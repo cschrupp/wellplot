@@ -56,8 +56,11 @@ from .model.authoring import (
     AuthoringGridSpacingMode,
     AuthoringGridSpec,
     AuthoringPageSpec,
+    AuthoringRasterColorbarSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
+    AuthoringRasterSampleAxisSpec,
+    AuthoringRasterWaveformSpec,
     AuthoringReferenceAxisKind,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
@@ -144,6 +147,90 @@ def authoring_reference_overlay_to_mapping(
 ) -> dict[str, Any]:
     """Project a canonical reference overlay to its legacy YAML envelope."""
     return overlay.model_dump(mode="json", exclude_none=True)
+
+
+def _raster_colorbar_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringRasterColorbarSpec:
+    """Normalize a legacy boolean or mapping colorbar setting."""
+    if value is None:
+        return AuthoringRasterColorbarSpec()
+    data: dict[str, Any] = (
+        {"enabled": value} if isinstance(value, bool) else _mapping(value, context=context)
+    )
+    try:
+        return AuthoringRasterColorbarSpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_raster_colorbar_to_mapping(
+    colorbar: AuthoringRasterColorbarSpec,
+) -> dict[str, Any]:
+    """Project canonical colorbar settings to the legacy YAML envelope."""
+    return colorbar.model_dump(mode="json", exclude_none=True)
+
+
+def _raster_sample_axis_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringRasterSampleAxisSpec:
+    """Normalize a legacy boolean or mapping sample-axis setting."""
+    if value is None:
+        return AuthoringRasterSampleAxisSpec()
+    if isinstance(value, bool):
+        data: dict[str, Any] = {"enabled": value}
+    else:
+        data = _mapping(value, context=context)
+        if "min" in data:
+            data["minimum"] = data.pop("min")
+        if "max" in data:
+            data["maximum"] = data.pop("max")
+        if "ticks" in data:
+            data["tick_count"] = data.pop("ticks")
+    try:
+        return AuthoringRasterSampleAxisSpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_raster_sample_axis_to_mapping(
+    sample_axis: AuthoringRasterSampleAxisSpec,
+) -> dict[str, Any]:
+    """Project canonical sample-axis settings to the legacy YAML envelope."""
+    data = sample_axis.model_dump(mode="json", exclude_none=True)
+    data["min"] = data.pop("minimum", None)
+    data["max"] = data.pop("maximum", None)
+    data["ticks"] = data.pop("tick_count")
+    return data
+
+
+def _raster_waveform_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringRasterWaveformSpec:
+    """Normalize a legacy boolean or mapping waveform setting."""
+    if value is None:
+        return AuthoringRasterWaveformSpec()
+    if isinstance(value, bool):
+        data: dict[str, Any] = {"enabled": value}
+    else:
+        data = _mapping(value, context=context)
+    try:
+        return AuthoringRasterWaveformSpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_raster_waveform_to_mapping(
+    waveform: AuthoringRasterWaveformSpec,
+) -> dict[str, Any]:
+    """Project canonical waveform settings to the legacy YAML envelope."""
+    return waveform.model_dump(mode="json", exclude_none=True)
 
 
 def _curve_header_display_from_legacy(
@@ -829,7 +916,41 @@ def _legacy_to_authoring(
                                 ),
                                 profile=profile,
                                 normalization=normalization,
+                                waveform_normalization=AuthoringRasterNormalizationKind(
+                                    str(binding.get("waveform_normalization", "auto"))
+                                    .strip()
+                                    .lower()
+                                ),
+                                clip_percentiles=(
+                                    tuple(float(item) for item in binding["clip_percentiles"])
+                                    if binding.get("clip_percentiles") is not None
+                                    else None
+                                ),
+                                interpolation=str(binding.get("interpolation", "nearest")),
+                                show_raster=bool(
+                                    binding.get("show_raster", profile.value != "waveform")
+                                ),
                                 alpha=float(binding.get("raster_alpha", 1.0)),
+                                color_limits=(
+                                    tuple(float(item) for item in binding["color_limits"])
+                                    if binding.get("color_limits") is not None
+                                    else None
+                                ),
+                                colorbar=_raster_colorbar_from_legacy(
+                                    binding.get("colorbar"), context="binding.colorbar"
+                                ),
+                                sample_axis=_raster_sample_axis_from_legacy(
+                                    binding.get("sample_axis"), context="binding.sample_axis"
+                                ),
+                                waveform=_raster_waveform_from_legacy(
+                                    (
+                                        True
+                                        if binding.get("waveform") is None
+                                        and profile == AuthoringRasterProfileKind.WAVEFORM
+                                        else binding.get("waveform")
+                                    ),
+                                    context="binding.waveform",
+                                ),
                                 extensions=extension,
                             )
                         )
@@ -1108,9 +1229,19 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
             {
                 "profile": binding.profile.value,
                 "normalization": binding.normalization.value,
+                "waveform_normalization": binding.waveform_normalization.value,
+                "interpolation": binding.interpolation,
+                "show_raster": binding.show_raster,
                 "raster_alpha": binding.alpha,
+                "colorbar": authoring_raster_colorbar_to_mapping(binding.colorbar),
+                "sample_axis": authoring_raster_sample_axis_to_mapping(binding.sample_axis),
+                "waveform": authoring_raster_waveform_to_mapping(binding.waveform),
             }
         )
+        if binding.clip_percentiles is not None:
+            element["clip_percentiles"] = list(binding.clip_percentiles)
+        if binding.color_limits is not None:
+            element["color_limits"] = list(binding.color_limits)
     return element
 
 

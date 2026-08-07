@@ -1155,6 +1155,11 @@ Behavior:
 - canonical curve-binding patches also accept typed `render_mode`, `wrap`,
   `value_labels`, and `header_display` fields; `value_labels.format` follows
   the existing renderer/schema vocabulary
+- canonical raster-binding patches accept typed raster display fields for
+  normalization, clipping, interpolation, visibility, color limits, and
+  nested `colorbar`, `sample_axis`, and `waveform` settings; legacy `min`,
+  `max`, and `ticks` sample-axis keys are normalized to canonical bounds and
+  tick-count fields
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current
