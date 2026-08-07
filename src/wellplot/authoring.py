@@ -62,6 +62,9 @@ from .model.authoring import (
     AuthoringScaleKind,
     AuthoringSectionSpec,
     AuthoringStyle,
+    AuthoringTrackHeaderObjectKind,
+    AuthoringTrackHeaderObjectSpec,
+    AuthoringTrackHeaderSpec,
     CurveBindingSpec,
     CurveFillSpec,
     NormalTrackSpec,
@@ -327,6 +330,63 @@ def authoring_grid_to_mapping(grid: AuthoringGridSpec) -> dict[str, Any]:
             "main": vertical_line("vertical_main"),
             "secondary": vertical_line("vertical_secondary"),
         },
+    }
+
+
+def _track_header_from_legacy(value: object, *, context: str) -> AuthoringTrackHeaderSpec:
+    """Normalize legacy track-header rows into the canonical object list."""
+    if value is None:
+        return AuthoringTrackHeaderSpec()
+    data = _mapping(value, context=context)
+    objects_value = data.get("objects")
+    if objects_value is not None:
+        items = _sequence(objects_value, context=f"{context}.objects")
+        objects: list[AuthoringTrackHeaderObjectSpec] = []
+        for index, item in enumerate(items):
+            object_data = _mapping(item, context=f"{context}.objects[{index}]")
+            try:
+                objects.append(
+                    AuthoringTrackHeaderObjectSpec(
+                        kind=AuthoringTrackHeaderObjectKind(str(object_data["kind"])),
+                        enabled=bool(object_data.get("enabled", True)),
+                        reserve_space=bool(object_data.get("reserve_space", True)),
+                        line_units=int(object_data.get("line_units", 1)),
+                    )
+                )
+            except (KeyError, TypeError, ValueError, ValidationError) as exc:
+                raise TemplateValidationError(f"Invalid {context}.objects[{index}].") from exc
+        try:
+            return AuthoringTrackHeaderSpec(objects=objects)
+        except ValidationError as exc:
+            raise TemplateValidationError(f"Invalid {context}.") from exc
+
+    defaults = AuthoringTrackHeaderSpec().objects
+    by_kind = {item.kind: item for item in defaults}
+    for kind in AuthoringTrackHeaderObjectKind:
+        if kind.value not in data:
+            continue
+        object_data = _mapping(data[kind.value], context=f"{context}.{kind.value}")
+        default = by_kind[kind]
+        try:
+            by_kind[kind] = AuthoringTrackHeaderObjectSpec(
+                kind=kind,
+                enabled=bool(object_data.get("enabled", default.enabled)),
+                reserve_space=bool(object_data.get("reserve_space", default.reserve_space)),
+                line_units=int(object_data.get("line_units", default.line_units)),
+            )
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise TemplateValidationError(f"Invalid {context}.{kind.value}.") from exc
+    return AuthoringTrackHeaderSpec(objects=[by_kind[item.kind] for item in defaults])
+
+
+def authoring_track_header_to_mapping(
+    track_header: AuthoringTrackHeaderSpec,
+) -> dict[str, Any]:
+    """Project canonical track-header rows to the renderer YAML envelope."""
+    return {
+        "objects": [
+            item.model_dump(mode="json", exclude_none=True) for item in track_header.objects
+        ]
     }
 
 
@@ -724,6 +784,9 @@ def _legacy_to_authoring(
                 "title": _as_text(track.get("title"), context="track.title", default=track_id),
                 "width_mm": float(track["width_mm"]),
                 "grid": _grid_from_legacy(track.get("grid"), context=f"track {track_id}.grid"),
+                "track_header": _track_header_from_legacy(
+                    track.get("track_header"), context=f"track {track_id}.track_header"
+                ),
                 "extensions": extensions,
             }
             x_scale = _scale_from_mapping(track.get("x_scale"), context=f"track {track_id}.x_scale")
@@ -985,6 +1048,7 @@ def _render_track(
             "kind": track.kind,
             "width_mm": track.width_mm,
             "grid": authoring_grid_to_mapping(track.grid),
+            "track_header": authoring_track_header_to_mapping(track.track_header),
             "elements": [],
         }
     )

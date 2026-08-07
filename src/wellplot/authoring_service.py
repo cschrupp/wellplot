@@ -44,6 +44,8 @@ from .model.authoring import (
     AuthoringScale,
     AuthoringSectionSpec,
     AuthoringStyle,
+    AuthoringTrackHeaderPatch,
+    AuthoringTrackHeaderSpec,
     CurveBindingSpec,
     CurveFillSpec,
     NormalTrackSpec,
@@ -155,6 +157,7 @@ class TrackPatch(_OperationModel):
     width_mm: float | None = Field(default=None, gt=0)
     x_scale: AuthoringScale | None = None
     grid: AuthoringGridPatch | None = None
+    track_header: AuthoringTrackHeaderPatch | None = None
     extensions: dict[str, Any] | None = None
 
 
@@ -833,6 +836,15 @@ class AuthoringService:
                 track.grid = AuthoringGridSpec.model_validate(
                     track.grid.model_dump(mode="python") | updates
                 )
+                continue
+            if field_name == "track_header":
+                if value is None:
+                    track.track_header = AuthoringTrackHeaderSpec()
+                else:
+                    updates = value.model_dump(mode="python", exclude_unset=True)
+                    track.track_header = AuthoringTrackHeaderSpec.model_validate(
+                        track.track_header.model_dump(mode="python") | updates
+                    )
                 continue
             setattr(track, field_name, deepcopy(value))
 

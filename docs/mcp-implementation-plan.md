@@ -394,6 +394,9 @@ Implementation checkpoint:
 - track grid properties now have typed canonical validation and partial-update
   merge semantics, with legacy nested grid aliases normalized at the adapter
   boundary and projected back for rendering
+- track-header row reservations now have typed canonical validation and
+  deterministic replacement semantics; renderer-only header styling remains
+  outside this object contract
 
 ### Slice 0.6-F. Defaults And Precedence
 

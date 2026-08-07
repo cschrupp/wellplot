@@ -15,6 +15,9 @@ from wellplot.model import (
     AuthoringScale,
     AuthoringScaleKind,
     AuthoringStyle,
+    AuthoringTrackHeaderObjectKind,
+    AuthoringTrackHeaderObjectSpec,
+    AuthoringTrackHeaderSpec,
     authoring_json_schema,
 )
 from wellplot.model.authoring import (
@@ -158,6 +161,14 @@ def test_grid_contract_validates_logarithmic_spacing_and_alpha() -> None:
 
     with pytest.raises(ValidationError, match="less than or equal to 1"):
         AuthoringGridSpec(vertical_main_alpha=1.1)
+
+
+def test_track_header_contract_rejects_duplicate_rows() -> None:
+    """Track-header row identity is explicit and cannot be duplicated."""
+    row = AuthoringTrackHeaderObjectSpec(kind=AuthoringTrackHeaderObjectKind.TITLE)
+
+    with pytest.raises(ValidationError, match="unique"):
+        AuthoringTrackHeaderSpec(objects=[row, row.model_copy()])
 
 
 def test_unknown_standard_fields_are_rejected() -> None:

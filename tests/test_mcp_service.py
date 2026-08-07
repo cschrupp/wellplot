@@ -1078,6 +1078,19 @@ class McpServiceTests(unittest.TestCase):
                         "vertical_main_spacing_mode": "scale",
                         "vertical_main_line_count": 5,
                     },
+                    "track_header": {
+                        "objects": [
+                            {"kind": "title", "enabled": True, "line_units": 1},
+                            {"kind": "scale", "enabled": False, "line_units": 1},
+                            {"kind": "legend", "enabled": True, "line_units": 2},
+                            {
+                                "kind": "divisions",
+                                "enabled": True,
+                                "reserve_space": True,
+                                "line_units": 1,
+                            },
+                        ]
+                    },
                 },
                 root=REPO_ROOT,
             )
@@ -1093,6 +1106,7 @@ class McpServiceTests(unittest.TestCase):
                 result.track["grid"]["vertical"]["main"]["spacing_mode"],
                 "scale",
             )
+            self.assertFalse(result.track["track_header"]["objects"][1]["enabled"])
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
@@ -1101,6 +1115,7 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(saved_track["x_scale"]["max"], 2000.0)
             self.assertEqual(saved_track["grid"]["vertical"]["main"]["line_count"], 5)
             self.assertEqual(saved_track["grid"]["vertical"]["main"]["scale"], "logarithmic")
+            self.assertTrue(saved_track["track_header"]["objects"][3]["enabled"])
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_track_rejects_unknown_patch_key(self) -> None:

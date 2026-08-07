@@ -43,7 +43,7 @@ from ..api.render import (
     render_window_png,
 )
 from ..api.serialize import report_to_dict, report_to_yaml
-from ..authoring import authoring_grid_to_mapping
+from ..authoring import authoring_grid_to_mapping, authoring_track_header_to_mapping
 from ..authoring_service import (
     AuthoringService,
     AuthoringTarget,
@@ -5229,7 +5229,7 @@ def _apply_canonical_track_update(
     patch: dict[str, object],
 ) -> bool:
     """Apply canonical track fields and project them into the legacy envelope."""
-    canonical_keys = {"title", "width_mm", "x_scale", "grid"}
+    canonical_keys = {"title", "width_mm", "x_scale", "grid", "track_header"}
     if not set(patch).issubset(canonical_keys):
         return False
 
@@ -5269,6 +5269,8 @@ def _apply_canonical_track_update(
             track["x_scale"] = _legacy_scale_from_authoring(updated_scale)
     if "grid" in patch:
         track["grid"] = authoring_grid_to_mapping(updated.grid)
+    if "track_header" in patch:
+        track["track_header"] = authoring_track_header_to_mapping(updated.track_header)
     return True
 
 

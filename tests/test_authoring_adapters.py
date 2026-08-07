@@ -56,6 +56,19 @@ def _legacy_mapping() -> dict[str, object]:
                                         }
                                     }
                                 },
+                                "track_header": {
+                                    "objects": [
+                                        {"kind": "title", "enabled": True, "line_units": 1},
+                                        {"kind": "scale", "enabled": False, "line_units": 1},
+                                        {"kind": "legend", "enabled": True, "line_units": 2},
+                                        {
+                                            "kind": "divisions",
+                                            "enabled": True,
+                                            "reserve_space": True,
+                                            "line_units": 1,
+                                        },
+                                    ]
+                                },
                             },
                             {"id": "vdl", "title": "VDL", "kind": "image", "width_mm": 40},
                         ],
@@ -113,6 +126,8 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert gr_track.grid.vertical_main_scale.value == "logarithmic"
     assert gr_track.grid.vertical_main_spacing_mode.value == "scale"
     assert gr_track.grid.vertical_main_color == "#222222"
+    assert gr_track.track_header.objects[1].enabled is False
+    assert gr_track.track_header.objects[2].line_units == 2
 
     rendered = authoring_document_to_render(document)
     assert rendered.page.width_mm == 297
@@ -123,6 +138,7 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert rendered_gr.elements[1].style.line_style == "--"
     assert rendered_gr.grid.vertical_main_line_count == 5
     assert rendered_gr.grid.vertical_main_color == "#222222"
+    assert rendered_gr.header.objects[3].enabled is True
     assert rendered.tracks[1].elements[0].profile.value == "vdl"
 
 

@@ -59,6 +59,10 @@ from .authoring import (
     AuthoringScaleKind,
     AuthoringSectionSpec,
     AuthoringStyle,
+    AuthoringTrackHeaderObjectKind,
+    AuthoringTrackHeaderObjectSpec,
+    AuthoringTrackHeaderPatch,
+    AuthoringTrackHeaderSpec,
     authoring_json_schema,
 )
 from .authoring import (
@@ -168,6 +172,10 @@ __all__ = [
     "AuthoringScaleKind",
     "AuthoringSectionSpec",
     "AuthoringStyle",
+    "AuthoringTrackHeaderObjectKind",
+    "AuthoringTrackHeaderObjectSpec",
+    "AuthoringTrackHeaderPatch",
+    "AuthoringTrackHeaderSpec",
     "AnnotationArrowSpec",
     "AnnotationGlyphSpec",
     "AnnotationIntervalSpec",

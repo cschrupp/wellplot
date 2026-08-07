@@ -1147,6 +1147,9 @@ Behavior:
 - the canonical `track` patch includes a typed `grid` object; grid updates are
   merged with the existing grid and normalized aliases such as `exponential`
   and `auto` are converted to canonical `logarithmic` and `scale` values
+- the canonical `track` patch also accepts a complete typed `track_header`
+  object replacement; row kinds must be unique and line reservations must be
+  positive
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current

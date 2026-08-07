@@ -88,6 +88,15 @@ class AuthoringGridSpacingMode(StrEnum):
     SCALE = "scale"
 
 
+class AuthoringTrackHeaderObjectKind(StrEnum):
+    """Logical rows available in a track header."""
+
+    TITLE = "title"
+    SCALE = "scale"
+    LEGEND = "legend"
+    DIVISIONS = "divisions"
+
+
 class AuthoringCurveFillKind(StrEnum):
     """Curve fill semantics exposed by the authoring contract."""
 
@@ -186,6 +195,62 @@ class AuthoringGridPatch(_AuthoringModel):
     vertical_secondary_alpha: float | None = Field(default=None, ge=0, le=1)
     vertical_secondary_scale: AuthoringGridScaleKind | None = None
     vertical_secondary_spacing_mode: AuthoringGridSpacingMode | None = None
+
+
+class AuthoringTrackHeaderObjectSpec(_AuthoringModel):
+    """One validated row reservation within a track header."""
+
+    kind: AuthoringTrackHeaderObjectKind
+    enabled: bool = True
+    reserve_space: bool = True
+    line_units: int = Field(default=1, ge=1)
+
+
+def _default_authoring_track_header_objects() -> list[AuthoringTrackHeaderObjectSpec]:
+    """Return the standard ordered rows for a track header."""
+    return [
+        AuthoringTrackHeaderObjectSpec(
+            kind=AuthoringTrackHeaderObjectKind.TITLE,
+            line_units=1,
+        ),
+        AuthoringTrackHeaderObjectSpec(
+            kind=AuthoringTrackHeaderObjectKind.SCALE,
+            line_units=1,
+        ),
+        AuthoringTrackHeaderObjectSpec(
+            kind=AuthoringTrackHeaderObjectKind.LEGEND,
+            line_units=2,
+        ),
+        AuthoringTrackHeaderObjectSpec(
+            kind=AuthoringTrackHeaderObjectKind.DIVISIONS,
+            enabled=False,
+            reserve_space=False,
+            line_units=1,
+        ),
+    ]
+
+
+class AuthoringTrackHeaderSpec(_AuthoringModel):
+    """Ordered track-header rows and their reserved vertical space."""
+
+    objects: list[AuthoringTrackHeaderObjectSpec] = Field(
+        default_factory=_default_authoring_track_header_objects,
+        min_length=1,
+    )
+
+    @model_validator(mode="after")
+    def validate_object_kinds(self) -> AuthoringTrackHeaderSpec:
+        """Require one entry for each logical header row kind."""
+        kinds = [item.kind for item in self.objects]
+        if len(set(kinds)) != len(kinds):
+            raise ValueError("Track header object kinds must be unique per track.")
+        return self
+
+
+class AuthoringTrackHeaderPatch(_AuthoringModel):
+    """Optional track-header replacement used by a partial track update."""
+
+    objects: list[AuthoringTrackHeaderObjectSpec] | None = None
 
 
 class AuthoringScale(_AuthoringModel):
@@ -354,6 +419,7 @@ class _TrackSpec(_AuthoringModel):
     title: str = Field(min_length=1)
     width_mm: float = Field(gt=0)
     grid: AuthoringGridSpec = Field(default_factory=AuthoringGridSpec)
+    track_header: AuthoringTrackHeaderSpec = Field(default_factory=AuthoringTrackHeaderSpec)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -586,6 +652,10 @@ __all__ = [
     "AuthoringScaleKind",
     "AuthoringSectionSpec",
     "AuthoringStyle",
+    "AuthoringTrackHeaderObjectKind",
+    "AuthoringTrackHeaderObjectSpec",
+    "AuthoringTrackHeaderPatch",
+    "AuthoringTrackHeaderSpec",
     "BindingSpec",
     "CurveBindingSpec",
     "CurveFillSpec",
