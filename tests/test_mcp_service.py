@@ -3297,6 +3297,7 @@ class McpServiceTests(unittest.TestCase):
     def test_authoring_catalog_resources_are_json(self) -> None:
         """Expose authoring catalog resources as JSON payloads."""
         patch_resource = service.authoring_patch_schema_resource()
+        canonical_resource = service.authoring_canonical_schema_resource()
         fill_resource = service.authoring_fill_kinds_resource()
         style_resource = service.authoring_style_presets_resource()
         header_archetype_resource = service.authoring_header_archetypes_resource()
@@ -3305,6 +3306,10 @@ class McpServiceTests(unittest.TestCase):
         channel_alias_resource = service.authoring_channel_aliases_resource()
 
         self.assertEqual(patch_resource.mime_type, "application/json")
+        canonical_payload = json.loads(canonical_resource.text)
+        self.assertEqual(canonical_resource.mime_type, "application/json")
+        self.assertIn("$defs", canonical_payload)
+        self.assertIn("sections", canonical_payload["properties"])
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertIn("annotation_object_kinds", json.loads(patch_resource.text))
         self.assertIn("annotation_patch_keys", json.loads(patch_resource.text))
@@ -3324,6 +3329,23 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("provider_aliases", json.loads(header_alias_resource.text))
         self.assertEqual(channel_alias_resource.mime_type, "application/json")
         self.assertIn("channel_aliases", json.loads(channel_alias_resource.text))
+
+    def test_inspect_authoring_objects_returns_typed_binding_values(self) -> None:
+        """Expose canonical object fields without requiring clients to parse legacy YAML."""
+        result = service.inspect_authoring_objects(
+            "examples/production/cbl_log_example/full_reconstruction.log.yaml",
+            object_kind="curve_binding",
+            section_id="main_pass",
+            track_id="cbl",
+            root=REPO_ROOT,
+        )
+
+        self.assertEqual(result.count, 2)
+        first = result.objects[0]["object"]
+        self.assertIsInstance(first, dict)
+        self.assertEqual(first["channel"], "CBL")
+        self.assertEqual(first["scale"]["maximum"], 100.0)
+        self.assertEqual(first["style"]["color"], "#111111")
 
     def test_start_from_example_prompt_embeds_goal_and_example(self) -> None:
         """Embed the requested goal and packaged example resources in the prompt."""

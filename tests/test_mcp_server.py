@@ -627,6 +627,7 @@ class McpServerIntegrationTests(unittest.TestCase):
             [
                 "validate_logfile",
                 "inspect_logfile",
+                "inspect_authoring_objects",
                 "inspect_data_source",
                 "check_channel_availability",
                 "preview_logfile_png",
@@ -686,6 +687,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://schema/logfile.json",
                 "wellplot://examples/production/index.json",
                 "wellplot://authoring/schema/patch.json",
+                "wellplot://authoring/schema/canonical.json",
                 "wellplot://authoring/catalog/track-kinds.json",
                 "wellplot://authoring/catalog/fill-kinds.json",
                 "wellplot://authoring/catalog/track-archetypes.json",

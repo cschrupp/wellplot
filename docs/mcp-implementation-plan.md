@@ -218,8 +218,14 @@ Current progress:
   surface
 - deterministic canonical object service is implemented with typed atomic
   list/get/create/update/remove/move/validate operations
-- builder and MCP adapters remain pending
-- implementation slices `0.6-E` through `0.6-G` remain pending
+- MCP now exposes the generated canonical JSON Schema and typed object
+  inspection through deterministic discovery tools
+- MCP persistence rejects mappings that cannot be normalized to the canonical
+  authoring contract
+- section edits and the canonical track/curve fields are routed through the
+  shared service before projection into the legacy render envelope
+- the remaining MCP mutation families and duplicated patch catalogs are still
+  pending in slice `0.6-E`
 
 ### Slice 0.6-A. Contract Inventory And Ownership
 
@@ -330,8 +336,8 @@ Implementation checkpoint:
   snapshots and validates every candidate before publishing it
 - typed request and patch models cover sections, tracks, curve/raster
   bindings, annotations, fills, remarks, and ordered moves
-- MCP still uses its existing mutation path until slice `0.6-E` routes it
-  through this service
+- MCP now has a canonical validation gate; full mutation parity is completed
+  incrementally in slice `0.6-E` without changing the legacy render envelope
 
 ### Slice 0.6-E. MCP Contract Parity
 
@@ -354,6 +360,19 @@ Acceptance:
   fields and values
 - contract-parity tests fail if those surfaces drift
 - existing narrow tools remain compatible or have documented migrations
+
+Implementation checkpoint:
+
+- `wellplot://authoring/schema/canonical.json` is generated directly from the
+  Pydantic authoring models
+- `inspect_authoring_objects(...)` returns typed, parent-scoped object payloads
+  for MCP clients
+- `update_section(...)` and the canonical fields of `update_track(...)` and
+  `update_curve_binding(...)` execute through `AuthoringService`
+- the legacy logfile mapping remains the persistence/render boundary, with a
+  canonical validation gate on every persisted MCP mutation
+- grid/header/overlay/raster-only fields remain compatibility-path fields until
+  their canonical models and service operations are added
 
 ### Slice 0.6-F. Defaults And Precedence
 

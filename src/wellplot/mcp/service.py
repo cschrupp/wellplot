@@ -41,6 +41,16 @@ from ..api.render import (
     render_window_png,
 )
 from ..api.serialize import report_to_dict, report_to_yaml
+from ..authoring_service import (
+    AuthoringService,
+    AuthoringTarget,
+    CurveBindingPatch,
+    SectionPatch,
+    TrackPatch,
+    UpdateCurveBindingRequest,
+    UpdateSectionRequest,
+    UpdateTrackRequest,
+)
 from ..errors import (
     DependencyUnavailableError,
     PathAccessError,
@@ -59,6 +69,7 @@ from ..logfile import (
 )
 from ..logfile_schema import get_logfile_json_schema
 from ..model import ArrayChannel, RasterChannel, ScalarChannel, WellDataset
+from ..model.authoring import authoring_json_schema
 from ..model.document import (
     CurveFillKind,
     ReportDetailKind,
@@ -224,6 +235,7 @@ AUTHORING_ANNOTATION_PATCH_KEYS = (
 AUTHORING_MOVE_TRACK_SELECTORS = ("before_track_id", "after_track_id", "position")
 AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/schema/patch.json",
+    "wellplot://authoring/schema/canonical.json",
     "wellplot://authoring/catalog/track-kinds.json",
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
@@ -668,6 +680,18 @@ class ResourceContent:
 
     text: str
     mime_type: str
+
+
+@dataclass(slots=True)
+class AuthoringObjectInspectionResult:
+    """Structured canonical-object inspection payload for MCP clients."""
+
+    logfile_path: str
+    object_kind: str
+    section_id: str | None
+    track_id: str | None
+    count: int
+    objects: list[dict[str, object]]
 
 
 @dataclass(slots=True)
@@ -1620,6 +1644,13 @@ def _persist_validated_logfile_mapping(
     root: Path,
 ) -> LogFileSpec:
     _normalize_between_instance_fill_references(mapping)
+    canonical = AuthoringService.from_mapping(mapping)
+    canonical_validation = canonical.validate()
+    if not canonical_validation.valid:
+        raise TemplateValidationError(
+            "Logfile mapping failed canonical authoring validation: "
+            + "; ".join(canonical_validation.errors)
+        )
     spec = logfile_from_mapping(mapping)
     _validate_logfile_spec_renderable(
         spec,
@@ -3526,6 +3557,12 @@ def authoring_patch_schema_resource() -> ResourceContent:
     return ResourceContent(text=payload, mime_type="application/json")
 
 
+def authoring_canonical_schema_resource() -> ResourceContent:
+    """Return the generated canonical authoring object contract as JSON text."""
+    payload = json.dumps(authoring_json_schema(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
 def authoring_track_kinds_resource() -> ResourceContent:
     """Return supported draft-authoring track kinds as JSON text."""
     payload = json.dumps({"track_kinds": _enum_values(TrackKind)}, indent=2, sort_keys=True)
@@ -3744,6 +3781,68 @@ def inspect_logfile(
         has_tail=_layout_has_tail(layout),
         section_ids=[summary.id for summary in section_summaries],
         sections=section_summaries,
+    )
+
+
+def inspect_authoring_objects(
+    logfile_path: str,
+    *,
+    object_kind: str,
+    section_id: str | None = None,
+    track_id: str | None = None,
+    root: str | Path | None = None,
+) -> AuthoringObjectInspectionResult:
+    """Inspect typed authoring objects without exposing legacy YAML internals."""
+    allowed_kinds = {
+        "section",
+        "track",
+        "curve_binding",
+        "raster_binding",
+        "annotation",
+        "fill",
+        "remark",
+    }
+    normalized_kind = str(object_kind).strip().lower()
+    if normalized_kind not in allowed_kinds:
+        raise TemplateValidationError(
+            f"Unsupported authoring object kind {object_kind!r}. "
+            f"Allowed kinds: {sorted(allowed_kinds)}."
+        )
+
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    authoring = AuthoringService.from_mapping(mapping)
+    refs = authoring.list(
+        normalized_kind,  # type: ignore[arg-type]
+        section_id=section_id,
+        track_id=track_id,
+    )
+    objects: list[dict[str, object]] = []
+    for ref in refs:
+        target = AuthoringTarget(
+            object_kind=ref.object_kind,
+            object_id=ref.object_id,
+            section_id=ref.section_id,
+            track_id=ref.track_id,
+        )
+        item = authoring.get(target)
+        objects.append(
+            {
+                "ref": ref.model_dump(mode="json"),
+                "object": item.model_dump(mode="json", exclude={"extensions"}),
+            }
+        )
+    return AuthoringObjectInspectionResult(
+        logfile_path=str(resolved_logfile),
+        object_kind=normalized_kind,
+        section_id=section_id,
+        track_id=track_id,
+        count=len(objects),
+        objects=objects,
     )
 
 
@@ -4579,6 +4678,241 @@ def replicate_section_structure(
     )
 
 
+def _apply_canonical_section_update(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    title: str | None,
+    subtitle: str | None,
+    depth_range: tuple[float, float] | None,
+) -> None:
+    """Apply typed section fields and project them into the legacy envelope."""
+    patch_values: dict[str, object] = {}
+    if title is not None:
+        patch_values["title"] = str(title)
+    if subtitle is not None:
+        patch_values["subtitle"] = str(subtitle)
+    if depth_range is not None:
+        patch_values["depth_range"] = depth_range
+
+    authoring = AuthoringService.from_mapping(mapping)
+    authoring.update(
+        UpdateSectionRequest(
+            section_id=section_id,
+            patch=SectionPatch.model_validate(patch_values),
+        )
+    )
+    updated = authoring.get(AuthoringTarget(object_kind="section", object_id=section_id))
+    section = _logfile_mapping_section(mapping, section_id)
+    section["title"] = updated.title
+    if updated.subtitle is None:
+        section.pop("subtitle", None)
+    else:
+        section["subtitle"] = updated.subtitle
+    if updated.depth_range is None:
+        section.pop("depth_range", None)
+    else:
+        section["depth_range"] = list(updated.depth_range)
+
+
+def _legacy_scale_from_authoring(scale: object) -> dict[str, object]:
+    """Convert a canonical scale to the legacy renderer's compact keys."""
+    return {
+        "kind": scale.kind.value,
+        "min": scale.minimum,
+        "max": scale.maximum,
+        **({"reverse": True} if scale.reverse else {}),
+        **({"unit": scale.unit} if scale.unit is not None else {}),
+    }
+
+
+def _canonical_scale_patch(value: object) -> object:
+    """Normalize legacy min/max scale keys before typed validation."""
+    if not isinstance(value, dict):
+        return value
+    normalized = deepcopy(value)
+    if "minimum" not in normalized and "min" in normalized:
+        normalized["minimum"] = normalized.pop("min")
+    if "maximum" not in normalized and "max" in normalized:
+        normalized["maximum"] = normalized.pop("max")
+    kind = str(normalized.get("kind", "linear")).strip().lower()
+    normalized["kind"] = {
+        "logarithmic": "log",
+        "tangent": "tangential",
+    }.get(kind, kind)
+    return normalized
+
+
+def _legacy_style_from_authoring(
+    style: object,
+    *,
+    fallback_color: str = "black",
+) -> dict[str, object]:
+    """Convert a canonical style to the legacy renderer's style vocabulary."""
+    normalized = style.model_dump(mode="json", exclude_none=True)
+    if "alpha" in normalized:
+        normalized["opacity"] = normalized.pop("alpha")
+    normalized.setdefault("color", fallback_color)
+    return normalized
+
+
+def _apply_canonical_track_update(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+    patch: dict[str, object],
+) -> bool:
+    """Apply canonical track fields and project them into the legacy envelope."""
+    canonical_keys = {"title", "width_mm", "x_scale"}
+    if not set(patch).issubset(canonical_keys):
+        return False
+
+    canonical_patch = deepcopy(patch)
+    if "x_scale" in canonical_patch:
+        canonical_patch["x_scale"] = _canonical_scale_patch(canonical_patch["x_scale"])
+
+    authoring = AuthoringService.from_mapping(mapping)
+    authoring.update(
+        UpdateTrackRequest(
+            section_id=section_id,
+            track_id=track_id,
+            patch=TrackPatch.model_validate(canonical_patch),
+        )
+    )
+    updated = authoring.get(
+        AuthoringTarget(
+            object_kind="track",
+            object_id=track_id,
+            section_id=section_id,
+        )
+    )
+    section = _logfile_mapping_section(mapping, section_id)
+    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+    track = tracks[_find_track_index(tracks, section_id=section_id, track_id=track_id)]
+    if not isinstance(track, dict):
+        raise RuntimeError("Expected a mapping track entry.")
+    if "title" in patch:
+        track["title"] = updated.title
+    if "width_mm" in patch:
+        track["width_mm"] = updated.width_mm
+    if "x_scale" in patch:
+        updated_scale = getattr(updated, "x_scale", None)
+        if updated_scale is None:
+            track.pop("x_scale", None)
+        else:
+            track["x_scale"] = _legacy_scale_from_authoring(updated_scale)
+    return True
+
+
+def _apply_canonical_curve_binding_update(
+    mapping: dict[str, object],
+    *,
+    spec: LogFileSpec,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    binding_id: str | None,
+    binding_index: int,
+    bindings: list[dict[str, object]],
+    patch: dict[str, object],
+) -> bool:
+    """Apply typed scalar-binding fields and project them into legacy YAML."""
+    canonical_keys = {"label", "style", "scale"}
+    style_keys = {
+        "color",
+        "line_style",
+        "line_width",
+        "alpha",
+        "opacity",
+        "fill_color",
+        "fill_alpha",
+        "colormap",
+    }
+    if not set(patch).issubset(canonical_keys):
+        return False
+    style_patch = patch.get("style")
+    if isinstance(style_patch, dict) and not set(style_patch).issubset(style_keys):
+        return False
+
+    authoring = AuthoringService.from_mapping(mapping)
+    raw_binding = bindings[binding_index]
+    raw_id = str(raw_binding.get("id", "")).strip()
+    target_binding_id = raw_id or None
+    if target_binding_id is None:
+        curve_candidates = [
+            binding
+            for binding in bindings
+            if isinstance(binding, dict)
+            and str(binding.get("kind", "curve")).strip().lower() == "curve"
+            and _binding_target_section_id(spec, binding) == section_id
+            and str(binding.get("track_id", "")).strip() == track_id
+            and str(binding.get("channel", "")).upper() == channel.upper()
+        ]
+        occurrence = curve_candidates.index(raw_binding)
+        refs = authoring.list("curve_binding", section_id=section_id, track_id=track_id)
+        matching_refs = [
+            ref
+            for ref in refs
+            if str(
+                authoring.get(
+                    AuthoringTarget(
+                        object_kind="curve_binding",
+                        object_id=ref.object_id,
+                        section_id=section_id,
+                        track_id=track_id,
+                    )
+                ).channel
+            ).upper()
+            == channel.upper()
+        ]
+        if occurrence >= len(matching_refs):
+            raise TemplateValidationError(
+                f"Could not resolve canonical binding identity for {channel!r}."
+            )
+        target_binding_id = matching_refs[occurrence].object_id
+
+    canonical_patch = deepcopy(patch)
+    if "scale" in canonical_patch:
+        canonical_patch["scale"] = _canonical_scale_patch(canonical_patch["scale"])
+    if isinstance(canonical_patch.get("style"), dict):
+        style_value = deepcopy(canonical_patch["style"])
+        if "alpha" not in style_value and "opacity" in style_value:
+            style_value["alpha"] = style_value.pop("opacity")
+        else:
+            style_value.pop("opacity", None)
+        canonical_patch["style"] = style_value
+    authoring.update(
+        UpdateCurveBindingRequest(
+            section_id=section_id,
+            track_id=track_id,
+            binding_id=target_binding_id,
+            patch=CurveBindingPatch.model_validate(canonical_patch),
+        )
+    )
+    updated = authoring.get(
+        AuthoringTarget(
+            object_kind="curve_binding",
+            object_id=target_binding_id,
+            section_id=section_id,
+            track_id=track_id,
+        )
+    )
+    if "label" in patch:
+        if updated.label is None:
+            raw_binding.pop("label", None)
+        else:
+            raw_binding["label"] = updated.label
+    if "scale" in patch:
+        if updated.scale is None:
+            raw_binding.pop("scale", None)
+        else:
+            raw_binding["scale"] = _legacy_scale_from_authoring(updated.scale)
+    if "style" in patch:
+        raw_binding["style"] = _legacy_style_from_authoring(updated.style)
+    return True
+
+
 def update_section(
     logfile_path: str,
     *,
@@ -4602,19 +4936,21 @@ def update_section(
         allowed_root=server_root,
     )
     _ensure_known_section(current_spec, section_id)
-    section = _logfile_mapping_section(mapping, section_id)
-
-    if title is not None:
-        section["title"] = str(title)
-    if subtitle is not None:
-        section["subtitle"] = str(subtitle)
+    normalized_range: tuple[float, float] | None = None
     if depth_range is not None:
         normalized_range, _ = _normalized_section_depth_range(
             depth_range,
             depth_range_unit=depth_range_unit,
             target_unit=_document_depth_unit(mapping),
         )
-        section["depth_range"] = normalized_range
+
+    _apply_canonical_section_update(
+        mapping,
+        section_id=section_id,
+        title=title,
+        subtitle=subtitle,
+        depth_range=normalized_range,
+    )
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -5075,37 +5411,43 @@ def update_track(
         allowed_root=server_root,
     )
     _ensure_known_track_ids(current_spec, section_id, [track_id])
-    section = _logfile_mapping_section(mapping, section_id)
-    tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
-    track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
-    track = tracks[track_index]
-    if not isinstance(track, dict):
-        raise RuntimeError("Expected a mapping track entry.")
+    if not _apply_canonical_track_update(
+        mapping,
+        section_id=section_id,
+        track_id=track_id,
+        patch=patch,
+    ):
+        section = _logfile_mapping_section(mapping, section_id)
+        tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+        track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+        track = tracks[track_index]
+        if not isinstance(track, dict):
+            raise RuntimeError("Expected a mapping track entry.")
 
-    updated_track = deepcopy(track)
-    for key, value in patch.items():
-        if key in {"title", "kind"}:
+        updated_track = deepcopy(track)
+        for key, value in patch.items():
+            if key in {"title", "kind"}:
+                if value is None:
+                    updated_track.pop(key, None)
+                else:
+                    updated_track[key] = str(value)
+                continue
+            if key == "width_mm":
+                if value is None:
+                    updated_track.pop(key, None)
+                else:
+                    updated_track[key] = float(value)
+                continue
             if value is None:
                 updated_track.pop(key, None)
-            else:
-                updated_track[key] = str(value)
-            continue
-        if key == "width_mm":
-            if value is None:
-                updated_track.pop(key, None)
-            else:
-                updated_track[key] = float(value)
-            continue
-        if value is None:
-            updated_track.pop(key, None)
-            continue
-        existing = updated_track.get(key)
-        if isinstance(existing, dict) and isinstance(value, dict):
-            updated_track[key] = _merge_optional_patch(existing, value)
-            continue
-        updated_track[key] = deepcopy(value)
+                continue
+            existing = updated_track.get(key)
+            if isinstance(existing, dict) and isinstance(value, dict):
+                updated_track[key] = _merge_optional_patch(existing, value)
+                continue
+            updated_track[key] = deepcopy(value)
 
-    tracks[track_index] = updated_track
+        tracks[track_index] = updated_track
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -5949,7 +6291,18 @@ def update_curve_binding(
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
         raise RuntimeError("Expected a mapping curve binding entry.")
-    bindings[binding_index] = _merge_optional_patch(binding, patch)
+    if not _apply_canonical_curve_binding_update(
+        mapping,
+        spec=current_spec,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+        binding_id=binding_id,
+        binding_index=binding_index,
+        bindings=bindings,
+        patch=patch,
+    ):
+        bindings[binding_index] = _merge_optional_patch(binding, patch)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,

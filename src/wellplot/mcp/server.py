@@ -67,6 +67,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return asdict(service.inspect_logfile(logfile_path, root=server_root))
 
     @mcp.tool()
+    def inspect_authoring_objects(
+        logfile_path: str,
+        object_kind: str,
+        section_id: str | None = None,
+        track_id: str | None = None,
+    ) -> dict[str, object]:
+        """Inspect typed canonical authoring objects in one logfile draft."""
+        return asdict(
+            service.inspect_authoring_objects(
+                logfile_path,
+                object_kind=object_kind,
+                section_id=section_id,
+                track_id=track_id,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def inspect_data_source(
         source_path: str,
         source_format: str = "auto",
@@ -1078,6 +1096,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_patch_schema_resource() -> str:
         """Return the draft-authoring patch contract resource."""
         return service.authoring_patch_schema_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/schema/canonical.json",
+        mime_type="application/json",
+    )
+    def authoring_canonical_schema_resource() -> str:
+        """Return the generated canonical authoring object contract resource."""
+        return service.authoring_canonical_schema_resource().text
 
     @mcp.resource(
         "wellplot://authoring/catalog/track-kinds.json",
