@@ -391,6 +391,9 @@ Implementation checkpoint:
 - `inspect_authoring_vocab` and the patch-schema resource expose generated
   `canonical_patch_keys` from the typed service models; legacy patch-key lists
   remain as compatibility catalogs while renderer-only fields are migrated
+- track grid properties now have typed canonical validation and partial-update
+  merge semantics, with legacy nested grid aliases normalized at the adapter
+  boundary and projected back for rendering
 
 ### Slice 0.6-F. Defaults And Precedence
 

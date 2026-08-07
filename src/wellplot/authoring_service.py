@@ -35,6 +35,8 @@ from .model.authoring import (
     AuthoringDataSource,
     AuthoringDepthSpec,
     AuthoringDocumentSpec,
+    AuthoringGridPatch,
+    AuthoringGridSpec,
     AuthoringPageSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
@@ -152,6 +154,7 @@ class TrackPatch(_OperationModel):
     title: str | None = None
     width_mm: float | None = Field(default=None, gt=0)
     x_scale: AuthoringScale | None = None
+    grid: AuthoringGridPatch | None = None
     extensions: dict[str, Any] | None = None
 
 
@@ -644,7 +647,7 @@ class AuthoringService:
             return self.get(AuthoringTarget(object_kind="section", object_id=request.section_id))
         if isinstance(request, UpdateTrackRequest):
             self._commit(
-                lambda document: self._patch_model(
+                lambda document: self._patch_track(
                     self._find_track_in(
                         self._find_section_in(document, request.section_id), request.track_id
                     ),
@@ -816,6 +819,22 @@ class AuthoringService:
         """Apply only fields explicitly supplied by a typed patch model."""
         for field_name in patch.model_fields_set:
             setattr(model, field_name, deepcopy(getattr(patch, field_name)))
+
+    @staticmethod
+    def _patch_track(track: TrackSpec, patch: TrackPatch) -> None:
+        """Apply track fields while merging partial canonical grid updates."""
+        for field_name in patch.model_fields_set:
+            value = getattr(patch, field_name)
+            if field_name == "grid":
+                if value is None:
+                    track.grid = AuthoringGridSpec()
+                    continue
+                updates = value.model_dump(mode="python", exclude_unset=True)
+                track.grid = AuthoringGridSpec.model_validate(
+                    track.grid.model_dump(mode="python") | updates
+                )
+                continue
+            setattr(track, field_name, deepcopy(value))
 
     def _patch_curve_binding(
         self,

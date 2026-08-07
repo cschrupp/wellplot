@@ -41,7 +41,22 @@ def _legacy_mapping() -> dict[str, object]:
                         "title": "Main",
                         "data": {"source_path": "data/test.las", "source_format": "las"},
                         "tracks": [
-                            {"id": "gr", "title": "Gamma Ray", "kind": "normal", "width_mm": 30},
+                            {
+                                "id": "gr",
+                                "title": "Gamma Ray",
+                                "kind": "normal",
+                                "width_mm": 30,
+                                "grid": {
+                                    "vertical": {
+                                        "main": {
+                                            "line_count": 5,
+                                            "scale": "exponential",
+                                            "spacing_mode": "scale",
+                                            "color": "#222222",
+                                        }
+                                    }
+                                },
+                            },
                             {"id": "vdl", "title": "VDL", "kind": "image", "width_mm": 40},
                         ],
                     }
@@ -94,6 +109,10 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert [binding.channel for binding in gr_track.bindings] == ["GR", "GR"]
     assert gr_track.bindings[1].scale is not None
     assert gr_track.bindings[1].scale.minimum == 200
+    assert gr_track.grid.vertical_main_line_count == 5
+    assert gr_track.grid.vertical_main_scale.value == "logarithmic"
+    assert gr_track.grid.vertical_main_spacing_mode.value == "scale"
+    assert gr_track.grid.vertical_main_color == "#222222"
 
     rendered = authoring_document_to_render(document)
     assert rendered.page.width_mm == 297
@@ -102,6 +121,8 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert len(rendered_gr.elements) == 2
     assert rendered_gr.elements[0].style.color == "black"
     assert rendered_gr.elements[1].style.line_style == "--"
+    assert rendered_gr.grid.vertical_main_line_count == 5
+    assert rendered_gr.grid.vertical_main_color == "#222222"
     assert rendered.tracks[1].elements[0].profile.value == "vdl"
 
 

@@ -8,6 +8,9 @@ from pydantic import ValidationError
 from wellplot.model import (
     AuthoringCurveFillKind,
     AuthoringDocumentSpec,
+    AuthoringGridScaleKind,
+    AuthoringGridSpacingMode,
+    AuthoringGridSpec,
     AuthoringRasterProfileKind,
     AuthoringScale,
     AuthoringScaleKind,
@@ -138,6 +141,23 @@ def test_array_track_accepts_raster_binding() -> None:
 
     assert track.bindings[0].kind == "raster"
     assert track.bindings[0].profile == AuthoringRasterProfileKind.VDL
+
+
+def test_grid_contract_validates_logarithmic_spacing_and_alpha() -> None:
+    """Expose deterministic grid properties with the same validation rules as scales."""
+    grid = AuthoringGridSpec(
+        vertical_main_scale=AuthoringGridScaleKind.LOGARITHMIC,
+        vertical_main_spacing_mode=AuthoringGridSpacingMode.SCALE,
+        vertical_main_line_count=5,
+        vertical_main_alpha=0.4,
+    )
+
+    assert grid.vertical_main_scale == AuthoringGridScaleKind.LOGARITHMIC
+    assert grid.vertical_main_spacing_mode == AuthoringGridSpacingMode.SCALE
+    assert grid.vertical_main_line_count == 5
+
+    with pytest.raises(ValidationError, match="less than or equal to 1"):
+        AuthoringGridSpec(vertical_main_alpha=1.1)
 
 
 def test_unknown_standard_fields_are_rejected() -> None:

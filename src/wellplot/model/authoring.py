@@ -65,6 +65,29 @@ class AuthoringReferenceAxisKind(StrEnum):
     TIME = "time"
 
 
+class AuthoringGridDisplayMode(StrEnum):
+    """Layer ordering options for one track grid."""
+
+    BELOW = "below"
+    ABOVE = "above"
+    NONE = "none"
+
+
+class AuthoringGridScaleKind(StrEnum):
+    """Scale transforms used to place vertical grid lines."""
+
+    LINEAR = "linear"
+    LOGARITHMIC = "logarithmic"
+    TANGENTIAL = "tangential"
+
+
+class AuthoringGridSpacingMode(StrEnum):
+    """Strategies for spacing vertical grid lines."""
+
+    COUNT = "count"
+    SCALE = "scale"
+
+
 class AuthoringCurveFillKind(StrEnum):
     """Curve fill semantics exposed by the authoring contract."""
 
@@ -95,6 +118,74 @@ class AuthoringStyle(_AuthoringModel):
     fill_color: str | None = Field(default=None, min_length=1)
     fill_alpha: float = Field(default=0.2, ge=0, le=1)
     colormap: str = Field(default="viridis", min_length=1)
+
+
+class AuthoringGridSpec(_AuthoringModel):
+    """Validated grid properties for one track."""
+
+    display: AuthoringGridDisplayMode = AuthoringGridDisplayMode.BELOW
+    major: bool = True
+    minor: bool = True
+    major_alpha: float = Field(default=0.35, ge=0, le=1)
+    minor_alpha: float = Field(default=0.15, ge=0, le=1)
+    horizontal_display: AuthoringGridDisplayMode = AuthoringGridDisplayMode.BELOW
+    horizontal_major_visible: bool = True
+    horizontal_minor_visible: bool = True
+    horizontal_major_color: str | None = Field(default=None, min_length=1)
+    horizontal_minor_color: str | None = Field(default=None, min_length=1)
+    horizontal_major_thickness: float | None = Field(default=None, gt=0)
+    horizontal_minor_thickness: float | None = Field(default=None, gt=0)
+    horizontal_major_alpha: float | None = Field(default=None, ge=0, le=1)
+    horizontal_minor_alpha: float | None = Field(default=None, ge=0, le=1)
+    vertical_display: AuthoringGridDisplayMode = AuthoringGridDisplayMode.BELOW
+    vertical_main_visible: bool = True
+    vertical_main_line_count: int = Field(default=4, ge=1)
+    vertical_main_thickness: float | None = Field(default=None, gt=0)
+    vertical_main_color: str | None = Field(default=None, min_length=1)
+    vertical_main_alpha: float = Field(default=0.35, ge=0, le=1)
+    vertical_main_scale: AuthoringGridScaleKind = AuthoringGridScaleKind.LINEAR
+    vertical_main_spacing_mode: AuthoringGridSpacingMode = AuthoringGridSpacingMode.COUNT
+    vertical_secondary_visible: bool = True
+    vertical_secondary_line_count: int = Field(default=4, ge=1)
+    vertical_secondary_thickness: float | None = Field(default=None, gt=0)
+    vertical_secondary_color: str | None = Field(default=None, min_length=1)
+    vertical_secondary_alpha: float = Field(default=0.15, ge=0, le=1)
+    vertical_secondary_scale: AuthoringGridScaleKind = AuthoringGridScaleKind.LINEAR
+    vertical_secondary_spacing_mode: AuthoringGridSpacingMode = AuthoringGridSpacingMode.COUNT
+
+
+class AuthoringGridPatch(_AuthoringModel):
+    """Optional grid fields used by a partial track update."""
+
+    display: AuthoringGridDisplayMode | None = None
+    major: bool | None = None
+    minor: bool | None = None
+    major_alpha: float | None = Field(default=None, ge=0, le=1)
+    minor_alpha: float | None = Field(default=None, ge=0, le=1)
+    horizontal_display: AuthoringGridDisplayMode | None = None
+    horizontal_major_visible: bool | None = None
+    horizontal_minor_visible: bool | None = None
+    horizontal_major_color: str | None = Field(default=None, min_length=1)
+    horizontal_minor_color: str | None = Field(default=None, min_length=1)
+    horizontal_major_thickness: float | None = Field(default=None, gt=0)
+    horizontal_minor_thickness: float | None = Field(default=None, gt=0)
+    horizontal_major_alpha: float | None = Field(default=None, ge=0, le=1)
+    horizontal_minor_alpha: float | None = Field(default=None, ge=0, le=1)
+    vertical_display: AuthoringGridDisplayMode | None = None
+    vertical_main_visible: bool | None = None
+    vertical_main_line_count: int | None = Field(default=None, ge=1)
+    vertical_main_thickness: float | None = Field(default=None, gt=0)
+    vertical_main_color: str | None = Field(default=None, min_length=1)
+    vertical_main_alpha: float | None = Field(default=None, ge=0, le=1)
+    vertical_main_scale: AuthoringGridScaleKind | None = None
+    vertical_main_spacing_mode: AuthoringGridSpacingMode | None = None
+    vertical_secondary_visible: bool | None = None
+    vertical_secondary_line_count: int | None = Field(default=None, ge=1)
+    vertical_secondary_thickness: float | None = Field(default=None, gt=0)
+    vertical_secondary_color: str | None = Field(default=None, min_length=1)
+    vertical_secondary_alpha: float | None = Field(default=None, ge=0, le=1)
+    vertical_secondary_scale: AuthoringGridScaleKind | None = None
+    vertical_secondary_spacing_mode: AuthoringGridSpacingMode | None = None
 
 
 class AuthoringScale(_AuthoringModel):
@@ -262,6 +353,7 @@ class _TrackSpec(_AuthoringModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     width_mm: float = Field(gt=0)
+    grid: AuthoringGridSpec = Field(default_factory=AuthoringGridSpec)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -480,6 +572,11 @@ __all__ = [
     "AuthoringDataSource",
     "AuthoringDepthSpec",
     "AuthoringDocumentSpec",
+    "AuthoringGridDisplayMode",
+    "AuthoringGridPatch",
+    "AuthoringGridScaleKind",
+    "AuthoringGridSpacingMode",
+    "AuthoringGridSpec",
     "AuthoringPageSpec",
     "AuthoringRasterNormalizationKind",
     "AuthoringRasterProfileKind",

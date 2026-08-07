@@ -49,6 +49,10 @@ from .model.authoring import (
     AuthoringDataSource,
     AuthoringDepthSpec,
     AuthoringDocumentSpec,
+    AuthoringGridDisplayMode,
+    AuthoringGridScaleKind,
+    AuthoringGridSpacingMode,
+    AuthoringGridSpec,
     AuthoringPageSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
@@ -130,6 +134,200 @@ def _style_from_mapping(value: object, *, context: str) -> AuthoringStyle:
         )
     except (TypeError, ValueError, ValidationError) as exc:
         raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _grid_display_mode(value: object, *, default: AuthoringGridDisplayMode) -> str:
+    """Normalize legacy boolean and textual grid display values."""
+    if value is None:
+        return default.value
+    if isinstance(value, bool):
+        return (
+            AuthoringGridDisplayMode.BELOW.value if value else AuthoringGridDisplayMode.NONE.value
+        )
+    aliases = {
+        "below": AuthoringGridDisplayMode.BELOW.value,
+        "under": AuthoringGridDisplayMode.BELOW.value,
+        "above": AuthoringGridDisplayMode.ABOVE.value,
+        "over": AuthoringGridDisplayMode.ABOVE.value,
+        "none": AuthoringGridDisplayMode.NONE.value,
+        "off": AuthoringGridDisplayMode.NONE.value,
+        "hidden": AuthoringGridDisplayMode.NONE.value,
+        "false": AuthoringGridDisplayMode.NONE.value,
+    }
+    normalized = aliases.get(str(value).strip().lower())
+    if normalized is None:
+        raise TemplateValidationError("Grid display must be below, above, or none.")
+    return normalized
+
+
+def _grid_scale_kind(value: object) -> str:
+    """Normalize legacy aliases to one canonical grid scale value."""
+    aliases = {
+        "linear": AuthoringGridScaleKind.LINEAR.value,
+        "log": AuthoringGridScaleKind.LOGARITHMIC.value,
+        "logarithmic": AuthoringGridScaleKind.LOGARITHMIC.value,
+        "exponential": AuthoringGridScaleKind.LOGARITHMIC.value,
+        "tangent": AuthoringGridScaleKind.TANGENTIAL.value,
+        "tangential": AuthoringGridScaleKind.TANGENTIAL.value,
+    }
+    normalized = aliases.get(str(value or "linear").strip().lower())
+    if normalized is None:
+        raise TemplateValidationError(
+            "Grid scale must be linear, logarithmic/exponential, or tangential."
+        )
+    return normalized
+
+
+def _grid_spacing_mode(value: object) -> str:
+    """Normalize legacy count/manual and scale/auto spacing aliases."""
+    aliases = {
+        "count": AuthoringGridSpacingMode.COUNT.value,
+        "manual": AuthoringGridSpacingMode.COUNT.value,
+        "scale": AuthoringGridSpacingMode.SCALE.value,
+        "auto": AuthoringGridSpacingMode.SCALE.value,
+    }
+    normalized = aliases.get(str(value or "count").strip().lower())
+    if normalized is None:
+        raise TemplateValidationError("Grid spacing must be count/manual or scale/auto.")
+    return normalized
+
+
+def _grid_from_legacy(value: object, *, context: str) -> AuthoringGridSpec:
+    """Normalize the nested legacy grid envelope into canonical flat fields."""
+    data = _mapping(value or {}, context=context)
+    horizontal = _mapping(data.get("horizontal", {}), context=f"{context}.horizontal")
+    vertical = _mapping(data.get("vertical", {}), context=f"{context}.vertical")
+    horizontal_main = _mapping(horizontal.get("main", {}), context=f"{context}.horizontal.main")
+    horizontal_secondary = _mapping(
+        horizontal.get("secondary", {}), context=f"{context}.horizontal.secondary"
+    )
+    vertical_main = _mapping(vertical.get("main", {}), context=f"{context}.vertical.main")
+    vertical_secondary = _mapping(
+        vertical.get("secondary", {}), context=f"{context}.vertical.secondary"
+    )
+
+    major = bool(data.get("major", True))
+    minor = bool(data.get("minor", True))
+    major_alpha = float(data.get("major_alpha", 0.35))
+    minor_alpha = float(data.get("minor_alpha", 0.15))
+    global_display = _grid_display_mode(data.get("display"), default=AuthoringGridDisplayMode.BELOW)
+    horizontal_display = _grid_display_mode(
+        horizontal.get("display", global_display),
+        default=AuthoringGridDisplayMode(global_display),
+    )
+    vertical_display = _grid_display_mode(
+        vertical.get("display", global_display),
+        default=AuthoringGridDisplayMode(global_display),
+    )
+
+    try:
+        return AuthoringGridSpec(
+            display=global_display,
+            major=major,
+            minor=minor,
+            major_alpha=major_alpha,
+            minor_alpha=minor_alpha,
+            horizontal_display=horizontal_display,
+            horizontal_major_visible=bool(horizontal_main.get("visible", major)),
+            horizontal_minor_visible=bool(horizontal_secondary.get("visible", minor)),
+            horizontal_major_color=_as_text(
+                horizontal_main.get("color"), context=f"{context}.horizontal.main.color"
+            ),
+            horizontal_minor_color=_as_text(
+                horizontal_secondary.get("color"),
+                context=f"{context}.horizontal.secondary.color",
+            ),
+            horizontal_major_thickness=(
+                float(horizontal_main["thickness"]) if "thickness" in horizontal_main else None
+            ),
+            horizontal_minor_thickness=(
+                float(horizontal_secondary["thickness"])
+                if "thickness" in horizontal_secondary
+                else None
+            ),
+            horizontal_major_alpha=float(horizontal_main.get("alpha", major_alpha)),
+            horizontal_minor_alpha=float(horizontal_secondary.get("alpha", minor_alpha)),
+            vertical_display=vertical_display,
+            vertical_main_visible=bool(vertical_main.get("visible", major)),
+            vertical_main_line_count=int(vertical_main.get("line_count", 4)),
+            vertical_main_thickness=(
+                float(vertical_main["thickness"]) if "thickness" in vertical_main else None
+            ),
+            vertical_main_color=_as_text(
+                vertical_main.get("color"), context=f"{context}.vertical.main.color"
+            ),
+            vertical_main_alpha=float(vertical_main.get("alpha", major_alpha)),
+            vertical_main_scale=_grid_scale_kind(vertical_main.get("scale")),
+            vertical_main_spacing_mode=_grid_spacing_mode(vertical_main.get("spacing_mode")),
+            vertical_secondary_visible=bool(vertical_secondary.get("visible", minor)),
+            vertical_secondary_line_count=int(vertical_secondary.get("line_count", 4)),
+            vertical_secondary_thickness=(
+                float(vertical_secondary["thickness"])
+                if "thickness" in vertical_secondary
+                else None
+            ),
+            vertical_secondary_color=_as_text(
+                vertical_secondary.get("color"),
+                context=f"{context}.vertical.secondary.color",
+            ),
+            vertical_secondary_alpha=float(vertical_secondary.get("alpha", minor_alpha)),
+            vertical_secondary_scale=_grid_scale_kind(vertical_secondary.get("scale")),
+            vertical_secondary_spacing_mode=_grid_spacing_mode(
+                vertical_secondary.get("spacing_mode")
+            ),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_grid_to_mapping(grid: AuthoringGridSpec) -> dict[str, Any]:
+    """Project canonical grid fields to the renderer's nested YAML envelope."""
+    values = grid.model_dump(mode="json", exclude_none=True)
+
+    def horizontal_line(prefix: str) -> dict[str, Any]:
+        return {
+            "visible": values[f"{prefix}_visible"],
+            **({"color": values[f"{prefix}_color"]} if f"{prefix}_color" in values else {}),
+            **(
+                {"thickness": values[f"{prefix}_thickness"]}
+                if f"{prefix}_thickness" in values
+                else {}
+            ),
+            **({"alpha": values[f"{prefix}_alpha"]} if f"{prefix}_alpha" in values else {}),
+        }
+
+    def vertical_line(prefix: str) -> dict[str, Any]:
+        return {
+            "visible": values[f"{prefix}_visible"],
+            "line_count": values[f"{prefix}_line_count"],
+            **({"color": values[f"{prefix}_color"]} if f"{prefix}_color" in values else {}),
+            **(
+                {"thickness": values[f"{prefix}_thickness"]}
+                if f"{prefix}_thickness" in values
+                else {}
+            ),
+            "alpha": values[f"{prefix}_alpha"],
+            "scale": values[f"{prefix}_scale"],
+            "spacing_mode": values[f"{prefix}_spacing_mode"],
+        }
+
+    return {
+        "display": values["display"],
+        "major": values["major"],
+        "minor": values["minor"],
+        "major_alpha": values["major_alpha"],
+        "minor_alpha": values["minor_alpha"],
+        "horizontal": {
+            "display": values["horizontal_display"],
+            "main": horizontal_line("horizontal_major"),
+            "secondary": horizontal_line("horizontal_minor"),
+        },
+        "vertical": {
+            "display": values["vertical_display"],
+            "main": vertical_line("vertical_main"),
+            "secondary": vertical_line("vertical_secondary"),
+        },
+    }
 
 
 def _track_kind(value: object) -> str:
@@ -516,9 +714,7 @@ def _legacy_to_authoring(
                             binding_id=binding_ids_by_index[binding_index],
                             track_bindings=track_bindings,
                             binding_ids_by_index=binding_ids_by_index,
-                            context=(
-                                f"document.bindings.channels[{binding_index}].fill"
-                            ),
+                            context=(f"document.bindings.channels[{binding_index}].fill"),
                         )
                     )
 
@@ -527,6 +723,7 @@ def _legacy_to_authoring(
                 "id": track_id,
                 "title": _as_text(track.get("title"), context="track.title", default=track_id),
                 "width_mm": float(track["width_mm"]),
+                "grid": _grid_from_legacy(track.get("grid"), context=f"track {track_id}.grid"),
                 "extensions": extensions,
             }
             x_scale = _scale_from_mapping(track.get("x_scale"), context=f"track {track_id}.x_scale")
@@ -787,6 +984,7 @@ def _render_track(
             "title": track.title,
             "kind": track.kind,
             "width_mm": track.width_mm,
+            "grid": authoring_grid_to_mapping(track.grid),
             "elements": [],
         }
     )

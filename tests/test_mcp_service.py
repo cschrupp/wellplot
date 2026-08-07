@@ -1072,6 +1072,12 @@ class McpServiceTests(unittest.TestCase):
                         "min": 0.2,
                         "max": 2000.0,
                     },
+                    "grid": {
+                        "vertical_main_color": "#333333",
+                        "vertical_main_scale": "logarithmic",
+                        "vertical_main_spacing_mode": "scale",
+                        "vertical_main_line_count": 5,
+                    },
                 },
                 root=REPO_ROOT,
             )
@@ -1082,12 +1088,19 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(result.track["title"], "Resistivity")
             self.assertEqual(result.track["width_mm"], 30.0)
             self.assertEqual(result.track["x_scale"]["kind"], "log")
+            self.assertEqual(result.track["grid"]["vertical"]["main"]["color"], "#333333")
+            self.assertEqual(
+                result.track["grid"]["vertical"]["main"]["spacing_mode"],
+                "scale",
+            )
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             tracks = saved_mapping["document"]["layout"]["log_sections"][0]["tracks"]
             saved_track = next(track for track in tracks if track["id"] == "rt")
             self.assertEqual(saved_track["title"], "Resistivity")
             self.assertEqual(saved_track["x_scale"]["max"], 2000.0)
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["line_count"], 5)
+            self.assertEqual(saved_track["grid"]["vertical"]["main"]["scale"], "logarithmic")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_track_rejects_unknown_patch_key(self) -> None:

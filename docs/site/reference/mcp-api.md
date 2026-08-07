@@ -1144,6 +1144,9 @@ Behavior:
 - `canonical_patch_keys` is generated from the typed authoring service patch
   models; the legacy patch-key lists remain compatibility vocabulary and may
   include renderer-specific fields
+- the canonical `track` patch includes a typed `grid` object; grid updates are
+  merged with the existing grid and normalized aliases such as `exponential`
+  and `auto` are converted to canonical `logarithmic` and `scale` values
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current
