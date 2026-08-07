@@ -4867,11 +4867,118 @@ def _legacy_style_from_authoring(
 
 
 _ANNOTATION_CORE_KEYS = {
-    "interval": {"kind", "top", "base", "text"},
-    "text": {"kind", "depth", "text"},
-    "marker": {"kind", "depth", "shape", "label"},
-    "arrow": {"kind", "top", "base", "label"},
-    "glyph": {"kind", "depth", "glyph"},
+    "interval": {
+        "kind",
+        "top",
+        "base",
+        "text",
+        "lane_start",
+        "lane_end",
+        "fill_color",
+        "fill_alpha",
+        "border_color",
+        "border_linewidth",
+        "border_style",
+        "text_color",
+        "text_orientation",
+        "text_wrap",
+        "horizontal_alignment",
+        "vertical_alignment",
+        "font_size",
+        "font_weight",
+        "font_style",
+        "padding",
+    },
+    "text": {
+        "kind",
+        "depth",
+        "top",
+        "base",
+        "text",
+        "lane_start",
+        "lane_end",
+        "color",
+        "background_color",
+        "border_color",
+        "border_linewidth",
+        "text_orientation",
+        "wrap",
+        "horizontal_alignment",
+        "vertical_alignment",
+        "font_size",
+        "font_weight",
+        "font_style",
+        "padding",
+    },
+    "marker": {
+        "kind",
+        "depth",
+        "x",
+        "shape",
+        "size",
+        "color",
+        "fill_color",
+        "edge_color",
+        "line_width",
+        "label",
+        "text_side",
+        "text_x",
+        "depth_offset",
+        "font_size",
+        "font_weight",
+        "font_style",
+        "arrow",
+        "arrow_style",
+        "arrow_linewidth",
+        "priority",
+        "label_mode",
+        "label_lane_start",
+        "label_lane_end",
+    },
+    "arrow": {
+        "kind",
+        "start_depth",
+        "end_depth",
+        "start_x",
+        "end_x",
+        "top",
+        "base",
+        "color",
+        "line_width",
+        "line_style",
+        "arrow_style",
+        "label",
+        "label_x",
+        "label_depth",
+        "font_size",
+        "font_weight",
+        "font_style",
+        "text_rotation",
+        "priority",
+        "label_mode",
+        "label_lane_start",
+        "label_lane_end",
+    },
+    "glyph": {
+        "kind",
+        "depth",
+        "top",
+        "base",
+        "glyph",
+        "lane_start",
+        "lane_end",
+        "color",
+        "background_color",
+        "border_color",
+        "border_linewidth",
+        "font_size",
+        "font_weight",
+        "font_style",
+        "rotation",
+        "horizontal_alignment",
+        "vertical_alignment",
+        "padding",
+    },
 }
 
 
@@ -4902,6 +5009,13 @@ def _typed_annotation(
         return None
     data["kind"] = kind
     data["annotation_id"] = annotation_id
+    if kind == "arrow":
+        if "top" in data:
+            data["start_depth"] = data.pop("top")
+        if "base" in data:
+            data["end_depth"] = data.pop("base")
+        data.setdefault("start_x", 0.5)
+        data.setdefault("end_x", 0.5)
     try:
         return TypeAdapter(AnnotationSpec).validate_python(data)
     except ValidationError as exc:
@@ -4977,6 +5091,12 @@ def _apply_canonical_annotation_update(
     )
     candidate = current.model_dump(mode="python", exclude_none=True)
     candidate.update(deepcopy(patch))
+    if kind in {"text", "glyph"}:
+        if "depth" in patch:
+            candidate.pop("top", None)
+            candidate.pop("base", None)
+        elif "top" in patch or "base" in patch:
+            candidate.pop("depth", None)
     typed = _typed_annotation(candidate, annotation_id=annotation_id)
     if typed is None:
         return False
@@ -4988,7 +5108,19 @@ def _apply_canonical_annotation_update(
             annotation=typed,
         )
     )
-    annotations[annotation_index] = _merge_optional_patch(annotation, patch)
+    updated_annotation = _merge_optional_patch(annotation, patch)
+    if kind == "arrow":
+        if "top" in patch:
+            updated_annotation["start_depth"] = updated_annotation.pop("top")
+        if "base" in patch:
+            updated_annotation["end_depth"] = updated_annotation.pop("base")
+    elif kind in {"text", "glyph"}:
+        if "depth" in patch:
+            updated_annotation.pop("top", None)
+            updated_annotation.pop("base", None)
+        elif "top" in patch or "base" in patch:
+            updated_annotation.pop("depth", None)
+    annotations[annotation_index] = updated_annotation
     return True
 
 

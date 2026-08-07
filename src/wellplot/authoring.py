@@ -598,43 +598,26 @@ def _annotation_from_mapping(
 ):
     data = _mapping(value, context=context)
     kind = str(data.get("kind", "text")).strip().lower()
+    data["kind"] = kind
+    data["annotation_id"] = annotation_id
+    if kind == "arrow":
+        if "start_depth" not in data and "top" in data:
+            data["start_depth"] = data.pop("top")
+        if "end_depth" not in data and "base" in data:
+            data["end_depth"] = data.pop("base")
+        data.setdefault("start_x", 0.5)
+        data.setdefault("end_x", 0.5)
     try:
         if kind == "interval":
-            return AnnotationIntervalSpec(
-                annotation_id=annotation_id,
-                top=float(data["top"]),
-                base=float(data["base"]),
-                text=str(data.get("text", "")),
-            )
+            return AnnotationIntervalSpec.model_validate(data)
         if kind == "text":
-            depth = data.get("depth")
-            if depth is None:
-                raise TemplateValidationError(f"{context}.depth is required for text annotations.")
-            return AnnotationTextSpec(
-                annotation_id=annotation_id,
-                depth=float(depth),
-                text=str(data["text"]),
-            )
+            return AnnotationTextSpec.model_validate(data)
         if kind == "marker":
-            return AnnotationMarkerSpec(
-                annotation_id=annotation_id,
-                depth=float(data["depth"]),
-                shape=str(data.get("shape", "circle")),
-                label=_as_text(data.get("label"), context=f"{context}.label"),
-            )
+            return AnnotationMarkerSpec.model_validate(data)
         if kind == "arrow":
-            return AnnotationArrowSpec(
-                annotation_id=annotation_id,
-                top=float(data["top"]),
-                base=float(data["base"]),
-                label=_as_text(data.get("label"), context=f"{context}.label"),
-            )
+            return AnnotationArrowSpec.model_validate(data)
         if kind == "glyph":
-            return AnnotationGlyphSpec(
-                annotation_id=annotation_id,
-                depth=float(data["depth"]),
-                glyph=str(data["glyph"]),
-            )
+            return AnnotationGlyphSpec.model_validate(data)
     except (KeyError, TypeError, ValueError, ValidationError) as exc:
         raise TemplateValidationError(f"Invalid {context}.") from exc
     raise TemplateValidationError(f"Unsupported annotation kind {kind!r} at {context}.")

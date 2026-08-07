@@ -240,6 +240,34 @@ def test_production_template_inheritance_loads_through_adapter() -> None:
     assert len(authoring_document_to_render(document).tracks) == 4
 
 
+def test_annotation_objects_preserve_renderer_geometry_and_styling() -> None:
+    """Normalize every annotation kind without dropping its display controls."""
+    document = load_authoring_document(Path("examples/annotation_track_objects_showcase.log.yaml"))
+    track = document.sections[0].tracks[2]
+
+    assert len(track.annotations) == 11
+    interval = track.annotations[0]
+    text = track.annotations[1]
+    marker = track.annotations[6]
+    arrow = track.annotations[9]
+    glyph = track.annotations[10]
+    assert interval.fill_color == "#2047a3"
+    assert interval.text_orientation == "vertical"
+    assert text.top == 670
+    assert text.base == 688
+    assert text.background_color == "#dbe7ff"
+    assert marker.label_mode.value == "dedicated_lane"
+    assert marker.label_lane_end == 0.98
+    assert arrow.start_depth == 696
+    assert arrow.end_x == 0.18
+    assert glyph.border_linewidth == 0.5
+
+    rendered = authoring_document_to_render(document)
+    rendered_arrow = rendered.tracks[2].annotations[9]
+    assert rendered_arrow.start_depth == 696
+    assert rendered_arrow.end_x == 0.18
+
+
 def test_ambiguous_legacy_binding_requires_section() -> None:
     """The adapter must not guess when a legacy track exists in two sections."""
     mapping = _legacy_mapping()

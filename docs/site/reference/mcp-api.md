@@ -581,6 +581,8 @@ Behavior:
 - selects the target object by zero-based `annotation_index`
 - rejects unsupported patch keys
 - deep-merges optional fields and removes keys when a patch value is `null`
+- validates annotation geometry, label lanes, marker shapes, typography, and
+  arrow styling through the canonical authoring contract
 - validates the mutated draft before saving
 
 ### `remove_annotation_object(logfile_path, section_id, track_id, annotation_index)`

@@ -41,6 +41,8 @@ from .authoring import (
     ArrayTrackSpec as AuthoringArrayTrackSpec,
 )
 from .authoring import (
+    AuthoringAnnotationLabelMode,
+    AuthoringAnnotationMarkerShape,
     AuthoringCurveFillKind,
     AuthoringCurveHeaderDisplayPatch,
     AuthoringCurveHeaderDisplaySpec,
@@ -158,6 +160,8 @@ from .document import (
 __all__ = [
     "ArrayChannel",
     "AuthoringAnnotationArrowSpec",
+    "AuthoringAnnotationLabelMode",
+    "AuthoringAnnotationMarkerShape",
     "AuthoringAnnotationGlyphSpec",
     "AuthoringAnnotationIntervalSpec",
     "AuthoringAnnotationMarkerSpec",

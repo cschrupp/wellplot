@@ -385,8 +385,9 @@ Implementation checkpoint:
   relations and projected back without losing renderer-specific fill fields
 - the legacy logfile mapping remains the persistence/render boundary, with a
   canonical validation gate on every persisted MCP mutation
-- renderer-only annotation fields remain compatibility-path fields until their
-  canonical models and service operations are added
+- annotation geometry, label placement, typography, fill, border, marker, and
+  arrow styling now have typed canonical object fields; legacy arrow `top` /
+  `base` aliases normalize to canonical start/end geometry
 - `inspect_authoring_vocab` and the patch-schema resource expose generated
   `canonical_patch_keys` from the typed service models; legacy patch-key lists
   remain as compatibility catalogs while renderer-only fields are migrated

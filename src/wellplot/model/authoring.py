@@ -104,6 +104,30 @@ class AuthoringTrackHeaderObjectKind(StrEnum):
     DIVISIONS = "divisions"
 
 
+class AuthoringAnnotationLabelMode(StrEnum):
+    """Placement strategies for annotation labels."""
+
+    NONE = "none"
+    FREE = "free"
+    DEDICATED_LANE = "dedicated_lane"
+
+
+class AuthoringAnnotationMarkerShape(StrEnum):
+    """Supported marker glyphs for annotation objects."""
+
+    CIRCLE = "circle"
+    SQUARE = "square"
+    DIAMOND = "diamond"
+    TRIANGLE_UP = "triangle_up"
+    TRIANGLE_DOWN = "triangle_down"
+    TRIANGLE_LEFT = "triangle_left"
+    TRIANGLE_RIGHT = "triangle_right"
+    X = "x"
+    PLUS = "plus"
+    BAR_HORIZONTAL = "bar_horizontal"
+    BAR_VERTICAL = "bar_vertical"
+
+
 class AuthoringReferenceOverlayMode(StrEnum):
     """Display modes for a curve overlaid on a reference track."""
 
@@ -558,12 +582,30 @@ class AnnotationIntervalSpec(_AuthoringModel):
     top: float
     base: float
     text: str = ""
+    lane_start: float = Field(default=0.0, ge=0, lt=1)
+    lane_end: float = Field(default=1.0, gt=0, le=1)
+    fill_color: str = Field(default="#d9d9d9", min_length=1)
+    fill_alpha: float = Field(default=1.0, ge=0, le=1)
+    border_color: str = Field(default="#222222", min_length=1)
+    border_linewidth: float = Field(default=0.6, gt=0)
+    border_style: str = Field(default="-", min_length=1)
+    text_color: str = Field(default="#111111", min_length=1)
+    text_orientation: Literal["horizontal", "vertical"] = "horizontal"
+    text_wrap: bool = True
+    horizontal_alignment: Literal["left", "center", "right"] = "center"
+    vertical_alignment: Literal["top", "center", "bottom"] = "center"
+    font_size: float = Field(default=7.0, gt=0)
+    font_weight: str = Field(default="normal", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    padding: float = Field(default=0.02, ge=0)
 
     @model_validator(mode="after")
     def validate_range(self) -> AnnotationIntervalSpec:
         """Require the interval base to be deeper than its top."""
         if self.base <= self.top:
             raise ValueError("Annotation interval base must be greater than top.")
+        if self.lane_start >= self.lane_end:
+            raise ValueError("Annotation interval lane_start must be less than lane_end.")
         return self
 
 
@@ -572,8 +614,39 @@ class AnnotationTextSpec(_AuthoringModel):
 
     kind: Literal["text"] = "text"
     annotation_id: str = Field(min_length=1)
-    depth: float
+    depth: float | None = None
     text: str = Field(min_length=1)
+    top: float | None = None
+    base: float | None = None
+    lane_start: float = Field(default=0.0, ge=0, lt=1)
+    lane_end: float = Field(default=1.0, gt=0, le=1)
+    color: str = Field(default="#111111", min_length=1)
+    background_color: str | None = Field(default=None, min_length=1)
+    border_color: str | None = Field(default=None, min_length=1)
+    border_linewidth: float | None = Field(default=None, gt=0)
+    text_orientation: Literal["horizontal", "vertical"] = "horizontal"
+    wrap: bool = True
+    horizontal_alignment: Literal["left", "center", "right"] = "center"
+    vertical_alignment: Literal["top", "center", "bottom"] = "center"
+    font_size: float = Field(default=7.0, gt=0)
+    font_weight: str = Field(default="normal", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    padding: float = Field(default=0.02, ge=0)
+
+    @model_validator(mode="after")
+    def validate_placement(self) -> AnnotationTextSpec:
+        """Require either a point depth or a complete interval."""
+        has_depth = self.depth is not None
+        has_interval = self.top is not None or self.base is not None
+        if has_depth == has_interval:
+            raise ValueError("Annotation text must define either depth or top/base.")
+        if (self.top is None) != (self.base is None):
+            raise ValueError("Annotation text top and base must be set together.")
+        if self.top is not None and self.base is not None and self.base <= self.top:
+            raise ValueError("Annotation text base must be greater than top.")
+        if self.lane_start >= self.lane_end:
+            raise ValueError("Annotation text lane_start must be less than lane_end.")
+        return self
 
 
 class AnnotationMarkerSpec(_AuthoringModel):
@@ -582,8 +655,41 @@ class AnnotationMarkerSpec(_AuthoringModel):
     kind: Literal["marker"] = "marker"
     annotation_id: str = Field(min_length=1)
     depth: float
-    shape: str = Field(default="circle", min_length=1)
+    x: float = Field(default=0.5, ge=0, le=1)
+    shape: AuthoringAnnotationMarkerShape = AuthoringAnnotationMarkerShape.CIRCLE
+    size: float = Field(default=32.0, gt=0)
+    color: str = Field(default="#111111", min_length=1)
+    fill_color: str | None = Field(default=None, min_length=1)
+    edge_color: str | None = Field(default=None, min_length=1)
+    line_width: float = Field(default=0.8, gt=0)
     label: str | None = Field(default=None, min_length=1)
+    text_side: Literal["auto", "left", "right"] = "auto"
+    text_x: float | None = Field(default=None, ge=0, le=1)
+    depth_offset: float | None = None
+    font_size: float | None = Field(default=None, gt=0)
+    font_weight: str = Field(default="bold", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    arrow: bool = True
+    arrow_style: str | None = Field(default=None, min_length=1)
+    arrow_linewidth: float | None = Field(default=None, gt=0)
+    priority: int = 100
+    label_mode: AuthoringAnnotationLabelMode = AuthoringAnnotationLabelMode.FREE
+    label_lane_start: float | None = Field(default=None, ge=0, lt=1)
+    label_lane_end: float | None = Field(default=None, gt=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_label_lane(self) -> AnnotationMarkerSpec:
+        """Require a complete lane only for dedicated marker labels."""
+        if (self.label_lane_start is None) != (self.label_lane_end is None):
+            raise ValueError("Marker label lane bounds must be set together.")
+        if self.label_lane_start is not None and self.label_lane_start >= self.label_lane_end:
+            raise ValueError("Marker label_lane_start must be less than label_lane_end.")
+        if self.label_mode == AuthoringAnnotationLabelMode.DEDICATED_LANE:
+            if self.label_lane_start is None or self.label_lane_end is None:
+                raise ValueError("Dedicated marker labels require lane bounds.")
+        elif self.label_lane_start is not None:
+            raise ValueError("Marker lane bounds require dedicated_lane label mode.")
+        return self
 
 
 class AnnotationArrowSpec(_AuthoringModel):
@@ -591,15 +697,38 @@ class AnnotationArrowSpec(_AuthoringModel):
 
     kind: Literal["arrow"] = "arrow"
     annotation_id: str = Field(min_length=1)
-    top: float
-    base: float
+    start_depth: float
+    end_depth: float
+    start_x: float = Field(ge=0, le=1)
+    end_x: float = Field(ge=0, le=1)
     label: str | None = Field(default=None, min_length=1)
+    color: str = Field(default="#222222", min_length=1)
+    line_width: float = Field(default=0.8, gt=0)
+    line_style: str = Field(default="-", min_length=1)
+    arrow_style: str = Field(default="-|>", min_length=1)
+    label_x: float | None = Field(default=None, ge=0, le=1)
+    label_depth: float | None = None
+    font_size: float = Field(default=7.0, gt=0)
+    font_weight: str = Field(default="bold", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    text_rotation: float = 0.0
+    priority: int = 100
+    label_mode: AuthoringAnnotationLabelMode = AuthoringAnnotationLabelMode.FREE
+    label_lane_start: float | None = Field(default=None, ge=0, lt=1)
+    label_lane_end: float | None = Field(default=None, gt=0, le=1)
 
     @model_validator(mode="after")
     def validate_range(self) -> AnnotationArrowSpec:
         """Require the arrow base to be deeper than its top."""
-        if self.base <= self.top:
-            raise ValueError("Annotation arrow base must be greater than top.")
+        if (self.label_lane_start is None) != (self.label_lane_end is None):
+            raise ValueError("Arrow label lane bounds must be set together.")
+        if self.label_lane_start is not None and self.label_lane_start >= self.label_lane_end:
+            raise ValueError("Arrow label_lane_start must be less than label_lane_end.")
+        if self.label_mode == AuthoringAnnotationLabelMode.DEDICATED_LANE:
+            if self.label_lane_start is None or self.label_lane_end is None:
+                raise ValueError("Dedicated arrow labels require lane bounds.")
+        elif self.label_lane_start is not None:
+            raise ValueError("Arrow lane bounds require dedicated_lane label mode.")
         return self
 
 
@@ -608,8 +737,38 @@ class AnnotationGlyphSpec(_AuthoringModel):
 
     kind: Literal["glyph"] = "glyph"
     annotation_id: str = Field(min_length=1)
-    depth: float
+    depth: float | None = None
     glyph: str = Field(min_length=1)
+    top: float | None = None
+    base: float | None = None
+    lane_start: float = Field(default=0.0, ge=0, lt=1)
+    lane_end: float = Field(default=1.0, gt=0, le=1)
+    color: str = Field(default="#111111", min_length=1)
+    background_color: str | None = Field(default=None, min_length=1)
+    border_color: str | None = Field(default=None, min_length=1)
+    border_linewidth: float | None = Field(default=None, gt=0)
+    font_size: float = Field(default=9.0, gt=0)
+    font_weight: str = Field(default="bold", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    rotation: float = 0.0
+    horizontal_alignment: Literal["left", "center", "right"] = "center"
+    vertical_alignment: Literal["top", "center", "bottom"] = "center"
+    padding: float = Field(default=0.02, ge=0)
+
+    @model_validator(mode="after")
+    def validate_placement(self) -> AnnotationGlyphSpec:
+        """Require either a point depth or a complete interval."""
+        has_depth = self.depth is not None
+        has_interval = self.top is not None or self.base is not None
+        if has_depth == has_interval:
+            raise ValueError("Annotation glyph must define either depth or top/base.")
+        if (self.top is None) != (self.base is None):
+            raise ValueError("Annotation glyph top and base must be set together.")
+        if self.top is not None and self.base is not None and self.base <= self.top:
+            raise ValueError("Annotation glyph base must be greater than top.")
+        if self.lane_start >= self.lane_end:
+            raise ValueError("Annotation glyph lane_start must be less than lane_end.")
+        return self
 
 
 AnnotationSpec: TypeAlias = Annotated[
@@ -843,6 +1002,8 @@ __all__ = [
     "AnnotationMarkerSpec",
     "AnnotationSpec",
     "AnnotationTextSpec",
+    "AuthoringAnnotationLabelMode",
+    "AuthoringAnnotationMarkerShape",
     "ArrayTrackSpec",
     "AuthoringCurveFillKind",
     "AuthoringCurveHeaderDisplayPatch",
