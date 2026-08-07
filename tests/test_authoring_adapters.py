@@ -330,3 +330,59 @@ def test_reference_overlay_round_trips_as_typed_binding_content() -> None:
     rendered = authoring_document_to_render(normalized)
     assert rendered.tracks[0].elements[0].reference_overlay is not None
     assert rendered.tracks[0].elements[0].reference_overlay.threshold == 1.5
+
+
+def test_reference_track_presentation_round_trips_as_typed_content() -> None:
+    """Normalize and render the complete reference-track presentation contract."""
+    mapping = _legacy_mapping()
+    document = mapping["document"]
+    assert isinstance(document, dict)
+    layout = document["layout"]
+    assert isinstance(layout, dict)
+    track = layout["log_sections"][0]["tracks"][0]
+    track["kind"] = "reference"
+    track["reference"] = {
+        "axis": "depth",
+        "define_layout": True,
+        "unit": "ft",
+        "scale_ratio": 500,
+        "major_step": 50,
+        "minor_step": 10,
+        "secondary_grid": {"display": False, "line_count": 5},
+        "header": {
+            "display_unit": False,
+            "display_scale": True,
+            "display_annotations": False,
+        },
+        "number_format": {"format": "fixed", "precision": 1},
+        "values_orientation": "vertical",
+        "events": [
+            {
+                "depth": 1002.0,
+                "label": "Casing Foot",
+                "color": "#8b5a2b",
+                "line_style": "--",
+                "text_side": "left",
+                "text_x": 0.72,
+            }
+        ],
+    }
+
+    normalized = authoring_document_from_mapping(mapping)
+    reference = normalized.sections[0].tracks[0]
+    assert reference.scale_ratio == 500
+    assert reference.major_step == 50
+    assert reference.secondary_grid_display is False
+    assert reference.display_unit_in_header is False
+    assert reference.number_format.value == "fixed"
+    assert reference.values_orientation == "vertical"
+    assert reference.events[0].label == "Casing Foot"
+
+    rendered = authoring_document_to_render(normalized)
+    rendered_reference = rendered.tracks[0].reference
+    assert rendered_reference is not None
+    assert rendered_reference.scale_ratio == 500
+    assert rendered_reference.secondary_grid_display is False
+    assert rendered_reference.display_unit_in_header is False
+    assert rendered_reference.number_format.value == "fixed"
+    assert rendered_reference.events[0].line_style == "--"

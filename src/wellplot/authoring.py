@@ -58,6 +58,7 @@ from .model.authoring import (
     AuthoringGridScaleKind,
     AuthoringGridSpacingMode,
     AuthoringGridSpec,
+    AuthoringNumberFormatKind,
     AuthoringPageSpec,
     AuthoringRasterColorbarSpec,
     AuthoringRasterNormalizationKind,
@@ -65,6 +66,7 @@ from .model.authoring import (
     AuthoringRasterSampleAxisSpec,
     AuthoringRasterWaveformSpec,
     AuthoringReferenceAxisKind,
+    AuthoringReferenceEventSpec,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
     AuthoringScale,
@@ -150,6 +152,55 @@ def authoring_reference_overlay_to_mapping(
 ) -> dict[str, Any]:
     """Project a canonical reference overlay to its legacy YAML envelope."""
     return overlay.model_dump(mode="json", exclude_none=True)
+
+
+def _reference_events_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> list[AuthoringReferenceEventSpec]:
+    """Normalize legacy reference events into typed canonical objects."""
+    if value is None:
+        return []
+    items = _sequence(value, context=context)
+    try:
+        return [AuthoringReferenceEventSpec.model_validate(item) for item in items]
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_reference_events_to_mapping(
+    events: Sequence[AuthoringReferenceEventSpec],
+) -> list[dict[str, Any]]:
+    """Project typed reference events to the renderer's event list."""
+    return [event.model_dump(mode="json", exclude_none=True) for event in events]
+
+
+def authoring_reference_track_to_mapping(track: ReferenceTrackSpec) -> dict[str, Any]:
+    """Project a typed reference track to the renderer's nested envelope."""
+    return {
+        "axis": track.axis.value,
+        "define_layout": track.define_layout,
+        **({"unit": track.unit} if track.unit is not None else {}),
+        **({"scale_ratio": track.scale_ratio} if track.scale_ratio is not None else {}),
+        **({"major_step": track.major_step} if track.major_step is not None else {}),
+        **({"minor_step": track.minor_step} if track.minor_step is not None else {}),
+        "secondary_grid": {
+            "display": track.secondary_grid_display,
+            "line_count": track.secondary_grid_line_count,
+        },
+        "header": {
+            "display_unit": track.display_unit_in_header,
+            "display_scale": track.display_scale_in_header,
+            "display_annotations": track.display_annotations_in_header,
+        },
+        "number_format": {
+            "format": track.number_format.value,
+            "precision": track.precision,
+        },
+        "values_orientation": track.values_orientation,
+        "events": authoring_reference_events_to_mapping(track.events),
+    }
 
 
 def _curve_callouts_from_legacy(
@@ -1042,10 +1093,56 @@ def _legacy_to_authoring(
                     track.get("reference", {}), context=f"track {track_id}.reference"
                 )
                 axis = AuthoringReferenceAxisKind(str(reference.get("axis", "depth")).lower())
+                secondary_grid = _mapping(
+                    reference.get("secondary_grid", {}),
+                    context=f"track {track_id}.reference.secondary_grid",
+                )
+                header = _mapping(
+                    reference.get("header", {}),
+                    context=f"track {track_id}.reference.header",
+                )
+                number_format = _mapping(
+                    reference.get("number_format", {}),
+                    context=f"track {track_id}.reference.number_format",
+                )
+                number_format_value = str(number_format.get("format", "automatic")).lower()
+                number_format_value = {
+                    "auto": "automatic",
+                    "automatic": "automatic",
+                }.get(number_format_value, number_format_value)
                 authoring_tracks.append(
                     ReferenceTrackSpec(
                         **common,
                         axis=axis,
+                        define_layout=bool(reference.get("define_layout", True)),
+                        unit=_as_text(reference.get("unit"), context="reference.unit"),
+                        scale_ratio=(
+                            int(reference["scale_ratio"])
+                            if reference.get("scale_ratio") is not None
+                            else None
+                        ),
+                        major_step=(
+                            float(reference["major_step"])
+                            if reference.get("major_step") is not None
+                            else None
+                        ),
+                        minor_step=(
+                            float(reference["minor_step"])
+                            if reference.get("minor_step") is not None
+                            else None
+                        ),
+                        secondary_grid_display=bool(secondary_grid.get("display", True)),
+                        secondary_grid_line_count=int(secondary_grid.get("line_count", 4)),
+                        display_unit_in_header=bool(header.get("display_unit", True)),
+                        display_scale_in_header=bool(header.get("display_scale", True)),
+                        display_annotations_in_header=bool(header.get("display_annotations", True)),
+                        number_format=AuthoringNumberFormatKind(number_format_value),
+                        precision=int(number_format.get("precision", 2)),
+                        values_orientation=str(reference.get("values_orientation", "horizontal")),
+                        events=_reference_events_from_legacy(
+                            reference.get("events"),
+                            context=f"track {track_id}.reference.events",
+                        ),
                         bindings=[
                             item
                             for item in canonical_bindings
@@ -1319,6 +1416,8 @@ def _render_track(
     )
     if getattr(track, "x_scale", None) is not None:
         payload["x_scale"] = track.x_scale.model_dump(mode="json", exclude_none=True)
+    if isinstance(track, ReferenceTrackSpec):
+        payload["reference"] = authoring_reference_track_to_mapping(track)
     bindings = getattr(track, "bindings", ())
     payload["elements"] = [_binding_element(binding) for binding in bindings]
     if isinstance(track, NormalTrackSpec):

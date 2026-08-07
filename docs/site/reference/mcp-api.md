@@ -474,6 +474,13 @@ Supported patch keys:
 - `reference`
 - `annotations`
 
+The `reference` patch is valid for reference/depth tracks and supports typed
+updates for `axis`, `define_layout`, `unit`, `scale_ratio`, `major_step`,
+`minor_step`, `secondary_grid_display`, `secondary_grid_line_count`, header
+visibility flags, `number_format`, `precision`, `values_orientation`, and
+replacement of the typed `events` list. Nested updates preserve omitted
+reference fields.
+
 Behavior:
 
 - deep-merges nested mapping updates such as `x_scale` and `grid`

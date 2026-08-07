@@ -19,6 +19,7 @@ from wellplot.model import (
     AuthoringRasterProfileKind,
     AuthoringRasterSampleAxisSpec,
     AuthoringRasterWaveformSpec,
+    AuthoringReferenceEventSpec,
     AuthoringReferenceOverlayMode,
     AuthoringReferenceOverlaySpec,
     AuthoringScale,
@@ -243,6 +244,27 @@ def test_reference_overlay_contract_requires_ordered_lane_bounds() -> None:
 
     with pytest.raises(ValidationError, match="less than"):
         AuthoringReferenceOverlaySpec(lane_start=0.8, lane_end=0.2)
+
+
+def test_reference_event_contract_validates_typed_presentation() -> None:
+    """Reference event geometry and formatting are part of the canonical contract."""
+    event = AuthoringReferenceEventSpec(
+        depth=1002.0,
+        label="Casing Foot",
+        color="#8b5a2b",
+        line_style="--",
+        line_width=0.9,
+        text_side="left",
+        text_x=0.72,
+        arrow=False,
+    )
+
+    assert event.label == "Casing Foot"
+    assert event.line_style == "--"
+    assert event.text_side == "left"
+
+    with pytest.raises(ValidationError, match="set together"):
+        AuthoringReferenceEventSpec(depth=1002.0, lane_start=0.2)
 
 
 def test_curve_display_contract_validates_value_labels() -> None:

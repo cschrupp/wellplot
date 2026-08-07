@@ -52,6 +52,7 @@ from ..authoring import (
     authoring_raster_sample_axis_to_mapping,
     authoring_raster_waveform_to_mapping,
     authoring_reference_overlay_to_mapping,
+    authoring_reference_track_to_mapping,
     authoring_track_header_to_mapping,
 )
 from ..authoring_service import (
@@ -5427,7 +5428,7 @@ def _apply_canonical_track_update(
     patch: dict[str, object],
 ) -> bool:
     """Apply canonical track fields and project them into the legacy envelope."""
-    canonical_keys = {"title", "width_mm", "x_scale", "grid", "track_header"}
+    canonical_keys = {"title", "width_mm", "x_scale", "reference", "grid", "track_header"}
     if not set(patch).issubset(canonical_keys):
         return False
 
@@ -5469,6 +5470,12 @@ def _apply_canonical_track_update(
         track["grid"] = authoring_grid_to_mapping(updated.grid)
     if "track_header" in patch:
         track["track_header"] = authoring_track_header_to_mapping(updated.track_header)
+    if "reference" in patch:
+        if not hasattr(updated, "axis"):
+            raise TemplateValidationError(
+                f"Track {track_id!r} does not support reference-track settings."
+            )
+        track["reference"] = authoring_reference_track_to_mapping(updated)
     return True
 
 

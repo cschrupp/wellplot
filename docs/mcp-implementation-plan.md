@@ -405,6 +405,10 @@ Implementation checkpoint:
 - raster normalization, clipping, interpolation, visibility, color limits,
   colorbars, sample axes, and waveform overlays now have typed canonical
   binding fields with nested partial-update merging
+- reference-track axis/layout settings, major/minor spacing, secondary-grid
+  visibility, header visibility, value formatting, orientation, and event
+  markers now have typed canonical fields with nested partial-update merging;
+  the adapter projects them back into the renderer's legacy reference envelope
 
 ### Slice 0.6-F. Defaults And Precedence
 

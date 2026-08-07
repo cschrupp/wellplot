@@ -42,6 +42,7 @@ from .model.authoring import (
     AuthoringDocumentSpec,
     AuthoringGridPatch,
     AuthoringGridSpec,
+    AuthoringNumberFormatKind,
     AuthoringPageSpec,
     AuthoringRasterColorbarPatch,
     AuthoringRasterColorbarSpec,
@@ -51,6 +52,8 @@ from .model.authoring import (
     AuthoringRasterSampleAxisSpec,
     AuthoringRasterWaveformPatch,
     AuthoringRasterWaveformSpec,
+    AuthoringReferenceAxisKind,
+    AuthoringReferenceEventSpec,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
     AuthoringScale,
@@ -162,12 +165,33 @@ class SectionPatch(_OperationModel):
     extensions: dict[str, Any] | None = None
 
 
+class ReferenceTrackPatch(_OperationModel):
+    """Optional reference-track fields used by a partial track update."""
+
+    axis: AuthoringReferenceAxisKind | None = None
+    define_layout: bool | None = None
+    unit: str | None = Field(default=None, min_length=1)
+    scale_ratio: int | None = Field(default=None, gt=0)
+    major_step: float | None = Field(default=None, gt=0)
+    minor_step: float | None = Field(default=None, gt=0)
+    secondary_grid_display: bool | None = None
+    secondary_grid_line_count: int | None = Field(default=None, ge=1)
+    display_unit_in_header: bool | None = None
+    display_scale_in_header: bool | None = None
+    display_annotations_in_header: bool | None = None
+    number_format: AuthoringNumberFormatKind | None = None
+    precision: int | None = Field(default=None, ge=0)
+    values_orientation: Literal["horizontal", "vertical"] | None = None
+    events: list[AuthoringReferenceEventSpec] | None = None
+
+
 class TrackPatch(_OperationModel):
     """Typed mutable fields for one track."""
 
     title: str | None = None
     width_mm: float | None = Field(default=None, gt=0)
     x_scale: AuthoringScale | None = None
+    reference: ReferenceTrackPatch | None = None
     grid: AuthoringGridPatch | None = None
     track_header: AuthoringTrackHeaderPatch | None = None
     extensions: dict[str, Any] | None = None
@@ -854,6 +878,39 @@ class AuthoringService:
         """Apply track fields while merging partial canonical grid updates."""
         for field_name in patch.model_fields_set:
             value = getattr(patch, field_name)
+            if field_name == "reference":
+                if not isinstance(track, ReferenceTrackSpec):
+                    raise ValueError("Reference settings require a reference track.")
+                if value is None:
+                    defaults = ReferenceTrackSpec()
+                    reference_fields = (
+                        "axis",
+                        "define_layout",
+                        "unit",
+                        "scale_ratio",
+                        "major_step",
+                        "minor_step",
+                        "secondary_grid_display",
+                        "secondary_grid_line_count",
+                        "display_unit_in_header",
+                        "display_scale_in_header",
+                        "display_annotations_in_header",
+                        "number_format",
+                        "precision",
+                        "values_orientation",
+                        "events",
+                    )
+                    for reference_field in reference_fields:
+                        setattr(
+                            track,
+                            reference_field,
+                            deepcopy(getattr(defaults, reference_field)),
+                        )
+                else:
+                    updates = value.model_dump(mode="python", exclude_unset=True)
+                    for reference_field, reference_value in updates.items():
+                        setattr(track, reference_field, deepcopy(reference_value))
+                continue
             if field_name == "grid":
                 if value is None:
                     track.grid = AuthoringGridSpec()
@@ -1175,6 +1232,7 @@ __all__ = [
     "MoveRequest",
     "PagePatch",
     "RasterBindingPatch",
+    "ReferenceTrackPatch",
     "RemoveRequest",
     "RemarkPatch",
     "SectionPatch",

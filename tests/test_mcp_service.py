@@ -1118,6 +1118,53 @@ class McpServiceTests(unittest.TestCase):
             self.assertTrue(saved_track["track_header"]["objects"][3]["enabled"])
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_reference_track_projects_typed_presentation(self) -> None:
+        """Persist reference-track presentation through the MCP service boundary."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="depth_custom",
+                title="Depth",
+                kind="reference",
+                width_mm=12.0,
+                root=REPO_ROOT,
+            )
+
+            result = service.update_track(
+                str(draft_path),
+                section_id="main",
+                track_id="depth_custom",
+                patch={
+                    "reference": {
+                        "scale_ratio": 500,
+                        "major_step": 50,
+                        "minor_step": 10,
+                        "secondary_grid_display": False,
+                        "display_unit_in_header": False,
+                        "number_format": "fixed",
+                        "precision": 1,
+                        "events": [{"depth": 1002.0, "label": "Casing Foot"}],
+                    }
+                },
+                root=REPO_ROOT,
+            )
+
+            reference = result.track["reference"]
+            self.assertEqual(reference["scale_ratio"], 500)
+            self.assertEqual(reference["major_step"], 50.0)
+            self.assertFalse(reference["secondary_grid"]["display"])
+            self.assertFalse(reference["header"]["display_unit"])
+            self.assertEqual(reference["number_format"]["format"], "fixed")
+            self.assertEqual(reference["events"][0]["label"], "Casing Foot")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_track_rejects_unknown_patch_key(self) -> None:
         """Reject track patches outside the supported editable surface."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:

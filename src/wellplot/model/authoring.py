@@ -418,6 +418,38 @@ class AuthoringReferenceOverlaySpec(_AuthoringModel):
         return self
 
 
+class AuthoringReferenceEventSpec(_AuthoringModel):
+    """Event marker and callout settings for a reference track."""
+
+    depth: float
+    label: str = ""
+    color: str = Field(default="#222222", min_length=1)
+    line_style: str = Field(default="-", min_length=1)
+    line_width: float = Field(default=0.7, gt=0)
+    tick_side: AuthoringReferenceTickSide = AuthoringReferenceTickSide.RIGHT
+    tick_length_ratio: float | None = Field(default=None, gt=0)
+    lane_start: float | None = Field(default=None, ge=0, le=1)
+    lane_end: float | None = Field(default=None, ge=0, le=1)
+    text_side: Literal["auto", "left", "right"] = "auto"
+    text_x: float | None = Field(default=None, ge=0, le=1)
+    depth_offset: float | None = None
+    font_size: float | None = Field(default=None, gt=0)
+    font_weight: str = Field(default="bold", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    arrow: bool = True
+    arrow_style: str | None = Field(default=None, min_length=1)
+    arrow_linewidth: float | None = Field(default=None, gt=0)
+
+    @model_validator(mode="after")
+    def validate_lane(self) -> AuthoringReferenceEventSpec:
+        """Require paired and ordered event lane bounds."""
+        if (self.lane_start is None) != (self.lane_end is None):
+            raise ValueError("Reference event lane_start and lane_end must be set together.")
+        if self.lane_start is not None and self.lane_start >= self.lane_end:
+            raise ValueError("Reference event lane_start must be less than lane_end.")
+        return self
+
+
 class AuthoringCurveHeaderDisplaySpec(_AuthoringModel):
     """Visibility controls for scalar curve header fields."""
 
@@ -880,6 +912,20 @@ class ReferenceTrackSpec(_TrackSpec):
 
     kind: Literal["reference"] = "reference"
     axis: AuthoringReferenceAxisKind = AuthoringReferenceAxisKind.DEPTH
+    define_layout: bool = True
+    unit: str | None = Field(default=None, min_length=1)
+    scale_ratio: int | None = Field(default=None, gt=0)
+    major_step: float | None = Field(default=None, gt=0)
+    minor_step: float | None = Field(default=None, gt=0)
+    secondary_grid_display: bool = True
+    secondary_grid_line_count: int = Field(default=4, ge=1)
+    display_unit_in_header: bool = True
+    display_scale_in_header: bool = True
+    display_annotations_in_header: bool = True
+    number_format: AuthoringNumberFormatKind = AuthoringNumberFormatKind.AUTOMATIC
+    precision: int = Field(default=2, ge=0)
+    values_orientation: Literal["horizontal", "vertical"] = "horizontal"
+    events: list[AuthoringReferenceEventSpec] = Field(default_factory=list)
     bindings: list[CurveBindingSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -1085,6 +1131,7 @@ __all__ = [
     "AuthoringRasterWaveformPatch",
     "AuthoringRasterWaveformSpec",
     "AuthoringReferenceAxisKind",
+    "AuthoringReferenceEventSpec",
     "AuthoringReferenceOverlayMode",
     "AuthoringReferenceOverlaySpec",
     "AuthoringReferenceTickSide",

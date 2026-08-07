@@ -26,6 +26,7 @@ from wellplot.authoring_service import (
     UpdateDepthRequest,
     UpdatePageRequest,
     UpdateSectionRequest,
+    UpdateTrackRequest,
 )
 from wellplot.model.authoring import (
     AnnotationTextSpec,
@@ -39,6 +40,7 @@ from wellplot.model.authoring import (
     CurveFillSpec,
     NormalTrackSpec,
     RasterBindingSpec,
+    ReferenceTrackSpec,
 )
 
 
@@ -184,6 +186,45 @@ def test_typed_updates_apply_partial_style_and_section_patches() -> None:
         service.get(AuthoringTarget(object_kind="section", object_id="main")).title
         == "Updated Main"
     )
+
+
+def test_reference_track_updates_merge_presentation_fields() -> None:
+    """Reference-track patches update typed axis presentation without replacing the track."""
+    service = _service()
+    service.create(
+        CreateTrackRequest(
+            section_id="main",
+            track=ReferenceTrackSpec(id="depth", title="Depth", width_mm=12),
+        )
+    )
+
+    updated = service.update(
+        UpdateTrackRequest(
+            section_id="main",
+            track_id="depth",
+            patch={
+                "reference": {
+                    "scale_ratio": 500,
+                    "major_step": 50,
+                    "minor_step": 10,
+                    "secondary_grid_display": False,
+                    "display_unit_in_header": False,
+                    "number_format": "fixed",
+                    "precision": 1,
+                    "events": [{"depth": 1002.0, "label": "Casing Foot"}],
+                }
+            },
+        )
+    )
+
+    assert updated.scale_ratio == 500
+    assert updated.major_step == 50
+    assert updated.minor_step == 10
+    assert updated.secondary_grid_display is False
+    assert updated.display_unit_in_header is False
+    assert updated.number_format.value == "fixed"
+    assert updated.precision == 1
+    assert updated.events[0].label == "Casing Foot"
 
 
 def test_document_settings_are_typed_and_parent_scoped() -> None:
