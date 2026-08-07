@@ -17,10 +17,14 @@ from wellplot.authoring_service import (
     CreateRasterBindingRequest,
     CreateRemarkRequest,
     CreateTrackRequest,
+    DepthPatch,
     MoveRequest,
+    PagePatch,
     RemoveRequest,
     SectionPatch,
     UpdateCurveBindingRequest,
+    UpdateDepthRequest,
+    UpdatePageRequest,
     UpdateSectionRequest,
 )
 from wellplot.model.authoring import (
@@ -180,6 +184,28 @@ def test_typed_updates_apply_partial_style_and_section_patches() -> None:
         service.get(AuthoringTarget(object_kind="section", object_id="main")).title
         == "Updated Main"
     )
+
+
+def test_document_settings_are_typed_and_parent_scoped() -> None:
+    """Page and depth settings use the same atomic service update contract."""
+    service = _service()
+
+    assert [item.object_id for item in service.list("page")] == ["page"]
+    assert [item.object_id for item in service.list("depth")] == ["depth"]
+
+    service.update(
+        UpdatePageRequest(patch=PagePatch(size="a4", orientation="landscape", continuous=True))
+    )
+    service.update(
+        UpdateDepthRequest(patch=DepthPatch(unit="ft", scale="1:240", major_step=10, minor_step=2))
+    )
+
+    page = service.get(AuthoringTarget(object_kind="page", object_id="page"))
+    depth = service.get(AuthoringTarget(object_kind="depth", object_id="depth"))
+    assert page.orientation == "landscape"
+    assert page.continuous is True
+    assert depth.unit == "ft"
+    assert depth.major_step == 10
 
 
 def test_failed_update_is_atomic() -> None:

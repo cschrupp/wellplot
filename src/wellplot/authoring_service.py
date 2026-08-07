@@ -25,7 +25,7 @@ from collections.abc import Callable, Mapping
 from copy import deepcopy
 from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from .authoring import authoring_document_from_mapping, authoring_document_to_mapping
 from .model.authoring import (
@@ -33,7 +33,9 @@ from .model.authoring import (
     AnnotationTrackSpec,
     ArrayTrackSpec,
     AuthoringDataSource,
+    AuthoringDepthSpec,
     AuthoringDocumentSpec,
+    AuthoringPageSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
     AuthoringRemarkSpec,
@@ -56,6 +58,8 @@ class _OperationModel(BaseModel):
 
 
 AuthoringObjectKind: TypeAlias = Literal[
+    "page",
+    "depth",
     "section",
     "track",
     "curve_binding",
@@ -90,6 +94,34 @@ class AuthoringValidationResult(_OperationModel):
 
     valid: bool
     errors: list[str] = Field(default_factory=list)
+
+
+class PagePatch(_OperationModel):
+    """Typed mutable fields for document page settings."""
+
+    size: str | None = None
+    width_mm: float | None = Field(default=None, gt=0)
+    height_mm: float | None = Field(default=None, gt=0)
+    orientation: Literal["portrait", "landscape"] | None = None
+    continuous: bool | None = None
+    bottom_track_header_enabled: bool | None = None
+    margin_left_mm: float | None = Field(default=None, ge=0)
+    margin_right_mm: float | None = Field(default=None, ge=0)
+    margin_top_mm: float | None = Field(default=None, ge=0)
+    margin_bottom_mm: float | None = Field(default=None, ge=0)
+    header_height_mm: float | None = Field(default=None, ge=0)
+    track_header_height_mm: float | None = Field(default=None, ge=0)
+    footer_height_mm: float | None = Field(default=None, ge=0)
+    track_gap_mm: float | None = Field(default=None, ge=0)
+
+
+class DepthPatch(_OperationModel):
+    """Typed mutable fields for the shared document depth axis."""
+
+    unit: str | None = None
+    scale: str | float | None = None
+    major_step: float | None = Field(default=None, gt=0)
+    minor_step: float | None = Field(default=None, gt=0)
 
 
 class AuthoringStylePatch(_OperationModel):
@@ -234,6 +266,20 @@ class UpdateSectionRequest(_OperationModel):
     patch: SectionPatch
 
 
+class UpdatePageRequest(_OperationModel):
+    """Update document page settings with a typed patch."""
+
+    kind: Literal["page"] = "page"
+    patch: PagePatch
+
+
+class UpdateDepthRequest(_OperationModel):
+    """Update document depth-axis settings with a typed patch."""
+
+    kind: Literal["depth"] = "depth"
+    patch: DepthPatch
+
+
 class UpdateTrackRequest(_OperationModel):
     """Update one track with a typed patch."""
 
@@ -292,7 +338,9 @@ class UpdateRemarkRequest(_OperationModel):
 
 
 UpdateRequest: TypeAlias = Annotated[
-    UpdateSectionRequest
+    UpdatePageRequest
+    | UpdateDepthRequest
+    | UpdateSectionRequest
     | UpdateTrackRequest
     | UpdateCurveBindingRequest
     | UpdateRasterBindingRequest
@@ -319,7 +367,9 @@ class MoveRequest(_OperationModel):
 
 
 AuthoringObject: TypeAlias = (
-    AuthoringSectionSpec
+    AuthoringPageSpec
+    | AuthoringDepthSpec
+    | AuthoringSectionSpec
     | TrackSpec
     | CurveBindingSpec
     | RasterBindingSpec
@@ -373,6 +423,14 @@ class AuthoringService:
     ) -> list[AuthoringObjectRef]:
         """List stable references for one object family."""
         refs: list[AuthoringObjectRef] = []
+        if object_kind in {"page", "depth"}:
+            return [
+                AuthoringObjectRef(
+                    object_kind=object_kind,
+                    object_id=object_kind,
+                    index=0,
+                )
+            ]
         if object_kind == "section":
             for index, section in enumerate(self._document.sections):
                 refs.append(
@@ -454,6 +512,10 @@ class AuthoringService:
 
     def get(self, target: AuthoringTarget) -> AuthoringObject:
         """Return a defensive copy of one parent-scoped object."""
+        if target.object_kind == "page":
+            return deepcopy(self._document.page)
+        if target.object_kind == "depth":
+            return deepcopy(self._document.depth)
         if target.object_kind == "section":
             return deepcopy(self._find_section(target.object_id))
         if target.object_kind == "remark":
@@ -567,6 +629,12 @@ class AuthoringService:
 
     def update(self, request: UpdateRequest) -> AuthoringObject:
         """Apply one typed patch or replacement atomically."""
+        if isinstance(request, UpdatePageRequest):
+            self._commit(lambda document: self._patch_model(document.page, request.patch))
+            return self.get(AuthoringTarget(object_kind="page", object_id="page"))
+        if isinstance(request, UpdateDepthRequest):
+            self._commit(lambda document: self._patch_model(document.depth, request.patch))
+            return self.get(AuthoringTarget(object_kind="depth", object_id="depth"))
         if isinstance(request, UpdateSectionRequest):
             self._commit(
                 lambda document: self._patch_model(
@@ -669,6 +737,8 @@ class AuthoringService:
 
     def remove(self, request: RemoveRequest) -> AuthoringObject:
         """Remove one object and atomically validate the remaining document."""
+        if request.target.object_kind in {"page", "depth"}:
+            raise ValueError(f"Cannot remove document-level {request.target.object_kind} settings.")
         existing = self.get(request.target)
 
         def mutate(document: AuthoringDocumentSpec) -> None:
@@ -975,6 +1045,16 @@ class AuthoringService:
         return value
 
 
+def authoring_operation_json_schema() -> dict[str, Any]:
+    """Return JSON Schemas for the typed authoring operation contracts."""
+    return {
+        "create": TypeAdapter(CreateRequest).json_schema(),
+        "update": TypeAdapter(UpdateRequest).json_schema(),
+        "remove": RemoveRequest.model_json_schema(),
+        "move": MoveRequest.model_json_schema(),
+    }
+
+
 __all__ = [
     "AuthoringObjectKind",
     "AuthoringObjectRef",
@@ -991,7 +1071,9 @@ __all__ = [
     "CreateSectionRequest",
     "CreateTrackRequest",
     "CurveBindingPatch",
+    "DepthPatch",
     "MoveRequest",
+    "PagePatch",
     "RasterBindingPatch",
     "RemoveRequest",
     "RemarkPatch",
@@ -999,10 +1081,13 @@ __all__ = [
     "TrackPatch",
     "UpdateAnnotationRequest",
     "UpdateCurveBindingRequest",
+    "UpdateDepthRequest",
     "UpdateFillRequest",
+    "UpdatePageRequest",
     "UpdateRasterBindingRequest",
     "UpdateRemarkRequest",
     "UpdateRequest",
     "UpdateSectionRequest",
     "UpdateTrackRequest",
+    "authoring_operation_json_schema",
 ]

@@ -688,6 +688,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "wellplot://examples/production/index.json",
                 "wellplot://authoring/schema/patch.json",
                 "wellplot://authoring/schema/canonical.json",
+                "wellplot://authoring/schema/operations.json",
                 "wellplot://authoring/catalog/track-kinds.json",
                 "wellplot://authoring/catalog/fill-kinds.json",
                 "wellplot://authoring/catalog/track-archetypes.json",

@@ -1106,6 +1106,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         return service.authoring_canonical_schema_resource().text
 
     @mcp.resource(
+        "wellplot://authoring/schema/operations.json",
+        mime_type="application/json",
+    )
+    def authoring_operations_schema_resource() -> str:
+        """Return generated typed authoring-operation schemas."""
+        return service.authoring_operations_schema_resource().text
+
+    @mcp.resource(
         "wellplot://authoring/catalog/track-kinds.json",
         mime_type="application/json",
     )

@@ -3298,6 +3298,7 @@ class McpServiceTests(unittest.TestCase):
         """Expose authoring catalog resources as JSON payloads."""
         patch_resource = service.authoring_patch_schema_resource()
         canonical_resource = service.authoring_canonical_schema_resource()
+        operations_resource = service.authoring_operations_schema_resource()
         fill_resource = service.authoring_fill_kinds_resource()
         style_resource = service.authoring_style_presets_resource()
         header_archetype_resource = service.authoring_header_archetypes_resource()
@@ -3310,6 +3311,10 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(canonical_resource.mime_type, "application/json")
         self.assertIn("$defs", canonical_payload)
         self.assertIn("sections", canonical_payload["properties"])
+        operations_payload = json.loads(operations_resource.text)
+        self.assertEqual(operations_resource.mime_type, "application/json")
+        self.assertIn("update", operations_payload)
+        self.assertIn("UpdatePageRequest", operations_payload["update"]["$defs"])
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertIn("annotation_object_kinds", json.loads(patch_resource.text))
         self.assertIn("annotation_patch_keys", json.loads(patch_resource.text))

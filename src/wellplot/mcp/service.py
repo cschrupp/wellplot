@@ -45,11 +45,16 @@ from ..authoring_service import (
     AuthoringService,
     AuthoringTarget,
     CurveBindingPatch,
+    DepthPatch,
+    PagePatch,
     SectionPatch,
     TrackPatch,
     UpdateCurveBindingRequest,
+    UpdateDepthRequest,
+    UpdatePageRequest,
     UpdateSectionRequest,
     UpdateTrackRequest,
+    authoring_operation_json_schema,
 )
 from ..errors import (
     DependencyUnavailableError,
@@ -236,6 +241,7 @@ AUTHORING_MOVE_TRACK_SELECTORS = ("before_track_id", "after_track_id", "position
 AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/schema/patch.json",
     "wellplot://authoring/schema/canonical.json",
+    "wellplot://authoring/schema/operations.json",
     "wellplot://authoring/catalog/track-kinds.json",
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
@@ -3563,6 +3569,12 @@ def authoring_canonical_schema_resource() -> ResourceContent:
     return ResourceContent(text=payload, mime_type="application/json")
 
 
+def authoring_operations_schema_resource() -> ResourceContent:
+    """Return generated typed authoring-operation schemas as JSON text."""
+    payload = json.dumps(authoring_operation_json_schema(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
 def authoring_track_kinds_resource() -> ResourceContent:
     """Return supported draft-authoring track kinds as JSON text."""
     payload = json.dumps({"track_kinds": _enum_values(TrackKind)}, indent=2, sort_keys=True)
@@ -3794,6 +3806,8 @@ def inspect_authoring_objects(
 ) -> AuthoringObjectInspectionResult:
     """Inspect typed authoring objects without exposing legacy YAML internals."""
     allowed_kinds = {
+        "page",
+        "depth",
         "section",
         "track",
         "curve_binding",
@@ -4715,6 +4729,32 @@ def _apply_canonical_section_update(
         section["depth_range"] = list(updated.depth_range)
 
 
+def _apply_canonical_page_update(
+    mapping: dict[str, object],
+    *,
+    patch: dict[str, object],
+) -> None:
+    """Apply typed page settings and project them into the legacy envelope."""
+    authoring = AuthoringService.from_mapping(mapping)
+    authoring.update(UpdatePageRequest(patch=PagePatch.model_validate(patch)))
+    updated = authoring.get(AuthoringTarget(object_kind="page", object_id="page"))
+    document = _logfile_mapping_document(mapping)
+    document["page"] = updated.model_dump(mode="json", exclude_none=True)
+
+
+def _apply_canonical_depth_update(
+    mapping: dict[str, object],
+    *,
+    patch: dict[str, object],
+) -> None:
+    """Apply typed depth settings and project them into the legacy envelope."""
+    authoring = AuthoringService.from_mapping(mapping)
+    authoring.update(UpdateDepthRequest(patch=DepthPatch.model_validate(patch)))
+    updated = authoring.get(AuthoringTarget(object_kind="depth", object_id="depth"))
+    document = _logfile_mapping_document(mapping)
+    document["depth"] = updated.model_dump(mode="json", exclude_none=True)
+
+
 def _legacy_scale_from_authoring(scale: object) -> dict[str, object]:
     """Convert a canonical scale to the legacy renderer's compact keys."""
     return {
@@ -5013,29 +5053,10 @@ def set_page_layout(
         resolved_logfile,
         allowed_root=server_root,
     )
-    document = _logfile_mapping_document(mapping)
-    page_mapping = document.get("page")
-    if not isinstance(page_mapping, dict):
-        page_mapping = {}
-        document["page"] = page_mapping
     render_mapping = _logfile_mapping_render(mapping)
 
-    for key, value in page_patch.items():
-        if key in {
-            "margin_left_mm",
-            "margin_right_mm",
-            "margin_top_mm",
-            "margin_bottom_mm",
-            "header_height_mm",
-            "track_header_height_mm",
-            "footer_height_mm",
-            "track_gap_mm",
-        }:
-            page_mapping[key] = float(value)
-        elif key in {"continuous", "bottom_track_header_enabled"}:
-            page_mapping[key] = bool(value)
-        else:
-            page_mapping[key] = str(value)
+    if page_patch:
+        _apply_canonical_page_update(mapping, patch=page_patch)
 
     for key, value in render_patch.items():
         if key == "output_path":
@@ -5134,20 +5155,17 @@ def set_depth_axis(
         resolved_logfile,
         allowed_root=server_root,
     )
-    document = _logfile_mapping_document(mapping)
-    depth_mapping = document.get("depth")
-    if not isinstance(depth_mapping, dict):
-        depth_mapping = {}
-        document["depth"] = depth_mapping
-
-    if unit is not None:
-        depth_mapping["unit"] = str(unit)
-    if scale is not None:
-        depth_mapping["scale"] = float(scale)
-    if major_step is not None:
-        depth_mapping["major_step"] = float(major_step)
-    if minor_step is not None:
-        depth_mapping["minor_step"] = float(minor_step)
+    depth_patch = {
+        key: value
+        for key, value in {
+            "unit": unit,
+            "scale": scale,
+            "major_step": major_step,
+            "minor_step": minor_step,
+        }.items()
+        if value is not None
+    }
+    _apply_canonical_depth_update(mapping, patch=depth_patch)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -5217,57 +5235,40 @@ def set_section_view(
         allowed_root=server_root,
     )
     _ensure_known_section(current_spec, section_id)
-    section = _logfile_mapping_section(mapping, section_id)
-    document = _logfile_mapping_document(mapping)
-    depth_mapping = document.get("depth")
-    if not isinstance(depth_mapping, dict):
-        depth_mapping = {}
-        document["depth"] = depth_mapping
-    page_mapping = document.get("page")
-    if not isinstance(page_mapping, dict):
-        page_mapping = {}
-        document["page"] = page_mapping
     render_mapping = _logfile_mapping_render(mapping)
 
     target_depth_unit = str(unit) if unit is not None else _document_depth_unit(mapping)
 
-    if title is not None:
-        section["title"] = str(title)
-    if subtitle is not None:
-        section["subtitle"] = str(subtitle)
+    normalized_range: tuple[float, float] | None = None
     if depth_range is not None:
         normalized_range, _ = _normalized_section_depth_range(
             depth_range,
             depth_range_unit=depth_range_unit,
             target_unit=target_depth_unit,
         )
-        section["depth_range"] = normalized_range
+    if title is not None or subtitle is not None or normalized_range is not None:
+        _apply_canonical_section_update(
+            mapping,
+            section_id=section_id,
+            title=title,
+            subtitle=subtitle,
+            depth_range=normalized_range,
+        )
 
-    if unit is not None:
-        depth_mapping["unit"] = str(unit)
-    if scale is not None:
-        depth_mapping["scale"] = float(scale)
-    if major_step is not None:
-        depth_mapping["major_step"] = float(major_step)
-    if minor_step is not None:
-        depth_mapping["minor_step"] = float(minor_step)
-
-    for key, value in page_patch.items():
-        if key in {
-            "margin_left_mm",
-            "margin_right_mm",
-            "margin_top_mm",
-            "margin_bottom_mm",
-            "header_height_mm",
-            "track_header_height_mm",
-            "footer_height_mm",
-            "track_gap_mm",
-        }:
-            page_mapping[key] = float(value)
-        elif key in {"continuous", "bottom_track_header_enabled"}:
-            page_mapping[key] = bool(value)
-        else:
-            page_mapping[key] = str(value)
+    depth_patch = {
+        key: value
+        for key, value in {
+            "unit": unit,
+            "scale": scale,
+            "major_step": major_step,
+            "minor_step": minor_step,
+        }.items()
+        if value is not None
+    }
+    if depth_patch:
+        _apply_canonical_depth_update(mapping, patch=depth_patch)
+    if page_patch:
+        _apply_canonical_page_update(mapping, patch=page_patch)
 
     for key, value in render_patch.items():
         if key == "output_path":

@@ -224,6 +224,10 @@ Current progress:
   authoring contract
 - section edits and the canonical track/curve fields are routed through the
   shared service before projection into the legacy render envelope
+- page and depth-axis edits are typed service operations used by their MCP
+  tools
+- typed create/update/remove/move request schemas are published as generated
+  MCP discovery data
 - the remaining MCP mutation families and duplicated patch catalogs are still
   pending in slice `0.6-E`
 
@@ -365,10 +369,14 @@ Implementation checkpoint:
 
 - `wellplot://authoring/schema/canonical.json` is generated directly from the
   Pydantic authoring models
+- `wellplot://authoring/schema/operations.json` is generated from the typed
+  authoring service request models
 - `inspect_authoring_objects(...)` returns typed, parent-scoped object payloads
   for MCP clients
 - `update_section(...)` and the canonical fields of `update_track(...)` and
   `update_curve_binding(...)` execute through `AuthoringService`
+- `set_page_layout(...)`, `set_depth_axis(...)`, and the corresponding parts
+  of `set_section_view(...)` execute through `AuthoringService`
 - the legacy logfile mapping remains the persistence/render boundary, with a
   canonical validation gate on every persisted MCP mutation
 - grid/header/overlay/raster-only fields remain compatibility-path fields until
