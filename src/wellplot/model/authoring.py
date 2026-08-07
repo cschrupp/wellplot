@@ -113,6 +113,15 @@ class AuthoringReferenceTickSide(StrEnum):
     BOTH = "both"
 
 
+class AuthoringNumberFormatKind(StrEnum):
+    """Numeric formatting modes for curve labels."""
+
+    AUTOMATIC = "automatic"
+    FIXED = "fixed"
+    SCIENTIFIC = "scientific"
+    CONCISE = "concise"
+
+
 class AuthoringCurveFillKind(StrEnum):
     """Curve fill semantics exposed by the authoring contract."""
 
@@ -293,6 +302,56 @@ class AuthoringReferenceOverlaySpec(_AuthoringModel):
         return self
 
 
+class AuthoringCurveHeaderDisplaySpec(_AuthoringModel):
+    """Visibility controls for scalar curve header fields."""
+
+    show_name: bool = True
+    show_unit: bool = True
+    show_limits: bool = True
+    show_color: bool = True
+    wrap_name: bool = False
+
+
+class AuthoringCurveHeaderDisplayPatch(_AuthoringModel):
+    """Optional curve-header visibility fields used by binding updates."""
+
+    show_name: bool | None = None
+    show_unit: bool | None = None
+    show_limits: bool | None = None
+    show_color: bool | None = None
+    wrap_name: bool | None = None
+
+
+class AuthoringCurveValueLabelsSpec(_AuthoringModel):
+    """Validated in-track value-label rendering settings."""
+
+    step: float = Field(default=5.0, gt=0)
+    format: AuthoringNumberFormatKind = AuthoringNumberFormatKind.AUTOMATIC
+    precision: int = Field(default=2, ge=0)
+    color: str | None = Field(default=None, min_length=1)
+    font_size: float = Field(default=5.5, gt=0)
+    font_family: str | None = Field(default=None, min_length=1)
+    font_weight: str = Field(default="normal", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    horizontal_alignment: Literal["left", "center", "right"] = "center"
+    vertical_alignment: Literal["top", "center", "bottom"] = "center"
+
+
+class AuthoringCurveValueLabelsPatch(_AuthoringModel):
+    """Optional value-label fields used by binding updates."""
+
+    step: float | None = Field(default=None, gt=0)
+    format: AuthoringNumberFormatKind | None = None
+    precision: int | None = Field(default=None, ge=0)
+    color: str | None = Field(default=None, min_length=1)
+    font_size: float | None = Field(default=None, gt=0)
+    font_family: str | None = Field(default=None, min_length=1)
+    font_weight: str | None = Field(default=None, min_length=1)
+    font_style: str | None = Field(default=None, min_length=1)
+    horizontal_alignment: Literal["left", "center", "right"] | None = None
+    vertical_alignment: Literal["top", "center", "bottom"] | None = None
+
+
 class AuthoringScale(_AuthoringModel):
     """Validated numeric scale for a track or scalar curve binding."""
 
@@ -331,6 +390,14 @@ class CurveBindingSpec(_AuthoringModel):
     scale: AuthoringScale | None = None
     style: AuthoringStyle = Field(default_factory=AuthoringStyle)
     reference_overlay: AuthoringReferenceOverlaySpec | None = None
+    wrap: bool = False
+    render_mode: Literal["line", "value_labels"] = "line"
+    value_labels: AuthoringCurveValueLabelsSpec = Field(
+        default_factory=AuthoringCurveValueLabelsSpec
+    )
+    header_display: AuthoringCurveHeaderDisplaySpec = Field(
+        default_factory=AuthoringCurveHeaderDisplaySpec
+    )
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -676,6 +743,10 @@ __all__ = [
     "AnnotationTextSpec",
     "ArrayTrackSpec",
     "AuthoringCurveFillKind",
+    "AuthoringCurveHeaderDisplayPatch",
+    "AuthoringCurveHeaderDisplaySpec",
+    "AuthoringCurveValueLabelsPatch",
+    "AuthoringCurveValueLabelsSpec",
     "AuthoringDataSource",
     "AuthoringDepthSpec",
     "AuthoringDocumentSpec",
@@ -691,6 +762,7 @@ __all__ = [
     "AuthoringReferenceOverlayMode",
     "AuthoringReferenceOverlaySpec",
     "AuthoringReferenceTickSide",
+    "AuthoringNumberFormatKind",
     "AuthoringRemarkSpec",
     "AuthoringScale",
     "AuthoringScaleKind",

@@ -400,6 +400,8 @@ Implementation checkpoint:
 - reference-curve overlay properties now have typed canonical validation and
   binding-level update projection; value-label, callout, and raster waveform
   controls remain separate renderer-specific fields
+- curve render mode, value-label formatting, wrapping, and header visibility
+  now have typed canonical binding fields with nested partial-update merging
 
 ### Slice 0.6-F. Defaults And Precedence
 

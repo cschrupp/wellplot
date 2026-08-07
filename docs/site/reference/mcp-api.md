@@ -1152,6 +1152,9 @@ Behavior:
   positive
 - canonical curve-binding patches accept a typed `reference_overlay` object;
   lane bounds must be paired and ordered before the update is persisted
+- canonical curve-binding patches also accept typed `render_mode`, `wrap`,
+  `value_labels`, and `header_display` fields; `value_labels.format` follows
+  the existing renderer/schema vocabulary
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current

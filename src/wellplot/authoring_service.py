@@ -32,6 +32,10 @@ from .model.authoring import (
     AnnotationSpec,
     AnnotationTrackSpec,
     ArrayTrackSpec,
+    AuthoringCurveHeaderDisplayPatch,
+    AuthoringCurveHeaderDisplaySpec,
+    AuthoringCurveValueLabelsPatch,
+    AuthoringCurveValueLabelsSpec,
     AuthoringDataSource,
     AuthoringDepthSpec,
     AuthoringDocumentSpec,
@@ -169,6 +173,10 @@ class CurveBindingPatch(_OperationModel):
     scale: AuthoringScale | None = None
     style: AuthoringStylePatch | None = None
     reference_overlay: AuthoringReferenceOverlaySpec | None = None
+    wrap: bool | None = None
+    render_mode: Literal["line", "value_labels"] | None = None
+    value_labels: AuthoringCurveValueLabelsPatch | None = None
+    header_display: AuthoringCurveHeaderDisplayPatch | None = None
     extensions: dict[str, Any] | None = None
 
 
@@ -875,6 +883,22 @@ class AuthoringService:
                         }
                     )
                 )
+            elif field_name == "value_labels":
+                if value is None:
+                    binding.value_labels = AuthoringCurveValueLabelsSpec()
+                else:
+                    updates = value.model_dump(mode="python", exclude_unset=True)
+                    binding.value_labels = AuthoringCurveValueLabelsSpec.model_validate(
+                        binding.value_labels.model_dump(mode="python") | updates
+                    )
+            elif field_name == "header_display":
+                if value is None:
+                    binding.header_display = AuthoringCurveHeaderDisplaySpec()
+                else:
+                    updates = value.model_dump(mode="python", exclude_unset=True)
+                    binding.header_display = AuthoringCurveHeaderDisplaySpec.model_validate(
+                        binding.header_display.model_dump(mode="python") | updates
+                    )
             else:
                 setattr(binding, field_name, deepcopy(value))
 

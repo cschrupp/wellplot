@@ -46,6 +46,8 @@ from .model.authoring import (
     AnnotationTextSpec,
     ArrayTrackSpec,
     AuthoringCurveFillKind,
+    AuthoringCurveHeaderDisplaySpec,
+    AuthoringCurveValueLabelsSpec,
     AuthoringDataSource,
     AuthoringDepthSpec,
     AuthoringDocumentSpec,
@@ -142,6 +144,58 @@ def authoring_reference_overlay_to_mapping(
 ) -> dict[str, Any]:
     """Project a canonical reference overlay to its legacy YAML envelope."""
     return overlay.model_dump(mode="json", exclude_none=True)
+
+
+def _curve_header_display_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringCurveHeaderDisplaySpec:
+    """Normalize legacy curve-header visibility settings."""
+    if value is None:
+        return AuthoringCurveHeaderDisplaySpec()
+    data = _mapping(value, context=context)
+    try:
+        return AuthoringCurveHeaderDisplaySpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _curve_value_labels_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringCurveValueLabelsSpec:
+    """Normalize legacy value-label settings and common number-format aliases."""
+    if value is None:
+        return AuthoringCurveValueLabelsSpec()
+    data = _mapping(value, context=context)
+    format_value = str(data.get("format", "automatic")).strip().lower()
+    data["format"] = {
+        "auto": "automatic",
+        "automatic": "automatic",
+        "fixed": "fixed",
+        "scientific": "scientific",
+        "concise": "concise",
+    }.get(format_value, format_value)
+    try:
+        return AuthoringCurveValueLabelsSpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_curve_header_display_to_mapping(
+    display: AuthoringCurveHeaderDisplaySpec,
+) -> dict[str, Any]:
+    """Project canonical curve-header visibility settings to YAML."""
+    return display.model_dump(mode="json", exclude_none=True)
+
+
+def authoring_curve_value_labels_to_mapping(
+    labels: AuthoringCurveValueLabelsSpec,
+) -> dict[str, Any]:
+    """Project canonical curve value-label settings to YAML."""
+    return labels.model_dump(mode="json", exclude_none=True)
 
 
 def _style_from_mapping(value: object, *, context: str) -> AuthoringStyle:
@@ -745,6 +799,15 @@ def _legacy_to_authoring(
                                 binding.get("reference_overlay"),
                                 context="binding.reference_overlay",
                             ),
+                            wrap=bool(binding.get("wrap", False)),
+                            render_mode=str(binding.get("render_mode", "line")),
+                            value_labels=_curve_value_labels_from_legacy(
+                                binding.get("value_labels"), context="binding.value_labels"
+                            ),
+                            header_display=_curve_header_display_from_legacy(
+                                binding.get("header_display"),
+                                context="binding.header_display",
+                            ),
                             extensions=extension,
                         )
                     )
@@ -1034,6 +1097,12 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
             element["reference_overlay"] = binding.reference_overlay.model_dump(
                 mode="json", exclude_none=True
             )
+        element["wrap"] = binding.wrap
+        element["render_mode"] = binding.render_mode
+        element["value_labels"] = authoring_curve_value_labels_to_mapping(binding.value_labels)
+        element["header_display"] = authoring_curve_header_display_to_mapping(
+            binding.header_display
+        )
     else:
         element.update(
             {

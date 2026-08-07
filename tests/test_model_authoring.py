@@ -7,6 +7,8 @@ from pydantic import ValidationError
 
 from wellplot.model import (
     AuthoringCurveFillKind,
+    AuthoringCurveHeaderDisplaySpec,
+    AuthoringCurveValueLabelsSpec,
     AuthoringDocumentSpec,
     AuthoringGridScaleKind,
     AuthoringGridSpacingMode,
@@ -186,6 +188,16 @@ def test_reference_overlay_contract_requires_ordered_lane_bounds() -> None:
 
     with pytest.raises(ValidationError, match="less than"):
         AuthoringReferenceOverlaySpec(lane_start=0.8, lane_end=0.2)
+
+
+def test_curve_display_contract_validates_value_labels() -> None:
+    """Curve display controls are typed independently from the curve style."""
+    labels = AuthoringCurveValueLabelsSpec(step=10, format="fixed", precision=1)
+    header = AuthoringCurveHeaderDisplaySpec(show_color=False)
+
+    assert labels.step == 10
+    assert labels.precision == 1
+    assert header.show_color is False
 
 
 def test_unknown_standard_fields_are_rejected() -> None:

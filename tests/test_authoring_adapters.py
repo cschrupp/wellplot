@@ -84,6 +84,9 @@ def _legacy_mapping() -> dict[str, object]:
                         "channel": "GR",
                         "style": {"color": "black", "line_width": 0.75},
                         "scale": {"kind": "linear", "min": 0, "max": 200},
+                        "render_mode": "value_labels",
+                        "value_labels": {"step": 10, "format": "fixed", "precision": 1},
+                        "header_display": {"show_color": False},
                     },
                     {
                         "id": "gr-2",
@@ -122,6 +125,9 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert [binding.channel for binding in gr_track.bindings] == ["GR", "GR"]
     assert gr_track.bindings[1].scale is not None
     assert gr_track.bindings[1].scale.minimum == 200
+    assert gr_track.bindings[0].render_mode == "value_labels"
+    assert gr_track.bindings[0].value_labels.precision == 1
+    assert gr_track.bindings[0].header_display.show_color is False
     assert gr_track.grid.vertical_main_line_count == 5
     assert gr_track.grid.vertical_main_scale.value == "logarithmic"
     assert gr_track.grid.vertical_main_spacing_mode.value == "scale"
@@ -136,6 +142,8 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert len(rendered_gr.elements) == 2
     assert rendered_gr.elements[0].style.color == "black"
     assert rendered_gr.elements[1].style.line_style == "--"
+    assert rendered_gr.elements[0].render_mode == "value_labels"
+    assert rendered_gr.elements[0].value_labels.precision == 1
     assert rendered_gr.grid.vertical_main_line_count == 5
     assert rendered_gr.grid.vertical_main_color == "#222222"
     assert rendered_gr.header.objects[3].enabled is True

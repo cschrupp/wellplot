@@ -1776,6 +1776,10 @@ class McpServiceTests(unittest.TestCase):
                         "min": 0.0,
                         "max": 150.0,
                     },
+                    "wrap": True,
+                    "render_mode": "value_labels",
+                    "value_labels": {"step": 10, "format": "fixed", "precision": 1},
+                    "header_display": {"show_color": False},
                 },
                 root=REPO_ROOT,
             )
@@ -1787,6 +1791,10 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(result.binding["label"], "Gamma Ray")
             self.assertEqual(result.binding["style"]["color"], "#00aa00")
             self.assertEqual(result.binding["scale"]["max"], 150.0)
+            self.assertTrue(result.binding["wrap"])
+            self.assertEqual(result.binding["render_mode"], "value_labels")
+            self.assertEqual(result.binding["value_labels"]["precision"], 1)
+            self.assertFalse(result.binding["header_display"]["show_color"])
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             bindings = saved_mapping["document"]["bindings"]["channels"]
@@ -1799,6 +1807,8 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(matching[0]["label"], "Gamma Ray")
             self.assertEqual(matching[0]["style"]["line_width"], 1.6)
             self.assertEqual(matching[0]["scale"]["max"], 150.0)
+            self.assertTrue(matching[0]["wrap"])
+            self.assertEqual(matching[0]["render_mode"], "value_labels")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_reference_overlay_uses_canonical_binding_contract(self) -> None:

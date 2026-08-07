@@ -44,6 +44,8 @@ from ..api.render import (
 )
 from ..api.serialize import report_to_dict, report_to_yaml
 from ..authoring import (
+    authoring_curve_header_display_to_mapping,
+    authoring_curve_value_labels_to_mapping,
     authoring_grid_to_mapping,
     authoring_reference_overlay_to_mapping,
     authoring_track_header_to_mapping,
@@ -5291,7 +5293,16 @@ def _apply_canonical_curve_binding_update(
     patch: dict[str, object],
 ) -> bool:
     """Apply typed scalar-binding fields and project them into legacy YAML."""
-    canonical_keys = {"label", "style", "scale", "reference_overlay"}
+    canonical_keys = {
+        "label",
+        "style",
+        "scale",
+        "reference_overlay",
+        "wrap",
+        "render_mode",
+        "value_labels",
+        "header_display",
+    }
     style_keys = {
         "color",
         "line_style",
@@ -5390,6 +5401,16 @@ def _apply_canonical_curve_binding_update(
             raw_binding["reference_overlay"] = authoring_reference_overlay_to_mapping(
                 updated.reference_overlay
             )
+    if "wrap" in patch:
+        raw_binding["wrap"] = updated.wrap
+    if "render_mode" in patch:
+        raw_binding["render_mode"] = updated.render_mode
+    if "value_labels" in patch:
+        raw_binding["value_labels"] = authoring_curve_value_labels_to_mapping(updated.value_labels)
+    if "header_display" in patch:
+        raw_binding["header_display"] = authoring_curve_header_display_to_mapping(
+            updated.header_display
+        )
     return True
 
 
