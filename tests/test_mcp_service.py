@@ -35,6 +35,16 @@ try:
     from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
+
+from wellplot.authoring_service import (
+    CurveBindingPatch,
+    DepthPatch,
+    PagePatch,
+    RasterBindingPatch,
+    RemarkPatch,
+    SectionPatch,
+    TrackPatch,
+)
 from wellplot.errors import PathAccessError, TemplateValidationError
 from wellplot.mcp import service
 
@@ -739,6 +749,8 @@ class McpServiceTests(unittest.TestCase):
                 minor_step=5.0,
                 page_patch={
                     "size": "Letter",
+                    "width_mm": 279.4,
+                    "height_mm": 215.9,
                     "orientation": "landscape",
                     "continuous": True,
                 },
@@ -856,6 +868,8 @@ class McpServiceTests(unittest.TestCase):
                 str(draft_path),
                 page_patch={
                     "size": "Letter",
+                    "width_mm": 279.4,
+                    "height_mm": 215.9,
                     "orientation": "landscape",
                     "continuous": True,
                     "track_header_height_mm": 24.0,
@@ -870,6 +884,8 @@ class McpServiceTests(unittest.TestCase):
 
             self.assertEqual(result.logfile_path, str(draft_path))
             self.assertEqual(result.page["size"], "Letter")
+            self.assertEqual(result.page["width_mm"], 279.4)
+            self.assertEqual(result.page["height_mm"], 215.9)
             self.assertEqual(result.page["orientation"], "landscape")
             self.assertEqual(result.page["continuous"], True)
             self.assertEqual(result.page["track_header_height_mm"], 24.0)
@@ -879,6 +895,8 @@ class McpServiceTests(unittest.TestCase):
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             self.assertEqual(saved_mapping["document"]["page"]["size"], "Letter")
+            self.assertEqual(saved_mapping["document"]["page"]["width_mm"], 279.4)
+            self.assertEqual(saved_mapping["document"]["page"]["height_mm"], 215.9)
             self.assertEqual(saved_mapping["document"]["page"]["orientation"], "landscape")
             self.assertEqual(saved_mapping["render"]["dpi"], 200)
             self.assertEqual(saved_mapping["render"]["output_path"], "updated-render.pdf")
@@ -3073,6 +3091,12 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("text", result.annotation_patch_keys)
         self.assertIn("fill", result.curve_binding_patch_keys)
         self.assertIn("sample_axis", result.raster_binding_patch_keys)
+        self.assertIn("width_mm", result.canonical_patch_keys["page"])
+        self.assertIn("height_mm", result.canonical_patch_keys["page"])
+        self.assertIn("style", result.canonical_patch_keys["curve_binding"])
+        self.assertIn("alpha", result.canonical_patch_keys["raster_binding"])
+        self.assertIn("text", result.canonical_patch_keys["annotation"]["text"])
+        self.assertIn("lines", result.canonical_patch_keys["remark"])
         self.assertIn("after_track_id", result.move_track_selectors)
         self.assertTrue(result.track_archetypes)
         self.assertIn(
@@ -3097,6 +3121,26 @@ class McpServiceTests(unittest.TestCase):
         )
         self.assertTrue(result.header_archetypes)
         self.assertIsNone(result.target_summary)
+
+    def test_canonical_patch_catalog_matches_typed_service_models(self) -> None:
+        """Keep MCP canonical patch discovery synchronized with service models."""
+        result = service.inspect_authoring_vocab(root=REPO_ROOT)
+
+        expected = {
+            "page": sorted(PagePatch.model_fields),
+            "depth": sorted(DepthPatch.model_fields),
+            "section": sorted(SectionPatch.model_fields),
+            "track": sorted(TrackPatch.model_fields),
+            "curve_binding": sorted(CurveBindingPatch.model_fields),
+            "raster_binding": sorted(RasterBindingPatch.model_fields),
+            "remark": sorted(RemarkPatch.model_fields),
+        }
+        for object_kind, field_names in expected.items():
+            self.assertEqual(result.canonical_patch_keys[object_kind], field_names)
+
+        for field_names in result.canonical_patch_keys["annotation"].values():
+            self.assertNotIn("annotation_id", field_names)
+            self.assertIn("kind", field_names)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_inspect_authoring_vocab_with_logfile_exposes_target_context(self) -> None:
@@ -3322,6 +3366,7 @@ class McpServiceTests(unittest.TestCase):
         self.assertIn("section_patch_keys", json.loads(patch_resource.text))
         self.assertIn("page_patch_keys", json.loads(patch_resource.text))
         self.assertIn("render_patch_keys", json.loads(patch_resource.text))
+        self.assertIn("canonical_patch_keys", json.loads(patch_resource.text))
         self.assertEqual(fill_resource.mime_type, "application/json")
         self.assertIn("curve_fill_kinds", json.loads(fill_resource.text))
         self.assertEqual(style_resource.mime_type, "application/json")

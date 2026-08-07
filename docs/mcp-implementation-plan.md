@@ -388,8 +388,9 @@ Implementation checkpoint:
 - advanced grid/header/overlay fields and renderer-only annotation/raster
   fields remain compatibility-path fields until their canonical models and
   service operations are added
-- duplicated MCP patch-key catalogs remain for compatibility and discovery;
-  retiring them is the next parity cleanup after this bridge is stabilized
+- `inspect_authoring_vocab` and the patch-schema resource expose generated
+  `canonical_patch_keys` from the typed service models; legacy patch-key lists
+  remain as compatibility catalogs while renderer-only fields are migrated
 
 ### Slice 0.6-F. Defaults And Precedence
 

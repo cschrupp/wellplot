@@ -33,7 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import yaml
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
 
 from ..api.builder import ProgrammaticLogSpec
 from ..api.render import (
@@ -54,6 +54,7 @@ from ..authoring_service import (
     DepthPatch,
     PagePatch,
     RasterBindingPatch,
+    RemarkPatch,
     RemoveRequest,
     SectionPatch,
     TrackPatch,
@@ -85,7 +86,12 @@ from ..logfile import (
 from ..logfile_schema import get_logfile_json_schema
 from ..model import ArrayChannel, RasterChannel, ScalarChannel, WellDataset
 from ..model.authoring import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
+    AnnotationIntervalSpec,
+    AnnotationMarkerSpec,
     AnnotationSpec,
+    AnnotationTextSpec,
     AuthoringCurveFillKind,
     AuthoringRemarkSpec,
     AuthoringStyle,
@@ -138,6 +144,8 @@ AUTHORING_SECTION_PATCH_KEYS = (
 )
 AUTHORING_PAGE_PATCH_KEYS = (
     "size",
+    "width_mm",
+    "height_mm",
     "orientation",
     "continuous",
     "bottom_track_header_enabled",
@@ -1253,6 +1261,7 @@ class AuthoringVocabularyResult:
     annotation_patch_keys: list[str]
     curve_binding_patch_keys: list[str]
     raster_binding_patch_keys: list[str]
+    canonical_patch_keys: dict[str, object]
     move_track_selectors: list[str]
     heading_field_catalog: dict[str, object]
     header_archetypes: list[dict[str, object]]
@@ -2630,6 +2639,37 @@ def _binding_ref(section_id: str, track_id: str, channel: str) -> dict[str, str]
     }
 
 
+def _canonical_patch_keys() -> dict[str, object]:
+    """Return patch fields generated from the typed authoring contract."""
+    annotation_models = {
+        "interval": AnnotationIntervalSpec,
+        "text": AnnotationTextSpec,
+        "marker": AnnotationMarkerSpec,
+        "arrow": AnnotationArrowSpec,
+        "glyph": AnnotationGlyphSpec,
+    }
+
+    def fields(model: type[BaseModel], *, exclude: set[str] | None = None) -> list[str]:
+        excluded = set() if exclude is None else exclude
+        return sorted(key for key in model.model_fields if key not in excluded)
+
+    return {
+        "page": fields(PagePatch),
+        "depth": fields(DepthPatch),
+        "section": fields(SectionPatch),
+        "track": fields(TrackPatch),
+        "curve_binding": fields(CurveBindingPatch),
+        "raster_binding": fields(RasterBindingPatch),
+        "annotation": {
+            kind: fields(model, exclude={"annotation_id"})
+            for kind, model in annotation_models.items()
+        },
+        "fill": fields(CurveFillSpec, exclude={"fill_id"}),
+        "remark": fields(RemarkPatch),
+        "style": fields(AuthoringStyle),
+    }
+
+
 def _authoring_patch_schema() -> dict[str, object]:
     return {
         "annotation_object_kinds": list(AUTHORING_ANNOTATION_OBJECT_KINDS),
@@ -2642,6 +2682,7 @@ def _authoring_patch_schema() -> dict[str, object]:
         "annotation_patch_keys": list(AUTHORING_ANNOTATION_PATCH_KEYS),
         "curve_binding_patch_keys": list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         "raster_binding_patch_keys": list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
+        "canonical_patch_keys": _canonical_patch_keys(),
         "move_track_target_selectors": list(AUTHORING_MOVE_TRACK_SELECTORS),
         "remarks_entry_fields": ["title", "lines", "alignment"],
     }
@@ -4834,8 +4875,7 @@ def _canonical_annotation_ref(
     refs = authoring.list("annotation", section_id=section_id, track_id=track_id)
     if annotation_index < 0 or annotation_index >= len(refs):
         raise TemplateValidationError(
-            f"annotation_index {annotation_index} is out of range for canonical track "
-            f"{track_id!r}."
+            f"annotation_index {annotation_index} is out of range for canonical track {track_id!r}."
         )
     return refs[annotation_index].object_id
 
@@ -4904,8 +4944,10 @@ def _apply_canonical_annotation_update(
     """Apply a representable annotation patch through the canonical service."""
     kind = str(annotation.get("kind", "text")).strip().lower()
     allowed = _ANNOTATION_CORE_KEYS.get(kind)
-    if allowed is None or not set(patch).issubset(allowed) or any(
-        value is None for value in patch.values()
+    if (
+        allowed is None
+        or not set(patch).issubset(allowed)
+        or any(value is None for value in patch.values())
     ):
         return False
     authoring = AuthoringService.from_mapping(mapping)
@@ -5157,9 +5199,7 @@ def _apply_canonical_remarks(
     authoring = AuthoringService.from_mapping(mapping)
     for ref in reversed(authoring.list("remark")):
         authoring.remove(
-            RemoveRequest(
-                target=AuthoringTarget(object_kind="remark", object_id=ref.object_id)
-            )
+            RemoveRequest(target=AuthoringTarget(object_kind="remark", object_id=ref.object_id))
         )
     try:
         for index, remark in enumerate(remarks):
@@ -6506,9 +6546,7 @@ def add_curve_fill(
                 channel=resolved_other_channel,
             )
         else:
-            raise TemplateValidationError(
-                f"{normalized_kind} fills require another curve binding."
-            )
+            raise TemplateValidationError(f"{normalized_kind} fills require another curve binding.")
 
     canonical_baseline: float | None = None
     if normalized_kind == AuthoringCurveFillKind.BASELINE_SPLIT.value:
@@ -6750,15 +6788,11 @@ def bind_raster(
         authoring = AuthoringService.from_mapping(mapping)
         existing_ids = {
             ref.object_id
-            for ref in authoring.list(
-                "curve_binding", section_id=section_id, track_id=track_id
-            )
+            for ref in authoring.list("curve_binding", section_id=section_id, track_id=track_id)
         }
         existing_ids.update(
             ref.object_id
-            for ref in authoring.list(
-                "raster_binding", section_id=section_id, track_id=track_id
-            )
+            for ref in authoring.list("raster_binding", section_id=section_id, track_id=track_id)
         )
         base_id = f"{section_id}.{track_id}.{resolved_channel}.raster"
         generated_id = base_id
@@ -8289,6 +8323,7 @@ def inspect_authoring_vocab(
         annotation_patch_keys=list(AUTHORING_ANNOTATION_PATCH_KEYS),
         curve_binding_patch_keys=list(AUTHORING_CURVE_BINDING_PATCH_KEYS),
         raster_binding_patch_keys=list(AUTHORING_RASTER_BINDING_PATCH_KEYS),
+        canonical_patch_keys=_canonical_patch_keys(),
         move_track_selectors=list(AUTHORING_MOVE_TRACK_SELECTORS),
         heading_field_catalog=_heading_field_catalog(),
         header_archetypes=_header_archetypes_catalog(),

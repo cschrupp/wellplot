@@ -1128,6 +1128,7 @@ Returns:
 - `track_patch_keys`
 - `curve_binding_patch_keys`
 - `raster_binding_patch_keys`
+- `canonical_patch_keys`
 - `move_track_selectors`
 - `heading_field_catalog`
 - `track_archetypes`
@@ -1140,6 +1141,9 @@ Behavior:
   - `logfile_path`, or
   - `template_path`
 - without a target, still returns the static authoring catalogs
+- `canonical_patch_keys` is generated from the typed authoring service patch
+  models; the legacy patch-key lists remain compatibility vocabulary and may
+  include renderer-specific fields
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current
