@@ -105,6 +105,33 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert rendered.tracks[1].elements[0].profile.value == "vdl"
 
 
+def test_legacy_binding_fill_round_trips_through_canonical_track() -> None:
+    """Normalize binding-level fills without losing renderer-specific fields."""
+    mapping = _legacy_mapping()
+    document = mapping["document"]
+    assert isinstance(document, dict)
+    bindings = document["bindings"]["channels"]
+    assert isinstance(bindings, list)
+    bindings[0]["fill"] = {
+        "kind": "to_lower_limit",
+        "label": "Gamma fill",
+        "color": "#8fd19e",
+        "alpha": 0.35,
+    }
+
+    normalized = authoring_document_from_mapping(mapping)
+    track = normalized.sections[0].tracks[0]
+    assert isinstance(track, NormalTrackSpec)
+    assert len(track.fills) == 1
+    assert track.fills[0].binding_id == "gr-1"
+    assert track.fills[0].extensions["compatibility"]["legacy_fill"]["label"] == "Gamma fill"
+
+    rendered = authoring_document_to_render(normalized)
+    assert rendered.tracks[0].elements[0].fill is not None
+    assert rendered.tracks[0].elements[0].fill.label == "Gamma fill"
+    assert rendered.tracks[0].elements[0].fill.color == "#8fd19e"
+
+
 def test_canonical_mapping_round_trips() -> None:
     """Normalized authoring YAML can be loaded without legacy conversion."""
     document = authoring_document_from_mapping(_legacy_mapping())

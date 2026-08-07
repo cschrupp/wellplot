@@ -377,10 +377,19 @@ Implementation checkpoint:
   `update_curve_binding(...)` execute through `AuthoringService`
 - `set_page_layout(...)`, `set_depth_axis(...)`, and the corresponding parts
   of `set_section_view(...)` execute through `AuthoringService`
+- annotation create/update/remove, fill create/remove, core raster-binding
+  create/update, and typed remarks replacement execute through
+  `AuthoringService` when their fields are representable by the canonical
+  contract
+- legacy binding-level fills are normalized into track-level canonical fill
+  relations and projected back without losing renderer-specific fill fields
 - the legacy logfile mapping remains the persistence/render boundary, with a
   canonical validation gate on every persisted MCP mutation
-- grid/header/overlay/raster-only fields remain compatibility-path fields until
-  their canonical models and service operations are added
+- advanced grid/header/overlay fields and renderer-only annotation/raster
+  fields remain compatibility-path fields until their canonical models and
+  service operations are added
+- duplicated MCP patch-key catalogs remain for compatibility and discovery;
+  retiring them is the next parity cleanup after this bridge is stabilized
 
 ### Slice 0.6-F. Defaults And Precedence
 

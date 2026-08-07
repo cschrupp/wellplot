@@ -165,6 +165,7 @@ class CurveFillSpec(_AuthoringModel):
     binding_id: str = Field(min_length=1)
     other_binding_id: str | None = Field(default=None, min_length=1)
     baseline: float | None = None
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_targets(self) -> CurveFillSpec:

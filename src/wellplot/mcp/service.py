@@ -24,6 +24,7 @@ from __future__ import annotations
 import csv
 import json
 import os
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -32,6 +33,7 @@ from pathlib import Path
 
 import numpy as np
 import yaml
+from pydantic import TypeAdapter, ValidationError
 
 from ..api.builder import ProgrammaticLogSpec
 from ..api.render import (
@@ -44,14 +46,22 @@ from ..api.serialize import report_to_dict, report_to_yaml
 from ..authoring_service import (
     AuthoringService,
     AuthoringTarget,
+    CreateAnnotationRequest,
+    CreateFillRequest,
+    CreateRasterBindingRequest,
+    CreateRemarkRequest,
     CurveBindingPatch,
     DepthPatch,
     PagePatch,
+    RasterBindingPatch,
+    RemoveRequest,
     SectionPatch,
     TrackPatch,
+    UpdateAnnotationRequest,
     UpdateCurveBindingRequest,
     UpdateDepthRequest,
     UpdatePageRequest,
+    UpdateRasterBindingRequest,
     UpdateSectionRequest,
     UpdateTrackRequest,
     authoring_operation_json_schema,
@@ -74,7 +84,15 @@ from ..logfile import (
 )
 from ..logfile_schema import get_logfile_json_schema
 from ..model import ArrayChannel, RasterChannel, ScalarChannel, WellDataset
-from ..model.authoring import authoring_json_schema
+from ..model.authoring import (
+    AnnotationSpec,
+    AuthoringCurveFillKind,
+    AuthoringRemarkSpec,
+    AuthoringStyle,
+    CurveFillSpec,
+    RasterBindingSpec,
+    authoring_json_schema,
+)
 from ..model.document import (
     CurveFillKind,
     ReportDetailKind,
@@ -4786,14 +4804,380 @@ def _canonical_scale_patch(value: object) -> object:
 def _legacy_style_from_authoring(
     style: object,
     *,
-    fallback_color: str = "black",
+    fallback_color: str | None = "black",
 ) -> dict[str, object]:
     """Convert a canonical style to the legacy renderer's style vocabulary."""
     normalized = style.model_dump(mode="json", exclude_none=True)
     if "alpha" in normalized:
         normalized["opacity"] = normalized.pop("alpha")
-    normalized.setdefault("color", fallback_color)
+    if fallback_color is not None:
+        normalized.setdefault("color", fallback_color)
     return normalized
+
+
+_ANNOTATION_CORE_KEYS = {
+    "interval": {"kind", "top", "base", "text"},
+    "text": {"kind", "depth", "text"},
+    "marker": {"kind", "depth", "shape", "label"},
+    "arrow": {"kind", "top", "base", "label"},
+    "glyph": {"kind", "depth", "glyph"},
+}
+
+
+def _canonical_annotation_ref(
+    authoring: AuthoringService,
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+) -> str:
+    refs = authoring.list("annotation", section_id=section_id, track_id=track_id)
+    if annotation_index < 0 or annotation_index >= len(refs):
+        raise TemplateValidationError(
+            f"annotation_index {annotation_index} is out of range for canonical track "
+            f"{track_id!r}."
+        )
+    return refs[annotation_index].object_id
+
+
+def _typed_annotation(
+    value: Mapping[str, object],
+    *,
+    annotation_id: str,
+) -> object | None:
+    data = deepcopy(dict(value))
+    kind = str(data.get("kind", "text")).strip().lower()
+    allowed = _ANNOTATION_CORE_KEYS.get(kind)
+    if allowed is None or not set(data).issubset(allowed):
+        return None
+    data["kind"] = kind
+    data["annotation_id"] = annotation_id
+    try:
+        return TypeAdapter(AnnotationSpec).validate_python(data)
+    except ValidationError as exc:
+        raise TemplateValidationError("Invalid canonical annotation object.") from exc
+
+
+def _apply_canonical_annotation_create(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+    annotation: dict[str, object],
+) -> bool:
+    """Validate a representable annotation through the canonical service."""
+    typed = _typed_annotation(annotation, annotation_id="pending")
+    if typed is None:
+        return False
+    authoring = AuthoringService.from_mapping(mapping)
+    existing_ids = {
+        ref.object_id
+        for ref in authoring.list("annotation", section_id=section_id, track_id=track_id)
+    }
+    base_id = f"{section_id}.{track_id}.annotation.1"
+    candidate = base_id
+    suffix = 2
+    while candidate in existing_ids:
+        candidate = f"{section_id}.{track_id}.annotation.{suffix}"
+        suffix += 1
+    typed = typed.model_copy(update={"annotation_id": candidate})
+    authoring.create(
+        CreateAnnotationRequest(
+            section_id=section_id,
+            track_id=track_id,
+            annotation=typed,
+        )
+    )
+    return True
+
+
+def _apply_canonical_annotation_update(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+    annotation: dict[str, object],
+    patch: dict[str, object],
+    annotations: list[dict[str, object]],
+) -> bool:
+    """Apply a representable annotation patch through the canonical service."""
+    kind = str(annotation.get("kind", "text")).strip().lower()
+    allowed = _ANNOTATION_CORE_KEYS.get(kind)
+    if allowed is None or not set(patch).issubset(allowed) or any(
+        value is None for value in patch.values()
+    ):
+        return False
+    authoring = AuthoringService.from_mapping(mapping)
+    annotation_id = _canonical_annotation_ref(
+        authoring,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+    )
+    current = authoring.get(
+        AuthoringTarget(
+            object_kind="annotation",
+            object_id=annotation_id,
+            section_id=section_id,
+            track_id=track_id,
+        )
+    )
+    candidate = current.model_dump(mode="python", exclude_none=True)
+    candidate.update(deepcopy(patch))
+    typed = _typed_annotation(candidate, annotation_id=annotation_id)
+    if typed is None:
+        return False
+    authoring.update(
+        UpdateAnnotationRequest(
+            section_id=section_id,
+            track_id=track_id,
+            annotation_id=annotation_id,
+            annotation=typed,
+        )
+    )
+    annotations[annotation_index] = _merge_optional_patch(annotation, patch)
+    return True
+
+
+def _apply_canonical_annotation_remove(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+    annotation_index: int,
+    annotations: list[dict[str, object]],
+) -> None:
+    """Remove one annotation through the canonical service."""
+    authoring = AuthoringService.from_mapping(mapping)
+    annotation_id = _canonical_annotation_ref(
+        authoring,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+    )
+    authoring.remove(
+        RemoveRequest(
+            target=AuthoringTarget(
+                object_kind="annotation",
+                object_id=annotation_id,
+                section_id=section_id,
+                track_id=track_id,
+            )
+        )
+    )
+    annotations.pop(annotation_index)
+
+
+def _canonical_raster_binding_ref(
+    authoring: AuthoringService,
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+) -> str:
+    matches = []
+    for ref in authoring.list("raster_binding", section_id=section_id, track_id=track_id):
+        binding = authoring.get(
+            AuthoringTarget(
+                object_kind="raster_binding",
+                object_id=ref.object_id,
+                section_id=section_id,
+                track_id=track_id,
+            )
+        )
+        if binding.channel.upper() == channel.upper():
+            matches.append(ref.object_id)
+    if len(matches) != 1:
+        raise TemplateValidationError(
+            f"Expected one raster binding for channel {channel!r} on track {track_id!r}; "
+            f"found {len(matches)}."
+        )
+    return matches[0]
+
+
+def _canonical_curve_binding_ref(
+    authoring: AuthoringService,
+    *,
+    spec: LogFileSpec,
+    bindings: list[dict[str, object]],
+    binding_index: int,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    binding_id: str | None = None,
+) -> str:
+    """Resolve one legacy curve binding occurrence to its canonical identity."""
+    raw_binding = bindings[binding_index]
+    raw_id = str(raw_binding.get("id", "")).strip()
+    if binding_id is not None:
+        raw_id = str(binding_id).strip()
+    if raw_id:
+        for ref in authoring.list("curve_binding", section_id=section_id, track_id=track_id):
+            if ref.object_id == raw_id:
+                return ref.object_id
+
+    candidates = [
+        binding
+        for binding in bindings
+        if isinstance(binding, dict)
+        and str(binding.get("kind", "curve")).strip().lower() == "curve"
+        and _binding_target_section_id(spec, binding) == section_id
+        and str(binding.get("track_id", "")) == track_id
+        and str(binding.get("channel", "")).upper() == channel.upper()
+    ]
+    try:
+        occurrence = candidates.index(raw_binding)
+    except ValueError as exc:
+        raise TemplateValidationError("Could not resolve the requested curve binding.") from exc
+    refs = authoring.list("curve_binding", section_id=section_id, track_id=track_id)
+    matching_refs = [
+        ref
+        for ref in refs
+        if authoring.get(
+            AuthoringTarget(
+                object_kind="curve_binding",
+                object_id=ref.object_id,
+                section_id=section_id,
+                track_id=track_id,
+            )
+        ).channel.upper()
+        == channel.upper()
+    ]
+    if occurrence >= len(matching_refs):
+        raise TemplateValidationError(
+            f"Could not resolve canonical binding identity for {channel!r}."
+        )
+    return matching_refs[occurrence].object_id
+
+
+_RASTER_CANONICAL_STYLE_KEYS = {
+    "color",
+    "line_style",
+    "line_width",
+    "alpha",
+    "opacity",
+    "fill_color",
+    "fill_alpha",
+    "colormap",
+}
+
+
+def _canonical_style_patch(value: object) -> dict[str, object] | None:
+    if not isinstance(value, dict) or not set(value).issubset(_RASTER_CANONICAL_STYLE_KEYS):
+        return None
+    style = deepcopy(value)
+    if "alpha" not in style and "opacity" in style:
+        style["alpha"] = style.pop("opacity")
+    else:
+        style.pop("opacity", None)
+    return style
+
+
+def _apply_canonical_raster_binding_update(
+    mapping: dict[str, object],
+    *,
+    section_id: str,
+    track_id: str,
+    channel: str,
+    binding: dict[str, object],
+    patch: dict[str, object],
+) -> bool:
+    """Apply typed raster-binding fields and project them into legacy YAML."""
+    canonical_keys = {"label", "style", "profile", "normalization", "raster_alpha"}
+    if not set(patch).issubset(canonical_keys):
+        return False
+    canonical_patch = deepcopy(patch)
+    if "style" in canonical_patch:
+        style_patch = _canonical_style_patch(canonical_patch["style"])
+        if style_patch is None:
+            return False
+        canonical_patch["style"] = style_patch
+    if "raster_alpha" in canonical_patch:
+        canonical_patch["alpha"] = canonical_patch.pop("raster_alpha")
+
+    authoring = AuthoringService.from_mapping(mapping)
+    binding_id = _canonical_raster_binding_ref(
+        authoring,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+    )
+    authoring.update(
+        UpdateRasterBindingRequest(
+            section_id=section_id,
+            track_id=track_id,
+            binding_id=binding_id,
+            patch=RasterBindingPatch.model_validate(canonical_patch),
+        )
+    )
+    updated = authoring.get(
+        AuthoringTarget(
+            object_kind="raster_binding",
+            object_id=binding_id,
+            section_id=section_id,
+            track_id=track_id,
+        )
+    )
+    if "label" in patch:
+        if updated.label is None:
+            binding.pop("label", None)
+        else:
+            binding["label"] = updated.label
+    if "style" in patch:
+        binding["style"] = _legacy_style_from_authoring(updated.style, fallback_color=None)
+    if "profile" in patch:
+        binding["profile"] = updated.profile.value
+    if "normalization" in patch:
+        binding["normalization"] = updated.normalization.value
+    if "raster_alpha" in patch:
+        binding["raster_alpha"] = updated.alpha
+    return True
+
+
+_REMARK_CORE_KEYS = {
+    "title",
+    "text",
+    "lines",
+    "alignment",
+    "font_size",
+    "title_font_size",
+    "border",
+}
+
+
+def _apply_canonical_remarks(
+    mapping: dict[str, object],
+    *,
+    remarks: list[dict[str, object]],
+) -> bool:
+    """Replace representable remarks through the canonical service."""
+    if any(not set(remark).issubset(_REMARK_CORE_KEYS) for remark in remarks):
+        return False
+    authoring = AuthoringService.from_mapping(mapping)
+    for ref in reversed(authoring.list("remark")):
+        authoring.remove(
+            RemoveRequest(
+                target=AuthoringTarget(object_kind="remark", object_id=ref.object_id)
+            )
+        )
+    try:
+        for index, remark in enumerate(remarks):
+            authoring.create(
+                CreateRemarkRequest(
+                    remark=AuthoringRemarkSpec.model_validate(remark),
+                    index=index,
+                )
+            )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError("Invalid canonical remark content.") from exc
+
+    layout = _logfile_mapping_layout(mapping)
+    layout["remarks"] = [
+        remark.model_dump(mode="json", exclude={"remark_id"}, exclude_none=True)
+        for remark in authoring.document.remarks
+    ]
+    return True
 
 
 def _apply_canonical_track_update(
@@ -5652,6 +6036,12 @@ def add_annotation_object(
             f"position {insert_index} is out of range for track {track_id!r} in "
             f"section {section_id!r}. Valid positions: 0..{len(annotations)}."
         )
+    _apply_canonical_annotation_create(
+        mapping,
+        section_id=section_id,
+        track_id=track_id,
+        annotation=annotation,
+    )
     annotations.insert(insert_index, deepcopy(annotation))
 
     saved_spec = _persist_validated_logfile_mapping(
@@ -5714,7 +6104,16 @@ def update_annotation_object(
         track_id=track_id,
         annotation_index=annotation_index,
     )
-    annotations[annotation_index] = _merge_optional_patch(annotation_mapping, patch)
+    if not _apply_canonical_annotation_update(
+        mapping,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+        annotation=annotation_mapping,
+        patch=patch,
+        annotations=annotations,
+    ):
+        annotations[annotation_index] = _merge_optional_patch(annotation_mapping, patch)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -5766,7 +6165,13 @@ def remove_annotation_object(
         track_id=track_id,
         annotation_index=annotation_index,
     )
-    annotations.pop(annotation_index)
+    _apply_canonical_annotation_remove(
+        mapping,
+        section_id=section_id,
+        track_id=track_id,
+        annotation_index=annotation_index,
+        annotations=annotations,
+    )
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -6048,6 +6453,90 @@ def add_curve_fill(
         fill["alpha"] = float(alpha)
     if crossover is not None:
         fill["crossover"] = deepcopy(crossover)
+
+    authoring = AuthoringService.from_mapping(mapping)
+    canonical_binding_id = _canonical_curve_binding_ref(
+        authoring,
+        spec=current_spec,
+        bindings=bindings,
+        binding_index=binding_index,
+        section_id=section_id,
+        track_id=track_id,
+        channel=resolved_channel,
+        binding_id=binding_id,
+    )
+    canonical_other_binding_id: str | None = None
+    if normalized_kind in {
+        AuthoringCurveFillKind.BETWEEN_CURVES.value,
+        AuthoringCurveFillKind.BETWEEN_INSTANCES.value,
+    }:
+        if other_element_id is not None:
+            other_id = str(other_element_id).strip()
+            for ref in authoring.list("curve_binding", section_id=section_id, track_id=track_id):
+                if ref.object_id == other_id:
+                    canonical_other_binding_id = ref.object_id
+                    break
+            if canonical_other_binding_id is None:
+                raise TemplateValidationError(
+                    f"Curve binding id {other_element_id!r} was not found on track "
+                    f"{track_id!r} in section {section_id!r}."
+                )
+        elif other_channel is not None:
+            resolved_other_channel = _resolve_section_channel_name(
+                current_spec,
+                logfile_path=resolved_logfile,
+                root=server_root,
+                section_id=section_id,
+                channel=other_channel,
+            )
+            other_binding_index = _find_curve_binding_index(
+                bindings,
+                spec=current_spec,
+                section_id=section_id,
+                track_id=track_id,
+                channel=resolved_other_channel,
+            )
+            canonical_other_binding_id = _canonical_curve_binding_ref(
+                authoring,
+                spec=current_spec,
+                bindings=bindings,
+                binding_index=other_binding_index,
+                section_id=section_id,
+                track_id=track_id,
+                channel=resolved_other_channel,
+            )
+        else:
+            raise TemplateValidationError(
+                f"{normalized_kind} fills require another curve binding."
+            )
+
+    canonical_baseline: float | None = None
+    if normalized_kind == AuthoringCurveFillKind.BASELINE_SPLIT.value:
+        baseline_value = baseline.get("value") if isinstance(baseline, dict) else None
+        if baseline_value is None:
+            raise TemplateValidationError("baseline_split fills require baseline.value.")
+        try:
+            canonical_baseline = float(baseline_value)
+        except (TypeError, ValueError) as exc:
+            raise TemplateValidationError("baseline.value must be numeric.") from exc
+
+    try:
+        canonical_fill = CurveFillSpec(
+            kind=AuthoringCurveFillKind(normalized_kind),
+            binding_id=canonical_binding_id,
+            other_binding_id=canonical_other_binding_id,
+            baseline=canonical_baseline,
+            extensions={"compatibility": {"legacy_fill": deepcopy(fill)}},
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError("Invalid canonical curve fill.") from exc
+    authoring.create(
+        CreateFillRequest(
+            section_id=section_id,
+            track_id=track_id,
+            fill=canonical_fill,
+        )
+    )
     binding["fill"] = fill
 
     saved_spec = _persist_validated_logfile_mapping(
@@ -6113,6 +6602,45 @@ def remove_curve_fill(
             f"section {section_id!r} does not define a fill."
         )
     removed_channel = str(binding.get("channel", channel))
+    authoring = AuthoringService.from_mapping(mapping)
+    canonical_binding_id = _canonical_curve_binding_ref(
+        authoring,
+        spec=current_spec,
+        bindings=bindings,
+        binding_index=binding_index,
+        section_id=section_id,
+        track_id=track_id,
+        channel=removed_channel,
+        binding_id=binding_id,
+    )
+    fill_refs = [
+        ref
+        for ref in authoring.list("fill", section_id=section_id, track_id=track_id)
+        if authoring.get(
+            AuthoringTarget(
+                object_kind="fill",
+                object_id=ref.object_id,
+                section_id=section_id,
+                track_id=track_id,
+            )
+        ).binding_id
+        == canonical_binding_id
+    ]
+    if len(fill_refs) != 1:
+        raise TemplateValidationError(
+            f"Expected one canonical fill for curve binding {removed_channel!r}; "
+            f"found {len(fill_refs)}."
+        )
+    authoring.remove(
+        RemoveRequest(
+            target=AuthoringTarget(
+                object_kind="fill",
+                object_id=fill_refs[0].object_id,
+                section_id=section_id,
+                track_id=track_id,
+            )
+        )
+    )
     binding.pop("fill", None)
 
     saved_spec = _persist_validated_logfile_mapping(
@@ -6201,6 +6729,63 @@ def bind_raster(
         "channel": resolved_channel,
         "kind": "raster",
     }
+    advanced_raster_fields = (
+        waveform_normalization,
+        clip_percentiles,
+        interpolation,
+        show_raster,
+        color_limits,
+        colorbar,
+        sample_axis,
+        waveform,
+    )
+    if all(value is None for value in advanced_raster_fields):
+        canonical_style = None
+        if style is not None:
+            canonical_style = _canonical_style_patch(style)
+            if canonical_style is None:
+                raise TemplateValidationError(
+                    "Unsupported style keys for canonical raster binding."
+                )
+        authoring = AuthoringService.from_mapping(mapping)
+        existing_ids = {
+            ref.object_id
+            for ref in authoring.list(
+                "curve_binding", section_id=section_id, track_id=track_id
+            )
+        }
+        existing_ids.update(
+            ref.object_id
+            for ref in authoring.list(
+                "raster_binding", section_id=section_id, track_id=track_id
+            )
+        )
+        base_id = f"{section_id}.{track_id}.{resolved_channel}.raster"
+        generated_id = base_id
+        suffix = 2
+        while generated_id in existing_ids:
+            generated_id = f"{base_id}.{suffix}"
+            suffix += 1
+        try:
+            typed_binding = RasterBindingSpec(
+                binding_id=generated_id,
+                channel=resolved_channel,
+                label=label,
+                style=AuthoringStyle.model_validate(canonical_style or {}),
+                profile=profile or "generic",
+                normalization=normalization or "auto",
+                alpha=1.0 if raster_alpha is None else raster_alpha,
+            )
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise TemplateValidationError("Invalid canonical raster binding.") from exc
+        authoring.create(
+            CreateRasterBindingRequest(
+                section_id=section_id,
+                track_id=track_id,
+                binding=typed_binding,
+            )
+        )
+        binding["id"] = generated_id
     if label is not None:
         binding["label"] = label
     if style is not None:
@@ -6366,7 +6951,15 @@ def update_raster_binding(
     binding = bindings[binding_index]
     if not isinstance(binding, dict):
         raise RuntimeError("Expected a mapping raster binding entry.")
-    bindings[binding_index] = _merge_optional_patch(binding, patch)
+    if not _apply_canonical_raster_binding_update(
+        mapping,
+        section_id=section_id,
+        track_id=track_id,
+        channel=channel,
+        binding=binding,
+        patch=patch,
+    ):
+        bindings[binding_index] = _merge_optional_patch(binding, patch)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -6693,8 +7286,9 @@ def set_remarks_content(
         resolved_logfile,
         allowed_root=server_root,
     )
-    layout = _logfile_mapping_layout(mapping)
-    layout["remarks"] = deepcopy(remarks)
+    if not _apply_canonical_remarks(mapping, remarks=remarks):
+        layout = _logfile_mapping_layout(mapping)
+        layout["remarks"] = deepcopy(remarks)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,

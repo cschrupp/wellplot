@@ -45,6 +45,7 @@ from .model.authoring import (
     AnnotationMarkerSpec,
     AnnotationTextSpec,
     ArrayTrackSpec,
+    AuthoringCurveFillKind,
     AuthoringDataSource,
     AuthoringDepthSpec,
     AuthoringDocumentSpec,
@@ -58,6 +59,7 @@ from .model.authoring import (
     AuthoringSectionSpec,
     AuthoringStyle,
     CurveBindingSpec,
+    CurveFillSpec,
     NormalTrackSpec,
     RasterBindingSpec,
     ReferenceTrackSpec,
@@ -216,6 +218,67 @@ def _annotation_from_mapping(
     raise TemplateValidationError(f"Unsupported annotation kind {kind!r} at {context}.")
 
 
+def _fill_from_mapping(
+    value: object,
+    *,
+    binding_id: str,
+    track_bindings: Sequence[tuple[int, Mapping[str, Any]]],
+    binding_ids_by_index: Mapping[int, str],
+    context: str,
+) -> CurveFillSpec:
+    """Normalize one legacy binding fill into a typed track-level relation."""
+    data = _mapping(value, context=context)
+    kind_text = str(data.get("kind", "")).strip().lower()
+    try:
+        kind = AuthoringCurveFillKind(kind_text)
+    except ValueError as exc:
+        raise TemplateValidationError(f"Unsupported fill kind {kind_text!r} at {context}.") from exc
+
+    other_binding_id: str | None = None
+    if kind in {
+        AuthoringCurveFillKind.BETWEEN_CURVES,
+        AuthoringCurveFillKind.BETWEEN_INSTANCES,
+    }:
+        other_element_id = _as_text(
+            data.get("other_element_id"), context=f"{context}.other_element_id"
+        )
+        other_channel = _as_text(data.get("other_channel"), context=f"{context}.other_channel")
+        if other_element_id is not None:
+            for index, binding in track_bindings:
+                if str(binding.get("id", "")).strip() == other_element_id:
+                    other_binding_id = binding_ids_by_index[index]
+                    break
+        elif other_channel is not None:
+            for index, binding in track_bindings:
+                if str(binding.get("channel", "")).strip().upper() == other_channel.upper():
+                    other_binding_id = binding_ids_by_index[index]
+                    break
+        if other_binding_id is None:
+            raise TemplateValidationError(
+                f"{context} must reference another binding on the same track."
+            )
+
+    baseline_value = data.get("baseline")
+    baseline: float | None = None
+    if kind == AuthoringCurveFillKind.BASELINE_SPLIT:
+        if isinstance(baseline_value, Mapping):
+            baseline_value = baseline_value.get("value")
+        if baseline_value is None:
+            raise TemplateValidationError(f"{context}.baseline.value is required.")
+        try:
+            baseline = float(baseline_value)
+        except (TypeError, ValueError) as exc:
+            raise TemplateValidationError(f"Invalid {context}.baseline value.") from exc
+
+    return CurveFillSpec(
+        kind=kind,
+        binding_id=binding_id,
+        other_binding_id=other_binding_id,
+        baseline=baseline,
+        extensions={"compatibility": {"legacy_fill": deepcopy(data)}},
+    )
+
+
 def _page_from_legacy(value: object) -> AuthoringPageSpec:
     data = _mapping(value or {}, context="document.page")
     page_kwargs: dict[str, Any] = {
@@ -369,7 +432,9 @@ def _legacy_to_authoring(
             track_id = str(track["id"])
             kind = _track_kind(track.get("kind", "normal"))
             canonical_bindings: list[CurveBindingSpec | RasterBindingSpec] = []
-            for binding_index, binding in bindings_by_track.get((section_id, track_id), []):
+            track_bindings = bindings_by_track.get((section_id, track_id), [])
+            binding_ids_by_index: dict[int, str] = {}
+            for binding_index, binding in track_bindings:
                 channel = _as_text(binding.get("channel"), context="binding.channel")
                 if channel is None:
                     raise TemplateValidationError("Binding channel must be non-empty.")
@@ -380,6 +445,7 @@ def _legacy_to_authoring(
                     index=binding_index,
                     used=used_binding_ids,
                 )
+                binding_ids_by_index[binding_index] = binding_id
                 extension = {"compatibility": {"legacy_binding": deepcopy(binding)}}
                 element_kind = str(binding.get("kind", "curve")).strip().lower()
                 if element_kind == "curve":
@@ -438,6 +504,24 @@ def _legacy_to_authoring(
                         context=f"track {track_id}.annotations[{annotation_index}]",
                     )
                 )
+            canonical_fills: list[CurveFillSpec] = []
+            if kind == "normal":
+                for binding_index, binding in track_bindings:
+                    fill = binding.get("fill")
+                    if fill is None:
+                        continue
+                    canonical_fills.append(
+                        _fill_from_mapping(
+                            fill,
+                            binding_id=binding_ids_by_index[binding_index],
+                            track_bindings=track_bindings,
+                            binding_ids_by_index=binding_ids_by_index,
+                            context=(
+                                f"document.bindings.channels[{binding_index}].fill"
+                            ),
+                        )
+                    )
+
             extensions = {"compatibility": {"legacy_track": deepcopy(track)}}
             common = {
                 "id": track_id,
@@ -451,6 +535,7 @@ def _legacy_to_authoring(
                     NormalTrackSpec(
                         **common,
                         x_scale=x_scale,
+                        fills=canonical_fills,
                         bindings=[
                             item
                             for item in canonical_bindings
@@ -669,6 +754,29 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
     return element
 
 
+def _fill_element(fill: CurveFillSpec) -> dict[str, Any]:
+    """Project one canonical fill to the legacy binding-level shape."""
+    compatibility = fill.extensions.get("compatibility")
+    legacy_fill = (
+        deepcopy(dict(compatibility["legacy_fill"]))
+        if isinstance(compatibility, Mapping)
+        and isinstance(compatibility.get("legacy_fill"), Mapping)
+        else {}
+    )
+    legacy_fill["kind"] = fill.kind.value
+    if fill.other_binding_id is not None:
+        legacy_fill.setdefault("other_element_id", fill.other_binding_id)
+    if fill.baseline is not None:
+        baseline = legacy_fill.get("baseline")
+        if isinstance(baseline, Mapping):
+            baseline = deepcopy(dict(baseline))
+            baseline["value"] = fill.baseline
+            legacy_fill["baseline"] = baseline
+        else:
+            legacy_fill["baseline"] = {"value": fill.baseline}
+    return legacy_fill
+
+
 def _render_track(
     document: AuthoringDocumentSpec, section_id: str, track: TrackSpec
 ) -> dict[str, Any]:
@@ -686,6 +794,16 @@ def _render_track(
         payload["x_scale"] = track.x_scale.model_dump(mode="json", exclude_none=True)
     bindings = getattr(track, "bindings", ())
     payload["elements"] = [_binding_element(binding) for binding in bindings]
+    if isinstance(track, NormalTrackSpec):
+        elements_by_id = {
+            str(element.get("id")): element
+            for element in payload["elements"]
+            if isinstance(element, dict)
+        }
+        for fill in track.fills:
+            target = elements_by_id.get(fill.binding_id)
+            if target is not None:
+                target["fill"] = _fill_element(fill)
     if hasattr(track, "annotations"):
         payload["annotations"] = [
             annotation.model_dump(mode="json", exclude={"annotation_id"}, exclude_none=True)
