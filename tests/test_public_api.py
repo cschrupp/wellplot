@@ -75,6 +75,10 @@ class PublicApiTests(unittest.TestCase):
         """Expose the documented runtime helpers from ``wellplot``."""
         expected = {
             "__version__",
+            "authoring_document_from_mapping",
+            "authoring_document_to_mapping",
+            "authoring_document_to_render",
+            "authoring_document_to_yaml",
             "ArrayChannel",
             "AnnotationArrowSpec",
             "AnnotationGlyphSpec",
@@ -146,6 +150,8 @@ class PublicApiTests(unittest.TestCase):
             "load_dataset_for_logfile",
             "load_datasets_for_logfile",
             "load_document",
+            "load_authoring_document",
+            "load_authoring_document_text",
             "load_document_yaml",
             "load_logfile",
             "load_report",

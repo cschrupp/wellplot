@@ -92,6 +92,9 @@ class AuthoringStyle(_AuthoringModel):
     line_style: str = Field(default="-", min_length=1)
     line_width: float = Field(default=0.8, gt=0)
     alpha: float = Field(default=1.0, ge=0, le=1)
+    fill_color: str | None = Field(default=None, min_length=1)
+    fill_alpha: float = Field(default=0.2, ge=0, le=1)
+    colormap: str = Field(default="viridis", min_length=1)
 
 
 class AuthoringScale(_AuthoringModel):
@@ -105,11 +108,13 @@ class AuthoringScale(_AuthoringModel):
 
     @model_validator(mode="after")
     def validate_bounds(self) -> AuthoringScale:
-        """Require ordered bounds and positive bounds for logarithmic scales."""
-        if self.maximum <= self.minimum:
-            raise ValueError("Scale maximum must be greater than minimum.")
+        """Require distinct bounds and positive bounds for logarithmic scales."""
+        if self.maximum == self.minimum:
+            raise ValueError("Scale minimum and maximum must differ.")
         if self.kind == AuthoringScaleKind.LOG and self.minimum <= 0:
             raise ValueError("Logarithmic scales require a positive minimum.")
+        if self.kind == AuthoringScaleKind.LOG and self.maximum <= 0:
+            raise ValueError("Logarithmic scales require a positive maximum.")
         return self
 
 
@@ -129,6 +134,7 @@ class CurveBindingSpec(_AuthoringModel):
     label: str | None = Field(default=None, min_length=1)
     scale: AuthoringScale | None = None
     style: AuthoringStyle = Field(default_factory=AuthoringStyle)
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
 
 class RasterBindingSpec(_AuthoringModel):
@@ -138,9 +144,11 @@ class RasterBindingSpec(_AuthoringModel):
     binding_id: str = Field(min_length=1)
     channel: str = Field(min_length=1)
     label: str | None = Field(default=None, min_length=1)
+    style: AuthoringStyle = Field(default_factory=AuthoringStyle)
     profile: AuthoringRasterProfileKind = AuthoringRasterProfileKind.GENERIC
     normalization: AuthoringRasterNormalizationKind = AuthoringRasterNormalizationKind.AUTO
     alpha: float = Field(default=1.0, ge=0, le=1)
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
 
 BindingSpec: TypeAlias = Annotated[
@@ -252,6 +260,7 @@ class _TrackSpec(_AuthoringModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
     width_mm: float = Field(gt=0)
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
 
 class NormalTrackSpec(_TrackSpec):
@@ -334,6 +343,15 @@ class AuthoringPageSpec(_AuthoringModel):
     height_mm: float | None = Field(default=None, gt=0)
     orientation: Literal["portrait", "landscape"] = "portrait"
     continuous: bool = False
+    bottom_track_header_enabled: bool = True
+    margin_left_mm: float = Field(default=0.0, ge=0)
+    margin_right_mm: float = Field(default=10.0, ge=0)
+    margin_top_mm: float = Field(default=10.0, ge=0)
+    margin_bottom_mm: float = Field(default=10.0, ge=0)
+    header_height_mm: float = Field(default=18.0, ge=0)
+    track_header_height_mm: float = Field(default=8.0, ge=0)
+    footer_height_mm: float = Field(default=10.0, ge=0)
+    track_gap_mm: float = Field(default=0.0, ge=0)
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> AuthoringPageSpec:
@@ -358,6 +376,10 @@ class AuthoringRemarkSpec(_AuthoringModel):
     title: str | None = Field(default=None, min_length=1)
     text: str | None = None
     lines: list[str] = Field(default_factory=list)
+    alignment: Literal["left", "center", "right"] = "left"
+    font_size: float | None = Field(default=None, gt=0)
+    title_font_size: float | None = Field(default=None, gt=0)
+    border: bool | None = None
 
     @model_validator(mode="after")
     def validate_content(self) -> AuthoringRemarkSpec:
@@ -376,6 +398,7 @@ class AuthoringSectionSpec(_AuthoringModel):
     depth_range: tuple[float, float] | None = None
     data_source: AuthoringDataSource | None = None
     tracks: list[TrackSpec] = Field(min_length=1)
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_section(self) -> AuthoringSectionSpec:

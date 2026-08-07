@@ -49,6 +49,14 @@ from .api import (
     save_document,
     save_report,
 )
+from .authoring import (
+    authoring_document_from_mapping,
+    authoring_document_to_mapping,
+    authoring_document_to_render,
+    authoring_document_to_yaml,
+    load_authoring_document,
+    load_authoring_document_text,
+)
 from .errors import DatasetValidationError
 from .layout import LayoutEngine
 from .logfile import (
@@ -119,6 +127,10 @@ from .templates import document_from_mapping, load_document
 
 __all__ = [
     "__version__",
+    "authoring_document_from_mapping",
+    "authoring_document_to_mapping",
+    "authoring_document_to_render",
+    "authoring_document_to_yaml",
     "ArrayChannel",
     "AnnotationArrowSpec",
     "AnnotationGlyphSpec",
@@ -211,4 +223,6 @@ __all__ = [
     "create_dataset",
     "document_from_mapping",
     "load_document",
+    "load_authoring_document",
+    "load_authoring_document_text",
 ]

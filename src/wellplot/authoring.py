@@ -1,0 +1,857 @@
+###############################################################################
+#
+# Copyright (C) 2026 Carlos Schrupp
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+###############################################################################
+
+"""Compatibility adapters for the canonical authoring contract.
+
+The adapters deliberately sit outside the renderer and MCP layers.  Legacy
+logfile YAML is normalized into typed authoring objects, while the original
+layout is retained in an explicit compatibility extension until every legacy
+render property has a first-class authoring field.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
+from pathlib import Path
+from typing import Any, TextIO
+
+import yaml
+from pydantic import ValidationError
+
+from .errors import TemplateValidationError
+from .logfile import load_logfile, load_logfile_text
+from .model import LogDocument
+from .model.authoring import (
+    AnnotationArrowSpec,
+    AnnotationGlyphSpec,
+    AnnotationIntervalSpec,
+    AnnotationMarkerSpec,
+    AnnotationTextSpec,
+    ArrayTrackSpec,
+    AuthoringDataSource,
+    AuthoringDepthSpec,
+    AuthoringDocumentSpec,
+    AuthoringPageSpec,
+    AuthoringRasterNormalizationKind,
+    AuthoringRasterProfileKind,
+    AuthoringReferenceAxisKind,
+    AuthoringRemarkSpec,
+    AuthoringScale,
+    AuthoringScaleKind,
+    AuthoringSectionSpec,
+    AuthoringStyle,
+    CurveBindingSpec,
+    NormalTrackSpec,
+    RasterBindingSpec,
+    ReferenceTrackSpec,
+    TrackSpec,
+)
+from .templates import document_from_mapping
+
+
+def _mapping(value: object, *, context: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise TemplateValidationError(
+            f"Expected a mapping for {context}, got {type(value).__name__}."
+        )
+    return dict(value)
+
+
+def _sequence(value: object, *, context: str) -> list[Any]:
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray, Mapping)):
+        raise TemplateValidationError(
+            f"Expected a sequence for {context}, got {type(value).__name__}."
+        )
+    return list(value)
+
+
+def _as_text(value: object, *, context: str, default: str | None = None) -> str | None:
+    if value is None:
+        return default
+    text = str(value).strip()
+    if not text:
+        return default
+    return text
+
+
+def _scale_from_mapping(value: object, *, context: str) -> AuthoringScale | None:
+    if value is None:
+        return None
+    data = _mapping(value, context=context)
+    kind = str(data.get("kind", "linear")).strip().lower()
+    if kind == "logarithmic":
+        kind = "log"
+    if kind == "tangent":
+        kind = "tangential"
+    try:
+        return AuthoringScale(
+            kind=AuthoringScaleKind(kind),
+            minimum=float(data.get("minimum", data.get("min", 0.0))),
+            maximum=float(data.get("maximum", data.get("max", 1.0))),
+            reverse=bool(data.get("reverse", False)),
+            unit=_as_text(data.get("unit"), context=f"{context}.unit"),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _style_from_mapping(value: object, *, context: str) -> AuthoringStyle:
+    if value is None:
+        return AuthoringStyle()
+    data = _mapping(value, context=context)
+    try:
+        return AuthoringStyle(
+            color=_as_text(data.get("color"), context=f"{context}.color"),
+            line_style=str(data.get("line_style", "-")),
+            line_width=float(data.get("line_width", 0.8)),
+            alpha=float(data.get("alpha", data.get("opacity", 1.0))),
+            fill_color=_as_text(data.get("fill_color"), context=f"{context}.fill_color"),
+            fill_alpha=float(data.get("fill_alpha", 0.2)),
+            colormap=str(data.get("colormap", "viridis")),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _track_kind(value: object) -> str:
+    kind = str(value or "normal").strip().lower()
+    aliases = {"depth": "reference", "curve": "normal", "image": "array"}
+    normalized = aliases.get(kind, kind)
+    if normalized not in {"reference", "normal", "array", "annotation"}:
+        raise TemplateValidationError(f"Unsupported track kind {kind!r}.")
+    return normalized
+
+
+def _binding_id(
+    binding: Mapping[str, Any],
+    *,
+    section_id: str,
+    track_id: str,
+    index: int,
+    used: set[str],
+) -> str:
+    candidate = _as_text(binding.get("id"), context="binding.id")
+    if candidate is None:
+        channel = _as_text(binding.get("channel"), context="binding.channel", default="channel")
+        candidate = f"{section_id}.{track_id}.{channel}.{index + 1}"
+    original = candidate
+    suffix = 2
+    while candidate in used:
+        candidate = f"{original}.{suffix}"
+        suffix += 1
+    used.add(candidate)
+    return candidate
+
+
+def _annotation_from_mapping(
+    value: object,
+    *,
+    annotation_id: str,
+    context: str,
+) -> (
+    AnnotationIntervalSpec
+    | AnnotationTextSpec
+    | AnnotationMarkerSpec
+    | AnnotationArrowSpec
+    | AnnotationGlyphSpec
+):
+    data = _mapping(value, context=context)
+    kind = str(data.get("kind", "text")).strip().lower()
+    try:
+        if kind == "interval":
+            return AnnotationIntervalSpec(
+                annotation_id=annotation_id,
+                top=float(data["top"]),
+                base=float(data["base"]),
+                text=str(data.get("text", "")),
+            )
+        if kind == "text":
+            depth = data.get("depth")
+            if depth is None:
+                raise TemplateValidationError(f"{context}.depth is required for text annotations.")
+            return AnnotationTextSpec(
+                annotation_id=annotation_id,
+                depth=float(depth),
+                text=str(data["text"]),
+            )
+        if kind == "marker":
+            return AnnotationMarkerSpec(
+                annotation_id=annotation_id,
+                depth=float(data["depth"]),
+                shape=str(data.get("shape", "circle")),
+                label=_as_text(data.get("label"), context=f"{context}.label"),
+            )
+        if kind == "arrow":
+            return AnnotationArrowSpec(
+                annotation_id=annotation_id,
+                top=float(data["top"]),
+                base=float(data["base"]),
+                label=_as_text(data.get("label"), context=f"{context}.label"),
+            )
+        if kind == "glyph":
+            return AnnotationGlyphSpec(
+                annotation_id=annotation_id,
+                depth=float(data["depth"]),
+                glyph=str(data["glyph"]),
+            )
+    except (KeyError, TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+    raise TemplateValidationError(f"Unsupported annotation kind {kind!r} at {context}.")
+
+
+def _page_from_legacy(value: object) -> AuthoringPageSpec:
+    data = _mapping(value or {}, context="document.page")
+    page_kwargs: dict[str, Any] = {
+        "size": _as_text(data.get("size"), context="document.page.size"),
+        "orientation": str(data.get("orientation", "portrait")).strip().lower(),
+        "continuous": bool(data.get("continuous", False)),
+        "bottom_track_header_enabled": bool(data.get("bottom_track_header_enabled", True)),
+    }
+    for field in (
+        "width_mm",
+        "height_mm",
+        "margin_left_mm",
+        "margin_right_mm",
+        "margin_top_mm",
+        "margin_bottom_mm",
+        "header_height_mm",
+        "track_header_height_mm",
+        "footer_height_mm",
+        "track_gap_mm",
+    ):
+        if field in data:
+            page_kwargs[field] = float(data[field])
+    if page_kwargs["size"] is None and (
+        "width_mm" not in page_kwargs or "height_mm" not in page_kwargs
+    ):
+        page_kwargs["size"] = "letter"
+    try:
+        return AuthoringPageSpec(**page_kwargs)
+    except ValidationError as exc:
+        raise TemplateValidationError("Invalid document.page.") from exc
+
+
+def _remarks_from_legacy(value: object) -> list[AuthoringRemarkSpec]:
+    remarks: list[AuthoringRemarkSpec] = []
+    for index, item in enumerate(_sequence(value or [], context="document.layout.remarks")):
+        data = _mapping(item, context=f"document.layout.remarks[{index}]")
+        lines = [
+            str(line)
+            for line in _sequence(data.get("lines", []), context=f"remarks[{index}].lines")
+        ]
+        text = _as_text(data.get("text"), context=f"remarks[{index}].text")
+        if text is None and not lines:
+            raise TemplateValidationError(
+                f"document.layout.remarks[{index}] must define text or lines."
+            )
+        remarks.append(
+            AuthoringRemarkSpec(
+                title=_as_text(data.get("title"), context=f"remarks[{index}].title"),
+                text=text,
+                lines=lines,
+                alignment=str(data.get("alignment", "left")),
+                font_size=(float(data["font_size"]) if data.get("font_size") is not None else None),
+                title_font_size=(
+                    float(data["title_font_size"])
+                    if data.get("title_font_size") is not None
+                    else None
+                ),
+                border=(bool(data["border"]) if "border" in data else None),
+            )
+        )
+    return remarks
+
+
+def _resolve_binding_section(
+    binding: Mapping[str, Any],
+    *,
+    sections: dict[str, dict[str, Mapping[str, Any]]],
+    track_sections: dict[str, list[str]],
+    context: str,
+) -> str:
+    explicit = _as_text(binding.get("section"), context=f"{context}.section")
+    track_id = _as_text(binding.get("track_id"), context=f"{context}.track_id")
+    if track_id is None:
+        raise TemplateValidationError(f"{context}.track_id must be non-empty.")
+    if explicit is not None:
+        if explicit not in sections or track_id not in sections[explicit]:
+            raise TemplateValidationError(
+                f"{context} does not identify an existing section and track."
+            )
+        return explicit
+    candidates = track_sections.get(track_id, [])
+    if len(candidates) != 1:
+        joined = ", ".join(candidates) or "none"
+        raise TemplateValidationError(
+            f"{context}.track_id {track_id!r} is ambiguous across sections ({joined}); "
+            "set section explicitly."
+        )
+    return candidates[0]
+
+
+def _legacy_to_authoring(
+    root: Mapping[str, Any], document: Mapping[str, Any]
+) -> AuthoringDocumentSpec:
+    layout = _mapping(document.get("layout"), context="document.layout")
+    section_items = _sequence(
+        layout.get("log_sections", []), context="document.layout.log_sections"
+    )
+    if not section_items:
+        raise TemplateValidationError("document.layout.log_sections cannot be empty.")
+
+    sections: dict[str, dict[str, Mapping[str, Any]]] = {}
+    track_sections: dict[str, list[str]] = {}
+    for index, item in enumerate(section_items):
+        section = _mapping(item, context=f"document.layout.log_sections[{index}]")
+        section_id = _as_text(section.get("id"), context=f"sections[{index}].id")
+        if section_id is None:
+            raise TemplateValidationError(f"document.layout.log_sections[{index}].id is required.")
+        tracks = _sequence(section.get("tracks", []), context=f"sections[{section_id}].tracks")
+        track_map: dict[str, Mapping[str, Any]] = {}
+        for track_item in tracks:
+            track = _mapping(track_item, context=f"sections[{section_id}].tracks")
+            track_id = _as_text(track.get("id"), context="track.id")
+            if track_id is None:
+                raise TemplateValidationError(
+                    f"Section {section_id!r} contains a track without id."
+                )
+            if track_id in track_map:
+                raise TemplateValidationError(
+                    f"Section {section_id!r} contains duplicate track ids."
+                )
+            track_map[track_id] = track
+            track_sections.setdefault(track_id, []).append(section_id)
+        sections[section_id] = track_map
+
+    bindings_by_track: dict[tuple[str, str], list[tuple[int, Mapping[str, Any]]]] = {}
+    binding_items = _sequence(
+        _mapping(document.get("bindings", {}), context="document.bindings").get("channels", []),
+        context="document.bindings.channels",
+    )
+    for index, item in enumerate(binding_items):
+        binding = _mapping(item, context=f"document.bindings.channels[{index}]")
+        section_id = _resolve_binding_section(
+            binding,
+            sections=sections,
+            track_sections=track_sections,
+            context=f"document.bindings.channels[{index}]",
+        )
+        track_id = str(binding["track_id"])
+        bindings_by_track.setdefault((section_id, track_id), []).append((index, binding))
+
+    used_binding_ids: set[str] = set()
+    authoring_sections: list[AuthoringSectionSpec] = []
+    for section_index, item in enumerate(section_items):
+        section = _mapping(item, context=f"document.layout.log_sections[{section_index}]")
+        section_id = str(section["id"])
+        authoring_tracks: list[TrackSpec] = []
+        for track_index, track_item in enumerate(
+            _sequence(section["tracks"], context="section.tracks")
+        ):
+            track = _mapping(track_item, context=f"section {section_id} track {track_index}")
+            track_id = str(track["id"])
+            kind = _track_kind(track.get("kind", "normal"))
+            canonical_bindings: list[CurveBindingSpec | RasterBindingSpec] = []
+            for binding_index, binding in bindings_by_track.get((section_id, track_id), []):
+                channel = _as_text(binding.get("channel"), context="binding.channel")
+                if channel is None:
+                    raise TemplateValidationError("Binding channel must be non-empty.")
+                binding_id = _binding_id(
+                    binding,
+                    section_id=section_id,
+                    track_id=track_id,
+                    index=binding_index,
+                    used=used_binding_ids,
+                )
+                extension = {"compatibility": {"legacy_binding": deepcopy(binding)}}
+                element_kind = str(binding.get("kind", "curve")).strip().lower()
+                if element_kind == "curve":
+                    canonical_bindings.append(
+                        CurveBindingSpec(
+                            binding_id=binding_id,
+                            channel=channel,
+                            label=_as_text(binding.get("label"), context="binding.label"),
+                            scale=_scale_from_mapping(
+                                binding.get("scale"), context="binding.scale"
+                            ),
+                            style=_style_from_mapping(
+                                binding.get("style"), context="binding.style"
+                            ),
+                            extensions=extension,
+                        )
+                    )
+                elif element_kind == "raster":
+                    try:
+                        profile = AuthoringRasterProfileKind(
+                            str(binding.get("profile", "generic")).strip().lower()
+                        )
+                        normalization = AuthoringRasterNormalizationKind(
+                            str(binding.get("normalization", "auto")).strip().lower()
+                        )
+                        canonical_bindings.append(
+                            RasterBindingSpec(
+                                binding_id=binding_id,
+                                channel=channel,
+                                label=_as_text(binding.get("label"), context="binding.label"),
+                                style=_style_from_mapping(
+                                    binding.get("style"), context="binding.style"
+                                ),
+                                profile=profile,
+                                normalization=normalization,
+                                alpha=float(binding.get("raster_alpha", 1.0)),
+                                extensions=extension,
+                            )
+                        )
+                    except (TypeError, ValueError, ValidationError) as exc:
+                        raise TemplateValidationError(
+                            "Invalid raster binding at "
+                            f"document.bindings.channels[{binding_index}]."
+                        ) from exc
+                else:
+                    raise TemplateValidationError(f"Unsupported binding kind {element_kind!r}.")
+
+            annotation_models = []
+            for annotation_index, annotation in enumerate(
+                _sequence(track.get("annotations", []), context=f"track {track_id}.annotations")
+            ):
+                annotation_models.append(
+                    _annotation_from_mapping(
+                        annotation,
+                        annotation_id=f"{section_id}.{track_id}.annotation.{annotation_index + 1}",
+                        context=f"track {track_id}.annotations[{annotation_index}]",
+                    )
+                )
+            extensions = {"compatibility": {"legacy_track": deepcopy(track)}}
+            common = {
+                "id": track_id,
+                "title": _as_text(track.get("title"), context="track.title", default=track_id),
+                "width_mm": float(track["width_mm"]),
+                "extensions": extensions,
+            }
+            x_scale = _scale_from_mapping(track.get("x_scale"), context=f"track {track_id}.x_scale")
+            if kind == "normal":
+                authoring_tracks.append(
+                    NormalTrackSpec(
+                        **common,
+                        x_scale=x_scale,
+                        bindings=[
+                            item
+                            for item in canonical_bindings
+                            if isinstance(item, CurveBindingSpec)
+                        ],
+                    )
+                )
+            elif kind == "reference":
+                reference = _mapping(
+                    track.get("reference", {}), context=f"track {track_id}.reference"
+                )
+                axis = AuthoringReferenceAxisKind(str(reference.get("axis", "depth")).lower())
+                authoring_tracks.append(
+                    ReferenceTrackSpec(
+                        **common,
+                        axis=axis,
+                        bindings=[
+                            item
+                            for item in canonical_bindings
+                            if isinstance(item, CurveBindingSpec)
+                        ],
+                    )
+                )
+            elif kind == "array":
+                authoring_tracks.append(ArrayTrackSpec(**common, bindings=canonical_bindings))
+            else:
+                from .model.authoring import AnnotationTrackSpec
+
+                authoring_tracks.append(
+                    AnnotationTrackSpec(**common, annotations=annotation_models)
+                )
+
+        data = _mapping(section.get("data", {}), context=f"section {section_id}.data")
+        source_path = _as_text(
+            data.get("source_path"), context=f"section {section_id}.data.source_path"
+        )
+        data_source = (
+            AuthoringDataSource(
+                source_path=source_path,
+                source_format=str(data.get("source_format", "auto")).lower(),
+            )
+            if source_path is not None
+            else None
+        )
+        depth_range_value = section.get("depth_range")
+        depth_range = None
+        if depth_range_value is not None:
+            values = _sequence(depth_range_value, context=f"section {section_id}.depth_range")
+            if len(values) != 2:
+                raise TemplateValidationError(
+                    f"Section {section_id!r} depth_range must contain two values."
+                )
+            depth_range = (float(values[0]), float(values[1]))
+        authoring_sections.append(
+            AuthoringSectionSpec(
+                id=section_id,
+                title=_as_text(section.get("title"), context="section.title", default=section_id),
+                subtitle=_as_text(section.get("subtitle"), context="section.subtitle"),
+                depth_range=depth_range,
+                data_source=data_source,
+                tracks=authoring_tracks,
+            )
+        )
+
+    depth = _mapping(document.get("depth", {}), context="document.depth")
+    page = _page_from_legacy(document.get("page", {}))
+    heading = _mapping(layout.get("heading", {}), context="document.layout.heading")
+    title = _as_text(heading.get("title"), context="heading.title")
+    subtitle = _as_text(heading.get("subtitle"), context="heading.subtitle")
+    extension = {
+        "compatibility": {
+            "format": "wellplot-logfile-v1",
+            "legacy_document": deepcopy(document),
+            "legacy_render": deepcopy(root.get("render", {})),
+            "legacy_data": deepcopy(root.get("data")),
+        }
+    }
+    try:
+        return AuthoringDocumentSpec(
+            name=str(root.get("name", "well-log")),
+            title=title,
+            subtitle=subtitle,
+            page=page,
+            depth=AuthoringDepthSpec(
+                unit=str(depth.get("unit", "m")),
+                scale=depth.get("scale", depth.get("scale_ratio", 200)),
+                major_step=(
+                    float(depth["major_step"]) if depth.get("major_step") is not None else None
+                ),
+                minor_step=(
+                    float(depth["minor_step"]) if depth.get("minor_step") is not None else None
+                ),
+            ),
+            sections=authoring_sections,
+            remarks=_remarks_from_legacy(layout.get("remarks", [])),
+            extensions=extension,
+        )
+    except ValidationError as exc:
+        raise TemplateValidationError(
+            "Legacy logfile could not be normalized to the authoring contract."
+        ) from exc
+
+
+def authoring_document_from_mapping(data: Mapping[str, object]) -> AuthoringDocumentSpec:
+    """Normalize canonical or legacy logfile mappings into an authoring model."""
+    root = _mapping(data, context="authoring document")
+    document_value = root.get("document")
+    if document_value is not None:
+        document = _mapping(document_value, context="document")
+        if "sections" in document:
+            canonical = deepcopy(document)
+            canonical.setdefault("name", root.get("name", "well-log"))
+            try:
+                return AuthoringDocumentSpec.model_validate(canonical)
+            except ValidationError as exc:
+                raise TemplateValidationError("Invalid canonical authoring document.") from exc
+        if "layout" in document:
+            return _legacy_to_authoring(root, document)
+    if "sections" in root:
+        try:
+            return AuthoringDocumentSpec.model_validate(root)
+        except ValidationError as exc:
+            raise TemplateValidationError("Invalid canonical authoring document.") from exc
+    if "layout" in root:
+        return _legacy_to_authoring(root, root)
+    raise TemplateValidationError("Authoring document must define sections or a legacy layout.")
+
+
+def _is_canonical_mapping(data: Mapping[str, Any]) -> bool:
+    """Return whether a YAML envelope contains canonical authoring sections."""
+    document = data.get("document")
+    return "sections" in data or (isinstance(document, Mapping) and "sections" in document)
+
+
+def authoring_document_to_mapping(document: AuthoringDocumentSpec) -> dict[str, object]:
+    """Serialize an authoring model to normalized version-1 YAML data."""
+    document_payload = document.model_dump(mode="json", exclude_none=True)
+    name = str(document_payload.pop("name"))
+    payload: dict[str, object] = {"version": 1, "name": name, "document": document_payload}
+    compatibility = document.extensions.get("compatibility")
+    if isinstance(compatibility, Mapping):
+        for key in ("legacy_render", "legacy_data"):
+            value = compatibility.get(key)
+            if value is not None:
+                payload[key.removeprefix("legacy_")] = deepcopy(value)
+    return payload
+
+
+def authoring_document_to_yaml(
+    document: AuthoringDocumentSpec,
+    destination: str | Path | TextIO | None = None,
+) -> str | None:
+    """Serialize an authoring model to YAML text or a destination."""
+    text = yaml.safe_dump(authoring_document_to_mapping(document), sort_keys=False)
+    if destination is None:
+        return text
+    if hasattr(destination, "write"):
+        destination.write(text)
+        return None
+    Path(destination).write_text(text, encoding="utf-8")
+    return None
+
+
+def _legacy_track(
+    document: AuthoringDocumentSpec, section_id: str, track_id: str
+) -> dict[str, Any]:
+    compatibility = document.extensions.get("compatibility", {})
+    legacy_document = (
+        compatibility.get("legacy_document") if isinstance(compatibility, Mapping) else None
+    )
+    if not isinstance(legacy_document, Mapping):
+        return {}
+    layout = legacy_document.get("layout")
+    if not isinstance(layout, Mapping):
+        return {}
+    for item in layout.get("log_sections", []):
+        if not isinstance(item, Mapping) or str(item.get("id")) != section_id:
+            continue
+        for track in item.get("tracks", []):
+            if isinstance(track, Mapping) and str(track.get("id")) == track_id:
+                return deepcopy(dict(track))
+    return {}
+
+
+def _binding_legacy_data(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str, Any]:
+    compatibility = binding.extensions.get("compatibility")
+    if isinstance(compatibility, Mapping) and isinstance(
+        compatibility.get("legacy_binding"), Mapping
+    ):
+        return deepcopy(dict(compatibility["legacy_binding"]))
+    return {}
+
+
+def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str, Any]:
+    element = _binding_legacy_data(binding)
+    element.update(
+        {
+            "kind": binding.kind,
+            "id": binding.binding_id,
+            "channel": binding.channel,
+            "label": binding.label or binding.channel,
+            "style": binding.style.model_dump(mode="json", exclude_none=True),
+        }
+    )
+    if isinstance(binding, CurveBindingSpec):
+        if binding.scale is not None:
+            element["scale"] = binding.scale.model_dump(mode="json", exclude_none=True)
+    else:
+        element.update(
+            {
+                "profile": binding.profile.value,
+                "normalization": binding.normalization.value,
+                "raster_alpha": binding.alpha,
+            }
+        )
+    return element
+
+
+def _render_track(
+    document: AuthoringDocumentSpec, section_id: str, track: TrackSpec
+) -> dict[str, Any]:
+    payload = _legacy_track(document, section_id, track.id)
+    payload.update(
+        {
+            "id": track.id,
+            "title": track.title,
+            "kind": track.kind,
+            "width_mm": track.width_mm,
+            "elements": [],
+        }
+    )
+    if getattr(track, "x_scale", None) is not None:
+        payload["x_scale"] = track.x_scale.model_dump(mode="json", exclude_none=True)
+    bindings = getattr(track, "bindings", ())
+    payload["elements"] = [_binding_element(binding) for binding in bindings]
+    if hasattr(track, "annotations"):
+        payload["annotations"] = [
+            annotation.model_dump(mode="json", exclude={"annotation_id"}, exclude_none=True)
+            for annotation in track.annotations
+        ]
+    return payload
+
+
+def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument:
+    """Convert a validated authoring model into the existing render model."""
+    compatibility = document.extensions.get("compatibility", {})
+    legacy_document = (
+        compatibility.get("legacy_document") if isinstance(compatibility, Mapping) else None
+    )
+    payload: dict[str, Any] = {}
+    if isinstance(legacy_document, Mapping):
+        for key in ("header", "footer", "markers", "zones", "metadata"):
+            if key in legacy_document:
+                payload[key] = deepcopy(legacy_document[key])
+        layout = legacy_document.get("layout")
+        if isinstance(layout, Mapping):
+            metadata = _mapping(payload.get("metadata", {}), context="document.metadata")
+            layout_sections = _mapping(
+                metadata.get("layout_sections", {}), context="metadata.layout_sections"
+            )
+            layout_sections["heading"] = deepcopy(layout.get("heading", {}))
+            layout_sections["remarks"] = [
+                remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
+            ]
+            layout_sections["log_sections"] = deepcopy(layout.get("log_sections", []))
+            layout_sections["tail"] = deepcopy(layout.get("tail", {}))
+            payload["metadata"] = {**metadata, "layout_sections": layout_sections}
+            heading = _mapping(layout.get("heading", {}), context="document.layout.heading")
+            if heading and "report" not in payload.get("header", {}):
+                payload["header"] = {
+                    **_mapping(payload.get("header", {}), context="document.header"),
+                    "report": heading,
+                }
+    metadata = _mapping(payload.get("metadata", {}), context="document.metadata")
+    layout_sections = _mapping(
+        metadata.get("layout_sections", {}), context="metadata.layout_sections"
+    )
+    layout_sections["remarks"] = [
+        remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
+    ]
+    layout_sections["log_sections"] = [
+        {
+            "id": section.id,
+            "title": section.title,
+            "subtitle": section.subtitle,
+            **(
+                {"depth_range": list(section.depth_range)}
+                if section.depth_range is not None
+                else {}
+            ),
+        }
+        for section in document.sections
+    ]
+    metadata["layout_sections"] = layout_sections
+    payload["metadata"] = metadata
+    if document.title is not None or document.subtitle is not None:
+        header = _mapping(payload.get("header", {}), context="document.header")
+        if document.title is not None:
+            header["title"] = document.title
+        if document.subtitle is not None:
+            header["subtitle"] = document.subtitle
+        payload["header"] = header
+    payload.update(
+        {
+            "name": document.name,
+            "page": document.page.model_dump(mode="json", exclude_none=True),
+            "depth": {
+                "unit": document.depth.unit,
+                "scale": document.depth.scale,
+                "major_step": document.depth.major_step,
+                "minor_step": document.depth.minor_step,
+            },
+            "tracks": [
+                {
+                    "id": section.id,
+                    "title": section.title,
+                    "kind": "normal",
+                    "width_mm": 1,
+                    "elements": [],
+                }
+                for section in document.sections
+            ],
+        }
+    )
+    # A render document represents one section. Use the first section because
+    # multi-section logfile rendering already owns section iteration.
+    section = document.sections[0]
+    payload["name"] = document.name
+    payload["tracks"] = [_render_track(document, section.id, track) for track in section.tracks]
+    if section.depth_range is not None:
+        payload["depth_range"] = list(section.depth_range)
+    return document_from_mapping(payload)
+
+
+def load_authoring_document(
+    path: str | Path, *, allowed_root: Path | None = None
+) -> AuthoringDocumentSpec:
+    """Load a canonical or legacy logfile YAML file into the authoring model."""
+    file_path = Path(path).expanduser().resolve()
+    if allowed_root is not None:
+        try:
+            file_path.relative_to(Path(allowed_root).expanduser().resolve())
+        except ValueError as exc:
+            raise TemplateValidationError(
+                f"authoring document must resolve inside {Path(allowed_root).resolve()}."
+            ) from exc
+    raw = yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(raw, Mapping):
+        raise TemplateValidationError("Authoring YAML root must be a mapping.")
+    if _is_canonical_mapping(raw):
+        return authoring_document_from_mapping(raw)
+    logfile = load_logfile(path, allowed_root=allowed_root)
+    root: dict[str, Any] = {
+        "version": 1,
+        "name": logfile.name,
+        "render": {
+            "backend": logfile.render_backend,
+            "output_path": logfile.render_output_path,
+            "dpi": logfile.render_dpi,
+            "continuous_strip_page_height_mm": logfile.render_continuous_strip_page_height_mm,
+            "matplotlib": logfile.render_matplotlib,
+        },
+        "document": logfile.document,
+    }
+    return authoring_document_from_mapping(root)
+
+
+def load_authoring_document_text(
+    yaml_text: str,
+    *,
+    base_dir: str | Path | None = None,
+    allowed_root: Path | None = None,
+) -> AuthoringDocumentSpec:
+    """Load YAML text into the canonical authoring model with template support."""
+    raw = yaml.safe_load(yaml_text) or {}
+    if not isinstance(raw, Mapping):
+        raise TemplateValidationError("Authoring YAML root must be a mapping.")
+    if _is_canonical_mapping(raw):
+        return authoring_document_from_mapping(raw)
+    logfile = load_logfile_text(yaml_text, base_dir=base_dir, allowed_root=allowed_root)
+    return authoring_document_from_mapping(
+        {
+            "version": 1,
+            "name": logfile.name,
+            "render": {
+                "backend": logfile.render_backend,
+                "output_path": logfile.render_output_path,
+                "dpi": logfile.render_dpi,
+                "continuous_strip_page_height_mm": logfile.render_continuous_strip_page_height_mm,
+                "matplotlib": logfile.render_matplotlib,
+            },
+            "document": logfile.document,
+        }
+    )
+
+
+__all__ = [
+    "authoring_document_from_mapping",
+    "authoring_document_to_mapping",
+    "authoring_document_to_render",
+    "authoring_document_to_yaml",
+    "load_authoring_document",
+    "load_authoring_document_text",
+]

@@ -22,9 +22,12 @@ The first implementation slice now includes:
 - generated-schema coverage for the canonical document boundary
 - representative tests for discriminators, duplicate binding instances,
   compatibility constraints, strict fields, and logarithmic scales
+- `wellplot.authoring` compatibility adapters for legacy logfile mappings,
+  normalized canonical YAML, template loading, and render conversion
 
-The canonical models are not yet wired into YAML parsing, the Python builder,
-or MCP mutations. Those adapters are the next implementation boundary.
+The canonical models are now wired to the YAML compatibility boundary and the
+existing render dataclasses. The Python builder, deterministic object service,
+and MCP mutations remain separate implementation slices.
 
 ## Contract Rule
 

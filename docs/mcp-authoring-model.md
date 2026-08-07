@@ -60,8 +60,11 @@ model and not the authority for Python or MCP behavior.
 
 The authoring contract will use Pydantic v2 models at the public
 serialization/API boundary. Those models will generate the JSON Schema used by
-YAML validation and MCP discovery. Explicit adapters will build the existing
-render dataclasses, which remain renderer-facing implementation objects.
+YAML validation and MCP discovery. The `wellplot.authoring` compatibility
+module now builds the existing render dataclasses, which remain
+renderer-facing implementation objects. Legacy render-only fields remain in
+an explicit compatibility extension until their canonical value objects are
+implemented.
 
 MCP, Python API, YAML, agent verification, and documentation must operate on or
 be generated from the same canonical contract.

@@ -213,9 +213,11 @@ Current progress:
 - initial object inventory and known-conflict register written
 - direct Pydantic dependency and first canonical model foundation added
 - representative contract tests pass
-- YAML, builder, MCP, and renderer adapters remain pending
-- implementation slices `0.6-C` through `0.6-G` remain pending; `0.6-B` is in
-  progress beyond the representative foundation
+- canonical YAML compatibility and render adapters are implemented for the
+  current section, track, binding, annotation, page, depth, and remarks
+  surface
+- builder and MCP adapters remain pending
+- implementation slices `0.6-D` through `0.6-G` remain pending
 
 ### Slice 0.6-A. Contract Inventory And Ownership
 
@@ -286,6 +288,15 @@ Acceptance:
   semantic regressions
 - compatibility behavior is covered by golden fixtures
 - no agent or MCP-specific normalization is required to make a document valid
+
+Implementation checkpoint:
+
+- `wellplot.authoring` provides canonical/legacy mapping, YAML, loading,
+  template-resolution, and render conversion entry points
+- legacy render-only fields are retained under explicit
+  `extensions.compatibility` until their first-class canonical objects are
+  implemented
+- the existing renderer and logfile loader remain unchanged
 
 ### Slice 0.6-D. Deterministic Object Service
 
