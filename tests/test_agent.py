@@ -54,6 +54,7 @@ from wellplot.agent.core import (
     AuthoringPlanPhase,
     FunctionToolDefinition,
     _extract_packet_header_fill_intent,
+    _merge_omitted_defaults,
     revise_authoring_request,
     run_authoring_request,
 )
@@ -913,6 +914,29 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(plan.packet_blueprint_id, "cased_hole_cbl_vdl")
             self.assertTrue(plan.phases)
             self.assertEqual(plan.phases[0].kind, "header_scaffold")
+
+    def test_omitted_defaults_preserve_explicit_nested_binding_values(self) -> None:
+        """Defaults fill missing nested fields without overriding explicit presentation."""
+        existing = {
+            "style": {"color": "magenta", "line_width": 1.4},
+            "sample_axis": {"enabled": True, "unit": "us"},
+        }
+        defaults = {
+            "style": {"color": "gray", "colormap": "gray_r"},
+            "sample_axis": {"enabled": False, "ticks": 7},
+            "show_raster": True,
+        }
+
+        missing = _merge_omitted_defaults(existing, defaults)
+
+        self.assertEqual(
+            missing,
+            {
+                "style": {"colormap": "gray_r"},
+                "sample_axis": {"ticks": 7},
+                "show_raster": True,
+            },
+        )
 
     def test_phase_success_state_requires_persisted_header_values(self) -> None:
         """Do not count header fill as complete when the scaffold still shows pending edits."""

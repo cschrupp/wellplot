@@ -870,6 +870,24 @@ def _merge_optional_mapping(
     return merged
 
 
+def _merge_omitted_defaults(
+    existing: dict[str, object],
+    defaults: dict[str, object],
+) -> dict[str, object]:
+    """Return only default fields absent from existing state, recursively."""
+    missing: dict[str, object] = {}
+    for key, value in defaults.items():
+        if key not in existing:
+            missing[key] = deepcopy(value)
+            continue
+        current = existing[key]
+        if isinstance(current, dict) and isinstance(value, dict):
+            nested = _merge_omitted_defaults(current, value)
+            if nested:
+                missing[key] = nested
+    return missing
+
+
 def _grid_style_patch_for_line(line: str) -> dict[str, object] | None:
     """Return one deterministic report-grid style patch for a natural-language line."""
     lowered = line.lower()
@@ -2142,12 +2160,20 @@ class AuthoringSession:
                 bindings = inspect_payload.get("bindings", [])
                 if not isinstance(bindings, list):
                     continue
-                if not any(
-                    isinstance(binding, dict)
-                    and str(binding.get("kind", "")).lower() == "raster"
-                    and str(binding.get("channel", "")).upper() == channel.upper()
-                    for binding in bindings
-                ):
+                target_binding = next(
+                    (
+                        binding
+                        for binding in bindings
+                        if isinstance(binding, dict)
+                        and str(binding.get("kind", "")).lower() == "raster"
+                        and str(binding.get("channel", "")).upper() == channel.upper()
+                    ),
+                    None,
+                )
+                if target_binding is None:
+                    continue
+                default_patch = _merge_omitted_defaults(target_binding, patch)
+                if not default_patch:
                     continue
                 result = await session.call_tool(
                     "update_raster_binding",
@@ -2156,7 +2182,7 @@ class AuthoringSession:
                         "section_id": section_id,
                         "track_id": track_id,
                         "channel": channel,
-                        "patch": patch,
+                        "patch": default_patch,
                     },
                 )
                 _require_mcp_success(result, action="update_raster_binding")
@@ -2169,7 +2195,7 @@ class AuthoringSession:
                             "section_id": section_id,
                             "track_id": track_id,
                             "channel": channel,
-                            "patch": patch,
+                            "patch": default_patch,
                         },
                     )
                 )
@@ -2388,11 +2414,7 @@ class AuthoringSession:
         if not isinstance(target_binding, dict):
             return None
         expected_subset = self._binding_expected_subset(spec)
-        patch = {
-            key: deepcopy(value)
-            for key, value in expected_subset.items()
-            if not self._subset_matches(target_binding.get(key), value)
-        }
+        patch = _merge_omitted_defaults(target_binding, expected_subset)
         if not patch:
             return None
         channel = str(spec.get("channel", "")).strip()

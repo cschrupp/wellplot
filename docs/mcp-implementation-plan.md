@@ -429,6 +429,12 @@ Work:
 - demote packet blueprints to examples, starter scaffolds, or regression fixtures
 - remove packet-specific reconciliation from general authoring paths
 
+Implementation checkpoint:
+
+- default reconciliation fills only fields omitted by the persisted object;
+  nested explicit values such as curve colors, scales, labels, and raster
+  display settings are never overwritten by packet or family defaults
+
 Acceptance:
 
 - explicit width, scale, color, line style, label, and raster settings survive
