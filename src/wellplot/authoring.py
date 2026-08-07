@@ -57,6 +57,7 @@ from .model.authoring import (
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
     AuthoringReferenceAxisKind,
+    AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
     AuthoringScale,
     AuthoringScaleKind,
@@ -119,6 +120,28 @@ def _scale_from_mapping(value: object, *, context: str) -> AuthoringScale | None
         )
     except (TypeError, ValueError, ValidationError) as exc:
         raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _reference_overlay_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> AuthoringReferenceOverlaySpec | None:
+    """Normalize one legacy reference-overlay mapping into a typed object."""
+    if value is None:
+        return None
+    data = _mapping(value, context=context)
+    try:
+        return AuthoringReferenceOverlaySpec.model_validate(data)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_reference_overlay_to_mapping(
+    overlay: AuthoringReferenceOverlaySpec,
+) -> dict[str, Any]:
+    """Project a canonical reference overlay to its legacy YAML envelope."""
+    return overlay.model_dump(mode="json", exclude_none=True)
 
 
 def _style_from_mapping(value: object, *, context: str) -> AuthoringStyle:
@@ -718,6 +741,10 @@ def _legacy_to_authoring(
                             style=_style_from_mapping(
                                 binding.get("style"), context="binding.style"
                             ),
+                            reference_overlay=_reference_overlay_from_legacy(
+                                binding.get("reference_overlay"),
+                                context="binding.reference_overlay",
+                            ),
                             extensions=extension,
                         )
                     )
@@ -1003,6 +1030,10 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
     if isinstance(binding, CurveBindingSpec):
         if binding.scale is not None:
             element["scale"] = binding.scale.model_dump(mode="json", exclude_none=True)
+        if binding.reference_overlay is not None:
+            element["reference_overlay"] = binding.reference_overlay.model_dump(
+                mode="json", exclude_none=True
+            )
     else:
         element.update(
             {

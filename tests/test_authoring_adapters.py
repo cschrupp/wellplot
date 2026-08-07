@@ -220,3 +220,32 @@ def test_ambiguous_legacy_binding_requires_section() -> None:
 
     with pytest.raises(TemplateValidationError, match="ambiguous"):
         authoring_document_from_mapping(mapping)
+
+
+def test_reference_overlay_round_trips_as_typed_binding_content() -> None:
+    """Normalize reference overlay properties without treating them as freeform YAML."""
+    mapping = _legacy_mapping()
+    document = mapping["document"]
+    assert isinstance(document, dict)
+    layout = document["layout"]
+    assert isinstance(layout, dict)
+    tracks = layout["log_sections"][0]["tracks"]
+    tracks[0]["kind"] = "reference"
+    channels = document["bindings"]["channels"]
+    channels[0]["reference_overlay"] = {
+        "mode": "indicator",
+        "lane_start": 0.2,
+        "lane_end": 0.8,
+        "tick_side": "right",
+        "threshold": 1.5,
+    }
+
+    normalized = authoring_document_from_mapping(mapping)
+    binding = normalized.sections[0].tracks[0].bindings[0]
+    assert binding.reference_overlay is not None
+    assert binding.reference_overlay.mode.value == "indicator"
+    assert binding.reference_overlay.tick_side.value == "right"
+
+    rendered = authoring_document_to_render(normalized)
+    assert rendered.tracks[0].elements[0].reference_overlay is not None
+    assert rendered.tracks[0].elements[0].reference_overlay.threshold == 1.5

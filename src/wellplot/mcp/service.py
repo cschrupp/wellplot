@@ -43,7 +43,11 @@ from ..api.render import (
     render_window_png,
 )
 from ..api.serialize import report_to_dict, report_to_yaml
-from ..authoring import authoring_grid_to_mapping, authoring_track_header_to_mapping
+from ..authoring import (
+    authoring_grid_to_mapping,
+    authoring_reference_overlay_to_mapping,
+    authoring_track_header_to_mapping,
+)
 from ..authoring_service import (
     AuthoringService,
     AuthoringTarget,
@@ -5287,7 +5291,7 @@ def _apply_canonical_curve_binding_update(
     patch: dict[str, object],
 ) -> bool:
     """Apply typed scalar-binding fields and project them into legacy YAML."""
-    canonical_keys = {"label", "style", "scale"}
+    canonical_keys = {"label", "style", "scale", "reference_overlay"}
     style_keys = {
         "color",
         "line_style",
@@ -5379,6 +5383,13 @@ def _apply_canonical_curve_binding_update(
             raw_binding["scale"] = _legacy_scale_from_authoring(updated.scale)
     if "style" in patch:
         raw_binding["style"] = _legacy_style_from_authoring(updated.style)
+    if "reference_overlay" in patch:
+        if updated.reference_overlay is None:
+            raw_binding.pop("reference_overlay", None)
+        else:
+            raw_binding["reference_overlay"] = authoring_reference_overlay_to_mapping(
+                updated.reference_overlay
+            )
     return True
 
 

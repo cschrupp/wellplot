@@ -12,6 +12,8 @@ from wellplot.model import (
     AuthoringGridSpacingMode,
     AuthoringGridSpec,
     AuthoringRasterProfileKind,
+    AuthoringReferenceOverlayMode,
+    AuthoringReferenceOverlaySpec,
     AuthoringScale,
     AuthoringScaleKind,
     AuthoringStyle,
@@ -169,6 +171,21 @@ def test_track_header_contract_rejects_duplicate_rows() -> None:
 
     with pytest.raises(ValidationError, match="unique"):
         AuthoringTrackHeaderSpec(objects=[row, row.model_copy()])
+
+
+def test_reference_overlay_contract_requires_ordered_lane_bounds() -> None:
+    """Reference overlays must define a valid normalized lane when bounded."""
+    overlay = AuthoringReferenceOverlaySpec(
+        mode=AuthoringReferenceOverlayMode.INDICATOR,
+        lane_start=0.2,
+        lane_end=0.8,
+        threshold=1.5,
+    )
+
+    assert overlay.mode == AuthoringReferenceOverlayMode.INDICATOR
+
+    with pytest.raises(ValidationError, match="less than"):
+        AuthoringReferenceOverlaySpec(lane_start=0.8, lane_end=0.2)
 
 
 def test_unknown_standard_fields_are_rejected() -> None:

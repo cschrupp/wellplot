@@ -1150,6 +1150,8 @@ Behavior:
 - the canonical `track` patch also accepts a complete typed `track_header`
   object replacement; row kinds must be unique and line reservations must be
   positive
+- canonical curve-binding patches accept a typed `reference_overlay` object;
+  lane bounds must be paired and ordered before the update is persisted
 - with `logfile_path`, includes section ids, track ids, available channels, and
   heading/remarks state from the current draft
 - with `logfile_path`, `target_summary.bindings_by_track` exposes the current

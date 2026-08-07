@@ -40,6 +40,7 @@ from .model.authoring import (
     AuthoringPageSpec,
     AuthoringRasterNormalizationKind,
     AuthoringRasterProfileKind,
+    AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
     AuthoringScale,
     AuthoringSectionSpec,
@@ -167,6 +168,7 @@ class CurveBindingPatch(_OperationModel):
     label: str | None = None
     scale: AuthoringScale | None = None
     style: AuthoringStylePatch | None = None
+    reference_overlay: AuthoringReferenceOverlaySpec | None = None
     extensions: dict[str, Any] | None = None
 
 

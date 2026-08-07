@@ -397,6 +397,9 @@ Implementation checkpoint:
 - track-header row reservations now have typed canonical validation and
   deterministic replacement semantics; renderer-only header styling remains
   outside this object contract
+- reference-curve overlay properties now have typed canonical validation and
+  binding-level update projection; value-label, callout, and raster waveform
+  controls remain separate renderer-specific fields
 
 ### Slice 0.6-F. Defaults And Precedence
 

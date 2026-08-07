@@ -97,6 +97,22 @@ class AuthoringTrackHeaderObjectKind(StrEnum):
     DIVISIONS = "divisions"
 
 
+class AuthoringReferenceOverlayMode(StrEnum):
+    """Display modes for a curve overlaid on a reference track."""
+
+    CURVE = "curve"
+    INDICATOR = "indicator"
+    TICKS = "ticks"
+
+
+class AuthoringReferenceTickSide(StrEnum):
+    """Sides on which reference overlay ticks may be drawn."""
+
+    LEFT = "left"
+    RIGHT = "right"
+    BOTH = "both"
+
+
 class AuthoringCurveFillKind(StrEnum):
     """Curve fill semantics exposed by the authoring contract."""
 
@@ -253,6 +269,30 @@ class AuthoringTrackHeaderPatch(_AuthoringModel):
     objects: list[AuthoringTrackHeaderObjectSpec] | None = None
 
 
+class AuthoringReferenceOverlaySpec(_AuthoringModel):
+    """Validated overlay properties for a reference-track curve binding."""
+
+    mode: AuthoringReferenceOverlayMode = AuthoringReferenceOverlayMode.CURVE
+    lane_start: float | None = Field(default=None, ge=0, le=1)
+    lane_end: float | None = Field(default=None, ge=0, le=1)
+    tick_side: AuthoringReferenceTickSide = AuthoringReferenceTickSide.BOTH
+    tick_length_ratio: float | None = Field(default=None, gt=0)
+    threshold: float | None = None
+
+    @model_validator(mode="after")
+    def validate_lane(self) -> AuthoringReferenceOverlaySpec:
+        """Require paired and ordered normalized overlay lane bounds."""
+        if (self.lane_start is None) != (self.lane_end is None):
+            raise ValueError("Reference overlay lane_start and lane_end must be set together.")
+        if (
+            self.lane_start is not None
+            and self.lane_end is not None
+            and self.lane_start >= self.lane_end
+        ):
+            raise ValueError("Reference overlay lane_start must be less than lane_end.")
+        return self
+
+
 class AuthoringScale(_AuthoringModel):
     """Validated numeric scale for a track or scalar curve binding."""
 
@@ -290,6 +330,7 @@ class CurveBindingSpec(_AuthoringModel):
     label: str | None = Field(default=None, min_length=1)
     scale: AuthoringScale | None = None
     style: AuthoringStyle = Field(default_factory=AuthoringStyle)
+    reference_overlay: AuthoringReferenceOverlaySpec | None = None
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -647,6 +688,9 @@ __all__ = [
     "AuthoringRasterNormalizationKind",
     "AuthoringRasterProfileKind",
     "AuthoringReferenceAxisKind",
+    "AuthoringReferenceOverlayMode",
+    "AuthoringReferenceOverlaySpec",
+    "AuthoringReferenceTickSide",
     "AuthoringRemarkSpec",
     "AuthoringScale",
     "AuthoringScaleKind",

@@ -1801,6 +1801,60 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(matching[0]["scale"]["max"], 150.0)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_update_reference_overlay_uses_canonical_binding_contract(self) -> None:
+        """Patch a reference overlay through the typed binding service."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+            service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="ref_overlay",
+                title="Reference Overlay",
+                kind="reference",
+                width_mm=16.0,
+                root=REPO_ROOT,
+            )
+            service.bind_curve(
+                str(draft_path),
+                section_id="main",
+                track_id="ref_overlay",
+                channel="GR",
+                root=REPO_ROOT,
+            )
+
+            result = service.update_curve_binding(
+                str(draft_path),
+                section_id="main",
+                track_id="ref_overlay",
+                channel="GR",
+                patch={
+                    "reference_overlay": {
+                        "mode": "indicator",
+                        "lane_start": 0.2,
+                        "lane_end": 0.8,
+                        "tick_side": "right",
+                        "threshold": 1.5,
+                    }
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.binding["reference_overlay"]["mode"], "indicator")
+            self.assertEqual(result.binding["reference_overlay"]["tick_side"], "right")
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            binding = next(
+                item
+                for item in saved_mapping["document"]["bindings"]["channels"]
+                if item.get("track_id") == "ref_overlay"
+            )
+            self.assertEqual(binding["reference_overlay"]["threshold"], 1.5)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_update_curve_binding_normalizes_between_instances_fill_reference(self) -> None:
         """Rewrite shorthand between_instances references to persisted sibling curve ids."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
