@@ -496,6 +496,47 @@ class AuthoringDataSource(_AuthoringModel):
     source_format: Literal["auto", "las", "dlis"] = "auto"
 
 
+class AuthoringCurveCalloutSpec(_AuthoringModel):
+    """In-track callout attached to one scalar curve binding."""
+
+    depth: float
+    label: str | None = Field(default=None, min_length=1)
+    side: Literal["auto", "left", "right"] = "auto"
+    placement: Literal["inline", "top", "bottom", "top_and_bottom"] = "inline"
+    text_x: float | None = Field(default=None, ge=0, le=1)
+    depth_offset: float | None = None
+    distance_from_top: float | None = Field(default=None, ge=0)
+    distance_from_bottom: float | None = Field(default=None, ge=0)
+    every: float | None = Field(default=None, gt=0)
+    color: str | None = Field(default=None, min_length=1)
+    font_size: float | None = Field(default=None, gt=0)
+    font_weight: str = Field(default="bold", min_length=1)
+    font_style: str = Field(default="normal", min_length=1)
+    arrow: bool = True
+    arrow_style: str | None = Field(default=None, min_length=1)
+    arrow_linewidth: float | None = Field(default=None, gt=0)
+
+
+class AuthoringCurveFillCrossoverSpec(_AuthoringModel):
+    """Optional two-color crossover styling for a curve fill."""
+
+    enabled: bool = False
+    left_color: str | None = Field(default=None, min_length=1)
+    right_color: str | None = Field(default=None, min_length=1)
+    alpha: float | None = Field(default=None, ge=0, le=1)
+
+
+class AuthoringCurveFillBaselineSpec(_AuthoringModel):
+    """Baseline and split-color styling for a baseline fill."""
+
+    value: float
+    lower_color: str | None = Field(default=None, min_length=1)
+    upper_color: str | None = Field(default=None, min_length=1)
+    line_color: str | None = Field(default=None, min_length=1)
+    line_width: float = Field(default=0.6, gt=0)
+    line_style: str = Field(default="--", min_length=1)
+
+
 class CurveBindingSpec(_AuthoringModel):
     """One scalar channel binding with stable instance identity."""
 
@@ -514,6 +555,7 @@ class CurveBindingSpec(_AuthoringModel):
     header_display: AuthoringCurveHeaderDisplaySpec = Field(
         default_factory=AuthoringCurveHeaderDisplaySpec
     )
+    callouts: list[AuthoringCurveCalloutSpec] = Field(default_factory=list)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -554,7 +596,13 @@ class CurveFillSpec(_AuthoringModel):
     fill_id: str | None = Field(default=None, min_length=1)
     binding_id: str = Field(min_length=1)
     other_binding_id: str | None = Field(default=None, min_length=1)
-    baseline: float | None = None
+    baseline: AuthoringCurveFillBaselineSpec | None = None
+    label: str | None = Field(default=None, min_length=1)
+    color: str | None = Field(default=None, min_length=1)
+    alpha: float | None = Field(default=None, ge=0, le=1)
+    crossover: AuthoringCurveFillCrossoverSpec = Field(
+        default_factory=AuthoringCurveFillCrossoverSpec
+    )
     extensions: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
@@ -571,6 +619,11 @@ class CurveFillSpec(_AuthoringModel):
             raise ValueError(f"Fill kind {self.kind} requires other_binding_id.")
         if self.kind == AuthoringCurveFillKind.BASELINE_SPLIT and self.baseline is None:
             raise ValueError("Baseline-split fills require baseline.")
+        if self.crossover.enabled and self.kind not in {
+            AuthoringCurveFillKind.BETWEEN_CURVES,
+            AuthoringCurveFillKind.BETWEEN_INSTANCES,
+        }:
+            raise ValueError("Crossover styling requires a between-curve fill.")
         return self
 
 
@@ -1006,6 +1059,9 @@ __all__ = [
     "AuthoringAnnotationMarkerShape",
     "ArrayTrackSpec",
     "AuthoringCurveFillKind",
+    "AuthoringCurveCalloutSpec",
+    "AuthoringCurveFillBaselineSpec",
+    "AuthoringCurveFillCrossoverSpec",
     "AuthoringCurveHeaderDisplayPatch",
     "AuthoringCurveHeaderDisplaySpec",
     "AuthoringCurveValueLabelsPatch",

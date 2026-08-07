@@ -44,6 +44,7 @@ from ..api.render import (
 )
 from ..api.serialize import report_to_dict, report_to_yaml
 from ..authoring import (
+    authoring_curve_callouts_to_mapping,
     authoring_curve_header_display_to_mapping,
     authoring_curve_value_labels_to_mapping,
     authoring_grid_to_mapping,
@@ -102,6 +103,8 @@ from ..model.authoring import (
     AnnotationMarkerSpec,
     AnnotationSpec,
     AnnotationTextSpec,
+    AuthoringCurveFillBaselineSpec,
+    AuthoringCurveFillCrossoverSpec,
     AuthoringCurveFillKind,
     AuthoringRemarkSpec,
     AuthoringStyle,
@@ -199,6 +202,7 @@ AUTHORING_CURVE_BINDING_PATCH_KEYS = (
     "value_labels",
     "wrap",
     "render_mode",
+    "callouts",
 )
 AUTHORING_RASTER_BINDING_PATCH_KEYS = (
     "label",
@@ -1596,6 +1600,7 @@ def _binding_summary_entry(binding: dict[str, object]) -> dict[str, object]:
         "value_labels",
         "wrap",
         "render_mode",
+        "callouts",
         "profile",
         "normalization",
         "waveform_normalization",
@@ -5489,6 +5494,7 @@ def _apply_canonical_curve_binding_update(
         "render_mode",
         "value_labels",
         "header_display",
+        "callouts",
     }
     style_keys = {
         "color",
@@ -5598,6 +5604,8 @@ def _apply_canonical_curve_binding_update(
         raw_binding["header_display"] = authoring_curve_header_display_to_mapping(
             updated.header_display
         )
+    if "callouts" in patch:
+        raw_binding["callouts"] = authoring_curve_callouts_to_mapping(updated.callouts)
     return True
 
 
@@ -6772,15 +6780,19 @@ def add_curve_fill(
         else:
             raise TemplateValidationError(f"{normalized_kind} fills require another curve binding.")
 
-    canonical_baseline: float | None = None
+    canonical_baseline: AuthoringCurveFillBaselineSpec | None = None
     if normalized_kind == AuthoringCurveFillKind.BASELINE_SPLIT.value:
-        baseline_value = baseline.get("value") if isinstance(baseline, dict) else None
-        if baseline_value is None:
+        if not isinstance(baseline, dict) or baseline.get("value") is None:
             raise TemplateValidationError("baseline_split fills require baseline.value.")
         try:
-            canonical_baseline = float(baseline_value)
-        except (TypeError, ValueError) as exc:
-            raise TemplateValidationError("baseline.value must be numeric.") from exc
+            canonical_baseline = AuthoringCurveFillBaselineSpec.model_validate(baseline)
+        except (TypeError, ValueError, ValidationError) as exc:
+            raise TemplateValidationError("Invalid baseline styling.") from exc
+
+    try:
+        canonical_crossover = AuthoringCurveFillCrossoverSpec.model_validate(crossover or {})
+    except ValidationError as exc:
+        raise TemplateValidationError("Invalid crossover styling.") from exc
 
     try:
         canonical_fill = CurveFillSpec(
@@ -6788,6 +6800,10 @@ def add_curve_fill(
             binding_id=canonical_binding_id,
             other_binding_id=canonical_other_binding_id,
             baseline=canonical_baseline,
+            label=label,
+            color=color,
+            alpha=alpha,
+            crossover=canonical_crossover,
             extensions={"compatibility": {"legacy_fill": deepcopy(fill)}},
         )
     except (TypeError, ValueError, ValidationError) as exc:
@@ -7109,6 +7125,7 @@ def update_curve_binding(
         "value_labels",
         "wrap",
         "render_mode",
+        "callouts",
     }
     invalid = sorted(key for key in patch if key not in allowed_keys)
     if invalid:

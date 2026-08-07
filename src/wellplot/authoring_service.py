@@ -32,6 +32,7 @@ from .model.authoring import (
     AnnotationSpec,
     AnnotationTrackSpec,
     ArrayTrackSpec,
+    AuthoringCurveCalloutSpec,
     AuthoringCurveHeaderDisplayPatch,
     AuthoringCurveHeaderDisplaySpec,
     AuthoringCurveValueLabelsPatch,
@@ -183,6 +184,7 @@ class CurveBindingPatch(_OperationModel):
     render_mode: Literal["line", "value_labels"] | None = None
     value_labels: AuthoringCurveValueLabelsPatch | None = None
     header_display: AuthoringCurveHeaderDisplayPatch | None = None
+    callouts: list[AuthoringCurveCalloutSpec] | None = None
     extensions: dict[str, Any] | None = None
 
 

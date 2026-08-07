@@ -753,12 +753,15 @@ Supported patch keys:
 - `value_labels`
 - `wrap`
 - `render_mode`
+- `callouts`
 
 Behavior:
 
 - deep-merges nested mapping updates
 - removes optional properties when their patch value is `null`
 - rejects unsupported patch keys
+- validates curve callout placement and fill presentation fields through the
+  canonical authoring contract
 - writes back to the explicit `logfile_path`
 - validates the mutated draft before saving
 

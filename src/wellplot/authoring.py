@@ -45,6 +45,9 @@ from .model.authoring import (
     AnnotationMarkerSpec,
     AnnotationTextSpec,
     ArrayTrackSpec,
+    AuthoringCurveCalloutSpec,
+    AuthoringCurveFillBaselineSpec,
+    AuthoringCurveFillCrossoverSpec,
     AuthoringCurveFillKind,
     AuthoringCurveHeaderDisplaySpec,
     AuthoringCurveValueLabelsSpec,
@@ -147,6 +150,28 @@ def authoring_reference_overlay_to_mapping(
 ) -> dict[str, Any]:
     """Project a canonical reference overlay to its legacy YAML envelope."""
     return overlay.model_dump(mode="json", exclude_none=True)
+
+
+def _curve_callouts_from_legacy(
+    value: object,
+    *,
+    context: str,
+) -> list[AuthoringCurveCalloutSpec]:
+    """Normalize legacy curve callouts into typed binding-owned objects."""
+    if value is None:
+        return []
+    items = _sequence(value, context=context)
+    try:
+        return [AuthoringCurveCalloutSpec.model_validate(item) for item in items]
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def authoring_curve_callouts_to_mapping(
+    callouts: Sequence[AuthoringCurveCalloutSpec],
+) -> list[dict[str, Any]]:
+    """Project typed curve callouts to the legacy binding envelope."""
+    return [item.model_dump(mode="json", exclude_none=True) for item in callouts]
 
 
 def _raster_colorbar_from_legacy(
@@ -664,22 +689,34 @@ def _fill_from_mapping(
             )
 
     baseline_value = data.get("baseline")
-    baseline: float | None = None
+    baseline: AuthoringCurveFillBaselineSpec | None = None
     if kind == AuthoringCurveFillKind.BASELINE_SPLIT:
         if isinstance(baseline_value, Mapping):
-            baseline_value = baseline_value.get("value")
+            baseline_data = dict(baseline_value)
+        else:
+            baseline_data = {"value": baseline_value}
+        baseline_value = baseline_data.get("value")
         if baseline_value is None:
             raise TemplateValidationError(f"{context}.baseline.value is required.")
         try:
-            baseline = float(baseline_value)
-        except (TypeError, ValueError) as exc:
+            baseline = AuthoringCurveFillBaselineSpec.model_validate(baseline_data)
+        except (TypeError, ValueError, ValidationError) as exc:
             raise TemplateValidationError(f"Invalid {context}.baseline value.") from exc
+
+    try:
+        crossover = AuthoringCurveFillCrossoverSpec.model_validate(data.get("crossover", {}))
+    except ValidationError as exc:
+        raise TemplateValidationError(f"Invalid {context}.crossover.") from exc
 
     return CurveFillSpec(
         kind=kind,
         binding_id=binding_id,
         other_binding_id=other_binding_id,
         baseline=baseline,
+        label=_as_text(data.get("label"), context=f"{context}.label"),
+        color=_as_text(data.get("color"), context=f"{context}.color"),
+        alpha=(float(data["alpha"]) if data.get("alpha") is not None else None),
+        crossover=crossover,
         extensions={"compatibility": {"legacy_fill": deepcopy(data)}},
     )
 
@@ -877,6 +914,9 @@ def _legacy_to_authoring(
                             header_display=_curve_header_display_from_legacy(
                                 binding.get("header_display"),
                                 context="binding.header_display",
+                            ),
+                            callouts=_curve_callouts_from_legacy(
+                                binding.get("callouts"), context="binding.callouts"
                             ),
                             extensions=extension,
                         )
@@ -1207,6 +1247,7 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
         element["header_display"] = authoring_curve_header_display_to_mapping(
             binding.header_display
         )
+        element["callouts"] = authoring_curve_callouts_to_mapping(binding.callouts)
     else:
         element.update(
             {
@@ -1242,12 +1283,22 @@ def _fill_element(fill: CurveFillSpec) -> dict[str, Any]:
         legacy_fill.setdefault("other_element_id", fill.other_binding_id)
     if fill.baseline is not None:
         baseline = legacy_fill.get("baseline")
+        baseline_values = fill.baseline.model_dump(mode="json", exclude_none=True)
         if isinstance(baseline, Mapping):
             baseline = deepcopy(dict(baseline))
-            baseline["value"] = fill.baseline
+            baseline.update(baseline_values)
             legacy_fill["baseline"] = baseline
         else:
-            legacy_fill["baseline"] = {"value": fill.baseline}
+            legacy_fill["baseline"] = baseline_values
+    if fill.label is not None:
+        legacy_fill["label"] = fill.label
+    if fill.color is not None:
+        legacy_fill["color"] = fill.color
+    if fill.alpha is not None:
+        legacy_fill["alpha"] = fill.alpha
+    crossover_data = fill.crossover.model_dump(mode="json", exclude_none=True)
+    if crossover_data != {"enabled": False}:
+        legacy_fill["crossover"] = crossover_data
     return legacy_fill
 
 

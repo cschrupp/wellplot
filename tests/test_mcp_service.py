@@ -1780,6 +1780,14 @@ class McpServiceTests(unittest.TestCase):
                     "render_mode": "value_labels",
                     "value_labels": {"step": 10, "format": "fixed", "precision": 1},
                     "header_display": {"show_color": False},
+                    "callouts": [
+                        {
+                            "depth": 1005,
+                            "label": "GR Sand",
+                            "placement": "bottom",
+                            "distance_from_top": 1.0,
+                        }
+                    ],
                 },
                 root=REPO_ROOT,
             )
@@ -1795,6 +1803,7 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(result.binding["render_mode"], "value_labels")
             self.assertEqual(result.binding["value_labels"]["precision"], 1)
             self.assertFalse(result.binding["header_display"]["show_color"])
+            self.assertEqual(result.binding["callouts"][0]["label"], "GR Sand")
 
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
             bindings = saved_mapping["document"]["bindings"]["channels"]

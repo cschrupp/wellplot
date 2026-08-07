@@ -87,6 +87,15 @@ def _legacy_mapping() -> dict[str, object]:
                         "render_mode": "value_labels",
                         "value_labels": {"step": 10, "format": "fixed", "precision": 1},
                         "header_display": {"show_color": False},
+                        "callouts": [
+                            {
+                                "depth": 1005,
+                                "label": "GR Sand",
+                                "side": "right",
+                                "placement": "bottom",
+                                "distance_from_top": 1.0,
+                            }
+                        ],
                     },
                     {
                         "id": "gr-2",
@@ -146,6 +155,8 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert gr_track.bindings[0].render_mode == "value_labels"
     assert gr_track.bindings[0].value_labels.precision == 1
     assert gr_track.bindings[0].header_display.show_color is False
+    assert gr_track.bindings[0].callouts[0].label == "GR Sand"
+    assert gr_track.bindings[0].callouts[0].placement == "bottom"
     assert gr_track.grid.vertical_main_line_count == 5
     assert gr_track.grid.vertical_main_scale.value == "logarithmic"
     assert gr_track.grid.vertical_main_spacing_mode.value == "scale"
@@ -162,6 +173,7 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert rendered_gr.elements[1].style.line_style == "--"
     assert rendered_gr.elements[0].render_mode == "value_labels"
     assert rendered_gr.elements[0].value_labels.precision == 1
+    assert rendered_gr.elements[0].callouts[0].label == "GR Sand"
     assert rendered_gr.grid.vertical_main_line_count == 5
     assert rendered_gr.grid.vertical_main_color == "#222222"
     assert rendered_gr.header.objects[3].enabled is True
@@ -200,6 +212,9 @@ def test_legacy_binding_fill_round_trips_through_canonical_track() -> None:
     assert len(track.fills) == 1
     assert track.fills[0].binding_id == "gr-1"
     assert track.fills[0].extensions["compatibility"]["legacy_fill"]["label"] == "Gamma fill"
+    assert track.fills[0].label == "Gamma fill"
+    assert track.fills[0].color == "#8fd19e"
+    assert track.fills[0].alpha == 0.35
 
     rendered = authoring_document_to_render(normalized)
     assert rendered.tracks[0].elements[0].fill is not None

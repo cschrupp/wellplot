@@ -6,6 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from wellplot.model import (
+    AuthoringCurveCalloutSpec,
+    AuthoringCurveFillBaselineSpec,
+    AuthoringCurveFillCrossoverSpec,
     AuthoringCurveFillKind,
     AuthoringCurveHeaderDisplaySpec,
     AuthoringCurveValueLabelsSpec,
@@ -131,6 +134,31 @@ def test_fill_must_reference_bindings_on_its_track() -> None:
                 )
             ],
         )
+
+
+def test_curve_display_relations_are_typed() -> None:
+    """Callouts and fill presentation settings are first-class curve data."""
+    callout = AuthoringCurveCalloutSpec(
+        depth=1005,
+        label="GR Sand",
+        placement="bottom",
+        distance_from_top=1.0,
+    )
+    fill = CurveFillSpec(
+        kind=AuthoringCurveFillKind.BASELINE_SPLIT,
+        binding_id="gr",
+        baseline=AuthoringCurveFillBaselineSpec(
+            value=70,
+            lower_color="#22c55e",
+            line_style=":",
+        ),
+        crossover=AuthoringCurveFillCrossoverSpec(enabled=False),
+    )
+    binding = CurveBindingSpec(binding_id="gr", channel="GR", callouts=[callout])
+
+    assert binding.callouts[0].placement == "bottom"
+    assert fill.baseline is not None
+    assert fill.baseline.lower_color == "#22c55e"
 
 
 def test_array_track_accepts_raster_binding() -> None:
