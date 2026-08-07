@@ -20,9 +20,9 @@
 """Canonical typed authoring models.
 
 These models define report intent at the public authoring boundary. They are
-currently introduced alongside the existing logfile mappings and renderer
-dataclasses; adapters will connect those layers in a later implementation
-slice.
+used by the YAML/render compatibility adapters and the deterministic
+authoring service, while the existing renderer dataclasses remain internal
+render-layer representations.
 """
 
 from __future__ import annotations
@@ -161,6 +161,7 @@ class CurveFillSpec(_AuthoringModel):
     """Fill relation between curve binding instances."""
 
     kind: AuthoringCurveFillKind
+    fill_id: str | None = Field(default=None, min_length=1)
     binding_id: str = Field(min_length=1)
     other_binding_id: str | None = Field(default=None, min_length=1)
     baseline: float | None = None
@@ -277,7 +278,13 @@ class NormalTrackSpec(_TrackSpec):
         binding_ids = {binding.binding_id for binding in self.bindings}
         if len(binding_ids) != len(self.bindings):
             raise ValueError(f"Track {self.id} contains duplicate binding ids.")
-        for fill in self.fills:
+        fill_ids: set[str] = set()
+        for index, fill in enumerate(self.fills):
+            if fill.fill_id is None:
+                fill.fill_id = f"{self.id}.fill.{index + 1}"
+            if fill.fill_id in fill_ids:
+                raise ValueError(f"Track {self.id} contains duplicate fill ids.")
+            fill_ids.add(fill.fill_id)
             targets = {fill.binding_id}
             if fill.other_binding_id is not None:
                 targets.add(fill.other_binding_id)
@@ -373,6 +380,7 @@ class AuthoringDepthSpec(_AuthoringModel):
 class AuthoringRemarkSpec(_AuthoringModel):
     """Simple report remark block."""
 
+    remark_id: str | None = Field(default=None, min_length=1)
     title: str | None = Field(default=None, min_length=1)
     text: str | None = None
     lines: list[str] = Field(default_factory=list)
@@ -425,7 +433,7 @@ class AuthoringDocumentSpec(_AuthoringModel):
 
     @model_validator(mode="after")
     def validate_document_references(self) -> AuthoringDocumentSpec:
-        """Require unique section ids and binding ids across the document."""
+        """Require stable unique identities across the document."""
         section_ids = [section.id for section in self.sections]
         if len(set(section_ids)) != len(section_ids):
             raise ValueError("Document contains duplicate section ids.")
@@ -437,6 +445,13 @@ class AuthoringDocumentSpec(_AuthoringModel):
                 binding_ids.extend(binding.binding_id for binding in bindings)
         if len(set(binding_ids)) != len(binding_ids):
             raise ValueError("Document contains duplicate binding ids.")
+        remark_ids: set[str] = set()
+        for index, remark in enumerate(self.remarks):
+            if remark.remark_id is None:
+                remark.remark_id = f"remark-{index + 1}"
+            if remark.remark_id in remark_ids:
+                raise ValueError("Document contains duplicate remark ids.")
+            remark_ids.add(remark.remark_id)
         return self
 
 

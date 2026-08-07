@@ -26,8 +26,9 @@ The first implementation slice now includes:
   normalized canonical YAML, template loading, and render conversion
 
 The canonical models are now wired to the YAML compatibility boundary and the
-existing render dataclasses. The Python builder, deterministic object service,
-and MCP mutations remain separate implementation slices.
+existing render dataclasses. The deterministic object service now provides
+typed atomic operations over those models. The Python builder and MCP
+mutations remain separate implementation slices.
 
 ## Contract Rule
 

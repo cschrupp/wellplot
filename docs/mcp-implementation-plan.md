@@ -216,8 +216,10 @@ Current progress:
 - canonical YAML compatibility and render adapters are implemented for the
   current section, track, binding, annotation, page, depth, and remarks
   surface
+- deterministic canonical object service is implemented with typed atomic
+  list/get/create/update/remove/move/validate operations
 - builder and MCP adapters remain pending
-- implementation slices `0.6-D` through `0.6-G` remain pending
+- implementation slices `0.6-E` through `0.6-G` remain pending
 
 ### Slice 0.6-A. Contract Inventory And Ownership
 
@@ -321,6 +323,15 @@ Acceptance:
 - direct Python use can inspect and revise an existing report without YAML-shaped
   dictionaries
 - failed updates leave the persisted document unchanged
+
+Implementation checkpoint:
+
+- `wellplot.authoring_service.AuthoringService` owns defensive canonical
+  snapshots and validates every candidate before publishing it
+- typed request and patch models cover sections, tracks, curve/raster
+  bindings, annotations, fills, remarks, and ordered moves
+- MCP still uses its existing mutation path until slice `0.6-E` routes it
+  through this service
 
 ### Slice 0.6-E. MCP Contract Parity
 
