@@ -1211,6 +1211,53 @@ class AgentTests(unittest.TestCase):
             self.assertFalse(missing["ok"])
             self.assertIn("source channel is missing", missing["outcomes"][0]["detail"])
 
+    def test_tool_outcome_verification_reports_missing_section_without_raising(self) -> None:
+        """Treat a provider target for an absent section as a failed outcome."""
+
+        class MissingSectionSession(FakeMcpSession):
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "inspect_track_bindings":
+                    return SimpleNamespace(
+                        isError=True,
+                        content=[
+                            SimpleNamespace(
+                                text=(
+                                    "Error executing tool inspect_track_bindings: "
+                                    "Unknown section_id 'repeat_pass'."
+                                )
+                            )
+                        ],
+                    )
+                return await super().call_tool(name, arguments)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+            outcome = anyio.run(
+                partial(
+                    session._verify_tool_outcomes,  # type: ignore[attr-defined]
+                    session=MissingSectionSession(root),
+                    draft_logfile="workspace/demo.log.yaml",
+                    draft_summary={"sections": [{"id": "main_pass"}]},
+                    tool_trace=(
+                        AuthoringToolCall(
+                            round=1,
+                            name="bind_curve",
+                            arguments={
+                                "logfile_path": "workspace/demo.log.yaml",
+                                "section_id": "repeat_pass",
+                                "track_id": "cbl",
+                                "channel": "CBL",
+                            },
+                        ),
+                    ),
+                    change_summary={"changed": True},
+                )
+            )
+
+            self.assertFalse(outcome["ok"])
+            self.assertIn("Unknown section_id", outcome["outcomes"][0]["detail"])
+
     def test_tool_outcome_verification_checks_canonical_layout_and_annotations(self) -> None:
         """Verify non-binding mutations against typed authoring objects."""
 

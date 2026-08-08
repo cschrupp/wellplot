@@ -1560,8 +1560,12 @@ class AuthoringSession:
                 "structure",
                 "structure",
                 "Apply requested section, track, and layout structure changes.",
-                "Use generic section, track, and layout tools for the requested structure. "
-                "Preserve existing objects unless the request explicitly changes them.",
+                "Inspect the current section IDs first. Only add or update tracks in sections "
+                "that already exist. If a requested section is missing, use "
+                "replicate_section_structure from a compatible existing section before "
+                "touching its tracks or bindings. Never issue track or binding operations "
+                "against a missing section. Preserve existing objects unless the request "
+                "explicitly changes them.",
                 ("sections", "tracks", "layout"),
             )
 
@@ -1960,6 +1964,7 @@ class AuthoringSession:
             "remove_annotation_object",
             "remove_raster_binding",
             "remove_track",
+            "replicate_section_structure",
             "set_depth_axis",
             "set_heading_content",
             "set_matplotlib_style",
@@ -1984,16 +1989,19 @@ class AuthoringSession:
         async def inspect_track(section_id: str, track_id: str) -> dict[str, object]:
             target = (section_id, track_id)
             if target not in inspections:
-                result = await session.call_tool(
-                    "inspect_track_bindings",
-                    {
-                        "logfile_path": draft_logfile,
-                        "section_id": section_id,
-                        "track_id": track_id,
-                    },
-                )
-                _require_mcp_success(result, action="inspect_track_bindings")
-                inspections[target] = _structured_content(result)
+                try:
+                    result = await session.call_tool(
+                        "inspect_track_bindings",
+                        {
+                            "logfile_path": draft_logfile,
+                            "section_id": section_id,
+                            "track_id": track_id,
+                        },
+                    )
+                    _require_mcp_success(result, action="inspect_track_bindings")
+                    inspections[target] = _structured_content(result)
+                except RuntimeError as exc:
+                    inspections[target] = {"_verification_error": str(exc)}
             return inspections[target]
 
         async def check_channel(section_id: str, channel: str) -> tuple[bool, str]:
@@ -2347,6 +2355,27 @@ class AuthoringSession:
                     record(call, changed, f"changed={changed}")
                 continue
 
+            if call.name == "replicate_section_structure":
+                source_section_id = str(arguments.get("source_section_id", "")).strip()
+                target_section_id = str(arguments.get("target_section_id", "")).strip()
+                source_exists = bool(section_summary(source_section_id))
+                target_exists = bool(section_summary(target_section_id))
+                ok = (
+                    bool(source_section_id and target_section_id)
+                    and source_exists
+                    and target_exists
+                )
+                record(
+                    call,
+                    ok,
+                    (
+                        "replicated section exists"
+                        if ok
+                        else f"source_exists={source_exists}, target_exists={target_exists}"
+                    ),
+                )
+                continue
+
             inspection = await inspect_track(section_id, track_id)
             bindings = inspection.get("bindings", [])
             if not isinstance(bindings, list):
@@ -2354,6 +2383,10 @@ class AuthoringSession:
             track = inspection.get("track", {})
             if not isinstance(track, dict):
                 track = {}
+            verification_error = inspection.get("_verification_error")
+            if isinstance(verification_error, str) and verification_error:
+                record(call, False, verification_error)
+                continue
 
             if call.name == "update_track":
                 patch = arguments.get("patch", {})
