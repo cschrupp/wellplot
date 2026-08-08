@@ -467,6 +467,17 @@ Work:
   object references
 - update canonical and stress-test notebooks
 
+Implementation checkpoint:
+
+- ordinary `run()` and `revise()` requests now produce generic phases for
+  structure, bindings, content, styling, and final verification without
+  selecting a packet blueprint
+- each mutating generic phase requires a persisted diff from
+  `summarize_logfile_changes`; an empty diff blocks the phase instead of
+  silently consuming more provider rounds
+- the shared phase executor is provider- and packet-neutral; packet assets are
+  retained only for explicit scaffold plans and transitional regression tests
+
 Acceptance:
 
 - generic requests complete without a packet blueprint

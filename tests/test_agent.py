@@ -912,7 +912,10 @@ class AgentTests(unittest.TestCase):
 
             self.assertEqual(plan.mode, "freeform")
             self.assertIsNone(plan.packet_blueprint_id)
-            self.assertEqual(plan.phases, ())
+            self.assertEqual(
+                [phase.kind for phase in plan.phases],
+                ["structure", "verification"],
+            )
 
     def test_authoring_session_plan_can_explicitly_select_scaffold(self) -> None:
         """Blueprint assets remain available as explicit dry-run scaffolds."""
@@ -947,8 +950,11 @@ class AgentTests(unittest.TestCase):
                 ),
             )
 
-            self.assertIsNone(result.plan)
-            self.assertEqual(result.phase_summaries, ())
+            self.assertIsNotNone(result.plan)
+            assert result.plan is not None
+            self.assertEqual(result.plan.mode, "freeform")
+            self.assertIsNone(result.plan.packet_blueprint_id)
+            self.assertTrue(result.phase_summaries)
             self.assertEqual(backend.tool_names[0], "set_heading_content")
             assert runtime.last_session is not None
             self.assertNotIn(
@@ -1025,6 +1031,31 @@ class AgentTests(unittest.TestCase):
 
             self.assertFalse(before_state["ok"])
             self.assertTrue(after_state["ok"])
+
+    def test_phase_success_state_requires_persisted_changes(self) -> None:
+        """A generic phase is incomplete when its persisted diff is empty."""
+        session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path("/tmp")))
+        phase = AuthoringPlanPhase(
+            id="bindings",
+            kind="bindings",
+            summary="Apply bindings.",
+            instructions="Bind requested source channels.",
+            success_check_specs=({"kind": "changes_detected"},),
+        )
+
+        unchanged_state = session._phase_success_state(  # type: ignore[attr-defined]
+            phase=phase,
+            draft_summary={"sections": []},
+            verification_context={"change_summary": {"summary_lines": []}},
+        )
+        changed_state = session._phase_success_state(  # type: ignore[attr-defined]
+            phase=phase,
+            draft_summary={"sections": []},
+            verification_context={"change_summary": {"summary_lines": ["Added binding."]}},
+        )
+
+        self.assertFalse(unchanged_state["ok"])
+        self.assertTrue(changed_state["ok"])
 
     def test_phase_success_state_requires_matching_remarks_payload(self) -> None:
         """Do not count remarks as complete when the persisted block does not match the request."""
@@ -1206,7 +1237,7 @@ class AgentTests(unittest.TestCase):
 
             async def run_plan() -> tuple[object, tuple[ExecutedAuthoringPhase, ...], object]:
                 async with session.runtime.open_session() as mcp_session:
-                    return await session._execute_packet_plan(  # type: ignore[attr-defined]
+                    return await session._execute_authoring_plan(  # type: ignore[attr-defined]
                         session=mcp_session,
                         draft_logfile="workspace/demo.log.yaml",
                         request_text="Reconstruct one cased-hole packet.",
@@ -1336,7 +1367,7 @@ class AgentTests(unittest.TestCase):
 
             async def run_plan() -> tuple[object, tuple[ExecutedAuthoringPhase, ...], object]:
                 async with session.runtime.open_session() as mcp_session:
-                    return await session._execute_packet_plan(  # type: ignore[attr-defined]
+                    return await session._execute_authoring_plan(  # type: ignore[attr-defined]
                         session=mcp_session,
                         draft_logfile="workspace/demo.log.yaml",
                         request_text="Reconstruct one cased-hole packet.",

@@ -250,10 +250,12 @@ They are not meant to be a second authoritative object model.
 The agent should:
 
 - classify user intent
+- decompose multi-object requests into generic authoring phases
 - inspect the current draft state
 - choose deterministic MCP tools
 - use defaults only for unspecified details
-- verify that requested object-level changes were actually persisted
+- verify that each phase produced a persisted change or a successful final
+  validation/preview
 
 The agent should not silently restore hidden packet rules that contradict the
 user's explicit request.

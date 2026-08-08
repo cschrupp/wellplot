@@ -1501,6 +1501,157 @@ class AuthoringSession:
             },
         )
 
+    @staticmethod
+    def _generic_plan_from_text(text: str) -> AuthoringPlanResult:
+        """Build generic phases from requested object-operation families."""
+        lowered = text.lower()
+        phases: list[AuthoringPlanPhase] = []
+
+        def contains(marker: str) -> bool:
+            """Match a scope marker as a word or phrase, not a substring."""
+            return re.search(rf"\b{re.escape(marker)}s?\b", lowered) is not None
+
+        def add_phase(
+            phase_id: str,
+            kind: str,
+            summary: str,
+            instructions: str,
+            tool_families: tuple[str, ...],
+        ) -> None:
+            phases.append(
+                AuthoringPlanPhase(
+                    id=phase_id,
+                    kind=kind,
+                    summary=summary,
+                    instructions=instructions,
+                    tool_families=tool_families,
+                    success_checks=("persisted changes are detected",),
+                    success_check_specs=({"kind": "changes_detected"},),
+                )
+            )
+
+        if any(
+            contains(marker)
+            for marker in (
+                "section",
+                "track",
+                "depth track",
+                "page layout",
+                "layout",
+                "replicate",
+                "move track",
+                "remove track",
+            )
+        ):
+            add_phase(
+                "structure",
+                "structure",
+                "Apply requested section, track, and layout structure changes.",
+                "Use generic section, track, and layout tools for the requested structure. "
+                "Preserve existing objects unless the request explicitly changes them.",
+                ("sections", "tracks", "layout"),
+            )
+
+        if any(
+            contains(marker)
+            for marker in (
+                "bind ",
+                "binding",
+                "curve",
+                "raster",
+                "channel",
+                "fill",
+            )
+        ):
+            add_phase(
+                "bindings",
+                "bindings",
+                "Apply requested curve, raster, and fill bindings.",
+                "Inspect source-channel availability first. Use generic binding tools and "
+                "report missing or ambiguous channels instead of inventing them.",
+                ("inspect", "bindings", "fills"),
+            )
+
+        if any(
+            contains(marker)
+            for marker in (
+                "annotation",
+                "remark",
+                "heading",
+                "title",
+                "subtitle",
+                "note",
+            )
+        ):
+            add_phase(
+                "content",
+                "content",
+                "Apply requested heading, remarks, and annotation content changes.",
+                "Use deterministic content and annotation tools. Keep content attached "
+                "to the requested object and report unsupported fields explicitly.",
+                ("heading", "remarks", "annotations"),
+            )
+
+        if any(
+            contains(marker)
+            for marker in (
+                "scale",
+                "color",
+                "colour",
+                "style",
+                "line width",
+                "line style",
+                "grid",
+                "logarithmic",
+                "linear",
+            )
+        ):
+            add_phase(
+                "styling",
+                "styling",
+                "Apply requested scales, styles, and grid presentation changes.",
+                "Use generic scale and style tools. Preserve explicit values and verify "
+                "the persisted nested presentation fields after writing.",
+                ("scale", "styles", "presets"),
+            )
+
+        if not phases:
+            add_phase(
+                "authoring",
+                "authoring",
+                "Apply the requested authoring changes.",
+                "Inspect the current draft, choose the smallest deterministic object edits, "
+                "and stop if the request references unsupported or missing objects.",
+                ("inspect", "authoring"),
+            )
+
+        phases.append(
+            AuthoringPlanPhase(
+                id="verification",
+                kind="verification",
+                summary="Validate the persisted draft and verify a renderable preview.",
+                instructions=(
+                    "Validate the draft and verify that the report preview renders. "
+                    "Report any remaining unsupported or inconsistent request items."
+                ),
+                tool_families=("inspect", "validate", "preview"),
+                success_checks=("draft validates", "preview renders"),
+                success_check_specs=(
+                    {"kind": "validation_valid"},
+                    {"kind": "preview_renderable"},
+                ),
+            )
+        )
+        return AuthoringPlanResult(
+            mode="freeform",
+            packet_blueprint_id=None,
+            phases=tuple(phases),
+            blocked=False,
+            run_state=AuthoringRunState(
+                objectives=tuple(phase.summary for phase in phases),
+            ),
+        )
+
     def _plan_from_text(
         self,
         text: str,
@@ -1517,12 +1668,7 @@ class AuthoringSession:
             None if blueprint_id is None else str(blueprint_id).strip()
         )
         if not normalized_blueprint_id:
-            return AuthoringPlanResult(
-                mode="freeform",
-                packet_blueprint_id=None,
-                phases=(),
-                blocked=False,
-            )
+            return self._generic_plan_from_text(text)
         blueprint = packet_blueprint_spec(normalized_blueprint_id)
         section_templates = {
             str(section.get("id", "")): dict(section)
@@ -1885,6 +2031,19 @@ class AuthoringSession:
                     if expected_remarks
                     else "No deterministic remarks block was available."
                 )
+            elif kind == "changes_detected":
+                change_summary = context.get("change_summary")
+                summary_lines = (
+                    change_summary.get("summary_lines", [])
+                    if isinstance(change_summary, dict)
+                    else []
+                )
+                ok = isinstance(summary_lines, list) and bool(summary_lines)
+                detail = (
+                    f"summary_lines={len(summary_lines)}"
+                    if isinstance(summary_lines, list)
+                    else "No change summary was captured."
+                )
             elif kind == "validation_valid":
                 ok = bool(validation and validation.get("valid") is True)
             elif kind == "preview_renderable":
@@ -1912,8 +2071,9 @@ class AuthoringSession:
         draft_logfile: str,
         phase: AuthoringPlanPhase,
         request_text: str,
+        previous_draft_text: str | None = None,
     ) -> dict[str, object]:
-        """Capture one deterministic verification context bundle for a packet phase."""
+        """Capture one deterministic verification context bundle for a phase."""
         check_kinds = {
             str(spec.get("kind", "")).strip() for spec in phase.success_check_specs
         }
@@ -1941,6 +2101,19 @@ class AuthoringSession:
             )
             _require_mcp_success(heading_slots_result, action="inspect_heading_slots")
             context["heading_slots"] = _structured_content(heading_slots_result)
+        if "changes_detected" in check_kinds and previous_draft_text is not None:
+            change_summary_result = await session.call_tool(
+                "summarize_logfile_changes",
+                {
+                    "logfile_path": draft_logfile,
+                    "previous_text": previous_draft_text,
+                },
+            )
+            _require_mcp_success(
+                change_summary_result,
+                action="summarize_logfile_changes",
+            )
+            context["change_summary"] = _structured_content(change_summary_result)
         return context
 
     async def _capture_phase_preview(
@@ -2622,7 +2795,7 @@ class AuthoringSession:
                     tool_calls.append(bind_call)
         return tuple(tool_calls)
 
-    async def _execute_packet_plan(
+    async def _execute_authoring_plan(
         self,
         *,
         session: McpSessionProtocol,
@@ -2632,8 +2805,9 @@ class AuthoringSession:
         prompt_text: str,
         tool_definitions: list[FunctionToolDefinition],
         request_max_rounds: int,
+        seed_context: str | None = None,
     ) -> tuple[ProviderRunResult, tuple[ExecutedAuthoringPhase, ...], AuthoringRunState]:
-        """Execute one staged packet plan and verify each phase deterministically."""
+        """Execute one staged authoring plan and verify each phase deterministically."""
         blueprint = (
             {}
             if plan.packet_blueprint_id is None
@@ -2656,6 +2830,14 @@ class AuthoringSession:
             )
             _require_mcp_success(summary_result, action="summarize_logfile_draft")
             current_summary = _structured_content(summary_result)
+            phase_baseline_text: str | None = None
+            if any(
+                str(spec.get("kind", "")).strip() == "changes_detected"
+                for spec in phase.success_check_specs
+            ):
+                draft_path = self.runtime.server_root / draft_logfile
+                if draft_path.exists():
+                    phase_baseline_text = draft_path.read_text(encoding="utf-8")
             before_verification_context = await self._phase_verification_context(
                 session=session,
                 draft_logfile=draft_logfile,
@@ -2782,22 +2964,27 @@ class AuthoringSession:
                         )
                 elif phase.kind == "verification":
                     phase_result = ProviderRunResult(
-                        final_text="Verified the packet draft state.",
+                        final_text="Verified the draft state.",
                         tool_trace=(),
                     )
                 else:
                     phase_budget = phase.max_rounds or request_max_rounds
+                    phase_message = (
+                        f"Authoring phase `{phase.id}`.\n"
+                        f"Phase summary: {phase.summary}\n"
+                        f"Phase instructions:\n{phase.instructions}\n\n"
+                        "Complete only this phase. Do not redesign already-complete "
+                        "draft objects. Use MCP tools only.\n\n"
+                    )
+                    if seed_context:
+                        phase_message += f"Seed context: {seed_context}\n\n"
+                    phase_message += (
+                        f"Current draft context:\n{json.dumps(current_summary, indent=2)}\n\n"
+                        f"Original request:\n{request_text}"
+                    )
                     phase_result = await self.backend.run_authoring(
                         instructions=prompt_text,
-                        initial_user_message=(
-                            f"Packet phase `{phase.id}`.\n"
-                            f"Phase summary: {phase.summary}\n"
-                            f"Phase instructions:\n{phase.instructions}\n\n"
-                            "Complete only this phase. Do not redesign already-complete "
-                            "packet parts. Use MCP tools only.\n\n"
-                            f"Current draft context:\n{json.dumps(current_summary, indent=2)}\n\n"
-                            f"Original request:\n{request_text}"
-                        ),
+                        initial_user_message=phase_message,
                         tool_definitions=tool_definitions,
                         tool_caller=call_mcp_tool,
                         max_rounds=phase_budget,
@@ -2910,6 +3097,7 @@ class AuthoringSession:
                 draft_logfile=draft_logfile,
                 phase=phase,
                 request_text=request_text,
+                previous_draft_text=phase_baseline_text,
             )
             after_state = self._phase_success_state(
                 phase=phase,
@@ -2972,9 +3160,9 @@ class AuthoringSession:
             "reasons": [reason for phase in phase_summaries for reason in phase.blocked_reasons],
         }
         final_text = (
-            "Packet plan completed."
+            "Authoring plan completed."
             if not blocked_objectives
-            else "Packet plan stopped on a blocked phase."
+            else "Authoring plan stopped on a blocked phase."
         )
         return (
             ProviderRunResult(
@@ -3063,8 +3251,8 @@ class AuthoringSession:
                     )
                 return result
 
-            packet_plan = self._plan_from_text(request.goal)
-            if packet_plan.mode == "packet":
+            authoring_plan = self._plan_from_text(effective_goal)
+            if authoring_plan.phases:
                 prompt_arguments: dict[str, object] = {
                     "goal": effective_goal,
                     "logfile_path": relative_output_logfile,
@@ -3082,14 +3270,15 @@ class AuthoringSession:
                     allowed_names=set(self.allowed_tool_names),
                     excluded_names={"create_logfile_draft"},
                 )
-                provider_result, phase_summaries, run_state = await self._execute_packet_plan(
+                provider_result, phase_summaries, run_state = await self._execute_authoring_plan(
                     session=session,
                     draft_logfile=relative_output_logfile,
-                    request_text=request.goal,
-                    plan=packet_plan,
+                    request_text=effective_goal,
+                    plan=authoring_plan,
                     prompt_text=authoring_prompt,
                     tool_definitions=tool_definitions,
                     request_max_rounds=request.max_rounds,
+                    seed_context=_request_seed_label(request),
                 )
                 if preflight_tool_trace:
                     provider_result = ProviderRunResult(
@@ -3106,7 +3295,7 @@ class AuthoringSession:
                     source_logfile_path=relative_source_logfile,
                     baseline_draft_text=baseline_draft_text,
                     provider_result=provider_result,
-                    plan=packet_plan,
+                    plan=authoring_plan,
                     phase_summaries=phase_summaries,
                     run_state=run_state,
                 )
@@ -3238,8 +3427,8 @@ class AuthoringSession:
                     )
                 return result
 
-            packet_plan = self._plan_from_text(request.feedback)
-            if packet_plan.mode == "packet":
+            authoring_plan = self._plan_from_text(effective_feedback)
+            if authoring_plan.phases:
                 prompt_result = await session.get_prompt(
                     "revise_plot_from_feedback",
                     {
@@ -3254,11 +3443,11 @@ class AuthoringSession:
                     allowed_names=set(self.allowed_tool_names),
                     excluded_names={"create_logfile_draft"},
                 )
-                provider_result, phase_summaries, run_state = await self._execute_packet_plan(
+                provider_result, phase_summaries, run_state = await self._execute_authoring_plan(
                     session=session,
                     draft_logfile=relative_logfile,
-                    request_text=request.feedback,
-                    plan=packet_plan,
+                    request_text=effective_feedback,
+                    plan=authoring_plan,
                     prompt_text=revision_prompt,
                     tool_definitions=tool_definitions,
                     request_max_rounds=request.max_rounds,
@@ -3278,7 +3467,7 @@ class AuthoringSession:
                     source_logfile_path=None,
                     baseline_draft_text=baseline_draft_text,
                     provider_result=provider_result,
-                    plan=packet_plan,
+                    plan=authoring_plan,
                     phase_summaries=phase_summaries,
                     run_state=run_state,
                 )
