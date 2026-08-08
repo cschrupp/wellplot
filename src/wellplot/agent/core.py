@@ -1562,10 +1562,14 @@ class AuthoringSession:
                 "Apply requested section, track, and layout structure changes.",
                 "Inspect the current section IDs first. Only add or update tracks in sections "
                 "that already exist. If a requested section is missing, use "
-                "replicate_section_structure from a compatible existing section before "
-                "touching its tracks or bindings. Never issue track or binding operations "
-                "against a missing section. Preserve existing objects unless the request "
-                "explicitly changes them.",
+                "replicate_section_structure from a compatible existing section after "
+                "the source section has its requested structure. For multi-section "
+                "requests, complete and verify the source section's tracks first, then "
+                "replicate it, then apply target-specific changes. Never issue track or "
+                "binding operations against a missing section or move a track before all "
+                "requested tracks exist. Treat an MCP result marked is_error=true as a "
+                "failed mutation and correct the arguments before continuing. Preserve "
+                "existing objects unless the request explicitly changes them.",
                 ("sections", "tracks", "layout"),
             )
 
@@ -2130,11 +2134,24 @@ class AuthoringSession:
             ok: bool,
             detail: str,
         ) -> None:
+            target_parts = [
+                f"{key}={call.arguments[key]}"
+                for key in (
+                    "section_id",
+                    "track_id",
+                    "source_section_id",
+                    "target_section_id",
+                    "channel",
+                    "binding_id",
+                )
+                if call.arguments.get(key) not in (None, "")
+            ]
             outcomes.append(
                 {
                     "tool": call.name,
                     "section_id": call.arguments.get("section_id"),
                     "track_id": call.arguments.get("track_id"),
+                    "target": ", ".join(target_parts),
                     "ok": ok,
                     "detail": detail,
                 }
@@ -2684,8 +2701,23 @@ class AuthoringSession:
                     if isinstance(outcome_state, dict)
                     else False
                 )
+                failed_outcomes = [
+                    outcome
+                    for outcome in outcomes
+                    if isinstance(outcome, dict) and not bool(outcome.get("ok"))
+                ]
                 detail = (
-                    f"outcomes={len(outcomes)}"
+                    (
+                        f"outcomes={len(outcomes)}, failed={len(failed_outcomes)}: "
+                        + "; ".join(
+                            "{tool}[{target}]: {failure}".format(
+                                tool=str(outcome.get("tool", "unknown")),
+                                target=str(outcome.get("target", "")).strip() or "no target",
+                                failure=str(outcome.get("detail", "verification failed")),
+                            )
+                            for outcome in failed_outcomes
+                        )
+                    )
                     if isinstance(outcomes, list)
                     else "No tool outcome verification was captured."
                 )
@@ -3776,7 +3808,12 @@ class AuthoringSession:
                     )
                 else:
                     blocked_reasons = tuple(
-                        f"Unmet success check `{check.get('kind', '')}`."
+                        (
+                            f"Unmet success check `{check.get('kind', '')}`: "
+                            f"{check.get('detail')}."
+                            if str(check.get("detail", "")).strip()
+                            else f"Unmet success check `{check.get('kind', '')}`."
+                        )
                         for check in after_state["checks"]
                         if not bool(check.get("ok"))
                     )

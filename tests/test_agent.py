@@ -939,6 +939,8 @@ class AgentTests(unittest.TestCase):
                 [phase.kind for phase in plan.phases],
                 ["structure", "verification"],
             )
+            self.assertIn("complete and verify the source section", plan.phases[0].instructions)
+            self.assertIn("is_error=true", plan.phases[0].instructions)
 
     def test_authoring_session_plan_can_explicitly_select_scaffold(self) -> None:
         """Blueprint assets remain available as explicit dry-run scaffolds."""
@@ -1432,6 +1434,41 @@ class AgentTests(unittest.TestCase):
         )
 
         self.assertFalse(state["ok"])
+
+    def test_tool_outcome_failure_detail_is_exposed_in_phase_state(self) -> None:
+        """Expose the failed mutation and verifier detail to the operator report."""
+        session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path("/tmp")))
+        phase = AuthoringPlanPhase(
+            id="structure",
+            kind="structure",
+            summary="Apply structure.",
+            instructions="Apply structure.",
+            success_check_specs=({"kind": "tool_outcomes_match"},),
+        )
+
+        state = session._phase_success_state(  # type: ignore[attr-defined]
+            phase=phase,
+            draft_summary={"sections": []},
+            verification_context={
+                "tool_outcomes": {
+                    "ok": False,
+                    "outcomes": [
+                        {
+                            "tool": "add_track",
+                            "target": "section_id=main_pass, track_id=cbl",
+                            "ok": False,
+                            "detail": "track is missing after mutation",
+                        }
+                    ],
+                }
+            },
+        )
+
+        self.assertFalse(state["ok"])
+        detail = str(state["checks"][0]["detail"])
+        self.assertIn("failed=1", detail)
+        self.assertIn("add_track", detail)
+        self.assertIn("track is missing after mutation", detail)
 
     def test_phase_success_state_requires_matching_remarks_payload(self) -> None:
         """Do not count remarks as complete when the persisted block does not match the request."""

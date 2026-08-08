@@ -161,9 +161,12 @@ class LocalStdioMcpRuntime:
 
     def tool_result_payload(self, result: object) -> dict[str, object]:
         """Normalize one MCP tool result for provider tool-loop replay."""
+        is_error = bool(getattr(result, "isError", False))
+        payload: dict[str, object] = {"is_error": is_error}
         structured = getattr(result, "structuredContent", None)
         if isinstance(structured, dict):
-            return {"structured": structured}
+            payload["structured"] = structured
+            return payload
 
         content_items: list[dict[str, object]] = []
         for item in getattr(result, "content", []) or []:
@@ -180,4 +183,5 @@ class LocalStdioMcpRuntime:
                         "note": "Binary content omitted from provider tool replay.",
                     }
                 )
-        return {"content": content_items}
+        payload["content"] = content_items
+        return payload
