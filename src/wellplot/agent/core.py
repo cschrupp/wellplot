@@ -43,11 +43,15 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "set_matplotlib_style",
     "validate_logfile",
     "inspect_logfile",
+    "inspect_authoring_objects",
     "inspect_data_source",
     "check_channel_availability",
     "inspect_header_archetypes",
     "inspect_packet_blueprints",
     "replicate_section_structure",
+    "update_section",
+    "set_page_layout",
+    "set_section_view",
     "apply_header_archetype",
     "inspect_heading_slots",
     "parse_key_value_text",
@@ -58,6 +62,9 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "inspect_authoring_vocab",
     "add_track",
     "update_track",
+    "add_annotation_object",
+    "update_annotation_object",
+    "remove_annotation_object",
     "inspect_track_bindings",
     "set_track_scales",
     "remove_track",
@@ -1943,27 +1950,36 @@ class AuthoringSession:
         """Verify persisted outcomes for deterministic mutating tool calls."""
         mutation_tools = {
             "add_curve_fill",
+            "add_annotation_object",
             "add_track",
             "bind_curve",
             "bind_raster",
             "move_track",
             "remove_curve_binding",
             "remove_curve_fill",
+            "remove_annotation_object",
             "remove_raster_binding",
             "remove_track",
             "set_depth_axis",
             "set_heading_content",
             "set_matplotlib_style",
+            "set_page_layout",
             "set_remarks_content",
+            "set_section_view",
             "set_section_data_source",
             "set_track_scales",
+            "update_annotation_object",
             "update_curve_binding",
             "update_raster_binding",
+            "update_section",
             "update_track",
         }
         outcomes: list[dict[str, object]] = []
         inspections: dict[tuple[str, str], dict[str, object]] = {}
         availability: dict[tuple[str, str], tuple[bool, str]] = {}
+        object_inspections: dict[
+            tuple[str, str | None, str | None], list[dict[str, object]]
+        ] = {}
 
         async def inspect_track(section_id: str, track_id: str) -> dict[str, object]:
             target = (section_id, track_id)
@@ -2039,6 +2055,57 @@ class AuthoringSession:
             availability[target] = result
             return result
 
+        async def inspect_objects(
+            object_kind: str,
+            *,
+            section_id: str | None = None,
+            track_id: str | None = None,
+        ) -> list[dict[str, object]]:
+            """Read canonical objects once for one verification scope."""
+            target = (object_kind, section_id, track_id)
+            if target not in object_inspections:
+                arguments: dict[str, object] = {
+                    "logfile_path": draft_logfile,
+                    "object_kind": object_kind,
+                }
+                if section_id is not None:
+                    arguments["section_id"] = section_id
+                if track_id is not None:
+                    arguments["track_id"] = track_id
+                result = await session.call_tool("inspect_authoring_objects", arguments)
+                _require_mcp_success(result, action="inspect_authoring_objects")
+                payload = _structured_content(result)
+                objects = payload.get("objects", [])
+                object_inspections[target] = [
+                    item for item in objects if isinstance(item, dict)
+                ] if isinstance(objects, list) else []
+            return object_inspections[target]
+
+        def object_value(item: dict[str, object]) -> dict[str, object]:
+            """Return the canonical object portion of one inspection item."""
+            value = item.get("object", {})
+            return value if isinstance(value, dict) else {}
+
+        def object_ref(item: dict[str, object]) -> dict[str, object]:
+            """Return the stable reference portion of one inspection item."""
+            value = item.get("ref", {})
+            return value if isinstance(value, dict) else {}
+
+        def find_object(
+            objects: list[dict[str, object]],
+            *,
+            object_id: str | None = None,
+            index: int | None = None,
+        ) -> dict[str, object] | None:
+            """Find one canonical object by stable id or ordered index."""
+            for item in objects:
+                ref = object_ref(item)
+                if object_id is not None and str(ref.get("object_id", "")) == object_id:
+                    return object_value(item)
+                if index is not None and ref.get("index") == index:
+                    return object_value(item)
+            return None
+
         def section_summary(section_id: str) -> dict[str, object]:
             return next(
                 (
@@ -2088,19 +2155,168 @@ class AuthoringSession:
                 record(call, heading_changed, "heading_changed=" + str(heading_changed))
                 continue
             if call.name == "set_remarks_content":
-                remarks_changed = bool(
-                    change_summary.get("remarks_changed", changed)
-                    if change_summary
-                    else False
+                remark_objects = await inspect_objects("remark")
+                persisted_remarks = [object_value(item) for item in remark_objects]
+                expected_remarks = _normalize_remarks_payload(arguments.get("remarks"))
+                actual_remarks = _normalize_remarks_payload(persisted_remarks)
+                remarks_match = actual_remarks == expected_remarks
+                detail = (
+                    f"remarks={len(actual_remarks)}"
+                    if remarks_match
+                    else f"remarks mismatch: expected={len(expected_remarks)}, "
+                    f"actual={len(actual_remarks)}"
                 )
-                record(call, remarks_changed, "remarks_changed=" + str(remarks_changed))
+                record(call, remarks_match, detail)
                 continue
             if call.name in {
-                "set_depth_axis",
                 "set_matplotlib_style",
                 "set_section_data_source",
             }:
                 record(call, changed, f"changed={changed}")
+                continue
+
+            if call.name == "set_depth_axis":
+                depth_objects = await inspect_objects("depth")
+                depth = find_object(depth_objects, object_id="depth")
+                expected = {
+                    key: arguments[key]
+                    for key in ("unit", "scale", "major_step", "minor_step")
+                    if arguments.get(key) is not None
+                }
+                ok = bool(expected) and depth is not None and self._subset_matches(
+                    depth,
+                    expected,
+                )
+                record(call, ok, "depth axis matches" if ok else "depth axis mismatch")
+                continue
+
+            if call.name == "update_section":
+                section_objects = await inspect_objects("section", section_id=section_id)
+                section = find_object(section_objects, object_id=section_id)
+                expected = {
+                    key: arguments[key]
+                    for key in ("title", "subtitle", "depth_range")
+                    if arguments.get(key) is not None
+                }
+                ok = bool(expected) and section is not None and self._subset_matches(
+                    section,
+                    expected,
+                )
+                record(call, ok, "section fields match" if ok else "section fields mismatch")
+                continue
+
+            if call.name == "set_page_layout":
+                page_objects = await inspect_objects("page")
+                page = find_object(page_objects, object_id="page")
+                page_patch = arguments.get("page_patch")
+                render_patch = arguments.get("render_patch")
+                page_ok = (
+                    isinstance(page_patch, dict)
+                    and bool(page_patch)
+                    and page is not None
+                    and self._subset_matches(page, page_patch)
+                ) or not page_patch
+                render_ok = bool(render_patch) and changed if render_patch else True
+                ok = page_ok and render_ok
+                record(
+                    call,
+                    ok,
+                    f"page={page_ok}, render_change={render_ok}",
+                )
+                continue
+
+            if call.name == "set_section_view":
+                section_objects = await inspect_objects("section", section_id=section_id)
+                depth_objects = await inspect_objects("depth")
+                page_objects = await inspect_objects("page")
+                section = find_object(section_objects, object_id=section_id)
+                depth = find_object(depth_objects, object_id="depth")
+                page = find_object(page_objects, object_id="page")
+                section_expected = {
+                    key: arguments[key]
+                    for key in ("title", "subtitle", "depth_range")
+                    if arguments.get(key) is not None
+                }
+                depth_expected = {
+                    key: arguments[key]
+                    for key in ("unit", "scale", "major_step", "minor_step")
+                    if arguments.get(key) is not None
+                }
+                page_patch = arguments.get("page_patch")
+                render_patch = arguments.get("render_patch")
+                section_ok = (
+                    not section_expected
+                    or section is not None
+                    and self._subset_matches(section, section_expected)
+                )
+                depth_ok = (
+                    not depth_expected
+                    or depth is not None
+                    and self._subset_matches(depth, depth_expected)
+                )
+                page_ok = (
+                    not page_patch
+                    or isinstance(page_patch, dict)
+                    and page is not None
+                    and self._subset_matches(page, page_patch)
+                )
+                render_ok = bool(render_patch) and changed if render_patch else True
+                ok = section_ok and depth_ok and page_ok and render_ok
+                record(
+                    call,
+                    ok,
+                    f"section={section_ok}, depth={depth_ok}, page={page_ok}, "
+                    f"render_change={render_ok}",
+                )
+                continue
+
+            if call.name in {
+                "add_annotation_object",
+                "update_annotation_object",
+                "remove_annotation_object",
+            }:
+                annotation_objects = await inspect_objects(
+                    "annotation",
+                    section_id=section_id,
+                    track_id=track_id,
+                )
+                if call.name == "add_annotation_object":
+                    annotation = arguments.get("annotation")
+                    annotation_id = (
+                        str(annotation.get("annotation_id", "")).strip()
+                        if isinstance(annotation, dict)
+                        else ""
+                    )
+                    persisted = find_object(annotation_objects, object_id=annotation_id)
+                    ok = (
+                        isinstance(annotation, dict)
+                        and bool(annotation_id)
+                        and persisted is not None
+                        and self._subset_matches(persisted, annotation)
+                    )
+                    detail = "annotation matches" if ok else "annotation is missing or mismatched"
+                elif call.name == "update_annotation_object":
+                    persisted = find_object(
+                        annotation_objects,
+                        index=arguments.get("annotation_index")
+                        if isinstance(arguments.get("annotation_index"), int)
+                        else None,
+                    )
+                    patch = arguments.get("patch")
+                    ok = (
+                        isinstance(patch, dict)
+                        and persisted is not None
+                        and self._subset_matches(persisted, patch)
+                    )
+                    detail = "annotation patch matches" if ok else "annotation patch mismatch"
+                else:
+                    ok = changed
+                    detail = (
+                        "annotation removal changed the draft"
+                        if ok
+                        else "annotation removal not detected"
+                    )
+                record(call, ok, detail)
                 continue
 
             if call.name in {"add_track", "remove_track", "move_track"}:
@@ -2426,7 +2642,12 @@ class AuthoringSession:
                     else []
                 )
                 ok = (
-                    bool(outcome_state and outcome_state.get("ok"))
+                    bool(
+                        outcome_state
+                        and outcome_state.get("ok")
+                        and isinstance(outcomes, list)
+                        and outcomes
+                    )
                     if isinstance(outcome_state, dict)
                     else False
                 )

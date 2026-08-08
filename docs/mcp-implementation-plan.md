@@ -478,6 +478,9 @@ Implementation checkpoint:
 - binding and fill outcomes are checked against persisted track bindings and
   `check_channel_availability`; missing or ambiguous source channels block the
   phase with a deterministic reason
+- section, depth, page, annotation, and remark mutations are checked through
+  `inspect_authoring_objects`; an empty or unrecognized mutation trace cannot
+  satisfy the generic phase outcome check
 - the shared phase executor is provider- and packet-neutral; packet assets are
   retained only for explicit scaffold plans and transitional regression tests
 

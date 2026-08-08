@@ -177,6 +177,8 @@ class FakeMcpSession:
                     "warnings": [],
                 }
             )
+        if name == "inspect_authoring_objects":
+            return SimpleNamespace(structuredContent={"objects": []})
         if name == "apply_header_archetype":
             return SimpleNamespace(structuredContent={"applied": True})
         if name == "inspect_packet_blueprints":
@@ -1208,6 +1210,181 @@ class AgentTests(unittest.TestCase):
 
             self.assertFalse(missing["ok"])
             self.assertIn("source channel is missing", missing["outcomes"][0]["detail"])
+
+    def test_tool_outcome_verification_checks_canonical_layout_and_annotations(self) -> None:
+        """Verify non-binding mutations against typed authoring objects."""
+
+        class CanonicalInspectionSession(FakeMcpSession):
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "inspect_authoring_objects":
+                    object_kind = str(arguments["object_kind"])
+                    objects = {
+                        "section": [
+                            {
+                                "ref": {"object_id": "main", "index": 0},
+                                "object": {
+                                    "id": "main",
+                                    "title": "Updated Main",
+                                    "subtitle": "Review",
+                                    "depth_range": [100.0, 200.0],
+                                },
+                            }
+                        ],
+                        "depth": [
+                            {
+                                "ref": {"object_id": "depth", "index": 0},
+                                "object": {
+                                    "unit": "ft",
+                                    "scale": 240.0,
+                                    "major_step": 10.0,
+                                },
+                            }
+                        ],
+                        "page": [
+                            {
+                                "ref": {"object_id": "page", "index": 0},
+                                "object": {
+                                    "size": "letter",
+                                    "orientation": "landscape",
+                                    "continuous": True,
+                                },
+                            }
+                        ],
+                        "annotation": [
+                            {
+                                "ref": {
+                                    "object_id": "marker-1",
+                                    "index": 0,
+                                    "section_id": "main",
+                                    "track_id": "notes",
+                                },
+                                "object": {
+                                    "kind": "marker",
+                                    "annotation_id": "marker-1",
+                                    "depth": 150.0,
+                                    "marker": "circle",
+                                    "color": "#2563eb",
+                                },
+                            }
+                        ],
+                        "remark": [
+                            {
+                                "ref": {"object_id": "remark-1", "index": 0},
+                                "object": {
+                                    "remark_id": "remark-1",
+                                    "title": "Notes",
+                                    "lines": ["Updated note"],
+                                    "alignment": "left",
+                                },
+                            }
+                        ],
+                    }
+                    return SimpleNamespace(
+                        structuredContent={"objects": objects.get(object_kind, [])}
+                    )
+                return await super().call_tool(name, arguments)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+            tool_trace = (
+                AuthoringToolCall(
+                    round=1,
+                    name="update_section",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "section_id": "main",
+                        "title": "Updated Main",
+                        "subtitle": "Review",
+                        "depth_range": [100.0, 200.0],
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="set_depth_axis",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "unit": "ft",
+                        "scale": 240.0,
+                        "major_step": 10.0,
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="set_page_layout",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "page_patch": {
+                            "size": "letter",
+                            "orientation": "landscape",
+                            "continuous": True,
+                        },
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="add_annotation_object",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "section_id": "main",
+                        "track_id": "notes",
+                        "annotation": {
+                            "kind": "marker",
+                            "annotation_id": "marker-1",
+                            "depth": 150.0,
+                            "marker": "circle",
+                            "color": "#2563eb",
+                        },
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="set_remarks_content",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "remarks": [
+                            {
+                                "title": "Notes",
+                                "lines": ["Updated note"],
+                                "alignment": "left",
+                            }
+                        ],
+                    },
+                ),
+            )
+
+            outcome = anyio.run(
+                partial(
+                    session._verify_tool_outcomes,  # type: ignore[attr-defined]
+                    session=CanonicalInspectionSession(root),
+                    draft_logfile="workspace/demo.log.yaml",
+                    draft_summary={"sections": []},
+                    tool_trace=tool_trace,
+                    change_summary={"changed": True},
+                )
+            )
+
+            self.assertTrue(outcome["ok"])
+            self.assertEqual(len(outcome["outcomes"]), len(tool_trace))
+
+    def test_tool_outcome_success_requires_at_least_one_verified_mutation(self) -> None:
+        """Do not pass a generic phase when no mutating outcome was inspected."""
+        session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(Path("/tmp")))
+        phase = AuthoringPlanPhase(
+            id="structure",
+            kind="structure",
+            summary="Apply structure.",
+            instructions="Apply structure.",
+            success_check_specs=({"kind": "tool_outcomes_match"},),
+        )
+
+        state = session._phase_success_state(  # type: ignore[attr-defined]
+            phase=phase,
+            draft_summary={"sections": []},
+            verification_context={"tool_outcomes": {"ok": True, "outcomes": []}},
+        )
+
+        self.assertFalse(state["ok"])
 
     def test_phase_success_state_requires_matching_remarks_payload(self) -> None:
         """Do not count remarks as complete when the persisted block does not match the request."""
