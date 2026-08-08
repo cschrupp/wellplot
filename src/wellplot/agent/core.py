@@ -167,6 +167,25 @@ def _phase_allowed_tool_names(phase: AuthoringPlanPhase) -> set[str]:
     return names
 
 
+def _tool_payload_error_text(payload: dict[str, object]) -> str | None:
+    """Extract one provider-facing MCP error from a normalized tool payload."""
+    if not bool(payload.get("is_error")):
+        return None
+    error = payload.get("error")
+    if isinstance(error, str) and error.strip():
+        return error.strip()
+    messages: list[str] = []
+    content = payload.get("content", [])
+    if isinstance(content, list):
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text")
+            if isinstance(text, str) and text.strip():
+                messages.append(text.strip())
+    return "\n".join(messages) if messages else "MCP returned an error result."
+
+
 @dataclass(frozen=True)
 class AuthoringRequest:
     """High-level natural-language authoring request."""
@@ -3584,18 +3603,25 @@ class AuthoringSession:
         async def call_mcp_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
             allowed_names = _phase_allowed_tool_names(current_phase)
             if name not in allowed_names:
-                return {
+                payload = {
                     "is_error": True,
                     "error": (
                         f"Tool {name!r} is not available during phase "
                         f"{current_phase.id!r}; use the phase-appropriate tool family."
                     ),
                 }
+                phase_mutation_errors.append(f"{name}: {_tool_payload_error_text(payload)}")
+                return payload
             tool_result = await session.call_tool(name, arguments)
-            return self.runtime.tool_result_payload(tool_result)
+            payload = self.runtime.tool_result_payload(tool_result)
+            error_text = _tool_payload_error_text(payload)
+            if error_text is not None and name not in _PHASE_READ_ONLY_TOOLS:
+                phase_mutation_errors.append(f"{name}: {error_text}")
+            return payload
 
         for phase in plan.phases:
             current_phase = phase
+            phase_mutation_errors: list[str] = []
             summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": draft_logfile},
@@ -3897,7 +3923,7 @@ class AuthoringSession:
                 preview_renderable=preview_png is not None,
                 verification_context=after_verification_context,
             )
-            if after_state["ok"]:
+            if after_state["ok"] and not phase_mutation_errors:
                 blocked_reasons = ()
             elif not blocked_reasons:
                 before_snapshot = json.dumps(before_state["checks"], sort_keys=True, default=str)
@@ -3917,6 +3943,10 @@ class AuthoringSession:
                         for check in after_state["checks"]
                         if not bool(check.get("ok"))
                     )
+            if phase_mutation_errors:
+                blocked_reasons = tuple(blocked_reasons) + tuple(
+                    f"MCP mutation error: {error}" for error in phase_mutation_errors
+                )
 
             status = "completed" if after_state["ok"] and not blocked_reasons else "blocked"
             tool_trace = phase_tool_trace

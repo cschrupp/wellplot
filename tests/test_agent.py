@@ -982,6 +982,9 @@ class AgentTests(unittest.TestCase):
             self.assertIsNone(result.plan.packet_blueprint_id)
             self.assertTrue(result.phase_summaries)
             self.assertNotIn("set_heading_content", backend.tool_names)
+            self.assertTrue(
+                any("not available during phase" in item for item in result.user_report.why_not)
+            )
             assert runtime.last_session is not None
             self.assertNotIn(
                 "inspect_packet_blueprints",
