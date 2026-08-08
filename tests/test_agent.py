@@ -156,6 +156,27 @@ class FakeMcpSession:
                     ]
                 }
             )
+        if name == "check_channel_availability":
+            requested_channels = [
+                str(channel)
+                for channel in arguments.get("requested_channels", [])
+                if str(channel).strip()
+            ]
+            return SimpleNamespace(
+                structuredContent={
+                    "found_channels": requested_channels,
+                    "missing_channels": [],
+                    "resolutions": [
+                        {
+                            "requested_channel": channel,
+                            "status": "exact",
+                            "matched_channels": [channel],
+                        }
+                        for channel in requested_channels
+                    ],
+                    "warnings": [],
+                }
+            )
         if name == "apply_header_archetype":
             return SimpleNamespace(structuredContent={"applied": True})
         if name == "inspect_packet_blueprints":
@@ -1056,6 +1077,137 @@ class AgentTests(unittest.TestCase):
 
         self.assertFalse(unchanged_state["ok"])
         self.assertTrue(changed_state["ok"])
+
+    def test_tool_outcome_verification_checks_persisted_binding_style_and_scale(self) -> None:
+        """Verify binding calls against canonical track inspection state."""
+
+        class OutcomeInspectionSession(FakeMcpSession):
+            async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                if name == "inspect_track_bindings":
+                    return SimpleNamespace(
+                        structuredContent={
+                            "track": {
+                                "id": "gamma",
+                                "x_scale": {"kind": "linear", "min": 0, "max": 150},
+                            },
+                            "bindings": [
+                                {
+                                    "id": "gr_1",
+                                    "kind": "curve",
+                                    "channel": "GR",
+                                    "label": "Gamma Ray",
+                                    "scale": {"kind": "linear", "min": 0, "max": 150},
+                                    "style": {
+                                        "color": "#2563eb",
+                                        "line_style": "dashed",
+                                    },
+                                }
+                            ],
+                        }
+                    )
+                return await super().call_tool(name, arguments)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+            fake_mcp = OutcomeInspectionSession(root)
+            tool_trace = (
+                AuthoringToolCall(
+                    round=1,
+                    name="bind_curve",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "section_id": "main",
+                        "track_id": "gamma",
+                        "channel": "GR",
+                        "binding_id": "gr_1",
+                        "label": "Gamma Ray",
+                        "scale": {"kind": "linear", "min": 0, "max": 150},
+                        "style": {"color": "#2563eb", "line_style": "dashed"},
+                    },
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="set_track_scales",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "section_id": "main",
+                        "track_id": "gamma",
+                        "x_scale": {"kind": "linear", "min": 0, "max": 150},
+                        "channel_scales": {
+                            "GR": {"kind": "linear", "min": 0, "max": 150}
+                        },
+                    },
+                ),
+            )
+
+            outcome = anyio.run(
+                partial(
+                    session._verify_tool_outcomes,  # type: ignore[attr-defined]
+                    session=fake_mcp,
+                    draft_logfile="workspace/demo.log.yaml",
+                    draft_summary={"sections": []},
+                    tool_trace=tool_trace,
+                    change_summary={"changed": True},
+                )
+            )
+
+            self.assertTrue(outcome["ok"])
+            self.assertEqual(len(outcome["outcomes"]), 2)
+
+            fake_mcp = OutcomeInspectionSession(root)
+            mismatched_trace = (
+                AuthoringToolCall(
+                    round=1,
+                    name="update_curve_binding",
+                    arguments={
+                        "logfile_path": "workspace/demo.log.yaml",
+                        "section_id": "main",
+                        "track_id": "gamma",
+                        "channel": "GR",
+                        "binding_id": "gr_1",
+                        "patch": {"style": {"color": "#dc2626"}},
+                    },
+                ),
+            )
+            mismatched = anyio.run(
+                partial(
+                    session._verify_tool_outcomes,  # type: ignore[attr-defined]
+                    session=fake_mcp,
+                    draft_logfile="workspace/demo.log.yaml",
+                    draft_summary={"sections": []},
+                    tool_trace=mismatched_trace,
+                    change_summary={"changed": True},
+                )
+            )
+
+            self.assertFalse(mismatched["ok"])
+
+            class MissingChannelSession(OutcomeInspectionSession):
+                async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+                    if name == "check_channel_availability":
+                        return SimpleNamespace(
+                            structuredContent={
+                                "found_channels": [],
+                                "missing_channels": ["GR"],
+                                "warnings": ["Requested channel 'GR' was not found."],
+                            }
+                        )
+                    return await super().call_tool(name, arguments)
+
+            missing = anyio.run(
+                partial(
+                    session._verify_tool_outcomes,  # type: ignore[attr-defined]
+                    session=MissingChannelSession(root),
+                    draft_logfile="workspace/demo.log.yaml",
+                    draft_summary={"sections": []},
+                    tool_trace=tool_trace[:1],
+                    change_summary={"changed": True},
+                )
+            )
+
+            self.assertFalse(missing["ok"])
+            self.assertIn("source channel is missing", missing["outcomes"][0]["detail"])
 
     def test_phase_success_state_requires_matching_remarks_payload(self) -> None:
         """Do not count remarks as complete when the persisted block does not match the request."""

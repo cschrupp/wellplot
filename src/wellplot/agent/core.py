@@ -1525,8 +1525,14 @@ class AuthoringSession:
                     summary=summary,
                     instructions=instructions,
                     tool_families=tool_families,
-                    success_checks=("persisted changes are detected",),
-                    success_check_specs=({"kind": "changes_detected"},),
+                    success_checks=(
+                        "persisted changes are detected",
+                        "deterministic tool outcomes match persisted state",
+                    ),
+                    success_check_specs=(
+                        {"kind": "changes_detected"},
+                        {"kind": "tool_outcomes_match"},
+                    ),
                 )
             )
 
@@ -1902,6 +1908,374 @@ class AuthoringSession:
                 return True, None
         return False, "no binding matched the expected subset"
 
+    @staticmethod
+    def _binding_patch_matches(
+        binding: dict[str, object],
+        patch: dict[str, object],
+    ) -> tuple[bool, str | None]:
+        """Check one persisted binding against a partial update patch."""
+        for key, expected in patch.items():
+            if expected is None:
+                if key in binding:
+                    return False, f"field {key!r} was not cleared"
+                continue
+            actual = binding.get(key)
+            if isinstance(expected, dict):
+                if not isinstance(actual, dict) or not AuthoringSession._subset_matches(
+                    actual,
+                    expected,
+                ):
+                    return False, f"field {key!r} does not match the requested patch"
+                continue
+            if actual != expected:
+                return False, f"field {key!r} does not match the requested patch"
+        return True, None
+
+    async def _verify_tool_outcomes(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        draft_summary: dict[str, object],
+        tool_trace: tuple[AuthoringToolCall, ...],
+        change_summary: dict[str, object] | None,
+    ) -> dict[str, object]:
+        """Verify persisted outcomes for deterministic mutating tool calls."""
+        mutation_tools = {
+            "add_curve_fill",
+            "add_track",
+            "bind_curve",
+            "bind_raster",
+            "move_track",
+            "remove_curve_binding",
+            "remove_curve_fill",
+            "remove_raster_binding",
+            "remove_track",
+            "set_depth_axis",
+            "set_heading_content",
+            "set_matplotlib_style",
+            "set_remarks_content",
+            "set_section_data_source",
+            "set_track_scales",
+            "update_curve_binding",
+            "update_raster_binding",
+            "update_track",
+        }
+        outcomes: list[dict[str, object]] = []
+        inspections: dict[tuple[str, str], dict[str, object]] = {}
+        availability: dict[tuple[str, str], tuple[bool, str]] = {}
+
+        async def inspect_track(section_id: str, track_id: str) -> dict[str, object]:
+            target = (section_id, track_id)
+            if target not in inspections:
+                result = await session.call_tool(
+                    "inspect_track_bindings",
+                    {
+                        "logfile_path": draft_logfile,
+                        "section_id": section_id,
+                        "track_id": track_id,
+                    },
+                )
+                _require_mcp_success(result, action="inspect_track_bindings")
+                inspections[target] = _structured_content(result)
+            return inspections[target]
+
+        async def check_channel(section_id: str, channel: str) -> tuple[bool, str]:
+            """Confirm one binding channel against the draft's active source."""
+            normalized_channel = channel.strip().upper()
+            target = (section_id, normalized_channel)
+            if target in availability:
+                return availability[target]
+            if not section_id or not normalized_channel:
+                result = False, "binding channel or section is missing"
+                availability[target] = result
+                return result
+            availability_result = await session.call_tool(
+                "check_channel_availability",
+                {
+                    "logfile_path": draft_logfile,
+                    "section_id": section_id,
+                    "requested_channels": [channel],
+                },
+            )
+            _require_mcp_success(
+                availability_result,
+                action="check_channel_availability",
+            )
+            payload = _structured_content(availability_result)
+            found_channels = {
+                str(value).strip().upper()
+                for value in payload.get("found_channels", [])
+                if str(value).strip()
+            }
+            resolved = False
+            for resolution in payload.get("resolutions", []):
+                if not isinstance(resolution, dict):
+                    continue
+                requested = str(resolution.get("requested_channel", "")).strip().upper()
+                status = str(resolution.get("status", "")).strip().lower()
+                if requested == normalized_channel and status in {"exact", "alias"}:
+                    resolved = bool(resolution.get("matched_channels"))
+                    break
+            if normalized_channel in found_channels or resolved:
+                result = True, "source channel is available"
+            else:
+                missing = {
+                    str(value).strip().upper()
+                    for value in payload.get("missing_channels", [])
+                    if str(value).strip()
+                }
+                warnings = [
+                    str(value).strip()
+                    for value in payload.get("warnings", [])
+                    if str(value).strip()
+                ]
+                detail = "source channel is missing or ambiguous"
+                if normalized_channel in missing:
+                    detail = "source channel is missing"
+                if warnings:
+                    detail += ": " + warnings[0]
+                result = False, detail
+            availability[target] = result
+            return result
+
+        def section_summary(section_id: str) -> dict[str, object]:
+            return next(
+                (
+                    section
+                    for section in draft_summary.get("sections", [])
+                    if isinstance(section, dict)
+                    and str(section.get("id", "")).strip() == section_id
+                ),
+                {},
+            )
+
+        def record(
+            call: AuthoringToolCall,
+            ok: bool,
+            detail: str,
+        ) -> None:
+            outcomes.append(
+                {
+                    "tool": call.name,
+                    "section_id": call.arguments.get("section_id"),
+                    "track_id": call.arguments.get("track_id"),
+                    "ok": ok,
+                    "detail": detail,
+                }
+            )
+
+        changed = bool(
+            change_summary
+            and (
+                change_summary.get("changed")
+                or bool(change_summary.get("summary_lines"))
+            )
+        )
+        for call in tool_trace:
+            if call.name not in mutation_tools:
+                continue
+            arguments = call.arguments
+            section_id = str(arguments.get("section_id", "")).strip()
+            track_id = str(arguments.get("track_id", "")).strip()
+
+            if call.name == "set_heading_content":
+                heading_changed = bool(
+                    change_summary.get("heading_changed", changed)
+                    if change_summary
+                    else False
+                )
+                record(call, heading_changed, "heading_changed=" + str(heading_changed))
+                continue
+            if call.name == "set_remarks_content":
+                remarks_changed = bool(
+                    change_summary.get("remarks_changed", changed)
+                    if change_summary
+                    else False
+                )
+                record(call, remarks_changed, "remarks_changed=" + str(remarks_changed))
+                continue
+            if call.name in {
+                "set_depth_axis",
+                "set_matplotlib_style",
+                "set_section_data_source",
+            }:
+                record(call, changed, f"changed={changed}")
+                continue
+
+            if call.name in {"add_track", "remove_track", "move_track"}:
+                section = section_summary(section_id)
+                track_ids = section.get("track_ids", [])
+                exists = isinstance(track_ids, list) and track_id in track_ids
+                if call.name == "add_track":
+                    expected_kind = str(arguments.get("kind", "")).strip()
+                    kinds = section.get("track_kinds", [])
+                    index = track_ids.index(track_id) if exists else -1
+                    kind_matches = (
+                        not expected_kind
+                        or (
+                            isinstance(kinds, list)
+                            and index >= 0
+                            and index < len(kinds)
+                            and str(kinds[index]).strip() == expected_kind
+                        )
+                    )
+                    record(
+                        call,
+                        exists and kind_matches,
+                        f"exists={exists}, kind_matches={kind_matches}",
+                    )
+                elif call.name == "remove_track":
+                    record(call, not exists, f"exists_after_remove={exists}")
+                else:
+                    record(call, changed, f"changed={changed}")
+                continue
+
+            inspection = await inspect_track(section_id, track_id)
+            bindings = inspection.get("bindings", [])
+            if not isinstance(bindings, list):
+                bindings = []
+            track = inspection.get("track", {})
+            if not isinstance(track, dict):
+                track = {}
+
+            if call.name == "update_track":
+                patch = arguments.get("patch", {})
+                ok = isinstance(patch, dict) and self._subset_matches(track, patch)
+                record(call, ok, "track patch matches" if ok else "track patch mismatch")
+                continue
+
+            if call.name == "set_track_scales":
+                ok = True
+                details: list[str] = []
+                x_scale = arguments.get("x_scale")
+                if isinstance(x_scale, dict):
+                    ok = self._subset_matches(track.get("x_scale"), x_scale)
+                    details.append(f"x_scale={ok}")
+                curve_scale = arguments.get("curve_scale")
+                if isinstance(curve_scale, dict):
+                    curve_bindings = [
+                        binding
+                        for binding in bindings
+                        if isinstance(binding, dict)
+                        and str(binding.get("kind", "")).strip().lower() == "curve"
+                    ]
+                    curve_ok = bool(curve_bindings) and all(
+                        self._subset_matches(binding.get("scale"), curve_scale)
+                        for binding in curve_bindings
+                    )
+                    ok = ok and curve_ok
+                    details.append(f"curve_scale={curve_ok}")
+                channel_scales = arguments.get("channel_scales")
+                if isinstance(channel_scales, dict):
+                    for channel, expected_scale in channel_scales.items():
+                        target_bindings = [
+                            binding
+                            for binding in bindings
+                            if isinstance(binding, dict)
+                            and str(binding.get("channel", "")).upper()
+                            == str(channel).upper()
+                        ]
+                        channel_ok = bool(target_bindings) and all(
+                            isinstance(expected_scale, dict)
+                            and self._subset_matches(binding.get("scale"), expected_scale)
+                            for binding in target_bindings
+                        )
+                        ok = ok and channel_ok
+                        details.append(f"{channel}={channel_ok}")
+                record(call, ok, ", ".join(details) or "no scale fields supplied")
+                continue
+
+            binding_kind = "raster" if "raster" in call.name else "curve"
+            channel = str(arguments.get("channel", "")).strip()
+            matching = [
+                binding
+                for binding in bindings
+                if isinstance(binding, dict)
+                and str(binding.get("kind", "")).strip().lower() == binding_kind
+                and str(binding.get("channel", "")).strip().upper() == channel.upper()
+            ]
+            binding_id = str(arguments.get("binding_id", "")).strip()
+            if binding_id:
+                matching = [
+                    binding
+                    for binding in matching
+                    if str(binding.get("id", "")).strip() == binding_id
+                ]
+
+            if call.name in {
+                "add_curve_fill",
+                "bind_curve",
+                "bind_raster",
+                "update_curve_binding",
+                "update_raster_binding",
+            }:
+                channel_available, availability_detail = await check_channel(
+                    section_id,
+                    channel,
+                )
+                if not channel_available:
+                    record(call, False, availability_detail)
+                    continue
+            if call.name in {"remove_curve_binding", "remove_raster_binding"}:
+                record(call, not matching, f"remaining_matches={len(matching)}")
+                continue
+            if not matching:
+                record(call, False, "persisted binding is missing")
+                continue
+            target_binding = matching[0]
+            expected: dict[str, object] = {}
+            if call.name in {"bind_curve", "bind_raster"}:
+                expected["channel"] = channel
+                expected["kind"] = binding_kind
+                for key in (
+                    "label",
+                    "style",
+                    "scale",
+                    "header_display",
+                    "profile",
+                    "normalization",
+                    "waveform_normalization",
+                    "clip_percentiles",
+                    "interpolation",
+                    "show_raster",
+                    "raster_alpha",
+                    "color_limits",
+                    "colorbar",
+                    "sample_axis",
+                    "waveform",
+                ):
+                    if key in arguments and arguments[key] is not None:
+                        expected[key] = arguments[key]
+                if binding_id:
+                    expected["binding_id"] = binding_id
+                ok, detail = self._binding_matches_expected_spec(bindings, expected)
+            elif call.name in {"update_curve_binding", "update_raster_binding"}:
+                patch = arguments.get("patch", {})
+                ok, detail = (
+                    self._binding_patch_matches(target_binding, patch)
+                    if isinstance(patch, dict)
+                    else (False, "binding patch is not a mapping")
+                )
+            elif call.name == "add_curve_fill":
+                fill = target_binding.get("fill")
+                ok = isinstance(fill, dict) and str(fill.get("kind", "")) == str(
+                    arguments.get("kind", "")
+                ).strip().lower()
+                detail = "fill kind matches" if ok else "persisted fill is missing or mismatched"
+            elif call.name == "remove_curve_fill":
+                ok = "fill" not in target_binding
+                detail = "fill removed" if ok else "fill remains"
+            else:
+                ok = changed
+                detail = f"changed={changed}"
+            record(call, ok, detail or "outcome verified")
+
+        return {
+            "ok": all(bool(outcome.get("ok")) for outcome in outcomes),
+            "outcomes": outcomes,
+        }
+
     def _phase_success_state(
         self,
         *,
@@ -2043,6 +2417,23 @@ class AuthoringSession:
                     f"summary_lines={len(summary_lines)}"
                     if isinstance(summary_lines, list)
                     else "No change summary was captured."
+                )
+            elif kind == "tool_outcomes_match":
+                outcome_state = context.get("tool_outcomes")
+                outcomes = (
+                    outcome_state.get("outcomes", [])
+                    if isinstance(outcome_state, dict)
+                    else []
+                )
+                ok = (
+                    bool(outcome_state and outcome_state.get("ok"))
+                    if isinstance(outcome_state, dict)
+                    else False
+                )
+                detail = (
+                    f"outcomes={len(outcomes)}"
+                    if isinstance(outcomes, list)
+                    else "No tool outcome verification was captured."
                 )
             elif kind == "validation_valid":
                 ok = bool(validation and validation.get("valid") is True)
@@ -3099,6 +3490,20 @@ class AuthoringSession:
                 request_text=request_text,
                 previous_draft_text=phase_baseline_text,
             )
+            phase_tool_trace = () if phase_result is None else phase_result.tool_trace
+            if any(
+                str(spec.get("kind", "")).strip() == "tool_outcomes_match"
+                for spec in phase.success_check_specs
+            ):
+                after_verification_context["tool_outcomes"] = await self._verify_tool_outcomes(
+                    session=session,
+                    draft_logfile=draft_logfile,
+                    draft_summary=post_summary,
+                    tool_trace=phase_tool_trace,
+                    change_summary=after_verification_context.get("change_summary")
+                    if isinstance(after_verification_context.get("change_summary"), dict)
+                    else None,
+                )
             after_state = self._phase_success_state(
                 phase=phase,
                 draft_summary=post_summary,
@@ -3123,7 +3528,7 @@ class AuthoringSession:
                     )
 
             status = "completed" if after_state["ok"] and not blocked_reasons else "blocked"
-            tool_trace = () if phase_result is None else phase_result.tool_trace
+            tool_trace = phase_tool_trace
             phase_summary = ExecutedAuthoringPhase(
                 id=phase.id,
                 kind=phase.kind,

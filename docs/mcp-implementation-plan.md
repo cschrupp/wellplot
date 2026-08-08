@@ -475,6 +475,9 @@ Implementation checkpoint:
 - each mutating generic phase requires a persisted diff from
   `summarize_logfile_changes`; an empty diff blocks the phase instead of
   silently consuming more provider rounds
+- binding and fill outcomes are checked against persisted track bindings and
+  `check_channel_availability`; missing or ambiguous source channels block the
+  phase with a deterministic reason
 - the shared phase executor is provider- and packet-neutral; packet assets are
   retained only for explicit scaffold plans and transitional regression tests
 
