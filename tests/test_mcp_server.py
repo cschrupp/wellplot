@@ -76,6 +76,7 @@ class McpServerIntegrationTests(unittest.TestCase):
             )
 
     async def _exercise_stdio_server(self, fixture_paths: McpFixturePaths) -> None:
+        import anyio
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
@@ -97,7 +98,8 @@ class McpServerIntegrationTests(unittest.TestCase):
             cwd=str(REPO_ROOT),
         )
         async with stdio_client(server) as streams, ClientSession(*streams) as session:
-            await session.initialize()
+            with anyio.fail_after(15):
+                await session.initialize()
 
             tools = await session.list_tools()
             resources = await session.list_resources()

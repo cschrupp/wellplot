@@ -1237,7 +1237,10 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
 def main() -> int:
     """Run the wellplot MCP server over stdio."""
     try:
-        create_mcp_server().run()
+        server = create_mcp_server()
+        from .stdio import run_stdio
+
+        run_stdio(server)
     except DependencyUnavailableError as exc:
         print(exc, file=sys.stderr)
         return 1
