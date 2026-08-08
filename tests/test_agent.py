@@ -55,6 +55,7 @@ from wellplot.agent.core import (
     FunctionToolDefinition,
     _extract_packet_header_fill_intent,
     _merge_omitted_defaults,
+    _phase_allowed_tool_names,
     revise_authoring_request,
     run_authoring_request,
 )
@@ -980,12 +981,31 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result.plan.mode, "freeform")
             self.assertIsNone(result.plan.packet_blueprint_id)
             self.assertTrue(result.phase_summaries)
-            self.assertEqual(backend.tool_names[0], "set_heading_content")
+            self.assertNotIn("set_heading_content", backend.tool_names)
             assert runtime.last_session is not None
             self.assertNotIn(
                 "inspect_packet_blueprints",
                 [name for name, _arguments in runtime.last_session.tool_calls],
             )
+
+    def test_structure_phase_excludes_binding_and_content_mutations(self) -> None:
+        """Phase routing keeps structure work separate from later authoring phases."""
+        phase = AuthoringPlanPhase(
+            id="structure",
+            kind="structure",
+            summary="Apply structure.",
+            instructions="Apply structure.",
+            tool_families=("sections", "tracks", "layout"),
+        )
+
+        allowed = _phase_allowed_tool_names(phase)
+
+        self.assertIn("add_track", allowed)
+        self.assertIn("replicate_section_structure", allowed)
+        self.assertIn("set_section_view", allowed)
+        self.assertNotIn("bind_curve", allowed)
+        self.assertNotIn("bind_raster", allowed)
+        self.assertNotIn("set_heading_content", allowed)
 
     def test_omitted_defaults_preserve_explicit_nested_binding_values(self) -> None:
         """Defaults fill missing nested fields without overriding explicit presentation."""

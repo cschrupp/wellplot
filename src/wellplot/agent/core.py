@@ -81,6 +81,91 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "summarize_logfile_changes",
 )
 
+_PHASE_READ_ONLY_TOOLS = frozenset(
+    {
+        "summarize_logfile_draft",
+        "inspect_logfile",
+        "inspect_authoring_objects",
+        "inspect_data_source",
+        "check_channel_availability",
+        "inspect_header_archetypes",
+        "inspect_packet_blueprints",
+        "inspect_heading_slots",
+        "inspect_style_presets",
+        "inspect_authoring_vocab",
+        "inspect_track_bindings",
+    }
+)
+
+_PHASE_TOOL_FAMILY_NAMES = {
+    "sections": frozenset(
+        {
+            "set_section_data_source",
+            "replicate_section_structure",
+            "update_section",
+        }
+    ),
+    "tracks": frozenset(
+        {
+            "add_track",
+            "update_track",
+            "remove_track",
+            "move_track",
+            "set_depth_axis",
+        }
+    ),
+    "layout": frozenset({"set_page_layout", "set_section_view", "set_depth_axis"}),
+    "bindings": frozenset(
+        {
+            "bind_curve",
+            "bind_raster",
+            "update_curve_binding",
+            "update_raster_binding",
+            "remove_curve_binding",
+            "remove_raster_binding",
+            "clear_track_bindings",
+        }
+    ),
+    "fills": frozenset({"add_curve_fill", "remove_curve_fill"}),
+    "scale": frozenset(
+        {"set_track_scales", "update_curve_binding", "update_raster_binding"}
+    ),
+    "styles": frozenset(
+        {
+            "set_matplotlib_style",
+            "apply_style_preset",
+            "update_track",
+            "update_curve_binding",
+            "update_raster_binding",
+        }
+    ),
+    "presets": frozenset({"inspect_style_presets", "apply_style_preset"}),
+    "heading": frozenset(
+        {
+            "parse_key_value_text",
+            "preview_header_mapping",
+            "apply_header_values",
+            "set_heading_content",
+        }
+    ),
+    "remarks": frozenset({"set_remarks_content"}),
+    "annotations": frozenset(
+        {
+            "add_annotation_object",
+            "update_annotation_object",
+            "remove_annotation_object",
+        }
+    ),
+}
+
+
+def _phase_allowed_tool_names(phase: AuthoringPlanPhase) -> set[str]:
+    """Return the MCP tools allowed during one authoring phase."""
+    names = set(_PHASE_READ_ONLY_TOOLS)
+    for family in phase.tool_families:
+        names.update(_PHASE_TOOL_FAMILY_NAMES.get(family, ()))
+    return names
+
 
 @dataclass(frozen=True)
 class AuthoringRequest:
@@ -3497,10 +3582,20 @@ class AuthoringSession:
         last_verification: dict[str, object] = {}
 
         async def call_mcp_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
+            allowed_names = _phase_allowed_tool_names(current_phase)
+            if name not in allowed_names:
+                return {
+                    "is_error": True,
+                    "error": (
+                        f"Tool {name!r} is not available during phase "
+                        f"{current_phase.id!r}; use the phase-appropriate tool family."
+                    ),
+                }
             tool_result = await session.call_tool(name, arguments)
             return self.runtime.tool_result_payload(tool_result)
 
         for phase in plan.phases:
+            current_phase = phase
             summary_result = await session.call_tool(
                 "summarize_logfile_draft",
                 {"logfile_path": draft_logfile},
@@ -3659,10 +3754,15 @@ class AuthoringSession:
                         f"Current draft context:\n{json.dumps(current_summary, indent=2)}\n\n"
                         f"Original request:\n{request_text}"
                     )
+                    phase_tool_definitions = [
+                        tool
+                        for tool in tool_definitions
+                        if tool.name in _phase_allowed_tool_names(phase)
+                    ]
                     phase_result = await self.backend.run_authoring(
                         instructions=prompt_text,
                         initial_user_message=phase_message,
-                        tool_definitions=tool_definitions,
+                        tool_definitions=phase_tool_definitions,
                         tool_caller=call_mcp_tool,
                         max_rounds=phase_budget,
                     )
