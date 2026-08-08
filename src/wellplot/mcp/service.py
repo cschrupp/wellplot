@@ -122,6 +122,11 @@ from ..model.document import (
 )
 from ..pipeline import prepare_logfile_render, render_prepared_logfile
 from ..units import DEFAULT_UNITS
+from .authoring_defaults import (
+    style_preset_by_id,
+    style_preset_catalog,
+    track_archetype_catalog,
+)
 from .header_archetypes import (
     header_archetype_catalog,
     header_archetype_heading,
@@ -295,245 +300,6 @@ AUTHORING_RESOURCE_URIS = (
 )
 AUTHORING_HEADER_OVERWRITE_POLICIES = ("fill_empty", "replace", "merge_lists")
 SUPPORTED_KEY_VALUE_FORMAT_HINTS = ("auto", "colon", "equals", "tsv", "csv")
-AUTHORING_TRACK_ARCHETYPES = (
-    {
-        "id": "reference_depth",
-        "label": "Reference Depth",
-        "kind": "reference",
-        "default_width_mm": 16.0,
-        "notes": "Shared depth axis, markers, and event context.",
-    },
-    {
-        "id": "gamma_ray",
-        "label": "Gamma Ray",
-        "kind": "normal",
-        "default_width_mm": 28.0,
-        "recommended_binding": {
-            "scale": {"kind": "linear", "min": 0.0, "max": 150.0},
-            "style": {"color": "#008000"},
-        },
-        "notes": "Single-curve scalar track for GR review.",
-    },
-    {
-        "id": "porosity_overlay",
-        "label": "Porosity Overlay",
-        "kind": "normal",
-        "default_width_mm": 32.0,
-        "recommended_channels": ["NPHI", "RHOB"],
-        "notes": "Dual-curve porosity track, often followed by crossover fill edits.",
-    },
-    {
-        "id": "resistivity_log",
-        "label": "Resistivity",
-        "kind": "normal",
-        "default_width_mm": 28.0,
-        "recommended_binding": {
-            "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-        },
-        "notes": "Scalar resistivity track with logarithmic scale.",
-    },
-    {
-        "id": "vdl_array",
-        "label": "VDL Array",
-        "kind": "array",
-        "default_width_mm": 28.0,
-        "notes": "Array/raster track for waveform-style VDL presentation.",
-    },
-)
-AUTHORING_STYLE_PRESETS = (
-    {
-        "family": "porosity_overlays",
-        "id": "density_neutron_overlay",
-        "label": "Density-Neutron Overlay",
-        "summary": "Balanced overlay style for RHOB/NPHI porosity review.",
-        "use_cases": ["porosity", "density-neutron", "overlay"],
-        "track_patch": {
-            "kind": "normal",
-            "width_mm": 32.0,
-            "grid": {"display": True, "vertical": {"secondary": {"line_count": 4}}},
-        },
-        "binding_templates": [
-            {
-                "alias_id": "bulk_density",
-                "label": "Density",
-                "scale": {"kind": "linear", "min": 1.95, "max": 2.95},
-                "style": {"color": "#c2410c", "line_width": 1.3},
-            },
-            {
-                "alias_id": "neutron_porosity",
-                "label": "Neutron",
-                "scale": {"kind": "linear", "min": 0.45, "max": -0.15},
-                "style": {"color": "#1d4ed8", "line_width": 1.1},
-                "fill": {
-                    "kind": "between_instances",
-                    "other_channel": "RHOB",
-                    "label": "Gas Crossover",
-                    "color": "#d1d5db",
-                    "alpha": 0.18,
-                    "crossover": {
-                        "enabled": True,
-                        "left_color": "#bfdbfe",
-                        "right_color": "#fed7aa",
-                        "alpha": 0.28,
-                    },
-                },
-            },
-        ],
-        "notes": [
-            "Use one shared track for RHOB and NPHI.",
-            "Reverse the neutron scale so low porosity plots to the right.",
-            "Prefer add_curve_fill(kind='between_instances', "
-            "other_channel='RHOB') for crossover fill.",
-        ],
-    },
-    {
-        "family": "gamma_ray_defaults",
-        "id": "gamma_ray_clean_print",
-        "label": "Gamma Ray Clean Print",
-        "summary": "Single-curve gamma ray styling with strong print contrast.",
-        "use_cases": ["gamma ray", "gr", "print-safe"],
-        "track_patch": {
-            "kind": "normal",
-            "width_mm": 28.0,
-            "grid": {"display": True},
-        },
-        "binding_templates": [
-            {
-                "alias_id": "gamma_ray",
-                "label": "Gamma Ray",
-                "scale": {"kind": "linear", "min": 0.0, "max": 150.0},
-                "style": {"color": "#166534", "line_width": 1.2},
-                "header_display": {"scale_text_color": "#166534"},
-            }
-        ],
-        "notes": [
-            "Good default for single-track GR review.",
-            "Keeps the scale conventional and readable on grayscale printouts.",
-        ],
-    },
-    {
-        "family": "resistivity_log_conventions",
-        "id": "triple_combo_resistivity",
-        "label": "Triple Combo Resistivity",
-        "summary": "Log-scale resistivity convention for shallow/medium/deep overlays.",
-        "use_cases": ["resistivity", "deep resistivity", "triple combo"],
-        "track_patch": {
-            "kind": "normal",
-            "width_mm": 32.0,
-            "x_scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-            "grid": {
-                "display": True,
-                "horizontal": {"display": True},
-                "vertical": {
-                    "main": {"scale": "logarithmic", "spacing_mode": "scale"},
-                    "secondary": {"scale": "logarithmic", "spacing_mode": "scale"},
-                },
-            },
-        },
-        "binding_templates": [
-            {
-                "alias_id": "shallow_resistivity",
-                "label": "RSH",
-                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#dc2626", "line_width": 0.9, "line_style": ":"},
-            },
-            {
-                "alias_id": "medium_resistivity",
-                "label": "RME",
-                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#16a34a", "line_width": 1.0},
-            },
-            {
-                "alias_id": "deep_resistivity",
-                "label": "RDEEP",
-                "scale": {"kind": "log", "min": 0.2, "max": 2000.0},
-                "style": {"color": "#111827", "line_width": 1.3},
-            },
-        ],
-        "notes": [
-            "Keep all resistivity curves on the same logarithmic scale.",
-            "Use the deepest investigation curve with the strongest visual weight.",
-            "Use a red dotted shallow curve and a conventional green medium curve.",
-        ],
-    },
-    {
-        "family": "cbl_vdl_variants",
-        "id": "cbl_vdl_high_contrast",
-        "label": "CBL/VDL High Contrast",
-        "summary": "High-contrast CBL/VDL presentation for screen review.",
-        "use_cases": ["cbl", "vdl", "cement bond", "waveform"],
-        "binding_templates": [
-            {
-                "alias_id": "cement_bond",
-                "label": "CBL",
-                "scale": {"kind": "linear", "min": 0.0, "max": 100.0},
-                "style": {"color": "#111827", "line_width": 1.3},
-            },
-            {
-                "alias_id": "variable_density_log",
-                "label": "VDL",
-                "render_mode": "raster",
-                "style": {"colormap": "gray_r"},
-            },
-        ],
-        "notes": [
-            "Use a dark scalar CBL curve against an inverted grayscale VDL raster.",
-            "Intended for screen-first diagnostics and anomaly review.",
-        ],
-    },
-    {
-        "family": "cbl_vdl_variants",
-        "id": "cbl_vdl_print_safe",
-        "label": "CBL/VDL Print Safe",
-        "summary": "Print-oriented CBL/VDL styling with restrained grayscale choices.",
-        "use_cases": ["cbl", "vdl", "print-safe"],
-        "binding_templates": [
-            {
-                "alias_id": "cement_bond",
-                "label": "CBL",
-                "scale": {"kind": "linear", "min": 0.0, "max": 100.0},
-                "style": {"color": "#374151", "line_width": 1.2},
-            },
-            {
-                "alias_id": "variable_density_log",
-                "label": "VDL",
-                "render_mode": "raster",
-                "style": {"colormap": "Greys"},
-            },
-        ],
-        "notes": [
-            "Avoids overly dark fills that collapse in office printers.",
-            "Prefer this preset when the main artifact will be PDF or paper.",
-        ],
-    },
-    {
-        "family": "report_page_styles",
-        "id": "report_header_clean",
-        "label": "Report Header Clean",
-        "summary": "Cleaner first page with fewer title rows and restrained remarks.",
-        "use_cases": ["header", "report page", "clean presentation"],
-        "heading_patch": {
-            "service_titles": [
-                {
-                    "value": "Primary Interpretation",
-                    "alignment": "left",
-                    "bold": True,
-                }
-            ]
-        },
-        "remarks_patch": [
-            {
-                "title": "Notes",
-                "lines": ["Condense first-page commentary to one short block."],
-                "alignment": "left",
-            }
-        ],
-        "notes": [
-            "Good fit when the plot should read more like a concise report page.",
-            "Use with inspect_heading_slots(...) before applying extracted header text.",
-        ],
-    },
-)
 AUTHORING_CHANNEL_ALIASES = (
     {
         "id": "gamma_ray",
@@ -3582,16 +3348,16 @@ def _header_archetypes_catalog() -> list[dict[str, object]]:
 
 
 def _track_archetypes_catalog() -> list[dict[str, object]]:
-    return deepcopy(list(AUTHORING_TRACK_ARCHETYPES))
+    return track_archetype_catalog()
 
 
 def _style_presets_catalog() -> list[dict[str, object]]:
-    return deepcopy(list(AUTHORING_STYLE_PRESETS))
+    return style_preset_catalog()
 
 
 def _style_preset_families() -> list[str]:
     families: list[str] = []
-    for preset in AUTHORING_STYLE_PRESETS:
+    for preset in _style_presets_catalog():
         family = str(preset.get("family", "")).strip()
         if family and family not in families:
             families.append(family)
@@ -8145,11 +7911,7 @@ def inspect_style_presets(
 
 def _style_preset_entry(preset_id: str) -> dict[str, object]:
     normalized_preset_id = str(preset_id).strip()
-    for preset in AUTHORING_STYLE_PRESETS:
-        if str(preset.get("id", "")).strip() == normalized_preset_id:
-            return deepcopy(dict(preset))
-    available = [str(preset.get("id", "")) for preset in AUTHORING_STYLE_PRESETS]
-    raise ValueError(f"preset_id must be one of {available}, got {preset_id!r}.")
+    return style_preset_by_id(normalized_preset_id)
 
 
 def _channel_alias_entry_by_id(alias_id: str) -> dict[str, object]:

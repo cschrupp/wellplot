@@ -431,6 +431,10 @@ Work:
 
 Implementation checkpoint:
 
+- reusable track archetypes and style-family presets now load from the
+  asset-backed `defaults/authoring_defaults.yaml` catalog rather than a
+  hard-coded service tuple; the existing MCP inspection and preset APIs remain
+  compatible
 - default reconciliation fills only fields omitted by the persisted object;
   nested explicit values such as curve colors, scales, labels, and raster
   display settings are never overwritten by packet or family defaults
