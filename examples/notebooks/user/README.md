@@ -31,10 +31,10 @@ They differ from the developer notebooks in three ways:
 - `agent_cbl_log_example_from_prompt.ipynb`
   - experimental packet stress-test that asks the agent to reconstruct the
     supported `cbl_log_example` packet from one structured prompt
-  - uses staged DLIS inputs, a cased-hole starter scaffold, and per-phase
-    preview checkpoints to expose where packet planning succeeds or blocks
+  - uses staged DLIS inputs and a cased-hole starter scaffold to exercise the
+    generic authoring path; packet blueprints are not inferred from the prompt
   - not the primary end-user tutorial; use it to test packet-scale behavior
-    while the planner is still stabilizing
+    and identify missing deterministic object operations
 
 ### Computed-Channel NumPy Recipes
 

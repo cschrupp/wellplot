@@ -897,8 +897,8 @@ class AgentTests(unittest.TestCase):
             assert runtime.last_session is not None
             self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile_to_file")
 
-    def test_authoring_session_plan_detects_packet_blueprint(self) -> None:
-        """Expose one public dry-run packet plan for structured packet requests."""
+    def test_authoring_session_plan_does_not_infer_packet_blueprint(self) -> None:
+        """Freeform planning does not turn packet terminology into authority."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
             session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
@@ -910,10 +910,51 @@ class AgentTests(unittest.TestCase):
                 """
             )
 
-            self.assertEqual(plan.mode, "packet")
+            self.assertEqual(plan.mode, "freeform")
+            self.assertIsNone(plan.packet_blueprint_id)
+            self.assertEqual(plan.phases, ())
+
+    def test_authoring_session_plan_can_explicitly_select_scaffold(self) -> None:
+        """Blueprint assets remain available as explicit dry-run scaffolds."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            session = AuthoringSession(backend=FakeBackend(), runtime=FakeRuntime(root))
+
+            plan = session.plan(
+                text="Build the supported packet scaffold.",
+                blueprint_id="cased_hole_cbl_vdl",
+            )
+
+            self.assertEqual(plan.mode, "scaffold")
             self.assertEqual(plan.packet_blueprint_id, "cased_hole_cbl_vdl")
             self.assertTrue(plan.phases)
             self.assertEqual(plan.phases[0].kind, "header_scaffold")
+
+    def test_packet_language_uses_generic_authoring_without_explicit_scaffold(self) -> None:
+        """Normal packet requests do not enter the blueprint executor implicitly."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = FakeBackend()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.run_request,
+                AuthoringRequest(
+                    goal="Reconstruct a CBL and VDL packet from the available source channels.",
+                    output_logfile="workspace/demo.log.yaml",
+                    example_id="forge16b_porosity_example",
+                ),
+            )
+
+            self.assertIsNone(result.plan)
+            self.assertEqual(result.phase_summaries, ())
+            self.assertEqual(backend.tool_names[0], "set_heading_content")
+            assert runtime.last_session is not None
+            self.assertNotIn(
+                "inspect_packet_blueprints",
+                [name for name, _arguments in runtime.last_session.tool_calls],
+            )
 
     def test_omitted_defaults_preserve_explicit_nested_binding_values(self) -> None:
         """Defaults fill missing nested fields without overriding explicit presentation."""

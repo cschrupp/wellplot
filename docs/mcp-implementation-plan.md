@@ -438,6 +438,10 @@ Implementation checkpoint:
 - default reconciliation fills only fields omitted by the persisted object;
   nested explicit values such as curve colors, scales, labels, and raster
   display settings are never overwritten by packet or family defaults
+- packet blueprints are no longer inferred from freeform authoring text;
+  `AuthoringSession.plan(..., blueprint_id=...)` exposes them only as explicit
+  scaffold plans, while ordinary `run()` and `revise()` requests use the
+  generic authoring path
 
 Acceptance:
 

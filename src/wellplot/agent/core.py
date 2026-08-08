@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
-from ..mcp.packet_blueprints import match_packet_blueprint, packet_blueprint_spec
+from ..mcp.packet_blueprints import packet_blueprint_spec
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -1298,9 +1298,18 @@ class AuthoringSession:
             ),
         )
 
-    def plan(self, *, text: str) -> AuthoringPlanResult:
-        """Return one dry-run structured plan for the supplied request text."""
-        return self._plan_from_text(text)
+    def plan(
+        self,
+        *,
+        text: str,
+        blueprint_id: str | None = None,
+    ) -> AuthoringPlanResult:
+        """Return a generic plan or an explicitly selected scaffold plan.
+
+        ``blueprint_id`` is opt-in. Normal authoring requests must not infer a
+        packet blueprint from natural-language keywords.
+        """
+        return self._plan_from_text(text, blueprint_id=blueprint_id)
 
     async def _run_deterministic_header_fill(
         self,
@@ -1492,17 +1501,29 @@ class AuthoringSession:
             },
         )
 
-    def _plan_from_text(self, text: str) -> AuthoringPlanResult:
-        """Build one structured plan for the current request text."""
-        blueprint_id = match_packet_blueprint(text)
-        if blueprint_id is None:
+    def _plan_from_text(
+        self,
+        text: str,
+        *,
+        blueprint_id: str | None = None,
+    ) -> AuthoringPlanResult:
+        """Build a generic plan or an explicitly selected scaffold plan.
+
+        Packet assets are deliberately not inferred from freeform request text.
+        Automatic matching made packet examples an implicit source of authoring
+        authority, which could override the user's requested object structure.
+        """
+        normalized_blueprint_id = (
+            None if blueprint_id is None else str(blueprint_id).strip()
+        )
+        if not normalized_blueprint_id:
             return AuthoringPlanResult(
                 mode="freeform",
                 packet_blueprint_id=None,
                 phases=(),
                 blocked=False,
             )
-        blueprint = packet_blueprint_spec(blueprint_id)
+        blueprint = packet_blueprint_spec(normalized_blueprint_id)
         section_templates = {
             str(section.get("id", "")): dict(section)
             for section in blueprint.get("section_templates", [])
@@ -1514,7 +1535,7 @@ class AuthoringSession:
                 continue
             phase_kind = str(raw_phase.get("kind", "")).strip()
             metadata: dict[str, object] = {
-                "blueprint_id": blueprint_id,
+                "blueprint_id": normalized_blueprint_id,
                 "header_archetype": blueprint.get("header_archetype"),
                 "unsupported_features": list(blueprint.get("unsupported_features", [])),
                 "remarks_templates": deepcopy(list(blueprint.get("remarks_templates", []))),
@@ -1572,8 +1593,8 @@ class AuthoringSession:
                 )
             )
         return AuthoringPlanResult(
-            mode="packet",
-            packet_blueprint_id=blueprint_id,
+            mode="scaffold",
+            packet_blueprint_id=normalized_blueprint_id,
             phases=tuple(phases),
             blocked=False,
             run_state=AuthoringRunState(

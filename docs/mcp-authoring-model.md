@@ -290,5 +290,11 @@ But it also showed a product risk:
 - hiding authority in packet-specific reconciliation rules
 - making prompt-level user intent less reliable than it should be
 
+Blueprint assets are now opt-in scaffolds. A freeform `run()` or `revise()` call
+does not infer a blueprint from packet terminology, and the dry-run planning API
+accepts an explicit `blueprint_id` only when a caller intentionally wants to
+inspect a scaffold. This keeps examples and regression fixtures available
+without making them hidden authoring authority.
+
 Future refactors should use the lessons from that experiment while moving back
 toward a user-first, object-first authoring model.
