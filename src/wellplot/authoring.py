@@ -2021,16 +2021,19 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
         if document.subtitle is not None:
             header["subtitle"] = document.subtitle
         payload["header"] = header
+    depth_payload: dict[str, Any] = {
+        "unit": document.depth.unit,
+        "scale": document.depth.scale,
+    }
+    if document.depth.major_step is not None:
+        depth_payload["major_step"] = document.depth.major_step
+    if document.depth.minor_step is not None:
+        depth_payload["minor_step"] = document.depth.minor_step
     payload.update(
         {
             "name": document.name,
             "page": document.page.model_dump(mode="json", exclude_none=True),
-            "depth": {
-                "unit": document.depth.unit,
-                "scale": document.depth.scale,
-                "major_step": document.depth.major_step,
-                "minor_step": document.depth.minor_step,
-            },
+            "depth": depth_payload,
             "tracks": [
                 {
                     "id": section.id,

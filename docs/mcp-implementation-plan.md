@@ -786,7 +786,12 @@ Acceptance completed:
 
 #### 0.6-G7. Cross-Domain Acceptance
 
-Add acceptance fixtures for:
+Status: implemented as a provider-free acceptance matrix in
+`tests/test_cross_domain_acceptance.py`. The fixtures compose the canonical
+objects directly rather than using a packet blueprint, so the CBL/VDL case is
+only one domain in the test surface.
+
+The acceptance matrix covers:
 
 - open-hole quicklook headers
 - resistivity with logarithmic tracks
@@ -797,6 +802,16 @@ Add acceptance fixtures for:
 - one-section, main/repeat, and arbitrary multi-section reports
 - missing channels, partial header data, and unsupported request fields
 - explicit colors, line styles, labels, and scales overriding defaults
+
+The canonical LAS notebook and experimental CBL notebook also have a
+credential-free structural gate. The gate verifies that the notebooks remain
+discoverable and use the public agent/session reporting flow; live provider
+execution remains a manual acceptance step because it requires credentials and
+source files.
+
+The acceptance pass also closed a generic canonical-to-render adapter defect:
+unset optional depth steps are now omitted before the legacy renderer schema is
+called, rather than serialized as `null` and passed to `float()`.
 
 The CBL notebook remains a stress test and regression fixture, not the source of
 implementation rules.

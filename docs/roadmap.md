@@ -580,7 +580,12 @@ Longer-term / UI-centric:
   `AuthoringDocumentIntent`, and the agent resolves, executes, verifies, and saves
   it through the canonical deterministic path. Legacy provider-loop fallback and
   the narrow header/style shortcuts remain temporarily available for compatibility.
-- Run cross-domain acceptance fixtures and notebook gates in `0.6-G7`.
+- G7 is implemented: cross-domain canonical fixtures now cover open-hole,
+  resistivity, porosity, mirrored duplicate curves, CBL/VDL scalar and raster
+  content, annotations, and one-section/main-repeat/arbitrary multi-section
+  reports. The same gate checks missing-channel and unsupported-request blocking,
+  explicit presentation precedence, and credential-free structure for the LAS
+  and CBL agent notebooks.
 - Add contract-parity, round-trip, atomic-mutation, contextual-reference,
   reconciliation, and idempotency tests as release gates.
 - Maintain release hardening:
