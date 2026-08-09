@@ -57,6 +57,15 @@ from .authoring import (
     load_authoring_document,
     load_authoring_document_text,
 )
+from .authoring_reconciler import (
+    AuthoringOperation,
+    AuthoringOperationAction,
+    AuthoringOperationObjectKind,
+    AuthoringOperationPhase,
+    AuthoringReconciliationIssue,
+    AuthoringReconciliationPlan,
+    reconcile_authoring,
+)
 from .authoring_service import (
     AuthoringObjectRef,
     AuthoringService,
@@ -165,6 +174,12 @@ from .templates import document_from_mapping, load_document
 __all__ = [
     "__version__",
     "AuthoringObjectRef",
+    "AuthoringOperation",
+    "AuthoringOperationAction",
+    "AuthoringOperationObjectKind",
+    "AuthoringOperationPhase",
+    "AuthoringReconciliationIssue",
+    "AuthoringReconciliationPlan",
     "AuthoringService",
     "AuthoringStylePatch",
     "AuthoringTarget",
@@ -292,6 +307,7 @@ __all__ = [
     "render_track_png",
     "render_window",
     "render_window_png",
+    "reconcile_authoring",
     "create_dataset",
     "document_from_mapping",
     "load_document",

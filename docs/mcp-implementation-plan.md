@@ -645,8 +645,32 @@ produce executable operations; those responsibilities begin in G4.
 
 #### 0.6-G4. Generic Desired-State Reconciler
 
-Implement a deterministic reconciler that compares the current canonical
-document with the desired partial state and returns a typed operation plan.
+Status: implemented in `wellplot.authoring_reconciler` as a provider-neutral,
+execution-free desired-state reconciler. It accepts either a raw
+`AuthoringDocumentIntent` plus explicit context or an already-resolved
+`AuthoringContextResolution`, and returns an `AuthoringReconciliationPlan`.
+
+The plan contains typed operations with stable identities, object scope,
+payloads, dependencies, and one of the ordered phases `report`, `sections`,
+`tracks`, `bindings`, `content`, `presentation`, or `finalize`. It compares
+only requested or non-preserved resolved values, so replaying the same intent
+does not emit redundant mutations.
+
+The reconciler covers:
+
+- report title/subtitle, output, page, depth, tail, and header metadata
+- stable general/service/detail header slots
+- arbitrary section IDs and arbitrary numbers of sections
+- track creation/update, widths, ordering, scales, grids, and headers
+- duplicate same-channel curve instances using distinct binding IDs
+- scalar and raster binding creation plus presentation updates
+- fills, typed annotations, remarks, ordering, and explicit removals
+
+It intentionally reports blocking issues instead of guessing when an existing
+track kind or binding source channel would need to change in place. Those
+objects have immutable identity/compatibility boundaries in the current
+deterministic service; replacement or an explicit follow-up operation is safer
+than silently removing and recreating user content.
 
 The plan must establish dependencies in this order:
 
@@ -661,6 +685,20 @@ The plan must establish dependencies in this order:
 The operation plan must be idempotent. Main/repeat replication may be an
 optimization, but arbitrary section IDs and arbitrary numbers of sections must
 remain valid.
+
+Acceptance completed:
+
+- matching explicit values produce no operations
+- structural track operations precede binding operations
+- content operations follow binding creation
+- presentation operations follow structure/content phases
+- ordering and explicit removals are final-phase operations
+- duplicate same-channel bindings remain distinct by binding ID
+- unsupported track-kind and binding-channel changes produce exact blocking
+  issues rather than improvised compensating mutations
+
+G4 intentionally does not execute operations or render previews; those
+responsibilities begin in G5.
 
 #### 0.6-G5. Deterministic Executor And Checkpoints
 

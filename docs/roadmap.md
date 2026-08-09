@@ -568,7 +568,10 @@ Longer-term / UI-centric:
   explicit, clear, and remove semantics without adding provider or packet logic.
 - G3 is implemented: contextual alias/source resolution and explicit precedence
   now return typed decisions and blocking issues without mutating drafts.
-- Build the generic idempotent desired-state reconciler in `0.6-G4`.
+- G4 is implemented: `wellplot.authoring_reconciler` now emits ordered,
+  idempotent typed operations for report/header, sections, tracks, bindings,
+  content, presentation, ordering, and explicit removals. It blocks immutable
+  track-kind and binding-channel changes instead of guessing.
 - Add deterministic operation execution, read-after-write checks, and phase
   checkpoints in `0.6-G5`.
 - Rebase the agent on the desired-state plan in `0.6-G6`.
