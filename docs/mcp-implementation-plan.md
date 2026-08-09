@@ -702,7 +702,12 @@ responsibilities begin in G5.
 
 #### 0.6-G5. Deterministic Executor And Checkpoints
 
-Execute each typed operation through `AuthoringService`:
+Status: implemented in `wellplot.authoring_executor` as a deterministic
+executor bound to one `AuthoringService` instance. The service now also owns a
+typed report title/subtitle patch so report-level G4 operations do not bypass
+the canonical mutation boundary.
+
+The executor:
 
 - check preconditions
 - apply atomically
@@ -710,6 +715,28 @@ Execute each typed operation through `AuthoringService`:
 - verify the exact postcondition
 - stop on failure without improvising compensating removals
 - expose phase summaries and previews from persisted state
+
+`AuthoringExecutionResult` records each operation outcome, the first blocking
+error, the final canonical document, and `AuthoringPhaseCheckpoint` snapshots.
+Callers may provide a preview callback receiving the persisted document and
+phase; its returned PNG is stored on that checkpoint. Preview failures are
+reported as warnings and never masquerade as a successful mutation.
+
+Creation, updates, replacements, moves, and explicit removals are translated
+to the existing typed `AuthoringService` requests. Partial output, tail,
+header, fill, and annotation operations are merged into validated canonical
+objects before service execution. Service validation remains the atomic
+rollback boundary for each operation.
+
+Acceptance completed:
+
+- valid plans execute in dependency order and capture read-after-write success
+- unknown or later dependencies fail before any mutation
+- failed typed mutations stop later phases and preserve the last valid service
+  snapshot
+- arbitrary new sections can be created with their tracks before bindings
+- duplicate same-channel bindings execute as distinct binding IDs
+- phase checkpoints expose persisted canonical snapshots and optional previews
 
 Track creation must complete before bindings; bindings must exist before fills;
 move operations must happen after all required siblings exist; removal must be

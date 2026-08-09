@@ -572,8 +572,9 @@ Longer-term / UI-centric:
   idempotent typed operations for report/header, sections, tracks, bindings,
   content, presentation, ordering, and explicit removals. It blocks immutable
   track-kind and binding-channel changes instead of guessing.
-- Add deterministic operation execution, read-after-write checks, and phase
-  checkpoints in `0.6-G5`.
+- G5 is implemented: `wellplot.authoring_executor` applies plans through
+  `AuthoringService`, verifies each persisted postcondition, stops on the first
+  failure, and exposes phase snapshots plus optional previews.
 - Rebase the agent on the desired-state plan in `0.6-G6`.
 - Run cross-domain acceptance fixtures and notebook gates in `0.6-G7`.
 - Add contract-parity, round-trip, atomic-mutation, contextual-reference,

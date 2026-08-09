@@ -80,6 +80,7 @@ class _OperationModel(BaseModel):
 
 
 AuthoringObjectKind: TypeAlias = Literal[
+    "report",
     "page",
     "depth",
     "output",
@@ -119,6 +120,13 @@ class AuthoringValidationResult(_OperationModel):
 
     valid: bool
     errors: list[str] = Field(default_factory=list)
+
+
+class ReportPatch(_OperationModel):
+    """Typed mutable fields for report title and subtitle."""
+
+    title: str | None = None
+    subtitle: str | None = None
 
 
 class PagePatch(_OperationModel):
@@ -335,6 +343,13 @@ class UpdatePageRequest(_OperationModel):
     patch: PagePatch
 
 
+class UpdateReportRequest(_OperationModel):
+    """Update report title and subtitle with a typed patch."""
+
+    kind: Literal["report"] = "report"
+    patch: ReportPatch
+
+
 class UpdateOutputRequest(_OperationModel):
     """Replace document output settings with a validated typed object."""
 
@@ -421,7 +436,8 @@ class UpdateRemarkRequest(_OperationModel):
 
 
 UpdateRequest: TypeAlias = Annotated[
-    UpdatePageRequest
+    UpdateReportRequest
+    | UpdatePageRequest
     | UpdateOutputRequest
     | UpdateHeaderRequest
     | UpdateTailRequest
@@ -453,7 +469,8 @@ class MoveRequest(_OperationModel):
 
 
 AuthoringObject: TypeAlias = (
-    AuthoringPageSpec
+    AuthoringDocumentSpec
+    | AuthoringPageSpec
     | AuthoringDepthSpec
     | AuthoringOutputSpec
     | AuthoringHeaderSpec
@@ -512,7 +529,7 @@ class AuthoringService:
     ) -> list[AuthoringObjectRef]:
         """List stable references for one object family."""
         refs: list[AuthoringObjectRef] = []
-        if object_kind in {"page", "depth", "output", "header", "tail"}:
+        if object_kind in {"report", "page", "depth", "output", "header", "tail"}:
             return [
                 AuthoringObjectRef(
                     object_kind=object_kind,
@@ -601,6 +618,8 @@ class AuthoringService:
 
     def get(self, target: AuthoringTarget) -> AuthoringObject:
         """Return a defensive copy of one parent-scoped object."""
+        if target.object_kind == "report":
+            return deepcopy(self._document)
         if target.object_kind == "page":
             return deepcopy(self._document.page)
         if target.object_kind == "depth":
@@ -724,6 +743,9 @@ class AuthoringService:
 
     def update(self, request: UpdateRequest) -> AuthoringObject:
         """Apply one typed patch or replacement atomically."""
+        if isinstance(request, UpdateReportRequest):
+            self._commit(lambda document: self._patch_model(document, request.patch))
+            return self.get(AuthoringTarget(object_kind="report", object_id="report"))
         if isinstance(request, UpdatePageRequest):
             self._commit(lambda document: self._patch_model(document.page, request.patch))
             return self.get(AuthoringTarget(object_kind="page", object_id="page"))
@@ -841,7 +863,14 @@ class AuthoringService:
 
     def remove(self, request: RemoveRequest) -> AuthoringObject:
         """Remove one object and atomically validate the remaining document."""
-        if request.target.object_kind in {"page", "depth", "output", "header", "tail"}:
+        if request.target.object_kind in {
+            "report",
+            "page",
+            "depth",
+            "output",
+            "header",
+            "tail",
+        }:
             raise ValueError(f"Cannot remove document-level {request.target.object_kind} settings.")
         existing = self.get(request.target)
 
@@ -1280,6 +1309,7 @@ __all__ = [
     "MoveRequest",
     "PagePatch",
     "RasterBindingPatch",
+    "ReportPatch",
     "ReferenceTrackPatch",
     "RemoveRequest",
     "RemarkPatch",
@@ -1292,6 +1322,7 @@ __all__ = [
     "UpdateHeaderRequest",
     "UpdateOutputRequest",
     "UpdatePageRequest",
+    "UpdateReportRequest",
     "UpdateRasterBindingRequest",
     "UpdateRemarkRequest",
     "UpdateRequest",
