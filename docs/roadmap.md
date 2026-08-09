@@ -562,11 +562,10 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete `0.6-G0` research and the cross-domain dependency matrix.
-- Validate the remaining renderer/report-block parity for the `0.6-G1`
-  canonical header, tail, and output foundation, then begin typed desired-state
-  intent models in `0.6-G2`.
-- Add typed desired-state intent models with omitted, explicit, clear, and remove
-  semantics in `0.6-G2`.
+- Complete the remaining renderer/report-block parity review for the `0.6-G1`
+  canonical header, tail, and output foundation.
+- G2 is implemented: typed desired-state intent models now distinguish omitted,
+  explicit, clear, and remove semantics without adding provider or packet logic.
 - Implement context resolution and precedence in `0.6-G3`.
 - Build the generic idempotent desired-state reconciler in `0.6-G4`.
 - Add deterministic operation execution, read-after-write checks, and phase

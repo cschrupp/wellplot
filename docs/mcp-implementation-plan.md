@@ -1,6 +1,6 @@
 # MCP Implementation Plan
 
-Last updated: 2026-08-06
+Last updated: 2026-08-08
 
 ## Purpose
 
@@ -552,8 +552,16 @@ slots and structure; they do not override explicit user values.
 
 #### 0.6-G2. Typed Desired-State Models
 
-Add provider-neutral partial intent models for report, header, section, track,
-curve binding, raster binding, fill, annotation, and output changes.
+Status: implemented as a provider-neutral Pydantic intent layer in
+`wellplot.model.intent`. The layer composes the existing canonical authoring
+models instead of defining a second vocabulary for scales, styles, bindings,
+annotations, or raster profiles.
+
+The intent layer covers partial changes for the report, header, page, depth,
+output, tail, section, track, curve binding, raster binding, fill, annotation,
+remark, and style/grid objects. Stable object identities and optional parent
+scope are carried in the intent so later context resolution can report an
+ambiguous target instead of guessing.
 
 The models must distinguish:
 
@@ -562,8 +570,31 @@ The models must distinguish:
 - explicit clear operations
 - explicit object removal
 
-The provider should return this validated desired state instead of directly
-improvising a long sequence of MCP mutations.
+The implementation uses the following rules:
+
+- omitted fields remain absent in `model_fields_set` and therefore preserve
+  existing state or permit a later default
+- typed field values are explicit sets, including user-supplied colors, line
+  styles, scales, and header values
+- `{"operation": "clear"}` is the only explicit clear marker; raw `null` is
+  rejected to prevent accidental data loss
+- `{"operation": "remove", ...}` carries stable object identity and optional
+  section/track scope for deletion
+- curve and raster binding intents are explicitly discriminated by `kind`, so
+  source-channel names cannot cause a raster binding to be treated as a curve
+
+`AuthoringDocumentIntent` can be serialized through the generated
+`authoring_intent_json_schema()` contract. The provider should return this
+validated desired state instead of directly improvising a long sequence of MCP
+mutations. G2 intentionally does not resolve aliases, apply defaults, compare
+against a draft, or execute operations; those responsibilities begin in G3.
+
+Acceptance completed:
+
+- omitted, explicit, clear, and remove states are covered by focused tests
+- raw null is rejected in favor of an explicit clear marker
+- nested curve/raster binding intent is unambiguous and strictly validated
+- the intent schema is generated from the Pydantic models
 
 #### 0.6-G3. Context Resolution And Precedence
 
