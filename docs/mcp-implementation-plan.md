@@ -1,6 +1,6 @@
 # MCP Implementation Plan
 
-Last updated: 2026-08-08
+Last updated: 2026-08-09
 
 ## Purpose
 
@@ -598,6 +598,12 @@ Acceptance completed:
 
 #### 0.6-G3. Context Resolution And Precedence
 
+Status: implemented in `wellplot.authoring_context` as a provider-neutral
+resolver. It accepts the current canonical document, optional scaffold,
+selected defaults, inspected source-channel candidates, and alias catalogs as
+explicit inputs. It returns a typed `AuthoringContextResolution`; it does not
+load files, call MCP, or persist mutations.
+
 Resolve contextual references before mutation planning:
 
 - header field aliases and archetype slots
@@ -608,6 +614,34 @@ Resolve contextual references before mutation planning:
 
 Use the precedence order: explicit user instruction, preserved existing state,
 defaults catalog, starter scaffold.
+
+The resolver records one decision per resolved field with its source and path,
+so a future reconciler can apply only the selected values. It also returns
+blocking issues rather than guessing when:
+
+- a header alias matches no slot or more than one slot
+- a requested source channel is unavailable or ambiguous
+- a curve/raster binding does not match the inspected channel kind
+- a binding identity is duplicated
+- content is attached to an incompatible track kind
+
+Header slots are normalized to stable canonical `slot_id` values. Channel
+aliases are normalized to one inspected source mnemonic only when exactly one
+candidate matches. Duplicate source channels remain valid when their binding
+IDs are distinct. The resolver also preserves explicit nested styles, scales,
+units, labels, and raster settings through the same precedence decisions.
+
+Acceptance completed:
+
+- explicit values override existing values, defaults, and scaffolds
+- existing values override defaults, and defaults override scaffolds
+- header and channel aliases resolve without inventing slots or channels
+- missing/ambiguous channels and incompatible content produce blocking issues
+- duplicate same-channel bindings are accepted when their identities differ
+- defaulted track kinds participate in compatibility checks
+
+G3 intentionally does not compare a complete document against desired state or
+produce executable operations; those responsibilities begin in G4.
 
 #### 0.6-G4. Generic Desired-State Reconciler
 

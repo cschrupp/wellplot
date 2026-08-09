@@ -566,7 +566,8 @@ Longer-term / UI-centric:
   canonical header, tail, and output foundation.
 - G2 is implemented: typed desired-state intent models now distinguish omitted,
   explicit, clear, and remove semantics without adding provider or packet logic.
-- Implement context resolution and precedence in `0.6-G3`.
+- G3 is implemented: contextual alias/source resolution and explicit precedence
+  now return typed decisions and blocking issues without mutating drafts.
 - Build the generic idempotent desired-state reconciler in `0.6-G4`.
 - Add deterministic operation execution, read-after-write checks, and phase
   checkpoints in `0.6-G5`.

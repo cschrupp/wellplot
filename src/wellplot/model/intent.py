@@ -169,6 +169,7 @@ class AuthoringHeaderIntent(_IntentModel):
     subtitle: ClearableText = None
     general_fields: list[AuthoringHeaderFieldIntent] | AuthoringClearIntent | None = None
     service_titles: list[AuthoringServiceTitleIntent] | AuthoringClearIntent | None = None
+    detail_fields: list[AuthoringHeaderFieldIntent] | AuthoringClearIntent | None = None
     detail: AuthoringHeaderDetailSpec | AuthoringClearIntent | None = None
     tail_enabled: ClearableBoolean = None
     extensions: dict[str, Any] | AuthoringClearIntent | None = None
