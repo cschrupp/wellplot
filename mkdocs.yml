@@ -68,3 +68,4 @@ nav:
       - MCP API: reference/mcp-api.md
       - YAML Logfile: reference/logfile-yaml.md
       - Report Pages: reference/report-pages.md
+      - Domain Contract Matrix: reference/domain-contract-matrix.md

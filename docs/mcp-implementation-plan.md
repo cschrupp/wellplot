@@ -508,6 +508,10 @@ Acceptance:
 Research must produce reusable object rules, aliases, constraints, and test
 fixtures rather than packet-specific templates.
 
+The research output is recorded in the [cross-domain authoring contract
+matrix](site/reference/domain-contract-matrix.md). It is the handoff contract
+for `0.6-G1` and later slices, not a new packet blueprint.
+
 - review representative open-hole, cased-hole, porosity, resistivity, caliper,
   image/array, and annotation logs
 - identify universal header fields, units, aliases, track families, curve

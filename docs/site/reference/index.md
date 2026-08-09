@@ -24,6 +24,10 @@ surface, YAML shape, or report-page structure.
   - heading, remarks, and tail structure
   - report block fields
   - open-hole and cased-hole detail tables
+- [Domain Contract Matrix](domain-contract-matrix.md)
+  - form, content, and data object boundaries
+  - dependency and compatibility rules
+  - cross-domain acceptance fixtures
 
 ## Design boundary
 
@@ -44,5 +48,6 @@ For deeper implementation notes, use the repository documents:
 - `docs/mcp-authoring-model.md`
 - `docs/authoring-contract-inventory.md`
 - `docs/mcp-implementation-plan.md`
+- `docs/site/reference/domain-contract-matrix.md`
 - `docs/decision-log.md`
 - `docs/roadmap.md`
