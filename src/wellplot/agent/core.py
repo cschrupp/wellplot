@@ -23,13 +23,27 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+from ..authoring import load_authoring_document
+from ..authoring_executor import (
+    AuthoringExecutionResult,
+    AuthoringExecutionStatus,
+    execute_authoring_plan,
+)
+from ..authoring_reconciler import (
+    AuthoringOperationPhase,
+    AuthoringReconciliationPlan,
+    reconcile_authoring,
+)
+from ..authoring_service import AuthoringService
 from ..mcp.packet_blueprints import packet_blueprint_spec
+from ..model.authoring import AuthoringDocumentSpec
+from ..model.intent import AuthoringDocumentIntent, authoring_intent_json_schema
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -195,6 +209,7 @@ class AuthoringRequest:
     example_id: str | None = None
     source_logfile_path: str | None = None
     max_rounds: int = 12
+    desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         """Require exactly one draft seed for the initial authoring pass."""
@@ -212,6 +227,7 @@ class RevisionRequest:
     feedback: str
     logfile_path: str
     max_rounds: int = 12
+    desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None
 
 
 @dataclass(frozen=True)
@@ -281,6 +297,8 @@ class AuthoringPlanResult:
     blocked: bool
     blocked_reasons: tuple[str, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
+    desired_state: AuthoringDocumentIntent | None = None
+    reconciliation_plan: AuthoringReconciliationPlan | None = None
 
 
 @dataclass(frozen=True)
@@ -1414,13 +1432,107 @@ class AuthoringSession:
         *,
         text: str,
         blueprint_id: str | None = None,
+        desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None,
+        existing: AuthoringDocumentSpec | None = None,
+        available_channels: Mapping[str, list[str]] | None = None,
     ) -> AuthoringPlanResult:
-        """Return a generic plan or an explicitly selected scaffold plan.
+        """Return a generic, scaffold, or typed desired-state plan.
 
         ``blueprint_id`` is opt-in. Normal authoring requests must not infer a
-        packet blueprint from natural-language keywords.
+        packet blueprint from natural-language keywords. When ``desired_state``
+        is supplied, the plan is resolved and reconciled against ``existing``
+        without mutating it.
         """
+        if desired_state is not None:
+            intent = self._coerce_desired_state(desired_state)
+            return self._plan_from_desired_state(
+                intent,
+                existing=existing,
+                available_channels=available_channels,
+            )
         return self._plan_from_text(text, blueprint_id=blueprint_id)
+
+    @staticmethod
+    def _coerce_desired_state(
+        desired_state: AuthoringDocumentIntent | Mapping[str, object],
+    ) -> AuthoringDocumentIntent:
+        """Validate one provider or caller supplied desired-state payload."""
+        if isinstance(desired_state, AuthoringDocumentIntent):
+            return desired_state
+        return AuthoringDocumentIntent.model_validate(dict(desired_state))
+
+    def _plan_from_desired_state(
+        self,
+        intent: AuthoringDocumentIntent,
+        *,
+        existing: AuthoringDocumentSpec | None,
+        available_channels: Mapping[str, list[str]] | None,
+    ) -> AuthoringPlanResult:
+        """Build the public plan view for one typed reconciliation plan."""
+        reconciliation_plan = reconcile_authoring(
+            intent,
+            existing=existing,
+            available_channels=available_channels,
+        )
+        operations_by_phase: dict[AuthoringOperationPhase, list[str]] = {}
+        for operation in reconciliation_plan.operations:
+            operations_by_phase.setdefault(operation.phase, []).append(operation.operation_id)
+
+        phases: list[AuthoringPlanPhase] = []
+        for phase in AuthoringOperationPhase:
+            operation_ids = operations_by_phase.get(phase, [])
+            if not operation_ids:
+                continue
+            phases.append(
+                AuthoringPlanPhase(
+                    id=f"desired-{phase.value}",
+                    kind=f"desired_state_{phase.value}",
+                    summary=f"Apply typed {phase.value} desired-state operations.",
+                    instructions=(
+                        "Execute the typed operations in dependency order and verify every "
+                        "persisted postcondition before proceeding."
+                    ),
+                    tool_families=("typed_authoring",),
+                    preconditions=tuple(
+                        f"operation dependencies for {operation_id} are satisfied"
+                        for operation_id in operation_ids
+                    ),
+                    success_checks=("all typed operations read back successfully",),
+                    success_check_specs=(
+                        {
+                            "kind": "typed_postconditions",
+                            "operation_ids": operation_ids,
+                        },
+                    ),
+                    metadata={"operation_ids": operation_ids},
+                )
+            )
+        if not phases and reconciliation_plan.ready:
+            phases.append(
+                AuthoringPlanPhase(
+                    id="desired-noop",
+                    kind="desired_state_noop",
+                    summary="No authoring changes are required.",
+                    instructions="Verify that the current canonical document already matches.",
+                    tool_families=("typed_authoring",),
+                    success_checks=("desired state is already satisfied",),
+                    success_check_specs=({"kind": "typed_postconditions", "operation_ids": []},),
+                )
+            )
+        return AuthoringPlanResult(
+            mode="desired_state",
+            packet_blueprint_id=None,
+            phases=tuple(phases),
+            blocked=not reconciliation_plan.ready,
+            blocked_reasons=tuple(
+                issue.message for issue in reconciliation_plan.issues
+            ),
+            run_state=AuthoringRunState(
+                objectives=tuple(phase.summary for phase in phases),
+            ),
+            desired_state=intent,
+            reconciliation_plan=reconciliation_plan,
+        )
 
     async def _run_deterministic_header_fill(
         self,
@@ -4000,6 +4112,342 @@ class AuthoringSession:
             run_state,
         )
 
+    async def _extract_desired_state(
+        self,
+        *,
+        request_text: str,
+        draft_logfile: str,
+        existing: AuthoringDocumentSpec,
+        summary: dict[str, object],
+        max_rounds: int,
+    ) -> tuple[ProviderRunResult, AuthoringDocumentIntent | None]:
+        """Ask a typed-state capable provider for one validated desired state."""
+        submitted: AuthoringDocumentIntent | None = None
+
+        async def submit_intent(
+            name: str,
+            arguments: dict[str, object],
+        ) -> dict[str, object]:
+            """Validate the provider submission without mutating the draft."""
+            nonlocal submitted
+            if name != "submit_authoring_intent":
+                return {
+                    "is_error": True,
+                    "error": (
+                        "Only submit_authoring_intent is available in desired-state "
+                        "extraction mode."
+                    ),
+                }
+            if submitted is not None:
+                return {
+                    "is_error": True,
+                    "error": "Only one desired-state submission is allowed.",
+                }
+            try:
+                submitted = AuthoringDocumentIntent.model_validate(arguments)
+            except Exception as exc:  # Pydantic gives provider-actionable details.
+                return {
+                    "is_error": True,
+                    "error": f"Invalid AuthoringDocumentIntent: {exc}",
+                }
+            return {
+                "accepted": True,
+                "message": (
+                    "Desired state validated. The deterministic planner will now "
+                    "resolve references and execute it."
+                ),
+            }
+
+        context = {
+            "draft_logfile": draft_logfile,
+            "request": request_text,
+            "current_document": existing.model_dump(mode="json"),
+            "sections": _bootstrap_sections(summary),
+        }
+        instructions = (
+            "You are the desired-state extraction stage of wellplot authoring. "
+            "Do not invent packet templates and do not call mutation tools. Read the "
+            "current document and source context, then call submit_authoring_intent "
+            "exactly once with only the requested changes. Omit fields that should be "
+            "preserved. Use the explicit clear or remove intent objects when the user "
+            "asks to clear or remove something. Preserve explicit labels, scales, "
+            "colors, line styles, widths, and raster settings exactly. If the request "
+            "references an unavailable or ambiguous channel, still describe the request; "
+            "the deterministic resolver will block it and report why."
+        )
+        initial_message = (
+            "Submit one typed desired state for this request. Do not describe a sequence "
+            "of MCP calls. The submission is validated before any mutation occurs.\n\n"
+            f"Context:\n{json.dumps(context, indent=2, default=str)}\n\n"
+            f"AuthoringDocumentIntent schema:\n"
+            f"{json.dumps(authoring_intent_json_schema(), indent=2, default=str)}"
+        )
+        tool_definition = FunctionToolDefinition(
+            name="submit_authoring_intent",
+            description=(
+                "Submit exactly one validated partial desired state for the current "
+                "wellplot document. Omit fields that must be preserved."
+            ),
+            parameters=authoring_intent_json_schema(),
+        )
+        provider_result = await self.backend.run_authoring(
+            instructions=instructions,
+            initial_user_message=initial_message,
+            tool_definitions=[tool_definition],
+            tool_caller=submit_intent,
+            max_rounds=max_rounds,
+        )
+        return provider_result, submitted
+
+    @staticmethod
+    def _typed_phase_summaries(
+        *,
+        plan: AuthoringPlanResult,
+        execution: AuthoringExecutionResult,
+    ) -> tuple[ExecutedAuthoringPhase, ...]:
+        """Convert executor checkpoints into the public agent phase contract."""
+        phase_by_operation_ids = {
+            tuple(phase.metadata.get("operation_ids", [])): phase for phase in plan.phases
+        }
+        summaries: list[ExecutedAuthoringPhase] = []
+        for checkpoint in execution.phase_summaries:
+            operation_ids = tuple(checkpoint.operation_ids)
+            plan_phase = phase_by_operation_ids.get(operation_ids)
+            phase_id = (
+                plan_phase.id
+                if plan_phase is not None
+                else f"desired-{checkpoint.phase.value}"
+            )
+            phase_kind = (
+                plan_phase.kind
+                if plan_phase is not None
+                else f"desired_state_{checkpoint.phase.value}"
+            )
+            phase_summary = (
+                plan_phase.summary
+                if plan_phase is not None
+                else f"Apply typed {checkpoint.phase.value} desired-state operations."
+            )
+            status = checkpoint.status.value
+            blocked_reasons = () if status == AuthoringExecutionStatus.COMPLETED else (
+                checkpoint.preview_error
+                or f"Typed {checkpoint.phase.value} phase did not complete.",
+            )
+            summaries.append(
+                ExecutedAuthoringPhase(
+                    id=phase_id,
+                    kind=phase_kind,
+                    summary=phase_summary,
+                    status=(
+                        "completed"
+                        if status == AuthoringExecutionStatus.COMPLETED
+                        else "blocked"
+                    ),
+                    tool_trace=(),
+                    verification={
+                        "ok": status == AuthoringExecutionStatus.COMPLETED,
+                        "operation_ids": list(operation_ids),
+                        "applied_count": checkpoint.applied_count,
+                    },
+                    blocked_reasons=blocked_reasons,
+                    preview_kind=(
+                        "typed_document" if checkpoint.preview_png is not None else None
+                    ),
+                    preview_target=(
+                        checkpoint.phase.value if checkpoint.preview_png is not None else None
+                    ),
+                    preview_png=checkpoint.preview_png,
+                )
+            )
+        return tuple(summaries)
+
+    async def _run_desired_state_workflow(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        request_text: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        max_rounds: int,
+        desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None,
+    ) -> AuthoringResult:
+        """Resolve, reconcile, execute, and persist one desired-state workflow."""
+        summary_result = await session.call_tool(
+            "summarize_logfile_draft",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(summary_result, action="summarize_logfile_draft")
+        summary = _structured_content(summary_result)
+        inspect_result = await session.call_tool(
+            "inspect_logfile",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(inspect_result, action="inspect_logfile")
+        output_path = self.runtime.server_root / draft_logfile
+        existing = load_authoring_document(output_path, allowed_root=self.runtime.server_root)
+        available_channels: dict[str, list[str]] = {}
+        for section in summary.get("sections", []):
+            if not isinstance(section, dict):
+                continue
+            section_id = str(section.get("id", "")).strip()
+            if not section_id:
+                continue
+            channels = section.get("available_channels", [])
+            if isinstance(channels, list):
+                available_channels[section_id] = [
+                    str(channel).strip() for channel in channels if str(channel).strip()
+                ]
+
+        if desired_state is None:
+            provider_result, intent = await self._extract_desired_state(
+                request_text=request_text,
+                draft_logfile=draft_logfile,
+                existing=existing,
+                summary=summary,
+                max_rounds=max_rounds,
+            )
+        else:
+            intent = self._coerce_desired_state(desired_state)
+            provider_result = ProviderRunResult(
+                final_text="Using caller-supplied typed desired state.",
+                tool_trace=(),
+            )
+
+        if intent is None:
+            provider_result = ProviderRunResult(
+                final_text="Desired-state extraction did not produce a valid submission.",
+                tool_trace=provider_result.tool_trace,
+                report_facts={
+                    "not_done": ["Extract a typed desired state from the request."],
+                    "reasons": [
+                        "The provider did not submit a valid AuthoringDocumentIntent."
+                    ],
+                    "next_help": [
+                        "Retry with a request that identifies the requested object fields "
+                        "and values explicitly."
+                    ],
+                },
+            )
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+            )
+
+        plan = self._plan_from_desired_state(
+            intent,
+            existing=existing,
+            available_channels=available_channels,
+        )
+        if plan.reconciliation_plan is None or not plan.reconciliation_plan.ready:
+            reasons = plan.blocked_reasons or ("Typed desired-state resolution was blocked.",)
+            provider_result = ProviderRunResult(
+                final_text="Desired-state planning was blocked before mutation.",
+                tool_trace=provider_result.tool_trace,
+                report_facts={
+                    "not_done": [phase.summary for phase in plan.phases] or [
+                        "Resolve and reconcile the typed desired state."
+                    ],
+                    "reasons": list(reasons),
+                    "next_help": [
+                        "Correct the blocked references or provide the missing source "
+                        "channel and try again."
+                    ],
+                },
+            )
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                plan=plan,
+            )
+
+        execution = execute_authoring_plan(
+            AuthoringService(existing),
+            plan.reconciliation_plan,
+        )
+        phase_summaries = self._typed_phase_summaries(plan=plan, execution=execution)
+        save_error: str | None = None
+        if execution.success:
+            save_result = await session.call_tool(
+                "save_authoring_document",
+                {
+                    "document": {
+                        "version": 1,
+                        "name": execution.document.name,
+                        "document": execution.document.model_dump(mode="json"),
+                    },
+                    "output_path": draft_logfile,
+                    "overwrite": True,
+                    "base_dir": str(Path(draft_logfile).parent),
+                },
+            )
+            save_error = _tool_payload_error_text(self.runtime.tool_result_payload(save_result))
+
+        completed = [phase.summary for phase in phase_summaries if phase.status == "completed"]
+        blocked = [phase.summary for phase in phase_summaries if phase.status != "completed"]
+        reasons = list(execution.errors)
+        if save_error:
+            reasons.append(f"Canonical desired-state save failed: {save_error}")
+        if not execution.success and not reasons:
+            reasons.append("The deterministic executor stopped before all postconditions passed.")
+        provider_result = ProviderRunResult(
+            final_text=(
+                "Typed desired state executed and persisted."
+                if execution.success and save_error is None
+                else "Typed desired-state execution was blocked."
+            ),
+            tool_trace=provider_result.tool_trace,
+            report_facts={
+                "completed": completed,
+                "not_done": blocked,
+                "reasons": reasons,
+                "warnings": list(execution.warnings),
+                "next_help": [
+                    "Inspect the blocked operation and correct its object identity or "
+                    "source-channel reference before retrying."
+                ] if reasons else [
+                    "Continue with another typed revision or request a final render."
+                ],
+            },
+        )
+        run_state = self._run_state_from_summary(
+            draft_summary=summary,
+            objectives=plan.run_state.objectives,
+            completed_objectives=tuple(completed),
+            blocked_objectives=tuple(blocked),
+            last_verification={
+                "success": execution.success and save_error is None,
+                "errors": reasons,
+            },
+        )
+        return await self._finalize_result(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=request_text,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            baseline_draft_text=baseline_draft_text,
+            provider_result=provider_result,
+            plan=plan,
+            phase_summaries=phase_summaries,
+            run_state=run_state,
+        )
+
     async def run_request(self, request: AuthoringRequest) -> AuthoringResult:
         """Run one authoring request from the provider-neutral request model."""
         relative_output_logfile = _relative_logfile_path(
@@ -4076,6 +4524,21 @@ class AuthoringSession:
                         preflight_tool_trace + result.tool_trace,
                     )
                 return result
+
+            if request.desired_state is not None or bool(
+                getattr(self.backend, "supports_desired_state", False)
+            ):
+                return await self._run_desired_state_workflow(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_kind="author",
+                    request_text=effective_goal,
+                    example_id=request.example_id,
+                    source_logfile_path=relative_source_logfile,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                    desired_state=request.desired_state,
+                )
 
             authoring_plan = self._plan_from_text(effective_goal)
             if authoring_plan.phases:
@@ -4253,6 +4716,21 @@ class AuthoringSession:
                     )
                 return result
 
+            if request.desired_state is not None or bool(
+                getattr(self.backend, "supports_desired_state", False)
+            ):
+                return await self._run_desired_state_workflow(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    request_text=effective_feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                    desired_state=request.desired_state,
+                )
+
             authoring_plan = self._plan_from_text(effective_feedback)
             if authoring_plan.phases:
                 prompt_result = await session.get_prompt(
@@ -4371,6 +4849,7 @@ class AuthoringSession:
         example_id: str | None = None,
         source_logfile_path: str | Path | None = None,
         max_rounds: int = 12,
+        desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None,
     ) -> AuthoringResult:
         """Run one authoring request with keyword arguments."""
         return await self.run_request(
@@ -4384,6 +4863,7 @@ class AuthoringSession:
                     else _relative_logfile_path(self.runtime.server_root, source_logfile_path)
                 ),
                 max_rounds=max_rounds,
+                desired_state=desired_state,
             )
         )
 
@@ -4393,6 +4873,7 @@ class AuthoringSession:
         feedback: str,
         logfile_path: str | Path,
         max_rounds: int = 12,
+        desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None,
     ) -> AuthoringResult:
         """Revise one existing draft logfile through the provider-backed agent loop."""
         return await self.revise_request(
@@ -4400,6 +4881,7 @@ class AuthoringSession:
                 feedback=feedback,
                 logfile_path=_relative_logfile_path(self.runtime.server_root, logfile_path),
                 max_rounds=max_rounds,
+                desired_state=desired_state,
             )
         )
 

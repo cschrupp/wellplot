@@ -1047,6 +1047,24 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
             )
         )
 
+    @mcp.tool()
+    def save_authoring_document(
+        document: dict[str, object],
+        output_path: str,
+        overwrite: bool = False,
+        base_dir: str | None = None,
+    ) -> dict[str, object]:
+        """Validate and save one canonical authoring document through the render adapter."""
+        return asdict(
+            service.save_authoring_document(
+                document,
+                output_path,
+                overwrite=overwrite,
+                base_dir=base_dir,
+                root=server_root,
+            )
+        )
+
     @mcp.resource("wellplot://schema/logfile.json", mime_type="application/json")
     def logfile_schema_resource() -> str:
         """Return the wellplot logfile JSON schema resource."""

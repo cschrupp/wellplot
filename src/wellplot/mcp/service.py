@@ -47,6 +47,7 @@ from ..authoring import (
     authoring_curve_callouts_to_mapping,
     authoring_curve_header_display_to_mapping,
     authoring_curve_value_labels_to_mapping,
+    authoring_document_to_logfile_mapping,
     authoring_grid_to_mapping,
     authoring_raster_colorbar_to_mapping,
     authoring_raster_sample_axis_to_mapping,
@@ -529,6 +530,16 @@ class FormattedLogfileTextResult:
 @dataclass(slots=True)
 class SavedLogfileTextResult:
     """Structured result for saving normalized logfile YAML text."""
+
+    name: str
+    render_backend: str
+    section_ids: list[str]
+    output_path: str
+
+
+@dataclass(slots=True)
+class SavedAuthoringDocumentResult:
+    """Structured result for saving a validated canonical authoring document."""
 
     name: str
     render_backend: str
@@ -8607,6 +8618,45 @@ def save_logfile_text(
         name=spec.name,
         render_backend=spec.render_backend,
         section_ids=_section_ids_from_spec(spec),
+        output_path=str(resolved_output_path),
+    )
+
+
+def save_authoring_document(
+    document: Mapping[str, object],
+    output_path: str,
+    *,
+    overwrite: bool = False,
+    base_dir: str | Path | None = None,
+    root: str | Path | None = None,
+) -> SavedAuthoringDocumentResult:
+    """Validate and save a canonical authoring document through the render adapter."""
+    server_root = resolve_server_root(root)
+    resolved_output_path = _resolve_user_path(output_path, root=server_root, context="output_path")
+    if resolved_output_path.exists() and not overwrite:
+        raise FileExistsError(f"Output path already exists: {resolved_output_path}")
+
+    resolved_base_dir = _resolve_base_dir(
+        base_dir,
+        root=server_root,
+        fallback=resolved_output_path.parent,
+    )
+    authoring = AuthoringService.from_mapping(document)
+    normalized_mapping = authoring_document_to_logfile_mapping(authoring.document)
+    rebased_mapping = _rebase_report_paths(
+        normalized_mapping,
+        from_base_dir=resolved_base_dir,
+        to_base_dir=resolved_output_path.parent,
+    )
+    normalized_yaml = report_to_yaml(rebased_mapping)
+    if not isinstance(normalized_yaml, str):
+        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
+    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    resolved_output_path.write_text(normalized_yaml, encoding="utf-8")
+    return SavedAuthoringDocumentResult(
+        name=authoring.document.name,
+        render_backend=authoring.document.output.backend,
+        section_ids=[section.id for section in authoring.document.sections],
         output_path=str(resolved_output_path),
     )
 

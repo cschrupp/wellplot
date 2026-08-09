@@ -744,7 +744,15 @@ explicit and last.
 
 #### 0.6-G6. Agent Integration
 
-Update `AuthoringSession.plan()`, `run()`, and `revise()` to use the same flow:
+Status: implemented for typed-state capable providers and explicit caller-supplied
+desired state. `AuthoringSession.plan()` now accepts an
+`AuthoringDocumentIntent`, resolves it against an existing canonical document,
+and exposes the resulting `AuthoringReconciliationPlan` as a dry run.
+
+OpenAI and OpenAI-compatible backends now advertise typed-state support. Their
+normal authoring path submits exactly one validated `AuthoringDocumentIntent`
+through a provider-local contract; the provider does not receive mutation tools
+in this stage. The agent then uses the same flow:
 
 1. inspect the current document and sources
 2. extract typed desired state
@@ -753,8 +761,28 @@ Update `AuthoringSession.plan()`, `run()`, and `revise()` to use the same flow:
 5. execute and verify the plan
 6. report completed, blocked, unsupported, and inconsistent requests
 
-Keep narrow deterministic shortcuts for header-only and style-only requests,
-but make them use the same canonical intent and verification contracts.
+The canonical document is persisted only after deterministic execution succeeds,
+through the validated MCP `save_authoring_document` adapter. Failed resolution, execution, or
+persistence leaves the draft unchanged and is surfaced in the structured user
+report. Phase summaries are derived from executor checkpoints rather than from
+provider claims.
+
+Narrow deterministic shortcuts for header-only and style-only requests remain
+available and retain their existing verification path; migrating those shortcuts
+to typed intents is a follow-up hardening task before the final release gate.
+
+Backends without typed-state support retain the legacy provider loop for
+compatibility during the transition. They are not the release-default path.
+
+Acceptance completed:
+
+- typed `plan()` returns ordered desired-state phases and deterministic operations
+- caller-supplied typed state bypasses provider mutation loops
+- capable providers receive only the intent-submission contract
+- canonical resolution, reconciliation, execution, read-back verification, and
+  persistence are ordered and fail-stop
+- typed phase summaries and deterministic next-help reporting are exposed through
+  the existing `AuthoringResult`
 
 #### 0.6-G7. Cross-Domain Acceptance
 

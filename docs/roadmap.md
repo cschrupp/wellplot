@@ -575,7 +575,11 @@ Longer-term / UI-centric:
 - G5 is implemented: `wellplot.authoring_executor` applies plans through
   `AuthoringService`, verifies each persisted postcondition, stops on the first
   failure, and exposes phase snapshots plus optional previews.
-- Rebase the agent on the desired-state plan in `0.6-G6`.
+- G6 is implemented for typed-state capable providers: `AuthoringSession.plan()`
+  exposes the dry-run reconciliation plan, capable providers submit one validated
+  `AuthoringDocumentIntent`, and the agent resolves, executes, verifies, and saves
+  it through the canonical deterministic path. Legacy provider-loop fallback and
+  the narrow header/style shortcuts remain temporarily available for compatibility.
 - Run cross-domain acceptance fixtures and notebook gates in `0.6-G7`.
 - Add contract-parity, round-trip, atomic-mutation, contextual-reference,
   reconciliation, and idempotency tests as release gates.

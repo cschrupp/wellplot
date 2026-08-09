@@ -681,6 +681,7 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "validate_logfile_text",
                 "format_logfile_text",
                 "save_logfile_text",
+                "save_authoring_document",
             ],
         )
         self.assertEqual(

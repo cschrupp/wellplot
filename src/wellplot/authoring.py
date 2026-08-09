@@ -1696,6 +1696,90 @@ def authoring_document_to_mapping(document: AuthoringDocumentSpec) -> dict[str, 
     return payload
 
 
+def authoring_document_to_logfile_mapping(
+    document: AuthoringDocumentSpec,
+) -> dict[str, object]:
+    """Project a canonical document into the multi-section logfile envelope."""
+    canonical = authoring_document_to_mapping(document)
+    compatibility = document.extensions.get("compatibility", {})
+    legacy_document = (
+        compatibility.get("legacy_document") if isinstance(compatibility, Mapping) else None
+    )
+    legacy = deepcopy(dict(legacy_document)) if isinstance(legacy_document, Mapping) else {}
+    legacy_layout = legacy.get("layout")
+    layout = deepcopy(dict(legacy_layout)) if isinstance(legacy_layout, Mapping) else {}
+    existing_sections = {
+        str(section.get("id", "")): deepcopy(dict(section))
+        for section in layout.get("log_sections", [])
+        if isinstance(section, Mapping) and str(section.get("id", "")).strip()
+    }
+    rendered_sections: list[dict[str, Any]] = []
+    binding_channels: list[dict[str, Any]] = []
+    for section in document.sections:
+        section_payload = existing_sections.get(section.id, {})
+        rendered_tracks = []
+        for track in section.tracks:
+            rendered_track = _render_track(document, section.id, track)
+            rendered_track.pop("elements", None)
+            rendered_tracks.append(rendered_track)
+        section_payload.update(
+            {
+                "id": section.id,
+                "title": section.title,
+                "subtitle": section.subtitle,
+                "tracks": rendered_tracks,
+            }
+        )
+        if section.depth_range is not None:
+            section_payload["depth_range"] = list(section.depth_range)
+        elif "depth_range" in section_payload:
+            section_payload.pop("depth_range")
+        if section.data_source is not None:
+            section_payload["data"] = section.data_source.model_dump(
+                mode="json", exclude_none=True
+            )
+        rendered_sections.append(section_payload)
+        for track in section.tracks:
+            for binding in getattr(track, "bindings", ()):
+                binding_payload = _binding_element(binding)
+                style = binding_payload.get("style")
+                if isinstance(style, Mapping):
+                    style = dict(style)
+                    style.pop("alpha", None)
+                    binding_payload["style"] = style
+                binding_payload["track_id"] = track.id
+                binding_payload["section"] = section.id
+                binding_channels.append(binding_payload)
+
+    heading = _header_to_legacy(document.header) if document.header is not None else {}
+    layout["heading"] = heading
+    layout["remarks"] = [
+        remark.model_dump(
+            mode="json",
+            exclude={"remark_id"},
+            exclude_none=True,
+        )
+        for remark in document.remarks
+    ]
+    layout["log_sections"] = rendered_sections
+    tail = layout.get("tail", {})
+    tail_payload = deepcopy(dict(tail)) if isinstance(tail, Mapping) else {}
+    tail_payload["enabled"] = document.tail.enabled
+    layout["tail"] = tail_payload
+    legacy["layout"] = layout
+    legacy["bindings"] = {"channels": binding_channels}
+    legacy["page"] = document.page.model_dump(mode="json", exclude_none=True)
+    legacy["depth"] = document.depth.model_dump(mode="json", exclude_none=True)
+    canonical["document"] = legacy
+    canonical["name"] = document.name
+    render = canonical.get("render")
+    if isinstance(render, Mapping):
+        canonical["render"] = {
+            key: value for key, value in render.items() if value is not None
+        }
+    return canonical
+
+
 def authoring_document_to_yaml(
     document: AuthoringDocumentSpec,
     destination: str | Path | TextIO | None = None,
@@ -2033,6 +2117,7 @@ def load_authoring_document_text(
 
 __all__ = [
     "authoring_document_from_mapping",
+    "authoring_document_to_logfile_mapping",
     "authoring_document_to_mapping",
     "authoring_document_to_render",
     "authoring_document_to_yaml",

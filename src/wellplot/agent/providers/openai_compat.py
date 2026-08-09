@@ -97,6 +97,7 @@ class OpenAICompatibleAuthoringBackend:
     base_url: str
     credential_source: str | None = None
     provider: str = field(default="openai_compat", init=False)
+    supports_desired_state: bool = field(default=True, init=False)
 
     @classmethod
     def from_local_configuration(

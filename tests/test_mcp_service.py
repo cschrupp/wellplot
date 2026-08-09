@@ -36,6 +36,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.authoring import load_authoring_document
 from wellplot.authoring_service import (
     CurveBindingPatch,
     DepthPatch,
@@ -3479,6 +3480,32 @@ class McpServiceTests(unittest.TestCase):
                     base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
                     root=REPO_ROOT,
                 )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_save_authoring_document_converts_canonical_state_to_renderable_logfile(self) -> None:
+        """Persist canonical authoring objects through the renderer compatibility adapter."""
+        document = load_authoring_document(
+            self._fixture_paths.single_logfile,
+            allowed_root=REPO_ROOT,
+        )
+        payload = {
+            "version": 1,
+            "name": document.name,
+            "document": document.model_dump(mode="json"),
+        }
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            output_path = Path(tmpdir) / "canonical-save.log.yaml"
+            result = service.save_authoring_document(
+                payload,
+                str(output_path),
+                base_dir=self._fixture_paths.fixture_dir.relative_to(REPO_ROOT),
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(result.name, document.name)
+            self.assertEqual(result.section_ids, ["main"])
+            validated = service.validate_logfile(str(output_path), root=REPO_ROOT)
+            self.assertTrue(validated.valid, validated.message)
 
     def test_schema_resource_is_json(self) -> None:
         """Expose the packaged schema resource as JSON text."""
