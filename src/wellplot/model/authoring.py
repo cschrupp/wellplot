@@ -1004,6 +1004,141 @@ class AuthoringDepthSpec(_AuthoringModel):
     minor_step: float | None = Field(default=None, gt=0)
 
 
+class AuthoringReportValueSpec(_AuthoringModel):
+    """Literal or source-backed value used by a report slot."""
+
+    value: str | None = None
+    source_key: str | None = Field(default=None, min_length=1)
+    default: str = ""
+    unit: str | None = Field(default=None, min_length=1)
+    provenance: Literal["unknown", "source", "user", "default", "preserved"] = "unknown"
+    availability: Literal["unknown", "available", "missing", "not_applicable"] = "unknown"
+
+
+class AuthoringHeaderFieldSpec(_AuthoringModel):
+    """Stable general-purpose header slot."""
+
+    slot_id: str = Field(min_length=1)
+    key: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    value: AuthoringReportValueSpec = Field(default_factory=AuthoringReportValueSpec)
+    aliases: list[str] = Field(default_factory=list)
+    layout_path: str | None = Field(default=None, min_length=1)
+
+
+class AuthoringServiceTitleSpec(_AuthoringModel):
+    """One service-title slot in a report heading or tail."""
+
+    slot_id: str = Field(min_length=1)
+    value: AuthoringReportValueSpec = Field(default_factory=AuthoringReportValueSpec)
+    font_size: float | None = Field(default=None, gt=0)
+    auto_adjust: bool = True
+    bold: bool = False
+    italic: bool = False
+    alignment: Literal["left", "center", "right"] = "left"
+
+
+class AuthoringHeaderDetailCellSpec(_AuthoringModel):
+    """Stable value slot inside a header detail row."""
+
+    slot_id: str = Field(min_length=1)
+    value: AuthoringReportValueSpec = Field(default_factory=AuthoringReportValueSpec)
+
+
+class AuthoringHeaderDetailColumnSpec(_AuthoringModel):
+    """One value column in a typed header detail row."""
+
+    cells: list[AuthoringHeaderDetailCellSpec] = Field(min_length=1, max_length=4)
+
+
+class AuthoringHeaderDetailRowSpec(_AuthoringModel):
+    """One typed row in an open-hole or cased-hole detail table."""
+
+    row_id: str = Field(min_length=1)
+    label: str | None = Field(default=None, min_length=1)
+    label_cells: list[str] = Field(default_factory=list, max_length=4)
+    values: list[AuthoringHeaderDetailCellSpec] = Field(default_factory=list, max_length=4)
+    columns: list[AuthoringHeaderDetailColumnSpec] = Field(default_factory=list, max_length=4)
+
+    @model_validator(mode="after")
+    def validate_shape(self) -> AuthoringHeaderDetailRowSpec:
+        """Require one label shape and one value shape for each row."""
+        if self.label is None and not self.label_cells:
+            raise ValueError("Header detail rows require label or label_cells.")
+        if bool(self.values) == bool(self.columns):
+            raise ValueError("Header detail rows require values or columns, but not both.")
+        return self
+
+
+class AuthoringHeaderDetailSpec(_AuthoringModel):
+    """Typed detail table used by a report header archetype."""
+
+    kind: str = Field(min_length=1)
+    title: str | None = Field(default=None, min_length=1)
+    column_titles: list[str] = Field(default_factory=list, max_length=4)
+    rows: list[AuthoringHeaderDetailRowSpec] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_columns(self) -> AuthoringHeaderDetailSpec:
+        """Require consistent value-column counts among column-shaped rows."""
+        column_rows = [row for row in self.rows if row.columns]
+        if not column_rows:
+            return self
+        expected = len(self.column_titles) or len(column_rows[0].columns)
+        if expected == 0 or expected > 4:
+            raise ValueError("Header detail must define between one and four value columns.")
+        if self.column_titles and len(self.column_titles) != expected:
+            raise ValueError("Header detail column_titles must match the value-column count.")
+        if any(len(row.columns) != expected for row in column_rows):
+            raise ValueError("Header detail rows must use a consistent value-column count.")
+        return self
+
+
+class AuthoringHeaderSpec(_AuthoringModel):
+    """First-class report heading with stable field and detail-slot identities."""
+
+    enabled: bool = True
+    provider_name: str | None = Field(default=None, min_length=1)
+    title: str | None = Field(default=None, min_length=1)
+    subtitle: str | None = Field(default=None, min_length=1)
+    general_fields: list[AuthoringHeaderFieldSpec] = Field(default_factory=list)
+    service_titles: list[AuthoringServiceTitleSpec] = Field(default_factory=list)
+    detail: AuthoringHeaderDetailSpec | None = None
+    tail_enabled: bool = False
+    extensions: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_slot_ids(self) -> AuthoringHeaderSpec:
+        """Require stable unique identities across all header value slots."""
+        slot_ids: list[str] = [field.slot_id for field in self.general_fields]
+        slot_ids.extend(title.slot_id for title in self.service_titles)
+        if self.detail is not None:
+            for row in self.detail.rows:
+                slot_ids.extend(cell.slot_id for cell in row.values)
+                for column in row.columns:
+                    slot_ids.extend(cell.slot_id for cell in column.cells)
+        if len(slot_ids) != len(set(slot_ids)):
+            raise ValueError("Header contains duplicate slot ids.")
+        return self
+
+
+class AuthoringTailSpec(_AuthoringModel):
+    """Report-tail enablement and compatibility extension settings."""
+
+    enabled: bool = False
+    extensions: dict[str, Any] = Field(default_factory=dict)
+
+
+class AuthoringOutputSpec(_AuthoringModel):
+    """Backend and file-output settings owned by the authoring document."""
+
+    backend: Literal["matplotlib", "plotly"] = "matplotlib"
+    output_path: str = Field(default="wellplot.pdf", min_length=1)
+    dpi: int = Field(default=180, ge=1)
+    continuous_strip_page_height_mm: float | None = Field(default=None, gt=0)
+    extensions: dict[str, Any] = Field(default_factory=dict)
+
+
 class AuthoringRemarkSpec(_AuthoringModel):
     """Simple report remark block."""
 
@@ -1052,8 +1187,11 @@ class AuthoringDocumentSpec(_AuthoringModel):
     name: str = Field(min_length=1)
     title: str | None = Field(default=None, min_length=1)
     subtitle: str | None = Field(default=None, min_length=1)
+    output: AuthoringOutputSpec = Field(default_factory=AuthoringOutputSpec)
     page: AuthoringPageSpec = Field(default_factory=AuthoringPageSpec)
     depth: AuthoringDepthSpec = Field(default_factory=AuthoringDepthSpec)
+    header: AuthoringHeaderSpec | None = None
+    tail: AuthoringTailSpec = Field(default_factory=AuthoringTailSpec)
     sections: list[AuthoringSectionSpec] = Field(min_length=1)
     remarks: list[AuthoringRemarkSpec] = Field(default_factory=list)
     extensions: dict[str, Any] = Field(default_factory=dict)
@@ -1115,6 +1253,12 @@ __all__ = [
     "AuthoringDataSource",
     "AuthoringDepthSpec",
     "AuthoringDocumentSpec",
+    "AuthoringHeaderDetailCellSpec",
+    "AuthoringHeaderDetailColumnSpec",
+    "AuthoringHeaderDetailRowSpec",
+    "AuthoringHeaderDetailSpec",
+    "AuthoringHeaderFieldSpec",
+    "AuthoringHeaderSpec",
     "AuthoringGridDisplayMode",
     "AuthoringGridPatch",
     "AuthoringGridScaleKind",
@@ -1136,11 +1280,15 @@ __all__ = [
     "AuthoringReferenceOverlaySpec",
     "AuthoringReferenceTickSide",
     "AuthoringNumberFormatKind",
+    "AuthoringOutputSpec",
     "AuthoringRemarkSpec",
+    "AuthoringReportValueSpec",
     "AuthoringScale",
     "AuthoringScaleKind",
     "AuthoringSectionSpec",
     "AuthoringStyle",
+    "AuthoringServiceTitleSpec",
+    "AuthoringTailSpec",
     "AuthoringTrackHeaderObjectKind",
     "AuthoringTrackHeaderObjectSpec",
     "AuthoringTrackHeaderPatch",

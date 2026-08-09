@@ -42,7 +42,9 @@ from .model.authoring import (
     AuthoringDocumentSpec,
     AuthoringGridPatch,
     AuthoringGridSpec,
+    AuthoringHeaderSpec,
     AuthoringNumberFormatKind,
+    AuthoringOutputSpec,
     AuthoringPageSpec,
     AuthoringRasterColorbarPatch,
     AuthoringRasterColorbarSpec,
@@ -59,6 +61,7 @@ from .model.authoring import (
     AuthoringScale,
     AuthoringSectionSpec,
     AuthoringStyle,
+    AuthoringTailSpec,
     AuthoringTrackHeaderPatch,
     AuthoringTrackHeaderSpec,
     CurveBindingSpec,
@@ -79,6 +82,9 @@ class _OperationModel(BaseModel):
 AuthoringObjectKind: TypeAlias = Literal[
     "page",
     "depth",
+    "output",
+    "header",
+    "tail",
     "section",
     "track",
     "curve_binding",
@@ -329,6 +335,27 @@ class UpdatePageRequest(_OperationModel):
     patch: PagePatch
 
 
+class UpdateOutputRequest(_OperationModel):
+    """Replace document output settings with a validated typed object."""
+
+    kind: Literal["output"] = "output"
+    output: AuthoringOutputSpec
+
+
+class UpdateHeaderRequest(_OperationModel):
+    """Replace the document header with a validated typed object."""
+
+    kind: Literal["header"] = "header"
+    header: AuthoringHeaderSpec
+
+
+class UpdateTailRequest(_OperationModel):
+    """Replace report-tail settings with a validated typed object."""
+
+    kind: Literal["tail"] = "tail"
+    tail: AuthoringTailSpec
+
+
 class UpdateDepthRequest(_OperationModel):
     """Update document depth-axis settings with a typed patch."""
 
@@ -395,6 +422,9 @@ class UpdateRemarkRequest(_OperationModel):
 
 UpdateRequest: TypeAlias = Annotated[
     UpdatePageRequest
+    | UpdateOutputRequest
+    | UpdateHeaderRequest
+    | UpdateTailRequest
     | UpdateDepthRequest
     | UpdateSectionRequest
     | UpdateTrackRequest
@@ -425,6 +455,9 @@ class MoveRequest(_OperationModel):
 AuthoringObject: TypeAlias = (
     AuthoringPageSpec
     | AuthoringDepthSpec
+    | AuthoringOutputSpec
+    | AuthoringHeaderSpec
+    | AuthoringTailSpec
     | AuthoringSectionSpec
     | TrackSpec
     | CurveBindingSpec
@@ -479,7 +512,7 @@ class AuthoringService:
     ) -> list[AuthoringObjectRef]:
         """List stable references for one object family."""
         refs: list[AuthoringObjectRef] = []
-        if object_kind in {"page", "depth"}:
+        if object_kind in {"page", "depth", "output", "header", "tail"}:
             return [
                 AuthoringObjectRef(
                     object_kind=object_kind,
@@ -572,6 +605,12 @@ class AuthoringService:
             return deepcopy(self._document.page)
         if target.object_kind == "depth":
             return deepcopy(self._document.depth)
+        if target.object_kind == "output":
+            return deepcopy(self._document.output)
+        if target.object_kind == "header":
+            return deepcopy(self._document.header or AuthoringHeaderSpec())
+        if target.object_kind == "tail":
+            return deepcopy(self._document.tail)
         if target.object_kind == "section":
             return deepcopy(self._find_section(target.object_id))
         if target.object_kind == "remark":
@@ -688,6 +727,15 @@ class AuthoringService:
         if isinstance(request, UpdatePageRequest):
             self._commit(lambda document: self._patch_model(document.page, request.patch))
             return self.get(AuthoringTarget(object_kind="page", object_id="page"))
+        if isinstance(request, UpdateOutputRequest):
+            self._commit(lambda document: setattr(document, "output", deepcopy(request.output)))
+            return self.get(AuthoringTarget(object_kind="output", object_id="output"))
+        if isinstance(request, UpdateHeaderRequest):
+            self._commit(lambda document: setattr(document, "header", deepcopy(request.header)))
+            return self.get(AuthoringTarget(object_kind="header", object_id="header"))
+        if isinstance(request, UpdateTailRequest):
+            self._commit(lambda document: setattr(document, "tail", deepcopy(request.tail)))
+            return self.get(AuthoringTarget(object_kind="tail", object_id="tail"))
         if isinstance(request, UpdateDepthRequest):
             self._commit(lambda document: self._patch_model(document.depth, request.patch))
             return self.get(AuthoringTarget(object_kind="depth", object_id="depth"))
@@ -793,7 +841,7 @@ class AuthoringService:
 
     def remove(self, request: RemoveRequest) -> AuthoringObject:
         """Remove one object and atomically validate the remaining document."""
-        if request.target.object_kind in {"page", "depth"}:
+        if request.target.object_kind in {"page", "depth", "output", "header", "tail"}:
             raise ValueError(f"Cannot remove document-level {request.target.object_kind} settings.")
         existing = self.get(request.target)
 
@@ -1241,11 +1289,14 @@ __all__ = [
     "UpdateCurveBindingRequest",
     "UpdateDepthRequest",
     "UpdateFillRequest",
+    "UpdateHeaderRequest",
+    "UpdateOutputRequest",
     "UpdatePageRequest",
     "UpdateRasterBindingRequest",
     "UpdateRemarkRequest",
     "UpdateRequest",
     "UpdateSectionRequest",
+    "UpdateTailRequest",
     "UpdateTrackRequest",
     "authoring_operation_json_schema",
 ]

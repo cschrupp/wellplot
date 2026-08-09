@@ -531,6 +531,13 @@ Acceptance:
 
 #### 0.6-G1. Complete The Canonical Report Contract
 
+Status: the first-class report-contract foundation is implemented. The typed
+authoring model now owns output settings, header slots, service titles, detail
+rows/cells, provenance/availability metadata, and tail enablement; the
+deterministic service exposes document-level getters and typed replacements.
+Legacy YAML remains an adapter boundary and renderer behavior is covered by
+round-trip tests.
+
 Finish the persisted objects that are still only compatibility mappings or
 renderer structures:
 

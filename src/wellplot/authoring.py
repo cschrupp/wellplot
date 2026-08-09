@@ -58,7 +58,14 @@ from .model.authoring import (
     AuthoringGridScaleKind,
     AuthoringGridSpacingMode,
     AuthoringGridSpec,
+    AuthoringHeaderDetailCellSpec,
+    AuthoringHeaderDetailColumnSpec,
+    AuthoringHeaderDetailRowSpec,
+    AuthoringHeaderDetailSpec,
+    AuthoringHeaderFieldSpec,
+    AuthoringHeaderSpec,
     AuthoringNumberFormatKind,
+    AuthoringOutputSpec,
     AuthoringPageSpec,
     AuthoringRasterColorbarSpec,
     AuthoringRasterNormalizationKind,
@@ -69,10 +76,13 @@ from .model.authoring import (
     AuthoringReferenceEventSpec,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
+    AuthoringReportValueSpec,
     AuthoringScale,
     AuthoringScaleKind,
     AuthoringSectionSpec,
+    AuthoringServiceTitleSpec,
     AuthoringStyle,
+    AuthoringTailSpec,
     AuthoringTrackHeaderObjectKind,
     AuthoringTrackHeaderObjectSpec,
     AuthoringTrackHeaderSpec,
@@ -804,6 +814,393 @@ def _page_from_legacy(value: object) -> AuthoringPageSpec:
         raise TemplateValidationError("Invalid document.page.") from exc
 
 
+def _header_literal(value: object) -> str | None:
+    """Preserve explicit empty header values while normalizing other literals."""
+    if value is None:
+        return None
+    return str(value)
+
+
+def _report_value_from_legacy(
+    value: object,
+    *,
+    context: str,
+    source_key: object = None,
+    default: object = "",
+    unit: object = None,
+) -> AuthoringReportValueSpec:
+    """Normalize one legacy report value into a typed authoring value."""
+    data: dict[str, Any]
+    if isinstance(value, Mapping):
+        data = dict(value)
+    elif value is None:
+        data = {}
+    else:
+        data = {"value": value}
+    resolved_source_key = data.get("source_key", source_key)
+    resolved_default = data.get("default", default)
+    resolved_unit = data.get("unit", unit)
+    literal = _header_literal(data.get("value")) if "value" in data else None
+    try:
+        return AuthoringReportValueSpec(
+            value=literal,
+            source_key=_as_text(resolved_source_key, context=f"{context}.source_key"),
+            default=str(resolved_default or ""),
+            unit=_as_text(resolved_unit, context=f"{context}.unit"),
+            provenance=str(
+                data.get("provenance", "preserved" if literal is not None else "unknown")
+            ).lower(),
+            availability=str(
+                data.get("availability", "available" if literal is not None else "unknown")
+            ).lower(),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(f"Invalid {context}.") from exc
+
+
+def _header_cell_from_legacy(
+    value: object,
+    *,
+    slot_id: str,
+    context: str,
+) -> AuthoringHeaderDetailCellSpec:
+    """Normalize one detail-table cell and assign a stable slot id."""
+    data = dict(value) if isinstance(value, Mapping) else {}
+    report_value = _report_value_from_legacy(value, context=context)
+    if isinstance(value, Mapping):
+        slot_id = str(data.get("slot_id", slot_id))
+    return AuthoringHeaderDetailCellSpec(slot_id=slot_id, value=report_value)
+
+
+def _header_from_legacy(value: object) -> AuthoringHeaderSpec | None:
+    """Normalize a legacy heading mapping into stable typed header slots."""
+    if value is None:
+        return None
+    heading = _mapping(value, context="document.layout.heading")
+    if not heading:
+        return None
+
+    fields: list[AuthoringHeaderFieldSpec] = []
+    for index, item in enumerate(
+        _sequence(heading.get("general_fields", []), context="heading.general_fields")
+    ):
+        data = _mapping(item, context=f"heading.general_fields[{index}]")
+        key = str(data.get("key", f"field_{index + 1}")).strip()
+        label = str(data.get("label", key)).strip()
+        fields.append(
+            AuthoringHeaderFieldSpec(
+                slot_id=str(data.get("slot_id", f"general.{key}")),
+                key=key,
+                label=label,
+                value=_report_value_from_legacy(
+                    data,
+                    context=f"heading.general_fields[{index}]",
+                ),
+                aliases=[str(alias) for alias in data.get("aliases", [key, label])],
+                layout_path=_as_text(
+                    data.get("layout_path"),
+                    context=f"heading.general_fields[{index}].layout_path",
+                ),
+            )
+        )
+
+    service_titles: list[AuthoringServiceTitleSpec] = []
+    for index, item in enumerate(
+        _sequence(heading.get("service_titles", []), context="heading.service_titles")
+    ):
+        data = dict(item) if isinstance(item, Mapping) else {"value": item}
+        service_titles.append(
+            AuthoringServiceTitleSpec(
+                slot_id=str(data.get("slot_id", f"service_title.{index + 1}")),
+                value=_report_value_from_legacy(
+                    data,
+                    context=f"heading.service_titles[{index}]",
+                ),
+                font_size=(float(data["font_size"]) if data.get("font_size") is not None else None),
+                auto_adjust=bool(data.get("auto_adjust", True)),
+                bold=bool(data.get("bold", False)),
+                italic=bool(data.get("italic", False)),
+                alignment=str(data.get("alignment", "left")).lower(),
+            )
+        )
+
+    detail_value = heading.get("detail")
+    detail: AuthoringHeaderDetailSpec | None = None
+    if detail_value is not None:
+        detail_data = _mapping(detail_value, context="heading.detail")
+        rows: list[AuthoringHeaderDetailRowSpec] = []
+        for row_index, row_value in enumerate(
+            _sequence(detail_data.get("rows", []), context="heading.detail.rows")
+        ):
+            row = _mapping(row_value, context=f"heading.detail.rows[{row_index}]")
+            label = _as_text(row.get("label"), context=f"heading.detail.rows[{row_index}].label")
+            label_cells = [str(cell) for cell in row.get("label_cells", [])]
+            values = [
+                _header_cell_from_legacy(
+                    cell,
+                    slot_id=f"detail.row_{row_index + 1}.value_{cell_index + 1}",
+                    context=f"heading.detail.rows[{row_index}].values[{cell_index}]",
+                )
+                for cell_index, cell in enumerate(
+                    _sequence(
+                        row.get("values", []),
+                        context=f"heading.detail.rows[{row_index}].values",
+                    )
+                )
+            ]
+            columns: list[AuthoringHeaderDetailColumnSpec] = []
+            for column_index, column_value in enumerate(
+                _sequence(
+                    row.get("columns", []),
+                    context=f"heading.detail.rows[{row_index}].columns",
+                )
+            ):
+                column = _mapping(
+                    column_value,
+                    context=f"heading.detail.rows[{row_index}].columns[{column_index}]",
+                )
+                cells = [
+                    _header_cell_from_legacy(
+                        cell,
+                        slot_id=(
+                            f"detail.row_{row_index + 1}.column_{column_index + 1}."
+                            f"cell_{cell_index + 1}"
+                        ),
+                        context=(
+                            f"heading.detail.rows[{row_index}].columns[{column_index}]"
+                            f".cells[{cell_index}]"
+                        ),
+                    )
+                    for cell_index, cell in enumerate(
+                        _sequence(
+                            column.get("cells", []),
+                            context=(
+                                f"heading.detail.rows[{row_index}].columns[{column_index}].cells"
+                            ),
+                        )
+                    )
+                ]
+                columns.append(AuthoringHeaderDetailColumnSpec(cells=cells))
+            rows.append(
+                AuthoringHeaderDetailRowSpec(
+                    row_id=str(row.get("row_id", f"detail.row_{row_index + 1}")),
+                    label=label,
+                    label_cells=label_cells,
+                    values=values,
+                    columns=columns,
+                )
+            )
+        if rows:
+            detail = AuthoringHeaderDetailSpec(
+                kind=str(detail_data.get("kind", "custom")),
+                title=_as_text(detail_data.get("title"), context="heading.detail.title"),
+                column_titles=[str(item) for item in detail_data.get("column_titles", [])],
+                rows=rows,
+            )
+
+    compatibility = {"legacy_heading": deepcopy(heading)}
+    return AuthoringHeaderSpec(
+        enabled=bool(heading.get("enabled", True)),
+        provider_name=_as_text(heading.get("provider_name"), context="heading.provider_name"),
+        title=_as_text(heading.get("title"), context="heading.title"),
+        subtitle=_as_text(heading.get("subtitle"), context="heading.subtitle"),
+        general_fields=fields,
+        service_titles=service_titles,
+        detail=detail,
+        tail_enabled=bool(heading.get("tail_enabled", False)),
+        extensions={"compatibility": compatibility},
+    )
+
+
+def _report_value_to_legacy(
+    value: AuthoringReportValueSpec,
+    *,
+    existing: object = None,
+) -> object:
+    """Project one typed report value while retaining legacy scalar shapes."""
+    if value.value is not None and value.source_key is None and value.unit is None:
+        return value.value
+    data = dict(existing) if isinstance(existing, Mapping) else {}
+    if value.value is not None:
+        data["value"] = value.value
+    elif value.source_key is not None:
+        data.pop("value", None)
+    if value.source_key is not None:
+        data["source_key"] = value.source_key
+    if value.default:
+        data["default"] = value.default
+    if value.unit is not None:
+        data["unit"] = value.unit
+    if data:
+        return data
+    return value.value
+
+
+def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
+    """Project the canonical header to the renderer's legacy heading shape."""
+    compatibility = header.extensions.get("compatibility", {})
+    existing = (
+        deepcopy(dict(compatibility["legacy_heading"]))
+        if isinstance(compatibility, Mapping)
+        and isinstance(compatibility.get("legacy_heading"), Mapping)
+        else {}
+    )
+    existing.update({"enabled": header.enabled})
+    if header.provider_name is not None:
+        existing["provider_name"] = header.provider_name
+    if header.title is not None:
+        existing["title"] = header.title
+    if header.subtitle is not None:
+        existing["subtitle"] = header.subtitle
+    existing["general_fields"] = [
+        {
+            **(
+                dict(
+                    next(
+                        (
+                            item
+                            for item in existing.get("general_fields", [])
+                            if isinstance(item, Mapping) and item.get("key") == field.key
+                        ),
+                        {},
+                    )
+                )
+            ),
+            "key": field.key,
+            "label": field.label,
+            **({"aliases": list(field.aliases)} if field.aliases else {}),
+            **({"layout_path": field.layout_path} if field.layout_path is not None else {}),
+            **(
+                {
+                    "value": _report_value_to_legacy(
+                        field.value,
+                        existing=next(
+                            (
+                                item.get("value")
+                                for item in existing.get("general_fields", [])
+                                if isinstance(item, Mapping) and item.get("key") == field.key
+                            ),
+                            None,
+                        ),
+                    )
+                }
+                if field.value.value is not None
+                else {}
+            ),
+            **(
+                {"source_key": field.value.source_key} if field.value.source_key is not None else {}
+            ),
+        }
+        for field in header.general_fields
+    ]
+    old_titles = existing.get("service_titles", [])
+    existing["service_titles"] = []
+    for index, title in enumerate(header.service_titles):
+        old = (
+            old_titles[index]
+            if index < len(old_titles) and isinstance(old_titles[index], Mapping)
+            else {}
+        )
+        item = dict(old)
+        item["value"] = _report_value_to_legacy(
+            title.value,
+            existing=old.get("value"),
+        )
+        item.update(
+            {
+                "font_size": title.font_size,
+                "auto_adjust": title.auto_adjust,
+                "bold": title.bold,
+                "italic": title.italic,
+                "alignment": title.alignment,
+            }
+        )
+        existing["service_titles"].append(item)
+    if header.detail is not None:
+        old_detail = existing.get("detail")
+        detail = dict(old_detail) if isinstance(old_detail, Mapping) else {}
+        detail.update(
+            {
+                "kind": header.detail.kind,
+                "title": header.detail.title,
+                "column_titles": list(header.detail.column_titles),
+            }
+        )
+        old_rows = detail.get("rows", [])
+        rows: list[dict[str, Any]] = []
+        for row_index, row in enumerate(header.detail.rows):
+            old_row = (
+                old_rows[row_index]
+                if row_index < len(old_rows) and isinstance(old_rows[row_index], Mapping)
+                else {}
+            )
+            row_data = dict(old_row)
+            if row.label is not None:
+                row_data["label"] = row.label
+                row_data.pop("label_cells", None)
+            else:
+                row_data["label_cells"] = list(row.label_cells)
+                row_data.pop("label", None)
+            if row.values:
+                old_values = old_row.get("values", [])
+                row_data["values"] = [
+                    _report_value_to_legacy(
+                        cell.value,
+                        existing=old_values[index] if index < len(old_values) else None,
+                    )
+                    for index, cell in enumerate(row.values)
+                ]
+                row_data.pop("columns", None)
+            else:
+                old_columns = old_row.get("columns", [])
+                row_data["columns"] = []
+                for column_index, column in enumerate(row.columns):
+                    old_column = (
+                        old_columns[column_index]
+                        if column_index < len(old_columns)
+                        and isinstance(old_columns[column_index], Mapping)
+                        else {}
+                    )
+                    old_cells = old_column.get("cells", [])
+                    row_data["columns"].append(
+                        {
+                            "cells": [
+                                _report_value_to_legacy(
+                                    cell.value,
+                                    existing=old_cells[cell_index]
+                                    if cell_index < len(old_cells)
+                                    else None,
+                                )
+                                for cell_index, cell in enumerate(column.cells)
+                            ]
+                        }
+                    )
+                row_data.pop("values", None)
+            rows.append(row_data)
+        detail["rows"] = rows
+        existing["detail"] = detail
+    existing["tail_enabled"] = header.tail_enabled
+    return existing
+
+
+def _output_from_legacy(value: object) -> AuthoringOutputSpec:
+    """Normalize root render settings into the canonical output object."""
+    data = _mapping(value or {}, context="render")
+    try:
+        return AuthoringOutputSpec(
+            backend=str(data.get("backend", "matplotlib")).lower(),
+            output_path=str(data.get("output_path", "wellplot.pdf")),
+            dpi=int(data.get("dpi", 180)),
+            continuous_strip_page_height_mm=(
+                float(data["continuous_strip_page_height_mm"])
+                if data.get("continuous_strip_page_height_mm") is not None
+                else None
+            ),
+        )
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError("Invalid render output settings.") from exc
+
+
 def _remarks_from_legacy(value: object) -> list[AuthoringRemarkSpec]:
     remarks: list[AuthoringRemarkSpec] = []
     for index, item in enumerate(_sequence(value or [], context="document.layout.remarks")):
@@ -1194,6 +1591,8 @@ def _legacy_to_authoring(
     depth = _mapping(document.get("depth", {}), context="document.depth")
     page = _page_from_legacy(document.get("page", {}))
     heading = _mapping(layout.get("heading", {}), context="document.layout.heading")
+    header = _header_from_legacy(heading)
+    tail_data = _mapping(layout.get("tail", {}), context="document.layout.tail")
     title = _as_text(heading.get("title"), context="heading.title")
     subtitle = _as_text(heading.get("subtitle"), context="heading.subtitle")
     extension = {
@@ -1209,6 +1608,7 @@ def _legacy_to_authoring(
             name=str(root.get("name", "well-log")),
             title=title,
             subtitle=subtitle,
+            output=_output_from_legacy(root.get("render", {})),
             page=page,
             depth=AuthoringDepthSpec(
                 unit=str(depth.get("unit", "m")),
@@ -1219,6 +1619,11 @@ def _legacy_to_authoring(
                 minor_step=(
                     float(depth["minor_step"]) if depth.get("minor_step") is not None else None
                 ),
+            ),
+            header=header,
+            tail=AuthoringTailSpec(
+                enabled=bool(tail_data.get("enabled", header.tail_enabled if header else False)),
+                extensions={"compatibility": {"legacy_tail": deepcopy(tail_data)}},
             ),
             sections=authoring_sections,
             remarks=_remarks_from_legacy(layout.get("remarks", [])),
@@ -1239,6 +1644,11 @@ def authoring_document_from_mapping(data: Mapping[str, object]) -> AuthoringDocu
         if "sections" in document:
             canonical = deepcopy(document)
             canonical.setdefault("name", root.get("name", "well-log"))
+            if "output" not in canonical and root.get("render") is not None:
+                canonical["output"] = _output_from_legacy(root.get("render", {})).model_dump(
+                    mode="python",
+                    exclude={"extensions"},
+                )
             try:
                 return AuthoringDocumentSpec.model_validate(canonical)
             except ValidationError as exc:
@@ -1265,13 +1675,24 @@ def authoring_document_to_mapping(document: AuthoringDocumentSpec) -> dict[str, 
     """Serialize an authoring model to normalized version-1 YAML data."""
     document_payload = document.model_dump(mode="json", exclude_none=True)
     name = str(document_payload.pop("name"))
+    output_payload = document_payload.pop("output", None)
+    if not isinstance(output_payload, Mapping):
+        output_payload = {}
+    output_payload = dict(output_payload)
+    output_payload.pop("extensions", None)
     payload: dict[str, object] = {"version": 1, "name": name, "document": document_payload}
     compatibility = document.extensions.get("compatibility")
+    render_payload: dict[str, Any] = {}
     if isinstance(compatibility, Mapping):
+        legacy_render = compatibility.get("legacy_render")
+        if isinstance(legacy_render, Mapping):
+            render_payload = deepcopy(dict(legacy_render))
         for key in ("legacy_render", "legacy_data"):
             value = compatibility.get(key)
-            if value is not None:
-                payload[key.removeprefix("legacy_")] = deepcopy(value)
+            if value is not None and key == "legacy_data":
+                payload["data"] = deepcopy(value)
+    render_payload.update(output_payload)
+    payload["render"] = render_payload
     return payload
 
 
@@ -1455,14 +1876,21 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
             layout_sections = _mapping(
                 metadata.get("layout_sections", {}), context="metadata.layout_sections"
             )
-            layout_sections["heading"] = deepcopy(layout.get("heading", {}))
+            layout_sections["heading"] = (
+                _header_to_legacy(document.header)
+                if document.header is not None
+                else deepcopy(layout.get("heading", {}))
+            )
             layout_sections["remarks"] = [
                 remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
             ]
             layout_sections["log_sections"] = deepcopy(layout.get("log_sections", []))
-            layout_sections["tail"] = deepcopy(layout.get("tail", {}))
+            legacy_tail = layout.get("tail", {})
+            tail_payload = dict(legacy_tail) if isinstance(legacy_tail, Mapping) else {}
+            tail_payload["enabled"] = document.tail.enabled
+            layout_sections["tail"] = tail_payload
             payload["metadata"] = {**metadata, "layout_sections": layout_sections}
-            heading = _mapping(layout.get("heading", {}), context="document.layout.heading")
+            heading = layout_sections["heading"]
             if heading and "report" not in payload.get("header", {}):
                 payload["header"] = {
                     **_mapping(payload.get("header", {}), context="document.header"),
@@ -1472,6 +1900,8 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
     layout_sections = _mapping(
         metadata.get("layout_sections", {}), context="metadata.layout_sections"
     )
+    if document.header is not None:
+        layout_sections["heading"] = _header_to_legacy(document.header)
     layout_sections["remarks"] = [
         remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
     ]
@@ -1488,8 +1918,18 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
         }
         for section in document.sections
     ]
+    tail_payload = layout_sections.get("tail", {})
+    tail_mapping = dict(tail_payload) if isinstance(tail_payload, Mapping) else {}
+    tail_mapping["enabled"] = document.tail.enabled
+    layout_sections["tail"] = tail_mapping
     metadata["layout_sections"] = layout_sections
     payload["metadata"] = metadata
+    if document.header is not None:
+        header_payload = _header_to_legacy(document.header)
+        payload["header"] = {
+            **_mapping(payload.get("header", {}), context="document.header"),
+            "report": header_payload,
+        }
     if document.title is not None or document.subtitle is not None:
         header = _mapping(payload.get("header", {}), context="document.header")
         if document.title is not None:

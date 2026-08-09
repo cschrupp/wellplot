@@ -562,8 +562,9 @@ Longer-term / UI-centric:
 ## Immediate Next Tasks
 
 - Complete `0.6-G0` research and the cross-domain dependency matrix.
-- Finish first-class canonical header, tail, and remaining report/output objects
-  in `0.6-G1`.
+- Validate the remaining renderer/report-block parity for the `0.6-G1`
+  canonical header, tail, and output foundation, then begin typed desired-state
+  intent models in `0.6-G2`.
 - Add typed desired-state intent models with omitted, explicit, clear, and remove
   semantics in `0.6-G2`.
 - Implement context resolution and precedence in `0.6-G3`.

@@ -24,8 +24,11 @@ from wellplot.authoring_service import (
     SectionPatch,
     UpdateCurveBindingRequest,
     UpdateDepthRequest,
+    UpdateHeaderRequest,
+    UpdateOutputRequest,
     UpdatePageRequest,
     UpdateSectionRequest,
+    UpdateTailRequest,
     UpdateTrackRequest,
 )
 from wellplot.model.authoring import (
@@ -33,6 +36,9 @@ from wellplot.model.authoring import (
     AnnotationTrackSpec,
     ArrayTrackSpec,
     AuthoringDocumentSpec,
+    AuthoringHeaderFieldSpec,
+    AuthoringHeaderSpec,
+    AuthoringOutputSpec,
     AuthoringRemarkSpec,
     AuthoringScale,
     AuthoringScaleKind,
@@ -247,6 +253,44 @@ def test_document_settings_are_typed_and_parent_scoped() -> None:
     assert page.continuous is True
     assert depth.unit == "ft"
     assert depth.major_step == 10
+
+
+def test_report_header_tail_and_output_are_first_class_service_objects() -> None:
+    """Expose stable document-level report objects through typed service operations."""
+    service = _service()
+
+    assert [item.object_id for item in service.list("output")] == ["output"]
+    assert [item.object_id for item in service.list("header")] == ["header"]
+    assert [item.object_id for item in service.list("tail")] == ["tail"]
+
+    service.update(
+        UpdateOutputRequest(
+            output=AuthoringOutputSpec(output_path="packet.pdf", dpi=300),
+        )
+    )
+    service.update(
+        UpdateHeaderRequest(
+            header=AuthoringHeaderSpec(
+                provider_name="Company",
+                general_fields=[
+                    AuthoringHeaderFieldSpec(
+                        slot_id="general.well",
+                        key="well",
+                        label="Well",
+                        value={"value": "Demo-1", "provenance": "user"},
+                    )
+                ],
+            )
+        )
+    )
+    service.update(UpdateTailRequest(tail={"enabled": True}))
+
+    output = service.get(AuthoringTarget(object_kind="output", object_id="output"))
+    header = service.get(AuthoringTarget(object_kind="header", object_id="header"))
+    tail = service.get(AuthoringTarget(object_kind="tail", object_id="tail"))
+    assert output.output_path == "packet.pdf"
+    assert header.general_fields[0].value.value == "Demo-1"
+    assert tail.enabled is True
 
 
 def test_failed_update_is_atomic() -> None:

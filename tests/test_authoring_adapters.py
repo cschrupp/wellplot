@@ -243,6 +243,78 @@ def test_canonical_yaml_loads_without_legacy_logfile_validation() -> None:
     assert yaml.safe_load(yaml_text)["document"]["sections"][0]["id"] == "main"
 
 
+def test_header_detail_slots_and_output_settings_round_trip() -> None:
+    """Normalize first-class report slots while preserving renderer output behavior."""
+    mapping = _legacy_mapping()
+    document = mapping["document"]
+    assert isinstance(document, dict)
+    layout = document["layout"]
+    assert isinstance(layout, dict)
+    layout["heading"] = {
+        "enabled": True,
+        "provider_name": "Company",
+        "title": "Adapter Test",
+        "general_fields": [
+            {"key": "well", "label": "Well", "value": "Demo-1", "unit": "name"},
+        ],
+        "service_titles": [
+            {"value": "Gamma Ray", "bold": True, "alignment": "center"},
+        ],
+        "detail": {
+            "kind": "open_hole",
+            "title": "Open Hole Metadata",
+            "rows": [
+                {
+                    "label": "Date",
+                    "values": [
+                        {"value": "2026-08-08", "unit": "date"},
+                        {"value": ""},
+                    ],
+                },
+                {
+                    "label_cells": ["Run", "Direction"],
+                    "columns": [
+                        {"cells": ["ONE"]},
+                        {"cells": ["Up"]},
+                    ],
+                },
+            ],
+        },
+        "tail_enabled": True,
+    }
+    layout["tail"] = {"enabled": True}
+    render = mapping["render"]
+    assert isinstance(render, dict)
+    render["continuous_strip_page_height_mm"] = 420
+
+    authoring = authoring_document_from_mapping(mapping)
+
+    assert authoring.output.continuous_strip_page_height_mm == 420
+    assert authoring.header is not None
+    assert authoring.header.general_fields[0].slot_id == "general.well"
+    assert authoring.header.general_fields[0].value.unit == "name"
+    assert authoring.header.service_titles[0].slot_id == "service_title.1"
+    assert authoring.header.detail is not None
+    assert authoring.header.detail.rows[0].values[0].slot_id == "detail.row_1.value_1"
+    assert authoring.header.detail.rows[1].columns[1].cells[0].slot_id == (
+        "detail.row_2.column_2.cell_1"
+    )
+    assert authoring.tail.enabled is True
+
+    normalized = authoring_document_to_mapping(authoring)
+    assert normalized["render"]["continuous_strip_page_height_mm"] == 420
+    normalized_header = normalized["document"]["header"]
+    assert normalized_header["general_fields"][0]["slot_id"] == "general.well"
+
+    restored = authoring_document_from_mapping(normalized)
+    assert restored == authoring
+    rendered = authoring_document_to_render(authoring)
+    assert rendered.header.report is not None
+    assert rendered.header.report.general_fields[0].value.value == "Demo-1"
+    assert rendered.header.report.detail is not None
+    assert rendered.header.report.detail.rows[0].columns[0].cells[0].value.value == ("2026-08-08")
+
+
 def test_production_template_inheritance_loads_through_adapter() -> None:
     """A production logfile with a template is normalized through one entry point."""
     path = Path("examples/production/cbl_log_example/full_reconstruction.log.yaml")
