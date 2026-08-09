@@ -744,8 +744,8 @@ explicit and last.
 
 #### 0.6-G6. Agent Integration
 
-Status: implemented for typed-state capable providers and explicit caller-supplied
-desired state. `AuthoringSession.plan()` now accepts an
+Status: deterministic foundation implemented; live natural-language integration
+remains incomplete. `AuthoringSession.plan()` now accepts an
 `AuthoringDocumentIntent`, resolves it against an existing canonical document,
 and exposes the resulting `AuthoringReconciliationPlan` as a dry run.
 
@@ -774,7 +774,7 @@ to typed intents is a follow-up hardening task before the final release gate.
 Backends without typed-state support retain the legacy provider loop for
 compatibility during the transition. They are not the release-default path.
 
-Acceptance completed:
+Foundation acceptance completed:
 
 - typed `plan()` returns ordered desired-state phases and deterministic operations
 - caller-supplied typed state bypasses provider mutation loops
@@ -784,9 +784,17 @@ Acceptance completed:
 - typed phase summaries and deterministic next-help reporting are exposed through
   the existing `AuthoringResult`
 
+The live integration gate is reopened because the agent currently supplies the
+reconciler with only existing-section channel names. It does not yet build a
+complete context snapshot for newly referenced sources and sections, does not
+wire the asset-backed generic defaults into desired-state planning, and asks the
+provider for one large intent without a bounded correction pass. These gaps can
+make an explicit request fail before deterministic assembly starts.
+
 #### 0.6-G7. Cross-Domain Acceptance
 
-Status: implemented as a provider-free acceptance matrix in
+Status: canonical deterministic acceptance implemented; provider-to-intent and
+live notebook acceptance remain incomplete. The current provider-free matrix in
 `tests/test_cross_domain_acceptance.py`. The fixtures compose the canonical
 objects directly rather than using a packet blueprint, so the CBL/VDL case is
 only one domain in the test surface.
@@ -814,7 +822,74 @@ unset optional depth steps are now omitted before the legacy renderer schema is
 called, rather than serialized as `null` and passed to `float()`.
 
 The CBL notebook remains a stress test and regression fixture, not the source of
-implementation rules.
+implementation rules. Its live run must still prove that the generic agent can
+compile a request into the same canonical objects covered by this matrix.
+
+### Corrective Integration Slices
+
+These slices complete the reopened G6/G7 integration gate. They are intentionally
+generic and apply to CBL/VDL, open-hole, porosity, resistivity, caliper, array,
+annotation, and custom multi-section reports.
+
+#### 0.6-G6R. Reopen Integration Acceptance
+
+Record the distinction between the completed deterministic foundation and the
+unfinished live-agent path. Keep packet blueprints out of ordinary planning and
+define the natural-language notebook gates as release requirements.
+
+#### 0.6-G6.1. Deterministic Context Snapshot
+
+Build a typed, read-only context snapshot before intent extraction. It must include
+the current canonical object inventory, header slots and aliases, every source
+referenced by the request, source format, and channel candidates with mnemonic,
+kind, unit, and source path. Missing or ambiguous context must be reported before
+mutation.
+
+#### 0.6-G6.2. Typed Request Compilation
+
+Compile the request into a compact manifest and then a typed desired state using
+the context snapshot. Return request-item coverage so every explicit instruction
+maps to an intent path or an explicit unsupported/inconsistent result. Permit one
+bounded correction pass for missing intent fields; do not expose mutation tools to
+the provider.
+
+#### 0.6-G6.3. Generic Defaults Resolution
+
+Validate the asset-backed defaults catalog against canonical property names and
+resolve defaults by object kind and channel family. Apply the precedence rule
+`explicit request > preserved existing value > unambiguous generic default >
+starter scaffold`. Packet blueprints remain opt-in scaffolds or fixtures and never
+become implicit runtime authority.
+
+#### 0.6-G6.4. Dependency-Ordered Assembly
+
+Generate the deterministic assembly sequence:
+`report/header -> sections and sources -> tracks -> curve/raster bindings ->
+fills/annotations -> presentation/order -> validation`.
+
+Support arbitrary sections, duplicate same-channel bindings, array tracks, and
+custom combinations without packet-specific reconciliation rules.
+
+#### 0.6-G6.5. Checkpoints and Persistence
+
+Verify every phase against canonical getters, expose phase previews before the
+final preview, and persist only after all phases pass. Convert transport failures
+into structured blocked results and allow one safe idempotent save retry after
+local serialization and validation.
+
+#### 0.6-G7.1. Real Agent Acceptance
+
+Add recorded provider-to-intent tests and optional live-provider gates for CBL/VDL,
+caliper, porosity, resistivity, open-hole, annotations, arrays, and arbitrary
+multi-section requests. Verify that explicit widths, scales, colors, styles,
+labels, raster settings, and header values override defaults.
+
+#### 0.6-G7.2. Notebook and Release Gate
+
+Update the notebooks to show context resolution, request coverage, defaults
+provenance, operation plans, phase verification, and blocked reasons. A blocked
+assembly must stop before rendering a partial draft. Release requires the unit,
+MCP, agent, documentation, and notebook gates to pass.
 
 ## Release Gate
 

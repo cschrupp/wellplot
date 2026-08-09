@@ -575,17 +575,15 @@ Longer-term / UI-centric:
 - G5 is implemented: `wellplot.authoring_executor` applies plans through
   `AuthoringService`, verifies each persisted postcondition, stops on the first
   failure, and exposes phase snapshots plus optional previews.
-- G6 is implemented for typed-state capable providers: `AuthoringSession.plan()`
-  exposes the dry-run reconciliation plan, capable providers submit one validated
-  `AuthoringDocumentIntent`, and the agent resolves, executes, verifies, and saves
-  it through the canonical deterministic path. Legacy provider-loop fallback and
-  the narrow header/style shortcuts remain temporarily available for compatibility.
-- G7 is implemented: cross-domain canonical fixtures now cover open-hole,
-  resistivity, porosity, mirrored duplicate curves, CBL/VDL scalar and raster
-  content, annotations, and one-section/main-repeat/arbitrary multi-section
-  reports. The same gate checks missing-channel and unsupported-request blocking,
-  explicit presentation precedence, and credential-free structure for the LAS
-  and CBL agent notebooks.
+- G6 deterministic foundation is implemented, but live natural-language integration
+  remains open. The missing work is the context snapshot, generic defaults wiring,
+  typed request coverage, dependency-ordered assembly, and transport-safe
+  persistence described in `docs/mcp-implementation-plan.md` under Corrective
+  Integration Slices.
+- G7 canonical deterministic fixtures are implemented, but provider-to-intent and
+  live notebook acceptance remain open. The release gate must exercise the generic
+  agent path across multiple log families, not only provider-free canonical
+  objects.
 - Add contract-parity, round-trip, atomic-mutation, contextual-reference,
   reconciliation, and idempotency tests as release gates.
 - Maintain release hardening:
