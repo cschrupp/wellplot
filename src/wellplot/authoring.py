@@ -288,8 +288,12 @@ def authoring_raster_sample_axis_to_mapping(
 ) -> dict[str, Any]:
     """Project canonical sample-axis settings to the legacy YAML envelope."""
     data = sample_axis.model_dump(mode="json", exclude_none=True)
-    data["min"] = data.pop("minimum", None)
-    data["max"] = data.pop("maximum", None)
+    minimum = data.pop("minimum", None)
+    maximum = data.pop("maximum", None)
+    if minimum is not None:
+        data["min"] = minimum
+    if maximum is not None:
+        data["max"] = maximum
     data["ticks"] = data.pop("tick_count")
     return data
 
@@ -1036,6 +1040,43 @@ def _report_value_to_legacy(
     return value.value
 
 
+def _remark_to_legacy(remark: AuthoringRemarkSpec) -> dict[str, Any]:
+    """Project one canonical remark without empty alternative content fields."""
+    data = remark.model_dump(mode="json", exclude={"remark_id"}, exclude_none=True)
+    if not data.get("text"):
+        data.pop("text", None)
+    if not data.get("lines"):
+        data.pop("lines", None)
+    return data
+
+
+def _header_field_to_legacy(
+    field: AuthoringHeaderFieldSpec,
+    existing_fields: Sequence[object],
+) -> dict[str, Any]:
+    """Project one canonical header field without leaking canonical metadata."""
+    existing = next(
+        (
+            item
+            for item in existing_fields
+            if isinstance(item, Mapping) and item.get("key") == field.key
+        ),
+        {},
+    )
+    item = dict(existing) if isinstance(existing, Mapping) else {}
+    for key in ("aliases", "layout_path", "slot_id"):
+        item.pop(key, None)
+    item["key"] = field.key
+    item["label"] = field.label
+    item.pop("value", None)
+    item.pop("source_key", None)
+    if field.value.value is not None:
+        item["value"] = _report_value_to_legacy(field.value, existing=existing.get("value"))
+    if field.value.source_key is not None:
+        item["source_key"] = field.value.source_key
+    return item
+
+
 def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
     """Project the canonical header to the renderer's legacy heading shape."""
     compatibility = header.extensions.get("compatibility", {})
@@ -1046,52 +1087,15 @@ def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
         else {}
     )
     existing.update({"enabled": header.enabled})
+    existing.pop("title", None)
+    existing.pop("subtitle", None)
     if header.provider_name is not None:
         existing["provider_name"] = header.provider_name
-    if header.title is not None:
-        existing["title"] = header.title
-    if header.subtitle is not None:
-        existing["subtitle"] = header.subtitle
+    existing_fields = existing.get("general_fields", [])
+    if not isinstance(existing_fields, Sequence) or isinstance(existing_fields, (str, bytes)):
+        existing_fields = []
     existing["general_fields"] = [
-        {
-            **(
-                dict(
-                    next(
-                        (
-                            item
-                            for item in existing.get("general_fields", [])
-                            if isinstance(item, Mapping) and item.get("key") == field.key
-                        ),
-                        {},
-                    )
-                )
-            ),
-            "key": field.key,
-            "label": field.label,
-            **({"aliases": list(field.aliases)} if field.aliases else {}),
-            **({"layout_path": field.layout_path} if field.layout_path is not None else {}),
-            **(
-                {
-                    "value": _report_value_to_legacy(
-                        field.value,
-                        existing=next(
-                            (
-                                item.get("value")
-                                for item in existing.get("general_fields", [])
-                                if isinstance(item, Mapping) and item.get("key") == field.key
-                            ),
-                            None,
-                        ),
-                    )
-                }
-                if field.value.value is not None
-                else {}
-            ),
-            **(
-                {"source_key": field.value.source_key} if field.value.source_key is not None else {}
-            ),
-        }
-        for field in header.general_fields
+        _header_field_to_legacy(field, existing_fields) for field in header.general_fields
     ]
     old_titles = existing.get("service_titles", [])
     existing["service_titles"] = []
@@ -1106,9 +1110,11 @@ def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
             title.value,
             existing=old.get("value"),
         )
+        item.pop("font_size", None)
+        if title.font_size is not None:
+            item["font_size"] = title.font_size
         item.update(
             {
-                "font_size": title.font_size,
                 "auto_adjust": title.auto_adjust,
                 "bold": title.bold,
                 "italic": title.italic,
@@ -1119,13 +1125,13 @@ def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
     if header.detail is not None:
         old_detail = existing.get("detail")
         detail = dict(old_detail) if isinstance(old_detail, Mapping) else {}
-        detail.update(
-            {
-                "kind": header.detail.kind,
-                "title": header.detail.title,
-                "column_titles": list(header.detail.column_titles),
-            }
-        )
+        detail["kind"] = header.detail.kind
+        detail.pop("title", None)
+        if header.detail.title is not None:
+            detail["title"] = header.detail.title
+        detail.pop("column_titles", None)
+        if header.detail.column_titles:
+            detail["column_titles"] = list(header.detail.column_titles)
         old_rows = detail.get("rows", [])
         rows: list[dict[str, Any]] = []
         for row_index, row in enumerate(header.detail.rows):
@@ -1726,10 +1732,13 @@ def authoring_document_to_logfile_mapping(
             {
                 "id": section.id,
                 "title": section.title,
-                "subtitle": section.subtitle,
                 "tracks": rendered_tracks,
             }
         )
+        if section.subtitle is not None:
+            section_payload["subtitle"] = section.subtitle
+        else:
+            section_payload.pop("subtitle", None)
         if section.depth_range is not None:
             section_payload["depth_range"] = list(section.depth_range)
         elif "depth_range" in section_payload:
@@ -1753,20 +1762,25 @@ def authoring_document_to_logfile_mapping(
 
     heading = _header_to_legacy(document.header) if document.header is not None else {}
     layout["heading"] = heading
-    layout["remarks"] = [
-        remark.model_dump(
-            mode="json",
-            exclude={"remark_id"},
-            exclude_none=True,
-        )
-        for remark in document.remarks
-    ]
+    layout["remarks"] = [_remark_to_legacy(remark) for remark in document.remarks]
     layout["log_sections"] = rendered_sections
     tail = layout.get("tail", {})
     tail_payload = deepcopy(dict(tail)) if isinstance(tail, Mapping) else {}
     tail_payload["enabled"] = document.tail.enabled
     layout["tail"] = tail_payload
     legacy["layout"] = layout
+    legacy_header = legacy.get("header")
+    header_payload = dict(legacy_header) if isinstance(legacy_header, Mapping) else {}
+    title = document.title or (document.header.title if document.header is not None else None)
+    subtitle = document.subtitle or (
+        document.header.subtitle if document.header is not None else None
+    )
+    if title is not None:
+        header_payload["title"] = title
+    if subtitle is not None:
+        header_payload["subtitle"] = subtitle
+    if header_payload:
+        legacy["header"] = header_payload
     legacy["bindings"] = {"channels": binding_channels}
     legacy["page"] = document.page.model_dump(mode="json", exclude_none=True)
     legacy["depth"] = document.depth.model_dump(mode="json", exclude_none=True)
@@ -1825,6 +1839,15 @@ def _binding_legacy_data(binding: CurveBindingSpec | RasterBindingSpec) -> dict[
     return {}
 
 
+def _scale_to_legacy(scale: AuthoringScale) -> dict[str, Any]:
+    """Project a canonical scale to the legacy min/max representation."""
+    data = scale.model_dump(mode="json", exclude_none=True)
+    data["min"] = data.pop("minimum")
+    data["max"] = data.pop("maximum")
+    data.pop("unit", None)
+    return data
+
+
 def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str, Any]:
     element = _binding_legacy_data(binding)
     element.update(
@@ -1838,7 +1861,7 @@ def _binding_element(binding: CurveBindingSpec | RasterBindingSpec) -> dict[str,
     )
     if isinstance(binding, CurveBindingSpec):
         if binding.scale is not None:
-            element["scale"] = binding.scale.model_dump(mode="json", exclude_none=True)
+            element["scale"] = _scale_to_legacy(binding.scale)
         if binding.reference_overlay is not None:
             element["reference_overlay"] = binding.reference_overlay.model_dump(
                 mode="json", exclude_none=True
@@ -1920,7 +1943,7 @@ def _render_track(
         }
     )
     if getattr(track, "x_scale", None) is not None:
-        payload["x_scale"] = track.x_scale.model_dump(mode="json", exclude_none=True)
+        payload["x_scale"] = _scale_to_legacy(track.x_scale)
     if isinstance(track, ReferenceTrackSpec):
         payload["reference"] = authoring_reference_track_to_mapping(track)
     bindings = getattr(track, "bindings", ())
@@ -1966,7 +1989,7 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
                 else deepcopy(layout.get("heading", {}))
             )
             layout_sections["remarks"] = [
-                remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
+                _remark_to_legacy(remark) for remark in document.remarks
             ]
             layout_sections["log_sections"] = deepcopy(layout.get("log_sections", []))
             legacy_tail = layout.get("tail", {})
@@ -1987,7 +2010,7 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
     if document.header is not None:
         layout_sections["heading"] = _header_to_legacy(document.header)
     layout_sections["remarks"] = [
-        remark.model_dump(mode="json", exclude_none=True) for remark in document.remarks
+        _remark_to_legacy(remark) for remark in document.remarks
     ]
     layout_sections["log_sections"] = [
         {
@@ -2014,12 +2037,16 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
             **_mapping(payload.get("header", {}), context="document.header"),
             "report": header_payload,
         }
-    if document.title is not None or document.subtitle is not None:
+    title = document.title or (document.header.title if document.header is not None else None)
+    subtitle = document.subtitle or (
+        document.header.subtitle if document.header is not None else None
+    )
+    if title is not None or subtitle is not None:
         header = _mapping(payload.get("header", {}), context="document.header")
-        if document.title is not None:
-            header["title"] = document.title
-        if document.subtitle is not None:
-            header["subtitle"] = document.subtitle
+        if title is not None:
+            header["title"] = title
+        if subtitle is not None:
+            header["subtitle"] = subtitle
         payload["header"] = header
     depth_payload: dict[str, Any] = {
         "unit": document.depth.unit,

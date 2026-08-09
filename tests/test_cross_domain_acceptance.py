@@ -9,10 +9,12 @@ import pytest
 from pydantic import ValidationError
 
 from wellplot import authoring_document_to_render
+from wellplot.authoring import authoring_document_to_logfile_mapping
 from wellplot.authoring_context import resolve_authoring_context
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_reconciler import reconcile_authoring
 from wellplot.authoring_service import AuthoringService
+from wellplot.logfile_schema import validate_logfile_mapping
 from wellplot.model import (
     AuthoringAnnotationMarkerShape,
     AuthoringAnnotationMarkerSpec,
@@ -328,6 +330,7 @@ def test_cross_domain_fixture_supports_report_cardinalities(section_ids: list[st
     """Compose the same generic object families across supported report shapes."""
     document = _document(section_ids)
     rendered = authoring_document_to_render(document)
+    validate_logfile_mapping(authoring_document_to_logfile_mapping(document))
 
     assert [section.id for section in document.sections] == section_ids
     assert [track.kind for track in document.sections[0].tracks] == [
