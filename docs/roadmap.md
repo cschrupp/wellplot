@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-06
+Last updated: 2026-08-08
 
 ## Scope Summary
 
@@ -522,7 +522,8 @@ Longer-term / UI-centric:
 
 ### Phase A: Deterministic Authoring Contract And Production Hardening (current)
 
-- Complete `0.6-A` through `0.6-G` in order.
+- Complete the `0.6-G0` through `0.6-G7` desired-state assembly program after
+  the canonical contract slices already landed.
 - Keep package metadata, docs, generated schema, and public exports aligned.
 - Hold the `0.6.0` version bump and release until contract, CRUD, MCP parity,
   agent, docs, notebook, and installed-wheel gates pass.
@@ -560,14 +561,19 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Complete the `0.6-A` field-level inventory and record every conflict between
-  current dataclasses, schema, parsers, builders, MCP tools, and agent checks.
-- Implement `0.6-B` canonical Pydantic authoring models and generated schema.
-- Add compatibility adapters before moving existing Python or MCP entry points.
-- Build complete deterministic object CRUD before resuming defaults or agent
-  work.
-- Add contract-parity, round-trip, atomic-mutation, and contextual-reference
-  tests as release gates.
+- Complete `0.6-G0` research and the cross-domain dependency matrix.
+- Finish first-class canonical header, tail, and remaining report/output objects
+  in `0.6-G1`.
+- Add typed desired-state intent models with omitted, explicit, clear, and remove
+  semantics in `0.6-G2`.
+- Implement context resolution and precedence in `0.6-G3`.
+- Build the generic idempotent desired-state reconciler in `0.6-G4`.
+- Add deterministic operation execution, read-after-write checks, and phase
+  checkpoints in `0.6-G5`.
+- Rebase the agent on the desired-state plan in `0.6-G6`.
+- Run cross-domain acceptance fixtures and notebook gates in `0.6-G7`.
+- Add contract-parity, round-trip, atomic-mutation, contextual-reference,
+  reconciliation, and idempotency tests as release gates.
 - Maintain release hardening:
   - keep PyPI trusted publishing and post-release install verification healthy
   - clean up remaining workflow maintenance noise such as action runtime deprecation warnings

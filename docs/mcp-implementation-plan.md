@@ -455,6 +455,14 @@ Acceptance:
 Goal:
 
 - make generated intelligence a consumer of complete deterministic capability
+- assemble broad user requests through typed desired state and dependency-ordered
+  reconciliation
+
+The current generic phase executor is necessary but not sufficient. It can
+restrict tool families and verify persisted mutations, but it still allows a
+provider to improvise the order of low-level edits. The missing product layer
+is a generic assembly planner that works for CBL/VDL, open-hole, porosity,
+resistivity, caliper, array, and custom multi-section reports.
 
 Work:
 
@@ -492,6 +500,137 @@ Acceptance:
 - phase reports correspond to persisted object state
 - canonical LAS notebook and CBL stress-test notebook pass end to end
 - full unit, MCP, agent, docs, and notebook smoke gates pass
+
+### 0.6-G Completion Program: Desired-State Assembly
+
+#### 0.6-G0. Contract And Domain Research
+
+Research must produce reusable object rules, aliases, constraints, and test
+fixtures rather than packet-specific templates.
+
+- review representative open-hole, cased-hole, porosity, resistivity, caliper,
+  image/array, and annotation logs
+- identify universal header fields, units, aliases, track families, curve
+  header conventions, scale semantics, raster semantics, and compatibility rules
+- document which values are finite, constrained, contextual, relational, or
+  explicitly extensible
+- define the dependency graph between report, header, sections, tracks,
+  bindings, fills, annotations, styles, and output settings
+- use external domain or implementation research only to validate these
+  reusable rules; do not encode each packet family as an authoritative blueprint
+
+Acceptance:
+
+- the rules apply to multiple log families without CBL-specific identifiers
+- the research output is represented as canonical constraints, aliases, defaults,
+  or fixtures
+
+#### 0.6-G1. Complete The Canonical Report Contract
+
+Finish the persisted objects that are still only compatibility mappings or
+renderer structures:
+
+- first-class header structure and stable header-slot identities
+- header labels, values, units, source keys, service titles, detail rows, and
+  optional provenance
+- tail/report blocks and remaining output settings that represent user intent
+- deterministic getters and typed updates for header and report content
+
+Existing header archetype assets remain layout scaffolds. They define available
+slots and structure; they do not override explicit user values.
+
+#### 0.6-G2. Typed Desired-State Models
+
+Add provider-neutral partial intent models for report, header, section, track,
+curve binding, raster binding, fill, annotation, and output changes.
+
+The models must distinguish:
+
+- omitted values, which preserve existing state or permit defaults
+- explicit values, which must be applied exactly
+- explicit clear operations
+- explicit object removal
+
+The provider should return this validated desired state instead of directly
+improvising a long sequence of MCP mutations.
+
+#### 0.6-G3. Context Resolution And Precedence
+
+Resolve contextual references before mutation planning:
+
+- header field aliases and archetype slots
+- source channels and channel aliases
+- track/content compatibility
+- stable binding identities, including duplicate same-channel bindings
+- units, scales, styles, and raster presentation values
+
+Use the precedence order: explicit user instruction, preserved existing state,
+defaults catalog, starter scaffold.
+
+#### 0.6-G4. Generic Desired-State Reconciler
+
+Implement a deterministic reconciler that compares the current canonical
+document with the desired partial state and returns a typed operation plan.
+
+The plan must establish dependencies in this order:
+
+1. report/header/output objects
+2. sections and section data sources
+3. tracks, kinds, widths, and ordering
+4. curve and raster bindings
+5. fills and annotations
+6. scales, labels, colors, line styles, and other presentation fields
+7. final ordering, explicit removals, validation, and preview
+
+The operation plan must be idempotent. Main/repeat replication may be an
+optimization, but arbitrary section IDs and arbitrary numbers of sections must
+remain valid.
+
+#### 0.6-G5. Deterministic Executor And Checkpoints
+
+Execute each typed operation through `AuthoringService`:
+
+- check preconditions
+- apply atomically
+- read the canonical object back
+- verify the exact postcondition
+- stop on failure without improvising compensating removals
+- expose phase summaries and previews from persisted state
+
+Track creation must complete before bindings; bindings must exist before fills;
+move operations must happen after all required siblings exist; removal must be
+explicit and last.
+
+#### 0.6-G6. Agent Integration
+
+Update `AuthoringSession.plan()`, `run()`, and `revise()` to use the same flow:
+
+1. inspect the current document and sources
+2. extract typed desired state
+3. validate and resolve references/defaults
+4. generate a dry-run operation plan
+5. execute and verify the plan
+6. report completed, blocked, unsupported, and inconsistent requests
+
+Keep narrow deterministic shortcuts for header-only and style-only requests,
+but make them use the same canonical intent and verification contracts.
+
+#### 0.6-G7. Cross-Domain Acceptance
+
+Add acceptance fixtures for:
+
+- open-hole quicklook headers
+- resistivity with logarithmic tracks
+- porosity overlays and crossover fills
+- mirrored caliper curves using one source channel twice
+- CBL/VDL scalar and raster tracks
+- annotation and mixed interpretation tracks
+- one-section, main/repeat, and arbitrary multi-section reports
+- missing channels, partial header data, and unsupported request fields
+- explicit colors, line styles, labels, and scales overriding defaults
+
+The CBL notebook remains a stress test and regression fixture, not the source of
+implementation rules.
 
 ## Release Gate
 
