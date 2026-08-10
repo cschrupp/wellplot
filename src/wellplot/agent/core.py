@@ -28,8 +28,13 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
+from uuid import uuid4
 
-from ..authoring import load_authoring_document
+from ..authoring import (
+    authoring_document_from_mapping,
+    authoring_document_to_yaml,
+    load_authoring_document,
+)
 from ..authoring_context import (
     AuthoringChannelInput,
     AuthoringContextIssue,
@@ -153,9 +158,7 @@ _PHASE_TOOL_FAMILY_NAMES = {
         }
     ),
     "fills": frozenset({"add_curve_fill", "remove_curve_fill"}),
-    "scale": frozenset(
-        {"set_track_scales", "update_curve_binding", "update_raster_binding"}
-    ),
+    "scale": frozenset({"set_track_scales", "update_curve_binding", "update_raster_binding"}),
     "styles": frozenset(
         {
             "set_matplotlib_style",
@@ -532,6 +535,16 @@ class _MatplotlibStyleIntent:
     """Deterministic report-wide Matplotlib style patch extracted from one request."""
 
     style_patch: dict[str, object]
+
+
+@dataclass(frozen=True)
+class _TypedPhasePreview:
+    """Preview captured from one staged typed checkpoint document."""
+
+    kind: str | None = None
+    target: str | None = None
+    png: bytes | None = None
+    error: str | None = None
 
 
 def _relative_logfile_path(root: Path, output_logfile: str | Path) -> str:
@@ -1223,9 +1236,7 @@ def _normalize_remarks_payload(
         if not title or not isinstance(lines_raw, list):
             continue
         lines = tuple(
-            str(line).strip()
-            for line in lines_raw
-            if isinstance(line, str) and line.strip()
+            str(line).strip() for line in lines_raw if isinstance(line, str) and line.strip()
         )
         normalized.append((title, lines))
     return tuple(normalized)
@@ -1567,9 +1578,7 @@ class AuthoringSession:
             packet_blueprint_id=None,
             phases=tuple(phases),
             blocked=not reconciliation_plan.ready,
-            blocked_reasons=tuple(
-                issue.message for issue in reconciliation_plan.issues
-            ),
+            blocked_reasons=tuple(issue.message for issue in reconciliation_plan.issues),
             run_state=AuthoringRunState(
                 objectives=tuple(phase.summary for phase in phases),
             ),
@@ -1944,9 +1953,7 @@ class AuthoringSession:
         Automatic matching made packet examples an implicit source of authoring
         authority, which could override the user's requested object structure.
         """
-        normalized_blueprint_id = (
-            None if blueprint_id is None else str(blueprint_id).strip()
-        )
+        normalized_blueprint_id = None if blueprint_id is None else str(blueprint_id).strip()
         if not normalized_blueprint_id:
             return self._generic_plan_from_text(text)
         blueprint = packet_blueprint_spec(normalized_blueprint_id)
@@ -2245,9 +2252,7 @@ class AuthoringSession:
         outcomes: list[dict[str, object]] = []
         inspections: dict[tuple[str, str], dict[str, object]] = {}
         availability: dict[tuple[str, str], tuple[bool, str]] = {}
-        object_inspections: dict[
-            tuple[str, str | None, str | None], list[dict[str, object]]
-        ] = {}
+        object_inspections: dict[tuple[str, str | None, str | None], list[dict[str, object]]] = {}
 
         async def inspect_track(section_id: str, track_id: str) -> dict[str, object]:
             target = (section_id, track_id)
@@ -2347,9 +2352,11 @@ class AuthoringSession:
                 _require_mcp_success(result, action="inspect_authoring_objects")
                 payload = _structured_content(result)
                 objects = payload.get("objects", [])
-                object_inspections[target] = [
-                    item for item in objects if isinstance(item, dict)
-                ] if isinstance(objects, list) else []
+                object_inspections[target] = (
+                    [item for item in objects if isinstance(item, dict)]
+                    if isinstance(objects, list)
+                    else []
+                )
             return object_inspections[target]
 
         def object_value(item: dict[str, object]) -> dict[str, object]:
@@ -2418,10 +2425,7 @@ class AuthoringSession:
 
         changed = bool(
             change_summary
-            and (
-                change_summary.get("changed")
-                or bool(change_summary.get("summary_lines"))
-            )
+            and (change_summary.get("changed") or bool(change_summary.get("summary_lines")))
         )
         for call in tool_trace:
             if call.name not in mutation_tools:
@@ -2432,9 +2436,7 @@ class AuthoringSession:
 
             if call.name == "set_heading_content":
                 heading_changed = bool(
-                    change_summary.get("heading_changed", changed)
-                    if change_summary
-                    else False
+                    change_summary.get("heading_changed", changed) if change_summary else False
                 )
                 record(call, heading_changed, "heading_changed=" + str(heading_changed))
                 continue
@@ -2467,9 +2469,13 @@ class AuthoringSession:
                     for key in ("unit", "scale", "major_step", "minor_step")
                     if arguments.get(key) is not None
                 }
-                ok = bool(expected) and depth is not None and self._subset_matches(
-                    depth,
-                    expected,
+                ok = (
+                    bool(expected)
+                    and depth is not None
+                    and self._subset_matches(
+                        depth,
+                        expected,
+                    )
                 )
                 record(call, ok, "depth axis matches" if ok else "depth axis mismatch")
                 continue
@@ -2482,9 +2488,13 @@ class AuthoringSession:
                     for key in ("title", "subtitle", "depth_range")
                     if arguments.get(key) is not None
                 }
-                ok = bool(expected) and section is not None and self._subset_matches(
-                    section,
-                    expected,
+                ok = (
+                    bool(expected)
+                    and section is not None
+                    and self._subset_matches(
+                        section,
+                        expected,
+                    )
                 )
                 record(call, ok, "section fields match" if ok else "section fields mismatch")
                 continue
@@ -2611,14 +2621,11 @@ class AuthoringSession:
                     expected_kind = str(arguments.get("kind", "")).strip()
                     kinds = section.get("track_kinds", [])
                     index = track_ids.index(track_id) if exists else -1
-                    kind_matches = (
-                        not expected_kind
-                        or (
-                            isinstance(kinds, list)
-                            and index >= 0
-                            and index < len(kinds)
-                            and str(kinds[index]).strip() == expected_kind
-                        )
+                    kind_matches = not expected_kind or (
+                        isinstance(kinds, list)
+                        and index >= 0
+                        and index < len(kinds)
+                        and str(kinds[index]).strip() == expected_kind
                     )
                     record(
                         call,
@@ -2698,8 +2705,7 @@ class AuthoringSession:
                             binding
                             for binding in bindings
                             if isinstance(binding, dict)
-                            and str(binding.get("channel", "")).upper()
-                            == str(channel).upper()
+                            and str(binding.get("channel", "")).upper() == str(channel).upper()
                         ]
                         channel_ok = bool(target_bindings) and all(
                             isinstance(expected_scale, dict)
@@ -2784,9 +2790,10 @@ class AuthoringSession:
                 )
             elif call.name == "add_curve_fill":
                 fill = target_binding.get("fill")
-                ok = isinstance(fill, dict) and str(fill.get("kind", "")) == str(
-                    arguments.get("kind", "")
-                ).strip().lower()
+                ok = (
+                    isinstance(fill, dict)
+                    and str(fill.get("kind", "")) == str(arguments.get("kind", "")).strip().lower()
+                )
                 detail = "fill kind matches" if ok else "persisted fill is missing or mismatched"
             elif call.name == "remove_curve_fill":
                 ok = "fill" not in target_binding
@@ -2893,9 +2900,7 @@ class AuthoringSession:
                     conflicts = preview_payload.get("conflicting_values", [])
                     unmatched = preview_payload.get("unmatched_values", [])
                     matched_count = (
-                        len(resolved_assignments)
-                        if isinstance(resolved_assignments, list)
-                        else 0
+                        len(resolved_assignments) if isinstance(resolved_assignments, list) else 0
                     )
                     pending_count = (
                         sum(
@@ -2946,9 +2951,7 @@ class AuthoringSession:
             elif kind == "tool_outcomes_match":
                 outcome_state = context.get("tool_outcomes")
                 outcomes = (
-                    outcome_state.get("outcomes", [])
-                    if isinstance(outcome_state, dict)
-                    else []
+                    outcome_state.get("outcomes", []) if isinstance(outcome_state, dict) else []
                 )
                 ok = (
                     bool(
@@ -3010,9 +3013,7 @@ class AuthoringSession:
         previous_draft_text: str | None = None,
     ) -> dict[str, object]:
         """Capture one deterministic verification context bundle for a phase."""
-        check_kinds = {
-            str(spec.get("kind", "")).strip() for spec in phase.success_check_specs
-        }
+        check_kinds = {str(spec.get("kind", "")).strip() for spec in phase.success_check_specs}
         context: dict[str, object] = {}
         if "header_values_applied" in check_kinds:
             intent = _extract_packet_header_fill_intent(request_text)
@@ -3433,18 +3434,15 @@ class AuthoringSession:
                 if not isinstance(raw_spec, dict):
                     continue
                 spec = deepcopy(raw_spec)
-                spec["kind"] = (
-                    str(spec.get("kind", "")).strip().lower()
-                    or ("raster" if track_kind == "array" else "curve")
+                spec["kind"] = str(spec.get("kind", "")).strip().lower() or (
+                    "raster" if track_kind == "array" else "curve"
                 )
                 specs.append(spec)
         if specs:
             return specs
         expected_by_track = section_template.get("expected_bindings_by_track", {})
         raw_channels = (
-            expected_by_track.get(track_id, [])
-            if isinstance(expected_by_track, dict)
-            else []
+            expected_by_track.get(track_id, []) if isinstance(expected_by_track, dict) else []
         )
         if not isinstance(raw_channels, list):
             return []
@@ -4090,8 +4088,7 @@ class AuthoringSession:
                 else:
                     blocked_reasons = tuple(
                         (
-                            f"Unmet success check `{check.get('kind', '')}`: "
-                            f"{check.get('detail')}."
+                            f"Unmet success check `{check.get('kind', '')}`: {check.get('detail')}."
                             if str(check.get("detail", "")).strip()
                             else f"Unmet success check `{check.get('kind', '')}`."
                         )
@@ -4381,12 +4378,149 @@ class AuthoringSession:
         )
 
     @staticmethod
+    def _typed_save_payload(document: AuthoringDocumentSpec) -> dict[str, object]:
+        """Validate and serialize one typed document before MCP persistence."""
+        envelope = {
+            "version": 1,
+            "name": document.name,
+            "document": document.model_dump(mode="json"),
+        }
+        validated = authoring_document_from_mapping(envelope)
+        # Exercise the same canonical serializer used for persisted documents.  The
+        # returned envelope keeps the MCP boundary explicit and JSON-compatible.
+        authoring_document_to_yaml(validated)
+        return {
+            "version": 1,
+            "name": validated.name,
+            "document": validated.model_dump(mode="json"),
+        }
+
+    async def _save_typed_document(
+        self,
+        *,
+        session: McpSessionProtocol,
+        document: AuthoringDocumentSpec,
+        output_path: str,
+        attempts: int,
+    ) -> tuple[str | None, bool]:
+        """Persist one validated typed document with a bounded idempotent retry."""
+        try:
+            document_payload = self._typed_save_payload(document)
+        except Exception as exc:
+            return f"local typed document validation failed: {exc}", False
+
+        last_error: str | None = None
+        saw_transport_failure = False
+        for _attempt in range(max(1, attempts)):
+            try:
+                result = await session.call_tool(
+                    "save_authoring_document",
+                    {
+                        "document": document_payload,
+                        "output_path": output_path,
+                        "overwrite": True,
+                        "base_dir": str(Path(output_path).parent),
+                    },
+                )
+                payload_error = _tool_payload_error_text(self.runtime.tool_result_payload(result))
+                if payload_error is None:
+                    return None, saw_transport_failure
+                last_error = payload_error
+            except Exception as exc:
+                saw_transport_failure = True
+                last_error = f"{type(exc).__name__}: {exc}"
+
+        total_attempts = max(1, attempts)
+        return (
+            f"save_authoring_document failed after {total_attempts} attempt(s): "
+            f"{last_error or 'unknown MCP failure'}",
+            saw_transport_failure,
+        )
+
+    async def _capture_typed_phase_previews(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        execution: AuthoringExecutionResult,
+    ) -> tuple[dict[AuthoringOperationPhase, _TypedPhasePreview], tuple[str, ...]]:
+        """Render each typed checkpoint from a temporary same-directory logfile."""
+        previews: dict[AuthoringOperationPhase, _TypedPhasePreview] = {}
+        warnings: list[str] = []
+        draft_path = Path(draft_logfile)
+        for index, checkpoint in enumerate(execution.phase_summaries):
+            staged_path = draft_path.parent / (
+                f".{draft_path.name}.phase-{index}-{uuid4().hex}.log.yaml"
+            )
+            staged_logfile = staged_path.as_posix()
+            try:
+                save_error, _ = await self._save_typed_document(
+                    session=session,
+                    document=checkpoint.document,
+                    output_path=staged_logfile,
+                    attempts=1,
+                )
+                if save_error is not None:
+                    message = (
+                        f"Phase `{checkpoint.phase.value}` preview staging failed: {save_error}"
+                    )
+                    previews[checkpoint.phase] = _TypedPhasePreview(error=message)
+                    warnings.append(message)
+                    continue
+
+                if checkpoint.phase == AuthoringOperationPhase.REPORT:
+                    preview_result = await session.call_tool(
+                        "preview_logfile_png",
+                        {
+                            "logfile_path": staged_logfile,
+                            "page_index": 0,
+                            "dpi": 72,
+                            "include_report_pages": True,
+                        },
+                    )
+                    _require_mcp_success(preview_result, action="preview_logfile_png")
+                    previews[checkpoint.phase] = _TypedPhasePreview(
+                        kind="report",
+                        png=self.runtime.image_bytes(preview_result),
+                    )
+                    continue
+
+                if not checkpoint.document.sections:
+                    raise RuntimeError("the checkpoint has no section to preview")
+                section_id = checkpoint.document.sections[0].id
+                preview_result = await session.call_tool(
+                    "preview_section_png",
+                    {
+                        "logfile_path": staged_logfile,
+                        "section_id": section_id,
+                        "dpi": 72,
+                    },
+                )
+                _require_mcp_success(preview_result, action="preview_section_png")
+                previews[checkpoint.phase] = _TypedPhasePreview(
+                    kind="section",
+                    target=section_id,
+                    png=self.runtime.image_bytes(preview_result),
+                )
+            except Exception as exc:
+                message = (
+                    f"Phase `{checkpoint.phase.value}` preview failed: {type(exc).__name__}: {exc}"
+                )
+                previews[checkpoint.phase] = _TypedPhasePreview(error=message)
+                warnings.append(message)
+            finally:
+                staged_path.unlink(missing_ok=True)
+        return previews, tuple(warnings)
+
+    @staticmethod
     def _typed_phase_summaries(
         *,
         plan: AuthoringPlanResult,
         execution: AuthoringExecutionResult,
+        phase_previews: Mapping[AuthoringOperationPhase, _TypedPhasePreview] | None = None,
     ) -> tuple[ExecutedAuthoringPhase, ...]:
         """Convert executor checkpoints into the public agent phase contract."""
+        captured_previews = {} if phase_previews is None else phase_previews
         phase_by_operation_ids = {
             tuple(phase.metadata.get("operation_ids", [])): phase for phase in plan.phases
         }
@@ -4395,9 +4529,7 @@ class AuthoringSession:
             operation_ids = tuple(checkpoint.operation_ids)
             plan_phase = phase_by_operation_ids.get(operation_ids)
             phase_id = (
-                plan_phase.id
-                if plan_phase is not None
-                else f"desired-{checkpoint.phase.value}"
+                plan_phase.id if plan_phase is not None else f"desired-{checkpoint.phase.value}"
             )
             phase_kind = (
                 plan_phase.kind
@@ -4410,9 +4542,14 @@ class AuthoringSession:
                 else f"Apply typed {checkpoint.phase.value} desired-state operations."
             )
             status = checkpoint.status.value
-            blocked_reasons = () if status == AuthoringExecutionStatus.COMPLETED else (
-                checkpoint.preview_error
-                or f"Typed {checkpoint.phase.value} phase did not complete.",
+            phase_preview = captured_previews.get(checkpoint.phase, _TypedPhasePreview())
+            blocked_reasons = (
+                ()
+                if status == AuthoringExecutionStatus.COMPLETED
+                else (
+                    checkpoint.preview_error
+                    or f"Typed {checkpoint.phase.value} phase did not complete.",
+                )
             )
             summaries.append(
                 ExecutedAuthoringPhase(
@@ -4420,27 +4557,87 @@ class AuthoringSession:
                     kind=phase_kind,
                     summary=phase_summary,
                     status=(
-                        "completed"
-                        if status == AuthoringExecutionStatus.COMPLETED
-                        else "blocked"
+                        "completed" if status == AuthoringExecutionStatus.COMPLETED else "blocked"
                     ),
                     tool_trace=(),
                     verification={
                         "ok": status == AuthoringExecutionStatus.COMPLETED,
                         "operation_ids": list(operation_ids),
                         "applied_count": checkpoint.applied_count,
+                        **(
+                            {"preview_error": phase_preview.error}
+                            if phase_preview.error is not None
+                            else {}
+                        ),
                     },
                     blocked_reasons=blocked_reasons,
-                    preview_kind=(
-                        "typed_document" if checkpoint.preview_png is not None else None
-                    ),
-                    preview_target=(
-                        checkpoint.phase.value if checkpoint.preview_png is not None else None
-                    ),
-                    preview_png=checkpoint.preview_png,
+                    preview_kind=phase_preview.kind,
+                    preview_target=phase_preview.target,
+                    preview_png=phase_preview.png,
                 )
             )
         return tuple(summaries)
+
+    def _typed_transport_blocked_result(
+        self,
+        *,
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        provider_result: ProviderRunResult,
+        plan: AuthoringPlanResult | None,
+        phase_summaries: tuple[ExecutedAuthoringPhase, ...],
+        run_state: AuthoringRunState,
+        reason: str,
+    ) -> AuthoringResult:
+        """Return a structured result when MCP transport prevents finalization."""
+        report_facts = dict(provider_result.report_facts)
+        report_facts["warnings"] = list(report_facts.get("warnings", [])) + [reason]
+        report_facts["reasons"] = list(report_facts.get("reasons", [])) + [reason]
+        report_facts["not_done"] = list(report_facts.get("not_done", [])) + [
+            "Persist and finalize the typed desired-state document."
+        ]
+        report_facts["next_help"] = list(report_facts.get("next_help", [])) + [
+            "Retry the request after the local MCP server connection is available."
+        ]
+        output_path = self.runtime.server_root / draft_logfile
+        draft_text = (
+            output_path.read_text(encoding="utf-8") if output_path.exists() else baseline_draft_text
+        )
+        return AuthoringResult(
+            provider=self.backend.provider,
+            model=self.backend.model,
+            credential_source=self.backend.credential_source,
+            request_kind=request_kind,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            goal=goal,
+            draft_logfile=draft_logfile,
+            server_root=self.runtime.server_root,
+            tool_trace=provider_result.tool_trace,
+            final_text="Typed desired-state execution was blocked by MCP transport.",
+            validation={"valid": False, "message": reason},
+            draft_summary={},
+            inspect_summary={},
+            change_summary={"summary_lines": []},
+            draft_text=draft_text,
+            report_preview_png=b"",
+            section_preview_png=b"",
+            plan=plan,
+            phase_summaries=phase_summaries,
+            run_state=run_state,
+            user_report=_build_user_report(
+                request_text=goal,
+                validation={"valid": False, "message": reason},
+                draft_summary={},
+                change_summary={"summary_lines": []},
+                tool_trace=provider_result.tool_trace,
+                report_facts=report_facts,
+            ),
+        )
 
     async def _run_desired_state_workflow(
         self,
@@ -4478,8 +4675,7 @@ class AuthoringSession:
         )
         available_channels = {
             section.section_id: [
-                candidate.model_dump(mode="json")
-                for candidate in section.available_channels
+                candidate.model_dump(mode="json") for candidate in section.available_channels
             ]
             for section in context_snapshot.sections
         }
@@ -4510,9 +4706,7 @@ class AuthoringSession:
                 tool_trace=provider_result.tool_trace,
                 report_facts={
                     "not_done": ["Extract a typed desired state from the request."],
-                    "reasons": [
-                        "The provider did not submit a valid AuthoringDocumentIntent."
-                    ],
+                    "reasons": ["The provider did not submit a valid AuthoringDocumentIntent."],
                     "next_help": [
                         "Retry with a request that identifies the requested object fields "
                         "and values explicitly."
@@ -4541,9 +4735,8 @@ class AuthoringSession:
                 final_text="Desired-state planning was blocked before mutation.",
                 tool_trace=provider_result.tool_trace,
                 report_facts={
-                    "not_done": [phase.summary for phase in plan.phases] or [
-                        "Resolve and reconcile the typed desired state."
-                    ],
+                    "not_done": [phase.summary for phase in plan.phases]
+                    or ["Resolve and reconcile the typed desired state."],
                     "reasons": list(reasons),
                     "next_help": [
                         "Correct the blocked references or provide the missing source "
@@ -4567,23 +4760,25 @@ class AuthoringSession:
             AuthoringService(existing),
             plan.reconciliation_plan,
         )
-        phase_summaries = self._typed_phase_summaries(plan=plan, execution=execution)
+        phase_previews, phase_preview_warnings = await self._capture_typed_phase_previews(
+            session=session,
+            draft_logfile=draft_logfile,
+            execution=execution,
+        )
+        phase_summaries = self._typed_phase_summaries(
+            plan=plan,
+            execution=execution,
+            phase_previews=phase_previews,
+        )
         save_error: str | None = None
+        save_transport_failure = False
         if execution.success:
-            save_result = await session.call_tool(
-                "save_authoring_document",
-                {
-                    "document": {
-                        "version": 1,
-                        "name": execution.document.name,
-                        "document": execution.document.model_dump(mode="json"),
-                    },
-                    "output_path": draft_logfile,
-                    "overwrite": True,
-                    "base_dir": str(Path(draft_logfile).parent),
-                },
+            save_error, save_transport_failure = await self._save_typed_document(
+                session=session,
+                document=execution.document,
+                output_path=draft_logfile,
+                attempts=2,
             )
-            save_error = _tool_payload_error_text(self.runtime.tool_result_payload(save_result))
 
         completed = [phase.summary for phase in phase_summaries if phase.status == "completed"]
         blocked = [phase.summary for phase in phase_summaries if phase.status != "completed"]
@@ -4592,6 +4787,7 @@ class AuthoringSession:
             reasons.append(f"Canonical desired-state save failed: {save_error}")
         if not execution.success and not reasons:
             reasons.append("The deterministic executor stopped before all postconditions passed.")
+        warnings = list(execution.warnings) + list(phase_preview_warnings)
         provider_result = ProviderRunResult(
             final_text=(
                 "Typed desired state executed and persisted."
@@ -4603,13 +4799,13 @@ class AuthoringSession:
                 "completed": completed,
                 "not_done": blocked,
                 "reasons": reasons,
-                "warnings": list(execution.warnings),
+                "warnings": warnings,
                 "next_help": [
                     "Inspect the blocked operation and correct its object identity or "
                     "source-channel reference before retrying."
-                ] if reasons else [
-                    "Continue with another typed revision or request a final render."
-                ],
+                ]
+                if reasons
+                else ["Continue with another typed revision or request a final render."],
             },
         )
         run_state = self._run_state_from_summary(
@@ -4620,21 +4816,56 @@ class AuthoringSession:
             last_verification={
                 "success": execution.success and save_error is None,
                 "errors": reasons,
+                "phase_preview_warnings": list(phase_preview_warnings),
             },
         )
-        return await self._finalize_result(
-            session=session,
-            draft_logfile=draft_logfile,
-            request_kind=request_kind,
-            goal=request_text,
-            example_id=example_id,
-            source_logfile_path=source_logfile_path,
-            baseline_draft_text=baseline_draft_text,
-            provider_result=provider_result,
-            plan=plan,
-            phase_summaries=phase_summaries,
-            run_state=run_state,
-        )
+        if save_error is not None and save_transport_failure:
+            return self._typed_transport_blocked_result(
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                plan=plan,
+                phase_summaries=phase_summaries,
+                run_state=run_state,
+                reason=save_error,
+            )
+        try:
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                plan=plan,
+                phase_summaries=phase_summaries,
+                run_state=run_state,
+            )
+        except Exception as exc:
+            if not save_transport_failure:
+                raise
+            return self._typed_transport_blocked_result(
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                plan=plan,
+                phase_summaries=phase_summaries,
+                run_state=run_state,
+                reason=(
+                    "MCP transport closed before final validation/preview: "
+                    f"{type(exc).__name__}: {exc}"
+                ),
+            )
 
     async def run_request(self, request: AuthoringRequest) -> AuthoringResult:
         """Run one authoring request from the provider-neutral request model."""

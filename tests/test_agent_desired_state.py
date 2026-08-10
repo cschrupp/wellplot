@@ -64,14 +64,18 @@ class _NoProviderBackend:
 class _TypedRuntime:
     """Minimal runtime for the typed desired-state integration path."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, save_failures: int = 0) -> None:
         self.server_root = root
+        self.save_failures = save_failures
         self.session: _TypedSession | None = None
 
     @asynccontextmanager
     async def open_session(self) -> object:
         """Yield one stateful fake MCP session."""
-        self.session = _TypedSession(self.server_root)
+        self.session = _TypedSession(
+            self.server_root,
+            save_failures=self.save_failures,
+        )
         yield self.session
 
     def build_tool_definitions(self, **_: object) -> list[object]:
@@ -97,8 +101,9 @@ class _TypedRuntime:
 class _TypedSession:
     """Stateful MCP double that persists the canonical YAML passed by the agent."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, save_failures: int = 0) -> None:
         self.root = root
+        self.save_failures = save_failures
         self.tool_calls: list[tuple[str, dict[str, object]]] = []
 
     async def get_prompt(self, _: str, __: dict[str, object]) -> object:
@@ -124,6 +129,9 @@ class _TypedSession:
                 }
             )
         if name == "save_authoring_document":
+            if self.save_failures and arguments.get("output_path") == "workspace/demo.log.yaml":
+                self.save_failures -= 1
+                raise RuntimeError("Connection closed during save")
             output_path = self.root / str(arguments["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             document = authoring_document_from_mapping(arguments["document"])
@@ -132,9 +140,7 @@ class _TypedSession:
         if name == "summarize_logfile_draft":
             return SimpleNamespace(structuredContent=self._summary())
         if name == "inspect_logfile":
-            return SimpleNamespace(
-                structuredContent={"section_ids": ["main"], "sections": []}
-            )
+            return SimpleNamespace(structuredContent={"section_ids": ["main"], "sections": []})
         if name == "inspect_heading_slots":
             return SimpleNamespace(
                 structuredContent={
@@ -173,9 +179,7 @@ class _TypedSession:
         if name == "validate_logfile":
             return SimpleNamespace(structuredContent={"valid": True})
         if name == "summarize_logfile_changes":
-            return SimpleNamespace(
-                structuredContent={"summary_lines": ["Updated report title."]}
-            )
+            return SimpleNamespace(structuredContent={"summary_lines": ["Updated report title."]})
         if name in {"preview_logfile_png", "preview_section_png"}:
             return SimpleNamespace(content=[SimpleNamespace(data=b"preview")])
         raise AssertionError(f"Unexpected MCP tool: {name}")
@@ -216,9 +220,7 @@ def test_plan_builds_typed_reconciliation_operations_without_mutation() -> None:
     assert plan.mode == "desired_state"
     assert plan.blocked is False
     assert plan.reconciliation_plan is not None
-    assert [operation.object_id for operation in plan.reconciliation_plan.operations] == [
-        "report"
-    ]
+    assert [operation.object_id for operation in plan.reconciliation_plan.operations] == ["report"]
     assert plan.desired_state is not None
     assert plan.desired_state.title == "Revised"
 
@@ -249,4 +251,69 @@ def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_pa
         allowed_root=tmp_path,
     )
     assert saved.title == "Revised"
-    assert [name for name, _ in runtime.session.tool_calls].count("save_authoring_document") == 1
+    save_calls = [
+        arguments
+        for name, arguments in runtime.session.tool_calls
+        if name == "save_authoring_document"
+    ]
+    assert len(save_calls) >= 2
+    assert [
+        arguments["output_path"]
+        for arguments in save_calls
+        if arguments["output_path"] == "workspace/demo.log.yaml"
+    ] == ["workspace/demo.log.yaml"]
+    assert result.phase_summaries[0].preview_kind == "report"
+    assert result.phase_summaries[0].preview_png == b"preview"
+
+
+def test_typed_save_retries_once_after_transport_failure(tmp_path: Path) -> None:
+    """Retry an idempotent final save once after a transient MCP failure."""
+    runtime = _TypedRuntime(tmp_path, save_failures=1)
+    session = AuthoringSession(backend=_NoProviderBackend(), runtime=runtime)
+
+    result = anyio.run(
+        session.run_request,
+        AuthoringRequest(
+            goal="Update the report title.",
+            output_logfile="workspace/demo.log.yaml",
+            example_id="demo",
+            desired_state={"title": "Revised"},
+        ),
+    )
+
+    saved = load_authoring_document(
+        tmp_path / "workspace/demo.log.yaml",
+        allowed_root=tmp_path,
+    )
+    assert saved.title == "Revised"
+    assert not result.user_report.warnings_or_errors
+    target_save_calls = [
+        arguments
+        for name, arguments in runtime.session.tool_calls
+        if name == "save_authoring_document"
+        and arguments["output_path"] == "workspace/demo.log.yaml"
+    ]
+    assert len(target_save_calls) == 2
+
+
+def test_typed_save_failure_returns_structured_blocked_result(tmp_path: Path) -> None:
+    """Do not leak a closed MCP transport when both final save attempts fail."""
+    runtime = _TypedRuntime(tmp_path, save_failures=2)
+    session = AuthoringSession(backend=_NoProviderBackend(), runtime=runtime)
+
+    result = anyio.run(
+        session.run_request,
+        AuthoringRequest(
+            goal="Update the report title.",
+            output_logfile="workspace/demo.log.yaml",
+            example_id="demo",
+            desired_state={"title": "Revised"},
+        ),
+    )
+
+    assert result.validation["valid"] is False
+    assert (
+        "save_authoring_document failed after 2 attempt(s)"
+        in (result.user_report.warnings_or_errors[0])
+    )
+    assert result.user_report.could_not_do
