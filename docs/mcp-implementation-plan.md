@@ -879,10 +879,20 @@ local serialization and validation.
 
 #### 0.6-G7.1. Real Agent Acceptance
 
-Add recorded provider-to-intent tests and optional live-provider gates for CBL/VDL,
-caliper, porosity, resistivity, open-hole, annotations, arrays, and arbitrary
-multi-section requests. Verify that explicit widths, scales, colors, styles,
-labels, raster settings, and header values override defaults.
+Status: recorded provider-to-intent acceptance implemented; live-provider execution
+remains an optional credentialed gate.
+
+`tests/test_cross_domain_acceptance.py` now replays provider submissions through
+the real `submit_authoring_intent` contract and then runs the submitted state
+through context resolution, planning, dependency-ordered reconciliation, and
+read-after-write execution. The acceptance cases cover CBL/VDL, mirrored
+caliper, porosity, logarithmic resistivity, open-hole header slots, annotations,
+arrays, and arbitrary multi-section reports. They verify that explicit widths,
+scales, colors, line styles, labels, raster settings, page layout, and header
+values survive the provider boundary and override existing/default values.
+
+Credentialed live-provider runs remain a manual release-gate activity; they must
+exercise the same cases without granting the provider mutation tools.
 
 #### 0.6-G7.2. Notebook and Release Gate
 
