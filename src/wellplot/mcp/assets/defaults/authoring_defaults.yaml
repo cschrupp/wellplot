@@ -4,11 +4,19 @@ track_archetypes:
     label: Reference Depth
     kind: reference
     default_width_mm: 16.0
+    recommended_channels:
+      - DEPT
+      - DEPTH
+      - MD
     notes: Shared depth axis, markers, and event context.
   - id: gamma_ray
     label: Gamma Ray
     kind: normal
     default_width_mm: 28.0
+    recommended_channels:
+      - GR
+      - SGR
+      - CGR
     recommended_binding:
       scale:
         kind: linear
@@ -29,6 +37,29 @@ track_archetypes:
     label: Resistivity
     kind: normal
     default_width_mm: 28.0
+    recommended_channels:
+      - RT
+      - RESD
+      - RDEP
+      - ILD
+      - AT90
+      - RMED
+      - ILM
+      - AT60
+      - RS
+      - RSH
+      - RXO
+      - AT30
+    recommended_track_patch:
+      x_scale:
+        kind: log
+        minimum: 0.2
+        maximum: 2000.0
+      grid:
+        vertical_main_scale: logarithmic
+        vertical_main_spacing_mode: scale
+        vertical_secondary_scale: logarithmic
+        vertical_secondary_spacing_mode: scale
     recommended_binding:
       scale:
         kind: log
@@ -39,6 +70,12 @@ track_archetypes:
     label: VDL Array
     kind: array
     default_width_mm: 28.0
+    recommended_channels:
+      - VDL
+    recommended_binding:
+      profile: vdl
+      style:
+        colormap: gray_r
     notes: Array/raster track for waveform-style VDL presentation.
 
 style_presets:
@@ -58,6 +95,16 @@ style_presets:
         vertical:
           secondary:
             line_count: 4
+    channel_families:
+      bulk_density:
+        - RHOB
+        - RHOZ
+        - ZDEN
+        - DEN
+      neutron_porosity:
+        - NPHI
+        - TNPH
+        - NPL
     binding_templates:
       - alias_id: bulk_density
         label: Density
@@ -105,6 +152,11 @@ style_presets:
       width_mm: 28.0
       grid:
         display: true
+    channel_families:
+      gamma_ray:
+        - GR
+        - SGR
+        - CGR
     binding_templates:
       - alias_id: gamma_ray
         label: Gamma Ray
@@ -146,6 +198,22 @@ style_presets:
           secondary:
             scale: logarithmic
             spacing_mode: scale
+    channel_families:
+      shallow_resistivity:
+        - RS
+        - RSH
+        - RXO
+        - AT30
+      medium_resistivity:
+        - RMED
+        - ILM
+        - AT60
+      deep_resistivity:
+        - RT
+        - RESD
+        - RDEP
+        - ILD
+        - AT90
     binding_templates:
       - alias_id: shallow_resistivity
         label: RSH
@@ -188,6 +256,12 @@ style_presets:
       - vdl
       - cement bond
       - waveform
+    channel_families:
+      cement_bond:
+        - CBL
+        - CBLF
+      variable_density_log:
+        - VDL
     binding_templates:
       - alias_id: cement_bond
         label: CBL
@@ -214,6 +288,12 @@ style_presets:
       - cbl
       - vdl
       - print-safe
+    channel_families:
+      cement_bond:
+        - CBL
+        - CBLF
+      variable_density_log:
+        - VDL
     binding_templates:
       - alias_id: cement_bond
         label: CBL

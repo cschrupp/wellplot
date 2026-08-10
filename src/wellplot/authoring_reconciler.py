@@ -698,9 +698,14 @@ def _add_binding_operation(
                 code="binding_create_incomplete",
                 message="Creating a binding requires a resolved source channel.",
             )
-        payload = _raw_intent(intent)
-        payload.pop("section_id", None)
-        payload.pop("track_id", None)
+        payload = _patch_for_model(
+            intent,
+            _MISSING,
+            base_path=base_path,
+            decisions=decisions,
+            ignored={"kind", "binding_id", "section_id", "track_id"},
+        )
+        payload.update({"kind": expected_kind, "binding_id": intent.binding_id})
         dependencies = [track_dependency] if track_dependency else []
         builder.add(
             phase=AuthoringOperationPhase.BINDINGS,

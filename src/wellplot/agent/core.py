@@ -36,6 +36,7 @@ from ..authoring_context import (
     AuthoringContextSnapshot,
     build_authoring_context_snapshot,
 )
+from ..authoring_defaults import generic_authoring_defaults
 from ..authoring_executor import (
     AuthoringExecutionResult,
     AuthoringExecutionStatus,
@@ -1508,11 +1509,14 @@ class AuthoringSession:
         available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None,
     ) -> AuthoringPlanResult:
         """Build the public plan view for one typed reconciliation plan."""
+        defaults_resolution = generic_authoring_defaults(intent)
         reconciliation_plan = reconcile_authoring(
             intent,
             existing=existing,
+            defaults=defaults_resolution.defaults,
             available_channels=available_channels,
         )
+        reconciliation_plan.warnings.extend(defaults_resolution.warnings)
         operations_by_phase: dict[AuthoringOperationPhase, list[str]] = {}
         for operation in reconciliation_plan.operations:
             operations_by_phase.setdefault(operation.phase, []).append(operation.operation_id)
