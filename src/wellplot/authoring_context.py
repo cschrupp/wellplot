@@ -851,6 +851,130 @@ def _iter_binding_targets(
     return targets
 
 
+def _binding_scope_key(
+    binding: AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
+    *,
+    section_id: str | None,
+    track_id: str | None,
+) -> tuple[str, str | None, str | None, str]:
+    """Return one logical identity for a binding declaration."""
+    return (binding.kind, section_id, track_id, binding.binding_id)
+
+
+def _merge_duplicate_binding(
+    primary: AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
+    duplicate: AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
+    *,
+    primary_path: str,
+    duplicate_path: str,
+    issues: list[AuthoringContextIssue],
+) -> bool:
+    """Merge non-conflicting fields from one alternate binding declaration."""
+    conflicts: list[str] = []
+    for field_name in duplicate.model_fields_set:
+        if field_name in {"kind", "binding_id", "section_id", "track_id"}:
+            continue
+        duplicate_value = getattr(duplicate, field_name)
+        if field_name in primary.model_fields_set:
+            primary_value = getattr(primary, field_name)
+            if _plain_value(primary_value) != _plain_value(duplicate_value):
+                conflicts.append(field_name)
+            continue
+        setattr(primary, field_name, deepcopy(duplicate_value))
+    if conflicts:
+        issues.append(
+            AuthoringContextIssue(
+                path=f"{duplicate_path}.binding_id",
+                code="duplicate_binding_definition",
+                message=(
+                    f"Binding {duplicate.binding_id!r} is declared at both "
+                    f"{primary_path} and {duplicate_path} with conflicting fields: "
+                    f"{', '.join(conflicts)}."
+                ),
+            )
+        )
+        return False
+    return True
+
+
+def _coalesce_alternate_binding_references(
+    intent: AuthoringDocumentIntent,
+    *,
+    issues: list[AuthoringContextIssue],
+) -> None:
+    """Coalesce equivalent nested and root-level binding references.
+
+    The desired-state schema supports both nested bindings and direct root
+    binding collections. Providers can reasonably emit both for the same
+    requested object. They are alternate representations, not two binding
+    instances, when their scoped identity matches. Repeated declarations in
+    the same collection remain visible to the duplicate-identity validator.
+    """
+    canonical: dict[
+        tuple[str, str | None, str | None, str],
+        tuple[
+            AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
+            str,
+            str,
+        ],
+    ] = {}
+
+    if isinstance(intent.sections, list):
+        for section in intent.sections:
+            if not isinstance(section, AuthoringSectionIntent) or not isinstance(
+                section.tracks, list
+            ):
+                continue
+            for track in section.tracks:
+                if not isinstance(track, AuthoringTrackIntent) or not isinstance(
+                    track.bindings, list
+                ):
+                    continue
+                for index, binding in enumerate(track.bindings):
+                    if not isinstance(
+                        binding,
+                        (AuthoringCurveBindingIntent, AuthoringRasterBindingIntent),
+                    ):
+                        continue
+                    path = (
+                        f"sections[{section.section_id}].tracks[{track.track_id}]"
+                        f".bindings[{index}]"
+                    )
+                    key = _binding_scope_key(
+                        binding,
+                        section_id=section.section_id,
+                        track_id=track.track_id,
+                    )
+                    if key not in canonical:
+                        canonical[key] = (binding, path, "nested")
+
+    for collection_name in ("curve_bindings", "raster_bindings"):
+        bindings = getattr(intent, collection_name)
+        if not isinstance(bindings, list):
+            continue
+        retained: list[AuthoringCurveBindingIntent | AuthoringRasterBindingIntent] = []
+        for index, binding in enumerate(bindings):
+            path = f"{collection_name}[{index}]"
+            key = _binding_scope_key(
+                binding,
+                section_id=binding.section_id,
+                track_id=binding.track_id,
+            )
+            previous = canonical.get(key)
+            if previous is None or previous[2] != "nested":
+                canonical.setdefault(key, (binding, path, "direct"))
+                retained.append(binding)
+                continue
+            _merge_duplicate_binding(
+                previous[0],
+                binding,
+                primary_path=previous[1],
+                duplicate_path=path,
+                issues=issues,
+            )
+        setattr(intent, collection_name, retained)
+
+
 def _existing_binding_channel(
     document: AuthoringDocumentSpec | None,
     *,
@@ -1139,6 +1263,7 @@ class AuthoringContextResolver:
             decisions=decisions,
             issues=issues,
         )
+        _coalesce_alternate_binding_references(resolved_intent, issues=issues)
         _resolve_channels(
             resolved_intent,
             existing=existing,

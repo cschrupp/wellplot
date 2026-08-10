@@ -9,14 +9,19 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from re import sub
 from typing import Any
 
-from .mcp.authoring_defaults import style_preset_catalog, track_archetype_catalog
+from .mcp.authoring_defaults import (
+    form_default_catalog,
+    style_preset_catalog,
+    track_archetype_catalog,
+)
 from .model.intent import (
+    AuthoringClearIntent,
     AuthoringCurveBindingIntent,
     AuthoringDocumentIntent,
     AuthoringRasterBindingIntent,
@@ -233,12 +238,16 @@ def _flatten_defaults(
     defaults[path] = deepcopy(value)
 
 
-def _binding_channels(track: AuthoringTrackIntent) -> list[str]:
+def _binding_channels(
+    track: AuthoringTrackIntent,
+    additional_bindings: Sequence[object] = (),
+) -> list[str]:
     """Return explicit source mnemonics present on one intent track."""
-    if not isinstance(track.bindings, list):
-        return []
+    bindings: Sequence[object] = additional_bindings
+    if isinstance(track.bindings, list):
+        bindings = [*track.bindings, *additional_bindings]
     channels: list[str] = []
-    for binding in track.bindings:
+    for binding in bindings:
         if not isinstance(binding, (AuthoringCurveBindingIntent, AuthoringRasterBindingIntent)):
             continue
         if isinstance(binding.channel, str) and binding.channel.strip():
@@ -288,23 +297,42 @@ def _entry_channels(entry: Mapping[str, Any]) -> set[str]:
 def _track_match_score(
     track: AuthoringTrackIntent,
     entry: Mapping[str, Any],
+    entries: Sequence[Mapping[str, Any]],
+    additional_bindings: Sequence[object] = (),
 ) -> int:
-    """Score one generic family without selecting ties."""
+    """Score one family using known evidence without rejecting unknowns."""
     entry_kind = str(entry.get("kind", "")).strip()
     if isinstance(track.kind, str) and entry_kind and track.kind != entry_kind:
         return 0
-    channels = {_normalize(channel) for channel in _binding_channels(track)}
+    requested_channels = _binding_channels(track, additional_bindings)
+    channels = {_normalize(channel) for channel in requested_channels}
     family_channels = _entry_channels(entry)
-    if channels and (not family_channels or not channels.issubset(family_channels)):
+    known_owners: dict[str, set[str]] = {}
+    for candidate in entries:
+        candidate_id = _normalize(candidate.get("id", ""))
+        for channel in _entry_channels(candidate):
+            known_owners.setdefault(channel, set()).add(candidate_id)
+    entry_id = _normalize(entry.get("id", ""))
+    contradictory_channels = {
+        channel
+        for channel in channels - family_channels
+        if channel in known_owners
+        and any(owner != entry_id for owner in known_owners[channel])
+    }
+    if contradictory_channels:
+        return 0
+    overlapping_channels = channels & family_channels
+    name_match = _track_name_matches(track, entry)
+    if channels and not overlapping_channels and not name_match:
         return 0
     score = 0
     if isinstance(track.kind, str) and track.kind == entry_kind:
         score += 20
-    if _track_name_matches(track, entry):
+    if name_match:
         score += 30
-    if channels and family_channels:
-        score += 25 + len(channels & family_channels)
-    if not channels and not _track_name_matches(track, entry):
+    if overlapping_channels:
+        score += 25 + len(overlapping_channels)
+    if not channels and not name_match:
         return 0
     return score
 
@@ -312,10 +340,21 @@ def _track_match_score(
 def _select_family(
     track: AuthoringTrackIntent,
     entries: list[dict[str, object]],
+    additional_bindings: Sequence[object] = (),
 ) -> tuple[dict[str, object] | None, str | None, str | None]:
     """Select one unique family or return an ambiguity warning."""
     scored = [
-        (score, entry) for entry in entries if (score := _track_match_score(track, entry)) > 0
+        (score, entry)
+        for entry in entries
+        if (
+            score := _track_match_score(
+                track,
+                entry,
+                entries,
+                additional_bindings,
+            )
+        )
+        > 0
     ]
     if not scored:
         return None, None, None
@@ -326,6 +365,129 @@ def _select_family(
         return None, None, f"Ambiguous defaults for track {track.track_id!r}: {ids}."
     selected = winners[0]
     return selected, str(selected.get("id", "")).strip() or None, None
+
+
+def _unmatched_channels(
+    track: AuthoringTrackIntent,
+    entries: Sequence[Mapping[str, Any]],
+    additional_bindings: Sequence[object] = (),
+) -> tuple[str, ...]:
+    """Return requested mnemonics absent from one catalog collection."""
+    known_channels = set().union(*(_entry_channels(entry) for entry in entries))
+    unmatched: dict[str, str] = {}
+    for channel in _binding_channels(track, additional_bindings):
+        normalized = _normalize(channel)
+        if normalized and normalized not in known_channels:
+            unmatched.setdefault(normalized, channel)
+    return tuple(sorted(unmatched.values(), key=str.lower))
+
+
+def _humanize_track_id(track_id: str) -> str:
+    """Derive a readable title without requiring a scientific family match."""
+    value = sub(r"([a-z0-9])([A-Z])", r"\1 \2", track_id)
+    value = sub(r"[_\-.]+", " ", value).strip()
+    return value.title()
+
+
+def _infer_track_form(
+    track: AuthoringTrackIntent,
+    *,
+    additional_bindings: Sequence[object] = (),
+    additional_annotations: Sequence[object] = (),
+) -> str | None:
+    """Infer a track form from explicit wording and compatible child objects."""
+    if isinstance(track.kind, str):
+        return track.kind
+    if isinstance(track.kind, AuthoringClearIntent):
+        return None
+
+    bindings: list[object] = []
+    if isinstance(track.bindings, list):
+        bindings.extend(track.bindings)
+    bindings.extend(additional_bindings)
+    if any(isinstance(binding, AuthoringRasterBindingIntent) for binding in bindings):
+        return "array"
+    if isinstance(track.annotations, list) or additional_annotations:
+        return "annotation"
+
+    identity = {
+        _normalize(track.track_id),
+        _normalize(track.title) if isinstance(track.title, str) else "",
+    }
+    if any(
+        marker in token
+        for token in identity
+        for marker in ("depth", "reference")
+        if token
+    ):
+        return "reference"
+    if any(isinstance(binding, AuthoringCurveBindingIntent) for binding in bindings):
+        return "normal"
+    return "normal"
+
+
+def _scoped_direct_children(
+    intent: AuthoringDocumentIntent,
+) -> tuple[dict[tuple[str, str], list[object]], dict[tuple[str, str], list[object]]]:
+    """Index root-level child declarations for track-form inference."""
+    bindings_by_track: dict[tuple[str, str], list[object]] = {}
+    for collection_name in ("curve_bindings", "raster_bindings"):
+        children = getattr(intent, collection_name)
+        if not isinstance(children, list):
+            continue
+        for child in children:
+            section_id = getattr(child, "section_id", None)
+            track_id = getattr(child, "track_id", None)
+            if isinstance(section_id, str) and isinstance(track_id, str):
+                bindings_by_track.setdefault((section_id, track_id), []).append(child)
+
+    annotations_by_track: dict[tuple[str, str], list[object]] = {}
+    if isinstance(intent.annotations, list):
+        for annotation in intent.annotations:
+            section_id = getattr(annotation, "section_id", None)
+            track_id = getattr(annotation, "track_id", None)
+            if isinstance(section_id, str) and isinstance(track_id, str):
+                annotations_by_track.setdefault((section_id, track_id), []).append(annotation)
+    return bindings_by_track, annotations_by_track
+
+
+def _add_generic_form_defaults(
+    defaults: dict[str, Any],
+    matched_families: dict[str, str],
+    *,
+    track_path: str,
+    track: AuthoringTrackIntent,
+    form_defaults: list[dict[str, object]],
+    additional_bindings: Sequence[object] = (),
+    additional_annotations: Sequence[object] = (),
+) -> None:
+    """Complete required track-form fields without selecting a family."""
+    form_kind = _infer_track_form(
+        track,
+        additional_bindings=additional_bindings,
+        additional_annotations=additional_annotations,
+    )
+    if form_kind is None:
+        return
+    entry = next(
+        (
+            candidate
+            for candidate in form_defaults
+            if str(candidate.get("id", "")).strip().lower() == form_kind
+        ),
+        None,
+    )
+    if entry is None:
+        return
+    patch = {
+        "kind": entry.get("kind", form_kind),
+        "width_mm": entry.get("default_width_mm"),
+    }
+    if track.title is None:
+        patch["title"] = _humanize_track_id(track.track_id)
+    for field_name, field_value in _canonical_patch(patch).items():
+        _flatten_defaults(defaults, f"{track_path}.{field_name}", field_value)
+    matched_families[f"{track_path}.form"] = str(entry.get("id", form_kind))
 
 
 def _template_for_binding(
@@ -413,6 +575,8 @@ def generic_authoring_defaults(
     warnings: list[str] = []
     archetypes = track_archetype_catalog()
     presets = style_preset_catalog()
+    form_defaults = form_default_catalog()
+    direct_bindings, direct_annotations = _scoped_direct_children(intent)
     if not isinstance(intent.sections, list):
         return AuthoringDefaultsResolution(defaults, matched_families)
 
@@ -423,15 +587,44 @@ def generic_authoring_defaults(
             if not isinstance(track, AuthoringTrackIntent):
                 continue
             track_path = f"sections[{section.section_id}].tracks[{track.track_id}]"
-            archetype, archetype_id, archetype_warning = _select_family(track, archetypes)
-            preset, preset_id, preset_warning = _select_family(track, presets)
+            scoped_bindings = direct_bindings.get((section.section_id, track.track_id), [])
+            archetype, archetype_id, archetype_warning = _select_family(
+                track,
+                archetypes,
+                scoped_bindings,
+            )
+            preset, preset_id, preset_warning = _select_family(
+                track,
+                presets,
+                scoped_bindings,
+            )
             if archetype_id:
                 matched_families[f"{track_path}.archetype"] = archetype_id
             if preset_id:
                 matched_families[f"{track_path}.preset"] = preset_id
+            unmatched = _unmatched_channels(
+                track,
+                [*archetypes, *presets],
+                scoped_bindings,
+            )
+            if unmatched:
+                matched_families[f"{track_path}.unmatched_channels"] = ", ".join(unmatched)
             for warning in (archetype_warning, preset_warning):
                 if warning:
                     warnings.append(warning)
+            if archetype is None and preset is None and (archetype_warning or preset_warning):
+                continue
+            _add_generic_form_defaults(
+                defaults,
+                matched_families,
+                track_path=track_path,
+                track=track,
+                form_defaults=form_defaults,
+                additional_bindings=scoped_bindings,
+                additional_annotations=direct_annotations.get(
+                    (section.section_id, track.track_id), []
+                ),
+            )
             if archetype is None and preset is None:
                 continue
             _add_track_defaults(

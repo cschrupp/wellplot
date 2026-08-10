@@ -192,6 +192,94 @@ def test_channel_alias_resolves_and_preserves_explicit_curve_style() -> None:
     ] == "blue"
 
 
+def test_nested_and_root_binding_references_are_coalesced() -> None:
+    """Treat two scoped representations of one binding as one logical object."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "resistivity",
+                        "kind": "normal",
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "ild-1",
+                                "channel": "ILD",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+        curve_bindings=[
+            {
+                "kind": "curve",
+                "binding_id": "ild-1",
+                "section_id": "main",
+                "track_id": "resistivity",
+                "style": {"color": "black", "line_width": 1.1},
+            }
+        ],
+    )
+
+    result = resolve_authoring_context(
+        intent,
+        available_channels={"main": [{"mnemonic": "ILD", "kind": "scalar"}]},
+    )
+
+    assert result.ready is True
+    assert result.resolved_intent.curve_bindings == []
+    binding = result.resolved_intent.sections[0].tracks[0].bindings[0]
+    assert isinstance(binding, AuthoringCurveBindingIntent)
+    assert binding.channel == "ILD"
+    assert binding.style is not None
+    assert binding.style.color == "black"
+
+
+def test_conflicting_nested_and_root_binding_references_block() -> None:
+    """Do not silently choose between conflicting alternate declarations."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "resistivity",
+                        "kind": "normal",
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "ild-1",
+                                "channel": "ILD",
+                                "style": {"color": "black"},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+        curve_bindings=[
+            {
+                "kind": "curve",
+                "binding_id": "ild-1",
+                "section_id": "main",
+                "track_id": "resistivity",
+                "style": {"color": "blue"},
+            }
+        ],
+    )
+
+    result = resolve_authoring_context(
+        intent,
+        available_channels={"main": [{"mnemonic": "ILD", "kind": "scalar"}]},
+    )
+
+    assert result.ready is False
+    assert "duplicate_binding_definition" in {issue.code for issue in result.issues}
+
+
 def test_missing_and_ambiguous_channels_block_resolution() -> None:
     """Do not invent a source channel when inspection is missing or ambiguous."""
     intent = AuthoringDocumentIntent(

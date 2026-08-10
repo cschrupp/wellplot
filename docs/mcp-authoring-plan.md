@@ -1,6 +1,6 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-08-06
+Last updated: 2026-08-10
 
 ## Summary
 
@@ -101,6 +101,56 @@ Examples and packet assets may remain useful as:
 - regression fixtures
 
 But they should not become a second authoritative template system.
+
+### Open-World Object Construction
+
+Scientific-family recognition must not be required to construct a valid
+authoring object. A user may request a familiar family such as resistivity,
+porosity, caliper, or CBL, but they may also request a project-specific track
+whose channels and terminology do not exist in the packaged defaults catalog.
+
+The agent and deterministic resolver should therefore separate two concerns:
+
+1. generic object construction
+2. optional scientific-family presentation conventions
+
+Generic construction is responsible for completing required form properties
+from the request and object relationships. For a new track this includes:
+
+- deriving a user-facing title from the requested name when the provider omits
+  an explicit title field
+- selecting a form kind from explicit wording and compatible child content
+- supplying an asset-backed width default for that form kind
+- preserving explicit scale, grid, style, and layout instructions exactly
+
+Family defaults may then enrich the object with conventional labels, scales,
+colors, line weights, or raster presentation. Failure to recognize a family or
+one channel mnemonic must not discard the generic structural defaults or block
+an otherwise valid object.
+
+The vocabulary must keep form and presentation kinds distinct:
+
+- track form kinds are `normal`, `reference`, `array`, and `annotation`
+- scale kinds are `linear`, `log`, and `tangential`
+
+A resistivity track is normally a `normal` form track with a `log` X-scale. A
+custom scalar track can use the same form without being classified as a
+resistivity family.
+
+The refined precedence order is:
+
+1. explicit user instruction
+2. explicit preservation of existing state
+3. selected specific family or style preset
+4. selected family archetype
+5. generic form defaults
+6. starter scaffolds and examples
+
+Unknown channel mnemonics are open-world inputs. When the source inspection
+confirms that a channel exists and its data kind is compatible with the target
+object, an unknown family classification should produce provenance or a
+warning, not a structural failure. Known contradictory evidence and genuinely
+ambiguous family matches must still fail closed.
 
 ## API Readiness Assessment
 

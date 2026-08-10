@@ -144,6 +144,67 @@ def test_reconciler_is_idempotent_for_matching_values() -> None:
     assert "sections[main].tracks[curves].bindings[gr-1]" in plan.unchanged_paths
 
 
+def test_reconciler_creates_track_from_nested_and_root_binding_references() -> None:
+    """Create a new track when the provider repeats binding data at root scope."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "resistivity",
+                        "title": "Resistivity",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "x_scale": {
+                            "kind": "log",
+                            "minimum": 0.2,
+                            "maximum": 2000,
+                        },
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "main.resistivity.ILD.1",
+                                "channel": "ILD",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+        curve_bindings=[
+            {
+                "kind": "curve",
+                "binding_id": "main.resistivity.ILD.1",
+                "section_id": "main",
+                "track_id": "resistivity",
+                "style": {"color": "black", "line_width": 1.1},
+            }
+        ],
+    )
+
+    plan = reconcile_authoring(
+        intent,
+        existing=_document(),
+        available_channels={"main": [{"mnemonic": "ILD", "kind": "scalar"}]},
+    )
+
+    assert plan.ready is True
+    assert any(
+        operation.object_kind == "track" and operation.object_id == "resistivity"
+        for operation in plan.operations
+    )
+    binding = next(
+        operation
+        for operation in plan.operations
+        if operation.object_kind == "curve_binding"
+    )
+    assert binding.payload["object"]["style"] == {
+        "color": "black",
+        "line_width": 1.1,
+    }
+
+
 def test_reconciler_blocks_unsupported_kind_and_channel_changes() -> None:
     """Report immutable structural changes instead of inventing replacements."""
     intent = AuthoringDocumentIntent(

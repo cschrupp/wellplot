@@ -50,7 +50,11 @@ def _require_entries(value: object, *, field_name: str) -> tuple[dict[str, Any],
 
 
 @lru_cache(maxsize=1)
-def _load_defaults() -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], ...]]:
+def _load_defaults() -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+]:
     """Load and validate the packaged defaults catalog once per process."""
     asset = files(ASSET_PACKAGE).joinpath(DEFAULTS_ASSET)
     payload = _require_mapping(
@@ -62,6 +66,7 @@ def _load_defaults() -> tuple[tuple[dict[str, Any], ...], tuple[dict[str, Any], 
     return (
         _require_entries(payload.get("track_archetypes"), field_name="track_archetypes"),
         _require_entries(payload.get("style_presets"), field_name="style_presets"),
+        _require_entries(payload.get("form_defaults"), field_name="form_defaults"),
     )
 
 
@@ -73,6 +78,11 @@ def track_archetype_catalog() -> list[dict[str, object]]:
 def style_preset_catalog() -> list[dict[str, object]]:
     """Return defensive copies of the asset-backed style presets."""
     return deepcopy(list(_load_defaults()[1]))
+
+
+def form_default_catalog() -> list[dict[str, object]]:
+    """Return defensive copies of generic track-form defaults."""
+    return deepcopy(list(_load_defaults()[2]))
 
 
 def style_preset_by_id(preset_id: str) -> dict[str, object]:

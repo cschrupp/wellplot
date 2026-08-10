@@ -1,4 +1,18 @@
 version: 1
+form_defaults:
+  - id: normal
+    kind: normal
+    default_width_mm: 28.0
+  - id: reference
+    kind: reference
+    default_width_mm: 16.0
+  - id: array
+    kind: array
+    default_width_mm: 28.0
+  - id: annotation
+    kind: annotation
+    default_width_mm: 28.0
+
 track_archetypes:
   - id: reference_depth
     label: Reference Depth
@@ -50,6 +64,7 @@ track_archetypes:
       - RSH
       - RXO
       - AT30
+      - MSFL
     recommended_track_patch:
       x_scale:
         kind: log
@@ -204,6 +219,7 @@ style_presets:
         - RSH
         - RXO
         - AT30
+        - MSFL
       medium_resistivity:
         - RMED
         - ILM

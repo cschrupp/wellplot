@@ -25,6 +25,8 @@ The MCP and agent should therefore expose:
 - deterministic edit operations
 - predictable precedence
 - fallback defaults instead of hidden packet-specific overrides
+- open-world object construction that does not require a catalogued scientific
+  family or internal schema knowledge
 
 ## Current Findings
 
@@ -228,6 +230,10 @@ Current progress:
   tools
 - typed create/update/remove/move request schemas are published as generated
   MCP discovery data
+- generic track-form defaults are asset-backed and can complete uncatalogued
+  normal, reference, array, and annotation tracks
+- optional family matching uses partial evidence and reports unmatched channel
+  mnemonics without blocking generic construction
 - the remaining MCP mutation families and duplicated patch catalogs are still
   pending in slice `0.6-E`
 
@@ -1075,11 +1081,263 @@ Acceptance completed:
   canonical notebook
 - agent, MCP, cross-domain, and documentation validation gates pass
 
+## Reopened 0.6-I: Open-World Object Construction
+
+The desired-state workflow can now normalize equivalent nested and root-level
+binding references, but notebook testing exposed a deeper defaults boundary.
+A natural request for a resistivity track produced one track operation and
+three valid binding operations, then blocked because the new track lacked
+required form fields. The defaults catalog already contained a resistivity
+title, normal-track kind, width, logarithmic scale, and presentation styles,
+but the family matcher rejected the whole family because `MSFL` was not listed
+as a shallow-resistivity mnemonic.
+
+That behavior is not only a missing alias. It makes structural object creation
+depend on complete scientific-family recognition, which is incompatible with
+the product mission. Users must be able to create custom tracks and bind
+inspected source channels even when no packaged family knows their terminology.
+
+The governing invariant for this program is:
+
+> Generic canonical object construction must succeed independently of optional
+> scientific-family defaults. Family recognition may enrich presentation, but
+> it must not define which valid objects users are allowed to create.
+
+Track form and scale vocabularies must also remain distinct:
+
+- track form kinds: `normal`, `reference`, `array`, `annotation`
+- scale kinds: `linear`, `log`, `tangential`
+
+A resistivity track is ordinarily a `normal` track with a `log` X-scale. The
+same normal-track form must remain available to arbitrary scalar channels that
+have no scientific-family entry.
+
+Implementation policy:
+
+- complete and commit each slice separately
+- keep packet blueprints out of normal request resolution
+- keep scientific mnemonic additions asset-backed
+- do not add request-specific branches to the agent or reconciler
+- preserve explicit user values ahead of every default source
+
+### 0.6-I1. Generic Form Completion
+
+Status: implemented in the current development branch.
+
+Goal:
+
+- make every supported track form constructible without selecting a scientific
+  family
+
+Work:
+
+- add asset-backed generic form defaults for `normal`, `reference`, `array`, and
+  `annotation` tracks
+- derive a user-facing title from the requested object name or humanized stable
+  track id when title is omitted from the typed provider submission
+- resolve form kind from explicit wording and compatible child content:
+  - explicit depth/reference intent selects `reference`
+  - raster content selects `array`
+  - annotation content selects `annotation`
+  - otherwise requested scalar-curve content selects `normal`
+- supply a conservative width default by form kind when neither the user nor
+  existing state supplies one
+- carry explicit X-scale, grid, style, label, and ordering instructions through
+  generic completion without requiring a family match
+
+Acceptance:
+
+- a custom scalar track with an arbitrary inspected channel can be created with
+  no family catalog entry
+- a custom raster track and annotation track receive compatible form defaults
+- omitted structural fields are completed without exposing internal property
+  names to the user
+- explicit form kind, width, title, and presentation fields are never replaced
+
+Implementation checkpoint:
+
+- generic form defaults are stored in `authoring_defaults.yaml`
+- form inference covers explicit kind, raster children, annotation children,
+  depth/reference naming, and scalar fallback
+- nested and scoped root-level child declarations are considered during form
+  inference
+- focused defaults, context, and reconciler tests pass
+
+### 0.6-I2. Optional Family Matching And Catalog Corrections
+
+Status: implemented in the current development branch.
+
+Goal:
+
+- make scientific-family defaults an optional evidence-based overlay
+
+Work:
+
+- add `MSFL` to the asset-backed shallow-resistivity channel family as a domain
+  catalog correction
+- replace the all-channels-must-be-known family gate with deterministic evidence
+  scoring
+- treat unknown channel mnemonics as neutral when object identity and known
+  channels strongly identify one family
+- reject a family when inspected channels provide known contradictory evidence
+- keep equal-scoring or otherwise ambiguous family matches unresolved
+- allow generic construction to continue when no family is selected
+- report unmatched channel mnemonics in defaults provenance instead of dropping
+  every structural default
+
+Acceptance:
+
+- `ILD`, `ILM`, and `MSFL` select the resistivity conventions
+- a resistivity-like track containing one new vendor mnemonic retains generic
+  construction and reports the unmatched mnemonic
+- recognized porosity channels do not silently receive resistivity conventions
+- a track with no family match remains valid when its canonical form and content
+  are compatible
+
+Implementation checkpoint:
+
+- `MSFL` is included in the asset-backed shallow-resistivity catalog
+- family candidates use known channel overlap, track identity, and form kind
+  evidence instead of an all-channels-known gate
+- known channel evidence that belongs to another family rejects the conflicting
+  candidate, while unknown mnemonics remain neutral
+- unmatched channel mnemonics are retained in defaults provenance
+- scoped root-level bindings participate in family selection
+- focused defaults, context, and reconciler tests pass
+
+### 0.6-I3. Defaults Precedence And Provenance
+
+Status: pending.
+
+Goal:
+
+- make every completed value explainable and preserve the most specific valid
+  authority
+
+Work:
+
+- enforce the refined precedence order:
+  1. explicit user instruction
+  2. explicit preservation of existing state
+  3. selected specific family or style preset
+  4. selected family archetype
+  5. generic form defaults
+  6. starter scaffolds and examples
+- correct internal family-patch ordering so a specific preset cannot be
+  overwritten by its more general archetype
+- record field-level provenance for inferred title, form kind, width, scale,
+  grid, binding style, and family classification
+- keep packet assets outside the defaults authority chain unless the caller
+  explicitly selects one as a starter scaffold
+
+Acceptance:
+
+- an explicit width, color, line style, label, or scale survives every selected
+  default family
+- specific triple-combo presentation values win over generic normal-track
+  values when both are applicable
+- generic form provenance remains visible when no family is selected
+- repeated reconciliation is idempotent
+
+### 0.6-I4. Actionable Creation Diagnostics
+
+Status: pending.
+
+Goal:
+
+- report the actual resolution failure instead of only the final schema symptom
+
+Work:
+
+- calculate the exact required fields still unresolved after generic and family
+  defaults have run
+- replace `Creating a track requires title, kind, and width_mm` with a message
+  that names only the fields actually missing for the identified track
+- include defaults-selection diagnostics such as unmatched channels,
+  contradictory evidence, or an ambiguous family tie
+- distinguish track form kind from X-scale kind in user-facing reports
+- recommend user clarification only when the missing information cannot be
+  resolved from the request, inspected source, existing state, or generic form
+  defaults
+- never ask a notebook user to provide canonical keys solely to compensate for
+  an internal resolution failure
+
+Acceptance:
+
+- a blocked report identifies the exact object, missing field, and failed
+  resolution source
+- an unknown family convention is reported as a warning when generic
+  construction can continue
+- genuine ambiguity produces concrete choices in domain language
+- the final `Next help` recommendation describes a user decision rather than an
+  internal schema repair
+
+### 0.6-I5. Cross-Domain Open-World Acceptance
+
+Status: pending.
+
+Goal:
+
+- prove that the workflow is not fitted to the current resistivity notebook
+
+Required scenarios:
+
+- the existing LAS request creates a resistivity track after depth, binds
+  `ILD`, `ILM`, and `MSFL`, applies logarithmic `0.2` to `2000` scales, and keeps
+  the deepest curve visually strongest
+- an uncatalogued custom scalar track is created from arbitrary available
+  channels
+- a porosity overlay uses explicit user scales and optional family conventions
+- a CBL scalar track and VDL raster track are constructed from canonical
+  objects without selecting a packet blueprint
+- an array track and annotation track receive compatible generic form defaults
+- duplicate same-channel bindings remain supported only through distinct stable
+  binding ids
+- known incompatible content, unavailable source channels, and genuinely
+  ambiguous family matches still fail closed
+
+Acceptance:
+
+- all scenarios compile to the same provider-neutral intent and canonical
+  reconciliation path
+- no scenario requires a request-specific branch or authoritative packet asset
+- explicit user presentation values remain unchanged
+- deterministic read-back verifies the created object graph and phase outcomes
+
+### 0.6-I6. Notebook, Documentation, And Release Acceptance
+
+Status: pending.
+
+Work:
+
+- rerun the canonical LAS notebook from a clean draft using the existing
+  natural-language resistivity request unchanged
+- document generic form completion, optional family overlays, provenance, and
+  form-kind versus scale-kind vocabulary
+- update troubleshooting guidance with actionable defaults diagnostics
+- add structural notebook checks that reject internal-field requirements in
+  user prompts
+- run targeted defaults, resolver, reconciler, agent, MCP, and notebook tests
+- run the full test suite, Ruff, strict documentation build, and installed-wheel
+  smoke checks
+
+Acceptance:
+
+- the user does not need to provide `kind`, `width_mm`, stable ids, or other
+  internal fields for an ordinary track-creation request
+- the unchanged resistivity notebook request completes and reports selected
+  generic/family provenance
+- an uncatalogued custom-track acceptance case also completes
+- documentation presents family defaults as optional enrichment rather than an
+  object-construction authority
+
 ## Release Gate
 
 Do not publish `0.6.0` until the repository release gates below pass. Slices
 `0.6-A` through `0.6-G7.2`, plus the reopened `0.6-H1` through `0.6-H6`
-header-language slices, are now the completed contract baseline.
+header-language slices, are the completed contract baseline. Reopened slices
+`0.6-I1` through `0.6-I6` are release blockers because open-world object
+construction is required for the user-facing authoring promise.
 
 Release-gate checklist:
 
@@ -1088,6 +1346,8 @@ Release-gate checklist:
 - package and installed-wheel smoke checks pass
 - canonical LAS notebook and experimental CBL notebook remain structurally
   discoverable and request per-phase previews
+- catalogued and uncatalogued track requests both complete through generic
+  canonical construction without packet-specific authority
 - credentialed live-provider acceptance is recorded manually when available
 
 Provider expansion, remote MCP transport, persistent/vector memory, and new
