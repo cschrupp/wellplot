@@ -1351,7 +1351,7 @@ Implementation checkpoint:
 
 ### 0.6-I6. Notebook, Documentation, And Release Acceptance
 
-Status: pending.
+Status: implemented in the current development branch.
 
 Work:
 
@@ -1375,6 +1375,17 @@ Acceptance:
 - an uncatalogued custom-track acceptance case also completes
 - documentation presents family defaults as optional enrichment rather than an
   object-construction authority
+
+Implementation checkpoint:
+
+- canonical and experimental notebook prompt blocks are structurally checked
+  for user-facing language and reject internal desired-state field names
+- the canonical LAS guide explains generic form completion, optional family
+  enrichment, field-level provenance, and form-kind versus X-scale vocabulary
+- MCP workflow troubleshooting explains unmatched-channel warnings,
+  fail-closed incompatibilities, ambiguous conventions, and phase checkpoints
+- package version, changelog, full test suite, strict docs build, and installed
+  wheel smoke checks pass
 
 ## Release Gate
 

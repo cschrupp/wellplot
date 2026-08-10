@@ -315,6 +315,37 @@ This is the pattern used by the step-by-step user notebook:
 - `examples/notebooks/user/agent_las_step_by_step.ipynb`
   - canonical end-user MCP example for the repository
 
+## Troubleshooting Authoring Resolution
+
+The agent is a natural-language front end to deterministic authoring, not an
+authority that invents packet structure. Ordinary track requests may omit
+implementation fields such as `kind`, `width_mm`, and stable binding ids.
+Generic form defaults complete those fields for `normal`, `reference`, `array`,
+and `annotation` tracks. Users should describe the scientific object and its
+presentation, not reproduce internal YAML keys.
+
+Keep these distinctions in mind when reading a result:
+
+- track form describes what can own the content: normal, reference, array, or
+  annotation
+- X-scale describes how scalar values are laid out: linear, log, or tangential
+- family defaults are optional conventions for recognized channel groups; they
+  do not replace generic construction and do not override explicit values
+- defaults provenance identifies whether a resolved value came from the user,
+  the existing draft, a generic form, or a family/style convention
+
+Warnings and blockers have different meanings. An unmatched source channel can
+still be plotted through a generic track, but its family-specific styling may
+be incomplete. An unavailable source channel, incompatible scalar/raster
+content, or ambiguous track form/presentation is blocked before mutation. The
+report names the affected object and suggests the smallest user-facing choice;
+it should not ask for an internal field merely because a default failed.
+
+For a blocked revision, inspect the phase report and preview the last valid
+checkpoint before retrying. For an existing multi-curve track, inspect its
+bindings first and then use the grouped scale/style operation so the track,
+curve scales, and logarithmic grid convention are verified together.
+
 ## `base_dir` Semantics
 
 `base_dir` is used only for unsaved text workflows.

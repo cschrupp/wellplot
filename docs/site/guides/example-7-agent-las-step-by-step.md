@@ -29,6 +29,34 @@ The flow is:
 8. preview after each step
 9. render the final PDF through the public agent session helper
 
+## Generic Object Construction
+
+Track creation does not require users to know the canonical YAML or typed
+model fields. A request such as "add a resistivity track after depth, bind the
+available deep, medium, and shallow curves, and use a logarithmic scale from
+0.2 to 2000 ohm.m" is compiled into the provider-neutral desired state and
+completed with generic form defaults when the request omits implementation
+details.
+
+The track form and its X-scale are separate decisions:
+
+- form: `normal`, `reference`, `array`, or `annotation`
+- X-scale: `linear`, `log`, or `tangential`
+
+Generic form defaults make ordinary scalar, depth/reference, array/raster, and
+annotation tracks constructible without `kind`, `width_mm`, or stable internal
+ids in the user prompt. Family archetypes and style presets are optional
+enrichment. They can add conventional scales, grids, labels, and styles when
+the source channels provide enough evidence, but they are not packet
+blueprints and they never override explicit user presentation values.
+
+The displayed operator report includes defaults provenance. This lets users
+see whether a value came from the request, the existing draft, a generic form,
+or an optional family/style convention. An unknown channel family can continue
+with generic construction and a warning; an incompatible source kind or a
+genuinely ambiguous form/presentation choice is reported as blocked instead
+of being guessed.
+
 The notebook uses these public APIs directly:
 
 - `create_project_session(...)`

@@ -38,7 +38,8 @@ now the release baseline for the MCP surface.
 - Agent-side request coverage, operation-plan metadata, defaults provenance,
   structured run state, blocked-phase reporting, and optional phase previews.
 - Canonical LAS and experimental CBL/VDL notebook workflows with release-gate
-  documentation and cross-domain acceptance fixtures.
+  documentation, cross-domain acceptance fixtures, and open-world generic
+  track construction checks.
 
 ### Changed
 
@@ -46,6 +47,9 @@ now the release baseline for the MCP surface.
   operations instead of allowing the provider to invent packet structure.
 - Defaults remain generic and subordinate to explicit user values; packet
   assets are scaffolds or regression fixtures, not hidden authoring authority.
+- Generic form completion covers uncatalogued scalar, reference, array, and
+  annotation tracks; family conventions remain optional and report their
+  provenance when selected.
 
 ### Notes
 
