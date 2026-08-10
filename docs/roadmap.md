@@ -33,8 +33,10 @@ The canonical MCP/agent direction for that mission is documented in
 
 ## Current Release Assessment
 
-The repository contains substantial post-`0.3.0` capability, but `0.6.0` is not
-ready to publish.
+The repository contains substantial post-`0.3.0` capability and the approved
+`0.6.0` contract program has passed its repository release gates. Publication
+still requires the maintainer release workflow and any credentialed live-agent
+acceptance that is intentionally kept manual.
 
 Current assessment:
 
@@ -48,7 +50,7 @@ Current assessment:
 | MCP deterministic tools | broad capability roster | route through canonical object service |
 | provider-neutral agent | implemented but experimental | rebase after deterministic contract |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
-| release metadata | still `0.3.0` | bump only after all `0.6.0` gates pass |
+| release metadata | `0.6.0` | publish through the verified release workflow |
 
 The `0.4.0` and `0.5.0` work remains delivered capability. Their previous
 "foundation complete" wording did not include cross-layer contract parity and
@@ -520,13 +522,13 @@ Longer-term / UI-centric:
 
 ## Development Plan
 
-### Phase A: Deterministic Authoring Contract And Production Hardening (current)
+### Phase A: Deterministic Authoring Contract And Production Hardening (complete for `0.6.0`)
 
 - Complete the `0.6-G0` through `0.6-G7` desired-state assembly program after
   the canonical contract slices already landed.
 - Keep package metadata, docs, generated schema, and public exports aligned.
-- Hold the `0.6.0` version bump and release until contract, CRUD, MCP parity,
-  agent, docs, notebook, and installed-wheel gates pass.
+- The contract, CRUD, MCP parity, agent, docs, notebook, and installed-wheel
+  gates are the release baseline; follow-up work belongs after `0.6.0`.
 - Continue staged lint/docstring tightening where signal remains high.
 
 ### Phase B: Rendering Quality
@@ -561,9 +563,9 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Complete `0.6-G0` research and the cross-domain dependency matrix.
-- Complete the remaining renderer/report-block parity review for the `0.6-G1`
-  canonical header, tail, and output foundation.
+- `0.6-G0` through `0.6-G7.2` are complete for the repository release gate.
+- Run the maintainer release workflow with `expected_version=0.6.0`; keep
+  credentialed live-provider acceptance as a manual check.
 - G2 is implemented: typed desired-state intent models now distinguish omitted,
   explicit, clear, and remove semantics without adding provider or packet logic.
 - G3 is implemented: contextual alias/source resolution and explicit precedence
@@ -575,15 +577,9 @@ Longer-term / UI-centric:
 - G5 is implemented: `wellplot.authoring_executor` applies plans through
   `AuthoringService`, verifies each persisted postcondition, stops on the first
   failure, and exposes phase snapshots plus optional previews.
-- G6 deterministic foundation is implemented, but live natural-language integration
-  remains open. The missing work is the context snapshot, generic defaults wiring,
-  typed request coverage, dependency-ordered assembly, and transport-safe
-  persistence described in `docs/mcp-implementation-plan.md` under Corrective
-  Integration Slices.
-- G7 canonical deterministic fixtures are implemented, but provider-to-intent and
-  live notebook acceptance remain open. The release gate must exercise the generic
-  agent path across multiple log families, not only provider-free canonical
-  objects.
+- G6 deterministic foundation and G7 cross-domain/provider-boundary fixtures,
+  notebook diagnostics, and release checks are implemented. Live provider runs
+  remain manual because credentials and model behavior are external state.
 - Add contract-parity, round-trip, atomic-mutation, contextual-reference,
   reconciliation, and idempotency tests as release gates.
 - Maintain release hardening:

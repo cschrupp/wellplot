@@ -31,9 +31,9 @@ Implementation inventory and slice plan:
 
 ## Release Status
 
-- Published package metadata: `0.3.0`
-- Branch release target: `0.6.0`, not ready to publish
-- Public status: experimental
+- Published package metadata: `0.6.0` in the release branch
+- Branch release target: `0.6.0`, release gate complete pending publication
+- Public status: experimental but contract-stabilized
 - Transport: stdio-first through `wellplot-mcp`
 - Packaging:
   - optional extra: `wellplot[mcp]`
@@ -41,8 +41,9 @@ Implementation inventory and slice plan:
 - Release boundary:
   - post-`0.3.0` tool, ingestion, and agent capabilities are implemented in the
     current branch
-  - `0.6.0` is blocked on canonical authoring contract, object CRUD, MCP parity,
-    defaults precedence, agent revalidation, and release closure
+  - `0.6.0` closes the canonical authoring contract, object CRUD, MCP parity,
+    defaults precedence, agent revalidation, notebook diagnostics, and release
+    documentation gates
 
 ## Implemented Surface
 

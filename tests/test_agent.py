@@ -25,8 +25,9 @@ import os
 import sys
 import tempfile
 import unittest
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, redirect_stdout
 from functools import partial
+from io import StringIO
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest import mock
@@ -52,6 +53,8 @@ from wellplot.agent import (
 )
 from wellplot.agent.core import (
     AuthoringPlanPhase,
+    AuthoringPlanResult,
+    AuthoringRunState,
     FunctionToolDefinition,
     _extract_packet_header_fill_intent,
     _merge_omitted_defaults,
@@ -2440,6 +2443,28 @@ class AgentTests(unittest.TestCase):
             draft_text="name: Demo Draft\n",
             report_preview_png=b"final-report",
             section_preview_png=b"section-preview",
+            plan=AuthoringPlanResult(
+                mode="desired_state",
+                packet_blueprint_id=None,
+                phases=(
+                    AuthoringPlanPhase(
+                        id="desired-tracks",
+                        kind="desired_state_tracks",
+                        summary="Apply track operations.",
+                        instructions="Apply and verify.",
+                        metadata={"operation_ids": ["track-1"]},
+                    ),
+                ),
+                blocked=False,
+            ),
+            run_state=AuthoringRunState(
+                discovered_sections=("main",),
+                available_channels_by_section={"main": ("GR", "RHOB")},
+            ),
+            request_coverage=(
+                {"request_item_id": "request-1", "status": "mapped"},
+            ),
+            defaults_provenance={"main.tracks[0]": "generic_normal_track"},
             phase_summaries=(
                 ExecutedAuthoringPhase(
                     id="header_fill",
@@ -2474,15 +2499,24 @@ class AgentTests(unittest.TestCase):
         fake_display_module.Image = FakeImage
         fake_display_module.display = display_calls.append
 
-        with mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}):
+        stdout = StringIO()
+        with (
+            mock.patch.dict(sys.modules, {"IPython.display": fake_display_module}),
+            redirect_stdout(stdout),
+        ):
             output = display_authoring_result(
                 "Demo",
                 result,
                 preview="report",
                 include_phase_previews=True,
-        )
+            )
 
         self.assertIsNone(output)
+        self.assertIn("Plan: desired_state", stdout.getvalue())
+        self.assertIn("Defaults provenance:", stdout.getvalue())
+        self.assertIn("Request coverage:", stdout.getvalue())
+        self.assertIn("Context:", stdout.getvalue())
+        self.assertIn("verification=passed", stdout.getvalue())
         self.assertEqual(
             [image.data for image in display_calls],
             [b"phase-report", b"phase-section", b"final-report"],

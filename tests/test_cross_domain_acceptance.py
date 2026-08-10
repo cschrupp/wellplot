@@ -495,6 +495,7 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
         )
         assert "wellplot.agent" in source
         assert "display_authoring_result" in source
+        assert "include_phase_previews=True" in source
         assert "session.run" in source
 
     las_source = "\n".join(

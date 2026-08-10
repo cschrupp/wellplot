@@ -901,9 +901,23 @@ provenance, operation plans, phase verification, and blocked reasons. A blocked
 assembly must stop before rendering a partial draft. Release requires the unit,
 MCP, agent, documentation, and notebook gates to pass.
 
+Status: complete. The public notebook display helper now exposes these fields
+from `AuthoringResult`, both user notebooks request phase previews, and the
+structural acceptance test keeps the examples credential-free in CI.
+
 ## Release Gate
 
-Do not publish `0.6.0` until slices `0.6-A` through `0.6-G` are complete.
+Do not publish `0.6.0` until the repository release gates below pass. Slices
+`0.6-A` through `0.6-G7.2` are now the completed contract baseline.
+
+Release-gate checklist:
+
+- unit, MCP, agent, and cross-domain acceptance tests pass
+- strict documentation build passes
+- package and installed-wheel smoke checks pass
+- canonical LAS notebook and experimental CBL notebook remain structurally
+  discoverable and request per-phase previews
+- credentialed live-provider acceptance is recorded manually when available
 
 Provider expansion, remote MCP transport, persistent/vector memory, and new
 packet-specific blueprints remain deferred. They do not block this contract

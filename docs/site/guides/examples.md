@@ -59,6 +59,14 @@ The examples are grouped by workflow rather than by isolated feature.
     `wellplot.agent` API
   - uses a live model plus local `wellplot-mcp` to revise the same draft one
     cell at a time
+  - displays request coverage, defaults provenance, phase verification, and
+    optional intermediate previews before the final render
+
+The experimental user notebook
+`examples/notebooks/user/agent_cbl_log_example_from_prompt.ipynb` is a CBL/VDL
+packet stress test, not a required blueprint-driven template. It exercises the
+same generic agent contract across cased-hole sections, scalar bindings, and
+raster content.
 
 ## Programmatic API examples
 

@@ -11,6 +11,13 @@ If you want hosted-model natural-language authoring from Python, use the public
 `wellplot.agent` layer on top of this server instead of re-implementing the
 provider + MCP tool loop yourself.
 
+The public `AuthoringResult` is also the verification surface for notebook and
+UI integrations. It carries request coverage, resolved run context, defaults
+provenance, planned operation counts, per-phase verification, and blocked
+reasons. Use `display_authoring_result(..., include_phase_previews=True)` when
+you need to inspect progress before the final preview; a blocked phase must be
+fixed before rendering a final draft.
+
 Both surfaces are experimental. The agent interprets intent and selects tools;
 it does not replace deterministic authoring semantics. Explicit user values
 must take precedence over defaults and starter/example scaffolds.

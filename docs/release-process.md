@@ -23,7 +23,7 @@ The manual workflow accepts:
    - `testpypi`
    - `pypi`
 2. `expected_version`
-   - optional version guard such as `0.3.0`
+   - optional version guard such as `0.6.0`
    - if provided, the workflow checks it against `src/wellplot/_version.py`
 
 ## What The Workflow Does
@@ -79,7 +79,9 @@ Run the local validation path first:
 
 ```bash
 uv run ruff check .
+uv run pytest -q
 uv run pytest tests/test_mcp_service.py tests/test_mcp_server.py tests/test_pipeline.py tests/test_cli.py tests/test_public_api.py
+uv run pytest tests/test_agent.py tests/test_agent_desired_state.py tests/test_cross_domain_acceptance.py
 uv run --with mcp pytest tests/test_mcp_server.py
 uv run --group docs mkdocs build --strict
 uv build
@@ -94,7 +96,7 @@ MPLBACKEND=Agg /tmp/wellplot-release-check-mcp/bin/python scripts/smoke_installe
 
 ## Maintenance Release Sequence
 
-1. Confirm the package version in `src/wellplot/_version.py`.
+1. Confirm the package version in `src/wellplot/_version.py` (`0.6.0` for this release).
 2. Update `CHANGELOG.md` for the release.
 3. Run the local preflight checks.
 4. Trigger the `Release` workflow with:

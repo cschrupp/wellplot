@@ -312,6 +312,7 @@ class AuthoringPlanResult:
     blocked: bool
     blocked_reasons: tuple[str, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
+    defaults_provenance: dict[str, str] = field(default_factory=dict)
     desired_state: AuthoringDocumentIntent | None = None
     reconciliation_plan: AuthoringReconciliationPlan | None = None
 
@@ -397,6 +398,8 @@ class AuthoringResult:
     phase_summaries: tuple[ExecutedAuthoringPhase, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
     user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
+    request_coverage: tuple[dict[str, object], ...] = ()
+    defaults_provenance: dict[str, str] = field(default_factory=dict)
 
     @property
     def draft_path(self) -> Path:
@@ -1446,6 +1449,12 @@ class AuthoringSession:
         validation_payload = _structured_content(validation_result)
         draft_summary_payload = _structured_content(draft_summary_result)
         change_summary_payload = _structured_content(change_summary_result)
+        report_facts = getattr(provider_result, "report_facts", {})
+        request_coverage = tuple(
+            dict(item)
+            for item in report_facts.get("request_coverage", [])
+            if isinstance(item, dict)
+        ) if isinstance(report_facts, dict) else ()
         return AuthoringResult(
             provider=self.backend.provider,
             model=self.backend.model,
@@ -1468,6 +1477,10 @@ class AuthoringSession:
             plan=plan,
             phase_summaries=phase_summaries,
             run_state=AuthoringRunState() if run_state is None else run_state,
+            request_coverage=request_coverage,
+            defaults_provenance=(
+                {} if plan is None else dict(plan.defaults_provenance)
+            ),
             user_report=_build_user_report(
                 request_text=goal,
                 validation=validation_payload,
@@ -1582,6 +1595,7 @@ class AuthoringSession:
             run_state=AuthoringRunState(
                 objectives=tuple(phase.summary for phase in phases),
             ),
+            defaults_provenance=dict(defaults_resolution.matched_families),
             desired_state=intent,
             reconciliation_plan=reconciliation_plan,
         )
@@ -4603,6 +4617,11 @@ class AuthoringSession:
         report_facts["next_help"] = list(report_facts.get("next_help", [])) + [
             "Retry the request after the local MCP server connection is available."
         ]
+        request_coverage = tuple(
+            dict(item)
+            for item in report_facts.get("request_coverage", [])
+            if isinstance(item, dict)
+        )
         output_path = self.runtime.server_root / draft_logfile
         draft_text = (
             output_path.read_text(encoding="utf-8") if output_path.exists() else baseline_draft_text
@@ -4629,6 +4648,10 @@ class AuthoringSession:
             plan=plan,
             phase_summaries=phase_summaries,
             run_state=run_state,
+            request_coverage=request_coverage,
+            defaults_provenance=(
+                {} if plan is None else dict(plan.defaults_provenance)
+            ),
             user_report=_build_user_report(
                 request_text=goal,
                 validation={"valid": False, "message": reason},

@@ -888,10 +888,40 @@ def display_authoring_result(
 
     print(title)
     print("Draft:", result.draft_logfile)
+    if result.plan is not None:
+        print("Plan:", result.plan.mode)
+        for phase in result.plan.phases:
+            operation_ids = phase.metadata.get("operation_ids", [])
+            operation_count = len(operation_ids) if isinstance(operation_ids, list) else 0
+            print(f" - {phase.id}: {operation_count} operation(s)")
+        if result.plan.blocked_reasons:
+            print("Plan blocked:")
+            for reason in result.plan.blocked_reasons:
+                print(" -", reason)
+    if result.defaults_provenance:
+        print("Defaults provenance:")
+        for path, family in result.defaults_provenance.items():
+            print(f" - {path}: {family}")
+    if result.request_coverage:
+        print("Request coverage:")
+        for item in result.request_coverage:
+            item_id = item.get("request_item_id", "unknown")
+            status = item.get("status", "unknown")
+            print(f" - {item_id}: {status}")
+    state = result.run_state
+    if state.discovered_sections or state.available_channels_by_section:
+        print("Context:")
+        if state.discovered_sections:
+            print(" - sections:", ", ".join(state.discovered_sections))
+        for section_id, channels in state.available_channels_by_section.items():
+            print(f" - {section_id} channels: {', '.join(channels)}")
     if result.phase_summaries:
         print("Phases:")
         for phase in result.phase_summaries:
-            print(f" - [{phase.status}] {phase.summary}")
+            verification = "passed" if phase.verification.get("ok") else "blocked"
+            print(f" - [{phase.status}; verification={verification}] {phase.summary}")
+            for reason in phase.blocked_reasons:
+                print("   reason:", reason)
     for label, items in result.user_report.sections():
         print(f"{label}:")
         for item in items:

@@ -37,6 +37,13 @@ The notebook uses these public APIs directly:
 - `display_authoring_result(...)`
 - `relative_path(...)`
 
+Each displayed result includes the deterministic execution evidence available
+for that request: resolved sections and channels, request-item coverage,
+defaults provenance, planned operation counts, phase verification status, and
+blocked reasons. Pass `include_phase_previews=True` to display the captured
+checkpoint image before the final preview. A blocked phase is reported and the
+workflow stops before rendering a partial final draft.
+
 ## Why this is the canonical MCP example
 
 This notebook is the best current summary of the project direction because it
@@ -90,9 +97,10 @@ This notebook is different:
 - narrow header-only requests are routed automatically through deterministic
   heading tools, so prompts like `Fill header RMF as 0.01 @ 25` do not need to
   go through the broader freeform authoring loop
-- `display_authoring_result(...)` now prints a concise deterministic operator
-  report before the preview image, so each notebook step shows what changed,
-  what did not, and what the agent can help with next
+- `display_authoring_result(...)` prints the deterministic operator report and
+  execution diagnostics before the preview image, so each notebook step shows
+  what changed, what was covered, which defaults were used, what was verified,
+  what did not complete, and what the agent can help with next
 - it is a working first pass, so prompt wording, model choice, and revision
   round budgets may still need tuning for final packet polish
 

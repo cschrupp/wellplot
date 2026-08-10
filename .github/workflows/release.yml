@@ -13,7 +13,7 @@ on:
           - testpypi
           - pypi
       expected_version:
-        description: "Optional version guard, for example 0.1.0."
+        description: "Optional version guard, for example 0.6.0."
         required: false
         type: string
 

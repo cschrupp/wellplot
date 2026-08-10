@@ -40,7 +40,7 @@ The GitHub Actions workflow accepts two important inputs:
    - `testpypi`
    - `pypi`
 2. `expected_version`
-   - optional version guard such as `0.3.0`
+   - optional version guard such as `0.6.0`
    - checked against `src/wellplot/_version.py`
 
 ## Build Job
@@ -62,6 +62,20 @@ It performs these steps:
 10. install the built wheel plus `mcp>=1,<2`
 11. rerun `scripts/smoke_installed_wheel.py` with MCP support enabled
 12. upload artifacts for the later publish job
+
+Before dispatching the workflow, run the repository release gates locally:
+
+```bash
+uv run ruff check .
+uv run pytest -q
+uv run --group docs mkdocs build --strict
+uv build
+```
+
+The notebook acceptance test is structural and credential-free. It verifies
+that the canonical LAS walkthrough and the experimental CBL/VDL stress test
+use the public agent result display and request per-phase previews. Credentialed
+live-provider runs remain a manual acceptance activity.
 
 ## Publishing Targets
 

@@ -23,6 +23,36 @@ This changelog tracks public release notes for the `wellplot` distribution.
 
 The entries below track public PyPI releases of the `wellplot` distribution.
 
+## [0.6.0] - 2026-08-10
+
+The deterministic authoring contract and provider-neutral agent workflow are
+now the release baseline for the MCP surface.
+
+### Added
+
+- Typed authoring models, context resolution, generic defaults, dependency-
+  ordered reconciliation, and read-after-write phase verification.
+- Deterministic header archetype ingestion and matching header-value filling,
+  duplicate bindings, raster bindings, annotations, page settings, and
+  explicit style/scale editing through the shared authoring service.
+- Agent-side request coverage, operation-plan metadata, defaults provenance,
+  structured run state, blocked-phase reporting, and optional phase previews.
+- Canonical LAS and experimental CBL/VDL notebook workflows with release-gate
+  documentation and cross-domain acceptance fixtures.
+
+### Changed
+
+- Natural-language authoring submits typed desired state to deterministic MCP
+  operations instead of allowing the provider to invent packet structure.
+- Defaults remain generic and subordinate to explicit user values; packet
+  assets are scaffolds or regression fixtures, not hidden authoring authority.
+
+### Notes
+
+- MCP remains local stdio-first and provider-neutral. Remote transport,
+  persistent memory, and credentialed live-provider acceptance remain deferred
+  or manual release activities.
+
 ## [0.3.0] - 2026-04-28
 
 Experimental MCP support is now part of the public `wellplot` distribution.
