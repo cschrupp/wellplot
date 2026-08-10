@@ -49,7 +49,12 @@ from ..authoring_reconciler import (
 from ..authoring_service import AuthoringService
 from ..mcp.packet_blueprints import packet_blueprint_spec
 from ..model.authoring import AuthoringDocumentSpec
-from ..model.intent import AuthoringDocumentIntent, authoring_intent_json_schema
+from ..model.intent import AuthoringDocumentIntent
+from .compilation import (
+    AuthoringIntentSubmission,
+    build_request_manifest,
+    validate_intent_coverage,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -782,6 +787,11 @@ def _build_user_report(
     for entry in report_facts.get("next_help", []):
         if isinstance(entry, str) and entry.strip():
             next_help.append(entry.strip())
+
+    for entry in report_facts.get("request_inconsistencies", []):
+        if isinstance(entry, str) and entry.strip():
+            could_not_do.append(entry.strip())
+            why_not.append("The request was explicitly marked unsupported or inconsistent.")
 
     if validation.get("valid") is False:
         message = validation.get("message")
@@ -4236,13 +4246,17 @@ class AuthoringSession:
     ) -> tuple[ProviderRunResult, AuthoringDocumentIntent | None]:
         """Ask a typed-state capable provider for one validated desired state."""
         submitted: AuthoringDocumentIntent | None = None
+        submission: AuthoringIntentSubmission | None = None
+        submission_attempts = 0
+        coverage_errors: list[str] = []
+        request_manifest = build_request_manifest(request_text)
 
         async def submit_intent(
             name: str,
             arguments: dict[str, object],
         ) -> dict[str, object]:
             """Validate the provider submission without mutating the draft."""
-            nonlocal submitted
+            nonlocal submitted, submission, submission_attempts, coverage_errors
             if name != "submit_authoring_intent":
                 return {
                     "is_error": True,
@@ -4251,29 +4265,52 @@ class AuthoringSession:
                         "extraction mode."
                     ),
                 }
-            if submitted is not None:
+            submission_attempts += 1
+            if submission_attempts > 2:
                 return {
                     "is_error": True,
-                    "error": "Only one desired-state submission is allowed.",
+                    "error": (
+                        "Only one initial submission and one correction submission are "
+                        "allowed. Stop and report the unresolved coverage errors."
+                    ),
                 }
             try:
-                submitted = AuthoringDocumentIntent.model_validate(arguments)
+                candidate = AuthoringIntentSubmission.model_validate(arguments)
             except Exception as exc:  # Pydantic gives provider-actionable details.
                 return {
                     "is_error": True,
-                    "error": f"Invalid AuthoringDocumentIntent: {exc}",
+                    "error": (
+                        f"Invalid AuthoringIntentSubmission: {exc}. Include an `intent` "
+                        "object and one coverage entry for every request item."
+                    ),
                 }
+            coverage_errors = validate_intent_coverage(
+                request_manifest,
+                candidate.coverage,
+            )
+            if coverage_errors:
+                return {
+                    "is_error": True,
+                    "error": (
+                        "Request coverage is incomplete or invalid. Submit one correction "
+                        "with the same intent plus corrected coverage:\n- "
+                        + "\n- ".join(coverage_errors)
+                    ),
+                }
+            submission = candidate
+            submitted = candidate.intent
             return {
                 "accepted": True,
                 "message": (
-                    "Desired state validated. The deterministic planner will now "
-                    "resolve references and execute it."
+                    "Typed desired state and request coverage validated. The deterministic "
+                    "planner will now resolve references and execute it."
                 ),
             }
 
         context = {
             "draft_logfile": draft_logfile,
             "request": request_text,
+            "request_manifest": request_manifest.model_dump(mode="json"),
             "current_document": existing.model_dump(mode="json"),
             "authoring_context": context_snapshot.model_dump(mode="json"),
         }
@@ -4281,7 +4318,9 @@ class AuthoringSession:
             "You are the desired-state extraction stage of wellplot authoring. "
             "Do not invent packet templates and do not call mutation tools. Read the "
             "current document and source context, then call submit_authoring_intent "
-            "exactly once with only the requested changes. Omit fields that should be "
+            "with only the requested changes and complete request coverage. You may "
+            "submit once initially and once more only when the tool reports a coverage "
+            "error. Omit fields that should be "
             "preserved. Use the explicit clear or remove intent objects when the user "
             "asks to clear or remove something. Preserve explicit labels, scales, "
             "colors, line styles, widths, and raster settings exactly. If the request "
@@ -4289,28 +4328,53 @@ class AuthoringSession:
             "the deterministic resolver will block it and report why."
         )
         initial_message = (
-            "Submit one typed desired state for this request. Do not describe a sequence "
-            "of MCP calls. The submission is validated before any mutation occurs.\n\n"
+            "Submit one typed desired state and coverage report for this request. Do not "
+            "describe a sequence of MCP calls. The submission is validated before any "
+            "mutation occurs. Every request item must have exactly one coverage entry. "
+            "Use `mapped` or `preserved` with intent paths, and use `unsupported` or "
+            "`inconsistent` only with a concise reason.\n\n"
             f"Context:\n{json.dumps(context, indent=2, default=str)}\n\n"
-            f"AuthoringDocumentIntent schema:\n"
-            f"{json.dumps(authoring_intent_json_schema(), indent=2, default=str)}"
+            f"AuthoringIntentSubmission schema:\n"
+            f"{json.dumps(AuthoringIntentSubmission.model_json_schema(), indent=2, default=str)}"
         )
         tool_definition = FunctionToolDefinition(
             name="submit_authoring_intent",
             description=(
-                "Submit exactly one validated partial desired state for the current "
-                "wellplot document. Omit fields that must be preserved."
+                "Submit one validated partial desired state and one coverage entry for "
+                "every request item. Omit fields that must be preserved."
             ),
-            parameters=authoring_intent_json_schema(),
+            parameters=AuthoringIntentSubmission.model_json_schema(),
         )
         provider_result = await self.backend.run_authoring(
             instructions=instructions,
             initial_user_message=initial_message,
             tool_definitions=[tool_definition],
             tool_caller=submit_intent,
-            max_rounds=max_rounds,
+            max_rounds=min(max_rounds, 3),
         )
-        return provider_result, submitted
+        report_facts = dict(getattr(provider_result, "report_facts", {}))
+        report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
+        if submission is not None:
+            report_facts["request_coverage"] = [
+                entry.model_dump(mode="json") for entry in submission.coverage
+            ]
+            report_facts["request_inconsistencies"] = [
+                f"{entry.request_item_id}: {entry.reason}"
+                for entry in submission.coverage
+                if entry.status in {"unsupported", "inconsistent"} and entry.reason
+            ]
+        elif coverage_errors:
+            report_facts["reasons"] = list(report_facts.get("reasons", [])) + [
+                "Request coverage validation failed: " + "; ".join(coverage_errors)
+            ]
+        return (
+            ProviderRunResult(
+                final_text=provider_result.final_text,
+                tool_trace=provider_result.tool_trace,
+                report_facts=report_facts,
+            ),
+            submitted,
+        )
 
     @staticmethod
     def _typed_phase_summaries(
