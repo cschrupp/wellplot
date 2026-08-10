@@ -898,6 +898,10 @@ def display_authoring_result(
             print("Plan blocked:")
             for reason in result.plan.blocked_reasons:
                 print(" -", reason)
+        if result.plan.warnings:
+            print("Plan warnings:")
+            for warning in result.plan.warnings:
+                print(" -", warning)
     if result.defaults_provenance:
         print("Defaults provenance:")
         for path, family in result.defaults_provenance.items():

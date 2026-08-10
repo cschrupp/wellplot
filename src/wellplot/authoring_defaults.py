@@ -673,6 +673,11 @@ def generic_authoring_defaults(
             )
             if unmatched:
                 matched_families[f"{track_path}.unmatched_channels"] = ", ".join(unmatched)
+                warnings.append(
+                    f"Unmatched source channel(s) for track {track.track_id!r}: "
+                    f"{', '.join(unmatched)}. Generic construction continues, but "
+                    "family-specific presentation may be incomplete."
+                )
             for warning in (archetype_warning, preset_warning):
                 if warning:
                     warnings.append(warning)

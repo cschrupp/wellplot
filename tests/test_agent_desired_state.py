@@ -225,6 +225,44 @@ def test_plan_builds_typed_reconciliation_operations_without_mutation() -> None:
     assert plan.desired_state.title == "Revised"
 
 
+def test_plan_exposes_unmatched_channel_warning_without_blocking_generic_track() -> None:
+    """Report unknown mnemonics while keeping generic construction available."""
+    session = AuthoringSession(
+        backend=_NoProviderBackend(),
+        runtime=_TypedRuntime(Path("/tmp")),
+    )
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "custom_sensor",
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "sensor",
+                                "channel": "SENSOR_X",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    )
+
+    plan = session.plan(
+        text="Add a custom sensor track.",
+        desired_state=intent,
+        existing=_document(),
+        available_channels={"main": ["SENSOR_X"]},
+    )
+
+    assert plan.blocked is False
+    assert any("Unmatched source channel(s)" in warning for warning in plan.warnings)
+    assert any("generic_form:normal" in value for value in plan.defaults_provenance.values())
+
+
 def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_path: Path) -> None:
     """Use the canonical resolver/executor path for a caller-supplied intent."""
     backend = _NoProviderBackend()

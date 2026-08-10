@@ -311,6 +311,7 @@ class AuthoringPlanResult:
     phases: tuple[AuthoringPlanPhase, ...]
     blocked: bool
     blocked_reasons: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
     defaults_provenance: dict[str, str] = field(default_factory=dict)
     desired_state: AuthoringDocumentIntent | None = None
@@ -1000,6 +1001,38 @@ def _build_user_report(
         needs_clarification=_clarification_entries(report_facts.get("needs_clarification")),
         next_help=_dedupe_text_items(next_help),
     )
+
+
+def _typed_plan_next_help(plan: AuthoringPlanResult) -> tuple[str, ...]:
+    """Return domain-language help for a blocked typed desired-state plan."""
+    issue_codes = {
+        issue.code
+        for issue in (plan.reconciliation_plan.issues if plan.reconciliation_plan else ())
+    }
+    help_items: list[str] = []
+    if "track_create_incomplete" in issue_codes:
+        help_items.append(
+            "Describe the missing track details in plain language, such as its display "
+            "name, approximate width, and whether it is a normal, depth/reference, "
+            "array, or annotation track. Track form is separate from its X-scale."
+        )
+    if any("Ambiguous defaults for track" in warning for warning in plan.warnings):
+        help_items.append(
+            "Choose the intended presentation convention or provide explicit colors, "
+            "labels, and scales; the object can be built generically without guessing "
+            "between conventions."
+        )
+    if any("Unmatched source channel" in warning for warning in plan.warnings):
+        help_items.append(
+            "The unmatched source channel was retained as requested; provide an explicit "
+            "presentation only if its family-specific styling matters."
+        )
+    if not help_items:
+        help_items.append(
+            "I can inspect the current draft and source context to identify the smallest "
+            "user-facing clarification needed."
+        )
+    return tuple(help_items)
 
 
 def _header_fill_overwrite_policy(text: str) -> str:
@@ -1744,6 +1777,7 @@ class AuthoringSession:
             phases=tuple(phases),
             blocked=not reconciliation_plan.ready,
             blocked_reasons=tuple(issue.message for issue in reconciliation_plan.issues),
+            warnings=tuple(reconciliation_plan.warnings),
             run_state=AuthoringRunState(
                 objectives=tuple(phase.summary for phase in phases),
             ),
@@ -5068,10 +5102,8 @@ class AuthoringSession:
                     "not_done": [phase.summary for phase in plan.phases]
                     or ["Resolve and reconcile the typed desired state."],
                     "reasons": list(reasons),
-                    "next_help": [
-                        "Correct the blocked references or provide the missing source "
-                        "channel and try again."
-                    ],
+                    "warnings": list(plan.warnings),
+                    "next_help": list(_typed_plan_next_help(plan)),
                 },
             )
             return await self._finalize_result(
@@ -5117,7 +5149,7 @@ class AuthoringSession:
             reasons.append(f"Canonical desired-state save failed: {save_error}")
         if not execution.success and not reasons:
             reasons.append("The deterministic executor stopped before all postconditions passed.")
-        warnings = list(execution.warnings) + list(phase_preview_warnings)
+        warnings = list(plan.warnings) + list(execution.warnings) + list(phase_preview_warnings)
         provider_result = ProviderRunResult(
             final_text=(
                 "Typed desired state executed and persisted."

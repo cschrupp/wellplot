@@ -445,14 +445,23 @@ def _track_mapping(
             continue
         result[field_name] = _plain(value)
     kind = result.get("kind")
-    if not isinstance(result.get("title"), str) or not isinstance(
-        result.get("width_mm"), (int, float)
-    ):
+    missing_fields: list[str] = []
+    if not isinstance(result.get("title"), str):
+        missing_fields.append("display title")
+    if not isinstance(kind, str):
+        missing_fields.append("track form")
+    if not isinstance(result.get("width_mm"), (int, float)):
+        missing_fields.append("track width")
+    if missing_fields:
         _add_issue(
             issues,
             path=base_path,
             code="track_create_incomplete",
-            message="Creating a track requires title, kind, and width_mm.",
+            message=(
+                f"Cannot create track {intent.track_id!r}: missing "
+                f"{', '.join(missing_fields)}. These values could not be resolved "
+                "from the request, existing draft, or generic form defaults."
+            ),
         )
     if not isinstance(kind, str):
         _add_issue(

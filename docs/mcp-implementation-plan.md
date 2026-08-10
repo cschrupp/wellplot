@@ -236,6 +236,8 @@ Current progress:
   mnemonics without blocking generic construction
 - defaulted fields expose source-level provenance and specific style presets
   override broader family archetypes
+- blocked typed plans expose exact missing properties, defaults warnings, and
+  domain-language next help
 - the remaining MCP mutation families and duplicated patch catalogs are still
   pending in slice `0.6-E`
 
@@ -1254,7 +1256,7 @@ Implementation checkpoint:
 
 ### 0.6-I4. Actionable Creation Diagnostics
 
-Status: pending.
+Status: implemented in the current development branch.
 
 Goal:
 
@@ -1284,6 +1286,19 @@ Acceptance:
 - genuine ambiguity produces concrete choices in domain language
 - the final `Next help` recommendation describes a user decision rather than an
   internal schema repair
+
+Implementation checkpoint:
+
+- track creation blockers identify only the unresolved display title, track form,
+  or track width
+- plan warnings are exposed separately from blocking reasons and flow into
+  typed user reports
+- unmatched-channel and ambiguous-default diagnostics are retained in the
+  report path
+- next-help text distinguishes track form (`normal`, `reference`, `array`, or
+  `annotation`) from X-scale (`linear`, `log`, or `tangential`)
+- notebook display shows plan warnings without labeling them as blockers
+- focused diagnostic, agent, and full-suite tests pass
 
 ### 0.6-I5. Cross-Domain Open-World Acceptance
 

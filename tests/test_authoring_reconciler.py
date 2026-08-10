@@ -144,6 +144,48 @@ def test_reconciler_is_idempotent_for_matching_values() -> None:
     assert "sections[main].tracks[curves].bindings[gr-1]" in plan.unchanged_paths
 
 
+def test_reconciler_reports_exact_missing_track_form_fields() -> None:
+    """Explain which user-facing track properties remain unresolved."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [{"track_id": "new_track"}],
+            }
+        ]
+    )
+
+    plan = reconcile_authoring(intent, existing=_document())
+
+    assert plan.ready is False
+    issue = next(issue for issue in plan.issues if issue.code == "track_create_incomplete")
+    assert issue.message == (
+        "Cannot create track 'new_track': missing display title, track form, track width. "
+        "These values could not be resolved from the request, existing draft, or generic "
+        "form defaults."
+    )
+    assert "width_mm" not in issue.message
+
+
+def test_reconciler_reports_only_the_unresolved_track_form() -> None:
+    """Do not report fields that the request already supplied."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {"track_id": "new_track", "title": "New Track", "width_mm": 24}
+                ],
+            }
+        ]
+    )
+
+    plan = reconcile_authoring(intent, existing=_document())
+
+    issue = next(issue for issue in plan.issues if issue.code == "track_create_incomplete")
+    assert issue.message.startswith("Cannot create track 'new_track': missing track form.")
+
+
 def test_reconciler_creates_track_from_nested_and_root_binding_references() -> None:
     """Create a new track when the provider repeats binding data at root scope."""
     intent = AuthoringDocumentIntent(
