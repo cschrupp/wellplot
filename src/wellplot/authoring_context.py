@@ -1189,6 +1189,11 @@ def _validate_track_content_compatibility(
                 existing=existing,
                 decisions=decisions,
             )
+            if kind is None:
+                # An unresolved form is diagnosed by reconciliation with the
+                # missing user-facing track fields. Do not mislabel its
+                # children as incompatible before that resolution can run.
+                continue
             if isinstance(track.bindings, list):
                 for index, binding in enumerate(track.bindings):
                     if isinstance(binding, AuthoringRasterBindingIntent) and kind != "array":

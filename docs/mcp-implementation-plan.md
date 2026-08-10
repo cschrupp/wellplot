@@ -1302,7 +1302,7 @@ Implementation checkpoint:
 
 ### 0.6-I5. Cross-Domain Open-World Acceptance
 
-Status: pending.
+Status: implemented in the current development branch.
 
 Goal:
 
@@ -1331,6 +1331,23 @@ Acceptance:
 - no scenario requires a request-specific branch or authoritative packet asset
 - explicit user presentation values remain unchanged
 - deterministic read-back verifies the created object graph and phase outcomes
+
+Implementation checkpoint:
+
+- a minimal depth-only report can receive a new resistivity track with generic
+  form completion, `ILD`/`ILM`/`MSFL` bindings, log scale `0.2` to `2000`, and
+  strongest styling on the deepest curve
+- uncatalogued scalar, array/raster, annotation, and CBL duplicate-binding
+  objects execute through the same typed plan and read back successfully
+- CBL/VDL construction does not select a packet blueprint; ambiguous CBL style
+  conventions remain warnings or blockers unless the user supplies the intended
+  presentation
+- missing source channels, incompatible binding content, and unresolved track
+  forms fail closed with the corresponding user-facing issue
+- compatibility validation defers when the parent form is unresolved, allowing
+  reconciliation to report missing track form fields instead of a misleading
+  child-content incompatibility
+- focused open-world, context, defaults, cross-domain, and agent tests pass
 
 ### 0.6-I6. Notebook, Documentation, And Release Acceptance
 
