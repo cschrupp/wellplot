@@ -103,6 +103,79 @@ def test_executor_applies_typed_operations_and_captures_phase_previews() -> None
     assert track.bindings[0].style.color == "blue"
 
 
+def test_executor_assembles_new_section_tracks_and_array_bindings() -> None:
+    """Persist a generic multi-track section in dependency order."""
+    document = _document()
+    service = AuthoringService(document)
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "packet_pass",
+                "title": "Packet Pass",
+                "tracks": [
+                    {
+                        "track_id": "packet_curves",
+                        "title": "Packet Curves",
+                        "kind": "normal",
+                        "width_mm": 24,
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "packet-gr-1",
+                                "channel": "GR",
+                            },
+                            {
+                                "kind": "curve",
+                                "binding_id": "packet-gr-2",
+                                "channel": "GR",
+                            },
+                        ],
+                    },
+                    {
+                        "track_id": "packet_waveform",
+                        "title": "Packet Waveform",
+                        "kind": "array",
+                        "width_mm": 30,
+                        "bindings": [
+                            {
+                                "kind": "raster",
+                                "binding_id": "packet-vdl",
+                                "channel": "VDL",
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
+    )
+    plan = reconcile_authoring(
+        intent,
+        existing=document,
+        available_channels={
+            "packet_pass": [
+                {"mnemonic": "GR", "kind": "scalar"},
+                {"mnemonic": "VDL", "kind": "raster"},
+            ]
+        },
+    )
+
+    result = execute_authoring_plan(service, plan)
+
+    assert result.success is True
+    assert [checkpoint.phase for checkpoint in result.phase_summaries] == [
+        AuthoringOperationPhase.SECTIONS,
+        AuthoringOperationPhase.TRACKS,
+        AuthoringOperationPhase.BINDINGS,
+    ]
+    packet = next(section for section in service.document.sections if section.id == "packet_pass")
+    assert [track.id for track in packet.tracks] == ["packet_curves", "packet_waveform"]
+    assert [binding.binding_id for binding in packet.tracks[0].bindings] == [
+        "packet-gr-1",
+        "packet-gr-2",
+    ]
+    assert packet.tracks[1].bindings[0].binding_id == "packet-vdl"
+
+
 def test_executor_stops_on_failed_operation_without_running_later_phases() -> None:
     """Stop at a typed service failure and preserve the last valid snapshot."""
     service = AuthoringService(_document())

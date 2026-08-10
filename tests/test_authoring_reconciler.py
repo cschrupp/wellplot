@@ -37,9 +37,7 @@ def _document() -> AuthoringDocumentSpec:
             {
                 "id": "repeat",
                 "title": "Repeat",
-                "tracks": [
-                    {"id": "curves", "title": "Curves", "kind": "normal", "width_mm": 25}
-                ],
+                "tracks": [{"id": "curves", "title": "Curves", "kind": "normal", "width_mm": 25}],
             },
         ],
     )
@@ -237,3 +235,105 @@ def test_reconciler_handles_arbitrary_new_sections_and_order_moves() -> None:
         operation.action.value == "move" and operation.object_kind == "section"
         for operation in plan.operations
     )
+
+
+def test_reconciler_assembles_new_sections_in_dependency_order() -> None:
+    """Create a section bootstrap, then tracks, bindings, and content in order."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "packet_pass",
+                "title": "Packet Pass",
+                "tracks": [
+                    {
+                        "track_id": "curves",
+                        "title": "Curves",
+                        "kind": "normal",
+                        "width_mm": 24,
+                        "bindings": [
+                            {"kind": "curve", "binding_id": "gr-1", "channel": "GR"},
+                            {"kind": "curve", "binding_id": "gr-2", "channel": "GR"},
+                        ],
+                        "fills": [
+                            {
+                                "fill_id": "gr-fill",
+                                "kind": "between_instances",
+                                "binding_id": "gr-1",
+                                "other_binding_id": "gr-2",
+                                "color": "tan",
+                            }
+                        ],
+                    },
+                    {
+                        "track_id": "waveform",
+                        "title": "Waveform",
+                        "kind": "array",
+                        "width_mm": 30,
+                        "bindings": [{"kind": "raster", "binding_id": "vdl", "channel": "VDL"}],
+                    },
+                    {
+                        "track_id": "markers",
+                        "title": "Markers",
+                        "kind": "annotation",
+                        "width_mm": 18,
+                        "annotations": [
+                            {
+                                "annotation_id": "top-marker",
+                                "annotation": {
+                                    "kind": "marker",
+                                    "annotation_id": "top-marker",
+                                    "depth": 1000,
+                                },
+                            }
+                        ],
+                    },
+                ],
+            }
+        ]
+    )
+
+    plan = reconcile_authoring(
+        intent,
+        existing=_document(),
+        available_channels={
+            "packet_pass": [
+                {"mnemonic": "GR", "kind": "scalar"},
+                {"mnemonic": "VDL", "kind": "raster"},
+            ]
+        },
+    )
+
+    assert plan.ready is True
+    assert list(dict.fromkeys(operation.phase for operation in plan.operations)) == [
+        AuthoringOperationPhase.SECTIONS,
+        AuthoringOperationPhase.TRACKS,
+        AuthoringOperationPhase.BINDINGS,
+        AuthoringOperationPhase.CONTENT,
+    ]
+    section_operation = plan.operations[0]
+    assert [track["id"] for track in section_operation.payload["object"]["tracks"]] == ["curves"]
+    track_operations = [
+        operation for operation in plan.operations if operation.object_kind == "track"
+    ]
+    assert [operation.object_id for operation in track_operations] == ["waveform", "markers"]
+    assert all(
+        section_operation.operation_id in operation.depends_on for operation in track_operations
+    )
+    binding_operations = [
+        operation
+        for operation in plan.operations
+        if operation.object_kind in {"curve_binding", "raster_binding"}
+    ]
+    assert [operation.object_id for operation in binding_operations] == ["gr-1", "gr-2", "vdl"]
+    assert binding_operations[0].depends_on == [section_operation.operation_id]
+    assert binding_operations[2].depends_on == [track_operations[0].operation_id]
+    content_operations = [
+        operation
+        for operation in plan.operations
+        if operation.phase == AuthoringOperationPhase.CONTENT
+    ]
+    assert [operation.object_id for operation in content_operations] == ["gr-fill", "top-marker"]
+    assert content_operations[0].depends_on == [
+        operation.operation_id for operation in binding_operations[:2]
+    ]
+    assert content_operations[1].depends_on == [track_operations[1].operation_id]

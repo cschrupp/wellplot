@@ -477,8 +477,9 @@ def _section_mapping(
     base_path: str,
     decisions: Mapping[str, object],
     issues: list[AuthoringReconciliationIssue],
+    bootstrap_tracks: Sequence[AuthoringTrackIntent] | None = None,
 ) -> dict[str, Any]:
-    """Build a create-shaped section with empty child content."""
+    """Build a create-shaped section with one required bootstrap track."""
     result: dict[str, Any] = {"id": intent.section_id}
     for field_name in ("title", "subtitle", "depth_range", "data_source", "extensions"):
         value = _effective_field(intent, field_name, base_path, decisions)
@@ -493,7 +494,7 @@ def _section_mapping(
             )
             continue
         result[field_name] = _plain(value)
-    tracks = intent.tracks
+    tracks = intent.tracks if bootstrap_tracks is None else bootstrap_tracks
     if isinstance(tracks, list):
         result["tracks"] = [
             _track_mapping(
@@ -920,6 +921,7 @@ def _process_track(
             object_id=intent.track_id,
             section_id=section_id,
             payload={"object": track_object},
+            depends_on=[section_dependency] if section_dependency else [],
             reason="Create the requested track form before adding content.",
         )
     elif current is not _MISSING:
@@ -1402,6 +1404,9 @@ def reconcile_authoring(
                 base_path=section_base,
                 decisions=decisions,
                 issues=issues,
+                # AuthoringSectionSpec requires one track at creation time.
+                # The remaining tracks are emitted in the TRACKS phase below.
+                bootstrap_tracks=(section_intent.tracks[:1] if section_intent.tracks else []),
             )
             section_create_ids[section_intent.section_id] = builder.add(
                 phase=AuthoringOperationPhase.SECTIONS,
@@ -1440,6 +1445,11 @@ def reconcile_authoring(
                 if _value(_mapping(track), "id") is not _MISSING
             ]
             embedded = current_section is _MISSING
+            bootstrap_track_id = (
+                section_intent.tracks[0].track_id
+                if embedded and section_intent.tracks
+                else None
+            )
             track_dependencies: dict[str, str] = {}
             for track_intent in section_intent.tracks:
                 track_base = f"{section_base}.tracks[{track_intent.track_id}]"
@@ -1452,7 +1462,9 @@ def reconcile_authoring(
                     decisions=decisions,
                     issues=issues,
                     unchanged=unchanged,
-                    embedded_in_section_create=embedded,
+                    embedded_in_section_create=(
+                        embedded and track_intent.track_id == bootstrap_track_id
+                    ),
                     section_dependency=section_create_ids.get(section_intent.section_id),
                 )
                 if track_id:
