@@ -988,6 +988,9 @@ def _header_from_legacy(value: object) -> AuthoringHeaderSpec | None:
             rows.append(
                 AuthoringHeaderDetailRowSpec(
                     row_id=str(row.get("row_id", f"detail.row_{row_index + 1}")),
+                    key=(str(row["key"]) if row.get("key") is not None else None),
+                    keys=[str(value) for value in row.get("keys", [])],
+                    aliases=[str(value) for value in row.get("aliases", [])],
                     label=label,
                     label_cells=label_cells,
                     values=values,
@@ -1141,6 +1144,14 @@ def _header_to_legacy(header: AuthoringHeaderSpec) -> dict[str, Any]:
                 else {}
             )
             row_data = dict(old_row)
+            if row.key is not None:
+                row_data["key"] = row.key
+                row_data.pop("keys", None)
+            elif row.keys:
+                row_data["keys"] = list(row.keys)
+                row_data.pop("key", None)
+            if row.aliases:
+                row_data["aliases"] = list(row.aliases)
             if row.label is not None:
                 row_data["label"] = row.label
                 row_data.pop("label_cells", None)

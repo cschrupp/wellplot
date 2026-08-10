@@ -504,6 +504,13 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
     )
     assert "create_project_session" in las_source
     assert "bootstrap_starter" in las_source
+    assert "Rmf measured:" in las_source
+    assert "Rmc measured:" in las_source
+    assert "Set header RM to" in las_source
+    assert "Use the measured one." in las_source
+    assert "needs_clarification" in las_source
+    assert "detail.rm_measured_temp" not in las_source
+    assert "detail.rm_bottom_temp" not in las_source
 
 
 class _RecordedIntentBackend:

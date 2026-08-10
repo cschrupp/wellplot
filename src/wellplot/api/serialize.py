@@ -624,10 +624,16 @@ def _serialize_report_detail_column(column: ReportDetailColumnSpec) -> dict[str,
 
 
 def _serialize_report_detail_row(row: ReportDetailRowSpec) -> dict[str, object]:
-    return {
+    payload = {
         "label_cells": [_serialize_report_detail_cell(item) for item in row.label_cells],
         "columns": [_serialize_report_detail_column(item) for item in row.columns],
     }
+    _set_if_not_none(payload, "key", row.key)
+    if row.keys:
+        payload["keys"] = list(row.keys)
+    if row.aliases:
+        payload["aliases"] = list(row.aliases)
+    return payload
 
 
 def _serialize_report_detail(detail: ReportDetailSpec) -> dict[str, object]:

@@ -273,6 +273,17 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
         "reportDetailRow": {
             "type": "object",
             "properties": {
+                "key": {"type": "string", "minLength": 1},
+                "aliases": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "keys": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "items": {"type": "string", "minLength": 1},
+                },
                 "label": {"type": "string", "minLength": 1},
                 "label_cells": {
                     "type": "array",

@@ -14,13 +14,22 @@ provider + MCP tool loop yourself.
 The public `AuthoringResult` is also the verification surface for notebook and
 UI integrations. It carries request coverage, resolved run context, defaults
 provenance, planned operation counts, per-phase verification, and blocked
-reasons. Use `display_authoring_result(..., include_phase_previews=True)` when
+reasons, plus structured `needs_clarification` entries when a user-facing
+header phrase needs disambiguation. Use
+`display_authoring_result(..., include_phase_previews=True)` when
 you need to inspect progress before the final preview; a blocked phase must be
 fixed before rendering a final draft.
 
 Both surfaces are experimental. The agent interprets intent and selects tools;
 it does not replace deterministic authoring semantics. Explicit user values
 must take precedence over defaults and starter/example scaffolds.
+
+When a deterministic header fill is ambiguous, keep the same
+`AuthoringSession` for the follow-up. The result exposes the visible candidate
+labels in `needs_clarification`; a reply such as `Use the measured one.` is
+resolved against those labels, revalidated against the current heading, and
+applied only if the selected field still exists. Pending choices are ephemeral
+session state, not MCP-server memory.
 
 ## Install
 
@@ -243,7 +252,11 @@ Recommended split:
   remarks content from external text
 - use `preview_header_mapping(...)` after you extract header values but before
   you write anything into the draft; it will surface ambiguous keys,
-  overwrite-policy conflicts, and the exact heading patch it would apply
+  overwrite-policy conflicts, a human-readable clarification question with
+  candidate labels, and the exact heading patch it would apply
+- in conversational requests, use the visible header label and its qualifier,
+  such as `RM measured` or `RM at bottom temperature`; canonical detail keys
+  remain available for programmatic callers but are not required user knowledge
 - use `apply_header_values(...)` only after the preview looks right; it writes
   the same deterministic mapping result back into the draft and returns the
   saved heading summary

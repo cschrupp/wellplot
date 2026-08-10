@@ -996,9 +996,19 @@ Behavior:
   - `merge_lists`
 - `merge_lists` currently behaves like `replace` for scalar heading/detail
   slots and returns a warning to make that explicit
-- reports ambiguous human-readable keys instead of guessing one slot; clients
-  can disambiguate with explicit keys like `general_field.company`,
-  `service_title_1`, or `detail.date`
+- reports ambiguous human-readable keys instead of guessing one slot; each
+  ambiguity includes `candidate_labels` and a `clarification_question`, while
+  programmatic clients may also use stable keys such as
+  `general_field.company`, `service_title_1`, `detail.rm_measured_temp`, and
+  `detail.rm_bottom_temp`
+- these stable keys are an advanced programmatic and diagnostic interface; user
+  prompts and the canonical notebook should use visible labels and qualifiers
+  instead
+- header archetype detail rows expose stable `key` values, and multi-field rows
+  expose aligned `keys`; visible labels remain supported as compatibility aliases
+- header archetype aliases such as `rm measured` are intended for conversational
+  requests; they are loaded from the archetype asset rather than inferred from
+  internal key spelling
 - does not write the draft; the returned `predicted_heading_patch` is the exact
   heading patch the server would apply in a later mutating step
 

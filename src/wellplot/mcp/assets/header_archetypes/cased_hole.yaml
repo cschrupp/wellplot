@@ -103,11 +103,15 @@ heading:
     kind: cased_hole
     title: Cased Hole Metadata
     rows:
-      - label: Date
+      - key: date
+        label: Date
         values:
           - source_key: DATE
           - ""
-      - label_cells:
+      - keys:
+          - run_number
+          - direction
+        label_cells:
           - Run
           - Direction
         columns:
@@ -115,113 +119,135 @@ heading:
               - ""
           - cells:
               - ""
-      - label: Service Order
+      - key: service_order
+        label: Service Order
         values:
           - ""
           - ""
-      - label: Driller Depth
+      - key: driller_depth
+        label: Driller Depth
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: Logged Depth
+      - key: logged_depth
+        label: Logged Depth
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: First Reading (Bottom)
+      - key: first_reading_bottom
+        label: First Reading (Bottom)
         columns:
           - cells:
               - source_key: STOP
               - ft
           - cells:
               - ""
-      - label: Last Reading
+      - key: last_reading
+        label: Last Reading
         columns:
           - cells:
               - source_key: STRT
               - ft
           - cells:
               - ""
-      - label: Start Time
+      - key: start_time
+        label: Start Time
         values:
           - ""
           - ""
-      - label: End Time
+      - key: end_time
+        label: End Time
         values:
           - ""
           - ""
-      - label: Drill Time
+      - key: drill_time
+        label: Drill Time
         values:
           - ""
           - ""
-      - label: Injection Type
+      - key: injection_type
+        label: Injection Type
         values:
           - ""
           - ""
-      - label: Fluid Density
+      - key: fluid_density
+        label: Fluid Density
         values:
           - ""
           - ""
-      - label: Fluid Salinity
+      - key: fluid_salinity
+        label: Fluid Salinity
         values:
           - ""
           - ""
-      - label: Fluid Level
+      - key: fluid_level
+        label: Fluid Level
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: Cement Top
+      - key: cement_top
+        label: Cement Top
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: Head Pressure
+      - key: head_pressure
+        label: Head Pressure
         columns:
           - cells:
               - ""
               - psi
           - cells:
               - ""
-      - label: Maximum Deviation
+      - key: maximum_deviation
+        label: Maximum Deviation
         columns:
           - cells:
               - ""
               - deg
           - cells:
               - ""
-      - label: Nominal Speed
+      - key: nominal_speed
+        label: Nominal Speed
         columns:
           - cells:
               - ""
               - ft/min
           - cells:
               - ""
-      - label: Bottom Temperature
+      - key: bottom_temperature
+        label: Bottom Temperature
         columns:
           - cells:
               - ""
               - degF
           - cells:
               - ""
-      - label: Reference Log
+      - key: reference_log
+        label: Reference Log
         values:
           - ""
           - ""
-      - label: Reference Date
+      - key: reference_date
+        label: Reference Date
         values:
           - ""
           - ""
-      - label_cells:
+      - keys:
+          - equipment_number
+          - base
+        label_cells:
           - Equipment No.
           - Base
         columns:
@@ -229,11 +255,13 @@ heading:
               - ""
           - cells:
               - ""
-      - label: Logged By
+      - key: logged_by
+        label: Logged By
         values:
           - ""
           - ""
-      - label: Witnessed By
+      - key: witnessed_by
+        label: Witnessed By
         values:
           - ""
           - ""

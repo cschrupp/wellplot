@@ -22,10 +22,12 @@ The flow is:
 1. stage the user LAS file into the project folder
 2. generate a reusable starter scaffold from a shipped preset
 3. let the LAS header populate the first-page metadata fields
-4. add remarks
-5. refine the overview track and then add one track at a time
-6. preview after each step
-7. render the final PDF through the public agent session helper
+4. fill additional header values with visible, qualified phrases
+5. resolve an ambiguous header value through a report-and-follow-up exchange
+6. add remarks
+7. refine the overview track and then add one track at a time
+8. preview after each step
+9. render the final PDF through the public agent session helper
 
 The notebook uses these public APIs directly:
 
@@ -128,6 +130,13 @@ archetype assets. The agent is expected to preserve that open-hole or
 cased-hole scaffold and fill matching values into it, not rebuild the first
 page when the user pastes ticket text or asks for a few specific header
 values.
+
+The header section also demonstrates the intended conversational boundary. A
+qualified request such as `Rmf measured` is applied directly. An unqualified
+request such as `RM` is not guessed when the heading contains multiple RM
+fields; the notebook displays the candidate labels and then continues with
+`Use the measured one.` in the same `AuthoringSession`. Users do not need to
+know canonical keys such as `detail.rm_measured_temp`.
 
 The safest iteration pattern is:
 

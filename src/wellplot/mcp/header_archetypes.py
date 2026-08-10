@@ -148,6 +148,7 @@ def _validate_detail_rows(
         return
     if not isinstance(rows, list):
         raise ValueError(f"{context} heading.detail.rows must be a list.")
+    seen_keys: set[str] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValueError(f"{context} heading.detail.rows[{index}] must be a mapping.")
@@ -162,6 +163,52 @@ def _validate_detail_rows(
             raise ValueError(
                 f"{context} heading.detail.rows[{index}] cannot define both label and label_cells."
             )
+
+        row_context = f"{context} heading.detail.rows[{index}]"
+        aliases = row.get("aliases")
+        if aliases is not None:
+            if not has_label:
+                raise ValueError(f"{row_context}.aliases requires a label row.")
+            row["aliases"] = _require_string_list(
+                aliases,
+                field_name="aliases",
+                context=row_context,
+            )
+        row_key = row.get("key")
+        if row_key is not None:
+            normalized_key = _require_non_empty_string(
+                row_key,
+                field_name="key",
+                context=row_context,
+            ).casefold()
+            if normalized_key in seen_keys:
+                raise ValueError(f"{row_context}.key {row_key!r} is not unique.")
+            seen_keys.add(normalized_key)
+
+        field_keys = row.get("keys")
+        if field_keys is not None:
+            if not has_label_cells:
+                raise ValueError(f"{row_context}.keys requires label_cells.")
+            if not isinstance(field_keys, list) or len(field_keys) != len(label_cells):
+                raise ValueError(
+                    f"{row_context}.keys must contain one key for each label_cells entry."
+                )
+            if row_key is not None:
+                raise ValueError(f"{row_context} cannot define both key and keys.")
+            for key_index, field_key in enumerate(field_keys):
+                normalized_key = _require_non_empty_string(
+                    field_key,
+                    field_name=f"keys[{key_index}]",
+                    context=row_context,
+                ).casefold()
+                if normalized_key in seen_keys:
+                    raise ValueError(
+                        f"{row_context}.keys[{key_index}] {field_key!r} is not unique."
+                    )
+                seen_keys.add(normalized_key)
+        elif has_label_cells:
+            # Existing third-party archetypes may omit keys; labels remain a supported fallback.
+            pass
 
 
 def _validate_header_archetype_entry(raw: object, *, source_name: str) -> dict[str, object]:
@@ -242,6 +289,19 @@ def header_archetype_catalog() -> list[dict[str, object]]:
         heading = dict(entry["heading"])
         detail = dict(heading.get("detail", {}))
         rows = list(detail.get("rows", []))
+        detail_slot_keys: list[str] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            row_key = str(row.get("key", "")).strip()
+            if row_key:
+                detail_slot_keys.append(row_key)
+                continue
+            field_keys = row.get("keys")
+            if isinstance(field_keys, list):
+                detail_slot_keys.extend(
+                    str(value).strip() for value in field_keys if str(value).strip()
+                )
         catalog.append(
             {
                 "id": str(entry["id"]),
@@ -271,6 +331,7 @@ def header_archetype_catalog() -> list[dict[str, object]]:
                     for row in rows
                     if isinstance(row, dict)
                 ],
+                "detail_slot_keys": detail_slot_keys,
                 "notes": list(entry.get("notes", [])),
             }
         )

@@ -346,6 +346,7 @@ class AuthoringUserReport:
     why_not: tuple[str, ...] = ()
     warnings_or_errors: tuple[str, ...] = ()
     request_inconsistencies: tuple[str, ...] = ()
+    needs_clarification: tuple[dict[str, object], ...] = ()
     next_help: tuple[str, ...] = ()
 
     def sections(self) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -358,6 +359,10 @@ class AuthoringUserReport:
                 ("Why not", self.why_not),
                 ("Warnings/errors", self.warnings_or_errors),
                 ("Request inconsistencies", self.request_inconsistencies),
+                (
+                    "Needs clarification",
+                    tuple(_clarification_summary_text(item) for item in self.needs_clarification),
+                ),
                 ("Next help", self.next_help),
             )
             if items
@@ -398,6 +403,7 @@ class AuthoringResult:
     phase_summaries: tuple[ExecutedAuthoringPhase, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
     user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
+    needs_clarification: tuple[dict[str, object], ...] = ()
     request_coverage: tuple[dict[str, object], ...] = ()
     defaults_provenance: dict[str, str] = field(default_factory=dict)
 
@@ -646,6 +652,142 @@ def _dedupe_text_items(items: list[str]) -> tuple[str, ...]:
     return tuple(ordered)
 
 
+def _clarification_entries(value: object) -> tuple[dict[str, object], ...]:
+    """Normalize structured clarification entries from deterministic tool output."""
+    if not isinstance(value, list):
+        return ()
+    return tuple(dict(entry) for entry in value if isinstance(entry, dict))
+
+
+def _clarification_summary_text(entry: dict[str, object]) -> str:
+    """Return the concise user-facing text for one clarification entry."""
+    question = entry.get("clarification_question")
+    if isinstance(question, str) and question.strip():
+        return question.strip()
+    input_key = str(entry.get("input_key", "the requested value")).strip()
+    labels = entry.get("candidate_labels")
+    if isinstance(labels, list):
+        visible_labels = [str(label).strip() for label in labels if str(label).strip()]
+        if visible_labels:
+            return f"Choose a header field for `{input_key}`: " + " or ".join(visible_labels) + "."
+    return f"Choose the header field for `{input_key}`."
+
+
+def _header_clarification_entries(payload: object) -> list[dict[str, object]]:
+    """Extract user-facing header conflicts from one preview payload."""
+    if not isinstance(payload, dict):
+        return []
+    conflicts = payload.get("conflicting_values")
+    if not isinstance(conflicts, list):
+        return []
+    entries: list[dict[str, object]] = []
+    for conflict in conflicts:
+        if not isinstance(conflict, dict):
+            continue
+        question = conflict.get("clarification_question")
+        if not isinstance(question, str) or not question.strip():
+            continue
+        entries.append(
+            {
+                "input_key": conflict.get("input_key"),
+                "input_value": deepcopy(conflict.get("input_value")),
+                "clarification_question": question.strip(),
+                "overwrite_policy": payload.get("overwrite_policy", "replace"),
+                "candidate_labels": deepcopy(conflict.get("candidate_labels", [])),
+                "candidate_targets": deepcopy(conflict.get("candidate_targets", [])),
+            }
+        )
+    return entries
+
+
+def _clarification_selector_tokens(value: object) -> set[str]:
+    """Normalize conversational clarification wording into meaningful tokens."""
+    text = str(value).casefold()
+    for delimiter in "_-.@/():,`'\"":
+        text = text.replace(delimiter, " ")
+    ignored = {
+        "as",
+        "choose",
+        "field",
+        "for",
+        "from",
+        "header",
+        "i",
+        "it",
+        "mean",
+        "one",
+        "please",
+        "select",
+        "the",
+        "this",
+        "that",
+        "to",
+        "use",
+        "value",
+        "with",
+    }
+    tokens = set(text.split()) - ignored
+    return {"temp" if token == "temperature" else token for token in tokens}
+
+
+def _select_pending_header_target(
+    text: str,
+    pending_entries: Sequence[dict[str, object]],
+) -> tuple[dict[str, object], dict[str, object]] | None:
+    """Select one pending header target from a natural clarification response."""
+    request_tokens = _clarification_selector_tokens(text)
+    if not request_tokens:
+        return None
+
+    matches: list[tuple[int, dict[str, object], dict[str, object]]] = []
+    for entry in pending_entries:
+        candidate_labels = entry.get("candidate_labels")
+        candidate_targets = entry.get("candidate_targets")
+        if not isinstance(candidate_targets, list):
+            continue
+        labels = candidate_labels if isinstance(candidate_labels, list) else []
+        for index, target in enumerate(candidate_targets):
+            if not isinstance(target, dict):
+                continue
+            terms: list[object] = [target.get("display_label"), target.get("target_key")]
+            if index < len(labels):
+                terms.append(labels[index])
+            candidate_tokens: set[str] = set()
+            for term in terms:
+                candidate_tokens.update(_clarification_selector_tokens(term))
+            if request_tokens.issubset(candidate_tokens):
+                matches.append((len(request_tokens), entry, target))
+
+    if not matches:
+        return None
+    highest_score = max(score for score, _entry, _target in matches)
+    best_matches = [
+        (entry, target)
+        for score, entry, target in matches
+        if score == highest_score
+    ]
+    if len(best_matches) != 1:
+        return None
+    return best_matches[0]
+
+
+def _header_clarification_target_key(target: dict[str, object]) -> str | None:
+    """Return a scoped mapping key for one selected clarification target."""
+    target_key = str(target.get("target_key", "")).strip()
+    if not target_key:
+        return None
+    target_kind = str(target.get("target_kind", "")).strip().lower()
+    if target_kind == "detail_field":
+        return f"detail.{target_key}"
+    if target_kind == "general_field":
+        return f"general_field.{target_key}"
+    if target_kind == "provider":
+        return "provider"
+    if target_kind == "service_title":
+        return target_key
+    return target_key
+
+
 def _extract_section_context(
     draft_summary: dict[str, object],
 ) -> tuple[set[str], set[str], set[str]]:
@@ -722,7 +864,7 @@ def _assignment_label(entry: object) -> str | None:
     """Return one best-effort human label for a structured assignment entry."""
     if not isinstance(entry, dict):
         return None
-    for key in ("target_key", "display_label", "request_key", "channel", "track_id"):
+    for key in ("display_label", "target_key", "request_key", "channel", "track_id"):
         value = entry.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
@@ -855,6 +997,7 @@ def _build_user_report(
         why_not=_dedupe_text_items(why_not),
         warnings_or_errors=_dedupe_text_items(warnings_or_errors),
         request_inconsistencies=inconsistencies,
+        needs_clarification=_clarification_entries(report_facts.get("needs_clarification")),
         next_help=_dedupe_text_items(next_help),
     )
 
@@ -1341,6 +1484,11 @@ class AuthoringSession:
     backend: ProviderBackendProtocol
     runtime: McpRuntimeProtocol
     allowed_tool_names: tuple[str, ...] = DEFAULT_ALLOWED_MCP_TOOLS
+    _pending_header_clarifications: dict[str, tuple[dict[str, object], ...]] = field(
+        default_factory=dict,
+        init=False,
+        repr=False,
+    )
 
     @classmethod
     def from_local_mcp(
@@ -1450,6 +1598,9 @@ class AuthoringSession:
         draft_summary_payload = _structured_content(draft_summary_result)
         change_summary_payload = _structured_content(change_summary_result)
         report_facts = getattr(provider_result, "report_facts", {})
+        needs_clarification = _clarification_entries(
+            report_facts.get("needs_clarification") if isinstance(report_facts, dict) else None
+        )
         request_coverage = tuple(
             dict(item)
             for item in report_facts.get("request_coverage", [])
@@ -1477,6 +1628,7 @@ class AuthoringSession:
             plan=plan,
             phase_summaries=phase_summaries,
             run_state=AuthoringRunState() if run_state is None else run_state,
+            needs_clarification=needs_clarification,
             request_coverage=request_coverage,
             defaults_provenance=(
                 {} if plan is None else dict(plan.defaults_provenance)
@@ -1654,6 +1806,7 @@ class AuthoringSession:
             },
         )
         _require_mcp_success(preview_result, action="preview_header_mapping")
+        preview_payload = _structured_content(preview_result)
         apply_result = await session.call_tool(
             "apply_header_values",
             {
@@ -1680,6 +1833,13 @@ class AuthoringSession:
         if isinstance(skipped_assignments, list):
             for entry in skipped_assignments:
                 if not isinstance(entry, dict):
+                    continue
+                clarification_question = entry.get("clarification_question")
+                if isinstance(clarification_question, str) and clarification_question.strip():
+                    input_key = str(entry.get("input_key", "requested header value")).strip()
+                    not_done.append(
+                        f"Did not apply the value for `{input_key}`; clarification is required."
+                    )
                     continue
                 label = _assignment_label(entry)
                 if label is not None:
@@ -1743,6 +1903,7 @@ class AuthoringSession:
                 "not_done": not_done,
                 "reasons": reasons,
                 "warnings": warnings,
+                "needs_clarification": _header_clarification_entries(preview_payload),
                 "next_help": [
                     "I can inspect the remaining header slots or preview a more "
                     "explicit mapping for any skipped values."
@@ -1764,6 +1925,147 @@ class AuthoringSession:
             baseline_draft_text=baseline_draft_text,
             provider_result=provider_result,
         )
+
+    def _remember_header_clarifications(
+        self,
+        draft_logfile: str,
+        result: AuthoringResult,
+    ) -> None:
+        """Store or clear pending header choices for one in-memory draft session."""
+        if result.needs_clarification:
+            self._pending_header_clarifications[draft_logfile] = result.needs_clarification
+        else:
+            self._pending_header_clarifications.pop(draft_logfile, None)
+
+    async def _continue_header_clarification(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        feedback: str,
+        baseline_draft_text: str,
+    ) -> AuthoringResult | None:
+        """Apply a recognized clarification choice after revalidating its target."""
+        pending = self._pending_header_clarifications.get(draft_logfile, ())
+        selection = _select_pending_header_target(feedback, pending)
+        if selection is None:
+            return None
+        clarification, target = selection
+        selection_key = _header_clarification_target_key(target)
+        original_value = clarification.get("input_value")
+        if selection_key is None or original_value is None:
+            return None
+
+        inspect_result = await session.call_tool(
+            "inspect_heading_slots",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(inspect_result, action="inspect_heading_slots")
+        overwrite_policy = str(clarification.get("overwrite_policy", "replace"))
+        if overwrite_policy not in {"fill_empty", "replace", "merge_lists"}:
+            overwrite_policy = "replace"
+        preview_result = await session.call_tool(
+            "preview_header_mapping",
+            {
+                "logfile_path": draft_logfile,
+                "values": {selection_key: str(original_value)},
+                "overwrite_policy": "replace",
+            },
+        )
+        _require_mcp_success(preview_result, action="preview_header_mapping")
+        preview_payload = _structured_content(preview_result)
+        resolved_assignments = preview_payload.get("resolved_assignments", [])
+        target_key = str(target.get("target_key", "")).strip()
+        target_label = str(target.get("display_label", "")).strip()
+        target_is_present = any(
+            isinstance(assignment, dict)
+            and (
+                str(assignment.get("target_key", "")).strip() == target_key
+                or str(assignment.get("display_label", "")).strip() == target_label
+            )
+            for assignment in resolved_assignments
+        ) if isinstance(resolved_assignments, list) else False
+        if not target_is_present:
+            clarification_entry = dict(clarification)
+            reason = (
+                f"The selected header field `{target_label or target_key}` is no longer "
+                "available in the current draft."
+            )
+            provider_result = ProviderRunResult(
+                final_text="Header clarification was blocked during current-draft revalidation.",
+                tool_trace=(
+                    AuthoringToolCall(
+                        round=1,
+                        name="inspect_heading_slots",
+                        arguments={"logfile_path": draft_logfile},
+                    ),
+                    AuthoringToolCall(
+                        round=1,
+                        name="preview_header_mapping",
+                        arguments={
+                            "logfile_path": draft_logfile,
+                            "values": {selection_key: str(original_value)},
+                            "overwrite_policy": "replace",
+                        },
+                    ),
+                ),
+                report_facts={
+                    "not_done": ["Apply the selected header value."],
+                    "reasons": [reason],
+                    "needs_clarification": [clarification_entry],
+                    "next_help": [
+                        "I can inspect the current heading slots and ask for a new choice."
+                    ],
+                },
+            )
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=feedback,
+                example_id=None,
+                source_logfile_path=None,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+            )
+
+        intent = _HeaderFillIntent(
+            values=((selection_key, str(original_value)),),
+            overwrite_policy=overwrite_policy,
+        )
+        result = await self._run_deterministic_header_fill(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=feedback,
+            example_id=None,
+            source_logfile_path=None,
+            baseline_draft_text=baseline_draft_text,
+            intent=intent,
+        )
+        object.__setattr__(
+            result,
+            "tool_trace",
+            (
+                AuthoringToolCall(
+                    round=1,
+                    name="inspect_heading_slots",
+                    arguments={"logfile_path": draft_logfile},
+                ),
+                AuthoringToolCall(
+                    round=1,
+                    name="preview_header_mapping",
+                    arguments={
+                        "logfile_path": draft_logfile,
+                        "values": {selection_key: str(original_value)},
+                        "overwrite_policy": "replace",
+                    },
+                ),
+            )
+            + result.tool_trace,
+        )
+        return result
 
     async def _apply_deterministic_matplotlib_style(
         self,
@@ -4622,6 +4924,7 @@ class AuthoringSession:
             for item in report_facts.get("request_coverage", [])
             if isinstance(item, dict)
         )
+        needs_clarification = _clarification_entries(report_facts.get("needs_clarification"))
         output_path = self.runtime.server_root / draft_logfile
         draft_text = (
             output_path.read_text(encoding="utf-8") if output_path.exists() else baseline_draft_text
@@ -4648,6 +4951,7 @@ class AuthoringSession:
             plan=plan,
             phase_summaries=phase_summaries,
             run_state=run_state,
+            needs_clarification=needs_clarification,
             request_coverage=request_coverage,
             defaults_provenance=(
                 {} if plan is None else dict(plan.defaults_provenance)
@@ -4895,6 +5199,9 @@ class AuthoringSession:
         relative_output_logfile = _relative_logfile_path(
             self.runtime.server_root, request.output_logfile
         )
+        # A new authoring run overwrites the draft and must not inherit choices
+        # from an earlier clarification conversation.
+        self._pending_header_clarifications.pop(relative_output_logfile, None)
         relative_source_logfile = (
             None
             if request.source_logfile_path is None
@@ -4959,6 +5266,7 @@ class AuthoringSession:
                     baseline_draft_text=baseline_draft_text,
                     intent=deterministic_header_fill,
                 )
+                self._remember_header_clarifications(relative_output_logfile, result)
                 if preflight_tool_trace:
                     object.__setattr__(
                         result,
@@ -5138,6 +5446,23 @@ class AuthoringSession:
                         provider_result=provider_result,
                     )
 
+            continuation = await self._continue_header_clarification(
+                session=session,
+                draft_logfile=relative_logfile,
+                request_kind="revise",
+                feedback=effective_feedback,
+                baseline_draft_text=baseline_draft_text,
+            )
+            if continuation is not None:
+                self._remember_header_clarifications(relative_logfile, continuation)
+                if preflight_tool_trace:
+                    object.__setattr__(
+                        continuation,
+                        "tool_trace",
+                        preflight_tool_trace + continuation.tool_trace,
+                    )
+                return continuation
+
             deterministic_header_fill = _extract_header_fill_intent(effective_feedback)
             if deterministic_header_fill is not None:
                 result = await self._run_deterministic_header_fill(
@@ -5150,6 +5475,7 @@ class AuthoringSession:
                     baseline_draft_text=baseline_draft_text,
                     intent=deterministic_header_fill,
                 )
+                self._remember_header_clarifications(relative_logfile, result)
                 if preflight_tool_trace:
                     object.__setattr__(
                         result,

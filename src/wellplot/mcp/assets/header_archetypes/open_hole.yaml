@@ -103,11 +103,15 @@ heading:
     kind: open_hole
     title: Open Hole Metadata
     rows:
-      - label: Date
+      - key: date
+        label: Date
         values:
           - source_key: DATE
           - ""
-      - label_cells:
+      - keys:
+          - run_number
+          - direction
+        label_cells:
           - Run
           - Direction
         columns:
@@ -115,79 +119,94 @@ heading:
               - ""
           - cells:
               - ""
-      - label: Service Order
+      - key: service_order
+        label: Service Order
         values:
           - ""
           - ""
-      - label: Driller Depth
+      - key: driller_depth
+        label: Driller Depth
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: Logged Depth
+      - key: logged_depth
+        label: Logged Depth
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: First Reading (Bottom)
+      - key: first_reading_bottom
+        label: First Reading (Bottom)
         columns:
           - cells:
               - source_key: STOP
               - ft
           - cells:
               - ""
-      - label: Last Reading
+      - key: last_reading
+        label: Last Reading
         columns:
           - cells:
               - source_key: STRT
               - ft
           - cells:
               - ""
-      - label: Logging Measured From
+      - key: logging_measured_from
+        label: Logging Measured From
         values:
           - source_key: LMF
           - ""
-      - label: Permanent Datum
+      - key: permanent_datum
+        label: Permanent Datum
         values:
           - ""
           - ""
-      - label: Elev. Kelly Bushing
+      - key: elevation_kb
+        label: Elev. Kelly Bushing
         columns:
           - cells:
               - source_key: EKB
               - ft
           - cells:
               - ""
-      - label: Elev. Drill Floor
+      - key: elevation_df
+        label: Elev. Drill Floor
         columns:
           - cells:
               - source_key: EDF
               - ft
           - cells:
               - ""
-      - label: Elev. Ground Level
+      - key: elevation_gl
+        label: Elev. Ground Level
         columns:
           - cells:
               - source_key: EGL
               - ft
           - cells:
               - ""
-      - label: Above Perm Datum
+      - key: above_permanent_datum
+        label: Above Perm Datum
         columns:
           - cells:
               - ""
               - ft
           - cells:
               - ""
-      - label: Location
+      - key: location
+        label: Location
         values:
           - source_key: LOC
           - ""
-      - label_cells:
+      - keys:
+          - country
+          - province
+        label_cells:
           - Country
           - Province
         columns:
@@ -195,7 +214,10 @@ heading:
               - source_key: CTRY
           - cells:
               - source_key: PROV
-      - label_cells:
+      - keys:
+          - latitude
+          - longitude
+        label_cells:
           - Latitude
           - Longitude
         columns:
@@ -203,26 +225,33 @@ heading:
               - source_key: LATI
           - cells:
               - source_key: LONG
-      - label: Drill Pipe
+      - key: drill_pipe
+        label: Drill Pipe
         values:
           - ""
           - ""
-      - label: Logged String
+      - key: logged_string
+        label: Logged String
         values:
           - ""
           - ""
-      - label: Hole Diameter
+      - key: hole_diameter
+        label: Hole Diameter
         columns:
           - cells:
               - ""
               - in
           - cells:
               - ""
-      - label: Injection Type
+      - key: injection_type
+        label: Injection Type
         values:
           - ""
           - ""
-      - label_cells:
+      - keys:
+          - density
+          - viscosity
+        label_cells:
           - Density
           - Viscosity
         columns:
@@ -230,7 +259,10 @@ heading:
               - ""
           - cells:
               - ""
-      - label_cells:
+      - keys:
+          - ph
+          - filtered_water
+        label_cells:
           - pH
           - Filtered Water
         columns:
@@ -238,11 +270,16 @@ heading:
               - ""
           - cells:
               - ""
-      - label: Sample Source
+      - key: sample_source
+        label: Sample Source
         values:
           - ""
           - ""
-      - label: RM @ Measured Temp
+      - key: rm_measured_temp
+        label: RM @ Measured Temp
+        aliases:
+          - rm measured
+          - rm at measured temperature
         columns:
           - cells:
               - ""
@@ -253,7 +290,12 @@ heading:
           - cells:
               - OHMM
               - C
-      - label: RMF @ Measured Temp
+      - key: rmf_measured_temp
+        label: RMF @ Measured Temp
+        aliases:
+          - rmf
+          - rmf measured
+          - rmf at measured temperature
         columns:
           - cells:
               - ""
@@ -264,7 +306,12 @@ heading:
           - cells:
               - OHMM
               - C
-      - label: RMC @ Measured Temp
+      - key: rmc_measured_temp
+        label: RMC @ Measured Temp
+        aliases:
+          - rmc
+          - rmc measured
+          - rmc at measured temperature
         columns:
           - cells:
               - ""
@@ -275,11 +322,16 @@ heading:
           - cells:
               - OHMM
               - C
-      - label: RMF Source
+      - key: rmf_source
+        label: RMF Source
         values:
           - ""
           - ""
-      - label: RM @ Bottom Temp
+      - key: rm_bottom_temp
+        label: RM @ Bottom Temp
+        aliases:
+          - rm bottom
+          - rm at bottom temperature
         columns:
           - cells:
               - ""
@@ -290,21 +342,26 @@ heading:
           - cells:
               - OHMM
               - C
-      - label: Time Since End of Circulation
+      - key: time_since_end_of_circulation
+        label: Time Since End of Circulation
         columns:
           - cells:
               - ""
               - hrs
           - cells:
               - ""
-      - label: Maximum Temperature
+      - key: maximum_temperature
+        label: Maximum Temperature
         columns:
           - cells:
               - ""
               - degF
           - cells:
               - ""
-      - label_cells:
+      - keys:
+          - equipment_number
+          - base
+        label_cells:
           - Equipment No.
           - Base
         columns:
@@ -312,11 +369,13 @@ heading:
               - ""
           - cells:
               - ""
-      - label: Logged By
+      - key: logged_by
+        label: Logged By
         values:
           - ""
           - ""
-      - label: Witnessed By
+      - key: witnessed_by
+        label: Witnessed By
         values:
           - ""
           - ""

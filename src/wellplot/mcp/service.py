@@ -1026,6 +1026,7 @@ class _HeaderAssignmentTarget:
     lookup_keys: list[str]
     current_mode: str
     current_value: str | None
+    aliases: tuple[str, ...] = ()
     general_field_index: int | None = None
     service_title_index: int | None = None
     detail_row_index: int | None = None
@@ -2521,7 +2522,11 @@ def _header_key_alias_catalog() -> dict[str, object]:
         "provider_aliases": ["provider_name", "provider"],
         "general_field_prefixes": ["general_field.<key>", "field.<key>"],
         "service_title_patterns": ["service_title_<1-based-index>", "title_<1-based-index>"],
-        "detail_prefixes": ["detail.<row label>", "detail.row_<row-index>.col_<column-index>"],
+        "detail_prefixes": [
+            "detail.<row key>",
+            "detail.<row label>",
+            "detail.row_<row-index>.col_<column-index>",
+        ],
         "detail_short_alias_rules": [
             (
                 "Uppercase abbreviations at the start of one detail label also match "
@@ -2532,8 +2537,11 @@ def _header_key_alias_catalog() -> dict[str, object]:
         "overwrite_policies": list(AUTHORING_HEADER_OVERWRITE_POLICIES),
         "notes": [
             "General fields match by canonical key and visible label text.",
-            "Detail rows match by label text when one target cell can be identified.",
-            "When a label matches multiple slots, use an explicit prefixed key to disambiguate.",
+            "Detail rows match by canonical key when present, with label text as a fallback.",
+            (
+                "When a label matches multiple slots, the result includes visible candidates "
+                "and a clarification question."
+            ),
         ],
     }
 
@@ -2684,13 +2692,25 @@ def _general_field_lookup_keys(key: str, label: str) -> list[str]:
     )
 
 
-def _detail_label_lookup_keys(label_text: str, *, row_index: int) -> list[str]:
+def _detail_label_lookup_keys(
+    label_text: str,
+    *,
+    row_index: int,
+    key_text: str | None = None,
+    aliases: list[str] | None = None,
+) -> list[str]:
     """Return lookup aliases for one detail-row label."""
-    lookup_values: list[object] = [
-        label_text,
-        f"detail.{label_text}",
-        f"detail.row_{row_index + 1}.col_1",
-    ]
+    lookup_values: list[object] = []
+    if key_text:
+        lookup_values.extend([key_text, f"detail.{key_text}"])
+    lookup_values.extend(aliases or [])
+    lookup_values.extend(
+        [
+            label_text,
+            f"detail.{label_text}",
+            f"detail.row_{row_index + 1}.col_1",
+        ]
+    )
     lookup_values.extend(DETAIL_FIELD_LOOKUP_ALIASES.get(_normalize_header_lookup(label_text), ()))
     shortened = label_text.split("@", 1)[0].split("(", 1)[0].strip()
     if shortened and shortened != label_text and shortened.upper() == shortened:
@@ -2705,6 +2725,75 @@ def _detail_label_lookup_keys(label_text: str, *, row_index: int) -> list[str]:
     return _header_slot_lookup_keys(*lookup_values)
 
 
+def _header_phrase_tokens(value: object) -> tuple[str, ...]:
+    """Return meaningful words used for conservative header phrase matching."""
+    text = str(value).casefold()
+    for delimiter in "_-.@/():,":
+        text = text.replace(delimiter, " ")
+    ignored = {"at", "of", "the"}
+    return tuple(token for token in text.split() if token and token not in ignored)
+
+
+def _header_target_match_score(
+    input_key: str,
+    target: _HeaderAssignmentTarget,
+) -> int | None:
+    """Return a deterministic match score for one header target, if applicable."""
+    normalized_input = _normalize_header_lookup(input_key)
+    explicit_input = str(input_key).strip().casefold()
+    canonical_keys = {
+        str(target.target_key).strip().casefold(),
+        f"detail.{str(target.target_key).strip()}".casefold(),
+    }
+    has_distinct_canonical_key = (
+        str(target.target_key).strip().casefold() != str(target.display_label).strip().casefold()
+    )
+    if has_distinct_canonical_key and explicit_input in canonical_keys:
+        return 400
+
+    normalized_aliases = {_normalize_header_lookup(alias) for alias in target.aliases}
+    if normalized_input in normalized_aliases:
+        return 300
+
+    normalized_label = _normalize_header_lookup(target.display_label)
+    if normalized_input == normalized_label:
+        return 250
+
+    if normalized_input in target.lookup_keys:
+        return 200
+
+    input_tokens = set(_header_phrase_tokens(input_key))
+    if len(input_tokens) < 2:
+        return None
+    candidate_terms = (target.display_label, *target.aliases)
+    for term in candidate_terms:
+        candidate_tokens = set(_header_phrase_tokens(term))
+        if input_tokens and input_tokens.issubset(candidate_tokens):
+            return 100 + len(input_tokens)
+    return None
+
+
+def _resolve_header_targets(
+    input_key: str,
+    targets: list[_HeaderAssignmentTarget],
+    targets_by_lookup: dict[str, list[_HeaderAssignmentTarget]],
+) -> list[_HeaderAssignmentTarget]:
+    """Resolve one input phrase to its highest-ranked deterministic targets."""
+    normalized_input = _normalize_header_lookup(input_key)
+    exact_matches = targets_by_lookup.get(normalized_input, [])
+    scored: dict[int, tuple[_HeaderAssignmentTarget, int]] = {}
+    candidates = exact_matches if exact_matches else targets
+    for target in candidates:
+        score = _header_target_match_score(input_key, target)
+        if score is None:
+            continue
+        scored[id(target)] = (target, score)
+    if not scored:
+        return []
+    highest_score = max(score for _target, score in scored.values())
+    return [target for target, score in scored.values() if score == highest_score]
+
+
 def _should_mirror_header_matches(
     lookup_key: str,
     matches: list[_HeaderAssignmentTarget],
@@ -2713,6 +2802,51 @@ def _should_mirror_header_matches(
     if lookup_key not in MIRRORED_HEADER_LOOKUP_KEYS:
         return False
     return {match.target_kind for match in matches}.issubset({"general_field", "detail_field"})
+
+
+def _header_ambiguity_question(
+    input_key: object,
+    input_value: object,
+    matches: list[_HeaderAssignmentTarget],
+) -> tuple[str, list[str]]:
+    """Build a user-facing question for one ambiguous header phrase."""
+    raw_labels = [match.display_label.strip() for match in matches if match.display_label.strip()]
+    label_counts: dict[str, int] = {}
+    for label in raw_labels:
+        label_counts[label] = label_counts.get(label, 0) + 1
+
+    kind_counts: dict[tuple[str, str], int] = {}
+    for match in matches:
+        label = match.display_label.strip()
+        kind = match.target_kind.replace("_", " ")
+        key = (label, kind)
+        kind_counts[key] = kind_counts.get(key, 0) + 1
+
+    kind_seen: dict[tuple[str, str], int] = {}
+    candidate_labels: list[str] = []
+    for match in matches:
+        label = match.display_label.strip()
+        if not label:
+            continue
+        if label_counts[label] == 1:
+            candidate_label = label
+        else:
+            kind = match.target_kind.replace("_", " ")
+            key = (label, kind)
+            kind_seen[key] = kind_seen.get(key, 0) + 1
+            suffix = kind
+            if kind_counts[key] > 1:
+                suffix = f"{kind} {kind_seen[key]}"
+            candidate_label = f"{label} ({suffix})"
+        if candidate_label not in candidate_labels:
+            candidate_labels.append(candidate_label)
+
+    formatted_labels = " or ".join(f"`{label}`" for label in candidate_labels)
+    question = (
+        f"Which header field should receive value {input_value!r} for `{input_key}`? "
+        f"Choose one: {formatted_labels}."
+    )
+    return question, candidate_labels
 
 
 def _heading_target_descriptors(
@@ -2805,18 +2939,30 @@ def _heading_target_descriptors(
                 label_text = _header_value_text(label_value)
                 if label_text is None:
                     continue
+                field_keys = row.get("keys")
+                key_text = (
+                    str(field_keys[column_index]).strip()
+                    if isinstance(field_keys, list)
+                    and column_index < len(field_keys)
+                    and str(field_keys[column_index]).strip()
+                    else None
+                )
                 cell_value = cells[0]
                 targets.append(
                     _HeaderAssignmentTarget(
                         target_kind="detail_field",
-                        target_key=label_text,
+                        target_key=key_text or label_text,
                         display_label=label_text,
                         slot_path=(
                             f"{slot_prefix}.detail.rows[{row_index}].columns[{column_index}]"
                             ".cells[0]"
                         ),
                         lookup_keys=_header_slot_lookup_keys(
-                            *_detail_label_lookup_keys(label_text, row_index=row_index),
+                            *_detail_label_lookup_keys(
+                                label_text,
+                                row_index=row_index,
+                                key_text=key_text,
+                            ),
                             f"detail.row_{row_index + 1}.col_{column_index + 1}",
                         ),
                         current_mode=_heading_value_slot_mode(cell_value),
@@ -2831,16 +2977,26 @@ def _heading_target_descriptors(
         label_text = _header_value_text(row.get("label"))
         if label_text is None:
             continue
+        row_key = row.get("key")
+        key_text = str(row_key).strip() if isinstance(row_key, str) and row_key.strip() else None
+        row_aliases = row.get("aliases")
+        aliases = row_aliases if isinstance(row_aliases, list) else None
         values = row.get("values")
         if isinstance(values, list) and values:
             cell_value = values[0]
             targets.append(
                 _HeaderAssignmentTarget(
                     target_kind="detail_field",
-                    target_key=label_text,
+                    target_key=key_text or label_text,
                     display_label=label_text,
+                    aliases=tuple(aliases or ()),
                     slot_path=f"{slot_prefix}.detail.rows[{row_index}].values[0]",
-                    lookup_keys=_detail_label_lookup_keys(label_text, row_index=row_index),
+                    lookup_keys=_detail_label_lookup_keys(
+                        label_text,
+                        row_index=row_index,
+                        key_text=key_text,
+                        aliases=aliases,
+                    ),
                     current_mode=_heading_value_slot_mode(cell_value),
                     current_value=_header_value_text(cell_value),
                     detail_row_index=row_index,
@@ -2861,10 +3017,16 @@ def _heading_target_descriptors(
             targets.append(
                 _HeaderAssignmentTarget(
                     target_kind="detail_field",
-                    target_key=label_text,
+                    target_key=key_text or label_text,
                     display_label=label_text,
+                    aliases=tuple(aliases or ()),
                     slot_path=f"{slot_prefix}.detail.rows[{row_index}].columns[0].cells[0]",
-                    lookup_keys=_detail_label_lookup_keys(label_text, row_index=row_index),
+                    lookup_keys=_detail_label_lookup_keys(
+                        label_text,
+                        row_index=row_index,
+                        key_text=key_text,
+                        aliases=aliases,
+                    ),
                     current_mode=_heading_value_slot_mode(cell_value),
                     current_value=_header_value_text(cell_value),
                     detail_row_index=row_index,
@@ -3296,11 +3458,18 @@ def _detail_row_slot(row: object, *, row_index: int, slot_prefix: str) -> dict[s
                     ]
                 )
 
-    return {
+    result = {
         "row_index": row_index,
         "label_slots": label_slots,
         "column_slots": column_slots,
     }
+    if isinstance(row.get("key"), str) and row["key"].strip():
+        result["key"] = row["key"].strip()
+    if isinstance(row.get("aliases"), list):
+        result["aliases"] = deepcopy(row["aliases"])
+    if isinstance(row.get("keys"), list):
+        result["keys"] = deepcopy(row["keys"])
+    return result
 
 
 def _heading_detail_slots(heading: dict[str, object], *, slot_prefix: str) -> dict[str, object]:
@@ -7636,7 +7805,10 @@ def preview_header_mapping(
             continue
 
         lookup_key = _normalize_header_lookup(input_key)
-        matches = targets_by_lookup.get(lookup_key, [])
+        matches = _resolve_header_targets(str(input_key), targets, targets_by_lookup)
+        exact_matches = targets_by_lookup.get(lookup_key, [])
+        if exact_matches and _should_mirror_header_matches(lookup_key, exact_matches):
+            matches = exact_matches
         if not matches:
             unmatched_values.append(
                 {
@@ -7647,15 +7819,23 @@ def preview_header_mapping(
             continue
 
         if len(matches) > 1 and not _should_mirror_header_matches(lookup_key, matches):
+            clarification_question, candidate_labels = _header_ambiguity_question(
+                input_key,
+                input_value,
+                matches,
+            )
             conflicting_values.append(
                 {
                     "input_key": str(input_key),
                     "input_value": input_value,
-                    "reason": "Ambiguous header key. Use an explicit prefixed key.",
+                    "reason": clarification_question,
+                    "clarification_question": clarification_question,
+                    "candidate_labels": candidate_labels,
                     "candidate_targets": [
                         {
                             "target_kind": match.target_kind,
                             "target_key": match.target_key,
+                            "display_label": match.display_label,
                             "slot_path": match.slot_path,
                         }
                         for match in matches
@@ -7672,6 +7852,7 @@ def preview_header_mapping(
                         "input_value": input_value,
                         "target_kind": target.target_kind,
                         "target_key": target.target_key,
+                        "display_label": target.display_label,
                         "slot_path": target.slot_path,
                         "previous_mode": target.current_mode,
                         "previous_value": target.current_value,
@@ -7690,6 +7871,7 @@ def preview_header_mapping(
                         "input_value": input_value,
                         "target_kind": target.target_kind,
                         "target_key": target.target_key,
+                        "display_label": target.display_label,
                         "slot_path": target.slot_path,
                         "existing_value": target.current_value,
                         "reason": "Target already has an explicit literal value.",
@@ -7705,6 +7887,7 @@ def preview_header_mapping(
                     "input_value": input_value,
                     "target_kind": target.target_kind,
                     "target_key": target.target_key,
+                    "display_label": target.display_label,
                     "slot_path": target.slot_path,
                     "previous_mode": target.current_mode,
                     "previous_value": target.current_value,
@@ -7770,6 +7953,7 @@ def apply_header_values(
             "reason": "Target already contains the requested value.",
             "target_kind": entry.get("target_kind"),
             "target_key": entry.get("target_key"),
+            "display_label": entry.get("display_label"),
             "slot_path": entry.get("slot_path"),
         }
         for entry in preview.resolved_assignments
@@ -7792,8 +7976,11 @@ def apply_header_values(
             "reason": str(entry.get("reason", "The target could not be updated safely.")),
             "target_kind": entry.get("target_kind"),
             "target_key": entry.get("target_key"),
+            "display_label": entry.get("display_label"),
             "slot_path": entry.get("slot_path"),
             "existing_value": deepcopy(entry.get("existing_value")),
+            "clarification_question": entry.get("clarification_question"),
+            "candidate_labels": deepcopy(entry.get("candidate_labels")),
             "candidate_targets": deepcopy(entry.get("candidate_targets")),
         }
         for entry in preview.conflicting_values

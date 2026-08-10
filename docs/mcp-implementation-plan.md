@@ -1,6 +1,6 @@
 # MCP Implementation Plan
 
-Last updated: 2026-08-09
+Last updated: 2026-08-10
 
 ## Purpose
 
@@ -905,10 +905,181 @@ Status: complete. The public notebook display helper now exposes these fields
 from `AuthoringResult`, both user notebooks request phase previews, and the
 structural acceptance test keeps the examples credential-free in CI.
 
+## Reopened 0.6-H: User-Facing Header Resolution
+
+The canonical header keys introduced by the deterministic contract are internal
+identities. They must not become a prerequisite for scientists using the agent.
+Users should be able to write `Rm measured`, `RM at bottom temperature`, or the
+visible field label and receive deterministic placement or a human-readable
+clarification when the request is ambiguous.
+
+The header workflow is:
+
+1. inspect the current heading and its available semantic fields
+2. resolve the user phrase against visible labels, asset-backed aliases, and
+   qualifiers
+3. apply a value only when the resolver has one valid target
+4. ask for clarification when multiple targets remain
+5. report unmatched values in domain language, without requiring internal keys
+
+Canonical keys remain accepted for programmatic API callers and diagnostics.
+They are not the primary agent prompt contract.
+
+### 0.6-H1. Asset-Backed Header Language Metadata
+
+Status: complete.
+
+- retain stable canonical keys for persistence and object identity
+- add optional user-facing aliases to header archetype detail fields
+- carry aliases through schema validation, typed authoring models, legacy
+  adapters, and canonical YAML serialization
+- remove string-derived semantic aliases from the service; domain wording must
+  come from data assets or stable visible labels
+- preserve label-based fallback for older third-party templates without aliases
+
+Acceptance:
+
+- `Rm measured` resolves to the field labeled `RM @ Measured Temp`
+- `Rm bottom` resolves to `RM @ Bottom Temp`
+- the same mechanism is available to other header fields without RM-specific
+  service code
+
+### 0.6-H2. Generic Deterministic Field Resolver
+
+Status: complete.
+
+- rank exact labels, configured aliases, normalized wording, and qualifiers
+- resolve only against fields present in the current heading
+- never guess when two candidates remain equally valid
+- keep explicit canonical-key matching available only as an advanced path
+
+Implementation checkpoint:
+
+- header targets retain their canonical key, visible label, and asset-backed
+  aliases as separate match metadata
+- exact configured aliases and labels are ranked before conservative
+  qualifier-aware phrase matching
+- natural phrases such as `RM measured temperature` resolve without exposing
+  internal keys, while unqualified `RM` remains blocked when both RM slots
+  are present
+- intentionally mirrored general/detail mappings, such as `Date`, retain
+  their existing multi-target behavior
+
+Acceptance completed:
+
+- qualified user phrases resolve to one current heading slot
+- duplicate labels and unqualified qualifiers remain conflicts
+- canonical and `detail.<key>` paths continue to work for advanced callers
+- older templates without canonical keys retain label-based matching
+
+### 0.6-H3. Human-Readable Ambiguity Contract
+
+Status: complete.
+
+- return candidate display labels with mapping conflicts
+- replace generic instructions to provide prefixed keys with a clarification
+  question containing the actual header labels
+- allow unambiguous values in the same request to be applied while one value is
+  held for clarification
+
+Implementation checkpoint:
+
+- ambiguous mappings include `candidate_labels`, `clarification_question`, and
+  candidate target metadata with each visible `display_label`
+- duplicate visible labels receive deterministic scope qualifiers such as
+  `(general field)` and `(detail field)` in the clarification choices
+- `apply_header_values(...)` persists unambiguous assignments from the same
+  request and reports the ambiguous values as skipped conflicts
+
+Acceptance completed:
+
+- ambiguous RM/service-company phrases ask a human-readable question
+- visible candidate labels distinguish duplicate labels where possible
+- a conflict does not discard unrelated successful assignments
+
+### 0.6-H4. Agent Reporting and Clarification
+
+Status: complete.
+
+- report completed fields using visible labels, not canonical IDs
+- add structured `needs_clarification` data to the authoring result
+- show the original value and the human-readable candidate choices
+
+Implementation checkpoint:
+
+- `AuthoringResult.needs_clarification` preserves the original input key and
+  value, clarification question, candidate labels, and target metadata
+- `AuthoringUserReport` renders a concise `Needs clarification` section while
+  retaining the structured entries for notebook and UI integrations
+- deterministic header assignments prefer `display_label` over canonical
+  `target_key` in user-facing completion and skip messages
+
+Acceptance completed:
+
+- completed header fields are reported with visible labels
+- ambiguous values are exposed as structured clarification entries
+- notebook display includes the clarification question without requiring users
+  to inspect canonical keys
+
+### 0.6-H5. Clarification Continuation
+
+Status: complete.
+
+- keep pending clarification state in the agent/session run state only
+- accept follow-ups such as `the measured one` or `use bottom temperature`
+- revalidate the selected field against the current draft before applying it
+
+Implementation checkpoint:
+
+- `AuthoringSession` stores pending header choices only for the lifetime of the
+  in-memory session and clears them when a new run overwrites the draft
+- a revision follow-up is resolved against visible candidate labels and
+  qualifiers, then converted to a scoped canonical mapping key internally
+- the selected key is previewed against the current heading before the original
+  value is applied; stale or unavailable targets fail closed
+- a focused agent regression test verifies that the follow-up bypasses the
+  provider loop and persists the selected value
+
+Acceptance completed:
+
+- `Use the measured one.` applies the pending `RM` value to `RM @ Measured Temp`
+- a pending choice is not persisted in the MCP server or across authoring
+  sessions
+- the final report clears `needs_clarification` after successful continuation
+
+### 0.6-H6. Notebook and Documentation Acceptance
+
+Status: complete.
+
+- update the notebook to use natural header language
+- verify unique phrases, ambiguous phrases, and follow-up clarification
+- keep canonical keys in advanced API documentation only
+- run MCP, agent, model, notebook, and documentation gates before closing H
+
+Implementation checkpoint:
+
+- the canonical LAS walkthrough uses qualified phrases such as `Rmf measured`
+  and `Rmc measured` without exposing internal mapping keys
+- the walkthrough includes an intentionally ambiguous `RM` request and displays
+  the structured clarification result before replying with `Use the measured
+  one.` when clarification is requested
+- the structural notebook gate checks the natural-language examples and rejects
+  internal `detail.*` keys in the user notebook source
+- the API reference retains canonical keys only for programmatic callers and
+  diagnostics
+
+Acceptance completed:
+
+- notebook source remains credential-free and JSON-valid
+- unique, ambiguous, and follow-up clarification paths are represented in the
+  canonical notebook
+- agent, MCP, cross-domain, and documentation validation gates pass
+
 ## Release Gate
 
 Do not publish `0.6.0` until the repository release gates below pass. Slices
-`0.6-A` through `0.6-G7.2` are now the completed contract baseline.
+`0.6-A` through `0.6-G7.2`, plus the reopened `0.6-H1` through `0.6-H6`
+header-language slices, are now the completed contract baseline.
 
 Release-gate checklist:
 

@@ -609,6 +609,18 @@ Return shape:
 - `warnings`
 - `predicted_heading_patch`
 
+Ambiguous entries in `conflicting_values` include the visible
+`candidate_labels`, a `clarification_question`, and candidate target metadata.
+The predicted patch still contains any unambiguous assignments from the same
+request; a client can apply those while retaining the conflicting value for a
+follow-up clarification.
+
+The agent-side continuation keeps that pending choice in the active
+`AuthoringSession` only. A follow-up may refer to a visible candidate naturally
+instead of repeating a canonical key; the agent re-previews the selected target
+against the current heading before applying the original value. New runs and
+new sessions do not inherit pending choices.
+
 Why it matters:
 
 - the MCP client needs one reviewable step between "I extracted these values"

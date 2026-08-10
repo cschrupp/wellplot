@@ -1093,6 +1093,25 @@ def _build_report_block(data: object) -> ReportBlockSpec | None:
                     ReportDetailRowSpec(
                         label_cells=label_cells,
                         columns=column_specs,
+                        key=(
+                            str(row_data["key"])
+                            if row_data.get("key") is not None
+                            else None
+                        ),
+                        keys=tuple(
+                            str(value)
+                            for value in _ensure_sequence(
+                                row_data.get("keys", []),
+                                context=f"header.report.detail.rows[{index}].keys",
+                            )
+                        ),
+                        aliases=tuple(
+                            str(value)
+                            for value in _ensure_sequence(
+                                row_data.get("aliases", []),
+                                context=f"header.report.detail.rows[{index}].aliases",
+                            )
+                        ),
                     )
                 )
             except (KeyError, TypeError, ValueError) as exc:

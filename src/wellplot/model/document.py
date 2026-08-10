@@ -1275,6 +1275,9 @@ class ReportDetailRowSpec:
 
     label_cells: tuple[ReportDetailCellSpec, ...]
     columns: tuple[ReportDetailColumnSpec, ...]
+    key: str | None = None
+    keys: tuple[str, ...] = ()
+    aliases: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the row label cells and value-column counts."""
@@ -1286,6 +1289,19 @@ class ReportDetailRowSpec:
             raise ValueError("Report detail rows must contain at least one data column.")
         if len(self.columns) > 4:
             raise ValueError("Report detail rows support at most 4 data columns.")
+        if self.key is not None and not str(self.key).strip():
+            raise ValueError("Report detail row key must be non-empty when provided.")
+        if self.key is not None and self.keys:
+            raise ValueError("Report detail rows cannot define both key and keys.")
+        if any(not str(alias).strip() for alias in self.aliases):
+            raise ValueError("Report detail row aliases must be non-empty.")
+        if self.aliases and self.keys:
+            raise ValueError("Report detail row aliases require one simple detail field.")
+        if self.keys:
+            if len(self.keys) != len(self.label_cells):
+                raise ValueError("Report detail row keys must match label cell count.")
+            if any(not str(key).strip() for key in self.keys):
+                raise ValueError("Report detail row keys must be non-empty.")
 
 
 @dataclass(slots=True)
@@ -1321,6 +1337,14 @@ class ReportDetailSpec:
                 raise ValueError(
                     "All report detail rows must have the same number of value columns."
                 )
+        slot_keys = [
+            key
+            for row in self.rows
+            for key in ([row.key] if row.key is not None else row.keys)
+        ]
+        normalized_keys = [str(key).strip().casefold() for key in slot_keys]
+        if len(normalized_keys) != len(set(normalized_keys)):
+            raise ValueError("Report detail row keys must be unique within the detail table.")
         if self.title is None:
             self.title = "Open Hole" if self.kind == ReportDetailKind.OPEN_HOLE else "Cased Hole"
 

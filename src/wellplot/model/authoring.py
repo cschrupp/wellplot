@@ -1055,6 +1055,9 @@ class AuthoringHeaderDetailRowSpec(_AuthoringModel):
     """One typed row in an open-hole or cased-hole detail table."""
 
     row_id: str = Field(min_length=1)
+    key: str | None = Field(default=None, min_length=1)
+    keys: list[str] = Field(default_factory=list, max_length=4)
+    aliases: list[str] = Field(default_factory=list)
     label: str | None = Field(default=None, min_length=1)
     label_cells: list[str] = Field(default_factory=list, max_length=4)
     values: list[AuthoringHeaderDetailCellSpec] = Field(default_factory=list, max_length=4)
@@ -1067,6 +1070,12 @@ class AuthoringHeaderDetailRowSpec(_AuthoringModel):
             raise ValueError("Header detail rows require label or label_cells.")
         if bool(self.values) == bool(self.columns):
             raise ValueError("Header detail rows require values or columns, but not both.")
+        if self.key is not None and self.keys:
+            raise ValueError("Header detail rows cannot define both key and keys.")
+        if self.aliases and self.keys:
+            raise ValueError("Header detail row aliases require one simple detail field.")
+        if self.keys and len(self.keys) != len(self.label_cells):
+            raise ValueError("Header detail row keys must match label cell count.")
         return self
 
 
@@ -1091,6 +1100,14 @@ class AuthoringHeaderDetailSpec(_AuthoringModel):
             raise ValueError("Header detail column_titles must match the value-column count.")
         if any(len(row.columns) != expected for row in column_rows):
             raise ValueError("Header detail rows must use a consistent value-column count.")
+        slot_keys = [
+            key
+            for row in self.rows
+            for key in ([row.key] if row.key is not None else row.keys)
+        ]
+        normalized_keys = [key.strip().casefold() for key in slot_keys]
+        if len(normalized_keys) != len(set(normalized_keys)):
+            raise ValueError("Header detail row keys must be unique within the detail table.")
         return self
 
 

@@ -119,9 +119,10 @@ class FakeBackend:
 class FakeMcpSession:
     """Minimal MCP session double for the authoring workflow."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, header_conflict: bool = False) -> None:
         """Initialize one fake session rooted at a temporary directory."""
         self.root = root
+        self.header_conflict = header_conflict
         self.tool_calls: list[tuple[str, dict[str, object]]] = []
         self.prompt_calls: list[tuple[str, dict[str, object]]] = []
 
@@ -243,6 +244,69 @@ class FakeMcpSession:
             )
         if name == "preview_header_mapping":
             values = dict(arguments.get("values", {}))
+            if self.header_conflict and any(
+                str(key).startswith("detail.") for key in values
+            ):
+                value = values.get("detail.rm_measured_temp")
+                return SimpleNamespace(
+                    structuredContent={
+                        "resolved_assignments": [
+                            {
+                                "request_key": "detail.rm_measured_temp",
+                                "target_key": "rm_measured_temp",
+                                "display_label": "RM @ Measured Temp",
+                                "value": value,
+                                "action": "set",
+                            }
+                        ],
+                        "conflicting_values": [],
+                        "unmatched_values": [],
+                        "warnings": [],
+                    }
+                )
+            if self.header_conflict and "RM" in values:
+                return SimpleNamespace(
+                    structuredContent={
+                        "resolved_assignments": [
+                            {
+                                "request_key": "Company",
+                                "target_key": "company",
+                                "display_label": "Company",
+                                "value": values.get("Company"),
+                                "action": "set",
+                            }
+                        ],
+                        "conflicting_values": [
+                            {
+                                "input_key": "RM",
+                                "input_value": values.get("RM"),
+                                "clarification_question": (
+                                    "Which header field should receive value "
+                                    "'0.005 @ 35' for `RM`? Choose one: "
+                                    "`RM @ Measured Temp` or `RM @ Bottom Temp`."
+                                ),
+                                "candidate_labels": [
+                                    "RM @ Measured Temp",
+                                    "RM @ Bottom Temp",
+                                ],
+                                "candidate_targets": [
+                                    {
+                                        "target_kind": "detail_field",
+                                        "target_key": "rm_measured_temp",
+                                        "display_label": "RM @ Measured Temp",
+                                    },
+                                    {
+                                        "target_kind": "detail_field",
+                                        "target_key": "rm_bottom_temp",
+                                        "display_label": "RM @ Bottom Temp",
+                                    },
+                                ],
+                            }
+                        ],
+                        "unmatched_values": [],
+                        "warnings": [],
+                    }
+                )
             return SimpleNamespace(
                 structuredContent={
                     "resolved_assignments": [
@@ -254,6 +318,73 @@ class FakeMcpSession:
             )
         if name == "apply_header_values":
             values = dict(arguments.get("values", {}))
+            if self.header_conflict and any(
+                str(key).startswith("detail.") for key in values
+            ):
+                value = values.get("detail.rm_measured_temp")
+                return SimpleNamespace(
+                    structuredContent={
+                        "applied_assignments": [
+                            {
+                                "request_key": "detail.rm_measured_temp",
+                                "target_key": "rm_measured_temp",
+                                "display_label": "RM @ Measured Temp",
+                                "value": value,
+                                "action": "set",
+                            }
+                        ],
+                        "skipped_assignments": [],
+                        "warnings": [],
+                    }
+                )
+            if self.header_conflict and "RM" in values:
+                return SimpleNamespace(
+                    structuredContent={
+                        "applied_assignments": [
+                            {
+                                "request_key": "Company",
+                                "target_key": "company",
+                                "display_label": "Company",
+                                "value": values.get("Company"),
+                                "action": "set",
+                            }
+                        ],
+                        "skipped_assignments": [
+                            {
+                                "input_key": "RM",
+                                "input_value": values.get("RM"),
+                                "status": "conflict",
+                                "reason": (
+                                    "Which header field should receive value "
+                                    "'0.005 @ 35' for `RM`? Choose one: "
+                                    "`RM @ Measured Temp` or `RM @ Bottom Temp`."
+                                ),
+                                "clarification_question": (
+                                    "Which header field should receive value "
+                                    "'0.005 @ 35' for `RM`? Choose one: "
+                                    "`RM @ Measured Temp` or `RM @ Bottom Temp`."
+                                ),
+                                "candidate_labels": [
+                                    "RM @ Measured Temp",
+                                    "RM @ Bottom Temp",
+                                ],
+                                "candidate_targets": [
+                                    {
+                                        "target_kind": "detail_field",
+                                        "target_key": "rm_measured_temp",
+                                        "display_label": "RM @ Measured Temp",
+                                    },
+                                    {
+                                        "target_kind": "detail_field",
+                                        "target_key": "rm_bottom_temp",
+                                        "display_label": "RM @ Bottom Temp",
+                                    },
+                                ],
+                            }
+                        ],
+                        "warnings": [],
+                    }
+                )
             return SimpleNamespace(
                 structuredContent={
                     "applied_assignments": [
@@ -343,15 +474,16 @@ class FakeMcpSession:
 class FakeRuntime:
     """Minimal runtime adapter that avoids the optional MCP dependency."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, header_conflict: bool = False) -> None:
         """Initialize one fake runtime rooted at a temporary directory."""
         self.server_root = root
+        self.header_conflict = header_conflict
         self.last_session: FakeMcpSession | None = None
 
     @asynccontextmanager
     async def open_session(self) -> object:
         """Yield one fake MCP session."""
-        session = FakeMcpSession(self.server_root)
+        session = FakeMcpSession(self.server_root, header_conflict=self.header_conflict)
         self.last_session = session
         yield session
 
@@ -593,6 +725,100 @@ class AgentTests(unittest.TestCase):
             )
             self.assertIn("Filled `Rmf`.", result.user_report.done)
             self.assertEqual(result.user_report.could_not_do, ())
+
+    def test_header_fill_report_exposes_visible_labels_and_clarification_data(self) -> None:
+        """Expose human labels and structured ambiguity data from deterministic header runs."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root, header_conflict=True)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            result = anyio.run(
+                session.run_request,
+                AuthoringRequest(
+                    goal="""
+                        Fill the following header fields with the following values:
+                        - Company: Acme Energy
+                        - RM: 0.005 @ 35
+                    """,
+                    output_logfile="workspace/demo.log.yaml",
+                    example_id="forge16b_porosity_example",
+                ),
+            )
+
+            self.assertIn("Filled `Company`.", result.user_report.done)
+            self.assertEqual(len(result.needs_clarification), 1)
+            clarification = result.needs_clarification[0]
+            self.assertEqual(clarification["input_key"], "RM")
+            self.assertEqual(
+                clarification["candidate_labels"],
+                ["RM @ Measured Temp", "RM @ Bottom Temp"],
+            )
+            self.assertIn(
+                "Which header field should receive value",
+                result.user_report_text,
+            )
+            self.assertIn("RM @ Measured Temp", result.user_report_text)
+
+    def test_header_clarification_follow_up_revalidates_and_applies_choice(self) -> None:
+        """Resolve an ambiguous header value from a natural follow-up request."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root, header_conflict=True)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            initial = anyio.run(
+                session.run_request,
+                AuthoringRequest(
+                    goal="""
+                        Fill the following header fields with the following values:
+                        - Company: Acme Energy
+                        - RM: 0.005 @ 35
+                    """,
+                    output_logfile="workspace/demo.log.yaml",
+                    example_id="forge16b_porosity_example",
+                ),
+            )
+
+            self.assertEqual(len(initial.needs_clarification), 1)
+
+            follow_up = anyio.run(
+                session.revise_request,
+                RevisionRequest(
+                    feedback="Use the measured one.",
+                    logfile_path="workspace/demo.log.yaml",
+                ),
+            )
+
+            backend.run_authoring.assert_not_awaited()
+            self.assertEqual(follow_up.needs_clarification, ())
+            self.assertIn("Filled `RM @ Measured Temp`.", follow_up.user_report.done)
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(
+                tool_names[:2],
+                ["inspect_heading_slots", "preview_header_mapping"],
+            )
+            self.assertIn("apply_header_values", tool_names)
+            preview_calls = [
+                arguments
+                for name, arguments in runtime.last_session.tool_calls
+                if name == "preview_header_mapping"
+            ]
+            self.assertEqual(
+                preview_calls[-1]["values"],
+                {"detail.rm_measured_temp": "0.005 @ 35"},
+            )
 
     def test_revision_request_reuses_existing_draft_without_recreation(self) -> None:
         """Run one provider-backed revision against an existing draft logfile."""

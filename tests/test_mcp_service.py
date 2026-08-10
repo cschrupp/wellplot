@@ -2590,6 +2590,8 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(selected.selected_archetype_id, "open_hole")
         self.assertEqual(selected.archetypes[0]["detail_kind"], "open_hole")
         self.assertIn("RMF @ Measured Temp", selected.archetypes[0]["detail_row_labels"])
+        self.assertIn("rm_measured_temp", selected.archetypes[0]["detail_slot_keys"])
+        self.assertIn("rm_bottom_temp", selected.archetypes[0]["detail_slot_keys"])
         self.assertIn("heading", selected.archetypes[0])
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
@@ -2619,7 +2621,7 @@ class McpServiceTests(unittest.TestCase):
             )
             self.assertEqual(
                 [entry["target_key"] for entry in preview.resolved_assignments],
-                ["RMF @ Measured Temp"],
+                ["rmf_measured_temp"],
             )
             rmf_row_index = next(
                 index
@@ -2640,6 +2642,10 @@ class McpServiceTests(unittest.TestCase):
             )
             self.assertEqual(
                 applied.applied_assignments[0]["target_key"],
+                "rmf_measured_temp",
+            )
+            self.assertEqual(
+                applied.applied_assignments[0]["display_label"],
                 "RMF @ Measured Temp",
             )
             saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
@@ -2655,6 +2661,84 @@ class McpServiceTests(unittest.TestCase):
             ][0]["cells"]
             self.assertEqual(cells[0], "0.01")
             self.assertEqual(cells[2], "25")
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_canonical_detail_keys_disambiguate_duplicate_labels(self) -> None:
+        """Use stable detail keys to fill both RM rows without guessing."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+            service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="open_hole",
+                root=REPO_ROOT,
+            )
+
+            slots = service.inspect_heading_slots(logfile_path=str(draft_path), root=REPO_ROOT)
+            detail_rows = slots.detail_slots["rows"]
+            self.assertIn("rm_measured_temp", {row.get("key") for row in detail_rows})
+            self.assertIn("rm_bottom_temp", {row.get("key") for row in detail_rows})
+
+            preview = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "detail.rm_measured_temp": "0.005 @ 35",
+                    "detail.rm_bottom_temp": "0.005 @ 35",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(
+                [entry["target_key"] for entry in preview.resolved_assignments],
+                ["rm_measured_temp", "rm_bottom_temp"],
+            )
+            self.assertEqual(preview.conflicting_values, [])
+
+            shortened_preview = service.preview_header_mapping(
+                str(draft_path),
+                values={"rm measured": "0.005 @ 35"},
+                root=REPO_ROOT,
+            )
+            self.assertEqual(
+                [entry["target_key"] for entry in shortened_preview.resolved_assignments],
+                ["rm_measured_temp"],
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_header_phrase_resolver_uses_qualifiers_without_requiring_canonical_keys(self) -> None:
+        """Resolve qualified human phrases while retaining ambiguity for an unqualified RM."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+            service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="open_hole",
+                root=REPO_ROOT,
+            )
+
+            result = service.preview_header_mapping(
+                str(draft_path),
+                values={
+                    "RM measured temperature": "0.01 @ 25",
+                    "RM": "0.005 @ 35",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(
+                [entry["target_key"] for entry in result.resolved_assignments],
+                ["rm_measured_temp"],
+            )
+            self.assertEqual(result.unmatched_values, [])
+            self.assertEqual(len(result.conflicting_values), 1)
+            self.assertEqual(result.conflicting_values[0]["input_key"], "RM")
+            self.assertEqual(
+                {
+                    candidate["target_key"]
+                    for candidate in result.conflicting_values[0]["candidate_targets"]
+                },
+                {"rm_measured_temp", "rm_bottom_temp"},
+            )
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_open_hole_archetype_resolves_common_ticket_aliases_without_rebuilding_layout(
@@ -2715,12 +2799,12 @@ class McpServiceTests(unittest.TestCase):
                     "elevation_df",
                     "log_measured_from",
                     "measured_from",
-                    "Run",
-                    "Driller Depth",
-                    "Maximum Temperature",
-                    "Logged By",
-                    "Equipment No.",
-                    "Base",
+                    "run_number",
+                    "driller_depth",
+                    "maximum_temperature",
+                    "logged_by",
+                    "equipment_number",
+                    "base",
                 }.issubset(resolved_target_keys)
             )
 
@@ -2795,7 +2879,7 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(preview.conflicting_values, [])
             resolved_target_keys = {entry["target_key"] for entry in preview.resolved_assignments}
             self.assertTrue(
-                {"logging_date", "Date", "Fluid Density", "Bottom Temperature"}.issubset(
+                {"logging_date", "date", "fluid_density", "bottom_temperature"}.issubset(
                     resolved_target_keys
                 )
             )
@@ -2889,7 +2973,17 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(len(result.conflicting_values), 1)
             self.assertEqual(
                 result.conflicting_values[0]["reason"],
-                "Ambiguous header key. Use an explicit prefixed key.",
+                "Which header field should receive value 'Acme Wireline' for `service company`? "
+                "Choose one: `Service Company (general field)` or "
+                "`Service Company (detail field)`.",
+            )
+            self.assertEqual(
+                result.conflicting_values[0]["clarification_question"],
+                result.conflicting_values[0]["reason"],
+            )
+            self.assertEqual(
+                result.conflicting_values[0]["candidate_labels"],
+                ["Service Company (general field)", "Service Company (detail field)"],
             )
             self.assertEqual(
                 {
@@ -2898,7 +2992,56 @@ class McpServiceTests(unittest.TestCase):
                 },
                 {"general_field", "detail_field"},
             )
+            self.assertTrue(
+                all(
+                    candidate["display_label"] == "Service Company"
+                    for candidate in result.conflicting_values[0]["candidate_targets"]
+                )
+            )
             self.assertEqual(result.predicted_heading_patch, {})
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_header_ambiguity_does_not_discard_unambiguous_values(self) -> None:
+        """Apply clear assignments while returning a clarification for one ambiguous value."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+            service.apply_header_archetype(
+                str(draft_path),
+                archetype_id="open_hole",
+                root=REPO_ROOT,
+            )
+
+            result = service.apply_header_values(
+                str(draft_path),
+                values={
+                    "RM": "0.005 @ 35",
+                    "Company": "Acme Energy",
+                },
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(
+                [entry["target_key"] for entry in result.applied_assignments],
+                ["company"],
+            )
+            conflicts = [
+                entry for entry in result.skipped_assignments if entry["status"] == "conflict"
+            ]
+            self.assertEqual(len(conflicts), 1)
+            self.assertIn("Which header field should receive", conflicts[0]["reason"])
+            self.assertEqual(
+                conflicts[0]["candidate_targets"][0]["display_label"],
+                "RM @ Measured Temp",
+            )
+
+            saved_mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            company = next(
+                item
+                for item in saved_mapping["document"]["layout"]["heading"]["general_fields"]
+                if item.get("key") == "company"
+            )
+            self.assertEqual(company["value"], "Acme Energy")
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_preview_header_mapping_replace_overwrites_literal_values(self) -> None:
