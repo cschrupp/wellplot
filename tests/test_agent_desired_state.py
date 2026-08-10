@@ -135,6 +135,41 @@ class _TypedSession:
             return SimpleNamespace(
                 structuredContent={"section_ids": ["main"], "sections": []}
             )
+        if name == "inspect_heading_slots":
+            return SimpleNamespace(
+                structuredContent={
+                    "target_kind": "logfile",
+                    "has_heading": False,
+                    "has_remarks": False,
+                    "has_tail": False,
+                    "provider_slots": [],
+                    "general_field_slots": [],
+                    "service_title_slots": [],
+                    "detail_slots": {},
+                    "remarks_capabilities": {},
+                    "current_values": {},
+                    "resource_uris": [],
+                }
+            )
+        if name == "inspect_data_source":
+            return SimpleNamespace(
+                structuredContent={
+                    "source_path": "workspace/data/demo.las",
+                    "source_format_detected": "las",
+                    "dataset_name": "Demo",
+                    "index": {"depth_unit": "m", "sample_count": 2},
+                    "channels": [
+                        {
+                            "mnemonic": "GR",
+                            "kind": "scalar",
+                            "value_unit": "gAPI",
+                            "value_shape": [2],
+                        }
+                    ],
+                    "metadata_keys": [],
+                    "warnings": [],
+                }
+            )
         if name == "validate_logfile":
             return SimpleNamespace(structuredContent={"valid": True})
         if name == "summarize_logfile_changes":

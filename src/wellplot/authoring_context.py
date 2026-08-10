@@ -87,6 +87,38 @@ class AuthoringChannelCandidate(_ContextModel):
     mnemonic: str = Field(min_length=1)
     kind: str = Field(default="scalar", min_length=1)
     aliases: list[str] = Field(default_factory=list)
+    unit: str | None = Field(default=None, min_length=1)
+    description: str = ""
+    value_shape: list[int] = Field(default_factory=list)
+    source_path: str | None = Field(default=None, min_length=1)
+
+
+class AuthoringSourceContext(_ContextModel):
+    """Inspected metadata for one source available to an authoring request."""
+
+    source_path: str = Field(min_length=1)
+    source_format: str = Field(min_length=1)
+    dataset_name: str = ""
+    channels: list[AuthoringChannelCandidate] = Field(default_factory=list)
+    metadata_keys: list[str] = Field(default_factory=list)
+    depth_unit: str | None = Field(default=None, min_length=1)
+    depth_min: float | None = None
+    depth_max: float | None = None
+    sample_count: int | None = None
+    warnings: list[str] = Field(default_factory=list)
+
+
+class AuthoringSectionContext(_ContextModel):
+    """Current or requested section context used during intent extraction."""
+
+    section_id: str = Field(min_length=1)
+    title: str = ""
+    source_path: str | None = Field(default=None, min_length=1)
+    source_format: str = "auto"
+    depth_range: list[float] | None = None
+    track_ids: list[str] = Field(default_factory=list)
+    track_kinds: list[str] = Field(default_factory=list)
+    available_channels: list[AuthoringChannelCandidate] = Field(default_factory=list)
 
 
 class AuthoringResolutionDecision(_ContextModel):
@@ -108,6 +140,18 @@ class AuthoringContextIssue(_ContextModel):
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)
     candidates: list[str] = Field(default_factory=list)
+
+
+class AuthoringContextSnapshot(_ContextModel):
+    """Read-only context inventory prepared before desired-state extraction."""
+
+    draft_logfile: str = Field(min_length=1)
+    object_inventory: dict[str, Any] = Field(default_factory=dict)
+    sections: list[AuthoringSectionContext] = Field(default_factory=list)
+    sources: list[AuthoringSourceContext] = Field(default_factory=list)
+    requested_source_slots: dict[str, str] = Field(default_factory=dict)
+    header_slots: dict[str, Any] = Field(default_factory=dict)
+    issues: list[AuthoringContextIssue] = Field(default_factory=list)
 
 
 class AuthoringContextResolution(_ContextModel):
@@ -162,6 +206,214 @@ def _mapping_value(value: object, key: str) -> object:
     if isinstance(value, Mapping) and key in value:
         return value[key]
     return _MISSING
+
+
+def _context_path_key(value: object) -> str:
+    """Normalize a source path enough to join inspection and section records."""
+    return str(value).strip().replace("\\", "/").removeprefix("./").lower()
+
+
+def _source_slot_section_id(slot: str, section_ids: Sequence[str]) -> str:
+    """Match a short source slot to an existing section naming convention."""
+    normalized_slot = _normalize_token(slot)
+    for section_id in section_ids:
+        normalized_section = _normalize_token(section_id)
+        if normalized_section == normalized_slot:
+            return section_id
+        if normalized_section.removesuffix("pass") == normalized_slot:
+            return section_id
+
+    pass_suffixes = {
+        section_id[len(section_id.removesuffix("_pass")) :]
+        for section_id in section_ids
+        if section_id.endswith("_pass")
+    }
+    if len(pass_suffixes) == 1 and not normalized_slot.endswith("pass"):
+        suffix = next(iter(pass_suffixes))
+        candidate = f"{slot}{suffix}"
+        if candidate:
+            return candidate
+    return slot
+
+
+def build_authoring_context_snapshot(
+    *,
+    draft_logfile: str,
+    existing: AuthoringDocumentSpec,
+    summary: Mapping[str, Any],
+    source_inspections: Mapping[str, Mapping[str, Any]],
+    requested_source_slots: Mapping[str, str] | None = None,
+    header_slots: Mapping[str, Any] | None = None,
+    issues: Sequence[AuthoringContextIssue] = (),
+) -> AuthoringContextSnapshot:
+    """Build one typed, read-only context snapshot from inspected MCP data."""
+    source_contexts: list[AuthoringSourceContext] = []
+    source_by_key: dict[str, AuthoringSourceContext] = {}
+    for requested_path, raw_inspection in source_inspections.items():
+        if not isinstance(raw_inspection, Mapping):
+            continue
+        source_path = str(raw_inspection.get("source_path") or requested_path).strip()
+        if not source_path:
+            continue
+        index = raw_inspection.get("index")
+        index_mapping = index if isinstance(index, Mapping) else {}
+        channels: list[AuthoringChannelCandidate] = []
+        for raw_channel in raw_inspection.get("channels", []):
+            if not isinstance(raw_channel, Mapping):
+                continue
+            mnemonic = str(raw_channel.get("mnemonic", "")).strip()
+            if not mnemonic:
+                continue
+            channels.append(
+                AuthoringChannelCandidate(
+                    mnemonic=mnemonic,
+                    kind=str(raw_channel.get("kind", "scalar")).strip() or "scalar",
+                    unit=(
+                        str(raw_channel["value_unit"]).strip()
+                        if raw_channel.get("value_unit")
+                        else None
+                    ),
+                    description=str(raw_channel.get("description", "")),
+                    value_shape=[
+                        int(value)
+                        for value in raw_channel.get("value_shape", [])
+                        if isinstance(value, int)
+                    ],
+                    source_path=source_path,
+                )
+            )
+        source_context = AuthoringSourceContext(
+            source_path=source_path,
+            source_format=(
+                str(raw_inspection.get("source_format_detected", "auto")).strip()
+                or "auto"
+            ),
+            dataset_name=str(raw_inspection.get("dataset_name", "")),
+            channels=channels,
+            metadata_keys=[
+                str(key) for key in raw_inspection.get("metadata_keys", []) if str(key)
+            ],
+            depth_unit=(
+                str(index_mapping["depth_unit"]).strip()
+                if index_mapping.get("depth_unit")
+                else None
+            ),
+            depth_min=index_mapping.get("depth_min"),
+            depth_max=index_mapping.get("depth_max"),
+            sample_count=index_mapping.get("sample_count"),
+            warnings=[
+                str(warning)
+                for warning in raw_inspection.get("warnings", [])
+                if str(warning).strip()
+            ],
+        )
+        source_contexts.append(source_context)
+        source_by_key[_context_path_key(requested_path)] = source_context
+        source_by_key[_context_path_key(source_path)] = source_context
+
+    raw_source_slots = {
+        str(slot).strip(): str(path).strip()
+        for slot, path in (requested_source_slots or {}).items()
+        if str(slot).strip() and str(path).strip()
+    }
+    summary_section_ids = [
+        str(section.get("id", "")).strip()
+        for section in summary.get("sections", [])
+        if isinstance(section, Mapping) and str(section.get("id", "")).strip()
+    ]
+    source_slots = {
+        _source_slot_section_id(slot, summary_section_ids): path
+        for slot, path in raw_source_slots.items()
+    }
+    sections: list[AuthoringSectionContext] = []
+    section_ids: set[str] = set()
+    for raw_section in summary.get("sections", []):
+        if not isinstance(raw_section, Mapping):
+            continue
+        section_id = str(raw_section.get("id", "")).strip()
+        if not section_id:
+            continue
+        section_ids.add(section_id)
+        summary_source_path = str(raw_section.get("source_path", "")).strip() or None
+        source_path = source_slots.get(section_id, summary_source_path)
+        source_context = source_by_key.get(_context_path_key(source_path)) if source_path else None
+        summary_channels = raw_section.get("available_channels", [])
+        available_channels = (
+            list(source_context.channels)
+            if source_context is not None
+            else [
+                AuthoringChannelCandidate(mnemonic=str(channel).strip())
+                for channel in summary_channels
+                if str(channel).strip()
+            ]
+        )
+        sections.append(
+            AuthoringSectionContext(
+                section_id=section_id,
+                title=str(raw_section.get("title", "")),
+                source_path=source_path,
+                source_format=(
+                    source_context.source_format
+                    if source_context is not None
+                    else str(raw_section.get("source_format", "auto"))
+                ),
+                depth_range=raw_section.get("depth_range"),
+                track_ids=[
+                    str(track_id)
+                    for track_id in raw_section.get("track_ids", [])
+                    if str(track_id).strip()
+                ],
+                track_kinds=[
+                    str(track_kind)
+                    for track_kind in raw_section.get("track_kinds", [])
+                    if str(track_kind).strip()
+                ],
+                available_channels=available_channels,
+            )
+        )
+
+    for section_id, source_path in source_slots.items():
+        if section_id in section_ids:
+            continue
+        source_context = source_by_key.get(_context_path_key(source_path))
+        sections.append(
+            AuthoringSectionContext(
+                section_id=section_id,
+                source_path=source_path,
+                source_format=(source_context.source_format if source_context else "auto"),
+                available_channels=(list(source_context.channels) if source_context else []),
+            )
+        )
+
+    object_inventory = {
+        "name": existing.name,
+        "title": existing.title,
+        "section_ids": [section.id for section in existing.sections],
+        "sections": [
+            {
+                "id": section.id,
+                "title": section.title,
+                "track_ids": [track.id for track in section.tracks],
+                "track_kinds": [track.kind for track in section.tracks],
+                "binding_ids": [
+                    binding.binding_id
+                    for track in section.tracks
+                    for binding in track.bindings
+                    if getattr(binding, "binding_id", None)
+                ],
+            }
+            for section in existing.sections
+        ],
+    }
+    return AuthoringContextSnapshot(
+        draft_logfile=draft_logfile,
+        object_inventory=object_inventory,
+        sections=sections,
+        sources=source_contexts,
+        requested_source_slots=source_slots,
+        header_slots=dict(header_slots or {}),
+        issues=list(issues),
+    )
 
 
 def _default_path_candidates(path: str) -> tuple[str, ...]:
@@ -962,8 +1214,12 @@ __all__ = [
     "AuthoringContextIssue",
     "AuthoringContextResolution",
     "AuthoringContextResolver",
+    "AuthoringContextSnapshot",
+    "AuthoringSectionContext",
+    "AuthoringSourceContext",
     "AuthoringResolutionDecision",
     "AuthoringResolutionSource",
     "AuthoringResolutionStatus",
+    "build_authoring_context_snapshot",
     "resolve_authoring_context",
 ]

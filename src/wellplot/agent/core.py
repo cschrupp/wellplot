@@ -23,13 +23,19 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from ..authoring import load_authoring_document
+from ..authoring_context import (
+    AuthoringChannelInput,
+    AuthoringContextIssue,
+    AuthoringContextSnapshot,
+    build_authoring_context_snapshot,
+)
 from ..authoring_executor import (
     AuthoringExecutionResult,
     AuthoringExecutionStatus,
@@ -1129,6 +1135,29 @@ def _parse_source_slot_mapping(text: str) -> dict[str, str]:
     return values
 
 
+def _request_source_paths(text: str, source_slots: Mapping[str, str]) -> dict[str, str]:
+    """Find source paths in a request that are not in its named source block."""
+    paths: dict[str, str] = dict(source_slots)
+    pattern = re.compile(r"[^\s`'\"(),;]+\.(?:las|dlis)\b", re.IGNORECASE)
+    for source_path in pattern.findall(text):
+        normalized = source_path.strip()
+        if not normalized:
+            continue
+        if normalized not in paths.values():
+            paths[f"source_{len(paths) + 1}"] = normalized
+    return paths
+
+
+def _source_format_for_path(source_path: str) -> str:
+    """Infer a safe inspection format from a source filename."""
+    suffix = Path(source_path).suffix.lower()
+    if suffix == ".las":
+        return "las"
+    if suffix == ".dlis":
+        return "dlis"
+    return "auto"
+
+
 def _extract_packet_header_fill_intent(text: str) -> _HeaderFillIntent | None:
     """Extract one packet header-value block without mixing in broader packet prose."""
     block_lines = _extract_named_block(
@@ -1434,7 +1463,7 @@ class AuthoringSession:
         blueprint_id: str | None = None,
         desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None,
         existing: AuthoringDocumentSpec | None = None,
-        available_channels: Mapping[str, list[str]] | None = None,
+        available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
     ) -> AuthoringPlanResult:
         """Return a generic, scaffold, or typed desired-state plan.
 
@@ -1466,7 +1495,7 @@ class AuthoringSession:
         intent: AuthoringDocumentIntent,
         *,
         existing: AuthoringDocumentSpec | None,
-        available_channels: Mapping[str, list[str]] | None,
+        available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None,
     ) -> AuthoringPlanResult:
         """Build the public plan view for one typed reconciliation plan."""
         reconciliation_plan = reconcile_authoring(
@@ -4112,13 +4141,97 @@ class AuthoringSession:
             run_state,
         )
 
+    async def _collect_authoring_context(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_text: str,
+        existing: AuthoringDocumentSpec,
+        summary: dict[str, object],
+    ) -> AuthoringContextSnapshot:
+        """Inspect all deterministic context needed before intent extraction."""
+        issues: list[AuthoringContextIssue] = []
+        heading_slots: dict[str, object] = {}
+        heading_result = await session.call_tool(
+            "inspect_heading_slots",
+            {"logfile_path": draft_logfile},
+        )
+        heading_error = _mcp_error_text(heading_result)
+        if heading_error is None:
+            heading_slots = _structured_content(heading_result)
+        else:
+            issues.append(
+                AuthoringContextIssue(
+                    path="header",
+                    code="header_context_unavailable",
+                    message=heading_error,
+                )
+            )
+
+        source_slots = _request_source_paths(
+            request_text,
+            _parse_source_slot_mapping(request_text),
+        )
+        source_requests: dict[str, tuple[str, str]] = {}
+        for source_path in source_slots.values():
+            normalized = source_path.strip()
+            if not normalized:
+                continue
+            path_key = normalized.replace("\\", "/").removeprefix("./").lower()
+            if path_key not in source_requests:
+                source_requests[path_key] = (
+                    normalized,
+                    _source_format_for_path(normalized),
+                )
+        for section in summary.get("sections", []):
+            if not isinstance(section, Mapping):
+                continue
+            source_path = str(section.get("source_path", "")).strip()
+            if not source_path:
+                continue
+            path_key = source_path.replace("\\", "/").removeprefix("./").lower()
+            if path_key not in source_requests:
+                source_requests[path_key] = (
+                    source_path,
+                    str(section.get("source_format", "auto")).strip() or "auto",
+                )
+
+        source_inspections: dict[str, Mapping[str, object]] = {}
+        for source_path, source_format in source_requests.values():
+            inspection_result = await session.call_tool(
+                "inspect_data_source",
+                {"source_path": source_path, "source_format": source_format},
+            )
+            inspection_error = _mcp_error_text(inspection_result)
+            if inspection_error is not None:
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"sources[{source_path}]",
+                        code="source_context_unavailable",
+                        message=inspection_error,
+                    )
+                )
+                continue
+            source_inspections[source_path] = _structured_content(inspection_result)
+
+        return build_authoring_context_snapshot(
+            draft_logfile=draft_logfile,
+            existing=existing,
+            summary=summary,
+            source_inspections=source_inspections,
+            requested_source_slots=source_slots,
+            header_slots=heading_slots,
+            issues=issues,
+        )
+
     async def _extract_desired_state(
         self,
         *,
         request_text: str,
         draft_logfile: str,
         existing: AuthoringDocumentSpec,
-        summary: dict[str, object],
+        context_snapshot: AuthoringContextSnapshot,
         max_rounds: int,
     ) -> tuple[ProviderRunResult, AuthoringDocumentIntent | None]:
         """Ask a typed-state capable provider for one validated desired state."""
@@ -4162,7 +4275,7 @@ class AuthoringSession:
             "draft_logfile": draft_logfile,
             "request": request_text,
             "current_document": existing.model_dump(mode="json"),
-            "sections": _bootstrap_sections(summary),
+            "authoring_context": context_snapshot.model_dump(mode="json"),
         }
         instructions = (
             "You are the desired-state extraction stage of wellplot authoring. "
@@ -4288,25 +4401,27 @@ class AuthoringSession:
         _require_mcp_success(inspect_result, action="inspect_logfile")
         output_path = self.runtime.server_root / draft_logfile
         existing = load_authoring_document(output_path, allowed_root=self.runtime.server_root)
-        available_channels: dict[str, list[str]] = {}
-        for section in summary.get("sections", []):
-            if not isinstance(section, dict):
-                continue
-            section_id = str(section.get("id", "")).strip()
-            if not section_id:
-                continue
-            channels = section.get("available_channels", [])
-            if isinstance(channels, list):
-                available_channels[section_id] = [
-                    str(channel).strip() for channel in channels if str(channel).strip()
-                ]
+        context_snapshot = await self._collect_authoring_context(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_text=request_text,
+            existing=existing,
+            summary=summary,
+        )
+        available_channels = {
+            section.section_id: [
+                candidate.model_dump(mode="json")
+                for candidate in section.available_channels
+            ]
+            for section in context_snapshot.sections
+        }
 
         if desired_state is None:
             provider_result, intent = await self._extract_desired_state(
                 request_text=request_text,
                 draft_logfile=draft_logfile,
                 existing=existing,
-                summary=summary,
+                context_snapshot=context_snapshot,
                 max_rounds=max_rounds,
             )
         else:
@@ -4314,6 +4429,11 @@ class AuthoringSession:
             provider_result = ProviderRunResult(
                 final_text="Using caller-supplied typed desired state.",
                 tool_trace=(),
+                report_facts={
+                    "context_issues": [
+                        issue.model_dump(mode="json") for issue in context_snapshot.issues
+                    ],
+                },
             )
 
         if intent is None:

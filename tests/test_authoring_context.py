@@ -5,7 +5,9 @@ from __future__ import annotations
 from wellplot.authoring_context import (
     AuthoringChannelAlias,
     AuthoringChannelCandidate,
+    AuthoringContextIssue,
     AuthoringResolutionSource,
+    build_authoring_context_snapshot,
     resolve_authoring_context,
 )
 from wellplot.model.authoring import (
@@ -292,3 +294,79 @@ def test_defaulted_track_kind_is_used_for_compatibility() -> None:
 
     assert result.ready is True
     assert result.resolved_values["sections[main].tracks[vdl].kind"] == "array"
+
+
+def test_context_snapshot_joins_new_sections_to_inspected_source_channels() -> None:
+    """Prepare typed source and section context before desired-state extraction."""
+    snapshot = build_authoring_context_snapshot(
+        draft_logfile="workspace/draft.log.yaml",
+        existing=_document(),
+        summary={
+            "sections": [
+                {
+                    "id": "main_pass",
+                    "title": "Main",
+                    "source_path": "main.las",
+                    "source_format": "las",
+                    "track_ids": ["cbl"],
+                    "track_kinds": ["normal"],
+                    "available_channels": ["CBL"],
+                }
+            ]
+        },
+        source_inspections={
+            "main.las": {
+                "source_path": "main.las",
+                "source_format_detected": "las",
+                "dataset_name": "Main",
+                "index": {"depth_unit": "ft", "depth_min": 100, "depth_max": 200},
+                "channels": [
+                    {
+                        "mnemonic": "CBL",
+                        "kind": "scalar",
+                        "value_unit": "mV",
+                        "description": "Cement bond amplitude",
+                        "value_shape": [11],
+                    }
+                ],
+            },
+            "repeat.dlis": {
+                "source_path": "repeat.dlis",
+                "source_format_detected": "dlis",
+                "dataset_name": "Repeat",
+                "index": {"depth_unit": "ft", "sample_count": 22},
+                "channels": [
+                    {
+                        "mnemonic": "VDL",
+                        "kind": "array",
+                        "value_unit": "us",
+                        "value_shape": [22, 64],
+                    }
+                ],
+            },
+        },
+        requested_source_slots={"main": "main.las", "repeat": "repeat.dlis"},
+        header_slots={"detail_slots": {"kind": "cased_hole"}},
+        issues=[
+            AuthoringContextIssue(
+                path="sources[missing.dlis]",
+                code="source_context_unavailable",
+                message="Source was not found.",
+            )
+        ],
+    )
+
+    assert [section.section_id for section in snapshot.sections] == [
+        "main_pass",
+        "repeat_pass",
+    ]
+    main = snapshot.sections[0]
+    repeat = snapshot.sections[1]
+    assert main.available_channels[0].kind == "scalar"
+    assert main.available_channels[0].unit == "mV"
+    assert repeat.available_channels[0].mnemonic == "VDL"
+    assert repeat.available_channels[0].kind == "array"
+    assert repeat.source_format == "dlis"
+    assert snapshot.object_inventory["sections"][0]["track_kinds"] == ["normal"]
+    assert snapshot.header_slots["detail_slots"]["kind"] == "cased_hole"
+    assert snapshot.issues[0].code == "source_context_unavailable"
