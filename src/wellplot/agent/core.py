@@ -1747,7 +1747,10 @@ class AuthoringSession:
             run_state=AuthoringRunState(
                 objectives=tuple(phase.summary for phase in phases),
             ),
-            defaults_provenance=dict(defaults_resolution.matched_families),
+            defaults_provenance={
+                **defaults_resolution.matched_families,
+                **defaults_resolution.provenance,
+            },
             desired_state=intent,
             reconciliation_plan=reconciliation_plan,
         )

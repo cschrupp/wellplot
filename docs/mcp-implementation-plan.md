@@ -234,6 +234,8 @@ Current progress:
   normal, reference, array, and annotation tracks
 - optional family matching uses partial evidence and reports unmatched channel
   mnemonics without blocking generic construction
+- defaulted fields expose source-level provenance and specific style presets
+  override broader family archetypes
 - the remaining MCP mutation families and duplicated patch catalogs are still
   pending in slice `0.6-E`
 
@@ -1207,7 +1209,7 @@ Implementation checkpoint:
 
 ### 0.6-I3. Defaults Precedence And Provenance
 
-Status: pending.
+Status: implemented in the current development branch.
 
 Goal:
 
@@ -1238,6 +1240,17 @@ Acceptance:
   values when both are applicable
 - generic form provenance remains visible when no family is selected
 - repeated reconciliation is idempotent
+
+Implementation checkpoint:
+
+- generic form, family archetype, style preset, and binding-template defaults
+  record field-level provenance
+- style preset patches are applied after archetype patches so specific values
+  such as width, scale, grid, and binding style are retained
+- the existing family/provenance metadata remains compatible, while agent plan
+  results also expose field-level default sources
+- explicit typed values continue to win through contextual resolution
+- focused defaults, context, reconciler, and full-suite tests pass
 
 ### 0.6-I4. Actionable Creation Diagnostics
 

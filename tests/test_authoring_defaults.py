@@ -72,13 +72,26 @@ def test_generic_defaults_select_unique_family_and_nested_binding_values() -> No
     binding_path = f"{track_path}.bindings[deep]"
     assert result.matched_families[f"{track_path}.archetype"] == "resistivity_log"
     assert result.matched_families[f"{track_path}.preset"] == "triple_combo_resistivity"
+    assert result.defaults[f"{track_path}.width_mm"] == 32.0
+    assert result.provenance[f"{track_path}.width_mm"] == (
+        "style_preset:triple_combo_resistivity"
+    )
     assert result.defaults[f"{track_path}.x_scale"] == {
         "kind": "log",
         "minimum": 0.2,
         "maximum": 2000.0,
     }
+    assert result.provenance[f"{track_path}.x_scale.kind"] == (
+        "style_preset:triple_combo_resistivity"
+    )
     assert result.defaults[f"{track_path}.grid.vertical_main_scale"] == "logarithmic"
+    assert result.provenance[f"{track_path}.grid.vertical_main_scale"] == (
+        "style_preset:triple_combo_resistivity"
+    )
     assert result.defaults[f"{binding_path}.style.color"] == "#111827"
+    assert result.provenance[f"{binding_path}.style.color"] == (
+        "style_preset:triple_combo_resistivity"
+    )
 
 
 def test_generic_defaults_do_not_override_explicit_values() -> None:
@@ -173,6 +186,8 @@ def test_generic_defaults_complete_uncatalogued_scalar_track() -> None:
     assert result.defaults[f"{track_path}.width_mm"] == 28.0
     assert result.matched_families[f"{track_path}.form"] == "normal"
     assert result.matched_families[f"{track_path}.unmatched_channels"] == "SENSOR_X"
+    assert result.provenance[f"{track_path}.title"] == "generic_form:normal"
+    assert result.provenance[f"{track_path}.kind"] == "generic_form:normal"
 
     plan = reconcile_authoring(
         intent,

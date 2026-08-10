@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from re import sub
 from typing import Any
 
@@ -35,6 +35,7 @@ class AuthoringDefaultsResolution:
 
     defaults: dict[str, Any]
     matched_families: dict[str, str]
+    provenance: dict[str, str] = field(default_factory=dict)
     warnings: tuple[str, ...] = ()
 
 
@@ -227,15 +228,32 @@ def _flatten_defaults(
     defaults: dict[str, Any],
     path: str,
     value: object,
+    provenance: dict[str, str] | None = None,
+    source: str | None = None,
 ) -> None:
     """Store a default at its object path and at nested field paths."""
     if isinstance(value, Mapping):
         normalized = deepcopy(dict(value))
         defaults[path] = normalized
+        if provenance is not None and source is not None:
+            provenance[path] = source
         for field_name, field_value in normalized.items():
-            _flatten_defaults(defaults, f"{path}.{field_name}", field_value)
+            _flatten_defaults(
+                defaults,
+                f"{path}.{field_name}",
+                field_value,
+                provenance,
+                source,
+            )
         return
     defaults[path] = deepcopy(value)
+    if provenance is not None and source is not None:
+        provenance[path] = source
+
+
+def _catalog_source(kind: str, entry: Mapping[str, Any]) -> str:
+    """Return stable provenance text for one catalog entry."""
+    return f"{kind}:{entry.get('id', '')}"
 
 
 def _binding_channels(
@@ -454,6 +472,7 @@ def _scoped_direct_children(
 def _add_generic_form_defaults(
     defaults: dict[str, Any],
     matched_families: dict[str, str],
+    provenance: dict[str, str],
     *,
     track_path: str,
     track: AuthoringTrackIntent,
@@ -485,8 +504,15 @@ def _add_generic_form_defaults(
     }
     if track.title is None:
         patch["title"] = _humanize_track_id(track.track_id)
+    source = _catalog_source("generic_form", entry)
     for field_name, field_value in _canonical_patch(patch).items():
-        _flatten_defaults(defaults, f"{track_path}.{field_name}", field_value)
+        _flatten_defaults(
+            defaults,
+            f"{track_path}.{field_name}",
+            field_value,
+            provenance,
+            source,
+        )
     matched_families[f"{track_path}.form"] = str(entry.get("id", form_kind))
 
 
@@ -508,22 +534,35 @@ def _template_for_binding(
 
 def _add_binding_defaults(
     defaults: dict[str, Any],
+    provenance: dict[str, str],
     *,
     binding_path: str,
     template: Mapping[str, Any] | None,
     fallback: Mapping[str, Any] | None,
+    template_source: str | None,
+    fallback_source: str | None,
 ) -> None:
     """Add specific template values, then generic family fallback values."""
-    for candidate in (fallback, template):
+    for candidate, source in (
+        (fallback, fallback_source),
+        (template, template_source),
+    ):
         if not isinstance(candidate, Mapping):
             continue
         patch = _canonical_patch(candidate)
         for field_name, field_value in patch.items():
-            _flatten_defaults(defaults, f"{binding_path}.{field_name}", field_value)
+            _flatten_defaults(
+                defaults,
+                f"{binding_path}.{field_name}",
+                field_value,
+                provenance,
+                source,
+            )
 
 
 def _add_track_defaults(
     defaults: dict[str, Any],
+    provenance: dict[str, str],
     *,
     track_path: str,
     track: AuthoringTrackIntent,
@@ -542,11 +581,22 @@ def _add_track_defaults(
             archetype_patch.update(archetype["recommended_track_patch"])
         track_patches.append(archetype_patch)
     if isinstance(preset, Mapping) and isinstance(preset.get("track_patch"), Mapping):
-        track_patches.insert(0, preset["track_patch"])
+        track_patches.append(preset["track_patch"])
 
-    for patch in track_patches:
+    patch_sources: list[str | None] = []
+    if isinstance(archetype, Mapping):
+        patch_sources.append(_catalog_source("family_archetype", archetype))
+    if isinstance(preset, Mapping) and isinstance(preset.get("track_patch"), Mapping):
+        patch_sources.append(_catalog_source("style_preset", preset))
+    for patch, source in zip(track_patches, patch_sources, strict=True):
         for field_name, field_value in _canonical_patch(patch).items():
-            _flatten_defaults(defaults, f"{track_path}.{field_name}", field_value)
+            _flatten_defaults(
+                defaults,
+                f"{track_path}.{field_name}",
+                field_value,
+                provenance,
+                source,
+            )
 
     fallback_binding = (
         archetype.get("recommended_binding") if isinstance(archetype, Mapping) else None
@@ -560,9 +610,18 @@ def _add_track_defaults(
         template = _template_for_binding(binding, preset)
         _add_binding_defaults(
             defaults,
+            provenance,
             binding_path=binding_path,
             template=template,
             fallback=fallback_binding,
+            template_source=(
+                _catalog_source("style_preset", preset) if isinstance(preset, Mapping) else None
+            ),
+            fallback_source=(
+                _catalog_source("family_archetype", archetype)
+                if isinstance(archetype, Mapping)
+                else None
+            ),
         )
 
 
@@ -572,13 +631,18 @@ def generic_authoring_defaults(
     """Return generic defaults for omitted fields in one typed desired state."""
     defaults: dict[str, Any] = {}
     matched_families: dict[str, str] = {}
+    provenance: dict[str, str] = {}
     warnings: list[str] = []
     archetypes = track_archetype_catalog()
     presets = style_preset_catalog()
     form_defaults = form_default_catalog()
     direct_bindings, direct_annotations = _scoped_direct_children(intent)
     if not isinstance(intent.sections, list):
-        return AuthoringDefaultsResolution(defaults, matched_families)
+        return AuthoringDefaultsResolution(
+            defaults=defaults,
+            matched_families=matched_families,
+            provenance=provenance,
+        )
 
     for section in intent.sections:
         if not hasattr(section, "tracks") or not isinstance(section.tracks, list):
@@ -617,6 +681,7 @@ def generic_authoring_defaults(
             _add_generic_form_defaults(
                 defaults,
                 matched_families,
+                provenance,
                 track_path=track_path,
                 track=track,
                 form_defaults=form_defaults,
@@ -629,6 +694,7 @@ def generic_authoring_defaults(
                 continue
             _add_track_defaults(
                 defaults,
+                provenance,
                 track_path=track_path,
                 track=track,
                 archetype=archetype,
@@ -638,6 +704,7 @@ def generic_authoring_defaults(
     return AuthoringDefaultsResolution(
         defaults=defaults,
         matched_families=matched_families,
+        provenance=provenance,
         warnings=tuple(dict.fromkeys(warnings)),
     )
 
