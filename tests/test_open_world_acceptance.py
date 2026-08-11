@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
 
+import anyio
 import pytest
 
 from wellplot.agent import AuthoringSession
+from wellplot.agent.compilation import build_request_manifest
+from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_service import AuthoringService
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
@@ -75,6 +79,122 @@ def _track(document: AuthoringDocumentSpec, track_id: str) -> object:
     """Return one read-back track by stable id."""
     section = next(section for section in document.sections if section.id == "main")
     return next(track for track in section.tracks if track.id == track_id)
+
+
+class _ResistivityExtractionBackend:
+    """Submit a natural-language resistivity request through the provider seam."""
+
+    provider = "fixture"
+    model = "fixture-model"
+    credential_source = "fixture"
+
+    def __init__(self, request_text: str) -> None:
+        self.manifest = build_request_manifest(request_text)
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Submit one provider-shaped intent and complete request coverage."""
+        tool_caller = kwargs["tool_caller"]
+        intent = {
+            "sections": [
+                {
+                    "section_id": "main",
+                    "tracks": [
+                        {
+                            "track_id": "resistivity",
+                            "section_id": "main",
+                            "bindings": [
+                                {
+                                    "kind": "curve",
+                                    "binding_id": "main.resistivity.ILD.1",
+                                    "section_id": "main",
+                                    "track_id": "resistivity",
+                                    "channel": "ILD",
+                                },
+                                {
+                                    "kind": "curve",
+                                    "binding_id": "main.resistivity.ILM.1",
+                                    "section_id": "main",
+                                    "track_id": "resistivity",
+                                    "channel": "ILM",
+                                },
+                                {
+                                    "kind": "curve",
+                                    "binding_id": "main.resistivity.MSFL.1",
+                                    "section_id": "main",
+                                    "track_id": "resistivity",
+                                    "channel": "MSFL",
+                                },
+                            ],
+                        }
+                    ],
+                }
+            ]
+        }
+        response = await tool_caller(
+            "submit_authoring_intent",
+            {
+                "intent": intent,
+                "coverage": [
+                    {
+                        "request_item_id": item.item_id,
+                        "status": "mapped",
+                        "intent_paths": ["sections[main].tracks[resistivity]"],
+                    }
+                    for item in self.manifest.items
+                ],
+            },
+        )
+        assert response["accepted"] is True
+        return SimpleNamespace(final_text="Submitted typed intent.", tool_trace=())
+
+
+def test_provider_submission_reaches_generic_resistivity_operation_payload() -> None:
+    """Verify the natural-language extraction seam before claiming notebook success."""
+    request_text = """
+        Revise the existing draft.
+
+        - Add one resistivity track after the depth track.
+        - Use a logarithmic scale from 0.2 to 2000 ohm.m.
+        - Bind the deep, medium, and shallow resistivity curves that are available.
+        - Keep the deepest resistivity curve visually strongest.
+    """
+    backend = _ResistivityExtractionBackend(request_text)
+    session = AuthoringSession(backend=backend, runtime=SimpleNamespace(server_root=Path(".")))
+    existing = _minimal_document()
+    context = AuthoringContextSnapshot(draft_logfile="draft.log.yaml")
+
+    result, intent = anyio.run(
+        partial(
+            session._extract_desired_state,
+            request_text=request_text,
+            draft_logfile="draft.log.yaml",
+            existing=existing,
+            context_snapshot=context,
+            max_rounds=3,
+        )
+    )
+
+    assert intent is not None
+    assert result.report_facts["submitted_intent"] == intent.model_dump(
+        mode="json", exclude_unset=True
+    )
+    plan = session.plan(
+        text=request_text,
+        desired_state=intent,
+        existing=existing,
+        available_channels={"main": ["ILD", "ILM", "MSFL"]},
+    )
+    assert plan.blocked is False, plan.blocked_reasons
+    track_operation = next(
+        operation
+        for operation in plan.operation_payloads
+        if operation["object_kind"] == "track"
+        and operation["object_id"] == "resistivity"
+    )
+    assert track_operation["payload"]["object"]["width_mm"] == 32.0
+    assert plan.applied_defaults_provenance[
+        "sections[main].tracks[resistivity].width_mm"
+    ] == "style_preset:triple_combo_resistivity"
 
 
 def test_open_world_resistivity_creation_uses_generic_reconciliation() -> None:

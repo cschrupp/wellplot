@@ -125,6 +125,52 @@ def test_defaults_win_over_scaffold_when_existing_state_is_absent() -> None:
     )
 
 
+def test_nested_parent_scope_does_not_replace_child_identity() -> None:
+    """Resolve defaults by local child ids when providers repeat parent scope."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "section_id": "main",
+                        "track_id": "resistivity",
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "section_id": "main",
+                                "track_id": "resistivity",
+                                "binding_id": "ild-1",
+                                "channel": "ILD",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    )
+    result = resolve_authoring_context(
+        intent,
+        defaults={
+            "sections[main].tracks[resistivity].width_mm": 32.0,
+            "sections[main].tracks[resistivity].bindings[ild-1].style": {
+                "color": "black",
+                "line_width": 1.3,
+            },
+        },
+        available_channels={"main": ["ILD"]},
+    )
+
+    assert result.ready is True
+    assert result.resolved_values[
+        "sections[main].tracks[resistivity].width_mm"
+    ] == 32.0
+    assert result.resolved_values[
+        "sections[main].tracks[resistivity].bindings[ild-1].style"
+    ]["color"] == "black"
+    assert not any("tracks[main]" in path for path in result.resolved_values)
+
+
 def test_header_alias_resolves_to_existing_stable_slot() -> None:
     """Resolve visible header labels without inventing a new slot."""
     intent = AuthoringDocumentIntent(

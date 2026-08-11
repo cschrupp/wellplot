@@ -1351,7 +1351,7 @@ Implementation checkpoint:
 
 ### 0.6-I6. Notebook, Documentation, And Release Acceptance
 
-Status: implemented in the current development branch.
+Status: reopened; provider-boundary acceptance is still required.
 
 Work:
 
@@ -1365,6 +1365,8 @@ Work:
 - run targeted defaults, resolver, reconciler, agent, MCP, and notebook tests
 - run the full test suite, Ruff, strict documentation build, and installed-wheel
   smoke checks
+- record the provider-submitted typed intent, contextual resolution decisions,
+  applied defaults, and final operation payloads for the exact notebook request
 
 Acceptance:
 
@@ -1372,6 +1374,9 @@ Acceptance:
   internal fields for an ordinary track-creation request
 - the unchanged resistivity notebook request completes and reports selected
   generic/family provenance
+- the unchanged resistivity notebook request is submitted by the provider,
+  resolved, reconciled, executed, and read back with the expected track width,
+  form, scale, ordering, bindings, and style strengths
 - an uncatalogued custom-track acceptance case also completes
 - documentation presents family defaults as optional enrichment rather than an
   object-construction authority
@@ -1386,14 +1391,268 @@ Implementation checkpoint:
   fail-closed incompatibilities, ambiguous conventions, and phase checkpoints
 - package version, changelog, full test suite, strict docs build, and installed
   wheel smoke checks pass
+- provider extraction and deterministic reconciliation are covered together;
+  static prompt inspection alone is not a release acceptance test
+
+## Reopened 0.6-J: Provider Compiler Stabilization
+
+Live execution of the canonical LAS notebook confirmed that the deterministic
+object service, defaults resolver, reconciler, and executor are not the current
+blocking layer. The source contains `SP`, `ILD`, `ILM`, and `MSFL`; the generic
+defaults and deterministic acceptance tests can construct the requested
+objects. The live provider nevertheless returned without submitting a valid
+typed intent, so neither request reached reconciliation or MCP mutation.
+
+The current extraction boundary presents only one tool, but that tool contains
+the complete authoring intent graph. Its generated schema has 58 definitions
+and is also repeated as pretty-printed text in the provider message. This makes
+a narrow track or binding request carry the report, page, header, annotation,
+raster, fill, and every other authoring contract at once. The resulting failure
+is currently collapsed into a generic instruction to provide more internal
+fields, even when the user's request is already sufficient.
+
+This is provider-compiler complexity, not evidence that more MCP mutation tools
+are needed. The governing invariants for this program are:
+
+> Natural language is compiled through small typed contracts, while the full
+> canonical document remains the deterministic validation and persistence
+> authority.
+
+> A provider failure must be observable before it is interpreted as a missing
+> user instruction or unsupported MCP capability.
+
+Implementation policy:
+
+- do not add MCP verbs, packet blueprints, or scientific-family branches to
+  make the SP or resistivity examples pass
+- keep the canonical Pydantic models and deterministic execution pipeline as
+  the final authority
+- reduce only the provider-facing compilation surface; do not weaken canonical
+  validation or permit arbitrary provider dictionaries
+- preserve one bounded correction attempt for invalid typed submissions
+- treat SP and resistivity as representative acceptance fixtures alongside
+  uncatalogued and non-curve objects
+- complete and commit each slice separately
+
+### 0.6-J1. Extraction Observability And Failure Contract
+
+Status: implemented in the current development branch.
+
+Goal:
+
+- expose what happened at the provider boundary without leaking credentials or
+  requiring debug logging
+
+Work:
+
+- retain provider finish reason, whether a tool call was emitted, submitted
+  tool name, argument-decoding failures, Pydantic validation failures, coverage
+  failures, and the bounded correction outcome
+- preserve a short sanitized provider text response when no tool call is made
+- distinguish `no_tool_call`, `invalid_json`, `schema_validation_failed`,
+  `coverage_failed`, `round_budget_exhausted`, and transport failures
+- stop replacing these diagnostics with the generic recommendation to provide
+  canonical object fields
+- expose the diagnostics through structured `AuthoringResult` report facts and
+  concise notebook output
+
+Acceptance:
+
+- a no-tool response reports that exact condition and a provider-facing next
+  action
+- an invalid submission reports stable canonical validation paths without
+  exposing request credentials or entire prompts
+- a valid submission retains the existing concise user report
+- extraction failure never claims that MCP mutation failed when MCP was not
+  called
+
+Implementation checkpoint:
+
+- provider adapters expose normalized response metadata for finish/status,
+  round count, and emitted tool calls
+- desired-state extraction records submission status, validation failures,
+  coverage failures, sanitized provider text, and provider exceptions
+- round exhaustion, malformed JSON, transport failure, prose-only responses,
+  and rejected typed submissions produce distinct report facts
+- the final user report preserves extraction diagnostics and no longer asks the
+  user to provide internal object fields when MCP was never called
+- focused compilation, adapter, and full-suite tests pass
+
+### 0.6-J2. Compact Request Inventory And Contract Budget
+
+Goal:
+
+- establish a small, measurable first compilation stage
+
+Work:
+
+- replace the full-intent first submission with a compact request inventory
+  containing requested action, object family, target identity or description,
+  parent scope, explicit values, and coverage status
+- support the canonical object families: report/header, section, track, curve
+  binding, raster binding, fill, annotation, page/output/depth, and remarks
+- keep natural user descriptions when stable ids are not known; contextual
+  resolution remains deterministic
+- remove the pretty-printed full JSON Schema from the provider message because
+  the tool schema already carries its contract
+- record provider-message and tool-schema size budgets in tests so accidental
+  growth is visible
+
+Acceptance:
+
+- the first-stage tool schema does not depend on the full canonical document
+  schema
+- every request manifest item is mapped, preserved, unsupported, or
+  inconsistent exactly once
+- compound requests can inventory multiple object families without choosing
+  mutation order
+- the unchanged SP and resistivity requests produce complete compact
+  inventories without internal keys in the notebook prompt
+
+### 0.6-J3. Scoped Typed Intent Compilation And Merge
+
+Goal:
+
+- compile each inventoried request group through the smallest applicable typed
+  intent contract
+
+Work:
+
+- define generated provider submission contracts for related canonical
+  families instead of one monolithic `AuthoringDocumentIntent` submission
+- group dependent objects where required, such as track plus child bindings,
+  while keeping unrelated report/header and annotation schemas out of that
+  submission
+- compile inventory groups independently with one bounded correction attempt
+- merge validated partial intents deterministically by canonical identity and
+  parent scope
+- reject conflicting partial intents, duplicate identities, incomplete request
+  coverage, and incompatible parent/child combinations before planning
+- validate the merged result as `AuthoringDocumentIntent` before defaults,
+  reconciliation, or persistence
+
+Acceptance:
+
+- a scalar-track request compiles only track, curve-binding, scale/grid, style,
+  ordering, and coverage fields
+- a header-only request does not receive section, raster, fill, or annotation
+  schemas
+- mixed requests merge into one canonical partial intent without losing
+  explicit values
+- explicit scale, color, line style, width, label, and ordering survive the
+  staged compiler unchanged
+- no scoped compiler contains SP-, resistivity-, CBL-, porosity-, or
+  packet-specific control flow
+
+### 0.6-J4. Provider Adapter Conformance
+
+Goal:
+
+- make typed compilation behavior consistent across supported provider APIs
+
+Work:
+
+- require the designated submission function when a compilation stage permits
+  exactly one function and prose is not a valid outcome
+- preserve automatic tool selection only in workflows where a prose-only
+  response is valid
+- verify streamed tool-call id, name, and argument fragment assembly
+- normalize finish reasons and malformed/empty response diagnostics across the
+  Responses and OpenAI-compatible Chat Completions adapters
+- keep provider-specific request options inside adapters rather than the
+  deterministic compiler
+- add recorded adapter fixtures for no-tool, one-tool, corrected-tool,
+  malformed-arguments, and truncated responses
+
+Acceptance:
+
+- the same compact submission contract behaves consistently through the
+  supported OpenAI and OpenAI-compatible adapters
+- a required submission cannot silently finish as prose
+- correction responses preserve the prior assistant tool call and tool result
+  in provider-compatible message order
+- adapter tests do not call MCP and compiler tests do not depend on a live
+  provider
+
+### 0.6-J5. End-To-End Compiler Acceptance Matrix
+
+Goal:
+
+- prove meaningful natural-language success across object families rather than
+  only validating caller-supplied typed intents
+
+Required scenarios:
+
+- add `SP` to an existing GR/SP track with an explicit `-80` to `20` scale
+- create a resistivity track after depth, bind `ILD`, `ILM`, and `MSFL`, apply
+  logarithmic `0.2` to `2000` scales and grid behavior, and make the deepest
+  curve visually strongest
+- create an uncatalogued normal track from an inspected scalar channel
+- create an array/raster track and bind an available array channel
+- apply an explicit curve color and line style that overrides family defaults
+- revise header content through the deterministic header-language path
+- report an unavailable channel and an ambiguous target without mutation
+
+Work:
+
+- run each request through provider submission, typed validation, deterministic
+  context resolution, defaults, reconciliation, execution, persistence, and
+  canonical read-back
+- use recorded provider submissions in CI and a credentialed live-provider
+  matrix as a manual release gate
+- assert final object values and ordering, not only tool calls or non-empty
+  output
+- record which layer blocked and verify that no later layer ran after a block
+
+Acceptance:
+
+- every successful scenario produces the expected persisted canonical object
+  graph and renderable draft
+- every blocked scenario identifies the exact compiler, context, defaults,
+  reconciliation, execution, transport, or render layer
+- tests fail if a provider emits no submission, if a request item disappears,
+  or if execution reports success without canonical read-back evidence
+- no acceptance scenario selects a packet blueprint unless the caller
+  explicitly requested a starter scaffold
+
+### 0.6-J6. Notebook, Documentation, And Release Closure
+
+Goal:
+
+- close the live authoring promise with reproducible evidence
+
+Work:
+
+- rerun `agent_las_step_by_step.ipynb` from a clean project directory without
+  changing the SP or resistivity prompts
+- retain phase previews and show compact compiler diagnostics only when a stage
+  blocks
+- update user documentation to explain intent compilation without exposing
+  canonical keys as required user vocabulary
+- document provider capability requirements and the difference between a
+  provider compilation failure and an MCP mutation failure
+- run full tests, Ruff, strict documentation build, notebook structural checks,
+  package build, and installed-wheel MCP smoke checks
+
+Acceptance:
+
+- the SP and resistivity notebook cells complete and read back the requested
+  persisted state
+- the same workflow succeeds for at least one uncatalogued scalar track
+- notebook users are not instructed to supply `track_id`, `kind`, `width_mm`,
+  `binding_id`, or JSON paths for ordinary requests
+- the release record names the live providers/models tested and separates
+  optional provider limitations from deterministic product limitations
+- no further MCP surface expansion is accepted until this release gate passes
 
 ## Release Gate
 
 Do not publish `0.6.0` until the repository release gates below pass. Slices
 `0.6-A` through `0.6-G7.2`, plus the reopened `0.6-H1` through `0.6-H6`
 header-language slices, are the completed contract baseline. Reopened slices
-`0.6-I1` through `0.6-I6` are release blockers because open-world object
-construction is required for the user-facing authoring promise.
+`0.6-I1` through `0.6-I6` and compiler slices `0.6-J1` through `0.6-J6` are
+release blockers because open-world object construction and provider-to-intent
+compilation are both required for the user-facing authoring promise.
 
 Release-gate checklist:
 
@@ -1404,6 +1663,10 @@ Release-gate checklist:
   discoverable and request per-phase previews
 - catalogued and uncatalogued track requests both complete through generic
   canonical construction without packet-specific authority
+- provider compilation uses bounded scoped contracts and reports exact
+  extraction failures before any deterministic authoring stage runs
+- unchanged SP and resistivity notebook requests persist and read back the
+  requested objects and values
 - credentialed live-provider acceptance is recorded manually when available
 
 Provider expansion, remote MCP transport, persistent/vector memory, and new

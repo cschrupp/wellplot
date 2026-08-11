@@ -64,6 +64,7 @@ from wellplot.agent.core import (
 )
 from wellplot.agent.mcp import _server_command, _server_env
 from wellplot.agent.providers import load_openai_compatible_api_key
+from wellplot.agent.providers._openai_responses import load_openai_client
 
 
 class FakeBackend:
@@ -2776,6 +2777,7 @@ class AgentTests(unittest.TestCase):
                 server_root=paths.server_root,
                 api_key=None,
                 base_url=None,
+                timeout=None,
             )
             self.assertEqual(session.run_max_rounds, 12)
             self.assertEqual(session.revise_max_rounds, 12)
@@ -2812,6 +2814,37 @@ class AgentTests(unittest.TestCase):
                 server_root=repo_root.resolve(),
                 api_key=None,
                 base_url="https://compat.example.test/v1",
+                timeout=None,
+            )
+
+    def test_create_project_session_passes_custom_timeout(self) -> None:
+        """Forward a larger request timeout to local OpenAI-compatible sessions."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir)
+            fake_session = mock.Mock(spec=AuthoringSession)
+            with mock.patch.object(
+                AuthoringSession,
+                "from_local_mcp",
+                return_value=fake_session,
+            ) as factory:
+                session, _ = create_project_session(
+                    server_root=repo_root,
+                    project_dir="workspace/demo-job",
+                    provider="openai_compat",
+                    model="compat-model",
+                    api_key="compat-token",
+                    base_url="https://compat.example.test/v1",
+                    timeout=1800,
+                )
+
+            self.assertIs(session.authoring_session, fake_session)
+            factory.assert_called_once_with(
+                provider="openai_compat",
+                model="compat-model",
+                server_root=repo_root.resolve(),
+                api_key="compat-token",
+                base_url="https://compat.example.test/v1",
+                timeout=1800,
             )
 
     def test_create_project_session_supports_ollama_alias_defaults(self) -> None:
@@ -2836,6 +2869,7 @@ class AgentTests(unittest.TestCase):
                 server_root=repo_root.resolve(),
                 api_key=None,
                 base_url="http://localhost:11434/v1",
+                timeout=None,
             )
 
     def test_project_session_add_data_file_stages_one_input(self) -> None:
@@ -3387,6 +3421,7 @@ class AgentTests(unittest.TestCase):
                 model="demo-model",
                 server_root="/tmp/openai-root",
                 api_key="demo-token",
+                timeout=1800,
             )
 
         runtime_factory.assert_called_once_with(server_root="/tmp/openai-root")
@@ -3394,6 +3429,7 @@ class AgentTests(unittest.TestCase):
             model="demo-model",
             server_root=runtime.server_root,
             api_key="demo-token",
+            timeout=1800,
         )
         self.assertIs(session.backend, backend)
         self.assertIs(session.runtime, runtime)
@@ -3423,6 +3459,7 @@ class AgentTests(unittest.TestCase):
                 server_root="/tmp/compat-root",
                 api_key="compat-token",
                 base_url="http://localhost:11434/v1",
+                timeout=1800,
             )
 
         runtime_factory.assert_called_once_with(server_root="/tmp/compat-root")
@@ -3431,6 +3468,7 @@ class AgentTests(unittest.TestCase):
             server_root=runtime.server_root,
             api_key="compat-token",
             base_url="http://localhost:11434/v1",
+            timeout=1800,
         )
         self.assertIs(session.backend, backend)
         self.assertIs(session.runtime, runtime)
@@ -3439,6 +3477,26 @@ class AgentTests(unittest.TestCase):
         """Reject the compatibility provider when no base URL is supplied."""
         with self.assertRaisesRegex(ValueError, "base_url"):
             AuthoringSession.from_local_mcp(provider="openai_compat", model="demo")
+
+    def test_load_openai_client_passes_timeout_to_sdk(self) -> None:
+        """Configure the SDK request timeout used by local model gateways."""
+        with mock.patch("openai.OpenAI") as openai_client:
+            load_openai_client(
+                api_key="demo-token",
+                base_url="https://compat.example.test/v1",
+                timeout=1800,
+            )
+
+        openai_client.assert_called_once_with(
+            api_key="demo-token",
+            base_url="https://compat.example.test/v1",
+            timeout=1800,
+        )
+
+    def test_load_openai_client_rejects_non_positive_timeout(self) -> None:
+        """Reject invalid request timeout values before constructing the client."""
+        with self.assertRaisesRegex(ValueError, "greater than zero"):
+            load_openai_client(api_key="demo-token", timeout=0)
 
     def test_openai_compat_uses_placeholder_token_for_loopback_base_url(self) -> None:
         """Allow local OpenAI-compatible endpoints to run without a configured key."""
@@ -3529,6 +3587,7 @@ class AgentTests(unittest.TestCase):
             server_root=None,
             api_key=None,
             base_url=None,
+            timeout=None,
         )
         stub_session.run.assert_awaited_once_with(
             goal="Simplify the heading.",

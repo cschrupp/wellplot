@@ -169,13 +169,13 @@ AuthoringChannelInput: TypeAlias = str | AuthoringChannelCandidate | Mapping[str
 
 _MISSING = object()
 _IDENTITY_FIELDS = (
-    "section_id",
-    "track_id",
     "binding_id",
     "fill_id",
     "annotation_id",
     "remark_id",
     "slot_id",
+    "track_id",
+    "section_id",
     "id",
 )
 

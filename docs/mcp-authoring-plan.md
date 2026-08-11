@@ -213,6 +213,26 @@ gaps are structural:
 - packet-specific agent logic can compensate for missing semantics and override
   explicit user values
 
+Live provider testing has also exposed a separate compilation-boundary gap:
+
+- the provider currently receives one monolithic typed-intent tool containing
+  the complete report, header, section, track, curve, raster, fill, annotation,
+  page, output, and remarks graph even for a narrow edit
+- that schema is duplicated as text in the provider message despite already
+  being supplied as the function schema
+- a provider that returns prose instead of the required typed submission causes
+  no MCP call, but the current user report hides the provider response and can
+  incorrectly suggest that the request needs internal object fields
+- deterministic tests using caller-supplied intents prove the execution path,
+  not the natural-language compilation path
+
+The active correction is the `0.6-J` provider compiler program in
+[docs/mcp-implementation-plan.md](mcp-implementation-plan.md). It introduces a
+compact request inventory, scoped typed-intent submissions, deterministic merge
+and full canonical validation, provider-adapter conformance, and end-to-end
+natural-language acceptance. This work must not add MCP mutation tools or
+scientific-family special cases.
+
 The detailed inventory is
 [docs/authoring-contract-inventory.md](authoring-contract-inventory.md).
 

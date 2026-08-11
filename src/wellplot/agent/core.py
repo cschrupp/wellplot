@@ -40,6 +40,7 @@ from ..authoring_context import (
     AuthoringContextIssue,
     AuthoringContextSnapshot,
     build_authoring_context_snapshot,
+    resolve_authoring_context,
 )
 from ..authoring_defaults import generic_authoring_defaults
 from ..authoring_executor import (
@@ -272,6 +273,34 @@ class ProviderRunResult:
     report_facts: dict[str, object] = field(default_factory=dict)
 
 
+def _sanitize_provider_text(value: object, *, limit: int = 500) -> str | None:
+    """Return a short provider message with common credential forms redacted."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    normalized = " ".join(value.split())
+    normalized = re.sub(
+        r"(?i)\b(?:sk|nvapi|hf|ghp)[-_][A-Za-z0-9_-]{8,}\b",
+        "[REDACTED]",
+        normalized,
+    )
+    normalized = re.sub(r"(?i)\bbearer\s+\S+", "Bearer [REDACTED]", normalized)
+    if len(normalized) > limit:
+        return normalized[: limit - 3].rstrip() + "..."
+    return normalized
+
+
+def _provider_exception_status(exc: BaseException) -> str:
+    """Classify one provider failure for the extraction report."""
+    if isinstance(exc, json.JSONDecodeError):
+        return "invalid_json"
+    message = str(exc).lower()
+    if "exceeded" in message and "round" in message:
+        return "round_budget_exhausted"
+    if any(token in message for token in ("connection", "transport", "closed")):
+        return "transport_failure"
+    return "provider_error"
+
+
 @dataclass(frozen=True)
 class AuthoringPlanPhase:
     """One planned authoring phase for a structured packet or draft workflow."""
@@ -314,6 +343,10 @@ class AuthoringPlanResult:
     warnings: tuple[str, ...] = ()
     run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
     defaults_provenance: dict[str, str] = field(default_factory=dict)
+    applied_defaults_provenance: dict[str, str] = field(default_factory=dict)
+    resolved_values: dict[str, object] = field(default_factory=dict)
+    resolution_decisions: tuple[dict[str, object], ...] = ()
+    operation_payloads: tuple[dict[str, object], ...] = ()
     desired_state: AuthoringDocumentIntent | None = None
     reconciliation_plan: AuthoringReconciliationPlan | None = None
 
@@ -407,6 +440,8 @@ class AuthoringResult:
     needs_clarification: tuple[dict[str, object], ...] = ()
     request_coverage: tuple[dict[str, object], ...] = ()
     defaults_provenance: dict[str, str] = field(default_factory=dict)
+    submitted_intent: dict[str, object] | None = None
+    report_facts: dict[str, object] = field(default_factory=dict)
 
     @property
     def draft_path(self) -> Path:
@@ -1532,6 +1567,7 @@ class AuthoringSession:
         server_root: str | Path | None = None,
         api_key: str | None = None,
         base_url: str | None = None,
+        timeout: float | None = None,
     ) -> AuthoringSession:
         """Create one public authoring session backed by local stdio MCP."""
         from .mcp import LocalStdioMcpRuntime
@@ -1544,6 +1580,7 @@ class AuthoringSession:
                 model=model,
                 server_root=runtime.server_root,
                 api_key=api_key,
+                timeout=timeout,
             )
         elif provider == "openai_compat":
             if base_url is None or not base_url.strip():
@@ -1553,6 +1590,7 @@ class AuthoringSession:
                 server_root=runtime.server_root,
                 api_key=api_key,
                 base_url=base_url,
+                timeout=timeout,
             )
         else:
             raise ValueError(
@@ -1639,6 +1677,12 @@ class AuthoringSession:
             for item in report_facts.get("request_coverage", [])
             if isinstance(item, dict)
         ) if isinstance(report_facts, dict) else ()
+        submitted_intent = (
+            dict(report_facts["submitted_intent"])
+            if isinstance(report_facts, dict)
+            and isinstance(report_facts.get("submitted_intent"), dict)
+            else None
+        )
         return AuthoringResult(
             provider=self.backend.provider,
             model=self.backend.model,
@@ -1666,6 +1710,8 @@ class AuthoringSession:
             defaults_provenance=(
                 {} if plan is None else dict(plan.defaults_provenance)
             ),
+            submitted_intent=submitted_intent,
+            report_facts=dict(getattr(provider_result, "report_facts", {})),
             user_report=_build_user_report(
                 request_text=goal,
                 validation=validation_payload,
@@ -1719,12 +1765,13 @@ class AuthoringSession:
     ) -> AuthoringPlanResult:
         """Build the public plan view for one typed reconciliation plan."""
         defaults_resolution = generic_authoring_defaults(intent)
-        reconciliation_plan = reconcile_authoring(
+        resolution = resolve_authoring_context(
             intent,
             existing=existing,
             defaults=defaults_resolution.defaults,
             available_channels=available_channels,
         )
+        reconciliation_plan = reconcile_authoring(resolution, existing=existing)
         reconciliation_plan.warnings.extend(defaults_resolution.warnings)
         operations_by_phase: dict[AuthoringOperationPhase, list[str]] = {}
         for operation in reconciliation_plan.operations:
@@ -1771,6 +1818,28 @@ class AuthoringSession:
                     success_check_specs=({"kind": "typed_postconditions", "operation_ids": []},),
                 )
             )
+        operation_payloads = tuple(
+            {
+                "operation_id": operation.operation_id,
+                "phase": operation.phase.value,
+                "action": operation.action.value,
+                "object_kind": operation.object_kind.value,
+                "object_id": operation.object_id,
+                "section_id": operation.section_id,
+                "track_id": operation.track_id,
+                "payload": operation.payload,
+            }
+            for operation in reconciliation_plan.operations
+        )
+        resolution_decisions = tuple(
+            decision.model_dump(mode="json") for decision in resolution.decisions
+        )
+        applied_defaults_provenance = {
+            decision.path: defaults_resolution.provenance[decision.path]
+            for decision in resolution.decisions
+            if decision.source.value == "default"
+            and decision.path in defaults_resolution.provenance
+        }
         return AuthoringPlanResult(
             mode="desired_state",
             packet_blueprint_id=None,
@@ -1785,6 +1854,10 @@ class AuthoringSession:
                 **defaults_resolution.matched_families,
                 **defaults_resolution.provenance,
             },
+            applied_defaults_provenance=applied_defaults_provenance,
+            resolved_values=dict(resolution.resolved_values),
+            resolution_decisions=resolution_decisions,
+            operation_payloads=operation_payloads,
             desired_state=intent,
             reconciliation_plan=reconciliation_plan,
         )
@@ -4603,6 +4676,8 @@ class AuthoringSession:
         submission: AuthoringIntentSubmission | None = None
         submission_attempts = 0
         coverage_errors: list[str] = []
+        coverage_failures: list[list[str]] = []
+        validation_failures: list[str] = []
         request_manifest = build_request_manifest(request_text)
 
         async def submit_intent(
@@ -4631,6 +4706,9 @@ class AuthoringSession:
             try:
                 candidate = AuthoringIntentSubmission.model_validate(arguments)
             except Exception as exc:  # Pydantic gives provider-actionable details.
+                validation_failures.append(
+                    _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
+                )
                 return {
                     "is_error": True,
                     "error": (
@@ -4643,6 +4721,7 @@ class AuthoringSession:
                 candidate.coverage,
             )
             if coverage_errors:
+                coverage_failures.append(list(coverage_errors))
                 return {
                     "is_error": True,
                     "error": (
@@ -4699,16 +4778,35 @@ class AuthoringSession:
             ),
             parameters=AuthoringIntentSubmission.model_json_schema(),
         )
-        provider_result = await self.backend.run_authoring(
-            instructions=instructions,
-            initial_user_message=initial_message,
-            tool_definitions=[tool_definition],
-            tool_caller=submit_intent,
-            max_rounds=min(max_rounds, 3),
-        )
+        try:
+            provider_result = await self.backend.run_authoring(
+                instructions=instructions,
+                initial_user_message=initial_message,
+                tool_definitions=[tool_definition],
+                tool_caller=submit_intent,
+                max_rounds=min(max_rounds, 3),
+            )
+        except Exception as exc:
+            provider_result = ProviderRunResult(
+                final_text="",
+                tool_trace=(),
+                report_facts={
+                    "provider_error": _sanitize_provider_text(str(exc), limit=800)
+                    or type(exc).__name__,
+                    "extraction": {
+                        "status": _provider_exception_status(exc),
+                        "submission_attempts": submission_attempts,
+                        "tool_calls_emitted": False,
+                    },
+                },
+            )
         report_facts = dict(getattr(provider_result, "report_facts", {}))
         report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
         if submission is not None:
+            report_facts["submitted_intent"] = submission.intent.model_dump(
+                mode="json",
+                exclude_unset=True,
+            )
             report_facts["request_coverage"] = [
                 entry.model_dump(mode="json") for entry in submission.coverage
             ]
@@ -4721,6 +4819,36 @@ class AuthoringSession:
             report_facts["reasons"] = list(report_facts.get("reasons", [])) + [
                 "Request coverage validation failed: " + "; ".join(coverage_errors)
             ]
+        extraction_facts = dict(
+            report_facts.get("extraction", {})
+            if isinstance(report_facts.get("extraction"), dict)
+            else {}
+        )
+        if submission is not None:
+            extraction_status = "submitted"
+        elif extraction_facts.get("status"):
+            extraction_status = str(extraction_facts["status"])
+        elif coverage_failures:
+            extraction_status = "coverage_failed"
+        elif validation_failures:
+            extraction_status = "schema_validation_failed"
+        elif provider_result.tool_trace:
+            extraction_status = "submission_rejected"
+        else:
+            extraction_status = "no_tool_call"
+        extraction_facts.update(
+            {
+                "status": extraction_status,
+                "submission_attempts": submission_attempts,
+                "tool_calls_emitted": bool(provider_result.tool_trace),
+                "validation_failures": validation_failures,
+                "coverage_failures": coverage_failures,
+            }
+        )
+        provider_text = _sanitize_provider_text(provider_result.final_text)
+        if provider_text is not None and submission is None:
+            extraction_facts["provider_text"] = provider_text
+        report_facts["extraction"] = extraction_facts
         return (
             ProviderRunResult(
                 final_text=provider_result.final_text,
@@ -4962,6 +5090,11 @@ class AuthoringSession:
             if isinstance(item, dict)
         )
         needs_clarification = _clarification_entries(report_facts.get("needs_clarification"))
+        submitted_intent = (
+            dict(report_facts["submitted_intent"])
+            if isinstance(report_facts.get("submitted_intent"), dict)
+            else None
+        )
         output_path = self.runtime.server_root / draft_logfile
         draft_text = (
             output_path.read_text(encoding="utf-8") if output_path.exists() else baseline_draft_text
@@ -4993,6 +5126,8 @@ class AuthoringSession:
             defaults_provenance=(
                 {} if plan is None else dict(plan.defaults_provenance)
             ),
+            submitted_intent=submitted_intent,
+            report_facts=report_facts,
             user_report=_build_user_report(
                 request_text=goal,
                 validation={"valid": False, "message": reason},
@@ -5065,17 +5200,76 @@ class AuthoringSession:
             )
 
         if intent is None:
+            report_facts = dict(provider_result.report_facts)
+            extraction_facts = report_facts.get("extraction", {})
+            extraction_status = (
+                extraction_facts.get("status")
+                if isinstance(extraction_facts, dict)
+                else None
+            )
+            if extraction_status == "no_tool_call":
+                extraction_reason = (
+                    "The provider returned without submitting the typed authoring request."
+                )
+                extraction_next_help = (
+                    "Retry with a provider/model that supports the typed authoring submission "
+                    "contract."
+                )
+            elif extraction_status == "round_budget_exhausted":
+                extraction_reason = "The provider exhausted its extraction round budget."
+                extraction_next_help = (
+                    "Retry with a larger provider context or a model that can complete the "
+                    "typed authoring submission."
+                )
+            elif extraction_status == "transport_failure":
+                extraction_reason = (
+                    "The provider connection failed before typed authoring completed."
+                )
+                extraction_next_help = "Retry after verifying the provider endpoint and timeout."
+            elif extraction_status == "invalid_json":
+                extraction_reason = "The provider emitted malformed typed-submission arguments."
+                extraction_next_help = (
+                    "Retry with a provider that supports structured tool arguments."
+                )
+            elif extraction_status in {"schema_validation_failed", "submission_rejected"}:
+                extraction_reason = (
+                    "The provider submitted typed data that failed canonical validation."
+                )
+                extraction_next_help = (
+                    "Inspect the reported validation details, then retry with a compatible "
+                    "provider/model."
+                )
+            elif extraction_status == "coverage_failed":
+                extraction_reason = "The provider did not account for every request item."
+                extraction_next_help = (
+                    "Retry with a provider that can return complete request coverage."
+                )
+            else:
+                extraction_reason = "Typed authoring extraction did not produce a valid submission."
+                extraction_next_help = (
+                    "Retry with a provider/model that supports the typed authoring submission "
+                    "contract."
+                )
+            report_facts["not_done"] = [
+                "Extract a typed desired state from the request."
+            ]
+            report_facts["reasons"] = [extraction_reason]
+            report_facts["next_help"] = [extraction_next_help]
+            provider_error = report_facts.get("provider_error")
+            if isinstance(provider_error, str) and provider_error.strip():
+                report_facts["warnings"] = [f"Provider error: {provider_error}"]
+            if isinstance(extraction_facts, dict):
+                provider_text = extraction_facts.get("provider_text")
+                if isinstance(provider_text, str) and provider_text.strip():
+                    warnings = report_facts.get("warnings")
+                    if not isinstance(warnings, list):
+                        warnings = []
+                        report_facts["warnings"] = warnings
+                    warnings.append(f"Provider response: {provider_text}")
             provider_result = ProviderRunResult(
                 final_text="Desired-state extraction did not produce a valid submission.",
                 tool_trace=provider_result.tool_trace,
-                report_facts={
-                    "not_done": ["Extract a typed desired state from the request."],
-                    "reasons": ["The provider did not submit a valid AuthoringDocumentIntent."],
-                    "next_help": [
-                        "Retry with a request that identifies the requested object fields "
-                        "and values explicitly."
-                    ],
-                },
+                report_facts=report_facts,
             )
             return await self._finalize_result(
                 session=session,
@@ -5099,6 +5293,7 @@ class AuthoringSession:
                 final_text="Desired-state planning was blocked before mutation.",
                 tool_trace=provider_result.tool_trace,
                 report_facts={
+                    **provider_result.report_facts,
                     "not_done": [phase.summary for phase in plan.phases]
                     or ["Resolve and reconcile the typed desired state."],
                     "reasons": list(reasons),
@@ -5158,10 +5353,15 @@ class AuthoringSession:
             ),
             tool_trace=provider_result.tool_trace,
             report_facts={
+                **provider_result.report_facts,
                 "completed": completed,
                 "not_done": blocked,
                 "reasons": reasons,
                 "warnings": warnings,
+                "applied_defaults_provenance": plan.applied_defaults_provenance,
+                "resolved_values": plan.resolved_values,
+                "resolution_decisions": list(plan.resolution_decisions),
+                "operation_payloads": list(plan.operation_payloads),
                 "next_help": [
                     "Inspect the blocked operation and correct its object identity or "
                     "source-channel reference before retrying."
@@ -5791,6 +5991,7 @@ async def run_authoring_request(
     server_root: str | Path | None = None,
     api_key: str | None = None,
     base_url: str | None = None,
+    timeout: float | None = None,
     max_rounds: int = 12,
 ) -> AuthoringResult:
     """Run one high-level authoring request against local stdio MCP."""
@@ -5800,6 +6001,7 @@ async def run_authoring_request(
         server_root=server_root,
         api_key=api_key,
         base_url=base_url,
+        timeout=timeout,
     )
     return await session.run(
         goal=goal,
@@ -5819,6 +6021,7 @@ async def revise_authoring_request(
     server_root: str | Path | None = None,
     api_key: str | None = None,
     base_url: str | None = None,
+    timeout: float | None = None,
     max_rounds: int = 12,
 ) -> AuthoringResult:
     """Revise one existing draft logfile against local stdio MCP."""
@@ -5828,6 +6031,7 @@ async def revise_authoring_request(
         server_root=server_root,
         api_key=api_key,
         base_url=base_url,
+        timeout=timeout,
     )
     return await session.revise(
         feedback=feedback,

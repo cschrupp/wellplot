@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-08
+Last updated: 2026-08-11
 
 ## Scope Summary
 
@@ -33,10 +33,11 @@ The canonical MCP/agent direction for that mission is documented in
 
 ## Current Release Assessment
 
-The repository contains substantial post-`0.3.0` capability and the approved
-`0.6.0` contract program has passed its repository release gates. Publication
-still requires the maintainer release workflow and any credentialed live-agent
-acceptance that is intentionally kept manual.
+The repository contains substantial post-`0.3.0` capability. The deterministic
+`0.6.0` contract foundation passes its focused repository tests, but live
+notebook execution reopened the provider-compilation release gate. Publication
+requires compiler stabilization, unchanged-prompt notebook acceptance, and the
+maintainer release workflow.
 
 Current assessment:
 
@@ -48,7 +49,7 @@ Current assessment:
 | Python construction API | implemented | retain with typed compatibility path |
 | Python object editing API | partial | complete before release |
 | MCP deterministic tools | broad capability roster | route through canonical object service |
-| provider-neutral agent | implemented but experimental | rebase after deterministic contract |
+| provider-neutral agent | deterministic execution works; live typed compilation is blocked | stabilize scoped provider contracts before release |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
 | release metadata | `0.6.0` | publish through the verified release workflow |
 
@@ -157,6 +158,10 @@ before further agent expansion:
 5. `0.6-E`: route MCP through the shared service and enforce contract parity
 6. `0.6-F`: implement fallback defaults and explicit precedence
 7. `0.6-G`: rebase the agent, revalidate generic workflows, and close release
+8. `0.6-H`/`0.6-I`: complete user-facing header resolution and open-world
+   object construction
+9. `0.6-J`: stabilize provider-to-intent compilation with bounded scoped
+   contracts and end-to-end notebook acceptance
 
 Core direction:
 
@@ -168,6 +173,10 @@ Core direction:
 - defaults fill omissions only
 - explicit user instructions override existing defaults and scaffolds
 - packet assets are scaffolds or regression fixtures, not hidden authority
+- provider-facing compilation contracts should be small and scoped; the full
+  canonical document remains the deterministic validation authority
+- a provider extraction failure must not be reported as an MCP mutation or as
+  missing internal user fields
 
 Detailed plans:
 
@@ -176,7 +185,8 @@ Detailed plans:
 
 Release rule:
 
-- do not publish `0.6.0` until all seven slices pass their acceptance gates
+- do not publish `0.6.0` until the deterministic contract slices and reopened
+  `0.6-H`, `0.6-I`, and `0.6-J` acceptance gates pass
 
 ## Completed Slice: Experimental MCP Server (2026-04-28)
 

@@ -17,7 +17,7 @@
 #
 ###############################################################################
 
-"""OpenAI-compatible provider adapter for the public wellplot authoring API."""
+"""OpenAI-compatible Chat Completions provider adapter."""
 
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from ..core import FunctionToolDefinition, ProviderRunResult, ToolCaller
+from ._openai_chat import run_chat_completions_authoring_loop
 from ._openai_responses import (
     load_api_key_from_sources,
     load_openai_client,
-    run_responses_authoring_loop,
 )
 
 
@@ -90,7 +90,7 @@ def load_openai_compatible_api_key(
 
 @dataclass(frozen=True)
 class OpenAICompatibleAuthoringBackend:
-    """Thin OpenAI-compatible Responses API adapter for the public session."""
+    """Thin OpenAI-compatible Chat Completions adapter for the public session."""
 
     model: str
     client: object
@@ -107,6 +107,7 @@ class OpenAICompatibleAuthoringBackend:
         server_root: str | Path,
         base_url: str,
         api_key: str | None = None,
+        timeout: float | None = None,
     ) -> OpenAICompatibleAuthoringBackend:
         """Build one backend from explicit args plus local ignored key sources."""
         normalized_base_url = base_url.strip()
@@ -119,7 +120,11 @@ class OpenAICompatibleAuthoringBackend:
         )
         return cls(
             model=model,
-            client=load_openai_client(api_key=token, base_url=normalized_base_url),
+            client=load_openai_client(
+                api_key=token,
+                base_url=normalized_base_url,
+                timeout=timeout,
+            ),
             base_url=normalized_base_url,
             credential_source=token_source,
         )
@@ -133,8 +138,8 @@ class OpenAICompatibleAuthoringBackend:
         tool_caller: ToolCaller,
         max_rounds: int,
     ) -> ProviderRunResult:
-        """Run one OpenAI-compatible Responses loop through the shared adapter."""
-        return await run_responses_authoring_loop(
+        """Run one OpenAI-compatible Chat Completions loop through the adapter."""
+        return await run_chat_completions_authoring_loop(
             client=self.client,
             model=self.model,
             provider_label="OpenAI-compatible",

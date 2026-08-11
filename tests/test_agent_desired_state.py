@@ -61,6 +61,44 @@ class _NoProviderBackend:
         raise AssertionError("typed desired-state execution called the provider")
 
 
+class _BlockedProviderBackend:
+    """Provider double that submits one valid but unresolvable channel request."""
+
+    provider = "fake"
+    model = "fake-model"
+    credential_source = "test"
+    supports_desired_state = True
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Submit a typed intent that deterministic channel inspection blocks."""
+        tool_caller = kwargs["tool_caller"]
+        response = await tool_caller(
+            "submit_authoring_intent",
+            {
+                "intent": {
+                    "curve_bindings": [
+                        {
+                            "kind": "curve",
+                            "binding_id": "missing-curve",
+                            "section_id": "main",
+                            "track_id": "curves",
+                            "channel": "NOT_AVAILABLE",
+                        }
+                    ]
+                },
+                "coverage": [
+                    {
+                        "request_item_id": "request-001",
+                        "status": "mapped",
+                        "intent_paths": ["curve_bindings[missing-curve]"],
+                    }
+                ],
+            },
+        )
+        assert response["accepted"] is True
+        return SimpleNamespace(final_text="Submitted blocked intent.", tool_trace=())
+
+
 class _TypedRuntime:
     """Minimal runtime for the typed desired-state integration path."""
 
@@ -355,3 +393,23 @@ def test_typed_save_failure_returns_structured_blocked_result(tmp_path: Path) ->
         in (result.user_report.warnings_or_errors[0])
     )
     assert result.user_report.could_not_do
+
+
+def test_blocked_provider_plan_preserves_submitted_intent(tmp_path: Path) -> None:
+    """Keep extraction evidence available when reconciliation blocks mutation."""
+    runtime = _TypedRuntime(tmp_path)
+    session = AuthoringSession(backend=_BlockedProviderBackend(), runtime=runtime)
+
+    result = anyio.run(
+        session.run_request,
+        AuthoringRequest(
+            goal="Bind an unavailable curve.",
+            output_logfile="workspace/demo.log.yaml",
+            example_id="demo",
+        ),
+    )
+
+    assert result.plan is not None
+    assert result.plan.blocked is True
+    assert result.submitted_intent is not None
+    assert result.submitted_intent["curve_bindings"][0]["channel"] == "NOT_AVAILABLE"

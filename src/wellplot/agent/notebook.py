@@ -829,6 +829,7 @@ def create_project_session(
     model: str | None = None,
     api_key: str | None = None,
     base_url: str | None = None,
+    timeout: float | None = None,
     run_max_rounds: int = 12,
     revise_max_rounds: int = 12,
 ) -> tuple[ProjectSession, ProjectPaths]:
@@ -846,6 +847,7 @@ def create_project_session(
         server_root=project_paths.server_root,
         api_key=api_key,
         base_url=resolved_base_url,
+        timeout=timeout,
     )
     return (
         ProjectSession(
@@ -888,6 +890,8 @@ def display_authoring_result(
 
     print(title)
     print("Draft:", result.draft_logfile)
+    if result.submitted_intent is not None:
+        print("Provider submission: captured and validated")
     if result.plan is not None:
         print("Plan:", result.plan.mode)
         for phase in result.plan.phases:
@@ -902,6 +906,26 @@ def display_authoring_result(
             print("Plan warnings:")
             for warning in result.plan.warnings:
                 print(" -", warning)
+        if result.plan.blocked:
+            diagnostic_suffixes = (
+                ".title",
+                ".kind",
+                ".width_mm",
+                ".x_scale",
+            )
+            resolution_values = {
+                path: value
+                for path, value in result.plan.resolved_values.items()
+                if path.endswith(diagnostic_suffixes)
+            }
+            if resolution_values:
+                print("Resolved structural values:")
+                for path, value in sorted(resolution_values.items()):
+                    print(f" - {path}: {value}")
+            if result.plan.applied_defaults_provenance:
+                print("Applied defaults provenance:")
+                for path, source in result.plan.applied_defaults_provenance.items():
+                    print(f" - {path}: {source}")
     if result.defaults_provenance:
         print("Defaults provenance:")
         for path, family in result.defaults_provenance.items():

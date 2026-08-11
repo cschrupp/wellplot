@@ -81,6 +81,7 @@ def load_openai_client(
     *,
     api_key: str,
     base_url: str | None = None,
+    timeout: float | None = None,
 ) -> object:
     """Import and construct the optional OpenAI client lazily."""
     try:
@@ -91,9 +92,13 @@ def load_openai_client(
             "OpenAI-based authoring session."
         ) from exc
 
-    client_kwargs: dict[str, str] = {"api_key": api_key}
+    client_kwargs: dict[str, object] = {"api_key": api_key}
     if base_url is not None and base_url.strip():
         client_kwargs["base_url"] = base_url.strip()
+    if timeout is not None:
+        if timeout <= 0:
+            raise ValueError("OpenAI client timeout must be greater than zero seconds.")
+        client_kwargs["timeout"] = timeout
     return OpenAI(**client_kwargs)
 
 
@@ -123,6 +128,8 @@ async def run_responses_authoring_loop(
         }
     ]
     tool_trace: list[AuthoringToolCall] = []
+    response_statuses: list[str] = []
+    response_rounds = 0
     function_tools = [
         {
             "type": "function",
@@ -136,6 +143,7 @@ async def run_responses_authoring_loop(
         raise RuntimeError(f"No function tools were provided to the {provider_label} backend.")
 
     for round_index in range(1, max_rounds + 1):
+        response_rounds = round_index
         request_kwargs: dict[str, object] = {
             "model": model,
             "tools": function_tools,
@@ -147,6 +155,9 @@ async def run_responses_authoring_loop(
             request_kwargs["previous_response_id"] = getattr(response, "id", None)
             request_kwargs["input"] = pending_input
         response = client.responses.create(**request_kwargs)
+        response_status = getattr(response, "status", None)
+        if response_status is not None:
+            response_statuses.append(str(response_status))
         output = getattr(response, "output", [])
         function_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
         if not function_calls:
@@ -202,4 +213,12 @@ async def run_responses_authoring_loop(
     return ProviderRunResult(
         final_text=final_text,
         tool_trace=tuple(tool_trace),
+        report_facts={
+            "provider_response": {
+                "adapter": "responses",
+                "rounds": response_rounds,
+                "tool_calls_emitted": bool(tool_trace),
+                "statuses": response_statuses,
+            }
+        },
     )

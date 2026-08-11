@@ -68,12 +68,13 @@ class OpenAIAuthoringBackend:
         model: str,
         server_root: str | Path,
         api_key: str | None = None,
+        timeout: float | None = None,
     ) -> OpenAIAuthoringBackend:
         """Build one backend from explicit args plus local ignored key sources."""
         token, token_source = load_openai_api_key(server_root=server_root, api_key=api_key)
         return cls(
             model=model,
-            client=load_openai_client(api_key=token),
+            client=load_openai_client(api_key=token, timeout=timeout),
             credential_source=token_source,
         )
 
