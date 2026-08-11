@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -41,6 +41,55 @@ AuthoringCoverageStatus = Literal[
     "unsupported",
     "inconsistent",
 ]
+
+AuthoringRequestAction = Literal[
+    "add",
+    "update",
+    "remove",
+    "clear",
+    "preserve",
+    "set",
+    "explain",
+]
+
+AuthoringRequestObjectFamily = Literal[
+    "report",
+    "header",
+    "section",
+    "track",
+    "curve_binding",
+    "raster_binding",
+    "fill",
+    "annotation",
+    "page",
+    "output",
+    "depth",
+    "remarks",
+    "unknown",
+]
+
+
+class AuthoringRequestInventoryItem(BaseModel):
+    """One compact provider classification for a natural-language request item."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    request_item_id: str = Field(min_length=1)
+    status: AuthoringCoverageStatus
+    action: AuthoringRequestAction
+    object_family: AuthoringRequestObjectFamily
+    target: str | None = Field(default=None, min_length=1)
+    parent_scope: str | None = Field(default=None, min_length=1)
+    explicit_values: dict[str, Any] = Field(default_factory=dict)
+    reason: str | None = Field(default=None, min_length=1)
+
+
+class AuthoringRequestInventory(BaseModel):
+    """Compact provider output used before scoped typed-intent compilation."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    items: list[AuthoringRequestInventoryItem] = Field(min_length=1)
 
 
 class AuthoringIntentCoverage(BaseModel):
@@ -152,12 +201,52 @@ def validate_intent_coverage(
     return errors
 
 
+def validate_request_inventory(
+    manifest: AuthoringRequestManifest,
+    inventory: Iterable[AuthoringRequestInventoryItem],
+) -> list[str]:
+    """Return deterministic errors for an incomplete compact request inventory."""
+    entries = list(inventory)
+    expected_ids = {item.item_id for item in manifest.items}
+    seen_ids: set[str] = set()
+    errors: list[str] = []
+    for entry in entries:
+        if entry.request_item_id in seen_ids:
+            errors.append(f"Duplicate inventory for {entry.request_item_id!r}.")
+        seen_ids.add(entry.request_item_id)
+        if entry.request_item_id not in expected_ids:
+            errors.append(
+                f"Inventory references unknown request item {entry.request_item_id!r}."
+            )
+        if entry.status in {"mapped", "preserved"}:
+            if entry.object_family == "unknown":
+                errors.append(
+                    f"Inventory for {entry.request_item_id!r} needs a known object family."
+                )
+            if entry.action == "explain":
+                errors.append(
+                    f"Inventory for {entry.request_item_id!r} needs an authoring action."
+                )
+        if entry.status in {"unsupported", "inconsistent"} and not entry.reason:
+            errors.append(
+                f"Inventory for {entry.request_item_id!r} needs a reason for status "
+                f"{entry.status!r}."
+            )
+    missing_ids = sorted(expected_ids - seen_ids)
+    errors.extend(f"Missing inventory for request item {item_id!r}." for item_id in missing_ids)
+    return errors
+
+
 __all__ = [
     "AuthoringCoverageStatus",
     "AuthoringIntentCoverage",
     "AuthoringIntentSubmission",
+    "AuthoringRequestAction",
     "AuthoringRequestItem",
+    "AuthoringRequestInventory",
+    "AuthoringRequestInventoryItem",
     "AuthoringRequestManifest",
     "build_request_manifest",
     "validate_intent_coverage",
+    "validate_request_inventory",
 ]

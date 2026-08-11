@@ -1480,6 +1480,9 @@ Implementation checkpoint:
 
 ### 0.6-J2. Compact Request Inventory And Contract Budget
 
+Status: implemented in the current development branch; scoped typed-intent
+routing remains the follow-up `0.6-J3` slice.
+
 Goal:
 
 - establish a small, measurable first compilation stage
@@ -1508,6 +1511,19 @@ Acceptance:
   mutation order
 - the unchanged SP and resistivity requests produce complete compact
   inventories without internal keys in the notebook prompt
+
+Implementation checkpoint:
+
+- compact `AuthoringRequestInventory` models describe actions, canonical
+  object families, human target/parent descriptions, explicit values, and
+  coverage status
+- inventory validation rejects duplicate, unknown, missing, unsupported, and
+  unexplained request items deterministically
+- the full typed-intent schema is supplied only through the provider function
+  definition and is no longer duplicated in the prompt text
+- provider contract metrics record message size, tool-schema size, and compact
+  inventory-schema size for budget tests and diagnostics
+- focused compilation and adapter tests pass
 
 ### 0.6-J3. Scoped Typed Intent Compilation And Merge
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,8 +13,11 @@ from wellplot.agent import AuthoringSession
 from wellplot.agent.compilation import (
     AuthoringIntentCoverage,
     AuthoringIntentSubmission,
+    AuthoringRequestInventory,
+    AuthoringRequestInventoryItem,
     build_request_manifest,
     validate_intent_coverage,
+    validate_request_inventory,
 )
 from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.model.intent import AuthoringDocumentIntent
@@ -67,6 +71,61 @@ def test_intent_coverage_reports_missing_and_invalid_items() -> None:
 
     assert any("unknown request item" in error for error in errors)
     assert any("Missing coverage" in error for error in errors)
+
+
+def test_request_inventory_is_compact_and_covers_object_families() -> None:
+    """Keep the first-stage provider contract independent of the full intent graph."""
+    manifest = build_request_manifest(
+        "- Add SP to the overview track.\n- Add a logarithmic resistivity track."
+    )
+    inventory = AuthoringRequestInventory(
+        items=[
+            {
+                "request_item_id": "request-001",
+                "status": "mapped",
+                "action": "update",
+                "object_family": "curve_binding",
+                "target": "SP",
+                "parent_scope": "overview track",
+                "explicit_values": {"scale": {"minimum": -80, "maximum": 20}},
+            },
+            {
+                "request_item_id": "request-002",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "track",
+                "target": "resistivity",
+                "explicit_values": {"scale_kind": "logarithmic"},
+            },
+        ]
+    )
+
+    assert validate_request_inventory(manifest, inventory.items) == []
+    schema_chars = len(
+        json.dumps(
+            AuthoringRequestInventory.model_json_schema(),
+            separators=(",", ":"),
+        )
+    )
+    assert schema_chars < 10_000
+
+
+def test_request_inventory_reports_missing_and_unknown_items() -> None:
+    """Reject inventory that cannot account for every natural-language item."""
+    manifest = build_request_manifest("- Set the title.\n- Add the remarks block.")
+    inventory = [
+        AuthoringRequestInventoryItem(
+            request_item_id="request-999",
+            status="mapped",
+            action="set",
+            object_family="report",
+        )
+    ]
+
+    errors = validate_request_inventory(manifest, inventory)
+
+    assert any("unknown request item" in error for error in errors)
+    assert any("Missing inventory" in error for error in errors)
 
 
 class _CorrectionBackend:
@@ -217,7 +276,10 @@ def test_desired_state_extraction_allows_one_coverage_correction() -> None:
     assert intent.title == "Revised"
     assert result.report_facts["request_coverage"][0]["intent_paths"] == ["title"]
     assert "request_manifest" in backend.initial_user_message
-    assert "AuthoringIntentSubmission schema" in backend.initial_user_message
+    assert "AuthoringIntentSubmission schema" not in backend.initial_user_message
+    contract = result.report_facts["provider_contract"]
+    assert contract["schema_repeated_in_message"] is False
+    assert contract["request_inventory_schema_chars"] < contract["tool_schema_chars"]
 
 
 def _extract_with_backend(backend: object, request_text: str = "Set the report title.") -> object:

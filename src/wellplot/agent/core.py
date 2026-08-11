@@ -59,6 +59,7 @@ from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
 from .compilation import (
     AuthoringIntentSubmission,
+    AuthoringRequestInventory,
     build_request_manifest,
     validate_intent_coverage,
 )
@@ -4760,6 +4761,17 @@ class AuthoringSession:
             "references an unavailable or ambiguous channel, still describe the request; "
             "the deterministic resolver will block it and report why."
         )
+        intent_schema = AuthoringIntentSubmission.model_json_schema()
+        intent_schema_chars = len(
+            json.dumps(intent_schema, separators=(",", ":"), default=str)
+        )
+        inventory_schema_chars = len(
+            json.dumps(
+                AuthoringRequestInventory.model_json_schema(),
+                separators=(",", ":"),
+                default=str,
+            )
+        )
         initial_message = (
             "Submit one typed desired state and coverage report for this request. Do not "
             "describe a sequence of MCP calls. The submission is validated before any "
@@ -4767,8 +4779,8 @@ class AuthoringSession:
             "Use `mapped` or `preserved` with intent paths, and use `unsupported` or "
             "`inconsistent` only with a concise reason.\n\n"
             f"Context:\n{json.dumps(context, indent=2, default=str)}\n\n"
-            f"AuthoringIntentSubmission schema:\n"
-            f"{json.dumps(AuthoringIntentSubmission.model_json_schema(), indent=2, default=str)}"
+            "The typed submission schema is supplied separately as the function schema. "
+            "Do not repeat or paraphrase it in the response."
         )
         tool_definition = FunctionToolDefinition(
             name="submit_authoring_intent",
@@ -4776,7 +4788,7 @@ class AuthoringSession:
                 "Submit one validated partial desired state and one coverage entry for "
                 "every request item. Omit fields that must be preserved."
             ),
-            parameters=AuthoringIntentSubmission.model_json_schema(),
+            parameters=intent_schema,
         )
         try:
             provider_result = await self.backend.run_authoring(
@@ -4802,6 +4814,13 @@ class AuthoringSession:
             )
         report_facts = dict(getattr(provider_result, "report_facts", {}))
         report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
+        report_facts["provider_contract"] = {
+            "tool_name": "submit_authoring_intent",
+            "message_chars": len(initial_message),
+            "tool_schema_chars": intent_schema_chars,
+            "request_inventory_schema_chars": inventory_schema_chars,
+            "schema_repeated_in_message": False,
+        }
         if submission is not None:
             report_facts["submitted_intent"] = submission.intent.model_dump(
                 mode="json",
