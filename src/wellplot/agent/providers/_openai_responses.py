@@ -27,7 +27,13 @@ from pathlib import Path
 
 from wellplot.errors import DependencyUnavailableError
 
-from ..core import AuthoringToolCall, FunctionToolDefinition, ProviderRunResult, ToolCaller
+from ..core import (
+    AuthoringToolCall,
+    FunctionToolDefinition,
+    ProviderAdapterError,
+    ProviderRunResult,
+    ToolCaller,
+)
 
 
 def load_api_key_from_sources(
@@ -102,6 +108,25 @@ def load_openai_client(
     return OpenAI(**client_kwargs)
 
 
+def _required_tool_name(
+    tool_definitions: list[FunctionToolDefinition],
+    required_tool_name: str | None,
+) -> str | None:
+    """Validate and normalize an optional required provider function name."""
+    if required_tool_name is None:
+        return None
+    normalized = required_tool_name.strip()
+    if not normalized:
+        return None
+    available_names = {tool.name for tool in tool_definitions}
+    if normalized not in available_names:
+        raise ProviderAdapterError(
+            "invalid_required_tool",
+            f"Required tool {normalized!r} was not supplied to the provider adapter.",
+        )
+    return normalized
+
+
 async def run_responses_authoring_loop(
     *,
     client: object,
@@ -112,6 +137,7 @@ async def run_responses_authoring_loop(
     tool_definitions: list[FunctionToolDefinition],
     tool_caller: ToolCaller,
     max_rounds: int,
+    required_tool_name: str | None = None,
 ) -> ProviderRunResult:
     """Run one OpenAI-style Responses loop and replay tool calls through MCP."""
     response = None
@@ -141,6 +167,8 @@ async def run_responses_authoring_loop(
     ]
     if not function_tools:
         raise RuntimeError(f"No function tools were provided to the {provider_label} backend.")
+    required_name = _required_tool_name(tool_definitions, required_tool_name)
+    required_tool_called = False
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -151,6 +179,11 @@ async def run_responses_authoring_loop(
         if response is None:
             request_kwargs["instructions"] = instructions
             request_kwargs["input"] = pending_input
+            if required_name is not None:
+                request_kwargs["tool_choice"] = {
+                    "type": "function",
+                    "name": required_name,
+                }
         else:
             request_kwargs["previous_response_id"] = getattr(response, "id", None)
             request_kwargs["input"] = pending_input
@@ -158,30 +191,77 @@ async def run_responses_authoring_loop(
         response_status = getattr(response, "status", None)
         if response_status is not None:
             response_statuses.append(str(response_status))
+            if str(response_status).lower() == "incomplete":
+                raise ProviderAdapterError(
+                    "truncated_response",
+                    f"The {provider_label} Responses request ended incomplete.",
+                )
         output = getattr(response, "output", [])
         function_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
         if not function_calls:
             response_text = getattr(response, "output_text", "")
             final_text = response_text if isinstance(response_text, str) else ""
+            if not final_text.strip():
+                raise ProviderAdapterError(
+                    "empty_response",
+                    f"The {provider_label} Responses response contained no text or tool calls.",
+                )
+            if required_name is not None and not required_tool_called:
+                raise ProviderAdapterError(
+                    "required_tool_not_called",
+                    f"The {provider_label} provider returned without calling required tool "
+                    f"{required_name!r}.",
+                )
             break
 
         pending_input = []
         for call in function_calls:
-            arguments = json.loads(getattr(call, "arguments", "") or "{}")
+            call_name = str(getattr(call, "name", "") or "").strip()
+            call_id = str(getattr(call, "call_id", "") or "").strip()
+            if not call_name or not call_id:
+                raise ProviderAdapterError(
+                    "truncated_tool_call",
+                    f"The {provider_label} provider emitted a tool call without a stable "
+                    "name or call id.",
+                )
+            if (
+                required_name is not None
+                and not required_tool_called
+                and call_name != required_name
+            ):
+                raise ProviderAdapterError(
+                    "unexpected_tool_call",
+                    f"The {provider_label} provider called {call_name!r} before required "
+                    f"tool {required_name!r}.",
+                )
+            try:
+                arguments = json.loads(getattr(call, "arguments", "") or "{}")
+            except json.JSONDecodeError as exc:
+                raise ProviderAdapterError(
+                    "malformed_tool_arguments",
+                    f"The {provider_label} provider emitted malformed JSON arguments for "
+                    f"tool {call_name!r}.",
+                ) from exc
             if not isinstance(arguments, dict):
-                raise RuntimeError("Expected tool-call arguments to decode into a mapping.")
+                raise ProviderAdapterError(
+                    "malformed_tool_arguments",
+                    f"The {provider_label} provider emitted non-object arguments for tool "
+                    f"{call_name!r}.",
+                )
             tool_trace.append(
                 AuthoringToolCall(
                     round=round_index,
-                    name=getattr(call, "name", ""),
+                    name=call_name,
                     arguments=arguments,
                 )
             )
-            tool_payload = await tool_caller(getattr(call, "name", ""), arguments)
+            tool_payload = await tool_caller(call_name, arguments)
+            if call_name == required_name:
+                required_tool_called = True
             pending_input.append(
                 {
                     "type": "function_call_output",
-                    "call_id": getattr(call, "call_id", ""),
+                    "call_id": call_id,
                     "output": json.dumps(tool_payload),
                 }
             )
@@ -218,7 +298,9 @@ async def run_responses_authoring_loop(
                 "adapter": "responses",
                 "rounds": response_rounds,
                 "tool_calls_emitted": bool(tool_trace),
-                "statuses": response_statuses,
+                "finish_reasons": response_statuses,
+                "response_statuses": response_statuses,
+                "required_tool_name": required_name,
             }
         },
     )

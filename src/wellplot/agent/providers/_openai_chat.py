@@ -23,7 +23,14 @@ from __future__ import annotations
 
 import json
 
-from ..core import AuthoringToolCall, FunctionToolDefinition, ProviderRunResult, ToolCaller
+from ..core import (
+    AuthoringToolCall,
+    FunctionToolDefinition,
+    ProviderAdapterError,
+    ProviderRunResult,
+    ToolCaller,
+)
+from ._openai_responses import _required_tool_name
 
 
 def _message_text(message: object) -> str:
@@ -109,6 +116,7 @@ async def run_chat_completions_authoring_loop(
     tool_definitions: list[FunctionToolDefinition],
     tool_caller: ToolCaller,
     max_rounds: int,
+    required_tool_name: str | None = None,
 ) -> ProviderRunResult:
     """Run one Chat Completions loop and replay tool calls through MCP."""
     if not tool_definitions:
@@ -129,6 +137,8 @@ async def run_chat_completions_authoring_loop(
         }
         for tool in tool_definitions
     ]
+    required_name = _required_tool_name(tool_definitions, required_tool_name)
+    required_tool_called = False
     tool_trace: list[AuthoringToolCall] = []
     final_text = ""
     finish_reasons: list[str] = []
@@ -136,33 +146,76 @@ async def run_chat_completions_authoring_loop(
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=function_tools,
-            stream=True,
-        )
+        request_kwargs: dict[str, object] = {
+            "model": model,
+            "messages": messages,
+            "tools": function_tools,
+            "stream": True,
+        }
+        if required_name is not None and not required_tool_called:
+            request_kwargs["tool_choice"] = {
+                "type": "function",
+                "function": {"name": required_name},
+            }
+        response = client.chat.completions.create(**request_kwargs)
         response_text, function_calls, finish_reason = _chat_response_parts(response)
         if finish_reason is not None:
             finish_reasons.append(finish_reason)
+            if finish_reason.lower() in {"length", "content_filter"}:
+                raise ProviderAdapterError(
+                    "truncated_response",
+                    f"The {provider_label} chat response ended with {finish_reason!r}.",
+                )
         if not response_text and not function_calls:
-            raise RuntimeError(f"The {provider_label} chat response contained no choices.")
+            raise ProviderAdapterError(
+                "empty_response",
+                f"The {provider_label} chat response contained no text or tool calls.",
+            )
         if not function_calls:
             final_text = response_text
+            if required_name is not None and not required_tool_called:
+                raise ProviderAdapterError(
+                    "required_tool_not_called",
+                    f"The {provider_label} provider returned without calling required tool "
+                    f"{required_name!r}.",
+                )
             break
 
         assistant_tool_calls: list[dict[str, object]] = []
         for call in function_calls:
-            call_name = call["name"]
-            raw_arguments = call["arguments"] or "{}"
-            if isinstance(raw_arguments, str):
+            call_name = call["name"].strip()
+            call_id = call["id"].strip()
+            raw_arguments = call["arguments"]
+            if not call_name or not call_id or not raw_arguments.strip():
+                raise ProviderAdapterError(
+                    "truncated_tool_call",
+                    f"The {provider_label} provider emitted an incomplete streamed tool call.",
+                )
+            if (
+                required_name is not None
+                and not required_tool_called
+                and call_name != required_name
+            ):
+                raise ProviderAdapterError(
+                    "unexpected_tool_call",
+                    f"The {provider_label} provider called {call_name!r} before required "
+                    f"tool {required_name!r}.",
+                )
+            try:
                 arguments = json.loads(raw_arguments)
-            else:
-                arguments = raw_arguments
+            except json.JSONDecodeError as exc:
+                raise ProviderAdapterError(
+                    "malformed_tool_arguments",
+                    f"The {provider_label} provider emitted malformed JSON arguments for "
+                    f"tool {call_name!r}.",
+                ) from exc
             if not isinstance(arguments, dict):
-                raise RuntimeError("Expected tool-call arguments to decode into a mapping.")
+                raise ProviderAdapterError(
+                    "malformed_tool_arguments",
+                    f"The {provider_label} provider emitted non-object arguments for tool "
+                    f"{call_name!r}.",
+                )
 
-            call_id = call["id"]
             assistant_tool_calls.append(
                 {
                     "id": call_id,
@@ -181,6 +234,8 @@ async def run_chat_completions_authoring_loop(
                 )
             )
             tool_payload = await tool_caller(call_name, arguments)
+            if call_name == required_name:
+                required_tool_called = True
             messages.append(
                 {
                     "role": "tool",
@@ -228,6 +283,8 @@ async def run_chat_completions_authoring_loop(
                 "rounds": response_rounds,
                 "tool_calls_emitted": bool(tool_trace),
                 "finish_reasons": finish_reasons,
+                "response_statuses": [],
+                "required_tool_name": required_name,
             }
         },
     )

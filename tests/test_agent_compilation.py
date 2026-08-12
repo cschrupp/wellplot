@@ -29,6 +29,7 @@ from wellplot.agent.compilation import (
     validate_intent_coverage,
     validate_request_inventory,
 )
+from wellplot.agent.core import ProviderAdapterError
 from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.model.intent import AuthoringDocumentIntent
 
@@ -359,12 +360,14 @@ class _CorrectionBackend:
         self.attempts = 0
         self.initial_user_messages: list[str] = []
         self.tool_names: list[str] = []
+        self.required_tool_names: list[str | None] = []
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit an invalid first coverage report and a valid correction."""
         self.initial_user_messages.append(str(kwargs["initial_user_message"]))
         tool_name = kwargs["tool_definitions"][0].name
         self.tool_names.append(tool_name)
+        self.required_tool_names.append(kwargs.get("required_tool_name"))
         tool_caller = kwargs["tool_caller"]
         assert callable(tool_caller)
         if tool_name == "submit_request_inventory":
@@ -521,6 +524,21 @@ class _RoundBudgetBackend:
         raise RuntimeError("The OpenAI-compatible authoring loop exceeded 3 rounds.")
 
 
+class _RequiredToolFailureBackend:
+    """Provider double that reports a normalized required-tool failure."""
+
+    provider = "fake"
+    model = "fake-model"
+    credential_source = "test"
+
+    async def run_authoring(self, **_: object) -> object:
+        """Simulate an adapter that returned prose instead of the submission tool."""
+        raise ProviderAdapterError(
+            "required_tool_not_called",
+            "Provider returned prose without the required submission tool.",
+        )
+
+
 def test_desired_state_extraction_allows_one_coverage_correction() -> None:
     """Accept a corrected submission without exposing mutation tools."""
     backend = _CorrectionBackend()
@@ -543,6 +561,7 @@ def test_desired_state_extraction_allows_one_coverage_correction() -> None:
         "submit_request_inventory",
         "submit_report_intent",
     ]
+    assert backend.required_tool_names == backend.tool_names
     assert intent is not None
     assert intent.title == "Revised"
     assert result.report_facts["request_coverage"][0]["intent_paths"] == ["title"]
@@ -622,6 +641,15 @@ def test_extraction_reports_round_budget_failure() -> None:
 
     assert intent is None
     assert result.report_facts["extraction"]["status"] == "round_budget_exhausted"
+    assert result.report_facts["provider_error"]
+
+
+def test_extraction_preserves_normalized_required_tool_failure() -> None:
+    """Expose adapter conformance failures without misclassifying MCP execution."""
+    result, intent = _extract_with_backend(_RequiredToolFailureBackend())
+
+    assert intent is None
+    assert result.report_facts["extraction"]["status"] == "required_tool_not_called"
     assert result.report_facts["provider_error"]
 
 

@@ -280,6 +280,15 @@ class ProviderRunResult:
     report_facts: dict[str, object] = field(default_factory=dict)
 
 
+class ProviderAdapterError(RuntimeError):
+    """Normalized provider-adapter failure with a stable diagnostic status."""
+
+    def __init__(self, status: str, message: str) -> None:
+        """Initialize one adapter failure with a machine-readable status."""
+        super().__init__(message)
+        self.status = status
+
+
 def _sanitize_provider_text(value: object, *, limit: int = 500) -> str | None:
     """Return a short provider message with common credential forms redacted."""
     if not isinstance(value, str) or not value.strip():
@@ -298,6 +307,8 @@ def _sanitize_provider_text(value: object, *, limit: int = 500) -> str | None:
 
 def _provider_exception_status(exc: BaseException) -> str:
     """Classify one provider failure for the extraction report."""
+    if isinstance(exc, ProviderAdapterError):
+        return exc.status
     if isinstance(exc, json.JSONDecodeError):
         return "invalid_json"
     message = str(exc).lower()
@@ -566,6 +577,7 @@ class ProviderBackendProtocol(Protocol):
         tool_definitions: list[FunctionToolDefinition],
         tool_caller: ToolCaller,
         max_rounds: int,
+        required_tool_name: str | None = None,
     ) -> ProviderRunResult:
         """Run one authoring loop and replay provider tool calls."""
 
@@ -4801,6 +4813,7 @@ class AuthoringSession:
                 tool_definitions=[inventory_tool],
                 tool_caller=submit_inventory,
                 max_rounds=min(max_rounds, 3),
+                required_tool_name="submit_request_inventory",
             )
             stage_results.append(("inventory", normalize_result(raw_result)))
         except Exception as exc:
@@ -5021,6 +5034,7 @@ class AuthoringSession:
                         tool_definitions=[scoped_tool],
                         tool_caller=submit_scoped_intent,
                         max_rounds=min(max_rounds, 3),
+                        required_tool_name=tool_name,
                     )
                     stage_results.append((scope, normalize_result(raw_result)))
                 except Exception as exc:

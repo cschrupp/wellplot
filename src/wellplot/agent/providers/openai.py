@@ -86,6 +86,7 @@ class OpenAIAuthoringBackend:
         tool_definitions: list[FunctionToolDefinition],
         tool_caller: ToolCaller,
         max_rounds: int,
+        required_tool_name: str | None = None,
     ) -> ProviderRunResult:
         """Run one OpenAI Responses API loop and replay tool calls through MCP."""
         return await run_responses_authoring_loop(
@@ -97,4 +98,5 @@ class OpenAIAuthoringBackend:
             tool_definitions=tool_definitions,
             tool_caller=tool_caller,
             max_rounds=max_rounds,
+            required_tool_name=required_tool_name,
         )

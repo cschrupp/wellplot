@@ -1588,6 +1588,8 @@ Implementation checkpoint:
 
 ### 0.6-J4. Provider Adapter Conformance
 
+Status: implemented in the current development branch.
+
 Goal:
 
 - make typed compilation behavior consistent across supported provider APIs
@@ -1615,6 +1617,25 @@ Acceptance:
   in provider-compatible message order
 - adapter tests do not call MCP and compiler tests do not depend on a live
   provider
+
+Implementation checkpoint:
+
+- desired-state inventory and scoped-intent calls pass one explicit required
+  submission function to provider adapters; broad MCP authoring loops retain
+  automatic tool selection
+- the Responses adapter sends the required function choice on the initial
+  request and continues correction exchanges from the returned response id
+- the Chat Completions adapter sends the required function choice only until a
+  submission call has been received, then preserves assistant tool-call and
+  tool-result message order for corrections
+- both adapters classify required-tool omissions, malformed non-object JSON
+  arguments, incomplete streamed calls, empty responses, and truncated
+  responses through stable `ProviderAdapterError` statuses
+- both adapters report normalized response facts: adapter name, round count,
+  emitted-tool flag, finish reasons, response statuses, and required tool name
+- recorded adapter tests cover required one-call submission, correction,
+  prose-when-optional, no-tool, empty, malformed, and truncated responses
+  without MCP or provider credentials
 
 ### 0.6-J5. End-To-End Compiler Acceptance Matrix
 
