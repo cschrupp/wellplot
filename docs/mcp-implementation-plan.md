@@ -1625,9 +1625,13 @@ Implementation checkpoint:
   automatic tool selection
 - the Responses adapter sends the required function choice on the initial
   request and continues correction exchanges from the returned response id
-- the Chat Completions adapter sends the required function choice only until a
-  submission call has been received, then preserves assistant tool-call and
-  tool-result message order for corrections
+- the Chat Completions adapter sends the required function choice initially and
+  again after an explicit tool validation error, while preserving assistant
+  tool-call and tool-result message order for corrections
+- an explicitly accepted typed submission ends its compiler stage immediately;
+  the adapter does not request a redundant prose summary, while explicit tool
+  validation errors keep the required submission function enforced for the one
+  permitted correction
 - both adapters classify required-tool omissions, malformed non-object JSON
   arguments, incomplete streamed calls, empty responses, and truncated
   responses through stable `ProviderAdapterError` statuses

@@ -40,7 +40,11 @@ class _FakeCompletions:
         self.requests: list[dict[str, object]] = []
 
     def create(self, **kwargs: object) -> object:
-        self.requests.append(kwargs)
+        request = dict(kwargs)
+        messages = request.get("messages")
+        if isinstance(messages, list):
+            request["messages"] = [dict(message) for message in messages]
+        self.requests.append(request)
         return self.responses.pop(0)
 
 
@@ -148,6 +152,7 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
         "finish_reasons": ["stop"],
         "response_statuses": [],
         "required_tool_name": "inspect_logfile",
+        "required_submission_accepted": False,
     }
     assert [(call.name, call.arguments) for call in result.tool_trace] == [
         ("inspect_logfile", {"logfile_path": "draft.log.yaml"})
@@ -178,8 +183,8 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
     assert "tool_choice" not in completions.requests[1]
 
 
-def test_chat_adapter_preserves_correction_message_order() -> None:
-    """Keep assistant tool calls immediately before their tool results."""
+def test_chat_adapter_preserves_and_enforces_correction_message_order() -> None:
+    """Keep a rejected submission retryable until a correction is accepted."""
     completions = _FakeCompletions(
         [
             _FakeStream(
@@ -228,7 +233,6 @@ def test_chat_adapter_preserves_correction_message_order() -> None:
                     )
                 ]
             ),
-            _chat_response(content="Submission accepted.", finish_reason="stop"),
         ]
     )
     client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
@@ -236,7 +240,9 @@ def test_chat_adapter_preserves_correction_message_order() -> None:
 
     async def call_tool(_: str, arguments: dict[str, object]) -> dict[str, object]:
         received.append(arguments)
-        return {"accepted": len(received) == 2}
+        if len(received) == 1:
+            return {"is_error": True, "error": "title must not be blank"}
+        return {"accepted": True, "message": "Submission accepted."}
 
     result = anyio.run(
         partial(
@@ -261,11 +267,10 @@ def test_chat_adapter_preserves_correction_message_order() -> None:
 
     assert result.final_text == "Submission accepted."
     assert received == [{"title": "First"}, {"title": "Corrected"}]
-    assert [message["role"] for message in completions.requests[2]["messages"]] == [
+    assert len(completions.requests) == 2
+    assert [message["role"] for message in completions.requests[1]["messages"]] == [
         "system",
         "user",
-        "assistant",
-        "tool",
         "assistant",
         "tool",
     ]
@@ -273,7 +278,10 @@ def test_chat_adapter_preserves_correction_message_order() -> None:
         "type": "function",
         "function": {"name": "submit_report_intent"},
     }
-    assert "tool_choice" not in completions.requests[1]
+    assert completions.requests[1]["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "submit_report_intent"},
+    }
 
 
 @pytest.mark.parametrize(

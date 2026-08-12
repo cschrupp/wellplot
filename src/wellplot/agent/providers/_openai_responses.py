@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from pathlib import Path
 
 from wellplot.errors import DependencyUnavailableError
@@ -127,6 +128,24 @@ def _required_tool_name(
     return normalized
 
 
+def _required_tool_submission_outcome(payload: object) -> bool | None:
+    """Return a required submission outcome, when the tool reports one.
+
+    ``None`` preserves the normal tool-loop behavior for required operational
+    tools. Typed compiler submissions explicitly return either ``accepted`` or
+    ``is_error``; those signals determine whether the adapter must request one
+    corrective submission or can end the stage without a prose round-trip.
+    """
+    if not isinstance(payload, Mapping):
+        return None
+    accepted = payload.get("accepted")
+    if isinstance(accepted, bool):
+        return accepted
+    if payload.get("is_error") is True:
+        return False
+    return None
+
+
 async def run_responses_authoring_loop(
     *,
     client: object,
@@ -169,6 +188,7 @@ async def run_responses_authoring_loop(
         raise RuntimeError(f"No function tools were provided to the {provider_label} backend.")
     required_name = _required_tool_name(tool_definitions, required_tool_name)
     required_tool_called = False
+    required_submission_accepted = False
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -179,14 +199,14 @@ async def run_responses_authoring_loop(
         if response is None:
             request_kwargs["instructions"] = instructions
             request_kwargs["input"] = pending_input
-            if required_name is not None:
-                request_kwargs["tool_choice"] = {
-                    "type": "function",
-                    "name": required_name,
-                }
         else:
             request_kwargs["previous_response_id"] = getattr(response, "id", None)
             request_kwargs["input"] = pending_input
+        if required_name is not None and not required_tool_called:
+            request_kwargs["tool_choice"] = {
+                "type": "function",
+                "name": required_name,
+            }
         response = client.responses.create(**request_kwargs)
         response_status = getattr(response, "status", None)
         if response_status is not None:
@@ -257,7 +277,9 @@ async def run_responses_authoring_loop(
             )
             tool_payload = await tool_caller(call_name, arguments)
             if call_name == required_name:
-                required_tool_called = True
+                submission_outcome = _required_tool_submission_outcome(tool_payload)
+                required_tool_called = submission_outcome is not False
+                required_submission_accepted = submission_outcome is True
             pending_input.append(
                 {
                     "type": "function_call_output",
@@ -265,10 +287,16 @@ async def run_responses_authoring_loop(
                     "output": json.dumps(tool_payload),
                 }
             )
+            if required_submission_accepted:
+                message = tool_payload.get("message") if isinstance(tool_payload, Mapping) else None
+                final_text = message if isinstance(message, str) else ""
+                break
+        if required_submission_accepted:
+            break
     else:
         raise RuntimeError(f"The {provider_label} authoring loop exceeded {max_rounds} rounds.")
 
-    if response is not None and not final_text.strip():
+    if response is not None and not final_text.strip() and not required_submission_accepted:
         summary_response = client.responses.create(
             model=model,
             previous_response_id=getattr(response, "id", None),
@@ -301,6 +329,7 @@ async def run_responses_authoring_loop(
                 "finish_reasons": response_statuses,
                 "response_statuses": response_statuses,
                 "required_tool_name": required_name,
+                "required_submission_accepted": required_submission_accepted,
             }
         },
     )

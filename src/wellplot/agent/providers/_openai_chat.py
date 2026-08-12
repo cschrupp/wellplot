@@ -30,7 +30,7 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
-from ._openai_responses import _required_tool_name
+from ._openai_responses import _required_tool_name, _required_tool_submission_outcome
 
 
 def _message_text(message: object) -> str:
@@ -139,6 +139,7 @@ async def run_chat_completions_authoring_loop(
     ]
     required_name = _required_tool_name(tool_definitions, required_tool_name)
     required_tool_called = False
+    required_submission_accepted = False
     tool_trace: list[AuthoringToolCall] = []
     final_text = ""
     finish_reasons: list[str] = []
@@ -235,7 +236,9 @@ async def run_chat_completions_authoring_loop(
             )
             tool_payload = await tool_caller(call_name, arguments)
             if call_name == required_name:
-                required_tool_called = True
+                submission_outcome = _required_tool_submission_outcome(tool_payload)
+                required_tool_called = submission_outcome is not False
+                required_submission_accepted = submission_outcome is True
             messages.append(
                 {
                     "role": "tool",
@@ -243,19 +246,25 @@ async def run_chat_completions_authoring_loop(
                     "content": json.dumps(tool_payload),
                 }
             )
+            if required_submission_accepted:
+                message = tool_payload.get("message") if isinstance(tool_payload, dict) else None
+                final_text = message if isinstance(message, str) else ""
+                break
 
         messages.insert(
-            len(messages) - len(function_calls),
+            len(messages) - len(assistant_tool_calls),
             {
                 "role": "assistant",
                 "content": response_text or None,
                 "tool_calls": assistant_tool_calls,
             },
         )
+        if required_submission_accepted:
+            break
     else:
         raise RuntimeError(f"The {provider_label} authoring loop exceeded {max_rounds} rounds.")
 
-    if not final_text.strip():
+    if not final_text.strip() and not required_submission_accepted:
         messages.append(
             {
                 "role": "user",
@@ -285,6 +294,7 @@ async def run_chat_completions_authoring_loop(
                 "finish_reasons": finish_reasons,
                 "response_statuses": [],
                 "required_tool_name": required_name,
+                "required_submission_accepted": required_submission_accepted,
             }
         },
     )

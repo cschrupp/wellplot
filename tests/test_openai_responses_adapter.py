@@ -73,8 +73,8 @@ def _tool_definition() -> list[FunctionToolDefinition]:
     ]
 
 
-def test_responses_adapter_requires_and_replays_one_submission() -> None:
-    """Force the initial required submission then continue from its response id."""
+def test_responses_adapter_ends_after_an_accepted_submission() -> None:
+    """End a typed compiler stage without a redundant prose continuation."""
     responses = _FakeResponses(
         [
             _response(
@@ -86,10 +86,6 @@ def test_responses_adapter_requires_and_replays_one_submission() -> None:
                     )
                 ],
             ),
-            _response(
-                response_id="response-2",
-                output_text="Submission accepted.",
-            ),
         ]
     )
     client = SimpleNamespace(responses=responses)
@@ -97,7 +93,7 @@ def test_responses_adapter_requires_and_replays_one_submission() -> None:
 
     async def call_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
         received.append((name, arguments))
-        return {"accepted": True}
+        return {"accepted": True, "message": "Submission accepted."}
 
     result = anyio.run(
         partial(
@@ -121,26 +117,20 @@ def test_responses_adapter_requires_and_replays_one_submission() -> None:
         "type": "function",
         "name": "submit_report_intent",
     }
-    assert responses.requests[1]["previous_response_id"] == "response-1"
-    assert responses.requests[1]["input"] == [
-        {
-            "type": "function_call_output",
-            "call_id": "call-1",
-            "output": '{"accepted": true}',
-        }
-    ]
+    assert len(responses.requests) == 1
     assert result.report_facts["provider_response"] == {
         "adapter": "responses",
-        "rounds": 2,
+        "rounds": 1,
         "tool_calls_emitted": True,
-        "finish_reasons": ["completed", "completed"],
-        "response_statuses": ["completed", "completed"],
+        "finish_reasons": ["completed"],
+        "response_statuses": ["completed"],
         "required_tool_name": "submit_report_intent",
+        "required_submission_accepted": True,
     }
 
 
-def test_responses_adapter_preserves_correction_exchange() -> None:
-    """Pass each corrected submission result through the response continuation."""
+def test_responses_adapter_preserves_and_enforces_correction_exchange() -> None:
+    """Require one corrective submission after an explicit tool validation error."""
     responses = _FakeResponses(
         [
             _response(
@@ -156,7 +146,6 @@ def test_responses_adapter_preserves_correction_exchange() -> None:
                     )
                 ],
             ),
-            _response(response_id="response-3", output_text="Submission accepted."),
         ]
     )
     client = SimpleNamespace(responses=responses)
@@ -164,7 +153,9 @@ def test_responses_adapter_preserves_correction_exchange() -> None:
 
     async def call_tool(_: str, arguments: dict[str, object]) -> dict[str, object]:
         submissions.append(arguments)
-        return {"accepted": len(submissions) == 2}
+        if len(submissions) == 1:
+            return {"is_error": True, "error": "title must not be blank"}
+        return {"accepted": True, "message": "Submission accepted."}
 
     result = anyio.run(
         partial(
@@ -184,8 +175,11 @@ def test_responses_adapter_preserves_correction_exchange() -> None:
     assert result.final_text == "Submission accepted."
     assert submissions == [{"title": "First"}, {"title": "Corrected"}]
     assert responses.requests[1]["previous_response_id"] == "response-1"
-    assert responses.requests[2]["previous_response_id"] == "response-2"
-    assert "tool_choice" not in responses.requests[1]
+    assert len(responses.requests) == 2
+    assert responses.requests[1]["tool_choice"] == {
+        "type": "function",
+        "name": "submit_report_intent",
+    }
 
 
 @pytest.mark.parametrize(
