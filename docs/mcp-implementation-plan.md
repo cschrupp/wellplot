@@ -1678,6 +1678,18 @@ Acceptance:
 - no acceptance scenario selects a packet blueprint unless the caller
   explicitly requested a starter scaffold
 
+Implementation checkpoint:
+
+- recorded provider fixtures now exercise the real `run_request` desired-state
+  workflow for scalar, logarithmic multi-curve, uncatalogued scalar, raster,
+  explicit-style, header-language, missing-channel, and ambiguous-channel
+  requests
+- the matrix asserts canonical YAML read-back and render-model conversion for
+  successful requests; unresolved channel cases must stop after provider
+  submission and before any canonical save
+- a credentialed live-provider matrix remains a manual release gate because
+  its provider output is non-deterministic and must not make CI flaky
+
 ### 0.6-J6. Notebook, Documentation, And Release Closure
 
 Goal:

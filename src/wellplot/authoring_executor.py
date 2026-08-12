@@ -224,6 +224,15 @@ def _resolve_clears(value: object, defaults: object = _MISSING) -> object:
     return deepcopy(value)
 
 
+def _omit_undefined(value: object) -> object:
+    """Drop omitted partial-intent fields before validating a created object."""
+    if isinstance(value, Mapping):
+        return {key: _omit_undefined(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [_omit_undefined(item) for item in value]
+    return deepcopy(value)
+
+
 def _find_by_id(items: object, field_name: str, object_id: str) -> object:
     """Find a stable object identity in a canonical collection."""
     for item in _items(items):
@@ -359,9 +368,7 @@ class AuthoringExecutor:
         """Apply operations until the first failed precondition or postcondition."""
         document = self.service.document
         if not plan.ready:
-            errors = tuple(
-                f"{issue.code}: {issue.message}" for issue in plan.issues
-            )
+            errors = tuple(f"{issue.code}: {issue.message}" for issue in plan.issues)
             return AuthoringExecutionResult(
                 success=False,
                 stopped=True,
@@ -397,9 +404,7 @@ class AuthoringExecutor:
                     if dependency not in applied_ids
                 ]
                 if missing_dependencies:
-                    message = (
-                        f"Missing completed dependencies: {', '.join(missing_dependencies)}."
-                    )
+                    message = f"Missing completed dependencies: {', '.join(missing_dependencies)}."
                     outcomes.append(self._failed_outcome(operation, message))
                     errors.append(f"{operation.operation_id}: {message}")
                     phase_status = AuthoringExecutionStatus.BLOCKED
@@ -407,9 +412,7 @@ class AuthoringExecutor:
                 expected_exists = operation.action != AuthoringOperationAction.CREATE
                 if _target_exists(self.service, operation) != expected_exists:
                     expected = "exist" if expected_exists else "not exist"
-                    message = (
-                        f"Precondition failed: target was expected to {expected}."
-                    )
+                    message = f"Precondition failed: target was expected to {expected}."
                     outcomes.append(self._failed_outcome(operation, message))
                     errors.append(f"{operation.operation_id}: {message}")
                     phase_status = AuthoringExecutionStatus.BLOCKED
@@ -531,11 +534,14 @@ class AuthoringExecutor:
         raw = operation.payload.get("object")
         if not isinstance(raw, Mapping):
             raise ValueError("Create operation requires an object mapping.")
+        value_mapping = _omit_undefined(_resolve_clears(raw))
+        if not isinstance(value_mapping, Mapping):
+            raise ValueError("Create operation did not resolve to an object mapping.")
         if operation.object_kind == AuthoringOperationObjectKind.SECTION:
-            value = AuthoringSectionSpec.model_validate(_resolve_clears(raw))
+            value = AuthoringSectionSpec.model_validate(value_mapping)
             self.service.create(CreateSectionRequest(section=value))
         elif operation.object_kind == AuthoringOperationObjectKind.TRACK:
-            value = TypeAdapter(TrackSpec).validate_python(_resolve_clears(raw))
+            value = TypeAdapter(TrackSpec).validate_python(value_mapping)
             self.service.create(
                 CreateTrackRequest(
                     section_id=self._required_scope(operation, "section"),
@@ -543,7 +549,7 @@ class AuthoringExecutor:
                 )
             )
         elif operation.object_kind == AuthoringOperationObjectKind.CURVE_BINDING:
-            value = CurveBindingSpec.model_validate(_resolve_clears(raw))
+            value = CurveBindingSpec.model_validate(value_mapping)
             self.service.create(
                 CreateCurveBindingRequest(
                     section_id=self._required_scope(operation, "section"),
@@ -552,7 +558,7 @@ class AuthoringExecutor:
                 )
             )
         elif operation.object_kind == AuthoringOperationObjectKind.RASTER_BINDING:
-            value = RasterBindingSpec.model_validate(_resolve_clears(raw))
+            value = RasterBindingSpec.model_validate(value_mapping)
             self.service.create(
                 CreateRasterBindingRequest(
                     section_id=self._required_scope(operation, "section"),
@@ -561,7 +567,7 @@ class AuthoringExecutor:
                 )
             )
         elif operation.object_kind == AuthoringOperationObjectKind.ANNOTATION:
-            value = TypeAdapter(AnnotationSpec).validate_python(_resolve_clears(raw))
+            value = TypeAdapter(AnnotationSpec).validate_python(value_mapping)
             self.service.create(
                 CreateAnnotationRequest(
                     section_id=self._required_scope(operation, "section"),
@@ -570,7 +576,7 @@ class AuthoringExecutor:
                 )
             )
         elif operation.object_kind == AuthoringOperationObjectKind.FILL:
-            value = CurveFillSpec.model_validate(_resolve_clears(raw))
+            value = CurveFillSpec.model_validate(value_mapping)
             self.service.create(
                 CreateFillRequest(
                     section_id=self._required_scope(operation, "section"),
@@ -579,11 +585,11 @@ class AuthoringExecutor:
                 )
             )
         elif operation.object_kind == AuthoringOperationObjectKind.REMARK:
-            value = AuthoringRemarkSpec.model_validate(_resolve_clears(raw))
+            value = AuthoringRemarkSpec.model_validate(value_mapping)
             self.service.create(CreateRemarkRequest(remark=value))
         else:
             raise ValueError(f"Create is unsupported for {operation.object_kind.value!r}.")
-        return _ExpectedState("subset", _resolve_clears(raw))
+        return _ExpectedState("subset", value_mapping)
 
     def _update(self, operation: AuthoringOperation) -> _ExpectedState:
         """Update one canonical object, merging replacements where required."""
@@ -608,9 +614,7 @@ class AuthoringExecutor:
             current = self.service.document.output.model_dump(mode="python")
             value = _merge(
                 current,
-                _resolve_clears(
-                    patch or {}, AuthoringOutputSpec().model_dump(mode="python")
-                ),
+                _resolve_clears(patch or {}, AuthoringOutputSpec().model_dump(mode="python")),
             )
             output = AuthoringOutputSpec.model_validate(value)
             self.service.update(UpdateOutputRequest(output=output))
@@ -619,9 +623,7 @@ class AuthoringExecutor:
             current = self.service.document.tail.model_dump(mode="python")
             value = _merge(
                 current,
-                _resolve_clears(
-                    patch or {}, AuthoringTailSpec().model_dump(mode="python")
-                ),
+                _resolve_clears(patch or {}, AuthoringTailSpec().model_dump(mode="python")),
             )
             tail = AuthoringTailSpec.model_validate(value)
             self.service.update(UpdateTailRequest(tail=tail))
@@ -746,11 +748,15 @@ class AuthoringExecutor:
             return _ExpectedState("replacement", value)
         if kind == AuthoringOperationObjectKind.PAGE:
             value = AuthoringPageSpec()
-            self.service.update(UpdatePageRequest(patch=PagePatch.model_validate(value.model_dump())))
+            self.service.update(
+                UpdatePageRequest(patch=PagePatch.model_validate(value.model_dump()))
+            )
             return _ExpectedState("replacement", value)
         if kind == AuthoringOperationObjectKind.DEPTH:
             value = AuthoringDepthSpec()
-            self.service.update(UpdateDepthRequest(patch=DepthPatch.model_validate(value.model_dump())))
+            self.service.update(
+                UpdateDepthRequest(patch=DepthPatch.model_validate(value.model_dump()))
+            )
             return _ExpectedState("replacement", value)
         if kind == AuthoringOperationObjectKind.HEADER:
             value = AuthoringHeaderSpec()
@@ -831,9 +837,7 @@ class AuthoringExecutor:
         if expected.kind == "removed":
             return not _target_exists(self.service, operation)
         if expected.kind == "moved":
-            refs = self.service.list(
-                operation.object_kind.value, section_id=operation.section_id
-            )
+            refs = self.service.list(operation.object_kind.value, section_id=operation.section_id)
             ref = next((item for item in refs if item.object_id == operation.object_id), None)
             return ref is not None and ref.index == expected.value
         actual = _target_value(self.service, operation)

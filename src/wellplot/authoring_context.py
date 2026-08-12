@@ -268,6 +268,11 @@ def build_authoring_context_snapshot(
                 AuthoringChannelCandidate(
                     mnemonic=mnemonic,
                     kind=str(raw_channel.get("kind", "scalar")).strip() or "scalar",
+                    aliases=[
+                        str(alias).strip()
+                        for alias in raw_channel.get("aliases", [])
+                        if str(alias).strip()
+                    ],
                     unit=(
                         str(raw_channel["value_unit"]).strip()
                         if raw_channel.get("value_unit")
@@ -285,14 +290,11 @@ def build_authoring_context_snapshot(
         source_context = AuthoringSourceContext(
             source_path=source_path,
             source_format=(
-                str(raw_inspection.get("source_format_detected", "auto")).strip()
-                or "auto"
+                str(raw_inspection.get("source_format_detected", "auto")).strip() or "auto"
             ),
             dataset_name=str(raw_inspection.get("dataset_name", "")),
             channels=channels,
-            metadata_keys=[
-                str(key) for key in raw_inspection.get("metadata_keys", []) if str(key)
-            ],
+            metadata_keys=[str(key) for key in raw_inspection.get("metadata_keys", []) if str(key)],
             depth_unit=(
                 str(index_mapping["depth_unit"]).strip()
                 if index_mapping.get("depth_unit")
@@ -714,9 +716,7 @@ def _resolve_header_aliases(
             if len(matches) != 1:
                 code = "header_slot_missing" if not matches else "header_slot_ambiguous"
                 status = (
-                    "No matching header slot"
-                    if not matches
-                    else "Multiple matching header slots"
+                    "No matching header slot" if not matches else "Multiple matching header slots"
                 )
                 issues.append(
                     AuthoringContextIssue(
@@ -791,8 +791,7 @@ def _candidate_matches(
     if alias is None:
         return [], None
     alias_terms = {
-        _normalize_token(term)
-        for term in [alias.id, alias.label, *alias.aliases, *alias.mnemonics]
+        _normalize_token(term) for term in [alias.id, alias.label, *alias.aliases, *alias.mnemonics]
     }
     matches = [
         candidate
@@ -937,8 +936,7 @@ def _coalesce_alternate_binding_references(
                     ):
                         continue
                     path = (
-                        f"sections[{section.section_id}].tracks[{track.track_id}]"
-                        f".bindings[{index}]"
+                        f"sections[{section.section_id}].tracks[{track.track_id}].bindings[{index}]"
                     )
                     key = _binding_scope_key(
                         binding,
@@ -1056,8 +1054,7 @@ def _resolve_channels(
                     path=f"{path}.channel",
                     code="channel_context_missing",
                     message=(
-                        "Source-channel availability and section scope are required "
-                        "before binding."
+                        "Source-channel availability and section scope are required before binding."
                     ),
                 )
             )

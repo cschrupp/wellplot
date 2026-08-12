@@ -176,6 +176,47 @@ def test_executor_assembles_new_section_tracks_and_array_bindings() -> None:
     assert packet.tracks[1].bindings[0].binding_id == "packet-vdl"
 
 
+def test_executor_creates_track_from_partial_grid_intent() -> None:
+    """Apply only specified grid controls and retain canonical grid defaults."""
+    service = AuthoringService(_document())
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "resistivity",
+                        "title": "Resistivity",
+                        "kind": "normal",
+                        "width_mm": 32.0,
+                        "x_scale": {
+                            "kind": "log",
+                            "minimum": 0.2,
+                            "maximum": 2000.0,
+                            "unit": "ohm.m",
+                        },
+                        "grid": {
+                            "vertical_main_scale": "logarithmic",
+                            "vertical_main_spacing_mode": "scale",
+                        },
+                    }
+                ],
+            }
+        ]
+    )
+    plan = reconcile_authoring(intent, existing=service.document)
+
+    result = execute_authoring_plan(service, plan)
+
+    assert result.success is True
+    track = next(
+        track for track in service.document.sections[0].tracks if track.id == "resistivity"
+    )
+    assert track.grid.major is True
+    assert track.grid.vertical_main_scale == "logarithmic"
+    assert track.grid.vertical_main_spacing_mode == "scale"
+
+
 def test_executor_stops_on_failed_operation_without_running_later_phases() -> None:
     """Stop at a typed service failure and preserve the last valid snapshot."""
     service = AuthoringService(_document())
