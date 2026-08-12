@@ -8,14 +8,24 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import anyio
+import pytest
 
+import wellplot.agent.compilation as compilation_module
 from wellplot.agent import AuthoringSession
 from wellplot.agent.compilation import (
+    AuthoringAnnotationIntentSubmission,
     AuthoringIntentCoverage,
     AuthoringIntentSubmission,
+    AuthoringRasterIntentSubmission,
+    AuthoringReportIntentSubmission,
     AuthoringRequestInventory,
     AuthoringRequestInventoryItem,
+    AuthoringScalarIntentSubmission,
+    AuthoringStructureIntentSubmission,
     build_request_manifest,
+    group_request_inventory,
+    merge_scoped_intents,
+    scoped_submission_model,
     validate_intent_coverage,
     validate_request_inventory,
 )
@@ -128,6 +138,216 @@ def test_request_inventory_reports_missing_and_unknown_items() -> None:
     assert any("Missing inventory" in error for error in errors)
 
 
+def test_request_inventory_groups_canonical_object_families() -> None:
+    """Route by canonical object role rather than scientific log family."""
+    inventory = AuthoringRequestInventory(
+        items=[
+            {
+                "request_item_id": "request-003",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "curve_binding",
+            },
+            {
+                "request_item_id": "request-002",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "track",
+            },
+            {
+                "request_item_id": "request-001",
+                "status": "mapped",
+                "action": "set",
+                "object_family": "page",
+            },
+            {
+                "request_item_id": "request-004",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "raster_binding",
+            },
+            {
+                "request_item_id": "request-005",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "annotation",
+            },
+            {
+                "request_item_id": "request-006",
+                "status": "unsupported",
+                "action": "explain",
+                "object_family": "unknown",
+                "reason": "Not represented by the canonical object model.",
+            },
+        ]
+    )
+
+    grouped = group_request_inventory(inventory)
+
+    assert list(grouped) == [
+        "report",
+        "structure",
+        "scalar",
+        "raster",
+        "annotation",
+    ]
+    assert grouped["scalar"][0].request_item_id == "request-003"
+    assert all(
+        item.request_item_id != "request-006" for items in grouped.values() for item in items
+    )
+
+
+def test_scoped_submission_schemas_exclude_unrelated_families() -> None:
+    """Keep each provider contract substantially smaller than the full graph."""
+    full_schema = json.dumps(AuthoringIntentSubmission.model_json_schema())
+    scoped_models = (
+        AuthoringReportIntentSubmission,
+        AuthoringStructureIntentSubmission,
+        AuthoringScalarIntentSubmission,
+        AuthoringRasterIntentSubmission,
+        AuthoringAnnotationIntentSubmission,
+    )
+
+    for model in scoped_models:
+        assert len(json.dumps(model.model_json_schema())) < len(full_schema) / 2
+
+    structure_properties = AuthoringStructureIntentSubmission.model_json_schema()["$defs"][
+        "AuthoringStructureIntentFragment"
+    ]["properties"]
+    scalar_properties = AuthoringScalarIntentSubmission.model_json_schema()["$defs"][
+        "AuthoringScalarIntentFragment"
+    ]["properties"]
+    report_properties = AuthoringReportIntentSubmission.model_json_schema()["$defs"][
+        "AuthoringReportIntentFragment"
+    ]["properties"]
+    assert "curve_bindings" not in structure_properties
+    assert "raster_bindings" not in structure_properties
+    assert "header" not in scalar_properties
+    assert "raster_bindings" not in scalar_properties
+    assert "sections" not in report_properties
+    assert scoped_submission_model("scalar") is AuthoringScalarIntentSubmission
+
+
+def test_scoped_intents_merge_into_canonical_desired_state() -> None:
+    """Preserve explicit values while merging independently validated fragments."""
+    report = AuthoringReportIntentSubmission.model_validate(
+        {
+            "intent": {"title": "Cross-domain report"},
+            "coverage": [
+                {
+                    "request_item_id": "request-001",
+                    "status": "mapped",
+                    "intent_paths": ["title"],
+                }
+            ],
+        }
+    )
+    structure = AuthoringStructureIntentSubmission.model_validate(
+        {
+            "intent": {
+                "sections": [
+                    {
+                        "section_id": "main",
+                        "tracks": [
+                            {
+                                "track_id": "measurement",
+                                "section_id": "main",
+                                "title": "Measurement",
+                                "kind": "normal",
+                                "width_mm": 24,
+                            }
+                        ],
+                    }
+                ]
+            },
+            "coverage": [
+                {
+                    "request_item_id": "request-002",
+                    "status": "mapped",
+                    "intent_paths": ["sections[main].tracks[measurement]"],
+                }
+            ],
+        }
+    )
+    scalar = AuthoringScalarIntentSubmission.model_validate(
+        {
+            "intent": {
+                "curve_bindings": [
+                    {
+                        "kind": "curve",
+                        "binding_id": "main.measurement.signal.1",
+                        "section_id": "main",
+                        "track_id": "measurement",
+                        "channel": "SIGNAL",
+                        "label": "Primary signal",
+                        "scale": {"kind": "linear", "minimum": -2, "maximum": 8},
+                        "style": {
+                            "color": "#123456",
+                            "line_style": "dashed",
+                            "line_width": 1.7,
+                        },
+                    }
+                ]
+            },
+            "coverage": [
+                {
+                    "request_item_id": "request-003",
+                    "status": "mapped",
+                    "intent_paths": ["curve_bindings[main.measurement.signal.1]"],
+                }
+            ],
+        }
+    )
+
+    merged = merge_scoped_intents([report.intent, structure.intent, scalar.intent])
+
+    assert merged.title == "Cross-domain report"
+    assert merged.sections[0].tracks[0].width_mm == 24
+    binding = merged.curve_bindings[0]
+    assert binding.label == "Primary signal"
+    assert binding.scale.minimum == -2
+    assert binding.scale.maximum == 8
+    assert binding.style.color == "#123456"
+    assert binding.style.line_style == "dashed"
+    assert binding.style.line_width == 1.7
+
+
+def test_scoped_intent_merge_rejects_duplicate_identities() -> None:
+    """Stop ambiguous provider output before defaults or reconciliation."""
+    scalar = AuthoringScalarIntentSubmission.model_validate(
+        {
+            "intent": {
+                "curve_bindings": [
+                    {
+                        "kind": "curve",
+                        "binding_id": "duplicate",
+                        "section_id": "main",
+                        "track_id": "left",
+                        "channel": "A",
+                    },
+                    {
+                        "kind": "curve",
+                        "binding_id": "duplicate",
+                        "section_id": "main",
+                        "track_id": "right",
+                        "channel": "B",
+                    },
+                ]
+            },
+            "coverage": [
+                {
+                    "request_item_id": "request-001",
+                    "status": "mapped",
+                    "intent_paths": ["curve_bindings"],
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(ValueError, match="Duplicate binding_id"):
+        merge_scoped_intents([scalar.intent])
+
+
 class _CorrectionBackend:
     """Provider double that needs one deterministic coverage correction."""
 
@@ -137,16 +357,39 @@ class _CorrectionBackend:
 
     def __init__(self) -> None:
         self.attempts = 0
-        self.initial_user_message = ""
+        self.initial_user_messages: list[str] = []
+        self.tool_names: list[str] = []
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit an invalid first coverage report and a valid correction."""
-        self.initial_user_message = str(kwargs["initial_user_message"])
+        self.initial_user_messages.append(str(kwargs["initial_user_message"]))
+        tool_name = kwargs["tool_definitions"][0].name
+        self.tool_names.append(tool_name)
         tool_caller = kwargs["tool_caller"]
         assert callable(tool_caller)
+        if tool_name == "submit_request_inventory":
+            self.attempts += 1
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "set",
+                            "object_family": "report",
+                            "target": "title",
+                            "explicit_values": {"value": "Revised"},
+                        }
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried request.", tool_trace=())
+        assert tool_name == "submit_report_intent"
         self.attempts += 1
         first = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
                 "intent": {"title": "Revised"},
                 "coverage": [],
@@ -155,7 +398,7 @@ class _CorrectionBackend:
         assert first["is_error"] is True
         self.attempts += 1
         second = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
                 "intent": {"title": "Revised"},
                 "coverage": [
@@ -207,8 +450,8 @@ class _InvalidSubmissionBackend:
         tool_caller = kwargs["tool_caller"]
         assert callable(tool_caller)
         response = await tool_caller(
-            "submit_authoring_intent",
-            {"intent": {"unexpected": True}, "coverage": []},
+            "submit_request_inventory",
+            {"items": [{"unexpected": True}]},
         )
         assert response["is_error"] is True
         return SimpleNamespace(final_text="The typed submission was rejected.", tool_trace=())
@@ -223,10 +466,34 @@ class _CoverageFailureBackend:
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit an intent that omits one request item from coverage."""
+        tool_name = kwargs["tool_definitions"][0].name
         tool_caller = kwargs["tool_caller"]
         assert callable(tool_caller)
+        if tool_name == "submit_request_inventory":
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "set",
+                            "object_family": "report",
+                        },
+                        {
+                            "request_item_id": "request-002",
+                            "status": "mapped",
+                            "action": "add",
+                            "object_family": "remarks",
+                        },
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried request.", tool_trace=())
+        assert tool_name == "submit_report_intent"
         response = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
                 "intent": {"title": "Revised"},
                 "coverage": [
@@ -271,15 +538,23 @@ def test_desired_state_extraction_allows_one_coverage_correction() -> None:
         )
     )
 
-    assert backend.attempts == 2
+    assert backend.attempts == 3
+    assert backend.tool_names == [
+        "submit_request_inventory",
+        "submit_report_intent",
+    ]
     assert intent is not None
     assert intent.title == "Revised"
     assert result.report_facts["request_coverage"][0]["intent_paths"] == ["title"]
-    assert "request_manifest" in backend.initial_user_message
-    assert "AuthoringIntentSubmission schema" not in backend.initial_user_message
+    assert "request_manifest" in backend.initial_user_messages[0]
+    assert all(
+        "AuthoringIntentSubmission schema" not in message
+        for message in backend.initial_user_messages
+    )
     contract = result.report_facts["provider_contract"]
     assert contract["schema_repeated_in_message"] is False
-    assert contract["request_inventory_schema_chars"] < contract["tool_schema_chars"]
+    assert contract["request_inventory_schema_chars"] < contract["full_intent_schema_chars"]
+    assert contract["stage_tool_schema_chars"]["report"] < contract["full_intent_schema_chars"]
 
 
 def _extract_with_backend(backend: object, request_text: str = "Set the report title.") -> object:
@@ -307,17 +582,16 @@ def test_extraction_reports_no_tool_call_and_sanitized_provider_text() -> None:
         "adapter": "fixture",
         "finish_reasons": ["stop"],
     }
-    assert result.report_facts["extraction"] == {
-        "status": "no_tool_call",
-        "submission_attempts": 0,
-        "tool_calls_emitted": False,
-        "validation_failures": [],
-        "coverage_failures": [],
-        "provider_text": (
-            "I can describe the requested changes, but I will not call a tool. "
-            "Token [REDACTED] was not used."
-        ),
-    }
+    extraction = result.report_facts["extraction"]
+    assert extraction["status"] == "no_tool_call"
+    assert extraction["submission_attempts"] == 0
+    assert extraction["tool_calls_emitted"] is False
+    assert extraction["validation_failures"] == []
+    assert extraction["coverage_failures"] == []
+    assert extraction["provider_text"] == (
+        "I can describe the requested changes, but I will not call a tool. "
+        "Token [REDACTED] was not used."
+    )
 
 
 def test_extraction_reports_schema_validation_failure() -> None:
@@ -366,3 +640,19 @@ def test_intent_submission_keeps_typed_intent_and_coverage_together() -> None:
 
     assert submission.intent.title == "Revised"
     assert submission.coverage[0].status == "mapped"
+
+
+def test_scoped_compiler_has_no_scientific_family_branches() -> None:
+    """Prevent notebook examples from becoming compiler control flow."""
+    source = Path(compilation_module.__file__).read_text(encoding="utf-8").lower()
+
+    for domain_token in (
+        "resistivity",
+        "porosity",
+        "caliper",
+        "cement bond",
+        "cbl",
+        "vdl",
+        "gamma ray",
+    ):
+        assert domain_token not in source

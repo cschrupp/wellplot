@@ -71,9 +71,29 @@ class _BlockedProviderBackend:
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit a typed intent that deterministic channel inspection blocks."""
+        tool_name = kwargs["tool_definitions"][0].name
         tool_caller = kwargs["tool_caller"]
+        if tool_name == "submit_request_inventory":
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "add",
+                            "object_family": "curve_binding",
+                            "target": "NOT_AVAILABLE",
+                            "parent_scope": "main/curves",
+                        }
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried blocked request.", tool_trace=())
+        assert tool_name == "submit_scalar_intent"
         response = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
                 "intent": {
                     "curve_bindings": [

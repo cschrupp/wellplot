@@ -893,9 +893,10 @@ Status: recorded provider-to-intent acceptance implemented; live-provider execut
 remains an optional credentialed gate.
 
 `tests/test_cross_domain_acceptance.py` now replays provider submissions through
-the real `submit_authoring_intent` contract and then runs the submitted state
-through context resolution, planning, dependency-ordered reconciliation, and
-read-after-write execution. The acceptance cases cover CBL/VDL, mirrored
+the compact inventory and scoped typed-intent contracts, merges the validated
+fragments, and then runs the canonical submitted state through context
+resolution, planning, dependency-ordered reconciliation, and read-after-write
+execution. The acceptance cases cover CBL/VDL, mirrored
 caliper, porosity, logarithmic resistivity, open-hole header slots, annotations,
 arrays, and arbitrary multi-section reports. They verify that explicit widths,
 scales, colors, line styles, labels, raster settings, page layout, and header
@@ -1527,6 +1528,8 @@ Implementation checkpoint:
 
 ### 0.6-J3. Scoped Typed Intent Compilation And Merge
 
+Status: implemented in the current development branch.
+
 Goal:
 
 - compile each inventoried request group through the smallest applicable typed
@@ -1559,6 +1562,29 @@ Acceptance:
   staged compiler unchanged
 - no scoped compiler contains SP-, resistivity-, CBL-, porosity-, or
   packet-specific control flow
+
+Implementation checkpoint:
+
+- the compact request inventory routes canonical object families into report,
+  structure, scalar-content, raster-content, and annotation scopes
+- each scope receives a generated Pydantic view projected from the canonical
+  intent models rather than a separately maintained provider schema
+- structural track declarations and child content declarations compile through
+  bounded independent submissions; accepted section and track identities are
+  forwarded to child scopes before the fragments rejoin
+- each scoped submission permits one correction, validates only its request
+  subset, and contributes to final whole-request coverage
+- unsupported and inconsistent inventory items remain explicit coverage entries
+  instead of being converted into guessed authoring objects
+- deterministic merge rejects conflicting fields and duplicate section, track,
+  binding, fill, annotation, and remark identities before validating the result
+  as `AuthoringDocumentIntent`
+- scoped provider context excludes unrelated current-document object families;
+  defaults, channel resolution, reconciliation, execution, and verification are
+  unchanged downstream
+- focused tests cover contract-size bounds, header/report isolation, mixed
+  structure and content compilation, explicit presentation preservation,
+  duplicate rejection, and absence of scientific-family compiler branches
 
 ### 0.6-J4. Provider Adapter Conformance
 

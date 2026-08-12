@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
@@ -513,6 +514,77 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
     assert "detail.rm_bottom_temp" not in las_source
 
 
+def _recorded_scope_payload(
+    intent: AuthoringDocumentIntent,
+    scope: str,
+) -> dict[str, object]:
+    """Project one recorded canonical intent into a provider-facing scope."""
+    payload = intent.model_dump(mode="json", exclude_unset=True)
+    if scope == "report":
+        report_fields = {
+            "title",
+            "subtitle",
+            "output",
+            "page",
+            "depth",
+            "header",
+            "tail",
+            "remarks",
+            "removals",
+        }
+        return {key: deepcopy(value) for key, value in payload.items() if key in report_fields}
+
+    if scope == "structure":
+        sections = deepcopy(payload.get("sections", []))
+        for section in sections:
+            for track in section.get("tracks", []):
+                track.pop("bindings", None)
+                track.pop("fills", None)
+                track.pop("annotations", None)
+        return {"sections": sections}
+
+    child_field = {
+        "scalar": "curve_bindings",
+        "raster": "raster_bindings",
+        "annotation": "annotations",
+    }[scope]
+    children = deepcopy(payload.get(child_field, []))
+    fills = deepcopy(payload.get("fills", [])) if scope == "scalar" else []
+    for section in payload.get("sections", []):
+        section_id = section["section_id"]
+        for track in section.get("tracks", []):
+            track_id = track["track_id"]
+            if scope == "scalar":
+                nested = [
+                    binding
+                    for binding in track.get("bindings", [])
+                    if binding.get("kind") == "curve"
+                ]
+            elif scope == "raster":
+                nested = [
+                    binding
+                    for binding in track.get("bindings", [])
+                    if binding.get("kind") == "raster"
+                ]
+            else:
+                nested = track.get("annotations", [])
+            for child in nested:
+                scoped_child = deepcopy(child)
+                scoped_child.setdefault("section_id", section_id)
+                scoped_child.setdefault("track_id", track_id)
+                children.append(scoped_child)
+            if scope == "scalar":
+                for fill in track.get("fills", []):
+                    scoped_fill = deepcopy(fill)
+                    scoped_fill.setdefault("section_id", section_id)
+                    scoped_fill.setdefault("track_id", track_id)
+                    fills.append(scoped_fill)
+    result = {child_field: children}
+    if scope == "scalar" and fills:
+        result["fills"] = fills
+    return result
+
+
 class _RecordedIntentBackend:
     """Provider fixture that submits one recorded typed intent and no mutations."""
 
@@ -521,30 +593,72 @@ class _RecordedIntentBackend:
     credential_source = "fixture"
     supports_desired_state = True
 
-    def __init__(self, request_text: str, intent: AuthoringDocumentIntent) -> None:
+    def __init__(
+        self,
+        request_text: str,
+        intent: AuthoringDocumentIntent,
+        request_scopes: list[str],
+    ) -> None:
         """Prepare coverage for one recorded natural-language request."""
         self.intent = intent
-        self.coverage = [
-            {
-                "request_item_id": item.item_id,
-                "status": "mapped",
-                "intent_paths": [f"recorded.{index}"],
-            }
-            for index, item in enumerate(build_request_manifest(request_text).items, start=1)
-        ]
+        self.manifest = build_request_manifest(request_text)
+        assert len(self.manifest.items) == len(request_scopes)
+        self.request_scopes = dict(
+            zip(
+                (item.item_id for item in self.manifest.items),
+                request_scopes,
+                strict=True,
+            )
+        )
         self.tool_names: list[str] = []
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit the fixture intent through the real extraction contract."""
         tool_definitions = kwargs["tool_definitions"]
-        self.tool_names = [definition.name for definition in tool_definitions]
+        self.tool_names.extend(definition.name for definition in tool_definitions)
+        tool_name = tool_definitions[0].name
         tool_caller = kwargs["tool_caller"]
         assert callable(tool_caller)
+        if tool_name == "submit_request_inventory":
+            object_families = {
+                "report": "report",
+                "structure": "track",
+                "scalar": "curve_binding",
+                "raster": "raster_binding",
+                "annotation": "annotation",
+            }
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": item.item_id,
+                            "status": "mapped",
+                            "action": "update",
+                            "object_family": object_families[self.request_scopes[item.item_id]],
+                            "target": item.text,
+                        }
+                        for item in self.manifest.items
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Recorded inventory accepted.", tool_trace=())
+
+        scope = tool_name.removeprefix("submit_").removesuffix("_intent")
         response = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
-                "intent": self.intent.model_dump(mode="json", exclude_unset=True),
-                "coverage": self.coverage,
+                "intent": _recorded_scope_payload(self.intent, scope),
+                "coverage": [
+                    {
+                        "request_item_id": item.item_id,
+                        "status": "mapped",
+                        "intent_paths": [f"recorded.{scope}"],
+                    }
+                    for item in self.manifest.items
+                    if self.request_scopes[item.item_id] == scope
+                ],
             },
         )
         assert response["accepted"] is True
@@ -557,9 +671,10 @@ def _run_recorded_intent_case(
     intent: AuthoringDocumentIntent,
     document: AuthoringDocumentSpec,
     available_channels: dict[str, list[object]],
+    request_scopes: list[str],
 ) -> AuthoringDocumentSpec:
     """Run one provider fixture through extraction, planning, and deterministic execution."""
-    backend = _RecordedIntentBackend(request_text, intent)
+    backend = _RecordedIntentBackend(request_text, intent, request_scopes)
     session = AuthoringSession(
         backend=backend,
         runtime=SimpleNamespace(server_root=Path(".")),
@@ -578,7 +693,8 @@ def _run_recorded_intent_case(
 
     assert submitted is not None
     assert provider_result.report_facts["request_coverage"]
-    assert backend.tool_names == ["submit_authoring_intent"]
+    assert backend.tool_names[0] == "submit_request_inventory"
+    assert all(name.startswith("submit_") for name in backend.tool_names)
     plan = session.plan(
         text=request_text,
         desired_state=submitted,
@@ -713,6 +829,15 @@ def test_recorded_provider_intent_preserves_explicit_cross_domain_presentation()
         request_text=request_text,
         intent=intent,
         document=document,
+        request_scopes=[
+            "report",
+            "structure",
+            "scalar",
+            "scalar",
+            "scalar",
+            "raster",
+            "annotation",
+        ],
         available_channels={
             "repeat_pass": ["CBL", {"mnemonic": "VDL", "kind": "array"}],
             "main_pass": [
@@ -787,6 +912,7 @@ def test_recorded_provider_intent_covers_header_and_arbitrary_sections() -> None
         request_text=request_text,
         intent=intent,
         document=document,
+        request_scopes=["report", "report", "structure", "structure"],
         available_channels={section.id: ["GR", "RHOB", "NPHI"] for section in document.sections},
     )
 

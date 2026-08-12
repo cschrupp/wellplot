@@ -90,57 +90,91 @@ class _ResistivityExtractionBackend:
 
     def __init__(self, request_text: str) -> None:
         self.manifest = build_request_manifest(request_text)
+        self.tool_names: list[str] = []
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit one provider-shaped intent and complete request coverage."""
+        tool_name = kwargs["tool_definitions"][0].name
+        self.tool_names.append(tool_name)
         tool_caller = kwargs["tool_caller"]
-        intent = {
-            "sections": [
+        structure_ids = {item.item_id for item in self.manifest.items[:3]}
+        scalar_ids = {item.item_id for item in self.manifest.items[3:]}
+        if tool_name == "submit_request_inventory":
+            response = await tool_caller(
+                tool_name,
                 {
-                    "section_id": "main",
-                    "tracks": [
+                    "items": [
                         {
-                            "track_id": "resistivity",
-                            "section_id": "main",
-                            "bindings": [
-                                {
-                                    "kind": "curve",
-                                    "binding_id": "main.resistivity.ILD.1",
-                                    "section_id": "main",
-                                    "track_id": "resistivity",
-                                    "channel": "ILD",
-                                },
-                                {
-                                    "kind": "curve",
-                                    "binding_id": "main.resistivity.ILM.1",
-                                    "section_id": "main",
-                                    "track_id": "resistivity",
-                                    "channel": "ILM",
-                                },
-                                {
-                                    "kind": "curve",
-                                    "binding_id": "main.resistivity.MSFL.1",
-                                    "section_id": "main",
-                                    "track_id": "resistivity",
-                                    "channel": "MSFL",
-                                },
-                            ],
+                            "request_item_id": item.item_id,
+                            "status": "mapped",
+                            "action": "add" if item.item_id in structure_ids else "update",
+                            "object_family": (
+                                "track" if item.item_id in structure_ids else "curve_binding"
+                            ),
+                            "target": item.text,
                         }
-                    ],
-                }
-            ]
-        }
+                        for item in self.manifest.items
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried request.", tool_trace=())
+        if tool_name == "submit_structure_intent":
+            intent = {
+                "sections": [
+                    {
+                        "section_id": "main",
+                        "tracks": [
+                            {
+                                "track_id": "resistivity",
+                                "section_id": "main",
+                                "x_scale": {
+                                    "kind": "log",
+                                    "minimum": 0.2,
+                                    "maximum": 2000.0,
+                                    "unit": "ohm.m",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            }
+            request_ids = structure_ids
+        else:
+            assert tool_name == "submit_scalar_intent"
+            assert '"compiled_structure"' in str(kwargs["initial_user_message"])
+            assert '"track_id": "resistivity"' in str(kwargs["initial_user_message"])
+            intent = {
+                "curve_bindings": [
+                    {
+                        "kind": "curve",
+                        "binding_id": f"main.resistivity.{channel}.1",
+                        "section_id": "main",
+                        "track_id": "resistivity",
+                        "channel": channel,
+                    }
+                    for channel in ("ILD", "ILM", "MSFL")
+                ]
+            }
+            request_ids = scalar_ids
         response = await tool_caller(
-            "submit_authoring_intent",
+            tool_name,
             {
                 "intent": intent,
                 "coverage": [
                     {
                         "request_item_id": item.item_id,
                         "status": "mapped",
-                        "intent_paths": ["sections[main].tracks[resistivity]"],
+                        "intent_paths": [
+                            (
+                                "sections[main].tracks[resistivity]"
+                                if item.item_id in structure_ids
+                                else "curve_bindings"
+                            )
+                        ],
                     }
                     for item in self.manifest.items
+                    if item.item_id in request_ids
                 ],
             },
         )
@@ -175,6 +209,11 @@ def test_provider_submission_reaches_generic_resistivity_operation_payload() -> 
     )
 
     assert intent is not None
+    assert backend.tool_names == [
+        "submit_request_inventory",
+        "submit_structure_intent",
+        "submit_scalar_intent",
+    ]
     assert result.report_facts["submitted_intent"] == intent.model_dump(
         mode="json", exclude_unset=True
     )
@@ -188,13 +227,13 @@ def test_provider_submission_reaches_generic_resistivity_operation_payload() -> 
     track_operation = next(
         operation
         for operation in plan.operation_payloads
-        if operation["object_kind"] == "track"
-        and operation["object_id"] == "resistivity"
+        if operation["object_kind"] == "track" and operation["object_id"] == "resistivity"
     )
     assert track_operation["payload"]["object"]["width_mm"] == 32.0
-    assert plan.applied_defaults_provenance[
-        "sections[main].tracks[resistivity].width_mm"
-    ] == "style_preset:triple_combo_resistivity"
+    assert (
+        plan.applied_defaults_provenance["sections[main].tracks[resistivity].width_mm"]
+        == "style_preset:triple_combo_resistivity"
+    )
 
 
 def test_open_world_resistivity_creation_uses_generic_reconciliation() -> None:

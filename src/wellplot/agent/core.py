@@ -58,10 +58,16 @@ from ..mcp.packet_blueprints import packet_blueprint_spec
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
 from .compilation import (
-    AuthoringIntentSubmission,
+    AuthoringCompilationScope,
+    AuthoringIntentCoverage,
     AuthoringRequestInventory,
+    AuthoringRequestManifest,
     build_request_manifest,
+    group_request_inventory,
+    merge_scoped_intents,
+    scoped_submission_model,
     validate_intent_coverage,
+    validate_request_inventory,
 )
 
 if TYPE_CHECKING:
@@ -798,11 +804,7 @@ def _select_pending_header_target(
     if not matches:
         return None
     highest_score = max(score for score, _entry, _target in matches)
-    best_matches = [
-        (entry, target)
-        for score, entry, target in matches
-        if score == highest_score
-    ]
+    best_matches = [(entry, target) for score, entry, target in matches if score == highest_score]
     if len(best_matches) != 1:
         return None
     return best_matches[0]
@@ -1673,11 +1675,15 @@ class AuthoringSession:
         needs_clarification = _clarification_entries(
             report_facts.get("needs_clarification") if isinstance(report_facts, dict) else None
         )
-        request_coverage = tuple(
-            dict(item)
-            for item in report_facts.get("request_coverage", [])
-            if isinstance(item, dict)
-        ) if isinstance(report_facts, dict) else ()
+        request_coverage = (
+            tuple(
+                dict(item)
+                for item in report_facts.get("request_coverage", [])
+                if isinstance(item, dict)
+            )
+            if isinstance(report_facts, dict)
+            else ()
+        )
         submitted_intent = (
             dict(report_facts["submitted_intent"])
             if isinstance(report_facts, dict)
@@ -1708,9 +1714,7 @@ class AuthoringSession:
             run_state=AuthoringRunState() if run_state is None else run_state,
             needs_clarification=needs_clarification,
             request_coverage=request_coverage,
-            defaults_provenance=(
-                {} if plan is None else dict(plan.defaults_provenance)
-            ),
+            defaults_provenance=({} if plan is None else dict(plan.defaults_provenance)),
             submitted_intent=submitted_intent,
             report_facts=dict(getattr(provider_result, "report_facts", {})),
             user_report=_build_user_report(
@@ -2089,14 +2093,18 @@ class AuthoringSession:
         resolved_assignments = preview_payload.get("resolved_assignments", [])
         target_key = str(target.get("target_key", "")).strip()
         target_label = str(target.get("display_label", "")).strip()
-        target_is_present = any(
-            isinstance(assignment, dict)
-            and (
-                str(assignment.get("target_key", "")).strip() == target_key
-                or str(assignment.get("display_label", "")).strip() == target_label
+        target_is_present = (
+            any(
+                isinstance(assignment, dict)
+                and (
+                    str(assignment.get("target_key", "")).strip() == target_key
+                    or str(assignment.get("display_label", "")).strip() == target_label
+                )
+                for assignment in resolved_assignments
             )
-            for assignment in resolved_assignments
-        ) if isinstance(resolved_assignments, list) else False
+            if isinstance(resolved_assignments, list)
+            else False
+        )
         if not target_is_present:
             clarification_entry = dict(clarification)
             reason = (
@@ -4672,40 +4680,56 @@ class AuthoringSession:
         context_snapshot: AuthoringContextSnapshot,
         max_rounds: int,
     ) -> tuple[ProviderRunResult, AuthoringDocumentIntent | None]:
-        """Ask a typed-state capable provider for one validated desired state."""
-        submitted: AuthoringDocumentIntent | None = None
-        submission: AuthoringIntentSubmission | None = None
-        submission_attempts = 0
-        coverage_errors: list[str] = []
-        coverage_failures: list[list[str]] = []
-        validation_failures: list[str] = []
+        """Compile one request through inventory and scoped typed submissions."""
         request_manifest = build_request_manifest(request_text)
+        inventory: AuthoringRequestInventory | None = None
+        inventory_attempts = 0
+        scoped_attempts: dict[str, int] = {}
+        validation_failures: list[str] = []
+        coverage_failures: list[list[str]] = []
+        inventory_failures: list[list[str]] = []
+        merge_failures: list[str] = []
+        failed_stages: list[str] = []
+        stage_results: list[tuple[str, ProviderRunResult]] = []
+        stage_messages: dict[str, int] = {}
+        stage_schema_chars: dict[str, int] = {}
+        scoped_submissions: dict[str, dict[str, object]] = {}
+        fragments: list[object] = []
+        coverage: list[AuthoringIntentCoverage] = []
+        provider_failure_status: str | None = None
 
-        async def submit_intent(
+        def normalize_result(result: object) -> ProviderRunResult:
+            """Normalize lightweight test doubles and provider adapter results."""
+            return ProviderRunResult(
+                final_text=str(getattr(result, "final_text", "")),
+                tool_trace=tuple(getattr(result, "tool_trace", ())),
+                report_facts=dict(getattr(result, "report_facts", {})),
+            )
+
+        async def submit_inventory(
             name: str,
             arguments: dict[str, object],
         ) -> dict[str, object]:
-            """Validate the provider submission without mutating the draft."""
-            nonlocal submitted, submission, submission_attempts, coverage_errors
-            if name != "submit_authoring_intent":
+            """Validate a compact inventory without mutating the draft."""
+            nonlocal inventory, inventory_attempts
+            if name != "submit_request_inventory":
                 return {
                     "is_error": True,
                     "error": (
-                        "Only submit_authoring_intent is available in desired-state "
-                        "extraction mode."
+                        "Only submit_request_inventory is available in request inventory mode."
                     ),
                 }
-            submission_attempts += 1
-            if submission_attempts > 2:
+            inventory_attempts += 1
+            if inventory_attempts > 2:
                 return {
                     "is_error": True,
                     "error": (
                         "Only one initial submission and one correction submission are "
-                        "allowed. Stop and report the unresolved coverage errors."
+                        "allowed for the request inventory."
                     ),
                 }
             try:
-                candidate = AuthoringIntentSubmission.model_validate(arguments)
+                candidate = AuthoringRequestInventory.model_validate(arguments)
             except Exception as exc:  # Pydantic gives provider-actionable details.
                 validation_failures.append(
                     _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
@@ -4713,165 +4737,446 @@ class AuthoringSession:
                 return {
                     "is_error": True,
                     "error": (
-                        f"Invalid AuthoringIntentSubmission: {exc}. Include an `intent` "
-                        "object and one coverage entry for every request item."
+                        f"Invalid AuthoringRequestInventory: {exc}. Include exactly one "
+                        "inventory item for every request item."
                     ),
                 }
-            coverage_errors = validate_intent_coverage(
+            errors = validate_request_inventory(
                 request_manifest,
-                candidate.coverage,
+                candidate.items,
             )
-            if coverage_errors:
-                coverage_failures.append(list(coverage_errors))
+            if errors:
+                inventory_failures.append(list(errors))
                 return {
                     "is_error": True,
                     "error": (
-                        "Request coverage is incomplete or invalid. Submit one correction "
-                        "with the same intent plus corrected coverage:\n- "
-                        + "\n- ".join(coverage_errors)
+                        "Request inventory is incomplete or invalid. Submit one correction "
+                        "with one item per request item:\n- " + "\n- ".join(errors)
                     ),
                 }
-            submission = candidate
-            submitted = candidate.intent
+            inventory = candidate
             return {
                 "accepted": True,
                 "message": (
-                    "Typed desired state and request coverage validated. The deterministic "
-                    "planner will now resolve references and execute it."
+                    "Request inventory validated. Related canonical object families will "
+                    "now be compiled through scoped typed contracts."
                 ),
             }
 
-        context = {
-            "draft_logfile": draft_logfile,
+        inventory_context = {
             "request": request_text,
             "request_manifest": request_manifest.model_dump(mode="json"),
-            "current_document": existing.model_dump(mode="json"),
-            "authoring_context": context_snapshot.model_dump(mode="json"),
         }
-        instructions = (
-            "You are the desired-state extraction stage of wellplot authoring. "
-            "Do not invent packet templates and do not call mutation tools. Read the "
-            "current document and source context, then call submit_authoring_intent "
-            "with only the requested changes and complete request coverage. You may "
-            "submit once initially and once more only when the tool reports a coverage "
-            "error. Omit fields that should be "
-            "preserved. Use the explicit clear or remove intent objects when the user "
-            "asks to clear or remove something. Preserve explicit labels, scales, "
-            "colors, line styles, widths, and raster settings exactly. If the request "
-            "references an unavailable or ambiguous channel, still describe the request; "
-            "the deterministic resolver will block it and report why."
+        inventory_instructions = (
+            "You are the request-inventory stage of wellplot authoring. Do not emit a "
+            "desired state and do not call mutation tools. Classify every request item "
+            "exactly once by canonical object family and requested action. Keep human "
+            "target and parent descriptions when stable ids are unknown. Copy explicit "
+            "values without applying defaults. Use unsupported or inconsistent only with "
+            "a concise reason."
         )
-        intent_schema = AuthoringIntentSubmission.model_json_schema()
-        intent_schema_chars = len(
-            json.dumps(intent_schema, separators=(",", ":"), default=str)
-        )
+        inventory_schema = AuthoringRequestInventory.model_json_schema()
         inventory_schema_chars = len(
-            json.dumps(
-                AuthoringRequestInventory.model_json_schema(),
-                separators=(",", ":"),
-                default=str,
-            )
+            json.dumps(inventory_schema, separators=(",", ":"), default=str)
         )
-        initial_message = (
-            "Submit one typed desired state and coverage report for this request. Do not "
-            "describe a sequence of MCP calls. The submission is validated before any "
-            "mutation occurs. Every request item must have exactly one coverage entry. "
-            "Use `mapped` or `preserved` with intent paths, and use `unsupported` or "
-            "`inconsistent` only with a concise reason.\n\n"
-            f"Context:\n{json.dumps(context, indent=2, default=str)}\n\n"
-            "The typed submission schema is supplied separately as the function schema. "
-            "Do not repeat or paraphrase it in the response."
+        inventory_message = (
+            "Submit the compact request inventory. Do not describe MCP calls or construct "
+            "the final document. Every request item must appear exactly once.\n\n"
+            f"Context:\n{json.dumps(inventory_context, indent=2, default=str)}\n\n"
+            "The inventory schema is supplied as the function schema; do not repeat it."
         )
-        tool_definition = FunctionToolDefinition(
-            name="submit_authoring_intent",
+        inventory_tool = FunctionToolDefinition(
+            name="submit_request_inventory",
             description=(
-                "Submit one validated partial desired state and one coverage entry for "
-                "every request item. Omit fields that must be preserved."
+                "Submit one compact classification and value inventory for every request item."
             ),
-            parameters=intent_schema,
+            parameters=inventory_schema,
         )
+        stage_messages["inventory"] = len(inventory_message)
+        stage_schema_chars["inventory"] = inventory_schema_chars
         try:
-            provider_result = await self.backend.run_authoring(
-                instructions=instructions,
-                initial_user_message=initial_message,
-                tool_definitions=[tool_definition],
-                tool_caller=submit_intent,
+            raw_result = await self.backend.run_authoring(
+                instructions=inventory_instructions,
+                initial_user_message=inventory_message,
+                tool_definitions=[inventory_tool],
+                tool_caller=submit_inventory,
                 max_rounds=min(max_rounds, 3),
             )
+            stage_results.append(("inventory", normalize_result(raw_result)))
         except Exception as exc:
-            provider_result = ProviderRunResult(
-                final_text="",
-                tool_trace=(),
-                report_facts={
-                    "provider_error": _sanitize_provider_text(str(exc), limit=800)
-                    or type(exc).__name__,
-                    "extraction": {
-                        "status": _provider_exception_status(exc),
-                        "submission_attempts": submission_attempts,
-                        "tool_calls_emitted": False,
-                    },
-                },
+            provider_failure_status = _provider_exception_status(exc)
+            stage_results.append(
+                (
+                    "inventory",
+                    ProviderRunResult(
+                        final_text="",
+                        tool_trace=(),
+                        report_facts={
+                            "provider_error": _sanitize_provider_text(str(exc), limit=800)
+                            or type(exc).__name__,
+                        },
+                    ),
+                )
             )
-        report_facts = dict(getattr(provider_result, "report_facts", {}))
+
+        def compact_document(scope: AuthoringCompilationScope) -> dict[str, object]:
+            """Return only current objects relevant to one compilation scope."""
+            payload = existing.model_dump(mode="json")
+            if scope == "report":
+                keys = (
+                    "title",
+                    "subtitle",
+                    "output",
+                    "page",
+                    "depth",
+                    "header",
+                    "tail",
+                    "remarks",
+                )
+                return {key: payload[key] for key in keys if key in payload}
+
+            sections = payload.get("sections", [])
+            if not isinstance(sections, list):
+                return {"sections": []}
+            compact_sections: list[dict[str, object]] = []
+            for section in sections:
+                if not isinstance(section, dict):
+                    continue
+                compact_section = {
+                    key: deepcopy(section[key])
+                    for key in (
+                        "id",
+                        "title",
+                        "subtitle",
+                        "depth_range",
+                        "data_source",
+                    )
+                    if key in section
+                }
+                compact_tracks: list[dict[str, object]] = []
+                tracks = section.get("tracks", [])
+                if not isinstance(tracks, list):
+                    tracks = []
+                for track in tracks:
+                    if not isinstance(track, dict):
+                        continue
+                    compact_track = {
+                        key: deepcopy(track[key])
+                        for key in (
+                            "id",
+                            "title",
+                            "kind",
+                            "width_mm",
+                            "x_scale",
+                            "grid",
+                            "track_header",
+                        )
+                        if key in track
+                    }
+                    if scope == "scalar":
+                        bindings = track.get("bindings", [])
+                        compact_track["bindings"] = [
+                            deepcopy(binding)
+                            for binding in bindings
+                            if isinstance(binding, dict) and binding.get("kind", "curve") == "curve"
+                        ]
+                        compact_track["fills"] = deepcopy(track.get("fills", []))
+                    elif scope == "raster":
+                        bindings = track.get("bindings", [])
+                        compact_track["bindings"] = [
+                            deepcopy(binding)
+                            for binding in bindings
+                            if isinstance(binding, dict) and binding.get("kind") == "raster"
+                        ]
+                    elif scope == "annotation":
+                        compact_track["annotations"] = deepcopy(track.get("annotations", []))
+                    compact_tracks.append(compact_track)
+                compact_section["tracks"] = compact_tracks
+                compact_sections.append(compact_section)
+            return {"sections": compact_sections}
+
+        if inventory is not None:
+            grouped = group_request_inventory(inventory)
+            manifest_by_id = {item.item_id: item for item in request_manifest.items}
+            context_payload = context_snapshot.model_dump(mode="json")
+            for scope, inventory_items in grouped.items():
+                item_ids = {item.request_item_id for item in inventory_items}
+                scoped_manifest = AuthoringRequestManifest(
+                    items=[
+                        manifest_by_id[item_id] for item_id in manifest_by_id if item_id in item_ids
+                    ]
+                )
+                submission_model = scoped_submission_model(scope)
+                tool_name = f"submit_{scope}_intent"
+                scoped_attempts[scope] = 0
+                accepted_submission: object | None = None
+
+                async def submit_scoped_intent(
+                    name: str,
+                    arguments: dict[str, object],
+                    *,
+                    expected_name: str = tool_name,
+                    model: type = submission_model,
+                    manifest: AuthoringRequestManifest = scoped_manifest,
+                    stage: str = scope,
+                ) -> dict[str, object]:
+                    """Validate one scoped typed fragment without mutation."""
+                    nonlocal accepted_submission
+                    if name != expected_name:
+                        return {
+                            "is_error": True,
+                            "error": f"Only {expected_name} is available in this stage.",
+                        }
+                    scoped_attempts[stage] += 1
+                    if scoped_attempts[stage] > 2:
+                        return {
+                            "is_error": True,
+                            "error": (
+                                "Only one initial submission and one correction submission "
+                                f"are allowed for the {stage} scope."
+                            ),
+                        }
+                    try:
+                        candidate = model.model_validate(arguments)
+                    except Exception as exc:
+                        validation_failures.append(
+                            f"{stage}: "
+                            + (_sanitize_provider_text(str(exc), limit=800) or type(exc).__name__)
+                        )
+                        return {
+                            "is_error": True,
+                            "error": (
+                                f"Invalid {model.__name__}: {exc}. Include only the "
+                                f"canonical fields accepted by the {stage} contract."
+                            ),
+                        }
+                    errors = validate_intent_coverage(manifest, candidate.coverage)
+                    if errors:
+                        coverage_failures.append([f"{stage}: {error}" for error in errors])
+                        return {
+                            "is_error": True,
+                            "error": (
+                                f"{stage.title()} request coverage is invalid. Submit one "
+                                "correction:\n- " + "\n- ".join(errors)
+                            ),
+                        }
+                    accepted_submission = candidate
+                    return {
+                        "accepted": True,
+                        "message": (
+                            f"{stage.title()} intent validated. It will be merged and "
+                            "canonically validated before planning."
+                        ),
+                    }
+
+                scoped_context: dict[str, object] = {
+                    "draft_logfile": draft_logfile,
+                    "request_items": scoped_manifest.model_dump(mode="json"),
+                    "request_inventory": {
+                        "items": [item.model_dump(mode="json") for item in inventory_items]
+                    },
+                    "current_objects": compact_document(scope),
+                    "context_issues": context_payload.get("issues", []),
+                }
+                if scope == "report":
+                    scoped_context["header_slots"] = context_payload.get("header_slots", {})
+                else:
+                    scoped_context["section_context"] = context_payload.get("sections", [])
+                if scope in {"scalar", "raster", "annotation"}:
+                    structure_submission = scoped_submissions.get("structure")
+                    if structure_submission is not None:
+                        scoped_context["compiled_structure"] = structure_submission["intent"]
+                scoped_instructions = (
+                    "You are one scoped desired-state compiler for wellplot authoring. "
+                    f"Compile only the {scope} request items through the supplied typed "
+                    "contract. Do not call mutation tools and do not include unrelated "
+                    "object families. Omit preserved fields, use explicit clear/remove "
+                    "objects when requested, and retain every explicit label, ordering, "
+                    "scale, grid, color, line style, width, and raster value exactly. "
+                    "Use stable proposed ids and parent ids consistently; deterministic "
+                    "context resolution will apply defaults and verify source channels."
+                )
+                scoped_message = (
+                    f"Submit the {scope} typed fragment and coverage for only these "
+                    "request items. The schema is supplied as the function schema.\n\n"
+                    f"Context:\n{json.dumps(scoped_context, indent=2, default=str)}"
+                )
+                scoped_schema = submission_model.model_json_schema()
+                stage_messages[scope] = len(scoped_message)
+                stage_schema_chars[scope] = len(
+                    json.dumps(scoped_schema, separators=(",", ":"), default=str)
+                )
+                scoped_tool = FunctionToolDefinition(
+                    name=tool_name,
+                    description=(
+                        f"Submit the validated partial {scope} desired state and coverage "
+                        "for this scope's request items."
+                    ),
+                    parameters=scoped_schema,
+                )
+                try:
+                    raw_result = await self.backend.run_authoring(
+                        instructions=scoped_instructions,
+                        initial_user_message=scoped_message,
+                        tool_definitions=[scoped_tool],
+                        tool_caller=submit_scoped_intent,
+                        max_rounds=min(max_rounds, 3),
+                    )
+                    stage_results.append((scope, normalize_result(raw_result)))
+                except Exception as exc:
+                    if provider_failure_status is None:
+                        provider_failure_status = _provider_exception_status(exc)
+                    stage_results.append(
+                        (
+                            scope,
+                            ProviderRunResult(
+                                final_text="",
+                                tool_trace=(),
+                                report_facts={
+                                    "provider_error": _sanitize_provider_text(str(exc), limit=800)
+                                    or type(exc).__name__,
+                                },
+                            ),
+                        )
+                    )
+                if accepted_submission is None:
+                    failed_stages.append(scope)
+                    continue
+                fragment = accepted_submission.intent
+                fragments.append(fragment)
+                coverage.extend(accepted_submission.coverage)
+                scoped_submissions[scope] = {
+                    "intent": fragment.model_dump(mode="json", exclude_unset=True),
+                    "coverage": [
+                        entry.model_dump(mode="json") for entry in accepted_submission.coverage
+                    ],
+                }
+
+            for item in inventory.items:
+                if item.status not in {"unsupported", "inconsistent"}:
+                    continue
+                coverage.append(
+                    AuthoringIntentCoverage(
+                        request_item_id=item.request_item_id,
+                        status=item.status,
+                        reason=item.reason,
+                    )
+                )
+
+        submitted: AuthoringDocumentIntent | None = None
+        if inventory is not None and not failed_stages:
+            final_coverage_errors = validate_intent_coverage(
+                request_manifest,
+                coverage,
+            )
+            if final_coverage_errors:
+                coverage_failures.append(final_coverage_errors)
+            else:
+                try:
+                    submitted = merge_scoped_intents(fragments)
+                except Exception as exc:
+                    merge_failures.append(
+                        _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
+                    )
+
+        combined_trace = tuple(call for _, result in stage_results for call in result.tool_trace)
+        final_text = next(
+            (
+                result.final_text
+                for _, result in reversed(stage_results)
+                if result.final_text.strip()
+            ),
+            "",
+        )
+        report_facts: dict[str, object] = {}
+        provider_stages: list[dict[str, object]] = []
+        for stage, result in stage_results:
+            if result.report_facts:
+                provider_stages.append({"stage": stage, **result.report_facts})
+                for key, value in result.report_facts.items():
+                    report_facts.setdefault(key, value)
+        if provider_stages:
+            report_facts["provider_stages"] = provider_stages
         report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
+        if inventory is not None:
+            report_facts["request_inventory"] = inventory.model_dump(mode="json")
         report_facts["provider_contract"] = {
-            "tool_name": "submit_authoring_intent",
-            "message_chars": len(initial_message),
-            "tool_schema_chars": intent_schema_chars,
+            "tool_name": "submit_request_inventory",
+            "tool_names": [
+                "submit_request_inventory",
+                *[f"submit_{scope}_intent" for scope in stage_schema_chars if scope != "inventory"],
+            ],
+            "message_chars": sum(stage_messages.values()),
+            "stage_message_chars": stage_messages,
+            "tool_schema_chars": max(stage_schema_chars.values(), default=0),
+            "stage_tool_schema_chars": stage_schema_chars,
             "request_inventory_schema_chars": inventory_schema_chars,
+            "full_intent_schema_chars": len(
+                json.dumps(
+                    AuthoringDocumentIntent.model_json_schema(),
+                    separators=(",", ":"),
+                    default=str,
+                )
+            ),
             "schema_repeated_in_message": False,
         }
-        if submission is not None:
-            report_facts["submitted_intent"] = submission.intent.model_dump(
+        if scoped_submissions:
+            report_facts["scoped_submissions"] = scoped_submissions
+        if submitted is not None:
+            report_facts["submitted_intent"] = submitted.model_dump(
                 mode="json",
                 exclude_unset=True,
             )
-            report_facts["request_coverage"] = [
-                entry.model_dump(mode="json") for entry in submission.coverage
-            ]
+            report_facts["request_coverage"] = [entry.model_dump(mode="json") for entry in coverage]
             report_facts["request_inconsistencies"] = [
                 f"{entry.request_item_id}: {entry.reason}"
-                for entry in submission.coverage
+                for entry in coverage
                 if entry.status in {"unsupported", "inconsistent"} and entry.reason
             ]
-        elif coverage_errors:
-            report_facts["reasons"] = list(report_facts.get("reasons", [])) + [
-                "Request coverage validation failed: " + "; ".join(coverage_errors)
+        elif coverage_failures or inventory_failures or merge_failures:
+            reasons = [
+                error for failure in (*inventory_failures, *coverage_failures) for error in failure
             ]
-        extraction_facts = dict(
-            report_facts.get("extraction", {})
-            if isinstance(report_facts.get("extraction"), dict)
-            else {}
-        )
-        if submission is not None:
+            reasons.extend(merge_failures)
+            report_facts["reasons"] = list(report_facts.get("reasons", [])) + [
+                "Desired-state compilation failed: " + "; ".join(reasons)
+            ]
+        if submitted is not None:
             extraction_status = "submitted"
-        elif extraction_facts.get("status"):
-            extraction_status = str(extraction_facts["status"])
+        elif provider_failure_status:
+            extraction_status = provider_failure_status
+        elif merge_failures:
+            extraction_status = "merge_failed"
+        elif inventory_failures:
+            extraction_status = "inventory_coverage_failed"
         elif coverage_failures:
             extraction_status = "coverage_failed"
         elif validation_failures:
             extraction_status = "schema_validation_failed"
-        elif provider_result.tool_trace:
+        elif combined_trace:
             extraction_status = "submission_rejected"
         else:
             extraction_status = "no_tool_call"
-        extraction_facts.update(
-            {
-                "status": extraction_status,
-                "submission_attempts": submission_attempts,
-                "tool_calls_emitted": bool(provider_result.tool_trace),
-                "validation_failures": validation_failures,
-                "coverage_failures": coverage_failures,
-            }
-        )
-        provider_text = _sanitize_provider_text(provider_result.final_text)
-        if provider_text is not None and submission is None:
+        extraction_facts: dict[str, object] = {
+            "status": extraction_status,
+            "submission_attempts": inventory_attempts + sum(scoped_attempts.values()),
+            "inventory_attempts": inventory_attempts,
+            "scoped_attempts": scoped_attempts,
+            "tool_calls_emitted": bool(combined_trace),
+            "validation_failures": validation_failures,
+            "inventory_failures": inventory_failures,
+            "coverage_failures": coverage_failures,
+            "merge_failures": merge_failures,
+            "failed_stages": failed_stages,
+        }
+        provider_text = _sanitize_provider_text(final_text)
+        if provider_text is not None and submitted is None:
             extraction_facts["provider_text"] = provider_text
         report_facts["extraction"] = extraction_facts
         return (
             ProviderRunResult(
-                final_text=provider_result.final_text,
-                tool_trace=provider_result.tool_trace,
+                final_text=final_text,
+                tool_trace=combined_trace,
                 report_facts=report_facts,
             ),
             submitted,
@@ -5142,9 +5447,7 @@ class AuthoringSession:
             run_state=run_state,
             needs_clarification=needs_clarification,
             request_coverage=request_coverage,
-            defaults_provenance=(
-                {} if plan is None else dict(plan.defaults_provenance)
-            ),
+            defaults_provenance=({} if plan is None else dict(plan.defaults_provenance)),
             submitted_intent=submitted_intent,
             report_facts=report_facts,
             user_report=_build_user_report(
@@ -5222,9 +5525,7 @@ class AuthoringSession:
             report_facts = dict(provider_result.report_facts)
             extraction_facts = report_facts.get("extraction", {})
             extraction_status = (
-                extraction_facts.get("status")
-                if isinstance(extraction_facts, dict)
-                else None
+                extraction_facts.get("status") if isinstance(extraction_facts, dict) else None
             )
             if extraction_status == "no_tool_call":
                 extraction_reason = (
@@ -5269,9 +5570,7 @@ class AuthoringSession:
                     "Retry with a provider/model that supports the typed authoring submission "
                     "contract."
                 )
-            report_facts["not_done"] = [
-                "Extract a typed desired state from the request."
-            ]
+            report_facts["not_done"] = ["Extract a typed desired state from the request."]
             report_facts["reasons"] = [extraction_reason]
             report_facts["next_help"] = [extraction_next_help]
             provider_error = report_facts.get("provider_error")
