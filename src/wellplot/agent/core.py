@@ -5578,6 +5578,13 @@ class AuthoringSession:
                 extraction_next_help = (
                     "Retry with a provider that can return complete request coverage."
                 )
+            elif extraction_status == "merge_failed":
+                extraction_reason = (
+                    "The provider submission could not be merged into one canonical desired state."
+                )
+                extraction_next_help = (
+                    "Retry after correcting the reported canonical field or identity conflict."
+                )
             else:
                 extraction_reason = "Typed authoring extraction did not produce a valid submission."
                 extraction_next_help = (
@@ -5585,7 +5592,11 @@ class AuthoringSession:
                     "contract."
                 )
             report_facts["not_done"] = ["Extract a typed desired state from the request."]
-            report_facts["reasons"] = [extraction_reason]
+            existing_reasons = report_facts.get("reasons")
+            reasons = list(existing_reasons) if isinstance(existing_reasons, list) else []
+            if extraction_reason not in reasons:
+                reasons.append(extraction_reason)
+            report_facts["reasons"] = reasons
             report_facts["next_help"] = [extraction_next_help]
             provider_error = report_facts.get("provider_error")
             if isinstance(provider_error, str) and provider_error.strip():

@@ -12,9 +12,9 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from copy import deepcopy
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 
 from ..model.intent import (
     AuthoringClearIntent,
@@ -132,6 +132,17 @@ class _ScopedCompilationModel(BaseModel):
     """Strict base for generated provider-facing scoped intent views."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    @model_validator(mode="after")
+    def reject_explicit_nulls(self) -> Self:
+        """Keep scoped submissions consistent with canonical intent semantics."""
+        for field_name in self.model_fields_set:
+            if getattr(self, field_name) is None:
+                raise ValueError(
+                    f"Intent field '{field_name}' cannot be null; use "
+                    '{"operation": "clear"} to clear it explicitly.'
+                )
+        return self
 
 
 def _project_model(

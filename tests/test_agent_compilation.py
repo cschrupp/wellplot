@@ -229,6 +229,32 @@ def test_scoped_submission_schemas_exclude_unrelated_families() -> None:
     assert scoped_submission_model("scalar") is AuthoringScalarIntentSubmission
 
 
+def test_scoped_submission_rejects_explicit_nulls_before_canonical_merge() -> None:
+    """Return raw nulls to the provider instead of falsely accepting them."""
+    with pytest.raises(ValueError, match="Intent field 'subtitle' cannot be null"):
+        AuthoringReportIntentSubmission.model_validate(
+            {
+                "intent": {
+                    "subtitle": None,
+                    "remarks": [
+                        {
+                            "remark_id": "source_note",
+                            "title": "Source note",
+                            "text": "Inspect the source before plotting channels.",
+                        }
+                    ],
+                },
+                "coverage": [
+                    {
+                        "request_item_id": "request-001",
+                        "status": "mapped",
+                        "intent_paths": ["remarks"],
+                    }
+                ],
+            }
+        )
+
+
 def test_scoped_intents_merge_into_canonical_desired_state() -> None:
     """Preserve explicit values while merging independently validated fragments."""
     report = AuthoringReportIntentSubmission.model_validate(

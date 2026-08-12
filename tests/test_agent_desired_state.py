@@ -16,6 +16,7 @@ from types import SimpleNamespace
 import anyio
 
 from wellplot.agent import AuthoringRequest, AuthoringSession
+from wellplot.agent.core import ProviderRunResult
 from wellplot.authoring import (
     authoring_document_from_mapping,
     authoring_document_to_yaml,
@@ -433,3 +434,47 @@ def test_blocked_provider_plan_preserves_submitted_intent(tmp_path: Path) -> Non
     assert result.plan.blocked is True
     assert result.submitted_intent is not None
     assert result.submitted_intent["curve_bindings"][0]["channel"] == "NOT_AVAILABLE"
+
+
+def test_merge_failure_report_preserves_the_canonical_diagnostic(tmp_path: Path) -> None:
+    """Keep the exact compiler reason instead of replacing it with provider advice."""
+
+    class _MergeFailureSession(AuthoringSession):
+        async def _extract_desired_state(self, **_: object) -> tuple[ProviderRunResult, None]:
+            return (
+                ProviderRunResult(
+                    final_text="",
+                    tool_trace=(),
+                    report_facts={
+                        "reasons": [
+                            "Desired-state compilation failed: Intent field 'subtitle' "
+                            "cannot be null."
+                        ],
+                        "extraction": {"status": "merge_failed"},
+                    },
+                ),
+                None,
+            )
+
+    class _MergeFailureBackend(_NoProviderBackend):
+        supports_desired_state = True
+
+    runtime = _TypedRuntime(tmp_path)
+    session = _MergeFailureSession(backend=_MergeFailureBackend(), runtime=runtime)
+
+    result = anyio.run(
+        session.run_request,
+        AuthoringRequest(
+            goal="Add a remarks block.",
+            output_logfile="workspace/demo.log.yaml",
+            example_id="demo",
+        ),
+    )
+
+    assert "Desired-state compilation failed: Intent field 'subtitle' cannot be null." in (
+        result.user_report.why_not
+    )
+    assert (
+        "The provider submission could not be merged into one canonical desired state."
+        in result.user_report.why_not
+    )
