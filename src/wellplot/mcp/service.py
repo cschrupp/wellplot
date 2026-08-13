@@ -65,18 +65,22 @@ from ..authoring_service import (
     CreateRemarkRequest,
     CurveBindingPatch,
     DepthPatch,
+    HeaderValuePatch,
     PagePatch,
     RasterBindingPatch,
     RemarkPatch,
     RemoveRequest,
     SectionPatch,
+    ServiceTitlePatch,
     TrackPatch,
     UpdateAnnotationRequest,
     UpdateCurveBindingRequest,
     UpdateDepthRequest,
+    UpdateHeaderSlotRequest,
     UpdatePageRequest,
     UpdateRasterBindingRequest,
     UpdateSectionRequest,
+    UpdateServiceTitleRequest,
     UpdateTrackRequest,
     authoring_hierarchy_catalog,
     authoring_operation_json_schema,
@@ -895,6 +899,16 @@ class HeadingContentResult:
     has_heading: bool
     has_tail: bool
     heading: dict[str, object]
+
+
+@dataclass(slots=True)
+class UpdatedHeaderObjectResult:
+    """Structured result for one stable header-slot mutation."""
+
+    logfile_path: str
+    object_kind: str
+    slot_id: str
+    object: dict[str, object]
 
 
 @dataclass(slots=True)
@@ -3862,6 +3876,8 @@ def inspect_authoring_objects(
     allowed_kinds = {
         "page",
         "depth",
+        "header_slot",
+        "service_title",
         "section",
         "track",
         "curve_binding",
@@ -7531,6 +7547,76 @@ def set_heading_content(
         has_heading=bool(saved_heading),
         has_tail=_layout_has_tail(saved_layout),
         heading=saved_heading,
+    )
+
+
+def update_header_slot(
+    logfile_path: str,
+    *,
+    slot_id: str,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedHeaderObjectResult:
+    """Update one general/detail header value without replacing its header."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    authoring = AuthoringService.from_mapping(mapping)
+    updated = authoring.update(
+        UpdateHeaderSlotRequest(
+            slot_id=slot_id,
+            patch=HeaderValuePatch.model_validate(patch),
+        )
+    )
+    canonical_mapping = authoring_document_to_logfile_mapping(authoring.document)
+    _persist_validated_logfile_mapping(
+        canonical_mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    return UpdatedHeaderObjectResult(
+        logfile_path=str(resolved_logfile),
+        object_kind="header_slot",
+        slot_id=slot_id,
+        object=updated.model_dump(mode="json", exclude={"extensions"}),
+    )
+
+
+def update_service_title(
+    logfile_path: str,
+    *,
+    slot_id: str,
+    patch: dict[str, object],
+    root: str | Path | None = None,
+) -> UpdatedHeaderObjectResult:
+    """Update one service title without replacing sibling header objects."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    _, mapping = _normalize_logfile_mapping_from_path(
+        resolved_logfile,
+        allowed_root=server_root,
+    )
+    authoring = AuthoringService.from_mapping(mapping)
+    updated = authoring.update(
+        UpdateServiceTitleRequest(
+            slot_id=slot_id,
+            patch=ServiceTitlePatch.model_validate(patch),
+        )
+    )
+    canonical_mapping = authoring_document_to_logfile_mapping(authoring.document)
+    _persist_validated_logfile_mapping(
+        canonical_mapping,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    return UpdatedHeaderObjectResult(
+        logfile_path=str(resolved_logfile),
+        object_kind="service_title",
+        slot_id=slot_id,
+        object=updated.model_dump(mode="json", exclude={"extensions"}),
     )
 
 

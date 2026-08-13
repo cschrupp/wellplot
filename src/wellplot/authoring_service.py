@@ -58,8 +58,10 @@ from .model.authoring import (
     AuthoringReferenceEventSpec,
     AuthoringReferenceOverlaySpec,
     AuthoringRemarkSpec,
+    AuthoringReportValueSpec,
     AuthoringScale,
     AuthoringSectionSpec,
+    AuthoringServiceTitleSpec,
     AuthoringStyle,
     AuthoringTailSpec,
     AuthoringTrackHeaderPatch,
@@ -85,6 +87,8 @@ AuthoringObjectKind: TypeAlias = Literal[
     "depth",
     "output",
     "header",
+    "header_slot",
+    "service_title",
     "tail",
     "section",
     "track",
@@ -120,6 +124,42 @@ class AuthoringValidationResult(_OperationModel):
 
     valid: bool
     errors: list[str] = Field(default_factory=list)
+
+
+class HeaderValuePatch(_OperationModel):
+    """Typed mutable fields for one header value slot."""
+
+    value: str | None = None
+    source_key: str | None = None
+    unit: str | None = None
+    provenance: Literal["unknown", "source", "user", "default", "preserved"] | None = None
+    availability: Literal["unknown", "available", "missing", "not_applicable"] | None = None
+
+
+class ServiceTitlePatch(HeaderValuePatch):
+    """Typed mutable fields for one service title and its presentation."""
+
+    font_size: float | None = Field(default=None, gt=0)
+    auto_adjust: bool | None = None
+    bold: bool | None = None
+    italic: bool | None = None
+    alignment: Literal["left", "center", "right"] | None = None
+
+
+class UpdateHeaderSlotRequest(_OperationModel):
+    """Update one header value slot without replacing the header structure."""
+
+    kind: Literal["header_slot"] = "header_slot"
+    slot_id: str = Field(min_length=1)
+    patch: HeaderValuePatch
+
+
+class UpdateServiceTitleRequest(_OperationModel):
+    """Update one service title without replacing sibling header objects."""
+
+    kind: Literal["service_title"] = "service_title"
+    slot_id: str = Field(min_length=1)
+    patch: ServiceTitlePatch
 
 
 class ReportPatch(_OperationModel):
@@ -440,6 +480,8 @@ UpdateRequest: TypeAlias = Annotated[
     | UpdatePageRequest
     | UpdateOutputRequest
     | UpdateHeaderRequest
+    | UpdateHeaderSlotRequest
+    | UpdateServiceTitleRequest
     | UpdateTailRequest
     | UpdateDepthRequest
     | UpdateSectionRequest
@@ -474,6 +516,8 @@ AuthoringObject: TypeAlias = (
     | AuthoringDepthSpec
     | AuthoringOutputSpec
     | AuthoringHeaderSpec
+    | AuthoringReportValueSpec
+    | AuthoringServiceTitleSpec
     | AuthoringTailSpec
     | AuthoringSectionSpec
     | TrackSpec
@@ -529,12 +573,32 @@ _HIERARCHY_NODE_DEFINITIONS: tuple[dict[str, object], ...] = (
     {
         "object_kind": "header",
         "parent_kind": "report",
-        "children": (),
+        "children": ("header_slot", "service_title"),
         "identity_field": "object_id",
         "parent_fields": (),
         "operations": ("list", "get", "update", "validate"),
         "canonical_contract": "AuthoringHeaderSpec",
         "update_request": UpdateHeaderRequest,
+    },
+    {
+        "object_kind": "header_slot",
+        "parent_kind": "header",
+        "children": (),
+        "identity_field": "slot_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringReportValueSpec",
+        "update_request": UpdateHeaderSlotRequest,
+    },
+    {
+        "object_kind": "service_title",
+        "parent_kind": "header",
+        "children": (),
+        "identity_field": "slot_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringServiceTitleSpec",
+        "update_request": UpdateServiceTitleRequest,
     },
     {
         "object_kind": "remark",
@@ -653,6 +717,8 @@ _HIERARCHY_CANONICAL_MODELS: dict[str, object] = {
     "page": AuthoringPageSpec,
     "depth": AuthoringDepthSpec,
     "header": AuthoringHeaderSpec,
+    "header_slot": AuthoringReportValueSpec,
+    "service_title": AuthoringServiceTitleSpec,
     "remark": AuthoringRemarkSpec,
     "tail": AuthoringTailSpec,
     "section": AuthoringSectionSpec,
@@ -746,6 +812,46 @@ class AuthoringService:
                     index=0,
                 )
             ]
+        if object_kind in {"header_slot", "service_title"}:
+            header = self._document.header
+            if header is None:
+                return []
+            refs: list[AuthoringObjectRef] = []
+            if object_kind == "header_slot":
+                slot_index = 0
+                for field in header.general_fields:
+                    refs.append(
+                        AuthoringObjectRef(
+                            object_kind=object_kind,
+                            object_id=field.slot_id,
+                            index=slot_index,
+                        )
+                    )
+                    slot_index += 1
+                if header.detail is not None:
+                    for row in header.detail.rows:
+                        cells = list(row.values)
+                        for column in row.columns:
+                            cells.extend(column.cells)
+                        for cell in cells:
+                            refs.append(
+                                AuthoringObjectRef(
+                                    object_kind=object_kind,
+                                    object_id=cell.slot_id,
+                                    index=slot_index,
+                                )
+                            )
+                            slot_index += 1
+            else:
+                refs = [
+                    AuthoringObjectRef(
+                        object_kind=object_kind,
+                        object_id=title.slot_id,
+                        index=index,
+                    )
+                    for index, title in enumerate(header.service_titles)
+                ]
+            return refs
         if object_kind == "section":
             for index, section in enumerate(self._document.sections):
                 refs.append(
@@ -837,6 +943,10 @@ class AuthoringService:
             return deepcopy(self._document.output)
         if target.object_kind == "header":
             return deepcopy(self._document.header or AuthoringHeaderSpec())
+        if target.object_kind == "header_slot":
+            return deepcopy(self._find_header_slot_in(self._document, target.object_id))
+        if target.object_kind == "service_title":
+            return deepcopy(self._find_service_title_in(self._document, target.object_id))
         if target.object_kind == "tail":
             return deepcopy(self._document.tail)
         if target.object_kind == "section":
@@ -964,6 +1074,32 @@ class AuthoringService:
         if isinstance(request, UpdateHeaderRequest):
             self._commit(lambda document: setattr(document, "header", deepcopy(request.header)))
             return self.get(AuthoringTarget(object_kind="header", object_id="header"))
+        if isinstance(request, UpdateHeaderSlotRequest):
+            self._commit(
+                lambda document: self._patch_model(
+                    self._find_header_slot_in(document, request.slot_id),
+                    request.patch,
+                )
+            )
+            return self.get(AuthoringTarget(object_kind="header_slot", object_id=request.slot_id))
+        if isinstance(request, UpdateServiceTitleRequest):
+
+            def patch_service_title(document: AuthoringDocumentSpec) -> None:
+                title = self._find_service_title_in(document, request.slot_id)
+                value_fields = set(HeaderValuePatch.model_fields)
+                value_patch = HeaderValuePatch.model_validate(
+                    {
+                        field_name: getattr(request.patch, field_name)
+                        for field_name in value_fields
+                        if field_name in request.patch.model_fields_set
+                    }
+                )
+                self._patch_model(title.value, value_patch)
+                for field_name in request.patch.model_fields_set - value_fields:
+                    setattr(title, field_name, deepcopy(getattr(request.patch, field_name)))
+
+            self._commit(patch_service_title)
+            return self.get(AuthoringTarget(object_kind="service_title", object_id=request.slot_id))
         if isinstance(request, UpdateTailRequest):
             self._commit(lambda document: setattr(document, "tail", deepcopy(request.tail)))
             return self.get(AuthoringTarget(object_kind="tail", object_id="tail"))
@@ -1078,6 +1214,8 @@ class AuthoringService:
             "depth",
             "output",
             "header",
+            "header_slot",
+            "service_title",
             "tail",
         }:
             raise ValueError(f"Cannot remove document-level {request.target.object_kind} settings.")
@@ -1158,6 +1296,43 @@ class AuthoringService:
         """Apply only fields explicitly supplied by a typed patch model."""
         for field_name in patch.model_fields_set:
             setattr(model, field_name, deepcopy(getattr(patch, field_name)))
+
+    @staticmethod
+    def _find_header_slot_in(
+        document: AuthoringDocumentSpec,
+        slot_id: str,
+    ) -> AuthoringReportValueSpec:
+        """Find one general or detail-table header value by stable slot id."""
+        header = document.header
+        if header is None:
+            raise KeyError(f"Unknown header slot {slot_id!r}: document has no header.")
+        for field in header.general_fields:
+            if field.slot_id == slot_id:
+                return field.value
+        if header.detail is not None:
+            for row in header.detail.rows:
+                for cell in row.values:
+                    if cell.slot_id == slot_id:
+                        return cell.value
+                for column in row.columns:
+                    for cell in column.cells:
+                        if cell.slot_id == slot_id:
+                            return cell.value
+        raise KeyError(f"Unknown header slot {slot_id!r}.")
+
+    @staticmethod
+    def _find_service_title_in(
+        document: AuthoringDocumentSpec,
+        slot_id: str,
+    ) -> AuthoringServiceTitleSpec:
+        """Find one service title by stable slot id."""
+        header = document.header
+        if header is None:
+            raise KeyError(f"Unknown service title {slot_id!r}: document has no header.")
+        for title in header.service_titles:
+            if title.slot_id == slot_id:
+                return title
+        raise KeyError(f"Unknown service title {slot_id!r}.")
 
     @staticmethod
     def _patch_track(track: TrackSpec, patch: TrackPatch) -> None:
@@ -1738,6 +1913,8 @@ __all__ = [
     "AuthoringStylePatch",
     "AuthoringTarget",
     "AuthoringValidationResult",
+    "HeaderValuePatch",
+    "ServiceTitlePatch",
     "CreateAnnotationRequest",
     "CreateCurveBindingRequest",
     "CreateFillRequest",
@@ -1762,6 +1939,7 @@ __all__ = [
     "UpdateDepthRequest",
     "UpdateFillRequest",
     "UpdateHeaderRequest",
+    "UpdateHeaderSlotRequest",
     "UpdateOutputRequest",
     "UpdatePageRequest",
     "UpdateReportRequest",
@@ -1769,6 +1947,7 @@ __all__ = [
     "UpdateRemarkRequest",
     "UpdateRequest",
     "UpdateSectionRequest",
+    "UpdateServiceTitleRequest",
     "UpdateTailRequest",
     "UpdateTrackRequest",
     "authoring_hierarchy_catalog",

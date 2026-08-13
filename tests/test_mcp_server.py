@@ -667,6 +667,8 @@ class McpServerIntegrationTests(unittest.TestCase):
                 "clear_track_bindings",
                 "move_track",
                 "set_heading_content",
+                "update_header_slot",
+                "update_service_title",
                 "set_remarks_content",
                 "inspect_header_archetypes",
                 "inspect_packet_blueprints",

@@ -25,9 +25,11 @@ from wellplot.authoring_service import (
     UpdateCurveBindingRequest,
     UpdateDepthRequest,
     UpdateHeaderRequest,
+    UpdateHeaderSlotRequest,
     UpdateOutputRequest,
     UpdatePageRequest,
     UpdateSectionRequest,
+    UpdateServiceTitleRequest,
     UpdateTailRequest,
     UpdateTrackRequest,
     authoring_hierarchy_catalog,
@@ -41,8 +43,10 @@ from wellplot.model.authoring import (
     AuthoringHeaderSpec,
     AuthoringOutputSpec,
     AuthoringRemarkSpec,
+    AuthoringReportValueSpec,
     AuthoringScale,
     AuthoringScaleKind,
+    AuthoringServiceTitleSpec,
     CurveBindingSpec,
     CurveFillSpec,
     NormalTrackSpec,
@@ -143,8 +147,71 @@ def test_hierarchy_catalog_is_generated_from_canonical_contracts() -> None:
 
     header = authoring_hierarchy_catalog("header")["nodes"][0]
     assert "sections" not in header["canonical_schema"]["properties"]
-    assert "track" not in header["children"]
+    assert header["children"] == ["header_slot", "service_title"]
     assert header["fields"]["provider_name"]["category"] == "constrained"
+
+
+def test_header_slot_and_service_title_updates_preserve_siblings() -> None:
+    """Patch one header object without replacing other header objects."""
+    service = _service()
+    service.update(
+        UpdateHeaderRequest(
+            header=AuthoringHeaderSpec(
+                provider_name="Company",
+                general_fields=[
+                    AuthoringHeaderFieldSpec(
+                        slot_id="company",
+                        key="company",
+                        label="Company",
+                        value=AuthoringReportValueSpec(value="Old Company"),
+                    ),
+                    AuthoringHeaderFieldSpec(
+                        slot_id="well",
+                        key="well",
+                        label="Well",
+                        value=AuthoringReportValueSpec(value="Well-1"),
+                    ),
+                ],
+                service_titles=[
+                    AuthoringServiceTitleSpec(
+                        slot_id="service-1",
+                        value=AuthoringReportValueSpec(value="CBL"),
+                        bold=True,
+                    ),
+                    AuthoringServiceTitleSpec(
+                        slot_id="service-2",
+                        value=AuthoringReportValueSpec(value="VDL"),
+                    ),
+                ],
+            )
+        )
+    )
+
+    updated_slot = service.update(
+        UpdateHeaderSlotRequest(
+            slot_id="company",
+            patch={"value": "New Company", "provenance": "user"},
+        )
+    )
+    assert updated_slot.value == "New Company"
+    assert updated_slot.provenance == "user"
+    assert (
+        service.get(AuthoringTarget(object_kind="header_slot", object_id="well")).value == "Well-1"
+    )
+
+    updated_title = service.update(
+        UpdateServiceTitleRequest(
+            slot_id="service-1",
+            patch={"value": "CBL Amplitude", "italic": True},
+        )
+    )
+    assert updated_title.value.value == "CBL Amplitude"
+    assert updated_title.bold is True
+    assert updated_title.italic is True
+    assert (
+        service.get(AuthoringTarget(object_kind="service_title", object_id="service-2")).value.value
+        == "VDL"
+    )
 
 
 def test_hierarchy_catalog_rejects_unknown_object_kind() -> None:

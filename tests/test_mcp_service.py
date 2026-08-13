@@ -2484,6 +2484,65 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(layout["tail"]["enabled"], True)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_header_object_updates_persist_and_preserve_siblings(self) -> None:
+        """Patch stable header objects through MCP service wrappers."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            self._seed_header_mapping_draft(draft_path)
+
+            header_slots = service.inspect_authoring_objects(
+                str(draft_path),
+                object_kind="header_slot",
+                root=REPO_ROOT,
+            )
+            service_titles = service.inspect_authoring_objects(
+                str(draft_path),
+                object_kind="service_title",
+                root=REPO_ROOT,
+            )
+            self.assertGreaterEqual(header_slots.count, 2)
+            self.assertEqual(service_titles.count, 1)
+
+            company_slot = header_slots.objects[0]["ref"]["object_id"]
+            well_slot = header_slots.objects[1]["ref"]["object_id"]
+            title_slot = service_titles.objects[0]["ref"]["object_id"]
+            updated_company = service.update_header_slot(
+                str(draft_path),
+                slot_id=str(company_slot),
+                patch={"value": "Updated Company", "provenance": "user"},
+                root=REPO_ROOT,
+            )
+            updated_title = service.update_service_title(
+                str(draft_path),
+                slot_id=str(title_slot),
+                patch={"value": "Updated Service", "italic": True},
+                root=REPO_ROOT,
+            )
+
+            self.assertEqual(updated_company.object["value"], "Updated Company")
+            self.assertEqual(updated_title.object["value"]["value"], "Updated Service")
+            self.assertTrue(updated_title.object["italic"])
+            reloaded_slots = service.inspect_authoring_objects(
+                str(draft_path),
+                object_kind="header_slot",
+                root=REPO_ROOT,
+            )
+            reloaded_titles = service.inspect_authoring_objects(
+                str(draft_path),
+                object_kind="service_title",
+                root=REPO_ROOT,
+            )
+            values_by_id = {
+                str(item["ref"]["object_id"]): item["object"] for item in reloaded_slots.objects
+            }
+            self.assertEqual(values_by_id[str(company_slot)]["value"], "Updated Company")
+            self.assertIsNone(values_by_id[str(well_slot)]["value"])
+            self.assertEqual(
+                reloaded_titles.objects[0]["object"]["value"]["value"],
+                "Updated Service",
+            )
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_set_remarks_content_replaces_remarks(self) -> None:
         """Replace the first-page remarks block and persist the new content."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:

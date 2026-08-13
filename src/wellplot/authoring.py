@@ -837,6 +837,13 @@ def _report_value_from_legacy(
     data: dict[str, Any]
     if isinstance(value, Mapping):
         data = dict(value)
+        nested_value = data.get("value")
+        if isinstance(nested_value, Mapping):
+            nested_data = dict(nested_value)
+            for key in ("source_key", "default", "unit", "provenance", "availability"):
+                if key in data and key not in nested_data:
+                    nested_data[key] = data[key]
+            data = nested_data
     elif value is None:
         data = {}
     else:

@@ -97,6 +97,14 @@ Primary form objects:
 - `remarks`
 - `tail`
 
+Header content is further divided into stable child objects:
+
+- `header_slot` for one general or detail-table value
+- `service_title` for one service-title value and its presentation properties
+
+These children are independently readable and patchable. Updating one value
+must not replace the complete header or clear sibling slots.
+
 Track subtypes are form specializations:
 
 - `reference` track

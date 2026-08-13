@@ -847,6 +847,38 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def update_header_slot(
+        logfile_path: str,
+        slot_id: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Update one stable general/detail header slot without replacing the header."""
+        return asdict(
+            service.update_header_slot(
+                logfile_path,
+                slot_id=slot_id,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
+    def update_service_title(
+        logfile_path: str,
+        slot_id: str,
+        patch: dict[str, object],
+    ) -> dict[str, object]:
+        """Update one stable service-title slot without replacing sibling titles."""
+        return asdict(
+            service.update_service_title(
+                logfile_path,
+                slot_id=slot_id,
+                patch=patch,
+                root=server_root,
+            )
+        )
+
+    @mcp.tool()
     def set_remarks_content(
         logfile_path: str,
         remarks: list[dict[str, object]],

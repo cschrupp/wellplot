@@ -583,8 +583,13 @@ Longer-term / UI-centric:
 - `0.6-K1` is implemented: the generated hierarchy/operation catalog and
   focused inspection parity are available through the canonical service and
   MCP resource/tool surface.
-- Implement `0.6-K2` through `0.6-K7` in separate reviewable commits, starting
-  with bounded object mutation parity.
+- `0.6-K2` is implemented for bounded canonical mutation parity: stable
+  header-slot and service-title updates now preserve sibling header objects,
+  return typed read-back objects, and are exposed through MCP tools. The
+  canonical-to-legacy adapter also preserves nested header values across
+  reloads.
+- Implement `0.6-K3` through `0.6-K7` in separate reviewable commits, starting
+  with the hierarchy-scoped request router.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

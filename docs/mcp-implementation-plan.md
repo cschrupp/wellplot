@@ -1822,6 +1822,8 @@ Acceptance:
 
 ### 0.6-K2. Complete Bounded Object Mutation Parity
 
+Status: implemented in the current development branch.
+
 Goal:
 
 - make every supported persisted mutation expressible as one typed operation
@@ -1849,6 +1851,16 @@ Acceptance:
 - create/update/remove/move operations round-trip through canonical YAML and
   read back through the matching getter
 - no mutation requires a caller to patch an arbitrary YAML mapping
+
+Implementation note:
+
+- `AuthoringService` now exposes stable `header_slot` and `service_title`
+  identities with typed partial updates.
+- MCP exposes `update_header_slot(...)` and `update_service_title(...)`; both
+  persist through the canonical-to-legacy adapter and return the updated
+  canonical object for read-back verification.
+- Nested report-value mappings are normalized without stringifying their
+  structured value during a subsequent load.
 
 ### 0.6-K3. Hierarchical Request Router
 

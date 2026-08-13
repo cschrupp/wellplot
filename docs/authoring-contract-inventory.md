@@ -25,6 +25,11 @@ The first implementation slice now includes:
 - `wellplot.authoring` compatibility adapters for legacy logfile mappings,
   normalized canonical YAML, template loading, and render conversion
 
+Header fields and service titles now carry stable canonical slot identities.
+The deterministic service and MCP expose bounded updates for those child
+objects, so filling one header value does not require replacing the complete
+header mapping.
+
 The canonical models are now wired to the YAML compatibility boundary and the
 existing render dataclasses. The deterministic object service now provides
 typed atomic operations over those models. The Python builder and MCP
