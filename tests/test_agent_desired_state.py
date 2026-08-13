@@ -346,6 +346,7 @@ def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_pa
     assert "Updated report title." not in result.user_report.done
     assert result.operation_outcomes
     assert result.operation_outcomes[0]["postcondition_verified"] is True
+    assert result.operation_outcomes[0]["verification"]["after"]["value"]["title"] == "Revised"
     assert result.operation_outcomes[0]["object_kind"] == "report"
     assert result.phase_summaries
     saved = load_authoring_document(

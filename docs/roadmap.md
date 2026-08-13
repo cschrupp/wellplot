@@ -607,9 +607,12 @@ Longer-term / UI-centric:
   typed report, structure, scalar, raster, and annotation submissions. It is
   covered across non-packet-specific object families and keeps the normal
   agent path unchanged until parity is demonstrated.
-- Implement `0.6-K7.2`: route the normal agent path through the bridge,
-  deterministic transaction executor, and verifier; then complete
-  cross-domain parity before release.
+- `0.6-K7.2` now routes typed desired-state execution through the generic
+  bridge, deterministic transaction executor, and verifier. Phase checkpoints
+  and typed before/after evidence feed the existing agent report and preview
+  surface.
+- Complete the remaining K7 acceptance work: legacy provider-tool authoring,
+  cross-domain parity, clean notebook runs, and release-gate validation.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

@@ -2060,8 +2060,9 @@ provider-to-typed-operation migration remains K7 work.
 
 ### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
 
-Implementation status: K7.1 generic reconciliation bridging is implemented;
-normal-agent routing and end-to-end migration remain K7.2 work.
+Implementation status: K7.2 typed desired-state routing and phase evidence are
+implemented; legacy provider-tool authoring and full cross-domain acceptance
+remain before K7 closure.
 
 Goal:
 
@@ -2096,8 +2097,12 @@ Implementation note for K7.1:
   stable parent/child identities and dependencies, and applies the same
   explicit clear-marker semantics as the deterministic executor.
 - This is a migration seam, not a second authoring path. The normal agent
-  still uses the existing G5 executor until K7.2 routes it through the bridge
-  and records parity evidence.
+  now routes typed desired-state execution through the bridge and records
+  parity evidence through the typed transaction boundary.
+- Typed execution preserves phase checkpoints, so the existing agent
+  preview/report layer receives snapshots only after verified branch
+  operations. Public operation outcomes retain typed canonical evidence,
+  including requested values and before/after targets.
 
 Acceptance:
 

@@ -161,6 +161,15 @@ def _resolve_clears(value: object, defaults: object | None = None) -> object:
     return _plain(value)
 
 
+def _omit_undefined(value: object) -> object:
+    """Drop omitted optional fields before validating a complete create object."""
+    if isinstance(value, Mapping):
+        return {key: _omit_undefined(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [_omit_undefined(item) for item in value]
+    return value
+
+
 def _scope_for(operation: AuthoringOperation) -> AuthoringCompilationScope:
     """Return the typed submission branch for one canonical object kind."""
     try:
@@ -335,7 +344,7 @@ def _update_request(
 
 def _create_request(operation: AuthoringOperation) -> CreateRequest:
     """Compile one generic create into its canonical typed request."""
-    raw = _resolve_clears(operation.payload.get("object", {}))
+    raw = _omit_undefined(_resolve_clears(operation.payload.get("object", {})))
     kind = operation.object_kind
     if not isinstance(raw, Mapping):
         raise ValueError(f"Create operation {operation.operation_id!r} requires an object mapping.")
@@ -447,6 +456,7 @@ def compile_reconciliation_plan(
                 natural_parent=parent,
                 explicit_values=dict(_plain(operation.payload)),
                 dependencies=list(operation.depends_on),
+                phase=operation.phase,
             )
         )
         operations_by_scope[scope].append(

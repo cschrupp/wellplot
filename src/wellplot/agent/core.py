@@ -46,7 +46,8 @@ from ..authoring_defaults import generic_authoring_defaults
 from ..authoring_executor import (
     AuthoringExecutionResult,
     AuthoringExecutionStatus,
-    execute_authoring_plan,
+    AuthoringOperationOutcome,
+    AuthoringPhaseCheckpoint,
 )
 from ..authoring_reconciler import (
     AuthoringOperationPhase,
@@ -74,6 +75,12 @@ from .compilation import (
     validate_request_inventory,
     validate_scoped_intent_semantics,
 )
+from .operation_executor import (
+    TypedOperationExecutionStatus,
+    TypedSubmissionExecutionResult,
+    execute_typed_submissions,
+)
+from .reconciliation_bridge import compile_reconciliation_plan
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -1057,6 +1064,74 @@ def _build_user_report(
         request_inconsistencies=inconsistencies,
         needs_clarification=_clarification_entries(report_facts.get("needs_clarification")),
         next_help=_dedupe_text_items(next_help),
+    )
+
+
+def _authoring_execution_from_typed(
+    plan: AuthoringPlanResult,
+    result: TypedSubmissionExecutionResult,
+) -> AuthoringExecutionResult:
+    """Adapt typed branch execution to the established agent phase contract."""
+    operation_by_id = {
+        str(operation["operation_id"]): operation
+        for operation in plan.operation_payloads
+        if isinstance(operation.get("operation_id"), str)
+    }
+    outcomes: list[AuthoringOperationOutcome] = []
+    for outcome in result.outcomes:
+        operation = operation_by_id.get(outcome.operation_id)
+        if operation is None:
+            continue
+        status = (
+            AuthoringExecutionStatus.COMPLETED
+            if outcome.status
+            in {
+                TypedOperationExecutionStatus.COMPLETED,
+                TypedOperationExecutionStatus.SKIPPED,
+            }
+            else AuthoringExecutionStatus.BLOCKED
+        )
+        outcomes.append(
+            AuthoringOperationOutcome(
+                operation_id=outcome.operation_id,
+                phase=AuthoringOperationPhase(operation["phase"]),
+                action=operation["action"],
+                object_kind=operation["object_kind"],
+                object_id=outcome.verification.target.object_id
+                if outcome.verification.target is not None
+                else str(operation["object_id"]),
+                status=status,
+                postcondition_verified=outcome.postcondition_verified,
+                message=outcome.message,
+                error=outcome.error,
+            )
+        )
+    checkpoints = tuple(
+        AuthoringPhaseCheckpoint(
+            phase=checkpoint.phase,
+            status=(
+                AuthoringExecutionStatus.COMPLETED
+                if checkpoint.status
+                in {
+                    TypedOperationExecutionStatus.COMPLETED,
+                    TypedOperationExecutionStatus.SKIPPED,
+                }
+                else AuthoringExecutionStatus.BLOCKED
+            ),
+            operation_ids=checkpoint.operation_ids,
+            applied_count=checkpoint.applied_count,
+            document=checkpoint.document,
+        )
+        for checkpoint in result.phase_summaries
+    )
+    return AuthoringExecutionResult(
+        success=result.success,
+        stopped=result.stopped,
+        document=result.document,
+        outcomes=tuple(outcomes),
+        phase_summaries=checkpoints,
+        errors=result.errors,
+        warnings=result.warnings,
     )
 
 
@@ -5201,7 +5276,12 @@ class AuthoringSession:
         if inventory is not None:
             report_facts["request_inventory"] = inventory.model_dump(mode="json")
             report_facts["request_work_units"] = [
-                unit.model_dump(mode="json") for unit in request_work_units
+                {
+                    key: value
+                    for key, value in unit.model_dump(mode="json").items()
+                    if key != "phase" or value is not None
+                }
+                for unit in request_work_units
             ]
         report_facts["provider_contract"] = {
             "tool_name": "submit_request_inventory",
@@ -5791,10 +5871,28 @@ class AuthoringSession:
                     plan=blocked_plan,
                 )
 
-        execution = execute_authoring_plan(
-            AuthoringService(existing),
-            plan.reconciliation_plan,
-        )
+        service = AuthoringService(existing)
+        typed_execution: TypedSubmissionExecutionResult | None = None
+        try:
+            compilation = compile_reconciliation_plan(
+                plan.reconciliation_plan,
+                service=service,
+                defaults_provenance=plan.applied_defaults_provenance,
+            )
+            typed_execution = execute_typed_submissions(
+                service,
+                compilation.submissions,
+                compilation.work_units,
+                defaults_provenance_by_operation=compilation.defaults_provenance_by_operation,
+            )
+            execution = _authoring_execution_from_typed(plan, typed_execution)
+        except Exception as exc:  # noqa: BLE001 - deterministic boundary report
+            execution = AuthoringExecutionResult(
+                success=False,
+                stopped=True,
+                document=existing,
+                errors=(f"Typed reconciliation compilation failed: {type(exc).__name__}: {exc}",),
+            )
         phase_previews, phase_preview_warnings = await self._capture_typed_phase_previews(
             session=session,
             draft_logfile=draft_logfile,
@@ -5848,7 +5946,12 @@ class AuthoringSession:
                 "resolution_decisions": list(plan.resolution_decisions),
                 "operation_payloads": list(plan.operation_payloads),
                 "operation_outcomes": [
-                    outcome.model_dump(mode="json") for outcome in execution.outcomes
+                    outcome.model_dump(mode="json")
+                    for outcome in (
+                        typed_execution.outcomes
+                        if typed_execution is not None
+                        else execution.outcomes
+                    )
                 ],
                 "next_help": [
                     "Inspect the blocked operation and correct its object identity or "

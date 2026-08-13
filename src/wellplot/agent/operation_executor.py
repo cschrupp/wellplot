@@ -15,6 +15,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..authoring_reconciler import AuthoringOperationPhase
 from ..authoring_service import (
     AuthoringService,
     AuthoringTarget,
@@ -74,6 +75,18 @@ class TypedOperationOutcome(BaseModel):
     verification: TypedVerificationEvidence = Field(default_factory=TypedVerificationEvidence)
 
 
+class TypedPhaseCheckpoint(BaseModel):
+    """Canonical snapshot captured after one verified operation phase."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    phase: AuthoringOperationPhase
+    status: TypedOperationExecutionStatus
+    operation_ids: tuple[str, ...] = ()
+    applied_count: int = 0
+    document: AuthoringDocumentSpec
+
+
 class TypedSubmissionExecutionResult(BaseModel):
     """Atomic result for one or more hierarchy-scoped submissions."""
 
@@ -83,6 +96,7 @@ class TypedSubmissionExecutionResult(BaseModel):
     stopped: bool
     document: AuthoringDocumentSpec
     outcomes: tuple[TypedOperationOutcome, ...] = ()
+    phase_summaries: tuple[TypedPhaseCheckpoint, ...] = ()
     applied_operation_ids: tuple[str, ...] = ()
     errors: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -293,6 +307,7 @@ def _request_object_kind_from_envelope(operation: object) -> str:
 
 def _ordered_operations(
     submissions: Iterable[BaseModel],
+    work_units: Mapping[str, AuthoringRequestWorkUnit],
 ) -> tuple[tuple[str, object], ...]:
     """Topologically order operations with stable branch and submission order."""
     candidates: list[tuple[str, object]] = []
@@ -306,11 +321,25 @@ def _ordered_operations(
     by_id = {operation.operation_id: (scope, operation) for scope, operation in candidates}
     if len(by_id) != len(candidates):
         raise ValueError("Operation ids must be unique across all branch submissions.")
+    phase_order = {phase: index for index, phase in enumerate(AuthoringOperationPhase)}
+    scope_order = {scope: index for index, scope in enumerate(_SCOPE_ORDER)}
+    candidate_order = {id(operation): index for index, (_, operation) in enumerate(candidates)}
+
+    def priority(candidate: tuple[str, object]) -> tuple[int, int, int]:
+        scope, operation = candidate
+        work_unit = work_units.get(operation.work_unit_id)
+        phase = None if work_unit is None else work_unit.phase
+        return (
+            99 if phase is None else phase_order[phase],
+            scope_order[scope],
+            candidate_order[id(operation)],
+        )
+
     ordered: list[tuple[str, object]] = []
     remaining = list(candidates)
     while remaining:
         progress = False
-        for candidate in list(remaining):
+        for candidate in sorted(remaining, key=priority):
             _, operation = candidate
             if all(
                 dependency in {item[1].operation_id for item in ordered}
@@ -391,7 +420,7 @@ def execute_typed_submissions(
     outcomes: list[TypedOperationOutcome] = []
     applied_ids: list[str] = []
     try:
-        ordered = _ordered_operations(submission_list)
+        ordered = _ordered_operations(submission_list, work_unit_by_id)
     except ValueError as exc:
         return TypedSubmissionExecutionResult(
             success=False,
@@ -400,7 +429,36 @@ def execute_typed_submissions(
             errors=(str(exc),),
         )
 
+    phase_summaries: list[TypedPhaseCheckpoint] = []
+    current_phase: AuthoringOperationPhase | None = None
+    current_phase_operation_ids: list[str] = []
+    current_phase_applied = 0
+
+    def checkpoint(phase: AuthoringOperationPhase, status: TypedOperationExecutionStatus) -> None:
+        """Record the current transactional snapshot for one operation phase."""
+        phase_summaries.append(
+            TypedPhaseCheckpoint(
+                phase=phase,
+                status=status,
+                operation_ids=tuple(current_phase_operation_ids),
+                applied_count=current_phase_applied,
+                document=AuthoringDocumentSpec.model_validate(
+                    working_service.document.model_dump(mode="python")
+                ),
+            )
+        )
+
     for scope, operation in ordered:
+        work_unit = work_unit_by_id.get(operation.work_unit_id)
+        operation_phase = None if work_unit is None else work_unit.phase
+        if operation_phase is not None and operation_phase != current_phase:
+            if current_phase is not None:
+                checkpoint(current_phase, TypedOperationExecutionStatus.COMPLETED)
+            current_phase = operation_phase
+            current_phase_operation_ids = []
+            current_phase_applied = 0
+        if operation_phase is not None:
+            current_phase_operation_ids.append(operation.operation_id)
         missing = [
             dependency for dependency in operation.depends_on if dependency not in applied_ids
         ]
@@ -418,11 +476,14 @@ def execute_typed_submissions(
                     error=message,
                 )
             )
+            if operation_phase is not None:
+                checkpoint(operation_phase, TypedOperationExecutionStatus.BLOCKED)
             return TypedSubmissionExecutionResult(
                 success=False,
                 stopped=True,
                 document=service.document,
                 outcomes=tuple(outcomes),
+                phase_summaries=tuple(phase_summaries),
                 applied_operation_ids=tuple(applied_ids),
                 errors=(f"{operation.operation_id}: {message}",),
             )
@@ -472,6 +533,8 @@ def execute_typed_submissions(
                     )
                 )
                 applied_ids.append(operation.operation_id)
+                if operation_phase is not None:
+                    current_phase_applied += 1
                 continue
             returned = _apply_request(working_service, request)
             if operation.action == "remove":
@@ -506,11 +569,14 @@ def execute_typed_submissions(
                     error=message,
                 )
             )
+            if operation_phase is not None:
+                checkpoint(operation_phase, TypedOperationExecutionStatus.BLOCKED)
             return TypedSubmissionExecutionResult(
                 success=False,
                 stopped=True,
                 document=service.document,
                 outcomes=tuple(outcomes),
+                phase_summaries=tuple(phase_summaries),
                 applied_operation_ids=tuple(applied_ids),
                 errors=(f"{operation.operation_id}: {message}",),
             )
@@ -531,6 +597,11 @@ def execute_typed_submissions(
             )
         )
         applied_ids.append(operation.operation_id)
+        if operation_phase is not None:
+            current_phase_applied += 1
+
+    if current_phase is not None:
+        checkpoint(current_phase, TypedOperationExecutionStatus.COMPLETED)
 
     service.replace_document(working_service.document)
     return TypedSubmissionExecutionResult(
@@ -538,6 +609,7 @@ def execute_typed_submissions(
         stopped=False,
         document=service.document,
         outcomes=tuple(outcomes),
+        phase_summaries=tuple(phase_summaries),
         applied_operation_ids=tuple(applied_ids),
     )
 
@@ -545,6 +617,7 @@ def execute_typed_submissions(
 __all__ = [
     "TypedOperationExecutionStatus",
     "TypedOperationOutcome",
+    "TypedPhaseCheckpoint",
     "TypedSubmissionExecutionResult",
     "TypedVerificationEvidence",
     "execute_typed_submissions",

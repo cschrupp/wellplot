@@ -118,6 +118,13 @@ def test_bridge_compiles_cross_branch_operations_for_typed_execution() -> None:
     )
 
     assert result.success is True, result.errors
+    assert [checkpoint.phase.value for checkpoint in result.phase_summaries] == [
+        "report",
+        "tracks",
+        "bindings",
+    ]
+    assert result.phase_summaries[1].document.sections[0].tracks[-1].id == "curves"
+    assert result.phase_summaries[2].document.sections[0].tracks[-1].bindings[0].channel == "GR"
     assert [outcome.operation_id for outcome in result.outcomes] == [
         "update-report",
         "create-curves",

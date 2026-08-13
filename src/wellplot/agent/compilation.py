@@ -16,6 +16,7 @@ from typing import Annotated, Any, Literal, Self
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model, model_validator
 
+from ..authoring_reconciler import AuthoringOperationPhase
 from ..authoring_service import (
     CreateAnnotationRequest,
     CreateCurveBindingRequest,
@@ -176,6 +177,7 @@ class AuthoringRequestWorkUnit(BaseModel):
     preserve_constraints: list[str] = Field(default_factory=list)
     dependencies: list[str] = Field(default_factory=list)
     reason: str | None = Field(default=None, min_length=1)
+    phase: AuthoringOperationPhase | None = None
 
 
 class AuthoringRequestInventory(BaseModel):
