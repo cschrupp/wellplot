@@ -129,6 +129,43 @@ def test_responses_adapter_ends_after_an_accepted_submission() -> None:
     }
 
 
+def test_responses_adapter_preserves_partial_trace_on_round_exhaustion() -> None:
+    """Expose the last submitted tool when a required stage exhausts its budget."""
+    responses = _FakeResponses(
+        [
+            _response(
+                response_id="response-1",
+                output=[_function_call(call_id="call-1", arguments='{"coverage": []}')],
+            )
+        ]
+    )
+    client = SimpleNamespace(responses=responses)
+
+    async def reject_submission(_: str, __: dict[str, object]) -> dict[str, object]:
+        """Keep the adapter in its bounded correction path."""
+        return {"is_error": True, "error": "coverage is incomplete"}
+
+    with pytest.raises(ProviderAdapterError) as caught:
+        anyio.run(
+            partial(
+                run_responses_authoring_loop,
+                client=client,
+                model="openai-model",
+                provider_label="OpenAI",
+                instructions="Submit the typed report intent.",
+                initial_user_message="Set the report title.",
+                tool_definitions=_tool_definition(),
+                tool_caller=reject_submission,
+                max_rounds=1,
+                required_tool_name="submit_report_intent",
+            )
+        )
+
+    assert caught.value.status == "round_budget_exhausted"
+    assert [call.name for call in caught.value.tool_trace] == ["submit_report_intent"]
+    assert caught.value.report_facts["provider_response"]["rounds"] == 1
+
+
 def test_responses_adapter_preserves_and_enforces_correction_exchange() -> None:
     """Require one corrective submission after an explicit tool validation error."""
     responses = _FakeResponses(

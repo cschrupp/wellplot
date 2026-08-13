@@ -183,6 +183,58 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
     assert "tool_choice" not in completions.requests[1]
 
 
+def test_chat_adapter_preserves_partial_trace_on_round_exhaustion() -> None:
+    """Expose the last submitted tool when a required stage exhausts its budget."""
+    completions = _FakeCompletions(
+        [
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(
+                            name="submit_report_intent",
+                            arguments='{"coverage": []}',
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    async def reject_submission(_: str, __: dict[str, object]) -> dict[str, object]:
+        """Keep the adapter in its bounded correction path."""
+        return {"is_error": True, "error": "coverage is incomplete"}
+
+    with pytest.raises(ProviderAdapterError) as caught:
+        anyio.run(
+            partial(
+                run_chat_completions_authoring_loop,
+                client=client,
+                model="local-model",
+                provider_label="OpenAI-compatible",
+                instructions="Submit the typed report intent.",
+                initial_user_message="Set the report title.",
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name="submit_report_intent",
+                        description="Submit one report fragment.",
+                        parameters={"type": "object"},
+                    )
+                ],
+                tool_caller=reject_submission,
+                max_rounds=1,
+                required_tool_name="submit_report_intent",
+            )
+        )
+
+    assert caught.value.status == "round_budget_exhausted"
+    assert [call.name for call in caught.value.tool_trace] == ["submit_report_intent"]
+    assert caught.value.report_facts["provider_response"]["rounds"] == 1
+
+
 def test_chat_adapter_preserves_and_enforces_correction_message_order() -> None:
     """Keep a rejected submission retryable until a correction is accepted."""
     completions = _FakeCompletions(

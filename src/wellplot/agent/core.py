@@ -295,10 +295,21 @@ class ProviderRunResult:
 class ProviderAdapterError(RuntimeError):
     """Normalized provider-adapter failure with a stable diagnostic status."""
 
-    def __init__(self, status: str, message: str) -> None:
+    def __init__(
+        self,
+        status: str,
+        message: str,
+        *,
+        tool_trace: Sequence[AuthoringToolCall] = (),
+        final_text: str = "",
+        report_facts: Mapping[str, object] | None = None,
+    ) -> None:
         """Initialize one adapter failure with a machine-readable status."""
         super().__init__(message)
         self.status = status
+        self.tool_trace = tuple(tool_trace)
+        self.final_text = final_text
+        self.report_facts = dict(report_facts or {})
 
 
 def _sanitize_provider_text(value: object, *, limit: int = 500) -> str | None:
@@ -4849,6 +4860,8 @@ class AuthoringSession:
         fragments: list[object] = []
         coverage: list[AuthoringIntentCoverage] = []
         provider_failure_status: str | None = None
+        provider_stage_failures: list[dict[str, object]] = []
+        corrected_failures: list[dict[str, object]] = []
 
         def normalize_result(result: object) -> ProviderRunResult:
             """Normalize lightweight test doubles and provider adapter results."""
@@ -4856,6 +4869,27 @@ class AuthoringSession:
                 final_text=str(getattr(result, "final_text", "")),
                 tool_trace=tuple(getattr(result, "tool_trace", ())),
                 report_facts=dict(getattr(result, "report_facts", {})),
+            )
+
+        def provider_failure_result(stage: str, exc: BaseException) -> ProviderRunResult:
+            """Normalize one failed provider stage while retaining partial evidence."""
+            failure_facts = dict(getattr(exc, "report_facts", {}) or {})
+            status = _provider_exception_status(exc)
+            message = _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
+            failure_facts["provider_error"] = message
+            failure_facts["provider_failure_status"] = status
+            failure_facts["provider_failure_stage"] = stage
+            provider_stage_failures.append(
+                {
+                    "stage": stage,
+                    "status": status,
+                    "message": message,
+                }
+            )
+            return ProviderRunResult(
+                final_text=str(getattr(exc, "final_text", "") or ""),
+                tool_trace=tuple(getattr(exc, "tool_trace", ()) or ()),
+                report_facts=failure_facts,
             )
 
         async def submit_inventory(
@@ -4907,6 +4941,11 @@ class AuthoringSession:
                     ),
                 }
             inventory = candidate
+            if inventory_failures:
+                corrected_failures.extend(
+                    {"stage": "inventory", "errors": errors} for errors in inventory_failures
+                )
+                inventory_failures.clear()
             return {
                 "accepted": True,
                 "message": (
@@ -4960,19 +4999,8 @@ class AuthoringSession:
             stage_results.append(("inventory", normalize_result(raw_result)))
         except Exception as exc:
             provider_failure_status = _provider_exception_status(exc)
-            stage_results.append(
-                (
-                    "inventory",
-                    ProviderRunResult(
-                        final_text="",
-                        tool_trace=(),
-                        report_facts={
-                            "provider_error": _sanitize_provider_text(str(exc), limit=800)
-                            or type(exc).__name__,
-                        },
-                    ),
-                )
-            )
+            failed_stages.append("inventory")
+            stage_results.append(("inventory", provider_failure_result("inventory", exc)))
 
         def compact_document(scope: AuthoringCompilationScope) -> dict[str, object]:
             """Return only current objects relevant to one compilation scope."""
@@ -5202,22 +5230,27 @@ class AuthoringSession:
                 except Exception as exc:
                     if provider_failure_status is None:
                         provider_failure_status = _provider_exception_status(exc)
-                    stage_results.append(
-                        (
-                            scope,
-                            ProviderRunResult(
-                                final_text="",
-                                tool_trace=(),
-                                report_facts={
-                                    "provider_error": _sanitize_provider_text(str(exc), limit=800)
-                                    or type(exc).__name__,
-                                },
-                            ),
-                        )
-                    )
+                    if scope not in failed_stages:
+                        failed_stages.append(scope)
+                    stage_results.append((scope, provider_failure_result(scope, exc)))
                 if accepted_submission is None:
-                    failed_stages.append(scope)
+                    if scope not in failed_stages:
+                        failed_stages.append(scope)
                     continue
+                corrected_scope_errors = [
+                    list(errors)
+                    for errors in coverage_failures
+                    if any(error.startswith(f"{scope}: ") for error in errors)
+                ]
+                if corrected_scope_errors:
+                    corrected_failures.extend(
+                        {"stage": scope, "errors": errors} for errors in corrected_scope_errors
+                    )
+                    coverage_failures[:] = [
+                        errors
+                        for errors in coverage_failures
+                        if not any(error.startswith(f"{scope}: ") for error in errors)
+                    ]
                 fragment = accepted_submission.intent
                 fragments.append(fragment)
                 coverage.extend(accepted_submission.coverage)
@@ -5256,14 +5289,25 @@ class AuthoringSession:
                     )
 
         combined_trace = tuple(call for _, result in stage_results for call in result.tool_trace)
-        final_text = next(
-            (
-                result.final_text
-                for _, result in reversed(stage_results)
-                if result.final_text.strip()
-            ),
-            "",
-        )
+        failed_stage_set = set(failed_stages)
+        if failed_stage_set:
+            final_text = next(
+                (
+                    result.final_text
+                    for stage, result in reversed(stage_results)
+                    if stage in failed_stage_set
+                ),
+                "",
+            )
+        else:
+            final_text = next(
+                (
+                    result.final_text
+                    for _, result in reversed(stage_results)
+                    if result.final_text.strip()
+                ),
+                "",
+            )
         report_facts: dict[str, object] = {}
         provider_stages: list[dict[str, object]] = []
         for stage, result in stage_results:
@@ -5271,8 +5315,17 @@ class AuthoringSession:
                 provider_stages.append({"stage": stage, **result.report_facts})
                 for key, value in result.report_facts.items():
                     report_facts.setdefault(key, value)
+        if failed_stage_set:
+            for stage, result in reversed(stage_results):
+                if stage in failed_stage_set:
+                    report_facts.update(result.report_facts)
+                    break
         if provider_stages:
             report_facts["provider_stages"] = provider_stages
+        if provider_stage_failures:
+            report_facts["provider_stage_failures"] = provider_stage_failures
+        if corrected_failures:
+            report_facts["corrected_failures"] = corrected_failures
         report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
         if inventory is not None:
             report_facts["request_inventory"] = inventory.model_dump(mode="json")
@@ -5317,11 +5370,16 @@ class AuthoringSession:
                 for entry in coverage
                 if entry.status in {"unsupported", "inconsistent"} and entry.reason
             ]
-        elif coverage_failures or inventory_failures or merge_failures:
+        elif coverage_failures or inventory_failures or merge_failures or provider_stage_failures:
             reasons = [
                 error for failure in (*inventory_failures, *coverage_failures) for error in failure
             ]
             reasons.extend(merge_failures)
+            reasons.extend(
+                f"Provider {failure['stage']} stage failed ({failure['status']}): "
+                f"{failure['message']}"
+                for failure in provider_stage_failures
+            )
             report_facts["reasons"] = list(report_facts.get("reasons", [])) + [
                 "Desired-state compilation failed: " + "; ".join(reasons)
             ]
@@ -5352,6 +5410,8 @@ class AuthoringSession:
             "coverage_failures": coverage_failures,
             "merge_failures": merge_failures,
             "failed_stages": failed_stages,
+            "provider_stage_failures": provider_stage_failures,
+            "corrected_failures": corrected_failures,
         }
         provider_text = _sanitize_provider_text(final_text)
         if provider_text is not None and submitted is None:

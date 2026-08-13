@@ -35,7 +35,7 @@ from wellplot.agent.compilation import (
     validate_request_inventory,
     validate_scoped_intent_semantics,
 )
-from wellplot.agent.core import ProviderAdapterError
+from wellplot.agent.core import AuthoringToolCall, ProviderAdapterError
 from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.model.intent import AuthoringDocumentIntent
 
@@ -895,6 +895,80 @@ class _RequiredToolFailureBackend:
         )
 
 
+class _CorrectedInventoryThenScopedFailureBackend:
+    """Provider double for the notebook's corrected-inventory failure shape."""
+
+    provider = "fake"
+    model = "fake-model"
+    credential_source = "test"
+
+    def __init__(self) -> None:
+        self.inventory_attempts = 0
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Correct inventory once, then fail after a scoped tool call."""
+        tool_name = kwargs["tool_definitions"][0].name
+        tool_caller = kwargs["tool_caller"]
+        assert callable(tool_caller)
+        if tool_name == "submit_request_inventory":
+            self.inventory_attempts += 1
+            first = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "set",
+                            "object_family": "service_title",
+                            "top_level_branch": "section",
+                            "target": "first service title",
+                            "explicit_values": {"value": "Open Hole Quicklook"},
+                        }
+                    ]
+                },
+            )
+            assert first["is_error"] is True
+            second = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "set",
+                            "object_family": "service_title",
+                            "top_level_branch": "header",
+                            "target": "first service title",
+                            "explicit_values": {"value": "Open Hole Quicklook"},
+                        }
+                    ]
+                },
+            )
+            assert second["accepted"] is True
+            return SimpleNamespace(final_text="Request inventory validated.", tool_trace=())
+
+        assert tool_name == "submit_report_intent"
+        raise ProviderAdapterError(
+            "round_budget_exhausted",
+            "The fake scoped authoring loop exceeded 3 rounds.",
+            tool_trace=(
+                AuthoringToolCall(
+                    round=3,
+                    name=tool_name,
+                    arguments={"coverage": []},
+                ),
+            ),
+            report_facts={
+                "provider_response": {
+                    "adapter": "fixture",
+                    "rounds": 3,
+                    "tool_calls_emitted": True,
+                }
+            },
+        )
+
+
 def test_desired_state_extraction_allows_one_coverage_correction() -> None:
     """Accept a corrected submission without exposing mutation tools."""
     backend = _CorrectionBackend()
@@ -1024,6 +1098,43 @@ def test_extraction_preserves_normalized_required_tool_failure() -> None:
     assert intent is None
     assert result.report_facts["extraction"]["status"] == "required_tool_not_called"
     assert result.report_facts["provider_error"]
+
+
+def test_extraction_reports_active_stage_and_corrected_inventory_history() -> None:
+    """Do not report a corrected inventory error as the active failure."""
+    result, intent = _extract_with_backend(
+        _CorrectedInventoryThenScopedFailureBackend(),
+        request_text="Set the first service title to Open Hole Quicklook.",
+    )
+
+    assert intent is None
+    assert result.final_text == ""
+    extraction = result.report_facts["extraction"]
+    assert extraction["status"] == "round_budget_exhausted"
+    assert extraction["failed_stages"] == ["report"]
+    assert extraction["inventory_failures"] == []
+    assert extraction["provider_stage_failures"] == [
+        {
+            "stage": "report",
+            "status": "round_budget_exhausted",
+            "message": "The fake scoped authoring loop exceeded 3 rounds.",
+        }
+    ]
+    assert extraction["corrected_failures"] == [
+        {
+            "stage": "inventory",
+            "errors": [
+                "Inventory for 'request-001' maps 'service_title' to branch "
+                "'section'; expected 'header'."
+            ],
+        }
+    ]
+    assert [call.name for call in result.tool_trace] == ["submit_report_intent"]
+    assert result.report_facts["provider_stages"][-1]["provider_failure_stage"] == "report"
+    assert "service_title" not in result.report_facts["reasons"][0]
+    assert (
+        "Provider report stage failed (round_budget_exhausted)" in result.report_facts["reasons"][0]
+    )
 
 
 def test_intent_submission_keeps_typed_intent_and_coverage_together() -> None:

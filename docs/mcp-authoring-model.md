@@ -1,6 +1,6 @@
 # MCP Authoring Model
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 ## Mission
 
@@ -59,6 +59,13 @@ The next boundary is a branch-scoped operation submission. Its request payloads
 are generated from the deterministic service request models, so a structure
 compiler can submit section/track operations but cannot submit curve, raster,
 or header mutations. Parent dependencies are checked before execution.
+
+The provider does not author hierarchy branches or coverage paths. It
+classifies the user-facing object family and supplies natural targets and
+explicit values; deterministic code derives branch ownership from the
+canonical hierarchy and tracks coverage by request work-unit id. This avoids
+asking a model to keep redundant `object_family`, `top_level_branch`, and
+JSON/YAML path representations consistent.
 
 The MCP should not drift toward an example-reconstruction engine that only
 works when a hidden packet specification is present.
@@ -249,6 +256,27 @@ The agent must compile canonical object operations, not raw YAML paths and not
 large partial `AuthoringDocumentIntent` fragments. YAML assembly, identity
 generation, defaults, compatibility checks, atomic persistence, and operation
 ordering remain deterministic responsibilities.
+
+### Authoritative Provider Compilation Flow
+
+The normal natural-language route is:
+
+1. split the request into stable manifest clauses
+2. ask the provider only for action, object family, natural target/parent,
+   explicit values, and clause status
+3. derive the hierarchy branch and parent-scoped work-unit identity
+   deterministically
+4. compile each work-unit group through the generated service-operation schema
+   for that branch
+5. resolve stable ids, defaults, dependencies, and assertions in deterministic
+   code
+6. execute one atomic typed transaction and verify every outcome through the
+   canonical getter
+
+Provider-authored partial document fragments and arbitrary intent coverage
+paths are not part of this route. Explicit caller-supplied typed desired state
+may remain a compatibility API, but it is not the interchange format used to
+interpret natural-language requests.
 
 ## Values And Constraints
 

@@ -49,7 +49,7 @@ Current assessment:
 | Python construction API | implemented | retain with typed compatibility path |
 | Python object editing API | partial | complete before release |
 | MCP deterministic tools | broad capability roster | route through canonical object service |
-| provider-neutral agent | deterministic execution works; scoped desired-state compilation remains too broad | replace it with hierarchy-scoped object-operation compilation before release |
+| provider-neutral agent | typed execution works, but the normal provider path still compiles scoped partial document intents before bridging back to operations | replace that path with direct hierarchy-scoped service-operation compilation and delete the superseded fragment compiler before release |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
 | release metadata | `0.6.0` | publish through the verified release workflow |
 
@@ -611,12 +611,15 @@ Longer-term / UI-centric:
   bridge, deterministic transaction executor, and verifier. Phase checkpoints
   and typed before/after evidence feed the existing agent report and preview
   surface.
-- `0.6-K7.3` now closes the public legacy provider-tool path. Natural-language
-  `run()` and `revise()` requests require a backend that explicitly supports
-  typed authoring; unsupported backends return a structured capability report
-  before provider tool discovery or mutation.
-- Complete the remaining K7 acceptance work: cross-domain parity, clean
-  notebook runs, and release-gate validation.
+- `0.6-K7.3` closed the public broad provider-to-MCP mutation fallback, but a
+  live notebook run proved that normal natural-language extraction still uses
+  scoped partial `AuthoringDocumentIntent` fragments and redundant
+  provider-authored branch/path metadata before reaching typed execution.
+- Complete corrective slices `0.6-K7.4` through `0.6-K7.8`: characterize the
+  failing path and repair diagnostics, derive hierarchy branches
+  deterministically, compile work units directly into generated service
+  operations, switch and delete the old provider fragment route, and pass the
+  cross-domain/notebook release matrix.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

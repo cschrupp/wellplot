@@ -294,7 +294,22 @@ async def run_responses_authoring_loop(
         if required_submission_accepted:
             break
     else:
-        raise RuntimeError(f"The {provider_label} authoring loop exceeded {max_rounds} rounds.")
+        raise ProviderAdapterError(
+            "round_budget_exhausted",
+            f"The {provider_label} authoring loop exceeded {max_rounds} rounds.",
+            tool_trace=tuple(tool_trace),
+            report_facts={
+                "provider_response": {
+                    "adapter": "responses",
+                    "rounds": response_rounds,
+                    "tool_calls_emitted": bool(tool_trace),
+                    "finish_reasons": response_statuses,
+                    "response_statuses": response_statuses,
+                    "required_tool_name": required_name,
+                    "required_submission_accepted": required_submission_accepted,
+                }
+            },
+        )
 
     if response is not None and not final_text.strip() and not required_submission_accepted:
         summary_response = client.responses.create(

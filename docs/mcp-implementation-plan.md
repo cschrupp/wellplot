@@ -2063,8 +2063,11 @@ provider-to-typed-operation migration remains K7 work.
 
 ### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
 
-Implementation status: K7.3 public legacy-provider closure is implemented;
-full cross-domain acceptance and final release closure remain before K7.
+Implementation status: reopened after live notebook diagnosis. K7.1 through
+K7.3 established the typed execution boundary and removed the public broad
+provider-to-MCP mutation fallback, but they did not replace the normal
+provider-to-`AuthoringDocumentIntent` scoped-fragment compiler. K7.4 through
+K7.8 below are release blockers.
 
 Goal:
 
@@ -2124,6 +2127,265 @@ Implementation note for K7.3:
   call. The private phase executor remains only as compatibility coverage, not
   as an automatic public fallback.
 
+#### Corrective diagnosis after K7.3
+
+The unchanged initial LAS notebook request still fails before deterministic
+execution. The observed request contains independent clauses for section
+subtitle, track preservation, header preservation and filling, service title,
+and remarks preservation. The current natural-language path nevertheless:
+
+1. asks the provider to classify each clause into an object family and a
+   redundant top-level branch;
+2. asks the provider for scoped partial `AuthoringDocumentIntent` fragments;
+3. asks the provider to report arbitrary intent paths for coverage;
+4. merges those fragments into a partial document graph;
+5. reconciles the graph into operations;
+6. bridges those operations back into the typed branch submissions already
+   supported by the deterministic executor.
+
+That route has three confirmed defects:
+
+- branch ownership can contradict itself because the provider can label
+  `service_title` as `section`, even though the canonical hierarchy already
+  defines it as `header`;
+- valid JSON Pointer coverage such as `/sections/0/subtitle` is rejected by a
+  validator that recognizes only dotted paths such as
+  `sections[0].subtitle`;
+- corrected first-attempt failures and failed-stage traces are accumulated or
+  discarded incorrectly, so the terminal report can show a stale inventory
+  error, an accepted inventory response, and no trace for the actual structure
+  failure at the same time.
+
+These are host compiler defects, not missing user fields, MCP verbs, defaults,
+provider context, or orchestration-framework features. Increasing provider
+rounds or introducing LangGraph would only repeat the same contradictory
+contracts. The corrective work must remove this path rather than patching each
+notebook phrase or path syntax independently.
+
+#### 0.6-K7.4. Failing-Path Characterization And Diagnostic Truth
+
+Goal:
+
+- make the current failure reproducible and ensure every reported failure
+  describes the active blocking stage only
+
+Work:
+
+- add a recorded-provider fixture for the unchanged initial LAS request,
+  including the incorrect `service_title` branch and JSON Pointer structure
+  coverage observed in the notebook
+- add architecture-level tracing around inventory, work-unit compilation,
+  operation submission, execution, and verification so stage transitions are
+  explicit in tests without logging credentials or complete prompts
+- preserve the trace and normalized failure status of a scoped stage when its
+  provider adapter raises
+- stop carrying corrected inventory failures into a later terminal failure
+- distinguish active failure, corrected attempts, warnings, and provider prose
+  in `AuthoringResult`; provider prose must never be the authoritative status
+- record baseline source-line and contract-size metrics for the compiler path
+  so the replacement can demonstrate simplification rather than growth
+
+Acceptance:
+
+- the recorded failure reproduces without a live provider
+- the terminal report names the structure coverage failure as the active block
+  and records the earlier inventory correction only as corrected history
+- tool trace includes the failed scoped submission stage
+- no MCP mutation or deterministic execution is reported when extraction
+  failed
+- this slice adds no phrase-specific routing, MCP mutation tool, blueprint, or
+  provider round-budget increase
+
+Commit boundary:
+
+- characterization tests and truthful diagnostics only; do not add the new
+  compiler route in this slice
+
+#### 0.6-K7.5. Deterministic Branch Ownership And Work Units
+
+Goal:
+
+- reduce provider classification to user-language interpretation while making
+  hierarchy ownership and coverage deterministic
+
+Work:
+
+- remove `top_level_branch` from the provider-authored inventory contract;
+  derive it from the canonical object-family hierarchy catalog
+- keep provider-authored fields limited to clause action, object family,
+  natural target, natural parent, explicit values, and a supported,
+  preserved, unsupported, inconsistent, or clarification status
+- build stable parent-scoped work-unit ids from manifest clause ids and
+  canonical branch ownership
+- replace arbitrary provider-authored intent-path coverage with work-unit-id
+  coverage
+- express preserve and negative clauses as assertions, not synthetic update or
+  remove operations
+- reject only genuine object-family or parent ambiguity; never ask the user for
+  an internal branch name, object id, or YAML path
+
+Acceptance:
+
+- `service_title` always routes to `header` regardless of provider-supplied
+  extra text
+- section subtitle routes to the section parent without any dotted path or
+  JSON Pointer
+- the unchanged initial LAS request produces complete, non-overlapping work
+  units for all clauses
+- each clause is covered exactly once and each mutation work unit has one
+  canonical branch and natural parent
+- header, remarks, section, track, scalar, raster, fill, and annotation
+  classifications are covered with no scientific-family special cases
+
+Commit boundary:
+
+- inventory and work-unit contracts plus focused tests; normal `run()` and
+  `revise()` routing remains unchanged until K7.6
+
+#### 0.6-K7.6. Direct Branch-Operation Provider Compiler
+
+Goal:
+
+- compile each work unit directly into the typed service operations consumed
+  by `execute_typed_submissions(...)`
+
+Work:
+
+- invoke `branch_operation_submission_model(...)` for one canonical branch and
+  parent at a time instead of projecting a partial
+  `AuthoringDocumentIntent`
+- provide only the original clauses, selected parent snapshot, relevant
+  canonical operation discovery, source-channel facts, and applicable defaults
+  for that work-unit group
+- require operation coverage by work-unit id and permit one bounded correction
+  for an invalid operation submission
+- resolve natural parent/target descriptions, generated identities, omitted
+  generic defaults, and child dependencies deterministically after submission
+- preserve explicit title, subtitle, scale, width, color, line style, label,
+  order, and clear/remove values unchanged
+- compile parent creates before child bindings, fills, rasters, or annotations;
+  pass resolved parent identities to descendants without asking the provider to
+  repeat them
+- execute accepted submissions through the existing atomic typed transaction
+  and canonical read-back verifier
+
+Acceptance:
+
+- a remarks-only request exposes only remark operations and cannot mutate GR,
+  header, section, or track objects
+- a service-title/header request exposes only header operations
+- a section/track request cannot emit bindings until the parent objects resolve
+- scalar, raster, fill, and annotation requests use generated canonical service
+  request models, not loose dictionaries or YAML paths
+- the provider-facing schema for each call contains no unrelated branch and no
+  full-document intent definitions
+- successful operation evidence maps every changed field back to its original
+  work unit
+
+Commit boundary:
+
+- direct compiler and isolated integration tests; retain the old normal route
+  only until the replacement acceptance in K7.7
+
+#### 0.6-K7.7. Authoritative Route Switch And Dead-Path Removal
+
+Goal:
+
+- leave one natural-language authoring route and reduce compiler complexity
+
+Work:
+
+- route provider-backed `run()` and `revise()` through manifest, deterministic
+  work units, direct branch-operation compilation, typed transaction, and
+  canonical verification
+- make `plan()` expose the same work units, operation families, dependencies,
+  assertions, and success checks without persistence
+- retain caller-supplied typed `desired_state` compatibility behind its
+  explicit API boundary; do not use it as the provider compilation format
+- route deterministic header-language and narrow report-content handling
+  through the same canonical service operations and verification facts
+- remove the provider scoped-fragment projection, arbitrary intent-path
+  coverage, fragment merge, and their normal-path orchestration
+- remove tests and prompt text that exist only for that superseded provider
+  path, while retaining canonical intent/reconciliation models that are still
+  part of the explicit typed API
+- add an architecture guard proving normal natural-language requests cannot
+  import or call the scoped `AuthoringDocumentIntent` compiler
+- compare compiler source and provider contract metrics with the K7.4 baseline;
+  investigate any net growth before closing the slice
+
+Acceptance:
+
+- there is no automatic fallback to the old provider fragment compiler
+- provider-backed natural-language execution reaches
+  `execute_typed_submissions(...)` without a desired-state merge or
+  reconciliation bridge
+- an unsupported provider blocks before mutation with one precise capability
+  diagnostic
+- caller-supplied typed desired state remains compatible and deterministic
+- deleted production code exceeds any compatibility glue added for the route
+  switch, unless a documented exception is approved before implementation
+
+Commit boundary:
+
+- route switch, dead-code deletion, architecture guard, and compatibility tests
+  as one coherent migration commit
+
+#### 0.6-K7.8. Cross-Domain Notebook And Release Acceptance
+
+Goal:
+
+- prove that the simplified compiler serves general well-log authoring rather
+  than the current examples
+
+Required recorded-provider scenarios:
+
+- initial open-hole draft with section subtitle, preserved track order,
+  header metadata filling, service title, and no remarks
+- remarks-only revision with mutation isolation
+- add SP to an existing track with explicit scale and style
+- create a logarithmic resistivity track with three available curves and
+  explicit visual precedence
+- create an uncatalogued scalar track using generic form defaults
+- create and configure an array/raster track
+- add and update a fill and an annotation object
+- apply page/output settings
+- combine header work with multi-section structure without crossing branch
+  contracts
+- block an unavailable channel and an ambiguous natural target without
+  persistence
+
+Work:
+
+- run every scenario through both recorded OpenAI Responses and
+  OpenAI-compatible adapter fixtures
+- assert canonical object values, parent relationships, order, defaults
+  provenance, and absence of unrelated mutations
+- rerun the canonical LAS notebook from a clean project directory with
+  unchanged user-facing prompts
+- rerun the CBL/VDL notebook as a stress test, not as compiler authority
+- run full unit/MCP/agent tests, Ruff, strict docs build, notebook structural
+  checks, package build, and installed-wheel MCP smoke checks
+- update release notes and public workflow docs only after the acceptance
+  evidence passes
+
+Acceptance:
+
+- all recorded cross-domain scenarios pass exact canonical read-back
+- the canonical LAS notebook completes initial draft, remarks, SP, and
+  resistivity cells without internal keys, paths, or retry prompt edits
+- the CBL/VDL notebook can use a starter scaffold but no packet-specific
+  compiler branch or hidden style authority
+- blocked requests identify the exact compiler, context, resolution,
+  transaction, verification, transport, or render layer
+- all release checks pass and the live-provider matrix is recorded as a manual,
+  non-CI release observation
+
+Commit boundary:
+
+- acceptance fixtures and documentation first; release metadata remains a
+  separate final release commit
+
 Acceptance:
 
 - the canonical LAS notebook completes initial draft, remarks, SP, and
@@ -2151,6 +2413,8 @@ header-language slices, are the completed contract baseline. Reopened slices
 hierarchy slices `0.6-K1` through `0.6-K7` are release blockers because
 open-world construction, provider compilation, and deterministic hierarchical
 object operations are all required for the user-facing authoring promise.
+Corrective sub-slices `0.6-K7.4` through `0.6-K7.8` must all close before the
+K7 gate is considered complete.
 
 Release-gate checklist:
 
@@ -2161,8 +2425,9 @@ Release-gate checklist:
   discoverable and request per-phase previews
 - catalogued and uncatalogued track requests both complete through generic
   canonical construction without packet-specific authority
-- provider compilation uses bounded scoped contracts and reports exact
-  extraction failures before any deterministic authoring stage runs
+- provider compilation uses direct bounded branch-operation contracts and
+  reports exact extraction failures before any deterministic authoring stage
+  runs
 - unchanged SP and resistivity notebook requests persist and read back the
   requested objects and values
 - provider compilation follows the natural authoring hierarchy and submits

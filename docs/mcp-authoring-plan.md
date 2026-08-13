@@ -1,6 +1,6 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-08-10
+Last updated: 2026-08-13
 
 ## Summary
 
@@ -226,11 +226,20 @@ Live provider testing has also exposed a separate compilation-boundary gap:
 - deterministic tests using caller-supplied intents prove the execution path,
   not the natural-language compilation path
 
-The active correction is the `0.6-J` provider compiler program in
-[docs/mcp-implementation-plan.md](mcp-implementation-plan.md). It introduces a
-compact request inventory, scoped typed-intent submissions, deterministic merge
-and full canonical validation, provider-adapter conformance, and end-to-end
-natural-language acceptance. This work must not add MCP mutation tools or
+The `0.6-J` compiler work reduced the original monolithic submission, but live
+notebook acceptance proved that its scoped partial-document compiler remains in
+the normal natural-language path. It redundantly asks providers for object
+family, hierarchy branch, and arbitrary intent paths, then merges partial
+`AuthoringDocumentIntent` fragments before bridging the result back into typed
+service operations.
+
+The active correction is `0.6-K7.4` through `0.6-K7.8` in
+[docs/mcp-implementation-plan.md](mcp-implementation-plan.md). It derives branch
+ownership deterministically, tracks coverage by work-unit id, compiles directly
+into generated canonical service-operation contracts, removes the superseded
+provider fragment path, and closes with cross-domain notebook acceptance. This
+work must reduce permanent compiler complexity and must not add MCP mutation
+tools, provider-specific prompt branches, packet authority, or
 scientific-family special cases.
 
 The detailed inventory is
@@ -811,7 +820,7 @@ authoring as stable. Every persisted object, property, value constraint, and
 relationship must have one canonical typed definition and complete required
 read/write coverage.
 
-### Current Status (2026-08-06)
+### Current Status (2026-08-13)
 
 Implemented capability:
 
@@ -824,12 +833,14 @@ Implemented capability:
 
 Release blockers:
 
-- authoring rules remain duplicated across model, schema, parser, builder, MCP,
-  and agent layers
-- complete canonical getters/setters do not exist for every persisted object
-- several nested builder and MCP inputs remain loose mappings
-- packet-specific reconciliation can act as hidden authority
-- cross-layer schema/API/MCP parity is not enforced
+- the normal provider route still compiles scoped partial document intents
+  before bridging back into typed service operations
+- redundant provider-authored hierarchy branches and arbitrary intent paths can
+  contradict canonical object ownership
+- extraction reports can retain corrected failures and lose the trace for the
+  active failed stage
+- unchanged canonical notebook prompts have not passed exact read-back through
+  the direct hierarchy-operation route
 
 ### Architecture Boundary
 
@@ -852,6 +863,13 @@ of the MCP server.
 5. `0.6-E`: MCP contract parity
 6. `0.6-F`: defaults and precedence
 7. `0.6-G`: agent rebase and release acceptance
+8. `0.6-H` and `0.6-I`: user-language header resolution and open-world object
+   construction
+9. `0.6-J`: bounded provider compiler foundation
+10. `0.6-K1` through `0.6-K7.3`: generated hierarchy, typed operations,
+    transaction, verification, and closure of the broad provider-to-MCP loop
+11. `0.6-K7.4` through `0.6-K7.8`: direct provider-to-service-operation
+    compilation, dead-path removal, and final acceptance
 
 Detailed contracts:
 
