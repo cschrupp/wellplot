@@ -626,7 +626,7 @@ def branch_operation_submission_model(scope: AuthoringCompilationScope) -> type[
     return _OPERATION_SUBMISSION_MODELS[scope]
 
 
-def _request_object_kind(request: BaseModel) -> str:
+def operation_request_object_kind(request: BaseModel) -> str:
     """Read the canonical object kind from one typed service request."""
     if isinstance(request, RemoveRequest):
         return request.target.object_kind
@@ -637,6 +637,8 @@ def validate_operation_submission(
     scope: AuthoringCompilationScope,
     submission: BaseModel,
     work_units: Iterable[AuthoringRequestWorkUnit],
+    *,
+    external_operation_ids: Iterable[str] = (),
 ) -> list[str]:
     """Validate branch scope, work-unit coverage, and parent-first ordering."""
     errors: list[str] = []
@@ -662,6 +664,7 @@ def validate_operation_submission(
     operation_positions = {
         operation.operation_id: index for index, operation in enumerate(operations)
     }
+    external_ids = set(external_operation_ids)
     if len(operation_by_id) != len(operations):
         errors.append("Operation ids must be unique within one branch submission.")
     for operation in operations:
@@ -673,19 +676,22 @@ def validate_operation_submission(
                 f"Operation {operation.operation_id!r} references unknown work unit "
                 f"{operation.work_unit_id!r}."
             )
-        object_kind = _request_object_kind(operation.request)
+        object_kind = operation_request_object_kind(operation.request)
         if object_kind not in _BRANCH_ALLOWED_OPERATION_KINDS[scope]:
             errors.append(
                 f"Operation {operation.operation_id!r} emits {object_kind!r} outside "
                 f"the {scope!r} branch."
             )
         for dependency in operation.depends_on:
-            if dependency not in operation_by_id:
+            if dependency not in operation_by_id and dependency not in external_ids:
                 errors.append(
                     f"Operation {operation.operation_id!r} depends on unknown operation "
                     f"{dependency!r}."
                 )
-            elif operation_positions[dependency] >= operation_positions[operation.operation_id]:
+            elif (
+                dependency in operation_positions
+                and operation_positions[dependency] >= operation_positions[operation.operation_id]
+            ):
                 errors.append(
                     f"Operation {operation.operation_id!r} must follow dependency {dependency!r}."
                 )
@@ -704,6 +710,11 @@ def validate_operation_submission(
         if unit.action == "preserve" and entry.operation_ids:
             errors.append(f"Preserved work unit {unit_id!r} must not receive operations.")
     return errors
+
+
+def operation_submission_operations(submission: BaseModel) -> tuple[BaseModel, ...]:
+    """Return typed operations from a validated branch submission."""
+    return tuple(getattr(submission, "operations", ()))
 
 
 _OBJECT_FAMILY_INTENT_ROOTS: dict[str, frozenset[str]] = {
@@ -1232,6 +1243,8 @@ __all__ = [
     "branch_operation_submission_model",
     "group_request_inventory",
     "merge_scoped_intents",
+    "operation_request_object_kind",
+    "operation_submission_operations",
     "scoped_submission_model",
     "validate_intent_coverage",
     "validate_operation_submission",

@@ -779,6 +779,13 @@ class AuthoringService:
         """Return a defensive copy of the current document."""
         return deepcopy(self._document)
 
+    def replace_document(self, document: AuthoringDocumentSpec) -> None:
+        """Publish one fully validated canonical document snapshot atomically."""
+        candidate = AuthoringDocumentSpec.model_validate(
+            deepcopy(document).model_dump(mode="python")
+        )
+        self._document = candidate
+
     def to_mapping(self) -> dict[str, object]:
         """Serialize a defensive snapshot through the canonical adapter."""
         return authoring_document_to_mapping(self._document)

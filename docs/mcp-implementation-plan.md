@@ -1952,6 +1952,10 @@ Implementation note:
 
 ### 0.6-K5. Deterministic Dependency Plan And Transaction
 
+Status: deterministic typed-operation transaction boundary implemented. The
+normal agent path remains on the existing reconciler until K7 migration and
+parity acceptance are complete.
+
 Goal:
 
 - assemble valid multi-object edits through deterministic hierarchy ordering
@@ -1970,6 +1974,23 @@ Work:
   required operations and assertions pass
 - stop at the first blocked dependency and do not run descendant operations
 
+Implementation note:
+
+- `execute_typed_submissions(...)` validates all branch submissions before
+  mutation, including dependencies that cross branch boundaries.
+- Operations execute in stable hierarchy order on a defensive
+  `AuthoringService` copy; the original service is replaced only after every
+  operation succeeds and its canonical read-back check passes.
+- Create retries are idempotent for matching parent or track objects while
+  same-id payload conflicts block without overwriting the existing object.
+  Child collections are compared by their own operations, so a later binding
+  does not make its parent look like a conflict.
+- Move operations verify the persisted collection index, and create remarks
+  or fills require stable identities so retries cannot silently duplicate
+  generated objects.
+- The executor returns per-operation status, dependency failures, applied ids,
+  and read-back diagnostics for the later K6 progress/reporting layer.
+
 Acceptance:
 
 - mixed header and section requests do not leak state between branches
@@ -1978,6 +1999,11 @@ Acceptance:
   fills, annotations, or remarks
 - a failed operation leaves the persisted draft unchanged while retaining
   precise operation diagnostics
+
+Current acceptance coverage includes mixed report/structure/scalar branch
+ordering, rollback after a descendant failure, matching-create idempotence,
+same-id conflict rejection, and move-index read-back. Preserve-assertion
+evaluation and normal-agent migration remain K6/K7 work.
 
 ### 0.6-K6. Hierarchical Verification And Progress Reporting
 

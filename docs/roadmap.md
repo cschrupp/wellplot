@@ -595,10 +595,15 @@ Longer-term / UI-centric:
   state path.
 - `0.6-K4` has its typed branch-operation contract foundation: canonical
   service request variants are scoped by branch and checked for work-unit
-  coverage and parent-first ordering. K5 must wire this boundary into
-  deterministic execution.
-- Implement the remaining `0.6-K3` acceptance items and `0.6-K4` through
-  `0.6-K7` in separate reviewable commits, starting with K5 execution wiring.
+  coverage and parent-first ordering.
+- `0.6-K5` now has a standalone deterministic transaction executor: branch
+  dependencies are ordered, operations are read back, conflicting retries
+  block, and failed runs do not publish partial documents. The normal agent
+  path remains unchanged until K7 migration and parity acceptance.
+- Implement the remaining `0.6-K3` acceptance items and `0.6-K6` through
+  `0.6-K7` in separate reviewable commits, with K6 adding hierarchical
+  verification/progress reporting before K7 replaces the normal desired-state
+  path.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.
