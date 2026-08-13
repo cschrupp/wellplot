@@ -462,6 +462,7 @@ class AuthoringResult:
     user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
     needs_clarification: tuple[dict[str, object], ...] = ()
     request_coverage: tuple[dict[str, object], ...] = ()
+    operation_outcomes: tuple[dict[str, object], ...] = ()
     defaults_provenance: dict[str, str] = field(default_factory=dict)
     submitted_intent: dict[str, object] | None = None
     report_facts: dict[str, object] = field(default_factory=dict)
@@ -1754,6 +1755,15 @@ class AuthoringSession:
             and isinstance(report_facts.get("submitted_intent"), dict)
             else None
         )
+        operation_outcomes = (
+            tuple(
+                dict(item)
+                for item in report_facts.get("operation_outcomes", [])
+                if isinstance(item, dict)
+            )
+            if isinstance(report_facts, dict)
+            else ()
+        )
         return AuthoringResult(
             provider=self.backend.provider,
             model=self.backend.model,
@@ -1778,6 +1788,7 @@ class AuthoringSession:
             run_state=AuthoringRunState() if run_state is None else run_state,
             needs_clarification=needs_clarification,
             request_coverage=request_coverage,
+            operation_outcomes=operation_outcomes,
             defaults_provenance=({} if plan is None else dict(plan.defaults_provenance)),
             submitted_intent=submitted_intent,
             report_facts=dict(getattr(provider_result, "report_facts", {})),
@@ -5836,6 +5847,9 @@ class AuthoringSession:
                 "resolved_values": plan.resolved_values,
                 "resolution_decisions": list(plan.resolution_decisions),
                 "operation_payloads": list(plan.operation_payloads),
+                "operation_outcomes": [
+                    outcome.model_dump(mode="json") for outcome in execution.outcomes
+                ],
                 "next_help": [
                     "Inspect the blocked operation and correct its object identity or "
                     "source-channel reference before retrying."

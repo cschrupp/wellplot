@@ -218,7 +218,14 @@ def _move_submission() -> tuple[object, tuple[AuthoringRequestWorkUnit, ...]]:
 
 def test_typed_submissions_execute_parent_first_and_read_back() -> None:
     """Execute structure before scalar content across branch submissions."""
-    result = execute_typed_submissions(_service(), _submissions(), _work_units())
+    result = execute_typed_submissions(
+        _service(),
+        _submissions(),
+        _work_units(),
+        defaults_provenance_by_operation={
+            "create-repeat": {"width_mm": "canonical_default"},
+        },
+    )
 
     assert result.success is True
     assert [outcome.operation_id for outcome in result.outcomes] == [
@@ -227,6 +234,18 @@ def test_typed_submissions_execute_parent_first_and_read_back() -> None:
         "bind-gr",
     ]
     assert all(outcome.postcondition_verified for outcome in result.outcomes)
+    section_outcome = result.outcomes[0]
+    assert section_outcome.branch == "structure"
+    assert section_outcome.request_item_id == "request-001"
+    assert section_outcome.clause_text == "Add a repeat section."
+    assert section_outcome.natural_parent is None
+    assert section_outcome.defaults_provenance == {"width_mm": "canonical_default"}
+    assert section_outcome.verification.before is None
+    assert section_outcome.verification.after["value"]["id"] == "repeat"
+    binding_outcome = result.outcomes[-1]
+    assert binding_outcome.natural_parent == "curves track"
+    assert binding_outcome.verification.requested["binding"]["channel"] == "GR"
+    assert binding_outcome.verification.after["value"]["binding_id"] == "gr-1"
     repeat = next(section for section in result.document.sections if section.id == "repeat")
     curves = next(track for track in repeat.tracks if track.id == "curves")
     assert curves.bindings[0].channel == "GR"
@@ -259,6 +278,9 @@ def test_typed_submissions_are_idempotent_for_existing_targets() -> None:
     assert second.success is True
     assert all(
         outcome.status == TypedOperationExecutionStatus.SKIPPED for outcome in second.outcomes
+    )
+    assert all(
+        outcome.verification.before == outcome.verification.after for outcome in second.outcomes
     )
     repeat_sections = [section for section in service.document.sections if section.id == "repeat"]
     assert len(repeat_sections) == 1
@@ -297,4 +319,7 @@ def test_typed_move_verifies_new_collection_index() -> None:
 
     assert result.success is True
     assert result.outcomes[0].postcondition_verified is True
+    assert result.outcomes[0].verification.before["index"] == 1
+    assert result.outcomes[0].verification.after["index"] == 0
+    assert result.outcomes[0].verification.persisted_index == 0
     assert [track.id for track in result.document.sections[0].tracks] == ["notes", "depth"]

@@ -103,6 +103,45 @@ def test_executor_applies_typed_operations_and_captures_phase_previews() -> None
     assert track.bindings[0].style.color == "blue"
 
 
+def test_executor_does_not_preview_a_blocked_phase() -> None:
+    """Do not present a preview when a phase has no verified mutation."""
+    service = AuthoringService(_document())
+    plan = AuthoringReconciliationPlan(
+        ready=True,
+        operations=[
+            AuthoringOperation(
+                operation_id="duplicate-curves",
+                phase=AuthoringOperationPhase.TRACKS,
+                action=AuthoringOperationAction.CREATE,
+                object_kind=AuthoringOperationObjectKind.TRACK,
+                object_id="curves",
+                section_id="main",
+                payload={
+                    "object": {
+                        "id": "curves",
+                        "title": "Duplicate",
+                        "kind": "normal",
+                        "width_mm": 20,
+                    }
+                },
+                reason="test precondition failure",
+            )
+        ],
+    )
+    preview_calls: list[AuthoringOperationPhase] = []
+
+    result = execute_authoring_plan(
+        service,
+        plan,
+        preview_callback=lambda _document, phase: preview_calls.append(phase) or b"preview",
+    )
+
+    assert result.success is False
+    assert result.phase_summaries[0].status == AuthoringExecutionStatus.BLOCKED
+    assert result.phase_summaries[0].preview_png is None
+    assert preview_calls == []
+
+
 def test_executor_assembles_new_section_tracks_and_array_bindings() -> None:
     """Persist a generic multi-track section in dependency order."""
     document = _document()

@@ -11,8 +11,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..authoring_service import (
     AuthoringService,
@@ -40,19 +41,37 @@ class TypedOperationExecutionStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class TypedVerificationEvidence(BaseModel):
+    """Canonical evidence captured for one operation postcondition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    target: AuthoringTarget | None = None
+    requested: dict[str, Any] = Field(default_factory=dict)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+    persisted_index: int | None = None
+
+
 class TypedOperationOutcome(BaseModel):
     """Read-after-write outcome for one typed service request."""
 
     model_config = ConfigDict(extra="forbid")
 
+    branch: AuthoringCompilationScope
     operation_id: str
     work_unit_id: str
+    request_item_id: str | None = None
+    clause_text: str | None = None
+    natural_parent: str | None = None
     action: str
     object_kind: str
     status: TypedOperationExecutionStatus
     postcondition_verified: bool = False
     message: str = ""
     error: str | None = None
+    defaults_provenance: dict[str, str] = Field(default_factory=dict)
+    verification: TypedVerificationEvidence = Field(default_factory=TypedVerificationEvidence)
 
 
 class TypedSubmissionExecutionResult(BaseModel):
@@ -185,6 +204,88 @@ def _same_create_payload(actual: BaseModel, expected: BaseModel, object_kind: st
     return actual_data == expected_data
 
 
+def _json_value(value: object) -> object:
+    """Convert canonical values into stable JSON-compatible evidence."""
+    if isinstance(value, BaseModel):
+        return value.model_dump(mode="json", exclude_none=False)
+    if isinstance(value, Mapping):
+        return {str(key): _json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_value(item) for item in value]
+    return value
+
+
+def _requested_evidence(request: BaseModel) -> dict[str, Any]:
+    """Serialize the typed request that supplied an operation's expectation."""
+    payload = request.model_dump(mode="json", exclude_unset=True)
+    return dict(_json_value(payload))
+
+
+def _target_snapshot(
+    service: AuthoringService,
+    target: AuthoringTarget | None,
+) -> dict[str, Any] | None:
+    """Read one target and its canonical collection index, if it exists."""
+    if target is None:
+        return None
+    try:
+        value = service.get(target)
+    except (KeyError, ValueError, TypeError):
+        return None
+    references = service.list(
+        target.object_kind,
+        section_id=target.section_id,
+        track_id=target.track_id,
+    )
+    reference = next((item for item in references if item.object_id == target.object_id), None)
+    return {
+        "value": _json_value(value),
+        "index": None if reference is None else reference.index,
+    }
+
+
+def _outcome_context(
+    operation: object,
+    scope: AuthoringCompilationScope,
+    work_units: Mapping[str, AuthoringRequestWorkUnit],
+    *,
+    status: TypedOperationExecutionStatus,
+    defaults_provenance: Mapping[str, str] | None = None,
+    target: AuthoringTarget | None = None,
+    before: dict[str, Any] | None = None,
+    after: dict[str, Any] | None = None,
+    postcondition_verified: bool = False,
+    message: str = "",
+    error: str | None = None,
+) -> TypedOperationOutcome:
+    """Build one outcome with clause and hierarchy context attached."""
+    typed_operation = operation
+    work_unit = work_units.get(typed_operation.work_unit_id)
+    persisted_index = None if after is None else after.get("index")
+    return TypedOperationOutcome(
+        branch=scope,
+        operation_id=typed_operation.operation_id,
+        work_unit_id=typed_operation.work_unit_id,
+        request_item_id=None if work_unit is None else work_unit.request_item_id,
+        clause_text=None if work_unit is None else work_unit.clause_text,
+        natural_parent=None if work_unit is None else work_unit.natural_parent,
+        action=typed_operation.action,
+        object_kind=operation_request_object_kind(typed_operation.request),
+        status=status,
+        postcondition_verified=postcondition_verified,
+        message=message,
+        error=error,
+        defaults_provenance=dict(defaults_provenance or {}),
+        verification=TypedVerificationEvidence(
+            target=target,
+            requested=_requested_evidence(typed_operation.request),
+            before=before,
+            after=after,
+            persisted_index=persisted_index,
+        ),
+    )
+
+
 def _request_object_kind_from_envelope(operation: object) -> str:
     """Read object kind from a generated operation envelope."""
     return operation_request_object_kind(operation.request)
@@ -251,9 +352,13 @@ def execute_typed_submissions(
     service: AuthoringService,
     submissions: Iterable[BaseModel],
     work_units: Iterable[AuthoringRequestWorkUnit],
+    *,
+    defaults_provenance_by_operation: Mapping[str, Mapping[str, str]] | None = None,
 ) -> TypedSubmissionExecutionResult:
     """Execute typed branch submissions atomically with canonical read-back."""
     submission_list = tuple(submissions)
+    work_unit_list = tuple(work_units)
+    work_unit_by_id = {unit.unit_id: unit for unit in work_unit_list}
     all_operations = tuple(
         operation
         for submission in submission_list
@@ -270,7 +375,7 @@ def execute_typed_submissions(
             validate_operation_submission(
                 scope,
                 submission,
-                work_units,
+                work_unit_list,
                 external_operation_ids=all_operation_ids,
             )
         )
@@ -299,16 +404,17 @@ def execute_typed_submissions(
         missing = [
             dependency for dependency in operation.depends_on if dependency not in applied_ids
         ]
-        object_kind = _request_object_kind_from_envelope(operation)
         if missing:
             message = f"Missing completed dependencies: {', '.join(missing)}."
             outcomes.append(
-                TypedOperationOutcome(
-                    operation_id=operation.operation_id,
-                    work_unit_id=operation.work_unit_id,
-                    action=operation.action,
-                    object_kind=object_kind,
+                _outcome_context(
+                    operation,
+                    scope,
+                    work_unit_by_id,
                     status=TypedOperationExecutionStatus.BLOCKED,
+                    defaults_provenance=(defaults_provenance_by_operation or {}).get(
+                        operation.operation_id
+                    ),
                     error=message,
                 )
             )
@@ -320,6 +426,10 @@ def execute_typed_submissions(
                 applied_operation_ids=tuple(applied_ids),
                 errors=(f"{operation.operation_id}: {message}",),
             )
+        target: AuthoringTarget | None = None
+        before: dict[str, Any] | None = None
+        after: dict[str, Any] | None = None
+        object_kind = _request_object_kind_from_envelope(operation)
         try:
             request = operation.request
             if operation.action == "create" and object_kind in {"remark", "fill"}:
@@ -331,11 +441,8 @@ def execute_typed_submissions(
                         f"{object_kind} identity ({identity_field})."
                     )
             target = _request_target(request)
-            if (
-                operation.action == "create"
-                and target is not None
-                and _target_exists(working_service, target)
-            ):
+            before = _target_snapshot(working_service, target)
+            if operation.action == "create" and target is not None and before is not None:
                 actual = working_service.get(target)
                 expected = _create_payload(request)
                 if (
@@ -347,13 +454,19 @@ def execute_typed_submissions(
                         f"Create operation {operation.operation_id!r} conflicts with "
                         f"existing {object_kind} {target.object_id!r}."
                     )
+                after = before
                 outcomes.append(
-                    TypedOperationOutcome(
-                        operation_id=operation.operation_id,
-                        work_unit_id=operation.work_unit_id,
-                        action=operation.action,
-                        object_kind=object_kind,
+                    _outcome_context(
+                        operation,
+                        scope,
+                        work_unit_by_id,
                         status=TypedOperationExecutionStatus.SKIPPED,
+                        defaults_provenance=(defaults_provenance_by_operation or {}).get(
+                            operation.operation_id
+                        ),
+                        target=target,
+                        before=before,
+                        after=after,
                         postcondition_verified=True,
                         message="Target already exists; operation is idempotently satisfied.",
                     )
@@ -363,34 +476,33 @@ def execute_typed_submissions(
             returned = _apply_request(working_service, request)
             if operation.action == "remove":
                 verified = target is not None and not _target_exists(working_service, target)
+                after = None
             elif operation.action == "move":
-                if target is None:
-                    verified = False
-                else:
-                    references = working_service.list(
-                        target.object_kind,
-                        section_id=target.section_id,
-                    )
-                    reference = next(
-                        (item for item in references if item.object_id == target.object_id),
-                        None,
-                    )
-                    verified = reference is not None and reference.index == request.new_index
+                after = _target_snapshot(working_service, target)
+                verified = after is not None and after["index"] == request.new_index
             else:
                 read_target = _request_target(request, returned)
                 actual = working_service.get(read_target)
+                after = _target_snapshot(working_service, read_target)
                 verified = returned is not None and _same(actual, returned)
             if not verified:
                 raise RuntimeError("Canonical read-after-write verification failed.")
         except Exception as exc:  # noqa: BLE001 - deterministic boundary report
             message = str(exc) or exc.__class__.__name__
+            if target is not None:
+                after = _target_snapshot(working_service, target)
             outcomes.append(
-                TypedOperationOutcome(
-                    operation_id=operation.operation_id,
-                    work_unit_id=operation.work_unit_id,
-                    action=operation.action,
-                    object_kind=object_kind,
+                _outcome_context(
+                    operation,
+                    scope,
+                    work_unit_by_id,
                     status=TypedOperationExecutionStatus.BLOCKED,
+                    defaults_provenance=(defaults_provenance_by_operation or {}).get(
+                        operation.operation_id
+                    ),
+                    target=target,
+                    before=before,
+                    after=after,
                     error=message,
                 )
             )
@@ -403,12 +515,17 @@ def execute_typed_submissions(
                 errors=(f"{operation.operation_id}: {message}",),
             )
         outcomes.append(
-            TypedOperationOutcome(
-                operation_id=operation.operation_id,
-                work_unit_id=operation.work_unit_id,
-                action=operation.action,
-                object_kind=object_kind,
+            _outcome_context(
+                operation,
+                scope,
+                work_unit_by_id,
                 status=TypedOperationExecutionStatus.COMPLETED,
+                defaults_provenance=(defaults_provenance_by_operation or {}).get(
+                    operation.operation_id
+                ),
+                target=target,
+                before=before,
+                after=after,
                 postcondition_verified=True,
                 message=f"Applied and verified in {scope} branch.",
             )
@@ -429,5 +546,6 @@ __all__ = [
     "TypedOperationExecutionStatus",
     "TypedOperationOutcome",
     "TypedSubmissionExecutionResult",
+    "TypedVerificationEvidence",
     "execute_typed_submissions",
 ]

@@ -600,10 +600,12 @@ Longer-term / UI-centric:
   dependencies are ordered, operations are read back, conflicting retries
   block, and failed runs do not publish partial documents. The normal agent
   path remains unchanged until K7 migration and parity acceptance.
-- Implement the remaining `0.6-K3` acceptance items and `0.6-K6` through
-  `0.6-K7` in separate reviewable commits, with K6 adding hierarchical
-  verification/progress reporting before K7 replaces the normal desired-state
-  path.
+- `0.6-K6` now records typed clause/parent/default context and canonical
+  before/after evidence, exposes deterministic operation outcomes in
+  `AuthoringResult`, and suppresses phase previews until verified mutation.
+- Implement the remaining `0.6-K3` acceptance items and `0.6-K7` in separate
+  reviewable commits. K7 must migrate the normal agent path and complete
+  cross-domain parity before release.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

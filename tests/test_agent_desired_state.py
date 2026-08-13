@@ -344,6 +344,9 @@ def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_pa
     assert result.user_report.done
     assert "Updated report." in result.user_report.done
     assert "Updated report title." not in result.user_report.done
+    assert result.operation_outcomes
+    assert result.operation_outcomes[0]["postcondition_verified"] is True
+    assert result.operation_outcomes[0]["object_kind"] == "report"
     assert result.phase_summaries
     saved = load_authoring_document(
         tmp_path / "workspace/demo.log.yaml",

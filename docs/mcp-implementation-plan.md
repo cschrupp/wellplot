@@ -2007,6 +2007,10 @@ evaluation and normal-agent migration remain K6/K7 work.
 
 ### 0.6-K6. Hierarchical Verification And Progress Reporting
 
+Status: typed operation evidence and verified-progress reporting implemented.
+The normal agent path still uses its existing reconciler until K7 migrates it
+to the typed branch-operation executor.
+
 Goal:
 
 - prove progress at the object level instead of inferring success from provider
@@ -2025,6 +2029,22 @@ Work:
 - prevent a provider's prose response or accepted tool payload from being
   described as a completed authoring change
 
+Implementation note:
+
+- Typed operation outcomes now include branch, request item, original clause,
+  natural parent, defaults provenance, target identity, requested request
+  data, and canonical before/after snapshots.
+- Snapshots include the persisted collection index, allowing track/section/
+  remark ordering changes to be distinguished from content changes.
+- Skipped creates report matching existing evidence; same-id conflicts remain
+  blocked. Removed objects report a verified absent after-state.
+- `AuthoringResult.operation_outcomes` exposes deterministic operation
+  outcomes to callers, while provider prose remains outside the authoritative
+  completed list.
+- Phase previews are captured only after a phase has completed at least one
+  verified mutation; blocked or no-progress phases do not produce a misleading
+  preview.
+
 Acceptance:
 
 - "Done" contains only canonically persisted, read-back-verified outcomes
@@ -2032,6 +2052,11 @@ Acceptance:
 - a failed header, track, or binding check names the exact object and property
 - token/round use is associated with work units so repeated no-progress stages
   are visible and bounded
+
+Current acceptance coverage includes clause/parent/default evidence, canonical
+before/after snapshots, persisted move indices, typed operation outcomes in
+the public result, and suppression of previews for blocked phases. Full
+provider-to-typed-operation migration remains K7 work.
 
 ### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
 

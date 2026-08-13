@@ -441,7 +441,10 @@ class AuthoringExecutor:
                 )
                 applied_ids.add(operation.operation_id)
                 phase_applied += 1
-            preview_png, preview_error = self._capture_preview(phase, preview_callback)
+            if phase_status == AuthoringExecutionStatus.COMPLETED and phase_applied > 0:
+                preview_png, preview_error = self._capture_preview(phase, preview_callback)
+            else:
+                preview_png, preview_error = None, None
             if preview_error:
                 warnings.append(f"{phase.value}: {preview_error}")
             checkpoints.append(
