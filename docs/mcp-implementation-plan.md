@@ -1,6 +1,6 @@
 # MCP Implementation Plan
 
-Last updated: 2026-08-10
+Last updated: 2026-08-13
 
 ## Purpose
 
@@ -2060,6 +2060,9 @@ provider-to-typed-operation migration remains K7 work.
 
 ### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
 
+Implementation status: K7.1 generic reconciliation bridging is implemented;
+normal-agent routing and end-to-end migration remain K7.2 work.
+
 Goal:
 
 - replace the scoped desired-state path and prove that hierarchical operations
@@ -2067,6 +2070,8 @@ Goal:
 
 Work:
 
+- compile the existing generic `AuthoringReconciliationPlan` into typed branch
+  submissions without adding packet-specific rules
 - migrate `run()`, `revise()`, and `plan()` to the hierarchy router, object
   operation compiler, deterministic dependency planner, and verifier
 - route deterministic header-language and narrow remarks handling through the
@@ -2080,6 +2085,19 @@ Work:
   drafts with unchanged user-facing prompts
 - update MCP and user documentation from the generated hierarchy and operation
   catalog
+
+Implementation note for K7.1:
+
+- `compile_reconciliation_plan(...)` translates the existing generic
+  reconciliation operations into the report, structure, scalar, raster, and
+  annotation submission branches consumed by
+  `execute_typed_submissions(...)`.
+- The bridge uses the canonical `AuthoringService` request models, preserves
+  stable parent/child identities and dependencies, and applies the same
+  explicit clear-marker semantics as the deterministic executor.
+- This is a migration seam, not a second authoring path. The normal agent
+  still uses the existing G5 executor until K7.2 routes it through the bridge
+  and records parity evidence.
 
 Acceptance:
 

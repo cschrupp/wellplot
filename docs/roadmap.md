@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-12
+Last updated: 2026-08-13
 
 ## Scope Summary
 
@@ -603,8 +603,12 @@ Longer-term / UI-centric:
 - `0.6-K6` now records typed clause/parent/default context and canonical
   before/after evidence, exposes deterministic operation outcomes in
   `AuthoringResult`, and suppresses phase previews until verified mutation.
-- Implement the remaining `0.6-K3` acceptance items and `0.6-K7` in separate
-  reviewable commits. K7 must migrate the normal agent path and complete
+- `0.6-K7.1` now provides a generic bridge from reconciliation operations to
+  typed report, structure, scalar, raster, and annotation submissions. It is
+  covered across non-packet-specific object families and keeps the normal
+  agent path unchanged until parity is demonstrated.
+- Implement `0.6-K7.2`: route the normal agent path through the bridge,
+  deterministic transaction executor, and verifier; then complete
   cross-domain parity before release.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
