@@ -23,12 +23,14 @@ from wellplot.agent.compilation import (
     AuthoringRequestWorkUnit,
     AuthoringScalarIntentSubmission,
     AuthoringStructureIntentSubmission,
+    branch_operation_submission_model,
     build_request_manifest,
     build_request_work_units,
     group_request_inventory,
     merge_scoped_intents,
     scoped_submission_model,
     validate_intent_coverage,
+    validate_operation_submission,
     validate_reconciliation_fulfillment,
     validate_request_inventory,
     validate_scoped_intent_semantics,
@@ -387,6 +389,143 @@ def test_request_inventory_rejects_wrong_hierarchy_branch() -> None:
     assert errors == [
         "Inventory for 'request-001' maps 'track' to branch 'header'; expected 'track'."
     ]
+
+
+def test_branch_operation_contract_is_parent_scoped_and_typed() -> None:
+    """Accept a typed track operation while excluding unrelated bindings."""
+    manifest = build_request_manifest("- Add a resistivity track after depth.")
+    inventory = AuthoringRequestInventory(
+        items=[
+            {
+                "request_item_id": "request-001",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "track",
+                "target": "resistivity",
+                "natural_parent": "main section",
+                "dependencies": ["depth track"],
+            }
+        ]
+    )
+    work_units = build_request_work_units(manifest, inventory)
+    submission_model = branch_operation_submission_model("structure")
+    submission = submission_model.model_validate(
+        {
+            "branch": "structure",
+            "operations": [
+                {
+                    "operation_id": "create-resistivity",
+                    "work_unit_id": "unit-request-001",
+                    "action": "create",
+                    "request": {
+                        "kind": "track",
+                        "section_id": "main",
+                        "track": {
+                            "id": "resistivity",
+                            "title": "Resistivity",
+                            "kind": "normal",
+                            "width_mm": 35,
+                        },
+                    },
+                }
+            ],
+            "coverage": [
+                {
+                    "unit_id": "unit-request-001",
+                    "status": "mapped",
+                    "operation_ids": ["create-resistivity"],
+                }
+            ],
+        }
+    )
+
+    assert validate_operation_submission("structure", submission, work_units) == []
+    assert submission.operations[0].request.kind == "track"
+    assert "curve_binding" not in submission_model.model_json_schema()["$defs"]
+
+
+def test_branch_operation_validation_rejects_cross_branch_and_bad_order() -> None:
+    """Block bindings in structure scope and dependencies that run too early."""
+    work_units = [
+        AuthoringRequestWorkUnit(
+            unit_id="unit-track",
+            request_item_id="request-track",
+            clause_text="Add a track.",
+            status="mapped",
+            action="add",
+            branch="track",
+            object_family="track",
+        ),
+        AuthoringRequestWorkUnit(
+            unit_id="unit-section",
+            request_item_id="request-section",
+            clause_text="Add a section.",
+            status="mapped",
+            action="add",
+            branch="section",
+            object_family="section",
+        ),
+    ]
+    submission_model = branch_operation_submission_model("structure")
+    submission = submission_model.model_validate(
+        {
+            "branch": "structure",
+            "operations": [
+                {
+                    "operation_id": "create-track",
+                    "work_unit_id": "unit-track",
+                    "depends_on": ["create-section"],
+                    "action": "create",
+                    "request": {
+                        "kind": "track",
+                        "section_id": "main",
+                        "track": {
+                            "id": "curves",
+                            "title": "Curves",
+                            "kind": "normal",
+                            "width_mm": 30,
+                        },
+                    },
+                },
+                {
+                    "operation_id": "create-section",
+                    "work_unit_id": "unit-section",
+                    "action": "create",
+                    "request": {
+                        "kind": "section",
+                        "section": {
+                            "id": "main",
+                            "title": "Main",
+                            "tracks": [
+                                {
+                                    "id": "depth",
+                                    "title": "Depth",
+                                    "kind": "reference",
+                                    "width_mm": 20,
+                                }
+                            ],
+                        },
+                    },
+                },
+            ],
+            "coverage": [
+                {
+                    "unit_id": "unit-track",
+                    "status": "mapped",
+                    "operation_ids": ["create-track"],
+                },
+                {
+                    "unit_id": "unit-section",
+                    "status": "mapped",
+                    "operation_ids": ["create-section"],
+                },
+            ],
+        }
+    )
+
+    errors = validate_operation_submission("structure", submission, work_units)
+
+    assert any("must follow dependency" in error for error in errors)
 
 
 def test_scoped_submission_schemas_exclude_unrelated_families() -> None:

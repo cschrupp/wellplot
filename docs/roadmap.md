@@ -593,8 +593,12 @@ Longer-term / UI-centric:
   original clause, explicit values, assertions, and dependencies. Complete
   the parent-first operation compiler in K4 before removing the old desired
   state path.
+- `0.6-K4` has its typed branch-operation contract foundation: canonical
+  service request variants are scoped by branch and checked for work-unit
+  coverage and parent-first ordering. K5 must wire this boundary into
+  deterministic execution.
 - Implement the remaining `0.6-K3` acceptance items and `0.6-K4` through
-  `0.6-K7` in separate reviewable commits.
+  `0.6-K7` in separate reviewable commits, starting with K5 execution wiring.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

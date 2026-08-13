@@ -1907,6 +1907,9 @@ Implementation note:
 
 ### 0.6-K4. Parent-First Object Operation Compiler
 
+Status: typed branch-operation contract foundation implemented in the current
+development branch; provider submission and executor wiring remain K5 work.
+
 Goal:
 
 - compile each work unit into the smallest applicable canonical operation
@@ -1934,6 +1937,18 @@ Acceptance:
   reinterpretation by later stages
 - provider schemas contain no unrelated object definitions or full-document
   desired-state graph
+
+Implementation note:
+
+- `branch_operation_submission_model(...)` now generates branch-scoped
+  contracts from the canonical `AuthoringService` create/update/remove/move
+  request models.
+- `validate_operation_submission(...)` verifies branch membership, work-unit
+  coverage, unique operation identities, and parent-first dependency order
+  before any mutation is attempted.
+- The contract carries typed service requests rather than loose YAML patches;
+  explicit values therefore remain in the request model for deterministic
+  execution and read-back verification.
 
 ### 0.6-K5. Deterministic Dependency Plan And Transaction
 

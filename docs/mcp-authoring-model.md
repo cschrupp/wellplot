@@ -55,6 +55,11 @@ explicit values, preserve assertions, and dependencies. This is routing
 context only; canonical Pydantic objects and deterministic MCP operations
 remain the mutation authority.
 
+The next boundary is a branch-scoped operation submission. Its request payloads
+are generated from the deterministic service request models, so a structure
+compiler can submit section/track operations but cannot submit curve, raster,
+or header mutations. Parent dependencies are checked before execution.
+
 The MCP should not drift toward an example-reconstruction engine that only
 works when a hidden packet specification is present.
 
