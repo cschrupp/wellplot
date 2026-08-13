@@ -619,17 +619,13 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result.draft_text, "name: Demo Draft\n")
             self.assertEqual(result.report_preview_png, b"report-preview")
             self.assertEqual(result.section_preview_png, b"section-preview")
-            self.assertEqual(backend.tool_names, ["set_heading_content"])
-            self.assertEqual(backend.tool_payload, {"structured": {"applied": 1}})
-            self.assertIn("Simplify the heading.", backend.initial_user_message)
-            self.assertIn(
-                "packaged example `forge16b_porosity_example`",
-                backend.initial_user_message,
-            )
-            self.assertIn("authoring prompt", backend.instructions)
+            self.assertEqual(backend.tool_names, [])
+            self.assertIsNone(backend.tool_payload)
+            self.assertEqual(result.tool_trace, ())
+            self.assertEqual(result.report_facts["extraction"]["status"], "unsupported_provider")
+            self.assertTrue(result.user_report.why_not)
             self.assertIsNotNone(runtime.last_session)
             assert runtime.last_session is not None
-            self.assertEqual(runtime.last_session.prompt_calls[0][0], "author_plot_from_request")
 
             preview_paths = result.write_preview_artifacts()
             self.assertEqual(preview_paths["report_preview"].read_bytes(), b"report-preview")
@@ -655,10 +651,8 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result.request_kind, "author")
             self.assertIsNone(result.example_id)
             self.assertEqual(result.source_logfile_path, "examples/starter.log.yaml")
-            self.assertIn(
-                "starter logfile `examples/starter.log.yaml`",
-                backend.initial_user_message,
-            )
+            self.assertEqual(backend.initial_user_message, "")
+            self.assertEqual(result.report_facts["extraction"]["status"], "unsupported_provider")
             assert runtime.last_session is not None
             create_call = runtime.last_session.tool_calls[0]
             self.assertEqual(create_call[0], "create_logfile_draft")
@@ -843,11 +837,15 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result.request_kind, "revise")
             self.assertIsNone(result.example_id)
             self.assertIsNone(result.source_logfile_path)
-            self.assertIn("Add one short remarks block.", backend.initial_user_message)
+            self.assertEqual(backend.initial_user_message, "")
             assert runtime.last_session is not None
             tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
             self.assertNotIn("create_logfile_draft", tool_names)
-            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+            self.assertEqual(runtime.last_session.prompt_calls, [])
+            self.assertEqual(
+                result.report_facts["extraction"]["status"],
+                "unsupported_provider",
+            )
 
     def test_revision_request_routes_header_fill_requests_to_deterministic_tools(self) -> None:
         """Reuse one existing draft and bypass the provider loop for header-only edits."""
@@ -1032,7 +1030,7 @@ class AgentTests(unittest.TestCase):
             runtime = FakeRuntime(root)
             session = AuthoringSession(backend=backend, runtime=runtime)
 
-            anyio.run(
+            result = anyio.run(
                 session.revise_request,
                 RevisionRequest(
                     feedback="""
@@ -1046,7 +1044,11 @@ class AgentTests(unittest.TestCase):
             assert runtime.last_session is not None
             tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
             self.assertNotIn("apply_header_values", tool_names)
-            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+            self.assertEqual(runtime.last_session.prompt_calls, [])
+            self.assertEqual(
+                result.report_facts["extraction"]["status"],
+                "unsupported_provider",
+            )
 
     def test_revision_request_applies_grid_style_preflight_before_provider_loop(self) -> None:
         """Apply deterministic report-style edits before the broader revision loop."""
@@ -1074,15 +1076,14 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result.request_kind, "revise")
             self.assertEqual(
                 [item.name for item in result.tool_trace],
-                ["set_matplotlib_style", "set_heading_content"],
+                ["set_matplotlib_style"],
             )
-            self.assertIn("Add one short remarks block.", backend.initial_user_message)
-            self.assertNotIn("darker grid lines", backend.initial_user_message.lower())
+            self.assertEqual(backend.initial_user_message, "")
             assert runtime.last_session is not None
             tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
             self.assertEqual(tool_names[0], "set_matplotlib_style")
-            self.assertIn("summarize_logfile_draft", tool_names)
-            self.assertEqual(runtime.last_session.prompt_calls[0][0], "revise_plot_from_feedback")
+            self.assertNotIn("get_prompt", tool_names)
+            self.assertEqual(runtime.last_session.prompt_calls, [])
 
     def test_authoring_session_surfaces_missing_seed_draft_clearly(self) -> None:
         """Raise one actionable error when the MCP server reports success without a file."""
@@ -1206,14 +1207,14 @@ class AgentTests(unittest.TestCase):
                 ),
             )
 
-            self.assertIsNotNone(result.plan)
-            assert result.plan is not None
-            self.assertEqual(result.plan.mode, "freeform")
-            self.assertIsNone(result.plan.packet_blueprint_id)
-            self.assertTrue(result.phase_summaries)
-            self.assertNotIn("set_heading_content", backend.tool_names)
+            self.assertIsNone(result.plan)
+            self.assertEqual(result.phase_summaries, ())
+            self.assertEqual(backend.tool_names, [])
             self.assertTrue(
-                any("not available during phase" in item for item in result.user_report.why_not)
+                any(
+                    "legacy provider-to-MCP mutation loop is disabled" in item
+                    for item in result.user_report.why_not
+                )
             )
             assert runtime.last_session is not None
             self.assertNotIn(

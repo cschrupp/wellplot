@@ -781,8 +781,11 @@ Narrow deterministic shortcuts for header-only and style-only requests remain
 available and retain their existing verification path; migrating those shortcuts
 to typed intents is a follow-up hardening task before the final release gate.
 
-Backends without typed-state support retain the legacy provider loop for
-compatibility during the transition. They are not the release-default path.
+Backends without typed-state support no longer enter a compatibility mutation
+loop. Public natural-language `run()` and `revise()` requests stop before any
+provider-issued MCP mutation when `supports_desired_state` is absent or false,
+and return a structured `unsupported_provider` report. Caller-supplied typed
+`desired_state` remains valid because it does not require provider extraction.
 
 Foundation acceptance completed:
 
@@ -2060,9 +2063,8 @@ provider-to-typed-operation migration remains K7 work.
 
 ### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
 
-Implementation status: K7.2 typed desired-state routing and phase evidence are
-implemented; legacy provider-tool authoring and full cross-domain acceptance
-remain before K7 closure.
+Implementation status: K7.3 public legacy-provider closure is implemented;
+full cross-domain acceptance and final release closure remain before K7.
 
 Goal:
 
@@ -2077,6 +2079,9 @@ Work:
   operation compiler, deterministic dependency planner, and verifier
 - route deterministic header-language and narrow remarks handling through the
   same canonical object operations
+- prevent providers without typed-state support from entering a broad
+  provider-to-MCP mutation loop; return an explicit structured capability
+  diagnostic instead
 - remove the broad scoped-fragment merge path after behavior and diagnostic
   parity; do not retain it as an automatic fallback
 - add recorded-provider acceptance for open-hole, porosity, caliper,
@@ -2104,6 +2109,21 @@ Implementation note for K7.1:
   operations. Public operation outcomes retain typed canonical evidence,
   including requested values and before/after targets.
 
+Implementation note for K7.3:
+
+- Public natural-language requests now have one authoritative route: typed
+  extraction followed by deterministic reconciliation, execution, and
+  verification. The former broad provider-to-MCP mutation branches were
+  removed from `run_request()` and `revise_request()`.
+- The provider protocol explicitly declares `supports_desired_state`. A
+  backend without that capability is blocked before provider prompt/tool
+  discovery and returns `extraction.status=unsupported_provider` with exact
+  next-help guidance.
+- Deterministic style/header shortcuts still run before the capability check,
+  and caller-supplied typed `desired_state` still executes without a provider
+  call. The private phase executor remains only as compatibility coverage, not
+  as an automatic public fallback.
+
 Acceptance:
 
 - the canonical LAS notebook completes initial draft, remarks, SP, and
@@ -2113,6 +2133,10 @@ Acceptance:
 - an uncatalogued scalar track and a custom annotation workflow use the same
   object-operation path as catalogued examples
 - no acceptance request depends on a packet blueprint or request-specific code
+- an untyped backend cannot call provider-issued MCP mutation tools through
+  either `run_request()` or `revise_request()`
+- blocked provider capability is reported with no provider tool trace and an
+  actionable next-help message
 - `AuthoringDocumentIntent` scoped compilation is absent from the normal agent
   path before `0.6.0` release
 - unit, MCP, agent, cross-domain, docs, notebook, package, and installed-wheel

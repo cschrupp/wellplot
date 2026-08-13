@@ -581,6 +581,7 @@ class ProviderBackendProtocol(Protocol):
     provider: str
     model: str
     credential_source: str | None
+    supports_desired_state: bool
 
     async def run_authoring(
         self,
@@ -5500,6 +5501,51 @@ class AuthoringSession:
                 staged_path.unlink(missing_ok=True)
         return previews, tuple(warnings)
 
+    async def _unsupported_provider_result(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        preflight_tool_trace: tuple[AuthoringToolCall, ...] = (),
+    ) -> AuthoringResult:
+        """Finalize a request when the provider cannot submit typed authoring data."""
+        provider_name = str(self.backend.provider).strip() or "unknown"
+        reason = (
+            f"Provider `{provider_name}` does not support typed authoring extraction. "
+            "The legacy provider-to-MCP mutation loop is disabled."
+        )
+        provider_result = ProviderRunResult(
+            final_text="Natural-language authoring was blocked before mutation.",
+            tool_trace=preflight_tool_trace,
+            report_facts={
+                "authoritative_completed": False,
+                "extraction": {
+                    "status": "unsupported_provider",
+                    "tool_calls_emitted": False,
+                },
+                "not_done": ["Extract and apply the typed desired state for this request."],
+                "reasons": [reason],
+                "next_help": [
+                    "Use a provider with typed authoring support or pass desired_state directly."
+                ],
+            },
+        )
+        return await self._finalize_result(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=goal,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            baseline_draft_text=baseline_draft_text,
+            provider_result=provider_result,
+        )
+
     @staticmethod
     def _typed_phase_summaries(
         *,
@@ -6115,117 +6161,7 @@ class AuthoringSession:
                     max_rounds=request.max_rounds,
                     desired_state=request.desired_state,
                 )
-
-            authoring_plan = self._plan_from_text(effective_goal)
-            if authoring_plan.phases:
-                prompt_arguments: dict[str, object] = {
-                    "goal": effective_goal,
-                    "logfile_path": relative_output_logfile,
-                }
-                if request.example_id is not None:
-                    prompt_arguments["example_id"] = request.example_id
-                prompt_result = await session.get_prompt(
-                    "author_plot_from_request",
-                    prompt_arguments,
-                )
-                authoring_prompt = self.runtime.prompt_text(prompt_result)
-                tools_result = await session.list_tools()
-                tool_definitions = self.runtime.build_tool_definitions(
-                    getattr(tools_result, "tools", []),
-                    allowed_names=set(self.allowed_tool_names),
-                    excluded_names={"create_logfile_draft"},
-                )
-                provider_result, phase_summaries, run_state = await self._execute_authoring_plan(
-                    session=session,
-                    draft_logfile=relative_output_logfile,
-                    request_text=effective_goal,
-                    plan=authoring_plan,
-                    prompt_text=authoring_prompt,
-                    tool_definitions=tool_definitions,
-                    request_max_rounds=request.max_rounds,
-                    seed_context=_request_seed_label(request),
-                )
-                if preflight_tool_trace:
-                    provider_result = ProviderRunResult(
-                        final_text=provider_result.final_text,
-                        tool_trace=preflight_tool_trace + provider_result.tool_trace,
-                        report_facts=provider_result.report_facts,
-                    )
-                return await self._finalize_result(
-                    session=session,
-                    draft_logfile=relative_output_logfile,
-                    request_kind="author",
-                    goal=request.goal,
-                    example_id=request.example_id,
-                    source_logfile_path=relative_source_logfile,
-                    baseline_draft_text=baseline_draft_text,
-                    provider_result=provider_result,
-                    plan=authoring_plan,
-                    phase_summaries=phase_summaries,
-                    run_state=run_state,
-                )
-
-            bootstrap_summary_result = await session.call_tool(
-                "summarize_logfile_draft",
-                {"logfile_path": relative_output_logfile},
-            )
-            _require_mcp_success(bootstrap_summary_result, action="summarize_logfile_draft")
-            bootstrap_vocab_result = await session.call_tool(
-                "inspect_authoring_vocab",
-                {"logfile_path": relative_output_logfile},
-            )
-            _require_mcp_success(bootstrap_vocab_result, action="inspect_authoring_vocab")
-            prompt_arguments: dict[str, object] = {
-                "goal": effective_goal,
-                "logfile_path": relative_output_logfile,
-            }
-            if request.example_id is not None:
-                prompt_arguments["example_id"] = request.example_id
-            prompt_result = await session.get_prompt(
-                "author_plot_from_request",
-                prompt_arguments,
-            )
-            authoring_prompt = self.runtime.prompt_text(prompt_result)
-            tools_result = await session.list_tools()
-            tool_definitions = self.runtime.build_tool_definitions(
-                getattr(tools_result, "tools", []),
-                allowed_names=set(self.allowed_tool_names),
-                excluded_names={"create_logfile_draft"},
-            )
-            if not tool_definitions:
-                raise RuntimeError("No MCP tools were exposed to the authoring loop.")
-
-            bootstrap_summary = _structured_content(bootstrap_summary_result)
-            bootstrap_vocab = _structured_content(bootstrap_vocab_result)
-            sections = _bootstrap_sections(bootstrap_summary)
-
-            async def call_mcp_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
-                tool_result = await session.call_tool(name, arguments)
-                return self.runtime.tool_result_payload(tool_result)
-
-            provider_result = await self.backend.run_authoring(
-                instructions=authoring_prompt,
-                initial_user_message=_authoring_bootstrap_message(
-                    goal=effective_goal,
-                    seed_label=_request_seed_label(request),
-                    logfile_path=relative_output_logfile,
-                    seed_result=_structured_content(baseline_result),
-                    sections=sections,
-                    heading_patch_keys=list(bootstrap_vocab.get("heading_patch_keys", [])),
-                    curve_binding_patch_keys=list(
-                        bootstrap_vocab.get("curve_binding_patch_keys", [])
-                    ),
-                ),
-                tool_definitions=tool_definitions,
-                tool_caller=call_mcp_tool,
-                max_rounds=request.max_rounds,
-            )
-            if preflight_tool_trace:
-                provider_result = ProviderRunResult(
-                    final_text=provider_result.final_text,
-                    tool_trace=preflight_tool_trace + provider_result.tool_trace,
-                )
-            return await self._finalize_result(
+            return await self._unsupported_provider_result(
                 session=session,
                 draft_logfile=relative_output_logfile,
                 request_kind="author",
@@ -6233,7 +6169,7 @@ class AuthoringSession:
                 example_id=request.example_id,
                 source_logfile_path=relative_source_logfile,
                 baseline_draft_text=baseline_draft_text,
-                provider_result=provider_result,
+                preflight_tool_trace=preflight_tool_trace,
             )
 
     async def revise_request(self, request: RevisionRequest) -> AuthoringResult:
@@ -6324,107 +6260,7 @@ class AuthoringSession:
                     max_rounds=request.max_rounds,
                     desired_state=request.desired_state,
                 )
-
-            authoring_plan = self._plan_from_text(effective_feedback)
-            if authoring_plan.phases:
-                prompt_result = await session.get_prompt(
-                    "revise_plot_from_feedback",
-                    {
-                        "logfile_path": relative_logfile,
-                        "feedback": effective_feedback,
-                    },
-                )
-                revision_prompt = self.runtime.prompt_text(prompt_result)
-                tools_result = await session.list_tools()
-                tool_definitions = self.runtime.build_tool_definitions(
-                    getattr(tools_result, "tools", []),
-                    allowed_names=set(self.allowed_tool_names),
-                    excluded_names={"create_logfile_draft"},
-                )
-                provider_result, phase_summaries, run_state = await self._execute_authoring_plan(
-                    session=session,
-                    draft_logfile=relative_logfile,
-                    request_text=effective_feedback,
-                    plan=authoring_plan,
-                    prompt_text=revision_prompt,
-                    tool_definitions=tool_definitions,
-                    request_max_rounds=request.max_rounds,
-                )
-                if preflight_tool_trace:
-                    provider_result = ProviderRunResult(
-                        final_text=provider_result.final_text,
-                        tool_trace=preflight_tool_trace + provider_result.tool_trace,
-                        report_facts=provider_result.report_facts,
-                    )
-                return await self._finalize_result(
-                    session=session,
-                    draft_logfile=relative_logfile,
-                    request_kind="revise",
-                    goal=request.feedback,
-                    example_id=None,
-                    source_logfile_path=None,
-                    baseline_draft_text=baseline_draft_text,
-                    provider_result=provider_result,
-                    plan=authoring_plan,
-                    phase_summaries=phase_summaries,
-                    run_state=run_state,
-                )
-            bootstrap_summary_result = await session.call_tool(
-                "summarize_logfile_draft",
-                {"logfile_path": relative_logfile},
-            )
-            _require_mcp_success(bootstrap_summary_result, action="summarize_logfile_draft")
-            bootstrap_vocab_result = await session.call_tool(
-                "inspect_authoring_vocab",
-                {"logfile_path": relative_logfile},
-            )
-            _require_mcp_success(bootstrap_vocab_result, action="inspect_authoring_vocab")
-            prompt_result = await session.get_prompt(
-                "revise_plot_from_feedback",
-                {
-                    "logfile_path": relative_logfile,
-                    "feedback": effective_feedback,
-                },
-            )
-            revision_prompt = self.runtime.prompt_text(prompt_result)
-            tools_result = await session.list_tools()
-            tool_definitions = self.runtime.build_tool_definitions(
-                getattr(tools_result, "tools", []),
-                allowed_names=set(self.allowed_tool_names),
-                excluded_names={"create_logfile_draft"},
-            )
-            if not tool_definitions:
-                raise RuntimeError("No MCP tools were exposed to the revision loop.")
-
-            bootstrap_summary = _structured_content(bootstrap_summary_result)
-            bootstrap_vocab = _structured_content(bootstrap_vocab_result)
-            sections = _bootstrap_sections(bootstrap_summary)
-
-            async def call_mcp_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
-                tool_result = await session.call_tool(name, arguments)
-                return self.runtime.tool_result_payload(tool_result)
-
-            provider_result = await self.backend.run_authoring(
-                instructions=revision_prompt,
-                initial_user_message=_revision_bootstrap_message(
-                    feedback=effective_feedback,
-                    logfile_path=relative_logfile,
-                    sections=sections,
-                    heading_patch_keys=list(bootstrap_vocab.get("heading_patch_keys", [])),
-                    curve_binding_patch_keys=list(
-                        bootstrap_vocab.get("curve_binding_patch_keys", [])
-                    ),
-                ),
-                tool_definitions=tool_definitions,
-                tool_caller=call_mcp_tool,
-                max_rounds=request.max_rounds,
-            )
-            if preflight_tool_trace:
-                provider_result = ProviderRunResult(
-                    final_text=provider_result.final_text,
-                    tool_trace=preflight_tool_trace + provider_result.tool_trace,
-                )
-            return await self._finalize_result(
+            return await self._unsupported_provider_result(
                 session=session,
                 draft_logfile=relative_logfile,
                 request_kind="revise",
@@ -6432,7 +6268,7 @@ class AuthoringSession:
                 example_id=None,
                 source_logfile_path=None,
                 baseline_draft_text=baseline_draft_text,
-                provider_result=provider_result,
+                preflight_tool_trace=preflight_tool_trace,
             )
 
     async def run(

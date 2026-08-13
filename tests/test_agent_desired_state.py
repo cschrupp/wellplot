@@ -15,7 +15,7 @@ from types import SimpleNamespace
 
 import anyio
 
-from wellplot.agent import AuthoringRequest, AuthoringSession
+from wellplot.agent import AuthoringRequest, AuthoringSession, RevisionRequest
 from wellplot.agent.core import ProviderRunResult
 from wellplot.authoring import (
     authoring_document_from_mapping,
@@ -367,6 +367,63 @@ def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_pa
     ] == ["workspace/demo.log.yaml"]
     assert result.phase_summaries[0].preview_kind == "report"
     assert result.phase_summaries[0].preview_png == b"preview"
+
+
+def test_natural_language_run_blocks_backend_without_typed_authoring_support(
+    tmp_path: Path,
+) -> None:
+    """Do not fall back to a broad provider mutation loop for an untyped backend."""
+    backend = _NoProviderBackend()
+    runtime = _TypedRuntime(tmp_path)
+    session = AuthoringSession(backend=backend, runtime=runtime)
+
+    result = anyio.run(
+        session.run_request,
+        AuthoringRequest(
+            goal="Add a resistivity track.",
+            output_logfile="workspace/demo.log.yaml",
+            example_id="demo",
+        ),
+    )
+
+    assert backend.calls == 0
+    assert result.tool_trace == ()
+    assert result.report_facts["extraction"]["status"] == "unsupported_provider"
+    assert any(
+        "legacy provider-to-MCP mutation loop is disabled" in reason
+        for reason in result.user_report.why_not
+    )
+    assert result.user_report.next_help == (
+        "Use a provider with typed authoring support or pass desired_state directly.",
+    )
+
+
+def test_natural_language_revision_blocks_backend_without_typed_authoring_support(
+    tmp_path: Path,
+) -> None:
+    """Keep revisions on the typed path instead of silently using legacy tools."""
+    backend = _NoProviderBackend()
+    runtime = _TypedRuntime(tmp_path)
+    draft_path = tmp_path / "workspace" / "demo.log.yaml"
+    draft_path.parent.mkdir(parents=True)
+    draft_path.write_text(authoring_document_to_yaml(_document()) or "", encoding="utf-8")
+    session = AuthoringSession(backend=backend, runtime=runtime)
+
+    result = anyio.run(
+        session.revise_request,
+        RevisionRequest(
+            feedback="Add a resistivity track.",
+            logfile_path="workspace/demo.log.yaml",
+        ),
+    )
+
+    assert backend.calls == 0
+    assert result.tool_trace == ()
+    assert result.report_facts["extraction"]["status"] == "unsupported_provider"
+    assert any(
+        "legacy provider-to-MCP mutation loop is disabled" in reason
+        for reason in result.user_report.why_not
+    )
 
 
 def test_typed_save_retries_once_after_transport_failure(tmp_path: Path) -> None:

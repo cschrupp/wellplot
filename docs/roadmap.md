@@ -611,8 +611,12 @@ Longer-term / UI-centric:
   bridge, deterministic transaction executor, and verifier. Phase checkpoints
   and typed before/after evidence feed the existing agent report and preview
   surface.
-- Complete the remaining K7 acceptance work: legacy provider-tool authoring,
-  cross-domain parity, clean notebook runs, and release-gate validation.
+- `0.6-K7.3` now closes the public legacy provider-tool path. Natural-language
+  `run()` and `revise()` requests require a backend that explicitly supports
+  typed authoring; unsupported backends return a structured capability report
+  before provider tool discovery or mutation.
+- Complete the remaining K7 acceptance work: cross-domain parity, clean
+  notebook runs, and release-gate validation.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.
