@@ -25,7 +25,7 @@ import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 from uuid import uuid4
@@ -61,13 +61,16 @@ from .compilation import (
     AuthoringCompilationScope,
     AuthoringIntentCoverage,
     AuthoringRequestInventory,
+    AuthoringRequestInventoryItem,
     AuthoringRequestManifest,
     build_request_manifest,
     group_request_inventory,
     merge_scoped_intents,
     scoped_submission_model,
     validate_intent_coverage,
+    validate_reconciliation_fulfillment,
     validate_request_inventory,
+    validate_scoped_intent_semantics,
 )
 
 if TYPE_CHECKING:
@@ -972,11 +975,12 @@ def _build_user_report(
     warnings_or_errors: list[str] = []
     next_help: list[str] = []
 
-    summary_lines = change_summary.get("summary_lines", [])
-    if isinstance(summary_lines, list):
-        for line in summary_lines:
-            if isinstance(line, str) and line.strip():
-                done.append(line.strip())
+    if not bool(report_facts.get("authoritative_completed")):
+        summary_lines = change_summary.get("summary_lines", [])
+        if isinstance(summary_lines, list):
+            for line in summary_lines:
+                if isinstance(line, str) and line.strip():
+                    done.append(line.strip())
 
     for entry in report_facts.get("completed", []):
         if isinstance(entry, str) and entry.strip():
@@ -1024,7 +1028,7 @@ def _build_user_report(
             "and available channels."
         )
 
-    if not done and tool_trace:
+    if not done and tool_trace and not bool(report_facts.get("authoritative_completed")):
         done.append(
             "Executed deterministic tools: "
             + ", ".join(item.name for item in tool_trace[:3])
@@ -1051,6 +1055,52 @@ def _build_user_report(
         needs_clarification=_clarification_entries(report_facts.get("needs_clarification")),
         next_help=_dedupe_text_items(next_help),
     )
+
+
+def _typed_operation_completion_lines(
+    *,
+    plan: AuthoringPlanResult,
+    execution: AuthoringExecutionResult,
+) -> list[str]:
+    """Describe only typed operations that passed deterministic postconditions."""
+    operation_by_id = {
+        str(operation["operation_id"]): operation
+        for operation in plan.operation_payloads
+        if isinstance(operation.get("operation_id"), str)
+    }
+    action_labels = {
+        "create": "Created",
+        "update": "Updated",
+        "remove": "Removed",
+        "move": "Moved",
+    }
+    completed: list[str] = []
+    for outcome in execution.outcomes:
+        if (
+            outcome.status != AuthoringExecutionStatus.COMPLETED
+            or not outcome.postcondition_verified
+        ):
+            continue
+        operation = operation_by_id.get(outcome.operation_id, {})
+        action = action_labels.get(outcome.action.value, outcome.action.value.title())
+        object_kind = outcome.object_kind.value.replace("_", " ")
+        object_id = outcome.object_id
+        line = f"{action} {object_kind}"
+        if object_id != outcome.object_kind.value:
+            line += f" `{object_id}`"
+        section_id = operation.get("section_id")
+        track_id = operation.get("track_id")
+        if isinstance(section_id, str) and section_id:
+            line += f" in section `{section_id}`"
+        if isinstance(track_id, str) and track_id:
+            line += f", track `{track_id}`"
+        completed.append(f"{line}.")
+
+    if not completed and execution.success:
+        completed.append(
+            "No typed changes were required; the requested state was already satisfied."
+        )
+    return list(_dedupe_text_items(completed))
 
 
 def _typed_plan_next_help(plan: AuthoringPlanResult) -> tuple[str, ...]:
@@ -4932,6 +4982,9 @@ class AuthoringSession:
                     model: type = submission_model,
                     manifest: AuthoringRequestManifest = scoped_manifest,
                     stage: str = scope,
+                    scoped_inventory: tuple[AuthoringRequestInventoryItem, ...] = tuple(
+                        inventory_items
+                    ),
                 ) -> dict[str, object]:
                     """Validate one scoped typed fragment without mutation."""
                     nonlocal accepted_submission
@@ -4964,6 +5017,13 @@ class AuthoringSession:
                             ),
                         }
                     errors = validate_intent_coverage(manifest, candidate.coverage)
+                    errors.extend(
+                        validate_scoped_intent_semantics(
+                            scoped_inventory,
+                            candidate.intent,
+                            candidate.coverage,
+                        )
+                    )
                     if errors:
                         coverage_failures.append([f"{stage}: {error}" for error in errors])
                         return {
@@ -5656,6 +5716,52 @@ class AuthoringSession:
                 plan=plan,
             )
 
+        inventory_payload = provider_result.report_facts.get("request_inventory")
+        if isinstance(inventory_payload, dict):
+            try:
+                request_inventory = AuthoringRequestInventory.model_validate(inventory_payload)
+            except Exception as exc:
+                fulfillment_errors = [
+                    "The accepted request inventory could not be revalidated before "
+                    f"execution: {type(exc).__name__}: {exc}"
+                ]
+            else:
+                fulfillment_errors = validate_reconciliation_fulfillment(
+                    request_inventory.items,
+                    plan.operation_payloads,
+                )
+            if fulfillment_errors:
+                blocked_plan = replace(
+                    plan,
+                    blocked=True,
+                    blocked_reasons=tuple(fulfillment_errors),
+                )
+                provider_result = ProviderRunResult(
+                    final_text="Typed desired-state plan was blocked before mutation.",
+                    tool_trace=provider_result.tool_trace,
+                    report_facts={
+                        **provider_result.report_facts,
+                        "not_done": ["Apply typed operations that fulfill every mapped request."],
+                        "reasons": fulfillment_errors,
+                        "warnings": list(blocked_plan.warnings),
+                        "next_help": [
+                            "Correct the typed intent so its planned operations match the "
+                            "requested action and object family."
+                        ],
+                    },
+                )
+                return await self._finalize_result(
+                    session=session,
+                    draft_logfile=draft_logfile,
+                    request_kind=request_kind,
+                    goal=request_text,
+                    example_id=example_id,
+                    source_logfile_path=source_logfile_path,
+                    baseline_draft_text=baseline_draft_text,
+                    provider_result=provider_result,
+                    plan=blocked_plan,
+                )
+
         execution = execute_authoring_plan(
             AuthoringService(existing),
             plan.reconciliation_plan,
@@ -5680,8 +5786,14 @@ class AuthoringSession:
                 attempts=2,
             )
 
-        completed = [phase.summary for phase in phase_summaries if phase.status == "completed"]
-        blocked = [phase.summary for phase in phase_summaries if phase.status != "completed"]
+        completed_phases = [
+            phase.summary for phase in phase_summaries if phase.status == "completed"
+        ]
+        blocked_phases = [phase.summary for phase in phase_summaries if phase.status != "completed"]
+        completed_operations = _typed_operation_completion_lines(
+            plan=plan,
+            execution=execution,
+        )
         reasons = list(execution.errors)
         if save_error:
             reasons.append(f"Canonical desired-state save failed: {save_error}")
@@ -5697,8 +5809,9 @@ class AuthoringSession:
             tool_trace=provider_result.tool_trace,
             report_facts={
                 **provider_result.report_facts,
-                "completed": completed,
-                "not_done": blocked,
+                "authoritative_completed": True,
+                "completed": completed_operations,
+                "not_done": blocked_phases,
                 "reasons": reasons,
                 "warnings": warnings,
                 "applied_defaults_provenance": plan.applied_defaults_provenance,
@@ -5716,8 +5829,8 @@ class AuthoringSession:
         run_state = self._run_state_from_summary(
             draft_summary=summary,
             objectives=plan.run_state.objectives,
-            completed_objectives=tuple(completed),
-            blocked_objectives=tuple(blocked),
+            completed_objectives=tuple(completed_phases),
+            blocked_objectives=tuple(blocked_phases),
             last_verification={
                 "success": execution.success and save_error is None,
                 "errors": reasons,

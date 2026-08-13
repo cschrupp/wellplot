@@ -485,6 +485,215 @@ AuthoringObject: TypeAlias = (
 )
 
 
+_HIERARCHY_NODE_DEFINITIONS: tuple[dict[str, object], ...] = (
+    {
+        "object_kind": "report",
+        "parent_kind": None,
+        "children": ("output", "page", "depth", "header", "tail", "remark", "section"),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringDocumentSpec",
+        "update_request": UpdateReportRequest,
+    },
+    {
+        "object_kind": "output",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringOutputSpec",
+        "update_request": UpdateOutputRequest,
+    },
+    {
+        "object_kind": "page",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringPageSpec",
+        "update_request": UpdatePageRequest,
+    },
+    {
+        "object_kind": "depth",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringDepthSpec",
+        "update_request": UpdateDepthRequest,
+    },
+    {
+        "object_kind": "header",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringHeaderSpec",
+        "update_request": UpdateHeaderRequest,
+    },
+    {
+        "object_kind": "remark",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "remark_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "create", "update", "remove", "move", "validate"),
+        "canonical_contract": "AuthoringRemarkSpec",
+        "create_request": CreateRemarkRequest,
+        "update_request": UpdateRemarkRequest,
+    },
+    {
+        "object_kind": "tail",
+        "parent_kind": "report",
+        "children": (),
+        "identity_field": "object_id",
+        "parent_fields": (),
+        "operations": ("list", "get", "update", "validate"),
+        "canonical_contract": "AuthoringTailSpec",
+        "update_request": UpdateTailRequest,
+    },
+    {
+        "object_kind": "section",
+        "parent_kind": "report",
+        "children": ("track",),
+        "identity_field": "id",
+        "parent_fields": (),
+        "operations": ("list", "get", "create", "update", "remove", "move", "validate"),
+        "canonical_contract": "AuthoringSectionSpec",
+        "create_request": CreateSectionRequest,
+        "update_request": UpdateSectionRequest,
+    },
+    {
+        "object_kind": "track",
+        "parent_kind": "section",
+        "children": ("curve_binding", "raster_binding", "fill", "annotation"),
+        "identity_field": "id",
+        "parent_fields": ("section_id",),
+        "operations": ("list", "get", "create", "update", "remove", "move", "validate"),
+        "canonical_contract": "TrackSpec",
+        "create_request": CreateTrackRequest,
+        "update_request": UpdateTrackRequest,
+        "constraints": {
+            "form_kind_immutable": True,
+            "child_compatibility": {
+                "normal": ("curve_binding", "fill"),
+                "reference": ("curve_binding",),
+                "array": ("curve_binding", "raster_binding"),
+                "annotation": ("annotation",),
+            },
+        },
+    },
+    {
+        "object_kind": "curve_binding",
+        "parent_kind": "track",
+        "children": (),
+        "identity_field": "binding_id",
+        "parent_fields": ("section_id", "track_id"),
+        "operations": ("list", "get", "create", "update", "remove", "validate"),
+        "canonical_contract": "CurveBindingSpec",
+        "create_request": CreateCurveBindingRequest,
+        "update_request": UpdateCurveBindingRequest,
+        "constraints": {
+            "compatible_track_kinds": ("normal", "reference", "array"),
+        },
+    },
+    {
+        "object_kind": "raster_binding",
+        "parent_kind": "track",
+        "children": (),
+        "identity_field": "binding_id",
+        "parent_fields": ("section_id", "track_id"),
+        "operations": ("list", "get", "create", "update", "remove", "validate"),
+        "canonical_contract": "RasterBindingSpec",
+        "create_request": CreateRasterBindingRequest,
+        "update_request": UpdateRasterBindingRequest,
+        "constraints": {
+            "compatible_track_kinds": ("array",),
+        },
+    },
+    {
+        "object_kind": "fill",
+        "parent_kind": "track",
+        "children": (),
+        "identity_field": "fill_id",
+        "parent_fields": ("section_id", "track_id"),
+        "operations": ("list", "get", "create", "update", "remove", "validate"),
+        "canonical_contract": "CurveFillSpec",
+        "create_request": CreateFillRequest,
+        "update_request": UpdateFillRequest,
+        "constraints": {
+            "compatible_track_kinds": ("normal",),
+            "target_fields": ("binding_id", "other_binding_id"),
+        },
+    },
+    {
+        "object_kind": "annotation",
+        "parent_kind": "track",
+        "children": (),
+        "identity_field": "annotation_id",
+        "parent_fields": ("section_id", "track_id"),
+        "operations": ("list", "get", "create", "update", "remove", "validate"),
+        "canonical_contract": "AnnotationSpec",
+        "create_request": CreateAnnotationRequest,
+        "update_request": UpdateAnnotationRequest,
+        "constraints": {
+            "compatible_track_kinds": ("annotation",),
+        },
+    },
+)
+
+_HIERARCHY_CANONICAL_MODELS: dict[str, object] = {
+    "report": AuthoringDocumentSpec,
+    "output": AuthoringOutputSpec,
+    "page": AuthoringPageSpec,
+    "depth": AuthoringDepthSpec,
+    "header": AuthoringHeaderSpec,
+    "remark": AuthoringRemarkSpec,
+    "tail": AuthoringTailSpec,
+    "section": AuthoringSectionSpec,
+    "track": TrackSpec,
+    "curve_binding": CurveBindingSpec,
+    "raster_binding": RasterBindingSpec,
+    "fill": CurveFillSpec,
+    "annotation": AnnotationSpec,
+}
+
+_HIERARCHY_ID_FIELDS = {
+    "object_id",
+    "id",
+    "remark_id",
+    "binding_id",
+    "fill_id",
+    "annotation_id",
+    "section_id",
+    "track_id",
+}
+_HIERARCHY_RELATIONAL_FIELDS = {
+    "data_source",
+    "binding_id",
+    "other_binding_id",
+    "track_id",
+    "section_id",
+}
+_HIERARCHY_SCHEMA_CONSTRAINT_KEYS = (
+    "enum",
+    "minimum",
+    "exclusiveMinimum",
+    "maximum",
+    "exclusiveMaximum",
+    "minLength",
+    "maxLength",
+    "minItems",
+    "maxItems",
+    "pattern",
+)
+
+
 class AuthoringService:
     """Own and atomically mutate one canonical authoring document."""
 
@@ -1289,6 +1498,239 @@ def authoring_operation_json_schema() -> dict[str, Any]:
     }
 
 
+def _hierarchy_canonical_schema(object_kind: str) -> dict[str, Any]:
+    """Return the generated canonical schema for one hierarchy node."""
+    model = _HIERARCHY_CANONICAL_MODELS[object_kind]
+    if object_kind in {"track", "annotation"}:
+        return TypeAdapter(model).json_schema()
+    if not isinstance(model, type) or not issubclass(model, BaseModel):
+        raise TypeError(f"Unsupported canonical schema model for {object_kind!r}.")
+    return model.model_json_schema()
+
+
+def _resolve_schema_reference(value: object, root_schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve a local JSON Schema reference when one is present."""
+    if not isinstance(value, Mapping):
+        return {}
+    reference = value.get("$ref")
+    if isinstance(reference, str) and reference.startswith("#/$defs/"):
+        definition = root_schema.get("$defs", {}).get(reference.rsplit("/", 1)[-1])
+        if isinstance(definition, Mapping):
+            return dict(definition)
+    return dict(value)
+
+
+def _schema_has_enum(value: object, root_schema: Mapping[str, Any]) -> bool:
+    """Return whether a JSON Schema value resolves to a finite enum."""
+    schema = _resolve_schema_reference(value, root_schema)
+    if "enum" in schema:
+        return True
+    for key in ("anyOf", "oneOf", "allOf"):
+        variants = schema.get(key)
+        if isinstance(variants, list) and any(
+            _schema_has_enum(variant, root_schema) for variant in variants
+        ):
+            return True
+    return False
+
+
+def _hierarchy_field_category(
+    object_kind: str,
+    field_name: str,
+    field_schema: Mapping[str, Any],
+    root_schema: Mapping[str, Any],
+) -> str:
+    """Classify one canonical field for hierarchy discovery."""
+    definition = next(
+        item for item in _HIERARCHY_NODE_DEFINITIONS if item["object_kind"] == object_kind
+    )
+    identity_field = str(definition["identity_field"])
+    if field_name == identity_field:
+        return "contextual"
+    if field_name in _HIERARCHY_RELATIONAL_FIELDS or field_name.endswith("_id"):
+        return "relational"
+    if field_name in {"channel", "source_path", "source_format"}:
+        return "contextual"
+    if _schema_has_enum(field_schema, root_schema):
+        return "finite"
+    return "constrained"
+
+
+def _hierarchy_field_catalog(object_kind: str, schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Generate field metadata from one canonical model schema."""
+    schema_views: list[tuple[str | None, Mapping[str, Any]]] = []
+    properties = schema.get("properties", {})
+    if isinstance(properties, Mapping) and properties:
+        schema_views.append((None, schema))
+    else:
+        variants = schema.get("oneOf", [])
+        if isinstance(variants, list):
+            for variant in variants:
+                if not isinstance(variant, Mapping):
+                    continue
+                reference = variant.get("$ref")
+                variant_name = reference.rsplit("/", 1)[-1] if isinstance(reference, str) else None
+                variant_schema = _resolve_schema_reference(variant, schema)
+                if isinstance(variant_schema.get("properties"), Mapping):
+                    schema_views.append((variant_name, variant_schema))
+
+    fields: dict[str, Any] = {}
+    field_variants: dict[str, list[tuple[str | None, Mapping[str, Any]]]] = {}
+    for variant_name, variant_schema in schema_views:
+        variant_properties = variant_schema.get("properties", {})
+        if not isinstance(variant_properties, Mapping):
+            continue
+        for field_name, field_schema in variant_properties.items():
+            if isinstance(field_name, str) and isinstance(field_schema, Mapping):
+                field_variants.setdefault(field_name, []).append((variant_name, field_schema))
+
+    for field_name, variants in field_variants.items():
+        field_schema = variants[0][1]
+        resolved = _resolve_schema_reference(field_schema, schema)
+        required = any(
+            field_name in set(variant_schema.get("required", []))
+            for _, variant_schema in schema_views
+            if isinstance(variant_schema.get("required", []), list)
+        )
+        constraints = {
+            key: deepcopy(resolved[key])
+            for key in _HIERARCHY_SCHEMA_CONSTRAINT_KEYS
+            if key in resolved
+        }
+        fields[field_name] = {
+            "category": _hierarchy_field_category(
+                object_kind,
+                field_name,
+                field_schema,
+                schema,
+            ),
+            "required_on_create": required,
+            "schema": deepcopy(dict(field_schema)),
+            "constraints": constraints,
+        }
+        variant_names = sorted(
+            {variant_name for variant_name, _ in variants if variant_name is not None}
+        )
+        if variant_names:
+            fields[field_name]["variants"] = variant_names
+    return fields
+
+
+def _hierarchy_json_value(value: object) -> object:
+    """Normalize generated metadata containers to JSON-compatible values."""
+    if isinstance(value, Mapping):
+        return {str(key): _hierarchy_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_hierarchy_json_value(item) for item in value]
+    return deepcopy(value)
+
+
+def _hierarchy_operation_schema(request_type: object) -> dict[str, Any] | None:
+    """Generate one typed operation schema for hierarchy discovery."""
+    if request_type is None:
+        return None
+    if not isinstance(request_type, type) or not issubclass(request_type, BaseModel):
+        raise TypeError(f"Unsupported hierarchy request model {request_type!r}.")
+    return request_type.model_json_schema()
+
+
+def _hierarchy_update_fields(
+    object_kind: str,
+    update_schema: Mapping[str, Any] | None,
+) -> list[str]:
+    """Return mutable payload fields from one generated update schema."""
+    if update_schema is None:
+        return []
+    properties = update_schema.get("properties", {})
+    if not isinstance(properties, Mapping):
+        return []
+    payload_name = "patch" if "patch" in properties else object_kind
+    payload_schema = _resolve_schema_reference(properties.get(payload_name), update_schema)
+    payload_properties = payload_schema.get("properties", {})
+    if not isinstance(payload_properties, Mapping):
+        return []
+    return sorted(str(field_name) for field_name in payload_properties)
+
+
+def authoring_hierarchy_catalog(object_kind: str | None = None) -> dict[str, Any]:
+    """Return generated canonical hierarchy and typed operation metadata."""
+    normalized_kind = object_kind.strip().lower() if object_kind is not None else None
+    definitions = list(_HIERARCHY_NODE_DEFINITIONS)
+    if normalized_kind is not None:
+        if normalized_kind not in {str(item["object_kind"]) for item in definitions}:
+            allowed = sorted(str(item["object_kind"]) for item in definitions)
+            raise ValueError(
+                f"Unsupported authoring object kind {object_kind!r}. Allowed kinds: {allowed}."
+            )
+        definitions = [item for item in definitions if item["object_kind"] == normalized_kind]
+
+    nodes: list[dict[str, Any]] = []
+    for definition in definitions:
+        kind = str(definition["object_kind"])
+        canonical_schema = _hierarchy_canonical_schema(kind)
+        operation_schemas: dict[str, Any] = {}
+        for operation in definition["operations"]:
+            request_key = f"{operation}_request"
+            request_type = definition.get(request_key)
+            if operation in {"create", "update"}:
+                schema = _hierarchy_operation_schema(request_type)
+            elif operation == "remove":
+                schema = RemoveRequest.model_json_schema()
+            elif operation == "move":
+                schema = MoveRequest.model_json_schema()
+            else:
+                schema = None
+            if schema is not None:
+                operation_schemas[operation] = schema
+
+        parent_kind = definition["parent_kind"]
+        parent = None
+        if parent_kind is not None:
+            parent = {
+                "object_kind": parent_kind,
+                "fields": list(definition["parent_fields"]),
+            }
+        nodes.append(
+            {
+                "object_kind": kind,
+                "canonical_contract": definition["canonical_contract"],
+                "canonical_schema": canonical_schema,
+                "identity": {
+                    "field": definition["identity_field"],
+                    "scope": list(definition["parent_fields"]),
+                },
+                "parent": parent,
+                "children": list(definition["children"]),
+                "operations": list(definition["operations"]),
+                "operation_schemas": operation_schemas,
+                "mutable_on_update": _hierarchy_update_fields(
+                    kind,
+                    operation_schemas.get("update"),
+                ),
+                "verification": {
+                    "operation": "get",
+                    "object_kind": kind,
+                },
+                "fields": _hierarchy_field_catalog(kind, canonical_schema),
+                "constraints": _hierarchy_json_value(definition.get("constraints", {})),
+            }
+        )
+
+    return {
+        "schema_version": 1,
+        "root_object_kind": "report",
+        "object_kind": normalized_kind,
+        "nodes": nodes,
+        "precedence": [
+            "explicit_user_value",
+            "preserved_existing_state",
+            "specific_defaults",
+            "generic_form_defaults",
+            "starter_scaffold",
+        ],
+    }
+
+
 __all__ = [
     "AuthoringObjectKind",
     "AuthoringObjectRef",
@@ -1329,5 +1771,6 @@ __all__ = [
     "UpdateSectionRequest",
     "UpdateTailRequest",
     "UpdateTrackRequest",
+    "authoring_hierarchy_catalog",
     "authoring_operation_json_schema",
 ]

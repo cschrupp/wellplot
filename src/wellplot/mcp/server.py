@@ -85,6 +85,11 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         )
 
     @mcp.tool()
+    def inspect_authoring_hierarchy(object_kind: str | None = None) -> dict[str, object]:
+        """Inspect generated canonical object hierarchy and typed operations."""
+        return asdict(service.inspect_authoring_hierarchy(object_kind=object_kind))
+
+    @mcp.tool()
     def inspect_data_source(
         source_path: str,
         source_format: str = "auto",
@@ -1130,6 +1135,14 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
     def authoring_operations_schema_resource() -> str:
         """Return generated typed authoring-operation schemas."""
         return service.authoring_operations_schema_resource().text
+
+    @mcp.resource(
+        "wellplot://authoring/catalog/hierarchy.json",
+        mime_type="application/json",
+    )
+    def authoring_hierarchy_resource() -> str:
+        """Return generated authoring hierarchy and operation metadata."""
+        return service.authoring_hierarchy_resource().text
 
     @mcp.resource(
         "wellplot://authoring/catalog/track-kinds.json",

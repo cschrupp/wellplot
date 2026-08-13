@@ -1724,14 +1724,294 @@ Acceptance:
   optional provider limitations from deterministic product limitations
 - no further MCP surface expansion is accepted until this release gate passes
 
+## Reopened 0.6-K: Hierarchical Object-Operation Compilation
+
+Live notebook testing after the scoped compiler work exposed a remaining
+architectural mismatch. The provider no longer receives the full canonical
+document schema at once, but the current scopes still combine unrelated levels
+of the authoring hierarchy. In particular, the `report` scope combines document
+settings, header content, remarks, and tail content, while the `structure`
+scope asks the provider to describe sections and tracks as a partial desired
+state before child content can be assembled.
+
+This remains too close to asking the provider to solve a YAML puzzle. The MCP
+already has a canonical object service and typed operation models, but its
+discovery and the agent compiler do not yet present those operations as one
+natural parent/child hierarchy.
+
+The governing invariants for this program are:
+
+> MCP mutation tools expose deterministic canonical object operations. They do
+> not expose raw YAML paths or require a provider to construct a document
+> graph.
+
+> A provider sees only the object branch and parent context needed for the
+> current user clause. Header work, report settings, sections, tracks, and
+> track content are separate compilation contexts.
+
+> The deterministic host resolves identity, defaults, dependencies,
+> compatibility, persistence, and verification. Generated intelligence
+> interprets the user's language and supplies explicit requested values.
+
+The canonical hierarchy for this program is:
+
+```text
+document
+|-- settings: output, page, depth
+|-- report content: title/subtitle, header, remarks, tail
+`-- sections[]
+    `-- section
+        `-- tracks[]
+            `-- track
+                |-- curve bindings -> fills
+                |-- raster bindings -> raster display objects
+                `-- annotations
+```
+
+Data-source inspection is contextual input. Validate, preview, render, and save
+are lifecycle operations. Neither belongs in the provider-facing mutation
+hierarchy.
+
+Implementation policy:
+
+- do not add packet-, CBL-, resistivity-, porosity-, or vendor-specific
+  compiler branches
+- do not expose raw JSONPath/YAML setters as the public authoring model
+- generate hierarchy and operation discovery from the canonical Pydantic
+  models and `AuthoringService` request models
+- keep object mutation tools bounded by one object and its parent scope
+- use defaults only after preserving explicit user values and existing-state
+  instructions
+- replace the scoped desired-state compiler after operation parity; do not keep
+  two permanent authoring workflows
+- complete and commit each slice separately
+
+### 0.6-K1. Generated Hierarchy And Operation Catalog
+
+Status: implemented in the current development branch.
+
+Goal:
+
+- make the canonical object tree, legal children, operations, fields, and
+  constraints discoverable without reading YAML or provider prompt text
+
+Work:
+
+- define generated hierarchy metadata for document settings, report content,
+  sections, tracks, bindings, fills, annotations, and nested header/raster
+  objects
+- generate each node's identity, parent requirements, legal children,
+  supported operations, create schema, update schema, movable status, and
+  verification getter from existing canonical models
+- expose the catalog through MCP discovery, including a hierarchy resource and
+  a focused inspection tool that accepts one object kind
+- classify each property as finite, constrained, contextual, or relational and
+  expose applicable generic defaults separately from allowed values
+- audit `inspect_authoring_objects(...)` parity: report, output, header, tail,
+  and all other service-owned object kinds must be inspectable through the same
+  canonical service
+
+Acceptance:
+
+- discovery for `header` contains no section, track, binding, raster, or
+  annotation schemas
+- discovery for `track` names its legal child kinds and immutable form-kind
+  rule
+- every `AuthoringService` object kind has a generated getter/operation entry
+- schema parity tests fail when service models and MCP discovery diverge
+
+### 0.6-K2. Complete Bounded Object Mutation Parity
+
+Goal:
+
+- make every supported persisted mutation expressible as one typed operation
+  over one canonical object
+
+Work:
+
+- audit create/update/remove/move/validate coverage against the hierarchy
+  catalog
+- add only missing object-level operations, favoring typed patches over
+  replacement of whole parent branches
+- add first-class header-slot and service-title updates so filling one header
+  value does not replace the complete header object
+- keep remark, section, track, curve, raster, fill, and annotation operations
+  parent-scoped and stable-id based
+- return the canonical object reference and post-write object from each
+  mutation for immediate verification
+- preserve atomic validation and reject incompatible child operations before
+  persistence
+
+Acceptance:
+
+- changing one header slot cannot clear unrelated header values or structure
+- changing one binding style cannot replace sibling bindings or track form
+- create/update/remove/move operations round-trip through canonical YAML and
+  read back through the matching getter
+- no mutation requires a caller to patch an arbitrary YAML mapping
+
+### 0.6-K3. Hierarchical Request Router
+
+Goal:
+
+- split natural language into small hierarchy work units without asking the
+  provider to assemble authoring state
+
+Work:
+
+- replace the current object-family inventory with a compact clause inventory
+  containing action, top-level branch, natural target, natural parent, explicit
+  values, preserve constraints, and dependencies
+- use branch values for document settings, title/subtitle, header, remarks,
+  tail, section, track, curve, raster, fill, and annotation
+- preserve the user's original clause text for the downstream branch compiler
+- classify negative instructions such as "do not add remarks" as assertions,
+  not update operations
+- reject or clarify genuinely cross-parent ambiguity before any mutation
+
+Acceptance:
+
+- a remarks-only request creates one remarks work unit
+- a header-fill request creates one header work unit and receives only header
+  discovery/context
+- a request containing header edits and new log tracks becomes two independent
+  work units rather than one mixed contract
+- every user clause is mapped, preserved, unsupported, inconsistent, or needs
+  clarification exactly once
+
+### 0.6-K4. Parent-First Object Operation Compiler
+
+Goal:
+
+- compile each work unit into the smallest applicable canonical operation
+
+Work:
+
+- generate branch-specific provider submission contracts from the create and
+  update request models rather than from `AuthoringDocumentIntent`
+- compile report settings, header slots, remarks/tail, sections, tracks, curve
+  bindings/fills, raster bindings, and annotations independently
+- provide only the selected parent snapshot, relevant source-channel facts,
+  allowed values, and defaults metadata to each compiler call
+- allow human targets and descriptions in provider output; resolve stable ids
+  and aliases deterministically after submission
+- carry explicit values unchanged into operation requests and record defaults
+  provenance only for omitted values
+- permit one bounded correction for invalid operation submissions
+
+Acceptance:
+
+- a header compiler cannot emit a track operation and a track compiler cannot
+  emit a header mutation
+- a new track operation is compiled before any child binding operation
+- explicit scale, width, color, line style, label, and ordering survive without
+  reinterpretation by later stages
+- provider schemas contain no unrelated object definitions or full-document
+  desired-state graph
+
+### 0.6-K5. Deterministic Dependency Plan And Transaction
+
+Goal:
+
+- assemble valid multi-object edits through deterministic hierarchy ordering
+
+Work:
+
+- build an operation dependency graph from canonical parent identities and
+  relational references
+- order document/report operations independently, sections before tracks,
+  tracks before bindings/annotations, bindings before fills, and validation
+  before preview/save
+- resolve default values and generated stable ids once, then pass those resolved
+  identities to child operations
+- evaluate preserve assertions before and after execution
+- execute against a defensive canonical snapshot and persist only after all
+  required operations and assertions pass
+- stop at the first blocked dependency and do not run descendant operations
+
+Acceptance:
+
+- mixed header and section requests do not leak state between branches
+- child operations never run against a missing parent
+- retries are idempotent and do not duplicate sections, tracks, bindings,
+  fills, annotations, or remarks
+- a failed operation leaves the persisted draft unchanged while retaining
+  precise operation diagnostics
+
+### 0.6-K6. Hierarchical Verification And Progress Reporting
+
+Goal:
+
+- prove progress at the object level instead of inferring success from provider
+  submissions or whole-document diffs
+
+Work:
+
+- read every changed object through its generated canonical getter
+- compare only the requested fields, relationships, order, and assertions for
+  that operation
+- record clause id, branch, parent, operation, defaults provenance, before/after
+  evidence, and verification status
+- generate phase previews only after a hierarchy branch has persisted a
+  verified visual change
+- report no-op preservation separately from completed mutation
+- prevent a provider's prose response or accepted tool payload from being
+  described as a completed authoring change
+
+Acceptance:
+
+- "Done" contains only canonically persisted, read-back-verified outcomes
+- a remarks request cannot report unrelated GR or header mutations
+- a failed header, track, or binding check names the exact object and property
+- token/round use is associated with work units so repeated no-progress stages
+  are visible and bounded
+
+### 0.6-K7. Migration, Cross-Domain Acceptance, And Release Closure
+
+Goal:
+
+- replace the scoped desired-state path and prove that hierarchical operations
+  generalize beyond the example notebooks
+
+Work:
+
+- migrate `run()`, `revise()`, and `plan()` to the hierarchy router, object
+  operation compiler, deterministic dependency planner, and verifier
+- route deterministic header-language and narrow remarks handling through the
+  same canonical object operations
+- remove the broad scoped-fragment merge path after behavior and diagnostic
+  parity; do not retain it as an automatic fallback
+- add recorded-provider acceptance for open-hole, porosity, caliper,
+  resistivity, CBL/VDL, array, annotation, page/output, and mixed report/section
+  requests
+- rerun the canonical LAS notebook and CBL stress-test notebook from clean
+  drafts with unchanged user-facing prompts
+- update MCP and user documentation from the generated hierarchy and operation
+  catalog
+
+Acceptance:
+
+- the canonical LAS notebook completes initial draft, remarks, SP, and
+  resistivity requests with exact canonical read-back
+- mixed header plus multi-section construction compiles and executes as
+  separate hierarchy branches
+- an uncatalogued scalar track and a custom annotation workflow use the same
+  object-operation path as catalogued examples
+- no acceptance request depends on a packet blueprint or request-specific code
+- `AuthoringDocumentIntent` scoped compilation is absent from the normal agent
+  path before `0.6.0` release
+- unit, MCP, agent, cross-domain, docs, notebook, package, and installed-wheel
+  release gates pass
+
 ## Release Gate
 
 Do not publish `0.6.0` until the repository release gates below pass. Slices
 `0.6-A` through `0.6-G7.2`, plus the reopened `0.6-H1` through `0.6-H6`
 header-language slices, are the completed contract baseline. Reopened slices
-`0.6-I1` through `0.6-I6` and compiler slices `0.6-J1` through `0.6-J6` are
-release blockers because open-world object construction and provider-to-intent
-compilation are both required for the user-facing authoring promise.
+`0.6-I1` through `0.6-I6`, compiler slices `0.6-J1` through `0.6-J6`, and
+hierarchy slices `0.6-K1` through `0.6-K7` are release blockers because
+open-world construction, provider compilation, and deterministic hierarchical
+object operations are all required for the user-facing authoring promise.
 
 Release-gate checklist:
 
@@ -1746,6 +2026,12 @@ Release-gate checklist:
   extraction failures before any deterministic authoring stage runs
 - unchanged SP and resistivity notebook requests persist and read back the
   requested objects and values
+- provider compilation follows the natural authoring hierarchy and submits
+  bounded canonical object operations rather than partial document graphs
+- header, report-content, section, track, and track-content work is compiled in
+  separate parent-scoped contexts and verified through canonical getters
+- the scoped `AuthoringDocumentIntent` fragment compiler is no longer used by
+  the normal agent path
 - credentialed live-provider acceptance is recorded manually when available
 
 Provider expansion, remote MCP transport, persistent/vector memory, and new

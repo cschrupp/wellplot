@@ -78,6 +78,7 @@ from ..authoring_service import (
     UpdateRasterBindingRequest,
     UpdateSectionRequest,
     UpdateTrackRequest,
+    authoring_hierarchy_catalog,
     authoring_operation_json_schema,
 )
 from ..errors import (
@@ -289,6 +290,7 @@ AUTHORING_RESOURCE_URIS = (
     "wellplot://authoring/schema/patch.json",
     "wellplot://authoring/schema/canonical.json",
     "wellplot://authoring/schema/operations.json",
+    "wellplot://authoring/catalog/hierarchy.json",
     "wellplot://authoring/catalog/track-kinds.json",
     "wellplot://authoring/catalog/fill-kinds.json",
     "wellplot://authoring/catalog/track-archetypes.json",
@@ -506,6 +508,17 @@ class AuthoringObjectInspectionResult:
     track_id: str | None
     count: int
     objects: list[dict[str, object]]
+
+
+@dataclass(slots=True)
+class AuthoringHierarchyInspectionResult:
+    """Structured generated hierarchy metadata for MCP discovery."""
+
+    object_kind: str | None
+    root_object_kind: str
+    schema_version: int
+    nodes: list[dict[str, object]]
+    precedence: list[str]
 
 
 @dataclass(slots=True)
@@ -3594,6 +3607,26 @@ def authoring_operations_schema_resource() -> ResourceContent:
     """Return generated typed authoring-operation schemas as JSON text."""
     payload = json.dumps(authoring_operation_json_schema(), indent=2, sort_keys=True)
     return ResourceContent(text=payload, mime_type="application/json")
+
+
+def authoring_hierarchy_resource() -> ResourceContent:
+    """Return generated hierarchy and operation metadata as JSON text."""
+    payload = json.dumps(authoring_hierarchy_catalog(), indent=2, sort_keys=True)
+    return ResourceContent(text=payload, mime_type="application/json")
+
+
+def inspect_authoring_hierarchy(
+    object_kind: str | None = None,
+) -> AuthoringHierarchyInspectionResult:
+    """Inspect the generated hierarchy for all nodes or one object kind."""
+    catalog = authoring_hierarchy_catalog(object_kind=object_kind)
+    return AuthoringHierarchyInspectionResult(
+        object_kind=catalog["object_kind"],
+        root_object_kind=str(catalog["root_object_kind"]),
+        schema_version=int(catalog["schema_version"]),
+        nodes=list(catalog["nodes"]),
+        precedence=list(catalog["precedence"]),
+    )
 
 
 def authoring_track_kinds_resource() -> ResourceContent:

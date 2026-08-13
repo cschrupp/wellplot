@@ -115,6 +115,24 @@ Notes:
 - standalone source inspection is limited to LAS and DLIS
 - LIS support is not added in this slice
 
+### `inspect_authoring_hierarchy(object_kind=None)`
+
+Purpose: inspect the generated canonical authoring hierarchy and the typed
+operations allowed for every object kind, or focus on one object kind.
+
+The catalog separates document settings, report content, sections, tracks, and
+track content. Each node reports its parent scope, legal children, identity
+fields, canonical Pydantic schema, operation schemas, field constraint
+categories, and compatibility rules.
+
+Use this tool before compiling an authoring request when the target object or
+its parent is not yet known. The focused form is intentionally smaller: a
+header inspection does not include section, track, raster, or annotation
+authoring schemas.
+
+The same generated payload is available as the
+`wellplot://authoring/catalog/hierarchy.json` resource.
+
 ### `check_channel_availability(requested_channels, source_path=None, logfile_path=None, section_id=None, source_format="auto")`
 
 Purpose: resolve requested channel names or aliases against one raw source or
@@ -1282,6 +1300,7 @@ Static resources:
 - `wellplot://schema/logfile.json`
 - `wellplot://examples/production/index.json`
 - `wellplot://authoring/schema/patch.json`
+- `wellplot://authoring/catalog/hierarchy.json`
 - `wellplot://authoring/catalog/track-kinds.json`
 - `wellplot://authoring/catalog/fill-kinds.json`
 - `wellplot://authoring/catalog/track-archetypes.json`

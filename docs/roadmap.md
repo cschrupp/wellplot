@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-11
+Last updated: 2026-08-12
 
 ## Scope Summary
 
@@ -49,7 +49,7 @@ Current assessment:
 | Python construction API | implemented | retain with typed compatibility path |
 | Python object editing API | partial | complete before release |
 | MCP deterministic tools | broad capability roster | route through canonical object service |
-| provider-neutral agent | deterministic execution works; live typed compilation is blocked | stabilize scoped provider contracts before release |
+| provider-neutral agent | deterministic execution works; scoped desired-state compilation remains too broad | replace it with hierarchy-scoped object-operation compilation before release |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
 | release metadata | `0.6.0` | publish through the verified release workflow |
 
@@ -162,6 +162,8 @@ before further agent expansion:
    object construction
 9. `0.6-J`: stabilize provider-to-intent compilation with bounded scoped
    contracts and end-to-end notebook acceptance
+10. `0.6-K`: expose the natural authoring hierarchy and compile bounded
+    canonical object operations parent-first
 
 Core direction:
 
@@ -175,6 +177,11 @@ Core direction:
 - packet assets are scaffolds or regression fixtures, not hidden authority
 - provider-facing compilation contracts should be small and scoped; the full
   canonical document remains the deterministic validation authority
+- report settings, header content, remarks, sections, tracks, and track content
+  are separate hierarchy contexts; a provider stage sees only one relevant
+  branch and parent
+- providers submit typed object operations, while deterministic code owns YAML
+  assembly, identities, defaults, dependency ordering, and verification
 - a provider extraction failure must not be reported as an MCP mutation or as
   missing internal user fields
 
@@ -186,7 +193,7 @@ Detailed plans:
 Release rule:
 
 - do not publish `0.6.0` until the deterministic contract slices and reopened
-  `0.6-H`, `0.6-I`, and `0.6-J` acceptance gates pass
+  `0.6-H`, `0.6-I`, `0.6-J`, and `0.6-K` acceptance gates pass
 
 ## Completed Slice: Experimental MCP Server (2026-04-28)
 
@@ -573,9 +580,14 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- `0.6-G0` through `0.6-G7.2` are complete for the repository release gate.
-- Run the maintainer release workflow with `expected_version=0.6.0`; keep
-  credentialed live-provider acceptance as a manual check.
+- `0.6-K1` is implemented: the generated hierarchy/operation catalog and
+  focused inspection parity are available through the canonical service and
+  MCP resource/tool surface.
+- Implement `0.6-K2` through `0.6-K7` in separate reviewable commits, starting
+  with bounded object mutation parity.
+- Do not run the maintainer release workflow until hierarchical object-operation
+  compilation replaces the normal scoped desired-state path and the unchanged
+  notebook prompts pass canonical read-back acceptance.
 - G2 is implemented: typed desired-state intent models now distinguish omitted,
   explicit, clear, and remove semantics without adding provider or packet logic.
 - G3 is implemented: contextual alias/source resolution and explicit precedence

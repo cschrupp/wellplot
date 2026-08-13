@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from typing import Any, Literal, Self
 
@@ -380,6 +380,227 @@ _OBJECT_FAMILY_SCOPES: dict[str, AuthoringCompilationScope] = {
     "annotation": "annotation",
 }
 
+_OBJECT_FAMILY_INTENT_ROOTS: dict[str, frozenset[str]] = {
+    "report": frozenset(
+        {"title", "subtitle", "output", "page", "depth", "header", "tail", "remarks"}
+    ),
+    "header": frozenset({"header"}),
+    "page": frozenset({"page"}),
+    "output": frozenset({"output"}),
+    "depth": frozenset({"depth"}),
+    "remarks": frozenset({"remarks"}),
+    "section": frozenset({"sections"}),
+    "track": frozenset({"sections"}),
+    "curve_binding": frozenset({"curve_bindings"}),
+    "raster_binding": frozenset({"raster_bindings"}),
+    "fill": frozenset({"fills"}),
+    "annotation": frozenset({"annotations"}),
+}
+
+_OBJECT_FAMILY_OPERATION_KINDS: dict[str, frozenset[str]] = {
+    "report": frozenset(
+        {"report", "output", "page", "depth", "header", "header_slot", "tail", "remark"}
+    ),
+    "header": frozenset({"header", "header_slot"}),
+    "page": frozenset({"page"}),
+    "output": frozenset({"output"}),
+    "depth": frozenset({"depth"}),
+    "remarks": frozenset({"remark"}),
+    "section": frozenset({"section"}),
+    "track": frozenset({"track"}),
+    "curve_binding": frozenset({"curve_binding"}),
+    "raster_binding": frozenset({"raster_binding"}),
+    "fill": frozenset({"fill"}),
+    "annotation": frozenset({"annotation"}),
+}
+
+_REQUEST_ACTION_OPERATION_ACTIONS: dict[str, frozenset[str]] = {
+    "add": frozenset({"create", "update"}),
+    "update": frozenset({"create", "update", "move"}),
+    "set": frozenset({"create", "update"}),
+    "remove": frozenset({"remove"}),
+    "clear": frozenset({"remove", "update"}),
+}
+
+
+def _intent_path_root(path: str) -> str:
+    """Return the canonical root field named by one provider coverage path."""
+    return re.split(r"[.\[]", path.strip(), maxsplit=1)[0]
+
+
+def _intent_value_is_clear(value: object) -> bool:
+    """Return whether one typed field carries the explicit canonical clear marker."""
+    return isinstance(value, AuthoringClearIntent)
+
+
+def _intent_value_is_populated(value: object) -> bool:
+    """Return whether one supplied intent value can fulfill an add/set/update request."""
+    if value is None or _intent_value_is_clear(value):
+        return False
+    if isinstance(value, (str, bytes, list, tuple, dict)):
+        return bool(value)
+    return True
+
+
+def _family_removal_kind(object_family: str) -> str:
+    """Return the canonical singular removal kind for one request family."""
+    return "remark" if object_family == "remarks" else object_family
+
+
+def _has_matching_removal(intent: BaseModel, object_family: str) -> bool:
+    """Return whether a scoped intent explicitly removes the requested family."""
+    removals = getattr(intent, "removals", ())
+    expected_kind = _family_removal_kind(object_family)
+    return any(
+        isinstance(removal, AuthoringRemoveIntent) and removal.object_kind == expected_kind
+        for removal in removals
+    )
+
+
+def validate_scoped_intent_semantics(
+    inventory: Iterable[AuthoringRequestInventoryItem],
+    intent: BaseModel,
+    coverage: Iterable[AuthoringIntentCoverage],
+) -> list[str]:
+    """Reject typed submissions that contradict their inventoried request actions.
+
+    Coverage paths are provider claims, so structural validation alone is not enough.
+    This gate confirms that an ``add``, ``set``, ``update``, ``remove``, or ``clear``
+    request points at a compatible supplied field in the scoped typed fragment.
+    """
+    inventory_by_id = {item.request_item_id: item for item in inventory}
+    coverage_by_id = {entry.request_item_id: entry for entry in coverage}
+    supplied_fields = intent.model_fields_set
+    errors: list[str] = []
+
+    for request_item_id, item in inventory_by_id.items():
+        if item.status in {"unsupported", "inconsistent"}:
+            continue
+        entry = coverage_by_id.get(request_item_id)
+        if entry is None or entry.status not in {"mapped", "preserved"}:
+            continue
+
+        roots = {_intent_path_root(path) for path in entry.intent_paths if path.strip()}
+        expected_roots = _OBJECT_FAMILY_INTENT_ROOTS.get(item.object_family, frozenset())
+        scope_root = _OBJECT_FAMILY_SCOPES.get(item.object_family)
+
+        if item.action == "preserve":
+            if "removals" in roots or any(
+                root in supplied_fields and _intent_value_is_clear(getattr(intent, root))
+                for root in roots
+                if root != "removals"
+            ):
+                errors.append(
+                    f"Coverage for {request_item_id!r} marks {item.object_family!r} "
+                    "as preserved but submits a destructive intent."
+                )
+            continue
+
+        allowed_roots = expected_roots | {"removals"}
+        if scope_root is not None:
+            allowed_roots = allowed_roots | {scope_root}
+        incompatible_roots = sorted(root for root in roots if root not in allowed_roots)
+        if incompatible_roots:
+            errors.append(
+                f"Coverage for {request_item_id!r} maps {item.object_family!r} to "
+                f"incompatible intent path roots {incompatible_roots!r}."
+            )
+            continue
+
+        if item.action == "remove":
+            if "removals" not in roots or not _has_matching_removal(intent, item.object_family):
+                errors.append(
+                    f"Request {request_item_id!r} removes {item.object_family!r}, but the "
+                    "submitted intent does not include a matching removal."
+                )
+            continue
+
+        expected_root = next((root for root in roots if root in expected_roots), None)
+        if expected_root is None and scope_root in roots:
+            expected_root = next(
+                (root for root in expected_roots if root in supplied_fields),
+                None,
+            )
+        if expected_root is None:
+            errors.append(
+                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                "coverage does not point to its canonical intent field."
+            )
+            continue
+
+        value = getattr(intent, expected_root, None)
+        if item.action == "clear":
+            if not _intent_value_is_clear(value) and not _has_matching_removal(
+                intent,
+                item.object_family,
+            ):
+                errors.append(
+                    f"Request {request_item_id!r} clears {item.object_family!r}, but the "
+                    "submitted intent does not include an explicit clear or removal."
+                )
+            continue
+
+        if expected_root not in supplied_fields:
+            errors.append(
+                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"the submitted intent omits {expected_root!r}."
+            )
+        elif _intent_value_is_clear(value):
+            errors.append(
+                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"the submitted intent explicitly clears {expected_root!r}."
+            )
+        elif not _intent_value_is_populated(value):
+            errors.append(
+                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"the submitted {expected_root!r} value is empty."
+            )
+
+    return errors
+
+
+def validate_reconciliation_fulfillment(
+    inventory: Iterable[AuthoringRequestInventoryItem],
+    operations: Iterable[Mapping[str, object]],
+) -> list[str]:
+    """Reject an operation plan whose mutation kinds contradict mapped requests.
+
+    A typed fragment can be structurally valid yet resolve into a different action
+    once identities and existing document state are considered. This second gate
+    prevents execution of that contradictory plan. A request already satisfied by
+    the existing document may legitimately produce no operation.
+    """
+    normalized_operations = [dict(operation) for operation in operations]
+    errors: list[str] = []
+    for item in inventory:
+        if item.status != "mapped" or item.action == "preserve":
+            continue
+        expected_kinds = _OBJECT_FAMILY_OPERATION_KINDS.get(item.object_family, frozenset())
+        if not expected_kinds:
+            continue
+        relevant_operations = [
+            operation
+            for operation in normalized_operations
+            if operation.get("object_kind") in expected_kinds
+        ]
+        if not relevant_operations:
+            continue
+        compatible_actions = _REQUEST_ACTION_OPERATION_ACTIONS.get(item.action, frozenset())
+        if any(operation.get("action") in compatible_actions for operation in relevant_operations):
+            continue
+        found_actions = sorted(
+            {
+                str(operation.get("action"))
+                for operation in relevant_operations
+                if operation.get("action") is not None
+            }
+        )
+        errors.append(
+            f"Request {item.request_item_id!r} {item.action}s {item.object_family!r}, "
+            f"but the reconciliation plan only contains incompatible actions {found_actions!r}."
+        )
+    return errors
+
 
 def _strip_bullet(line: str) -> str:
     """Remove one common bullet or numbered-list prefix."""
@@ -612,5 +833,7 @@ __all__ = [
     "merge_scoped_intents",
     "scoped_submission_model",
     "validate_intent_coverage",
+    "validate_reconciliation_fulfillment",
     "validate_request_inventory",
+    "validate_scoped_intent_semantics",
 ]

@@ -1,6 +1,6 @@
 # MCP Authoring Model
 
-Last updated: 2026-08-06
+Last updated: 2026-08-12
 
 ## Mission
 
@@ -154,6 +154,82 @@ Compatibility rules should stay explicit:
 - `reference` tracks accept reference-specific overlays/events
 - `annotation` tracks accept annotation objects, not generic curve/raster
   bindings
+
+### Natural Authoring Hierarchy
+
+The provider and MCP discovery surfaces must expose the canonical document in
+the same hierarchy that a user edits it. A provider should never receive
+header mutations, section construction, raster configuration, and annotation
+schemas in one undifferentiated authoring contract.
+
+The public hierarchy is:
+
+```text
+authoring document
+|-- document settings
+|   |-- output
+|   |-- page
+|   `-- depth
+|-- report content
+|   |-- title and subtitle
+|   |-- header
+|   |   |-- general fields
+|   |   |-- service titles
+|   |   `-- detail rows and cells
+|   |-- remarks
+|   `-- tail
+`-- sections (ordered)
+    `-- section
+        |-- title, subtitle, depth range, and data-source routing
+        `-- tracks (ordered)
+            `-- track
+                |-- form, width, scale, grid, and header display
+                |-- curve bindings and fills
+                |-- raster bindings and supported overlays
+                `-- annotation objects
+```
+
+Data-source inspection and channel discovery provide read-only context for
+this hierarchy. Validation, preview, render, and save are lifecycle operations
+over it; they are not additional authoring object families.
+
+Each hierarchy node must publish, from the canonical typed contract:
+
+- its stable identity and parent identity
+- its allowed child object kinds
+- supported `list`, `get`, `create`, `update`, `remove`, `move`, and `validate`
+  operations
+- required-on-create and mutable-on-update properties
+- finite, constrained, contextual, and relational value rules
+- applicable generic defaults and their precedence
+- the canonical getter used for read-after-write verification
+
+This metadata must be generated rather than copied into provider prompts or a
+separately maintained vocabulary.
+
+### Hierarchy-Aware Agent Exposure
+
+Natural-language compilation should traverse the hierarchy instead of asking a
+model to solve a partial YAML graph:
+
+1. split the request into user clauses and classify only their top-level branch
+2. inspect the smallest current parent context needed by each clause
+3. compile one small typed object operation for that branch and parent
+4. resolve human targets, omitted defaults, and contextual references
+   deterministically
+5. order parent operations before child operations
+6. execute each operation through the canonical service and read it back
+7. validate and preview only after the requested object outcomes pass
+
+A mixed request may therefore create independent report-content and log-section
+work units, but no individual provider stage receives both contracts. Preserve
+and negative instructions become assertions or postconditions rather than
+synthetic mutations.
+
+The agent must compile canonical object operations, not raw YAML paths and not
+large partial `AuthoringDocumentIntent` fragments. YAML assembly, identity
+generation, defaults, compatibility checks, atomic persistence, and operation
+ordering remain deterministic responsibilities.
 
 ## Values And Constraints
 

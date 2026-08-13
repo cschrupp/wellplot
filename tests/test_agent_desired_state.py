@@ -342,6 +342,8 @@ def test_run_executes_typed_desired_state_and_persists_after_verification(tmp_pa
     assert result.plan is not None
     assert result.plan.mode == "desired_state"
     assert result.user_report.done
+    assert "Updated report." in result.user_report.done
+    assert "Updated report title." not in result.user_report.done
     assert result.phase_summaries
     saved = load_authoring_document(
         tmp_path / "workspace/demo.log.yaml",

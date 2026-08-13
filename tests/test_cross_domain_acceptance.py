@@ -654,7 +654,7 @@ class _RecordedIntentBackend:
                     {
                         "request_item_id": item.item_id,
                         "status": "mapped",
-                        "intent_paths": [f"recorded.{scope}"],
+                        "intent_paths": [scope],
                     }
                     for item in self.manifest.items
                     if self.request_scopes[item.item_id] == scope

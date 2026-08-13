@@ -3433,6 +3433,27 @@ class McpServiceTests(unittest.TestCase):
         self.assertTrue(result.header_archetypes)
         self.assertIsNone(result.target_summary)
 
+    def test_inspect_authoring_hierarchy_is_parent_scoped(self) -> None:
+        """Expose one hierarchy node without unrelated object schemas."""
+        result = service.inspect_authoring_hierarchy(object_kind="header")
+
+        self.assertEqual(result.object_kind, "header")
+        self.assertEqual(result.root_object_kind, "report")
+        self.assertEqual(len(result.nodes), 1)
+        node = result.nodes[0]
+        self.assertEqual(node["parent"]["object_kind"], "report")
+        self.assertNotIn("sections", node["canonical_schema"]["properties"])
+        self.assertNotIn("track", node["children"])
+
+    def test_authoring_hierarchy_resource_is_generated_json(self) -> None:
+        """Expose the generated hierarchy catalog as an MCP resource."""
+        resource = service.authoring_hierarchy_resource()
+        payload = json.loads(resource.text)
+
+        self.assertEqual(resource.mime_type, "application/json")
+        self.assertEqual(payload["root_object_kind"], "report")
+        self.assertIn("track", {node["object_kind"] for node in payload["nodes"]})
+
     def test_canonical_patch_catalog_matches_typed_service_models(self) -> None:
         """Keep MCP canonical patch discovery synchronized with service models."""
         result = service.inspect_authoring_vocab(root=REPO_ROOT)
@@ -3680,6 +3701,7 @@ class McpServiceTests(unittest.TestCase):
         patch_resource = service.authoring_patch_schema_resource()
         canonical_resource = service.authoring_canonical_schema_resource()
         operations_resource = service.authoring_operations_schema_resource()
+        hierarchy_resource = service.authoring_hierarchy_resource()
         fill_resource = service.authoring_fill_kinds_resource()
         style_resource = service.authoring_style_presets_resource()
         header_archetype_resource = service.authoring_header_archetypes_resource()
@@ -3696,6 +3718,9 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(operations_resource.mime_type, "application/json")
         self.assertIn("update", operations_payload)
         self.assertIn("UpdatePageRequest", operations_payload["update"]["$defs"])
+        hierarchy_payload = json.loads(hierarchy_resource.text)
+        self.assertEqual(hierarchy_resource.mime_type, "application/json")
+        self.assertIn("nodes", hierarchy_payload)
         self.assertIn("heading_patch_keys", json.loads(patch_resource.text))
         self.assertIn("annotation_object_kinds", json.loads(patch_resource.text))
         self.assertIn("annotation_patch_keys", json.loads(patch_resource.text))

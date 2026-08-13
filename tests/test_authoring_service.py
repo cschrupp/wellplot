@@ -30,6 +30,7 @@ from wellplot.authoring_service import (
     UpdateSectionRequest,
     UpdateTailRequest,
     UpdateTrackRequest,
+    authoring_hierarchy_catalog,
 )
 from wellplot.model.authoring import (
     AnnotationTextSpec,
@@ -101,6 +102,55 @@ def test_list_and_get_return_scoped_defensive_objects() -> None:
         ).title
         == "Curves"
     )
+
+
+def test_hierarchy_catalog_is_generated_from_canonical_contracts() -> None:
+    """Expose parent/child operations and isolated schemas for each object kind."""
+    catalog = authoring_hierarchy_catalog()
+    nodes = {node["object_kind"]: node for node in catalog["nodes"]}
+
+    assert catalog["root_object_kind"] == "report"
+    assert nodes["report"]["children"] == [
+        "output",
+        "page",
+        "depth",
+        "header",
+        "tail",
+        "remark",
+        "section",
+    ]
+    assert nodes["section"]["parent"] == {
+        "object_kind": "report",
+        "fields": [],
+    }
+    assert nodes["track"]["parent"] == {
+        "object_kind": "section",
+        "fields": ["section_id"],
+    }
+    assert nodes["track"]["constraints"]["form_kind_immutable"] is True
+    assert nodes["track"]["constraints"]["child_compatibility"]["array"] == [
+        "curve_binding",
+        "raster_binding",
+    ]
+    assert {"id", "kind", "title", "width_mm"}.issubset(nodes["track"]["fields"])
+    assert "create" in nodes["track"]["operations"]
+    assert "update" in nodes["track"]["operation_schemas"]
+    assert "width_mm" in nodes["track"]["mutable_on_update"]
+    assert nodes["track"]["verification"] == {
+        "operation": "get",
+        "object_kind": "track",
+    }
+
+    header = authoring_hierarchy_catalog("header")["nodes"][0]
+    assert "sections" not in header["canonical_schema"]["properties"]
+    assert "track" not in header["children"]
+    assert header["fields"]["provider_name"]["category"] == "constrained"
+
+
+def test_hierarchy_catalog_rejects_unknown_object_kind() -> None:
+    """Keep focused hierarchy discovery limited to canonical object kinds."""
+    with pytest.raises(ValueError, match="Unsupported authoring object kind"):
+        authoring_hierarchy_catalog("not-an-authoring-object")
 
 
 def test_create_operations_cover_typed_content_families() -> None:

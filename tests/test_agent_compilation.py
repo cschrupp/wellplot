@@ -27,7 +27,9 @@ from wellplot.agent.compilation import (
     merge_scoped_intents,
     scoped_submission_model,
     validate_intent_coverage,
+    validate_reconciliation_fulfillment,
     validate_request_inventory,
+    validate_scoped_intent_semantics,
 )
 from wellplot.agent.core import ProviderAdapterError
 from wellplot.authoring_context import AuthoringContextSnapshot
@@ -82,6 +84,118 @@ def test_intent_coverage_reports_missing_and_invalid_items() -> None:
 
     assert any("unknown request item" in error for error in errors)
     assert any("Missing coverage" in error for error in errors)
+
+
+def test_scoped_semantics_rejects_add_request_that_clears_remarks() -> None:
+    """Do not accept a coverage claim that clears the requested report content."""
+    inventory = [
+        AuthoringRequestInventoryItem(
+            request_item_id="request-001",
+            status="mapped",
+            action="add",
+            object_family="remarks",
+        )
+    ]
+    submission = AuthoringReportIntentSubmission.model_validate(
+        {
+            "intent": {"remarks": {"operation": "clear"}},
+            "coverage": [
+                {
+                    "request_item_id": "request-001",
+                    "status": "mapped",
+                    "intent_paths": ["remarks"],
+                }
+            ],
+        }
+    )
+
+    errors = validate_scoped_intent_semantics(
+        inventory,
+        submission.intent,
+        submission.coverage,
+    )
+
+    assert errors == [
+        "Request 'request-001' adds 'remarks', but the submitted intent explicitly "
+        "clears 'remarks'."
+    ]
+
+
+def test_scoped_semantics_accepts_add_request_with_populated_remark() -> None:
+    """Allow a normal populated report object to satisfy an add request."""
+    inventory = [
+        AuthoringRequestInventoryItem(
+            request_item_id="request-001",
+            status="mapped",
+            action="add",
+            object_family="remarks",
+        )
+    ]
+    submission = AuthoringReportIntentSubmission.model_validate(
+        {
+            "intent": {
+                "remarks": [
+                    {
+                        "remark_id": "quicklook_note",
+                        "title": "Notes",
+                        "text": "This quicklook is an iterative interpretation artifact.",
+                    }
+                ]
+            },
+            "coverage": [
+                {
+                    "request_item_id": "request-001",
+                    "status": "mapped",
+                    "intent_paths": ["remarks[quicklook_note]"],
+                }
+            ],
+        }
+    )
+
+    assert (
+        validate_scoped_intent_semantics(
+            inventory,
+            submission.intent,
+            submission.coverage,
+        )
+        == []
+    )
+
+
+def test_reconciliation_fulfillment_rejects_incompatible_actions_generically() -> None:
+    """Keep add requests from being satisfied by removals across object families."""
+    inventory = [
+        AuthoringRequestInventoryItem(
+            request_item_id="request-001",
+            status="mapped",
+            action="add",
+            object_family="remarks",
+        ),
+        AuthoringRequestInventoryItem(
+            request_item_id="request-002",
+            status="mapped",
+            action="add",
+            object_family="track",
+        ),
+        AuthoringRequestInventoryItem(
+            request_item_id="request-003",
+            status="mapped",
+            action="add",
+            object_family="curve_binding",
+        ),
+    ]
+    operations = [
+        {"object_kind": "remark", "action": "remove"},
+        {"object_kind": "track", "action": "remove"},
+        {"object_kind": "curve_binding", "action": "remove"},
+    ]
+
+    errors = validate_reconciliation_fulfillment(inventory, operations)
+
+    assert len(errors) == 3
+    assert "request-001" in errors[0]
+    assert "request-002" in errors[1]
+    assert "request-003" in errors[2]
 
 
 def test_request_inventory_is_compact_and_covers_object_families() -> None:
