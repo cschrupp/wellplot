@@ -588,8 +588,13 @@ Longer-term / UI-centric:
   return typed read-back objects, and are exposed through MCP tools. The
   canonical-to-legacy adapter also preserves nested header values across
   reloads.
-- Implement `0.6-K3` through `0.6-K7` in separate reviewable commits, starting
-  with the hierarchy-scoped request router.
+- `0.6-K3` has its initial clause-routing contract: inventories normalize
+  hierarchy branches and produce parent-scoped work units that preserve the
+  original clause, explicit values, assertions, and dependencies. Complete
+  the parent-first operation compiler in K4 before removing the old desired
+  state path.
+- Implement the remaining `0.6-K3` acceptance items and `0.6-K4` through
+  `0.6-K7` in separate reviewable commits.
 - Do not run the maintainer release workflow until hierarchical object-operation
   compilation replaces the normal scoped desired-state path and the unchanged
   notebook prompts pass canonical read-back acceptance.

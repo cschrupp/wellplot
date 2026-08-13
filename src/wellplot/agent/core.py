@@ -63,7 +63,9 @@ from .compilation import (
     AuthoringRequestInventory,
     AuthoringRequestInventoryItem,
     AuthoringRequestManifest,
+    AuthoringRequestWorkUnit,
     build_request_manifest,
+    build_request_work_units,
     group_request_inventory,
     merge_scoped_intents,
     scoped_submission_model,
@@ -4756,6 +4758,7 @@ class AuthoringSession:
         stage_messages: dict[str, int] = {}
         stage_schema_chars: dict[str, int] = {}
         scoped_submissions: dict[str, dict[str, object]] = {}
+        request_work_units: tuple[AuthoringRequestWorkUnit, ...] = ()
         fragments: list[object] = []
         coverage: list[AuthoringIntentCoverage] = []
         provider_failure_status: str | None = None
@@ -4832,10 +4835,12 @@ class AuthoringSession:
         inventory_instructions = (
             "You are the request-inventory stage of wellplot authoring. Do not emit a "
             "desired state and do not call mutation tools. Classify every request item "
-            "exactly once by canonical object family and requested action. Keep human "
-            "target and parent descriptions when stable ids are unknown. Copy explicit "
-            "values without applying defaults. Use unsupported or inconsistent only with "
-            "a concise reason."
+            "exactly once by canonical object family, hierarchy branch, and requested "
+            "action. Keep the original clause as the request item context; preserve human "
+            "target and natural parent descriptions when stable ids are unknown. Copy "
+            "explicit values without applying defaults. Put negative instructions in "
+            "preserve_constraints and ordering requirements in dependencies. Use "
+            "unsupported or inconsistent only with a concise reason."
         )
         inventory_schema = AuthoringRequestInventory.model_json_schema()
         inventory_schema_chars = len(
@@ -4959,11 +4964,17 @@ class AuthoringSession:
             return {"sections": compact_sections}
 
         if inventory is not None:
+            request_work_units = build_request_work_units(request_manifest, inventory)
             grouped = group_request_inventory(inventory)
             manifest_by_id = {item.item_id: item for item in request_manifest.items}
             context_payload = context_snapshot.model_dump(mode="json")
             for scope, inventory_items in grouped.items():
                 item_ids = {item.request_item_id for item in inventory_items}
+                scoped_work_units = [
+                    unit.model_dump(mode="json")
+                    for unit in request_work_units
+                    if unit.request_item_id in item_ids
+                ]
                 scoped_manifest = AuthoringRequestManifest(
                     items=[
                         manifest_by_id[item_id] for item_id in manifest_by_id if item_id in item_ids
@@ -5048,6 +5059,7 @@ class AuthoringSession:
                     "request_inventory": {
                         "items": [item.model_dump(mode="json") for item in inventory_items]
                     },
+                    "work_units": scoped_work_units,
                     "current_objects": compact_document(scope),
                     "context_issues": context_payload.get("issues", []),
                 }
@@ -5063,7 +5075,10 @@ class AuthoringSession:
                     "You are one scoped desired-state compiler for wellplot authoring. "
                     f"Compile only the {scope} request items through the supplied typed "
                     "contract. Do not call mutation tools and do not include unrelated "
-                    "object families. Omit preserved fields, use explicit clear/remove "
+                    "branches. Use the supplied work units to preserve each original "
+                    "clause and its natural parent; do not merge clauses from different "
+                    "parents into one invented object. Omit preserved fields, use explicit "
+                    "clear/remove "
                     "objects when requested, and retain every explicit label, ordering, "
                     "scale, grid, color, line style, width, and raster value exactly. "
                     "Use stable proposed ids and parent ids consistently; deterministic "
@@ -5174,6 +5189,9 @@ class AuthoringSession:
         report_facts["request_manifest"] = request_manifest.model_dump(mode="json")
         if inventory is not None:
             report_facts["request_inventory"] = inventory.model_dump(mode="json")
+            report_facts["request_work_units"] = [
+                unit.model_dump(mode="json") for unit in request_work_units
+            ]
         report_facts["provider_contract"] = {
             "tool_name": "submit_request_inventory",
             "tool_names": [

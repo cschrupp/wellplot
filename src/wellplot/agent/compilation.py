@@ -14,7 +14,7 @@ from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model, model_validator
 
 from ..model.intent import (
     AuthoringClearIntent,
@@ -62,6 +62,8 @@ AuthoringRequestAction = Literal[
 AuthoringRequestObjectFamily = Literal[
     "report",
     "header",
+    "header_slot",
+    "service_title",
     "section",
     "track",
     "curve_binding",
@@ -72,6 +74,24 @@ AuthoringRequestObjectFamily = Literal[
     "output",
     "depth",
     "remarks",
+    "tail",
+    "unknown",
+]
+
+AuthoringRequestBranch = Literal[
+    "report",
+    "header",
+    "section",
+    "track",
+    "curve_binding",
+    "raster_binding",
+    "fill",
+    "annotation",
+    "page",
+    "output",
+    "depth",
+    "remarks",
+    "tail",
     "unknown",
 ]
 
@@ -85,9 +105,50 @@ class AuthoringRequestInventoryItem(BaseModel):
     status: AuthoringCoverageStatus
     action: AuthoringRequestAction
     object_family: AuthoringRequestObjectFamily
+    top_level_branch: AuthoringRequestBranch | None = None
     target: str | None = Field(default=None, min_length=1)
-    parent_scope: str | None = Field(default=None, min_length=1)
+    natural_parent: str | None = Field(
+        default=None,
+        min_length=1,
+        validation_alias=AliasChoices("natural_parent", "parent_scope"),
+        serialization_alias="natural_parent",
+    )
     explicit_values: dict[str, Any] = Field(default_factory=dict)
+    preserve_constraints: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    reason: str | None = Field(default=None, min_length=1)
+
+    @property
+    def parent_scope(self) -> str | None:
+        """Keep the pre-K3 name available to internal callers and adapters."""
+        return self.natural_parent
+
+    @model_validator(mode="after")
+    def normalize_branch(self) -> AuthoringRequestInventoryItem:
+        """Derive the hierarchy branch when a provider omits the redundant value."""
+        if self.top_level_branch is None:
+            branch = _OBJECT_FAMILY_BRANCHES.get(self.object_family, "unknown")
+            object.__setattr__(self, "top_level_branch", branch)
+        return self
+
+
+class AuthoringRequestWorkUnit(BaseModel):
+    """One parent-scoped clause preserved for a downstream branch compiler."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    unit_id: str = Field(min_length=1)
+    request_item_id: str = Field(min_length=1)
+    clause_text: str = Field(min_length=1)
+    status: AuthoringCoverageStatus
+    action: AuthoringRequestAction
+    branch: AuthoringRequestBranch
+    object_family: AuthoringRequestObjectFamily
+    target: str | None = Field(default=None, min_length=1)
+    natural_parent: str | None = Field(default=None, min_length=1)
+    explicit_values: dict[str, Any] = Field(default_factory=dict)
+    preserve_constraints: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
     reason: str | None = Field(default=None, min_length=1)
 
 
@@ -368,10 +429,13 @@ _SCOPE_ORDER: tuple[AuthoringCompilationScope, ...] = (
 _OBJECT_FAMILY_SCOPES: dict[str, AuthoringCompilationScope] = {
     "report": "report",
     "header": "report",
+    "header_slot": "report",
+    "service_title": "report",
     "page": "report",
     "output": "report",
     "depth": "report",
     "remarks": "report",
+    "tail": "report",
     "section": "structure",
     "track": "structure",
     "curve_binding": "scalar",
@@ -380,15 +444,48 @@ _OBJECT_FAMILY_SCOPES: dict[str, AuthoringCompilationScope] = {
     "annotation": "annotation",
 }
 
+_OBJECT_FAMILY_BRANCHES: dict[str, AuthoringRequestBranch] = {
+    "report": "report",
+    "header": "header",
+    "header_slot": "header",
+    "service_title": "header",
+    "section": "section",
+    "track": "track",
+    "curve_binding": "curve_binding",
+    "raster_binding": "raster_binding",
+    "fill": "fill",
+    "annotation": "annotation",
+    "page": "page",
+    "output": "output",
+    "depth": "depth",
+    "remarks": "remarks",
+    "tail": "tail",
+    "unknown": "unknown",
+}
+
 _OBJECT_FAMILY_INTENT_ROOTS: dict[str, frozenset[str]] = {
     "report": frozenset(
-        {"title", "subtitle", "output", "page", "depth", "header", "tail", "remarks"}
+        {
+            "title",
+            "subtitle",
+            "output",
+            "page",
+            "depth",
+            "header",
+            "header_slot",
+            "service_title",
+            "tail",
+            "remarks",
+        }
     ),
     "header": frozenset({"header"}),
+    "header_slot": frozenset({"header"}),
+    "service_title": frozenset({"header"}),
     "page": frozenset({"page"}),
     "output": frozenset({"output"}),
     "depth": frozenset({"depth"}),
     "remarks": frozenset({"remarks"}),
+    "tail": frozenset({"tail"}),
     "section": frozenset({"sections"}),
     "track": frozenset({"sections"}),
     "curve_binding": frozenset({"curve_bindings"}),
@@ -399,13 +496,26 @@ _OBJECT_FAMILY_INTENT_ROOTS: dict[str, frozenset[str]] = {
 
 _OBJECT_FAMILY_OPERATION_KINDS: dict[str, frozenset[str]] = {
     "report": frozenset(
-        {"report", "output", "page", "depth", "header", "header_slot", "tail", "remark"}
+        {
+            "report",
+            "output",
+            "page",
+            "depth",
+            "header",
+            "header_slot",
+            "service_title",
+            "tail",
+            "remark",
+        }
     ),
-    "header": frozenset({"header", "header_slot"}),
+    "header": frozenset({"header", "header_slot", "service_title"}),
+    "header_slot": frozenset({"header_slot"}),
+    "service_title": frozenset({"service_title"}),
     "page": frozenset({"page"}),
     "output": frozenset({"output"}),
     "depth": frozenset({"depth"}),
     "remarks": frozenset({"remark"}),
+    "tail": frozenset({"tail"}),
     "section": frozenset({"section"}),
     "track": frozenset({"track"}),
     "curve_binding": frozenset({"curve_binding"}),
@@ -662,6 +772,44 @@ def build_request_manifest(text: str) -> AuthoringRequestManifest:
     )
 
 
+def build_request_work_units(
+    manifest: AuthoringRequestManifest,
+    inventory: AuthoringRequestInventory,
+) -> tuple[AuthoringRequestWorkUnit, ...]:
+    """Join provider classifications to original clauses in manifest order.
+
+    Work units deliberately retain one request clause each. This prevents a
+    mixed prompt from becoming one provider-owned document graph while still
+    giving each downstream compiler the natural target, parent, values, and
+    preserve assertions it needs.
+    """
+    manifest_by_id = {item.item_id: item for item in manifest.items}
+    units: list[AuthoringRequestWorkUnit] = []
+    for item in inventory.items:
+        manifest_item = manifest_by_id.get(item.request_item_id)
+        if manifest_item is None:
+            continue
+        branch = item.top_level_branch or _OBJECT_FAMILY_BRANCHES.get(item.object_family, "unknown")
+        units.append(
+            AuthoringRequestWorkUnit(
+                unit_id=f"unit-{item.request_item_id}",
+                request_item_id=item.request_item_id,
+                clause_text=manifest_item.text,
+                status=item.status,
+                action=item.action,
+                branch=branch,
+                object_family=item.object_family,
+                target=item.target,
+                natural_parent=item.natural_parent,
+                explicit_values=deepcopy(item.explicit_values),
+                preserve_constraints=list(item.preserve_constraints),
+                dependencies=list(item.dependencies),
+                reason=item.reason,
+            )
+        )
+    return tuple(units)
+
+
 def validate_intent_coverage(
     manifest: AuthoringRequestManifest,
     coverage: Iterable[AuthoringIntentCoverage],
@@ -708,6 +856,12 @@ def validate_request_inventory(
             if entry.object_family == "unknown":
                 errors.append(
                     f"Inventory for {entry.request_item_id!r} needs a known object family."
+                )
+            expected_branch = _OBJECT_FAMILY_BRANCHES.get(entry.object_family, "unknown")
+            if entry.top_level_branch != expected_branch:
+                errors.append(
+                    f"Inventory for {entry.request_item_id!r} maps {entry.object_family!r} "
+                    f"to branch {entry.top_level_branch!r}; expected {expected_branch!r}."
                 )
             if entry.action == "explain":
                 errors.append(f"Inventory for {entry.request_item_id!r} needs an authoring action.")
@@ -822,6 +976,7 @@ __all__ = [
     "AuthoringRequestInventory",
     "AuthoringRequestInventoryItem",
     "AuthoringRequestManifest",
+    "AuthoringRequestWorkUnit",
     "AuthoringScalarIntentFragment",
     "AuthoringScalarIntentSubmission",
     "AuthoringSectionStructureIntent",
@@ -829,6 +984,7 @@ __all__ = [
     "AuthoringStructureIntentSubmission",
     "AuthoringTrackStructureIntent",
     "build_request_manifest",
+    "build_request_work_units",
     "group_request_inventory",
     "merge_scoped_intents",
     "scoped_submission_model",

@@ -1864,6 +1864,9 @@ Implementation note:
 
 ### 0.6-K3. Hierarchical Request Router
 
+Status: initial clause-routing contract implemented in the current development
+branch; parent-first mutation compilation remains K4 work.
+
 Goal:
 
 - split natural language into small hierarchy work units without asking the
@@ -1890,6 +1893,17 @@ Acceptance:
   work units rather than one mixed contract
 - every user clause is mapped, preserved, unsupported, inconsistent, or needs
   clarification exactly once
+
+Implementation note:
+
+- request inventory items now carry a normalized hierarchy branch, natural
+  parent, explicit values, preserve constraints, and dependencies while
+  accepting the earlier `parent_scope` input name for compatibility
+- deterministic `AuthoringRequestWorkUnit` objects join each inventory item to
+  its original manifest clause in request order
+- scoped compiler context includes only the work units for that scope, keeping
+  parent descriptions and negative assertions visible without exposing the
+  complete document graph
 
 ### 0.6-K4. Parent-First Object Operation Compiler
 

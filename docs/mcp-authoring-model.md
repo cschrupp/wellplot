@@ -49,6 +49,12 @@ That means:
 - defaults fill missing details only
 - explicit user instructions override defaults
 
+Provider request classification is represented as short hierarchy work units:
+each unit retains the original clause, normalized branch, natural parent,
+explicit values, preserve assertions, and dependencies. This is routing
+context only; canonical Pydantic objects and deterministic MCP operations
+remain the mutation authority.
+
 The MCP should not drift toward an example-reconstruction engine that only
 works when a hidden packet specification is present.
 

@@ -20,9 +20,11 @@ from wellplot.agent.compilation import (
     AuthoringReportIntentSubmission,
     AuthoringRequestInventory,
     AuthoringRequestInventoryItem,
+    AuthoringRequestWorkUnit,
     AuthoringScalarIntentSubmission,
     AuthoringStructureIntentSubmission,
     build_request_manifest,
+    build_request_work_units,
     group_request_inventory,
     merge_scoped_intents,
     scoped_submission_model,
@@ -310,6 +312,81 @@ def test_request_inventory_groups_canonical_object_families() -> None:
     assert all(
         item.request_item_id != "request-006" for items in grouped.values() for item in items
     )
+
+
+def test_request_work_units_preserve_clause_and_hierarchy_context() -> None:
+    """Keep each natural-language clause isolated for its parent compiler."""
+    manifest = build_request_manifest(
+        "- Fill the Company header value.\n"
+        "- Add a resistivity track after depth.\n"
+        "- Do not add remarks."
+    )
+    inventory = AuthoringRequestInventory(
+        items=[
+            {
+                "request_item_id": "request-001",
+                "status": "mapped",
+                "action": "update",
+                "object_family": "header_slot",
+                "target": "Company",
+                "natural_parent": "open-hole header",
+                "preserve_constraints": ["keep all other header slots"],
+            },
+            {
+                "request_item_id": "request-002",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "track",
+                "target": "resistivity",
+                "natural_parent": "main section",
+                "dependencies": ["depth track"],
+            },
+            {
+                "request_item_id": "request-003",
+                "status": "preserved",
+                "action": "preserve",
+                "object_family": "remarks",
+                "preserve_constraints": ["do not create or replace remarks"],
+            },
+        ]
+    )
+
+    units = build_request_work_units(manifest, inventory)
+
+    assert isinstance(units[0], AuthoringRequestWorkUnit)
+    assert [unit.unit_id for unit in units] == [
+        "unit-request-001",
+        "unit-request-002",
+        "unit-request-003",
+    ]
+    assert units[0].branch == "header"
+    assert units[0].clause_text == "Fill the Company header value."
+    assert units[0].natural_parent == "open-hole header"
+    assert units[0].preserve_constraints == ["keep all other header slots"]
+    assert units[1].branch == "track"
+    assert units[1].dependencies == ["depth track"]
+    assert units[2].status == "preserved"
+
+
+def test_request_inventory_rejects_wrong_hierarchy_branch() -> None:
+    """Do not let provider output route one family into another branch."""
+    manifest = build_request_manifest("- Add a resistivity track.")
+    errors = validate_request_inventory(
+        manifest,
+        [
+            AuthoringRequestInventoryItem(
+                request_item_id="request-001",
+                status="mapped",
+                action="add",
+                object_family="track",
+                top_level_branch="header",
+            )
+        ],
+    )
+
+    assert errors == [
+        "Inventory for 'request-001' maps 'track' to branch 'header'; expected 'track'."
+    ]
 
 
 def test_scoped_submission_schemas_exclude_unrelated_families() -> None:
@@ -705,6 +782,23 @@ def test_desired_state_extraction_allows_one_coverage_correction() -> None:
     assert intent is not None
     assert intent.title == "Revised"
     assert result.report_facts["request_coverage"][0]["intent_paths"] == ["title"]
+    assert result.report_facts["request_work_units"] == [
+        {
+            "unit_id": "unit-request-001",
+            "request_item_id": "request-001",
+            "clause_text": "Set the report title to Revised.",
+            "status": "mapped",
+            "action": "set",
+            "branch": "report",
+            "object_family": "report",
+            "target": "title",
+            "natural_parent": None,
+            "explicit_values": {"value": "Revised"},
+            "preserve_constraints": [],
+            "dependencies": [],
+            "reason": None,
+        }
+    ]
     assert "request_manifest" in backend.initial_user_messages[0]
     assert all(
         "AuthoringIntentSubmission schema" not in message
