@@ -109,9 +109,8 @@ class _BlockedProviderBackend:
                 },
                 "coverage": [
                     {
-                        "request_item_id": "request-001",
+                        "unit_id": "unit-request-001",
                         "status": "mapped",
-                        "intent_paths": ["curve_bindings[missing-curve]"],
                     }
                 ],
             },

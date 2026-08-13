@@ -163,15 +163,8 @@ class _ResistivityExtractionBackend:
                 "intent": intent,
                 "coverage": [
                     {
-                        "request_item_id": item.item_id,
+                        "unit_id": f"unit-{item.item_id}",
                         "status": "mapped",
-                        "intent_paths": [
-                            (
-                                "sections[main].tracks[resistivity]"
-                                if item.item_id in structure_ids
-                                else "curve_bindings"
-                            )
-                        ],
                     }
                     for item in self.manifest.items
                     if item.item_id in request_ids

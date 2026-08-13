@@ -2203,6 +2203,9 @@ Commit boundary:
 
 #### 0.6-K7.5. Deterministic Branch Ownership And Work Units
 
+Status: implemented in the current development branch; normal `run()` and
+`revise()` routing remains unchanged until K7.6.
+
 Goal:
 
 - reduce provider classification to user-language interpretation while making

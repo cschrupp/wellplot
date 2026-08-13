@@ -4961,7 +4961,7 @@ class AuthoringSession:
         inventory_instructions = (
             "You are the request-inventory stage of wellplot authoring. Do not emit a "
             "desired state and do not call mutation tools. Classify every request item "
-            "exactly once by canonical object family, hierarchy branch, and requested "
+            "exactly once by canonical object family and requested "
             "action. Keep the original clause as the request item context; preserve human "
             "target and natural parent descriptions when stable ids are unknown. Copy "
             "explicit values without applying defaults. Put negative instructions in "
@@ -5266,7 +5266,7 @@ class AuthoringSession:
                     continue
                 coverage.append(
                     AuthoringIntentCoverage(
-                        request_item_id=item.request_item_id,
+                        unit_id=f"unit-{item.request_item_id}",
                         status=item.status,
                         reason=item.reason,
                     )
@@ -5366,7 +5366,7 @@ class AuthoringSession:
             )
             report_facts["request_coverage"] = [entry.model_dump(mode="json") for entry in coverage]
             report_facts["request_inconsistencies"] = [
-                f"{entry.request_item_id}: {entry.reason}"
+                f"{entry.unit_id}: {entry.reason}"
                 for entry in coverage
                 if entry.status in {"unsupported", "inconsistent"} and entry.reason
             ]

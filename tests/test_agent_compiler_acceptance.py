@@ -401,9 +401,8 @@ class _RecordedCompilerBackend:
                 "intent": fragment,
                 "coverage": [
                     {
-                        "request_item_id": item.item_id,
+                        "unit_id": f"unit-{item.item_id}",
                         "status": "preserved" if action == "preserve" else "mapped",
-                        "intent_paths": [scope],
                     }
                     for item, action in scope_items
                 ],

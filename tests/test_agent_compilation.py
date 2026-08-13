@@ -73,20 +73,18 @@ def test_intent_coverage_reports_missing_and_invalid_items() -> None:
     manifest = build_request_manifest("- Set the title.\n- Add the CBL track.")
     coverage = [
         AuthoringIntentCoverage(
-            request_item_id="request-001",
+            unit_id="unit-request-001",
             status="mapped",
-            intent_paths=["title"],
         ),
         AuthoringIntentCoverage(
-            request_item_id="request-999",
+            unit_id="unit-request-999",
             status="mapped",
-            intent_paths=["sections[main].tracks[cbl]"],
         ),
     ]
 
     errors = validate_intent_coverage(manifest, coverage)
 
-    assert any("unknown request item" in error for error in errors)
+    assert any("unknown work unit" in error for error in errors)
     assert any("Missing coverage" in error for error in errors)
 
 
@@ -105,9 +103,8 @@ def test_scoped_semantics_rejects_add_request_that_clears_remarks() -> None:
             "intent": {"remarks": {"operation": "clear"}},
             "coverage": [
                 {
-                    "request_item_id": "request-001",
+                    "unit_id": "unit-request-001",
                     "status": "mapped",
-                    "intent_paths": ["remarks"],
                 }
             ],
         }
@@ -120,7 +117,7 @@ def test_scoped_semantics_rejects_add_request_that_clears_remarks() -> None:
     )
 
     assert errors == [
-        "Request 'request-001' adds 'remarks', but the submitted intent explicitly "
+        "Request 'unit-request-001' adds 'remarks', but the submitted intent explicitly "
         "clears 'remarks'."
     ]
 
@@ -148,9 +145,8 @@ def test_scoped_semantics_accepts_add_request_with_populated_remark() -> None:
             },
             "coverage": [
                 {
-                    "request_item_id": "request-001",
+                    "unit_id": "unit-request-001",
                     "status": "mapped",
-                    "intent_paths": ["remarks[quicklook_note]"],
                 }
             ],
         }
@@ -370,25 +366,33 @@ def test_request_work_units_preserve_clause_and_hierarchy_context() -> None:
     assert units[2].status == "preserved"
 
 
-def test_request_inventory_rejects_wrong_hierarchy_branch() -> None:
-    """Do not let provider output route one family into another branch."""
+def test_request_work_unit_derives_canonical_hierarchy_branch() -> None:
+    """Derive hierarchy ownership from the canonical object family."""
     manifest = build_request_manifest("- Add a resistivity track.")
-    errors = validate_request_inventory(
-        manifest,
-        [
-            AuthoringRequestInventoryItem(
-                request_item_id="request-001",
-                status="mapped",
-                action="add",
-                object_family="track",
-                top_level_branch="header",
-            )
-        ],
+    inventory = AuthoringRequestInventory(
+        items=[
+            {
+                "request_item_id": "request-001",
+                "status": "mapped",
+                "action": "add",
+                "object_family": "track",
+            }
+        ]
     )
 
-    assert errors == [
-        "Inventory for 'request-001' maps 'track' to branch 'header'; expected 'track'."
-    ]
+    assert validate_request_inventory(manifest, inventory.items) == []
+    units = build_request_work_units(manifest, inventory)
+    assert units[0].branch == "track"
+
+
+def test_provider_contract_uses_work_units_without_yaml_paths_or_branches() -> None:
+    """Keep hierarchy and intent paths out of provider-authored contracts."""
+    inventory_fields = AuthoringRequestInventoryItem.model_fields
+    coverage_fields = AuthoringIntentCoverage.model_fields
+
+    assert "top_level_branch" not in inventory_fields
+    assert "intent_paths" not in coverage_fields
+    assert set(coverage_fields) == {"unit_id", "status", "reason"}
 
 
 def test_branch_operation_contract_is_parent_scoped_and_typed() -> None:
@@ -576,9 +580,8 @@ def test_scoped_submission_rejects_explicit_nulls_before_canonical_merge() -> No
                 },
                 "coverage": [
                     {
-                        "request_item_id": "request-001",
+                        "unit_id": "unit-request-001",
                         "status": "mapped",
-                        "intent_paths": ["remarks"],
                     }
                 ],
             }
@@ -592,9 +595,8 @@ def test_scoped_intents_merge_into_canonical_desired_state() -> None:
             "intent": {"title": "Cross-domain report"},
             "coverage": [
                 {
-                    "request_item_id": "request-001",
+                    "unit_id": "unit-request-001",
                     "status": "mapped",
-                    "intent_paths": ["title"],
                 }
             ],
         }
@@ -619,9 +621,8 @@ def test_scoped_intents_merge_into_canonical_desired_state() -> None:
             },
             "coverage": [
                 {
-                    "request_item_id": "request-002",
+                    "unit_id": "unit-request-002",
                     "status": "mapped",
-                    "intent_paths": ["sections[main].tracks[measurement]"],
                 }
             ],
         }
@@ -648,9 +649,8 @@ def test_scoped_intents_merge_into_canonical_desired_state() -> None:
             },
             "coverage": [
                 {
-                    "request_item_id": "request-003",
+                    "unit_id": "unit-request-003",
                     "status": "mapped",
-                    "intent_paths": ["curve_bindings[main.measurement.signal.1]"],
                 }
             ],
         }
@@ -693,9 +693,8 @@ def test_scoped_intent_merge_rejects_duplicate_identities() -> None:
             },
             "coverage": [
                 {
-                    "request_item_id": "request-001",
+                    "unit_id": "unit-request-001",
                     "status": "mapped",
-                    "intent_paths": ["curve_bindings"],
                 }
             ],
         }
@@ -762,9 +761,8 @@ class _CorrectionBackend:
                 "intent": {"title": "Revised"},
                 "coverage": [
                     {
-                        "request_item_id": "request-001",
+                        "unit_id": "unit-request-001",
                         "status": "mapped",
-                        "intent_paths": ["title"],
                     }
                 ],
             },
@@ -857,9 +855,8 @@ class _CoverageFailureBackend:
                 "intent": {"title": "Revised"},
                 "coverage": [
                     {
-                        "request_item_id": "request-001",
+                        "unit_id": "unit-request-001",
                         "status": "mapped",
-                        "intent_paths": ["title"],
                     }
                 ],
             },
@@ -919,9 +916,8 @@ class _CorrectedInventoryThenScopedFailureBackend:
                         {
                             "request_item_id": "request-001",
                             "status": "mapped",
-                            "action": "set",
+                            "action": "explain",
                             "object_family": "service_title",
-                            "top_level_branch": "section",
                             "target": "first service title",
                             "explicit_values": {"value": "Open Hole Quicklook"},
                         }
@@ -938,7 +934,6 @@ class _CorrectedInventoryThenScopedFailureBackend:
                             "status": "mapped",
                             "action": "set",
                             "object_family": "service_title",
-                            "top_level_branch": "header",
                             "target": "first service title",
                             "explicit_values": {"value": "Open Hole Quicklook"},
                         }
@@ -994,7 +989,7 @@ def test_desired_state_extraction_allows_one_coverage_correction() -> None:
     assert backend.required_tool_names == backend.tool_names
     assert intent is not None
     assert intent.title == "Revised"
-    assert result.report_facts["request_coverage"][0]["intent_paths"] == ["title"]
+    assert result.report_facts["request_coverage"][0]["unit_id"] == "unit-request-001"
     assert result.report_facts["request_work_units"] == [
         {
             "unit_id": "unit-request-001",
@@ -1123,10 +1118,7 @@ def test_extraction_reports_active_stage_and_corrected_inventory_history() -> No
     assert extraction["corrected_failures"] == [
         {
             "stage": "inventory",
-            "errors": [
-                "Inventory for 'request-001' maps 'service_title' to branch "
-                "'section'; expected 'header'."
-            ],
+            "errors": ["Inventory for 'request-001' needs an authoring action."],
         }
     ]
     assert [call.name for call in result.tool_trace] == ["submit_report_intent"]
@@ -1143,9 +1135,8 @@ def test_intent_submission_keeps_typed_intent_and_coverage_together() -> None:
         intent=AuthoringDocumentIntent(title="Revised"),
         coverage=[
             {
-                "request_item_id": "request-001",
+                "unit_id": "unit-request-001",
                 "status": "mapped",
-                "intent_paths": ["title"],
             }
         ],
     )

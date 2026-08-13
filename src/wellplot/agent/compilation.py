@@ -132,7 +132,6 @@ class AuthoringRequestInventoryItem(BaseModel):
     status: AuthoringCoverageStatus
     action: AuthoringRequestAction
     object_family: AuthoringRequestObjectFamily
-    top_level_branch: AuthoringRequestBranch | None = None
     target: str | None = Field(default=None, min_length=1)
     natural_parent: str | None = Field(
         default=None,
@@ -149,14 +148,6 @@ class AuthoringRequestInventoryItem(BaseModel):
     def parent_scope(self) -> str | None:
         """Keep the pre-K3 name available to internal callers and adapters."""
         return self.natural_parent
-
-    @model_validator(mode="after")
-    def normalize_branch(self) -> AuthoringRequestInventoryItem:
-        """Derive the hierarchy branch when a provider omits the redundant value."""
-        if self.top_level_branch is None:
-            branch = _OBJECT_FAMILY_BRANCHES.get(self.object_family, "unknown")
-            object.__setattr__(self, "top_level_branch", branch)
-        return self
 
 
 class AuthoringRequestWorkUnit(BaseModel):
@@ -189,13 +180,12 @@ class AuthoringRequestInventory(BaseModel):
 
 
 class AuthoringIntentCoverage(BaseModel):
-    """Provider claim linking one request item to typed intent paths."""
+    """Provider claim linking one parent-scoped work unit to typed intent."""
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    request_item_id: str = Field(min_length=1)
+    unit_id: str = Field(min_length=1)
     status: AuthoringCoverageStatus
-    intent_paths: list[str] = Field(default_factory=list)
     reason: str | None = Field(default=None, min_length=1)
 
 
@@ -789,11 +779,6 @@ _REQUEST_ACTION_OPERATION_ACTIONS: dict[str, frozenset[str]] = {
 }
 
 
-def _intent_path_root(path: str) -> str:
-    """Return the canonical root field named by one provider coverage path."""
-    return re.split(r"[.\[]", path.strip(), maxsplit=1)[0]
-
-
 def _intent_value_is_clear(value: object) -> bool:
     """Return whether one typed field carries the explicit canonical clear marker."""
     return isinstance(value, AuthoringClearIntent)
@@ -830,67 +815,52 @@ def validate_scoped_intent_semantics(
 ) -> list[str]:
     """Reject typed submissions that contradict their inventoried request actions.
 
-    Coverage paths are provider claims, so structural validation alone is not enough.
-    This gate confirms that an ``add``, ``set``, ``update``, ``remove``, or ``clear``
-    request points at a compatible supplied field in the scoped typed fragment.
+    Structural validation alone is not enough. This gate confirms that an
+    ``add``, ``set``, ``update``, ``remove``, or ``clear`` request points at a
+    compatible supplied field in the scoped typed fragment. The work unit's
+    canonical object family supplies the expected field roots; the provider
+    does not submit raw intent paths.
     """
-    inventory_by_id = {item.request_item_id: item for item in inventory}
-    coverage_by_id = {entry.request_item_id: entry for entry in coverage}
+    inventory_by_unit = {f"unit-{item.request_item_id}": item for item in inventory}
+    coverage_by_unit = {entry.unit_id: entry for entry in coverage}
     supplied_fields = intent.model_fields_set
     errors: list[str] = []
 
-    for request_item_id, item in inventory_by_id.items():
+    for unit_id, item in inventory_by_unit.items():
         if item.status in {"unsupported", "inconsistent"}:
             continue
-        entry = coverage_by_id.get(request_item_id)
+        entry = coverage_by_unit.get(unit_id)
         if entry is None or entry.status not in {"mapped", "preserved"}:
             continue
 
-        roots = {_intent_path_root(path) for path in entry.intent_paths if path.strip()}
         expected_roots = _OBJECT_FAMILY_INTENT_ROOTS.get(item.object_family, frozenset())
-        scope_root = _OBJECT_FAMILY_SCOPES.get(item.object_family)
+        expected_root = next(
+            (root for root in expected_roots if root in supplied_fields),
+            None,
+        )
 
         if item.action == "preserve":
-            if "removals" in roots or any(
-                root in supplied_fields and _intent_value_is_clear(getattr(intent, root))
-                for root in roots
-                if root != "removals"
+            if "removals" in supplied_fields or (
+                expected_root is not None and _intent_value_is_clear(getattr(intent, expected_root))
             ):
                 errors.append(
-                    f"Coverage for {request_item_id!r} marks {item.object_family!r} "
+                    f"Coverage for {unit_id!r} marks {item.object_family!r} "
                     "as preserved but submits a destructive intent."
                 )
             continue
 
-        allowed_roots = expected_roots | {"removals"}
-        if scope_root is not None:
-            allowed_roots = allowed_roots | {scope_root}
-        incompatible_roots = sorted(root for root in roots if root not in allowed_roots)
-        if incompatible_roots:
-            errors.append(
-                f"Coverage for {request_item_id!r} maps {item.object_family!r} to "
-                f"incompatible intent path roots {incompatible_roots!r}."
-            )
-            continue
-
         if item.action == "remove":
-            if "removals" not in roots or not _has_matching_removal(intent, item.object_family):
+            if not _has_matching_removal(intent, item.object_family):
                 errors.append(
-                    f"Request {request_item_id!r} removes {item.object_family!r}, but the "
+                    f"Request {unit_id!r} removes {item.object_family!r}, but the "
                     "submitted intent does not include a matching removal."
                 )
             continue
 
-        expected_root = next((root for root in roots if root in expected_roots), None)
-        if expected_root is None and scope_root in roots:
-            expected_root = next(
-                (root for root in expected_roots if root in supplied_fields),
-                None,
-            )
         if expected_root is None:
             errors.append(
-                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
-                "coverage does not point to its canonical intent field."
+                f"Request {unit_id!r} {item.action}s {item.object_family!r}, but "
+                "the submitted intent does not include its canonical field."
             )
             continue
 
@@ -901,24 +871,24 @@ def validate_scoped_intent_semantics(
                 item.object_family,
             ):
                 errors.append(
-                    f"Request {request_item_id!r} clears {item.object_family!r}, but the "
+                    f"Request {unit_id!r} clears {item.object_family!r}, but the "
                     "submitted intent does not include an explicit clear or removal."
                 )
             continue
 
         if expected_root not in supplied_fields:
             errors.append(
-                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"Request {unit_id!r} {item.action}s {item.object_family!r}, but "
                 f"the submitted intent omits {expected_root!r}."
             )
         elif _intent_value_is_clear(value):
             errors.append(
-                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"Request {unit_id!r} {item.action}s {item.object_family!r}, but "
                 f"the submitted intent explicitly clears {expected_root!r}."
             )
         elif not _intent_value_is_populated(value):
             errors.append(
-                f"Request {request_item_id!r} {item.action}s {item.object_family!r}, but "
+                f"Request {unit_id!r} {item.action}s {item.object_family!r}, but "
                 f"the submitted {expected_root!r} value is empty."
             )
 
@@ -1045,7 +1015,7 @@ def build_request_work_units(
         manifest_item = manifest_by_id.get(item.request_item_id)
         if manifest_item is None:
             continue
-        branch = item.top_level_branch or _OBJECT_FAMILY_BRANCHES.get(item.object_family, "unknown")
+        branch = _OBJECT_FAMILY_BRANCHES.get(item.object_family, "unknown")
         units.append(
             AuthoringRequestWorkUnit(
                 unit_id=f"unit-{item.request_item_id}",
@@ -1069,27 +1039,29 @@ def build_request_work_units(
 def validate_intent_coverage(
     manifest: AuthoringRequestManifest,
     coverage: Iterable[AuthoringIntentCoverage],
+    work_units: Iterable[AuthoringRequestWorkUnit] | None = None,
 ) -> list[str]:
-    """Return deterministic errors for incomplete or contradictory coverage."""
+    """Return deterministic errors for incomplete work-unit coverage."""
     entries = list(coverage)
-    expected_ids = {item.item_id for item in manifest.items}
+    expected_ids = (
+        {unit.unit_id for unit in work_units}
+        if work_units is not None
+        else {f"unit-{item.item_id}" for item in manifest.items}
+    )
     seen_ids: set[str] = set()
     errors: list[str] = []
     for entry in entries:
-        if entry.request_item_id in seen_ids:
-            errors.append(f"Duplicate coverage for {entry.request_item_id!r}.")
-        seen_ids.add(entry.request_item_id)
-        if entry.request_item_id not in expected_ids:
-            errors.append(f"Coverage references unknown request item {entry.request_item_id!r}.")
-        if entry.status in {"mapped", "preserved"} and not entry.intent_paths:
-            errors.append(f"Coverage for {entry.request_item_id!r} needs at least one intent path.")
+        if entry.unit_id in seen_ids:
+            errors.append(f"Duplicate coverage for work unit {entry.unit_id!r}.")
+        seen_ids.add(entry.unit_id)
+        if entry.unit_id not in expected_ids:
+            errors.append(f"Coverage references unknown work unit {entry.unit_id!r}.")
         if entry.status in {"unsupported", "inconsistent"} and not entry.reason:
             errors.append(
-                f"Coverage for {entry.request_item_id!r} needs a reason for status "
-                f"{entry.status!r}."
+                f"Coverage for {entry.unit_id!r} needs a reason for status {entry.status!r}."
             )
     missing_ids = sorted(expected_ids - seen_ids)
-    errors.extend(f"Missing coverage for request item {item_id!r}." for item_id in missing_ids)
+    errors.extend(f"Missing coverage for work unit {unit_id!r}." for unit_id in missing_ids)
     return errors
 
 
@@ -1112,12 +1084,6 @@ def validate_request_inventory(
             if entry.object_family == "unknown":
                 errors.append(
                     f"Inventory for {entry.request_item_id!r} needs a known object family."
-                )
-            expected_branch = _OBJECT_FAMILY_BRANCHES.get(entry.object_family, "unknown")
-            if entry.top_level_branch != expected_branch:
-                errors.append(
-                    f"Inventory for {entry.request_item_id!r} maps {entry.object_family!r} "
-                    f"to branch {entry.top_level_branch!r}; expected {expected_branch!r}."
                 )
             if entry.action == "explain":
                 errors.append(f"Inventory for {entry.request_item_id!r} needs an authoring action.")
