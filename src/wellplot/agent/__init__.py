@@ -19,6 +19,12 @@
 
 """Public host-side agent exports for LLM-driven wellplot authoring."""
 
+from .branch_compiler import (
+    BranchOperationGroup,
+    DirectBranchCompilationResult,
+    build_branch_operation_groups,
+    compile_direct_branch_operations,
+)
 from .core import (
     AuthoringPlanPhase,
     AuthoringPlanResult,
@@ -52,12 +58,16 @@ __all__ = [
     "AuthoringSession",
     "AuthoringToolCall",
     "AuthoringUserReport",
+    "BranchOperationGroup",
+    "DirectBranchCompilationResult",
     "ExecutedAuthoringPhase",
     "ProjectPaths",
     "ProjectSession",
     "ProjectStarter",
     "RevisionRequest",
     "create_project_session",
+    "build_branch_operation_groups",
+    "compile_direct_branch_operations",
     "display_authoring_result",
     "display_phase_previews",
     "relative_path",

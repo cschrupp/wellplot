@@ -18,6 +18,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field, create_model, m
 
 from ..authoring_reconciler import AuthoringOperationPhase
 from ..authoring_service import (
+    AuthoringTarget,
     CreateAnnotationRequest,
     CreateCurveBindingRequest,
     CreateFillRequest,
@@ -346,6 +347,62 @@ def _removals_override(remove_model: type[BaseModel]) -> dict[str, tuple[object,
     }
 
 
+def _scoped_target_model(name: str, object_kinds: tuple[str, ...]) -> type[BaseModel]:
+    """Generate a remove target restricted to one provider branch."""
+    return create_model(
+        name,
+        __base__=AuthoringTarget,
+        __module__=__name__,
+        object_kind=(Literal.__getitem__(object_kinds), ...),
+    )
+
+
+def _scoped_remove_request_model(
+    name: str,
+    object_kinds: tuple[str, ...],
+) -> type[BaseModel]:
+    """Generate a remove request whose target cannot name another branch."""
+    target_model = _scoped_target_model(f"{name}Target", object_kinds)
+    return create_model(
+        name,
+        __base__=RemoveRequest,
+        __module__=__name__,
+        target=(target_model, ...),
+    )
+
+
+AuthoringReportRemoveRequest = _scoped_remove_request_model(
+    "AuthoringReportRemoveRequest",
+    (
+        "report",
+        "page",
+        "depth",
+        "output",
+        "header",
+        "header_slot",
+        "service_title",
+        "tail",
+        "remark",
+    ),
+)
+AuthoringStructureRemoveRequest = _scoped_remove_request_model(
+    "AuthoringStructureRemoveRequest",
+    ("section", "track"),
+)
+AuthoringScalarRemoveRequest = _scoped_remove_request_model(
+    "AuthoringScalarRemoveRequest",
+    ("curve_binding", "fill"),
+)
+AuthoringRasterRemoveRequest = _scoped_remove_request_model(
+    "AuthoringRasterRemoveRequest",
+    ("raster_binding",),
+)
+AuthoringAnnotationRemoveRequest = _scoped_remove_request_model(
+    "AuthoringAnnotationRemoveRequest",
+    ("annotation",),
+)
+
+
 AuthoringReportIntentFragment = _project_model(
     "AuthoringReportIntentFragment",
     AuthoringDocumentIntent,
@@ -535,31 +592,31 @@ _BRANCH_REQUEST_VARIANTS: dict[str, dict[str, tuple[type[BaseModel], ...]]] = {
             UpdateDepthRequest,
             UpdateRemarkRequest,
         ),
-        "remove": (RemoveRequest,),
+        "remove": (AuthoringReportRemoveRequest,),
         "move": (MoveRequest,),
     },
     "structure": {
         "create": (CreateSectionRequest, CreateTrackRequest),
         "update": (UpdateSectionRequest, UpdateTrackRequest),
-        "remove": (RemoveRequest,),
+        "remove": (AuthoringStructureRemoveRequest,),
         "move": (MoveRequest,),
     },
     "scalar": {
         "create": (CreateCurveBindingRequest, CreateFillRequest),
         "update": (UpdateCurveBindingRequest, UpdateFillRequest),
-        "remove": (RemoveRequest,),
+        "remove": (AuthoringScalarRemoveRequest,),
         "move": (MoveRequest,),
     },
     "raster": {
         "create": (CreateRasterBindingRequest,),
         "update": (UpdateRasterBindingRequest,),
-        "remove": (RemoveRequest,),
+        "remove": (AuthoringRasterRemoveRequest,),
         "move": (MoveRequest,),
     },
     "annotation": {
         "create": (CreateAnnotationRequest,),
         "update": (UpdateAnnotationRequest,),
-        "remove": (RemoveRequest,),
+        "remove": (AuthoringAnnotationRemoveRequest,),
         "move": (MoveRequest,),
     },
 }
@@ -616,6 +673,13 @@ _BRANCH_ALLOWED_OPERATION_KINDS: dict[str, frozenset[str]] = {
 def branch_operation_submission_model(scope: AuthoringCompilationScope) -> type[BaseModel]:
     """Return the typed provider contract for one compilation scope."""
     return _OPERATION_SUBMISSION_MODELS[scope]
+
+
+def compilation_scope_for_object_family(
+    object_family: str,
+) -> AuthoringCompilationScope | None:
+    """Return the canonical provider compilation scope for one object family."""
+    return _OBJECT_FAMILY_SCOPES.get(object_family)
 
 
 def operation_request_object_kind(request: BaseModel) -> str:
@@ -1209,6 +1273,7 @@ __all__ = [
     "build_request_manifest",
     "build_request_work_units",
     "branch_operation_submission_model",
+    "compilation_scope_for_object_family",
     "group_request_inventory",
     "merge_scoped_intents",
     "operation_request_object_kind",

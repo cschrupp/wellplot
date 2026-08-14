@@ -2247,6 +2247,9 @@ Commit boundary:
 
 #### 0.6-K7.6. Direct Branch-Operation Provider Compiler
 
+Status: implemented in the current development branch; the authoritative
+`run()` / `revise()` route remains deferred to K7.7.
+
 Goal:
 
 - compile each work unit directly into the typed service operations consumed
@@ -2289,6 +2292,21 @@ Commit boundary:
 
 - direct compiler and isolated integration tests; retain the old normal route
   only until the replacement acceptance in K7.7
+
+Implementation checkpoint:
+
+- `wellplot.agent.branch_compiler` groups work units by canonical compilation
+  scope and natural parent, then invokes one generated branch-operation schema
+  per group
+- provider submissions are validated before they leave the compiler; one
+  correction is allowed and earlier validation errors are retained as
+  diagnostic history
+- branch operation schemas use branch-scoped remove targets, so a provider
+  cannot emit object kinds from an unrelated hierarchy branch
+- parent operation ids and resolved object identities are carried into later
+  group context without merging groups into a full-document intent
+- successful results are typed submissions for the existing atomic executor;
+  this slice performs no persistence and does not change normal agent routing
 
 #### 0.6-K7.7. Authoritative Route Switch And Dead-Path Removal
 
