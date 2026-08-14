@@ -484,6 +484,65 @@ class _DirectRouteBackend:
         return SimpleNamespace(final_text="Compiled structure operations.", tool_trace=())
 
 
+class _RemarksOnlyDirectBackend:
+    """Provider double that receives report operations without an inventory stage."""
+
+    provider = "direct-fixture"
+    model = "direct-fixture-model"
+    credential_source = "fixture"
+    supports_direct_operations = True
+    supports_desired_state = True
+
+    def __init__(self, request_text: str) -> None:
+        self.manifest = build_request_manifest(request_text)
+        self.tool_names: list[str] = []
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Create one remark that covers every related content constraint."""
+        tool_name = str(kwargs["required_tool_name"])
+        self.tool_names.append(tool_name)
+        assert tool_name == "submit_report_operations"
+        tool_caller = kwargs["tool_caller"]
+        operation_id = "create-open-hole-note"
+        response = await tool_caller(
+            tool_name,
+            {
+                "branch": "report",
+                "operations": [
+                    {
+                        "operation_id": operation_id,
+                        "work_unit_id": f"unit-{self.manifest.items[0].item_id}",
+                        "action": "create",
+                        "request": {
+                            "kind": "remark",
+                            "remark": {
+                                "remark_id": "open-hole-quicklook-note",
+                                "title": "Notes",
+                                "text": (
+                                    "Open-hole quicklook built from a user-supplied LAS file. "
+                                    "Only channels confirmed through source inspection should "
+                                    "be plotted. This packet is an iterative interpretation "
+                                    "artifact, not a vendor-issued original."
+                                ),
+                            },
+                            "index": 0,
+                        },
+                    }
+                ],
+                "coverage": [
+                    {
+                        "unit_id": f"unit-{item.item_id}",
+                        "status": "mapped",
+                        "operation_ids": [operation_id],
+                    }
+                    for item in self.manifest.items
+                ],
+            },
+        )
+        assert response["accepted"] is True
+        return SimpleNamespace(final_text="Compiled report operations.", tool_trace=())
+
+
 class _MixedDirectRouteBackend:
     """Recorded provider for a cross-branch, generic authoring request."""
 
@@ -822,6 +881,56 @@ def test_direct_route_executes_branch_operations_and_readback(tmp_path: Path) ->
     )
     assert any(track.id == "resistivity" for track in saved.sections[0].tracks)
     assert backend.tool_names == ["submit_request_inventory", "submit_structure_operations"]
+
+
+def test_direct_route_remarks_only_skips_inventory_and_isolates_mutation(tmp_path: Path) -> None:
+    """Compile explicit remarks content without exposing unrelated authoring branches."""
+    goal = """
+        Add one concise remarks block to the first page.
+
+        - Keep it short and readable.
+        - Mention that this is an open-hole quicklook built from a user-supplied LAS file.
+        - Mention that only channels confirmed through source inspection should be plotted.
+        - Mention that this packet is an iterative interpretation artifact, not a
+          vendor-issued original.
+    """
+    backend = _RemarksOnlyDirectBackend(goal)
+    original = _document(with_header=True)
+    baseline = authoring_document_from_mapping(authoring_document_to_logfile_mapping(original))
+    runtime = _AcceptanceRuntime(tmp_path, document=original, channels=_channels())
+
+    result = anyio.run(
+        AuthoringSession(backend=backend, runtime=runtime).run_request,
+        AuthoringRequest(
+            goal=goal,
+            output_logfile="workspace/remarks-only.log.yaml",
+            example_id="remarks-only",
+        ),
+    )
+
+    assert result.plan is not None
+    assert result.plan.blocked is False
+    assert backend.tool_names == ["submit_report_operations"]
+    saved = load_authoring_document(
+        tmp_path / "workspace/remarks-only.log.yaml",
+        allowed_root=tmp_path,
+    )
+    assert len(saved.remarks) == 1
+    assert "user-supplied LAS file" in (saved.remarks[0].text or "")
+    assert "not a vendor-issued original" in (saved.remarks[0].text or "")
+    assert saved.header is not None
+    assert baseline.header is not None
+    assert saved.header.title == baseline.header.title
+    assert saved.header.general_fields[0].slot_id == baseline.header.general_fields[0].slot_id
+    assert saved.header.general_fields[0].value == baseline.header.general_fields[0].value
+    assert [track.id for track in saved.sections[0].tracks] == [
+        track.id for track in baseline.sections[0].tracks
+    ]
+    saved_gr = _track(saved, "gr_sp").bindings[0]
+    baseline_gr = _track(baseline, "gr_sp").bindings[0]
+    assert saved_gr.binding_id == baseline_gr.binding_id
+    assert saved_gr.channel == baseline_gr.channel
+    assert saved_gr.label == baseline_gr.label
 
 
 def test_direct_route_cross_domain_operations_preserve_hierarchy_and_values(

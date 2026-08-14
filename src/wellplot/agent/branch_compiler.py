@@ -188,8 +188,10 @@ def _group_message(
     return (
         "Submit typed operations for this branch and natural parent only. Do not emit a "
         "full-document intent, YAML paths, or operations for another parent. Preserve "
-        "explicit values exactly. Use one operation-coverage entry per work unit. Parent "
-        "operations must precede child operations; use available operation ids for "
+        "explicit values exactly. Use one operation-coverage entry per work unit. "
+        "When multiple work units describe constraints for one object, emit one operation "
+        "when possible and reference that operation from every related coverage entry. "
+        "Parent operations must precede child operations; use available operation ids for "
         "cross-group dependencies. The typed operation schema is supplied as the tool "
         "schema.\n\nContext:\n" + json.dumps(payload, indent=2, default=str)
     )

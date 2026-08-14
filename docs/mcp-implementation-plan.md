@@ -2363,6 +2363,9 @@ Implementation checkpoint:
 - direct operation plans expose operation families, phase success checks,
   request work units, skipped unsupported/inconsistent items, and provider
   correction evidence in the deterministic user report
+- explicit remarks-only requests are classified locally into report work units,
+  bypass the provider inventory stage, and still use the typed report-operation
+  compiler plus canonical read-after-write verification
 - unsupported provider capabilities block before mutation instead of falling
   through to the old provider-to-MCP mutation loop
 
@@ -2412,6 +2415,12 @@ Work:
   checks, package build, and installed-wheel MCP smoke checks
 - update release notes and public workflow docs only after the acceptance
   evidence passes
+
+Acceptance checkpoint:
+
+- the remarks-only recorded-provider scenario now bypasses inventory, exposes
+  only `submit_report_operations`, persists one synthesized remark, and proves
+  that header and section content remain unchanged
 
 Acceptance:
 

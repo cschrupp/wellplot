@@ -733,6 +733,18 @@ def validate_operation_submission(
                 f"{operation.work_unit_id!r}."
             )
         object_kind = operation_request_object_kind(operation.request)
+        operation_unit = known_units.get(operation.work_unit_id)
+        if operation_unit is not None:
+            expected_kinds = _OBJECT_FAMILY_OPERATION_KINDS.get(
+                operation_unit.object_family,
+                frozenset(),
+            )
+            if object_kind not in expected_kinds:
+                errors.append(
+                    f"Operation {operation.operation_id!r} emits {object_kind!r} for "
+                    f"{operation_unit.object_family!r} work unit "
+                    f"{operation_unit.unit_id!r}."
+                )
         if object_kind not in _BRANCH_ALLOWED_OPERATION_KINDS[scope]:
             errors.append(
                 f"Operation {operation.operation_id!r} emits {object_kind!r} outside "
@@ -761,6 +773,17 @@ def validate_operation_submission(
         unknown = sorted(referenced - operation_ids)
         if unknown:
             errors.append(f"Coverage for {unit_id!r} references unknown operations {unknown!r}.")
+        expected_kinds = _OBJECT_FAMILY_OPERATION_KINDS.get(unit.object_family, frozenset())
+        incompatible = sorted(
+            operation_id
+            for operation_id in referenced & operation_ids
+            if operation_request_object_kind(operation_by_id[operation_id].request)
+            not in expected_kinds
+        )
+        if incompatible:
+            errors.append(
+                f"Coverage for {unit_id!r} references incompatible operations {incompatible!r}."
+            )
         if unit.status == "mapped" and unit.action != "preserve" and not entry.operation_ids:
             errors.append(f"Mapped work unit {unit_id!r} has no operation.")
         if unit.action == "preserve" and entry.operation_ids:
@@ -1062,6 +1085,69 @@ def build_request_manifest(text: str) -> AuthoringRequestManifest:
     )
 
 
+_REMARK_OBJECT_PATTERN = re.compile(r"\b(?:remarks?|notes?)\b", re.IGNORECASE)
+_REMARK_MUTATION_PATTERN = re.compile(
+    r"\b(?:add|create|insert|replace|update|change|set|remove|delete|clear)\b",
+    re.IGNORECASE,
+)
+_OTHER_AUTHORING_MUTATION_PATTERN = re.compile(
+    r"\b(?:add|create|insert|replace|update|change|set|remove|delete|clear|bind|move|keep)\b"
+    r"[^.\n]*\b(?:header|service\s+title|section|track|curve|binding|raster|fill|"
+    r"annotation|page|output|depth|report\s+title|subtitle)\b",
+    re.IGNORECASE,
+)
+
+
+def build_deterministic_narrow_inventory(
+    manifest: AuthoringRequestManifest,
+) -> AuthoringRequestInventory | None:
+    """Classify an unambiguous single-family request without provider judgment.
+
+    Only remarks requests are supported initially. The first clause must name
+    the remarks object and request one mutation. Remaining clauses are treated
+    as content constraints only when they do not independently mutate another
+    canonical authoring family.
+    """
+    primary_items = [
+        item
+        for item in manifest.items
+        if _REMARK_OBJECT_PATTERN.search(item.text) and _REMARK_MUTATION_PATTERN.search(item.text)
+    ]
+    if len(primary_items) != 1:
+        return None
+
+    primary = primary_items[0]
+    for item in manifest.items:
+        if item.item_id == primary.item_id:
+            continue
+        if _OTHER_AUTHORING_MUTATION_PATTERN.search(item.text):
+            return None
+
+    normalized_primary = primary.text.casefold()
+    if re.search(r"\b(?:remove|delete)\b", normalized_primary):
+        action: AuthoringRequestAction = "remove"
+    elif re.search(r"\bclear\b", normalized_primary):
+        action = "clear"
+    elif re.search(r"\b(?:add|create|insert)\b", normalized_primary):
+        action = "add"
+    else:
+        action = "update"
+
+    return AuthoringRequestInventory(
+        items=[
+            AuthoringRequestInventoryItem(
+                request_item_id=item.item_id,
+                status="mapped",
+                action=action,
+                object_family="remarks",
+                target=primary.text,
+                natural_parent="report remarks",
+            )
+            for item in manifest.items
+        ]
+    )
+
+
 def build_request_work_units(
     manifest: AuthoringRequestManifest,
     inventory: AuthoringRequestInventory,
@@ -1270,6 +1356,7 @@ __all__ = [
     "AuthoringStructureIntentFragment",
     "AuthoringStructureIntentSubmission",
     "AuthoringTrackStructureIntent",
+    "build_deterministic_narrow_inventory",
     "build_request_manifest",
     "build_request_work_units",
     "branch_operation_submission_model",

@@ -74,6 +74,7 @@ from .compilation import (
     AuthoringRequestInventoryItem,
     AuthoringRequestManifest,
     AuthoringRequestWorkUnit,
+    build_deterministic_narrow_inventory,
     build_request_manifest,
     build_request_work_units,
     compilation_scope_for_object_family,
@@ -4860,7 +4861,29 @@ class AuthoringSession:
     ]:
         """Classify a request before direct branch-operation compilation."""
         request_manifest = build_request_manifest(request_text)
-        inventory: AuthoringRequestInventory | None = None
+        inventory = build_deterministic_narrow_inventory(request_manifest)
+        if inventory is not None:
+            return (
+                ProviderRunResult(
+                    final_text="Classified one deterministic narrow report request.",
+                    tool_trace=(),
+                    report_facts={
+                        "request_manifest": request_manifest.model_dump(mode="json"),
+                        "request_inventory": inventory.model_dump(mode="json"),
+                        "extraction": {
+                            "status": "deterministic",
+                            "inventory_attempts": 0,
+                            "validation_failures": [],
+                            "inventory_failures": [],
+                            "tool_calls_emitted": False,
+                        },
+                    },
+                ),
+                request_manifest,
+                inventory,
+            )
+
+        inventory = None
         attempts = 0
         validation_errors: list[str] = []
         inventory_errors: list[list[str]] = []

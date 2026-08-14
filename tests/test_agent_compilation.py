@@ -24,6 +24,7 @@ from wellplot.agent.compilation import (
     AuthoringScalarIntentSubmission,
     AuthoringStructureIntentSubmission,
     branch_operation_submission_model,
+    build_deterministic_narrow_inventory,
     build_request_manifest,
     build_request_work_units,
     group_request_inventory,
@@ -66,6 +67,40 @@ def test_request_manifest_assigns_stable_items_to_bulleted_requests() -> None:
     assert manifest.items[1].text == "Data Sources:"
     assert manifest.items[2].text == "main: main.dlis"
     assert manifest.items[5].text == "Use the explicit blue dashed curve style."
+
+
+def test_deterministic_narrow_inventory_classifies_remarks_constraints() -> None:
+    """Keep an explicit remarks-only request out of provider inventory classification."""
+    manifest = build_request_manifest(
+        """
+        Add one concise remarks block to the first page.
+
+        - Keep it short and readable.
+        - Mention that this is an open-hole quicklook built from a user-supplied LAS file.
+        - Mention that only source-inspected channels should be plotted.
+        - Mention that this is not a vendor-issued original.
+        """
+    )
+
+    inventory = build_deterministic_narrow_inventory(manifest)
+
+    assert inventory is not None
+    assert len(inventory.items) == len(manifest.items)
+    assert {item.object_family for item in inventory.items} == {"remarks"}
+    assert {item.action for item in inventory.items} == {"add"}
+    assert {item.natural_parent for item in inventory.items} == {"report remarks"}
+
+
+def test_deterministic_narrow_inventory_rejects_mixed_authoring_request() -> None:
+    """Do not hide an independent track mutation inside a remarks work unit."""
+    manifest = build_request_manifest(
+        """
+        - Add one concise remarks block.
+        - Keep the depth track before the GR track.
+        """
+    )
+
+    assert build_deterministic_narrow_inventory(manifest) is None
 
 
 def test_intent_coverage_reports_missing_and_invalid_items() -> None:
@@ -530,6 +565,48 @@ def test_branch_operation_validation_rejects_cross_branch_and_bad_order() -> Non
     errors = validate_operation_submission("structure", submission, work_units)
 
     assert any("must follow dependency" in error for error in errors)
+
+
+def test_branch_operation_validation_rejects_wrong_family_in_report_scope() -> None:
+    """Do not let a header operation satisfy a remarks-only work unit."""
+    work_unit = AuthoringRequestWorkUnit(
+        unit_id="unit-remarks",
+        request_item_id="request-remarks",
+        clause_text="Add one concise remarks block.",
+        status="mapped",
+        action="add",
+        branch="remarks",
+        object_family="remarks",
+    )
+    submission_model = branch_operation_submission_model("report")
+    submission = submission_model.model_validate(
+        {
+            "branch": "report",
+            "operations": [
+                {
+                    "operation_id": "replace-header",
+                    "work_unit_id": "unit-remarks",
+                    "action": "update",
+                    "request": {
+                        "kind": "header",
+                        "header": {"title": "Wrong object"},
+                    },
+                }
+            ],
+            "coverage": [
+                {
+                    "unit_id": "unit-remarks",
+                    "status": "mapped",
+                    "operation_ids": ["replace-header"],
+                }
+            ],
+        }
+    )
+
+    errors = validate_operation_submission("report", submission, [work_unit])
+
+    assert any("emits 'header' for 'remarks' work unit" in error for error in errors)
+    assert any("references incompatible operations" in error for error in errors)
 
 
 def test_scoped_submission_schemas_exclude_unrelated_families() -> None:
