@@ -69,6 +69,7 @@ class _BlockedProviderBackend:
     model = "fake-model"
     credential_source = "test"
     supports_desired_state = True
+    supports_scoped_intent_compatibility = True
 
     async def run_authoring(self, **kwargs: object) -> object:
         """Submit a typed intent that deterministic channel inspection blocks."""
@@ -520,6 +521,7 @@ def test_merge_failure_report_preserves_the_canonical_diagnostic(tmp_path: Path)
 
     class _MergeFailureBackend(_NoProviderBackend):
         supports_desired_state = True
+        supports_scoped_intent_compatibility = True
 
     runtime = _TypedRuntime(tmp_path)
     session = _MergeFailureSession(backend=_MergeFailureBackend(), runtime=runtime)

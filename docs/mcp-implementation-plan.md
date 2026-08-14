@@ -2247,8 +2247,8 @@ Commit boundary:
 
 #### 0.6-K7.6. Direct Branch-Operation Provider Compiler
 
-Status: implemented in the current development branch; the authoritative
-`run()` / `revise()` route remains deferred to K7.7.
+Status: implemented in the current development branch and now used by the
+authoritative provider-backed route.
 
 Goal:
 
@@ -2290,8 +2290,7 @@ Acceptance:
 
 Commit boundary:
 
-- direct compiler and isolated integration tests; retain the old normal route
-  only until the replacement acceptance in K7.7
+- direct compiler and isolated integration tests
 
 Implementation checkpoint:
 
@@ -2306,9 +2305,13 @@ Implementation checkpoint:
 - parent operation ids and resolved object identities are carried into later
   group context without merging groups into a full-document intent
 - successful results are typed submissions for the existing atomic executor;
-  this slice performs no persistence and does not change normal agent routing
+  the host route owns persistence and canonical verification
 
 #### 0.6-K7.7. Authoritative Route Switch And Dead-Path Removal
+
+Status: implemented in the current development branch. Provider-backed natural
+language requests now use direct branch operations; the old scoped-intent
+compiler is available only through an explicit test/compatibility capability.
 
 Goal:
 
@@ -2346,6 +2349,22 @@ Acceptance:
 - caller-supplied typed desired state remains compatible and deterministic
 - deleted production code exceeds any compatibility glue added for the route
   switch, unless a documented exception is approved before implementation
+
+Implementation checkpoint:
+
+- production OpenAI and OpenAI-compatible backends advertise
+  `supports_direct_operations`; `run()` and `revise()` route natural-language
+  requests through inventory, parent-scoped branch compilation, typed
+  transaction execution, phase previews, persistence, and final verification
+- `desired_state=` remains an explicit caller-supplied compatibility route;
+  `supports_scoped_intent_compatibility` is required for legacy recorded
+  provider fixtures, so `supports_desired_state` alone no longer activates the
+  superseded natural-language compiler
+- direct operation plans expose operation families, phase success checks,
+  request work units, skipped unsupported/inconsistent items, and provider
+  correction evidence in the deterministic user report
+- unsupported provider capabilities block before mutation instead of falling
+  through to the old provider-to-MCP mutation loop
 
 Commit boundary:
 

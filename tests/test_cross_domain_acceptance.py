@@ -592,6 +592,7 @@ class _RecordedIntentBackend:
     model = "recorded-model"
     credential_source = "fixture"
     supports_desired_state = True
+    supports_scoped_intent_compatibility = True
 
     def __init__(
         self,

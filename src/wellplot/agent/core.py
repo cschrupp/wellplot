@@ -42,7 +42,12 @@ from ..authoring_context import (
     build_authoring_context_snapshot,
     resolve_authoring_context,
 )
-from ..authoring_defaults import generic_authoring_defaults
+from ..authoring_defaults import (
+    form_default_catalog,
+    generic_authoring_defaults,
+    style_preset_catalog,
+    track_archetype_catalog,
+)
 from ..authoring_executor import (
     AuthoringExecutionResult,
     AuthoringExecutionStatus,
@@ -54,7 +59,11 @@ from ..authoring_reconciler import (
     AuthoringReconciliationPlan,
     reconcile_authoring,
 )
-from ..authoring_service import AuthoringService
+from ..authoring_service import (
+    AuthoringService,
+    authoring_hierarchy_catalog,
+    authoring_operation_json_schema,
+)
 from ..mcp.packet_blueprints import packet_blueprint_spec
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
@@ -67,8 +76,10 @@ from .compilation import (
     AuthoringRequestWorkUnit,
     build_request_manifest,
     build_request_work_units,
+    compilation_scope_for_object_family,
     group_request_inventory,
     merge_scoped_intents,
+    operation_request_object_kind,
     scoped_submission_model,
     validate_intent_coverage,
     validate_reconciliation_fulfillment,
@@ -593,6 +604,7 @@ class ProviderBackendProtocol(Protocol):
     model: str
     credential_source: str | None
     supports_desired_state: bool
+    supports_direct_operations: bool
 
     async def run_authoring(
         self,
@@ -4833,6 +4845,150 @@ class AuthoringSession:
             issues=issues,
         )
 
+    async def _extract_request_inventory(
+        self,
+        *,
+        request_text: str,
+        draft_logfile: str,
+        existing: AuthoringDocumentSpec,
+        context_snapshot: AuthoringContextSnapshot,
+        max_rounds: int,
+    ) -> tuple[
+        ProviderRunResult,
+        AuthoringRequestManifest,
+        AuthoringRequestInventory | None,
+    ]:
+        """Classify a request before direct branch-operation compilation."""
+        request_manifest = build_request_manifest(request_text)
+        inventory: AuthoringRequestInventory | None = None
+        attempts = 0
+        validation_errors: list[str] = []
+        inventory_errors: list[list[str]] = []
+
+        async def submit_inventory(
+            name: str,
+            arguments: dict[str, object],
+        ) -> dict[str, object]:
+            """Validate one complete request inventory without mutating the draft."""
+            nonlocal attempts, inventory
+            if name != "submit_request_inventory":
+                return {
+                    "is_error": True,
+                    "error": "Only submit_request_inventory is available at this stage.",
+                }
+            attempts += 1
+            if attempts > 2:
+                return {
+                    "is_error": True,
+                    "error": "Only one initial inventory and one correction are allowed.",
+                }
+            try:
+                candidate = AuthoringRequestInventory.model_validate(arguments)
+            except Exception as exc:  # Pydantic provides actionable schema details.
+                validation_errors.append(
+                    _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
+                )
+                return {
+                    "is_error": True,
+                    "error": f"Invalid request inventory: {exc}",
+                }
+            errors = validate_request_inventory(request_manifest, candidate.items)
+            if errors:
+                inventory_errors.append(list(errors))
+                return {
+                    "is_error": True,
+                    "error": "Request inventory is incomplete or invalid:\n- "
+                    + "\n- ".join(errors),
+                }
+            inventory = candidate
+            return {
+                "accepted": True,
+                "message": "Request inventory validated for direct branch compilation.",
+            }
+
+        context = {
+            "request": request_text,
+            "request_manifest": request_manifest.model_dump(mode="json"),
+            "current_document": existing.model_dump(mode="json"),
+            "authoring_context": context_snapshot.model_dump(mode="json"),
+        }
+        tool = FunctionToolDefinition(
+            name="submit_request_inventory",
+            description=(
+                "Classify every request clause once by canonical object family and action, "
+                "copy explicit values, and preserve natural-language targets."
+            ),
+            parameters=AuthoringRequestInventory.model_json_schema(),
+        )
+        provider_result: ProviderRunResult
+        try:
+            raw_result = await self.backend.run_authoring(
+                instructions=(
+                    "You are the request-inventory stage of wellplot. Do not emit YAML, a "
+                    "full-document desired state, or mutation calls. Classify every request "
+                    "item exactly once. Use canonical object families, copy explicit values "
+                    "without applying defaults, keep negative instructions in "
+                    "preserve_constraints, and use unsupported or inconsistent only with a "
+                    "concise reason."
+                ),
+                initial_user_message=(
+                    "Submit the compact request inventory. Every request item must appear "
+                    "exactly once. The typed inventory schema is supplied as the tool "
+                    "schema.\n\nContext:\n" + json.dumps(context, indent=2, default=str)
+                ),
+                tool_definitions=[tool],
+                tool_caller=submit_inventory,
+                max_rounds=min(max_rounds, 3),
+                required_tool_name="submit_request_inventory",
+            )
+            provider_result = ProviderRunResult(
+                final_text=str(getattr(raw_result, "final_text", "")),
+                tool_trace=tuple(getattr(raw_result, "tool_trace", ()) or ()),
+                report_facts=dict(getattr(raw_result, "report_facts", {}) or {}),
+            )
+        except Exception as exc:
+            status = _provider_exception_status(exc)
+            message = _sanitize_provider_text(str(exc), limit=800) or type(exc).__name__
+            provider_result = ProviderRunResult(
+                final_text=str(getattr(exc, "final_text", "") or ""),
+                tool_trace=tuple(getattr(exc, "tool_trace", ()) or ()),
+                report_facts={
+                    "provider_error": message,
+                    "provider_failure_status": status,
+                    "provider_failure_stage": "inventory",
+                },
+            )
+
+        report_facts = dict(provider_result.report_facts)
+        extraction_status = "submitted" if inventory is not None else "invalid"
+        if inventory is None:
+            error_status = report_facts.get("provider_failure_status")
+            extraction_status = str(error_status or "submission_rejected")
+        report_facts.update(
+            {
+                "request_manifest": request_manifest.model_dump(mode="json"),
+                "request_inventory": (
+                    None if inventory is None else inventory.model_dump(mode="json")
+                ),
+                "extraction": {
+                    "status": extraction_status,
+                    "inventory_attempts": attempts,
+                    "validation_failures": validation_errors,
+                    "inventory_failures": inventory_errors,
+                    "tool_calls_emitted": bool(provider_result.tool_trace),
+                },
+            }
+        )
+        return (
+            ProviderRunResult(
+                final_text=provider_result.final_text,
+                tool_trace=provider_result.tool_trace,
+                report_facts=report_facts,
+            ),
+            request_manifest,
+            inventory,
+        )
+
     async def _extract_desired_state(
         self,
         *,
@@ -5749,6 +5905,413 @@ class AuthoringSession:
             ),
         )
 
+    @staticmethod
+    def _direct_operation_phase(object_family: str) -> AuthoringOperationPhase:
+        """Return deterministic execution order for one canonical object family."""
+        if object_family in {
+            "report",
+            "header",
+            "header_slot",
+            "service_title",
+            "page",
+            "output",
+            "depth",
+            "remarks",
+            "tail",
+        }:
+            return AuthoringOperationPhase.REPORT
+        if object_family == "section":
+            return AuthoringOperationPhase.SECTIONS
+        if object_family == "track":
+            return AuthoringOperationPhase.TRACKS
+        if object_family in {"curve_binding", "raster_binding"}:
+            return AuthoringOperationPhase.BINDINGS
+        if object_family == "annotation":
+            return AuthoringOperationPhase.CONTENT
+        return AuthoringOperationPhase.PRESENTATION
+
+    @staticmethod
+    def _plan_from_direct_submissions(
+        *,
+        submissions: Sequence[object],
+        work_units: Sequence[AuthoringRequestWorkUnit],
+        blocked_reasons: Sequence[str] = (),
+    ) -> AuthoringPlanResult:
+        """Build the public plan contract from accepted branch operations."""
+        unit_by_id = {unit.unit_id: unit for unit in work_units}
+        operation_payloads: list[dict[str, object]] = []
+        operations_by_phase: dict[AuthoringOperationPhase, list[str]] = {}
+        for submission in submissions:
+            for operation in getattr(submission, "operations", ()):
+                unit = unit_by_id.get(operation.work_unit_id)
+                phase = (
+                    unit.phase
+                    if unit is not None and unit.phase is not None
+                    else AuthoringOperationPhase.PRESENTATION
+                )
+                request = operation.request
+                object_kind = operation_request_object_kind(request)
+                payload = request.model_dump(mode="json")
+                target = getattr(request, "target", None)
+                object_id = getattr(target, "object_id", None) if target is not None else None
+                if object_id is None:
+                    object_payload = payload.get(object_kind)
+                    if isinstance(object_payload, Mapping):
+                        object_id = (
+                            object_payload.get("id")
+                            or object_payload.get("binding_id")
+                            or object_payload.get("fill_id")
+                            or object_payload.get("annotation_id")
+                            or object_payload.get("remark_id")
+                        )
+                object_id = str(object_id or operation.operation_id)
+                operation_payloads.append(
+                    {
+                        "operation_id": operation.operation_id,
+                        "phase": phase.value,
+                        "action": operation.action,
+                        "object_kind": object_kind,
+                        "object_id": object_id,
+                        "section_id": getattr(request, "section_id", None),
+                        "track_id": getattr(request, "track_id", None),
+                        "payload": payload,
+                    }
+                )
+                operations_by_phase.setdefault(phase, []).append(operation.operation_id)
+
+        phases: list[AuthoringPlanPhase] = []
+        for phase in AuthoringOperationPhase:
+            operation_ids = operations_by_phase.get(phase, [])
+            if not operation_ids:
+                continue
+            phases.append(
+                AuthoringPlanPhase(
+                    id=f"direct-{phase.value}",
+                    kind=f"direct_operations_{phase.value}",
+                    summary=f"Apply and verify direct {phase.value} operations.",
+                    instructions=(
+                        "Execute the branch-compiled operations atomically and verify every "
+                        "canonical read-after-write postcondition."
+                    ),
+                    tool_families=("typed_authoring",),
+                    success_checks=("all direct operations read back successfully",),
+                    success_check_specs=(
+                        {"kind": "typed_postconditions", "operation_ids": operation_ids},
+                    ),
+                    metadata={"operation_ids": operation_ids},
+                )
+            )
+        return AuthoringPlanResult(
+            mode="direct_operations",
+            packet_blueprint_id=None,
+            phases=tuple(phases),
+            blocked=bool(blocked_reasons),
+            blocked_reasons=tuple(blocked_reasons),
+            run_state=AuthoringRunState(
+                objectives=tuple(phase.summary for phase in phases),
+            ),
+            operation_payloads=tuple(operation_payloads),
+        )
+
+    async def _run_direct_operation_workflow(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        request_text: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        max_rounds: int,
+    ) -> AuthoringResult:
+        """Compile natural language into branch operations, then execute atomically."""
+        from .branch_compiler import build_branch_operation_groups, compile_direct_branch_operations
+
+        summary_result = await session.call_tool(
+            "summarize_logfile_draft",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(summary_result, action="summarize_logfile_draft")
+        summary = _structured_content(summary_result)
+        inspect_result = await session.call_tool(
+            "inspect_logfile",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(inspect_result, action="inspect_logfile")
+        output_path = self.runtime.server_root / draft_logfile
+        existing = load_authoring_document(output_path, allowed_root=self.runtime.server_root)
+        context_snapshot = await self._collect_authoring_context(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_text=request_text,
+            existing=existing,
+            summary=summary,
+        )
+        provider_result, request_manifest, inventory = await self._extract_request_inventory(
+            request_text=request_text,
+            draft_logfile=draft_logfile,
+            existing=existing,
+            context_snapshot=context_snapshot,
+            max_rounds=max_rounds,
+        )
+        if inventory is None:
+            report_facts = dict(provider_result.report_facts)
+            extraction = report_facts.get("extraction", {})
+            status = extraction.get("status") if isinstance(extraction, dict) else None
+            reason = (
+                "The provider connection failed before request inventory completed."
+                if status == "transport_failure"
+                else "The provider did not produce a valid request inventory."
+            )
+            report_facts["not_done"] = ["Classify the request into canonical work units."]
+            report_facts["reasons"] = [reason]
+            report_facts["next_help"] = [
+                "Retry with a provider/model that supports the typed inventory tool contract."
+            ]
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=ProviderRunResult(
+                    final_text="Direct operation planning was blocked before mutation.",
+                    tool_trace=provider_result.tool_trace,
+                    report_facts=report_facts,
+                ),
+            )
+
+        all_work_units = build_request_work_units(request_manifest, inventory)
+        actionable_work_units = tuple(
+            unit
+            for unit in all_work_units
+            if unit.status not in {"unsupported", "inconsistent"}
+            and compilation_scope_for_object_family(unit.object_family) is not None
+        )
+        phased_work_units = tuple(
+            unit.model_copy(update={"phase": self._direct_operation_phase(unit.object_family)})
+            for unit in actionable_work_units
+        )
+        source_channels = {
+            section.section_id: [
+                candidate.model_dump(mode="json") for candidate in section.available_channels
+            ]
+            for section in context_snapshot.sections
+        }
+        parent_snapshots: dict[str, object] = {}
+        for section in existing.sections:
+            section_payload = section.model_dump(mode="json")
+            parent_snapshots[f"{section.id} section"] = section_payload
+            for track in section.tracks:
+                parent_snapshots[f"{track.id} track"] = track.model_dump(mode="json")
+        context = {
+            "current_document": existing.model_dump(mode="json"),
+            "parent_snapshots": parent_snapshots,
+            "source_channels": source_channels,
+            "canonical_operations": authoring_operation_json_schema(),
+            "canonical_hierarchy": authoring_hierarchy_catalog(),
+            "applicable_defaults": {
+                "form_defaults": form_default_catalog(),
+                "track_archetypes": track_archetype_catalog(),
+                "style_presets": style_preset_catalog(),
+            },
+        }
+        groups = build_branch_operation_groups(phased_work_units, context=context)
+        skipped_work_units = tuple(unit for unit in all_work_units if unit not in phased_work_units)
+        skipped_request_items = [
+            {
+                "request_item_id": unit.request_item_id,
+                "clause": unit.clause_text,
+                "status": unit.status,
+                "reason": unit.reason
+                or "No direct operation branch is available for this object family.",
+            }
+            for unit in skipped_work_units
+        ]
+        compilation = await compile_direct_branch_operations(
+            self.backend,
+            groups,
+            max_rounds=max_rounds,
+        )
+        plan = self._plan_from_direct_submissions(
+            submissions=compilation.submissions,
+            work_units=phased_work_units,
+            blocked_reasons=compilation.blocked_reasons,
+        )
+        report_facts = {
+            **provider_result.report_facts,
+            "request_work_units": [unit.model_dump(mode="json") for unit in all_work_units],
+            "request_coverage": [
+                {
+                    "request_item_id": unit.request_item_id,
+                    "unit_id": unit.unit_id,
+                    "status": unit.status,
+                    "object_family": unit.object_family,
+                    "natural_parent": unit.natural_parent,
+                }
+                for unit in all_work_units
+            ],
+            "direct_compilation": compilation.provider_facts,
+            "correction_errors": list(compilation.correction_errors),
+            "request_inconsistency_details": skipped_request_items,
+            "request_inconsistencies": [
+                f"Request item `{item['request_item_id']}` was skipped: {item['reason']}."
+                for item in skipped_request_items
+            ],
+        }
+        if not compilation.success:
+            report_facts.update(
+                {
+                    "not_done": [phase.summary for phase in plan.phases]
+                    or ["Compile direct branch operations."],
+                    "reasons": list(compilation.blocked_reasons),
+                    "next_help": [
+                        "Inspect the blocked branch diagnostic and retry with the missing "
+                        "parent, target, or explicit value clarified."
+                    ],
+                }
+            )
+            return await self._finalize_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=ProviderRunResult(
+                    final_text="Direct branch-operation compilation was blocked before mutation.",
+                    tool_trace=provider_result.tool_trace + compilation.tool_trace,
+                    report_facts=report_facts,
+                ),
+                plan=plan,
+            )
+
+        service = AuthoringService(existing)
+        try:
+            typed_execution = execute_typed_submissions(
+                service,
+                compilation.submissions,
+                phased_work_units,
+            )
+            execution = _authoring_execution_from_typed(plan, typed_execution)
+        except Exception as exc:  # noqa: BLE001 - deterministic boundary report
+            execution = AuthoringExecutionResult(
+                success=False,
+                stopped=True,
+                document=existing,
+                errors=(f"Direct operation execution failed: {type(exc).__name__}: {exc}",),
+            )
+            typed_execution = None
+        phase_previews, phase_preview_warnings = await self._capture_typed_phase_previews(
+            session=session,
+            draft_logfile=draft_logfile,
+            execution=execution,
+        )
+        phase_summaries = self._typed_phase_summaries(
+            plan=plan,
+            execution=execution,
+            phase_previews=phase_previews,
+        )
+        save_error: str | None = None
+        save_transport_failure = False
+        if execution.success:
+            save_error, save_transport_failure = await self._save_typed_document(
+                session=session,
+                document=execution.document,
+                output_path=draft_logfile,
+                attempts=2,
+            )
+        completed_phases = [
+            phase.summary for phase in phase_summaries if phase.status == "completed"
+        ]
+        blocked_phases = [phase.summary for phase in phase_summaries if phase.status != "completed"]
+        if skipped_request_items:
+            blocked_phases.extend(
+                f"Skipped request item `{item['request_item_id']}`: {item['reason']}."
+                for item in skipped_request_items
+            )
+        reasons = list(execution.errors)
+        if save_error:
+            reasons.append(f"Canonical direct-operation save failed: {save_error}")
+        warnings = list(phase_preview_warnings)
+        report_facts.update(
+            {
+                "authoritative_completed": True,
+                "completed": _typed_operation_completion_lines(plan=plan, execution=execution),
+                "not_done": blocked_phases,
+                "reasons": reasons,
+                "warnings": warnings,
+                "operation_payloads": list(plan.operation_payloads),
+                "operation_outcomes": [
+                    outcome.model_dump(mode="json")
+                    for outcome in (
+                        typed_execution.outcomes
+                        if typed_execution is not None
+                        else execution.outcomes
+                    )
+                ],
+                "next_help": (
+                    [
+                        "Inspect the blocked operation and correct its object identity or "
+                        "source-channel reference before retrying."
+                    ]
+                    if reasons or skipped_request_items
+                    else ["Continue with another typed revision or request a final render."]
+                ),
+            }
+        )
+        provider_result = ProviderRunResult(
+            final_text=(
+                "Direct branch operations executed and persisted."
+                if execution.success and save_error is None
+                else "Direct branch-operation execution was blocked."
+            ),
+            tool_trace=provider_result.tool_trace + compilation.tool_trace,
+            report_facts=report_facts,
+        )
+        run_state = self._run_state_from_summary(
+            draft_summary=summary,
+            objectives=plan.run_state.objectives,
+            completed_objectives=tuple(completed_phases),
+            blocked_objectives=tuple(blocked_phases),
+            last_verification={
+                "success": execution.success and save_error is None,
+                "errors": reasons,
+                "phase_preview_warnings": list(phase_preview_warnings),
+            },
+        )
+        if save_error is not None and save_transport_failure:
+            return self._typed_transport_blocked_result(
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=request_text,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                plan=plan,
+                phase_summaries=phase_summaries,
+                run_state=run_state,
+                reason=save_error,
+            )
+        return await self._finalize_result(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=request_text,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            baseline_draft_text=baseline_draft_text,
+            provider_result=provider_result,
+            plan=plan,
+            phase_summaries=phase_summaries,
+            run_state=run_state,
+        )
+
     async def _run_desired_state_workflow(
         self,
         *,
@@ -6207,9 +6770,7 @@ class AuthoringSession:
                     )
                 return result
 
-            if request.desired_state is not None or bool(
-                getattr(self.backend, "supports_desired_state", False)
-            ):
+            if request.desired_state is not None:
                 return await self._run_desired_state_workflow(
                     session=session,
                     draft_logfile=relative_output_logfile,
@@ -6220,6 +6781,29 @@ class AuthoringSession:
                     baseline_draft_text=baseline_draft_text,
                     max_rounds=request.max_rounds,
                     desired_state=request.desired_state,
+                )
+            if bool(getattr(self.backend, "supports_direct_operations", False)):
+                return await self._run_direct_operation_workflow(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_kind="author",
+                    request_text=effective_goal,
+                    example_id=request.example_id,
+                    source_logfile_path=relative_source_logfile,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                )
+            if bool(getattr(self.backend, "supports_scoped_intent_compatibility", False)):
+                return await self._run_desired_state_workflow(
+                    session=session,
+                    draft_logfile=relative_output_logfile,
+                    request_kind="author",
+                    request_text=effective_goal,
+                    example_id=request.example_id,
+                    source_logfile_path=relative_source_logfile,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                    desired_state=None,
                 )
             return await self._unsupported_provider_result(
                 session=session,
@@ -6306,9 +6890,7 @@ class AuthoringSession:
                     )
                 return result
 
-            if request.desired_state is not None or bool(
-                getattr(self.backend, "supports_desired_state", False)
-            ):
+            if request.desired_state is not None:
                 return await self._run_desired_state_workflow(
                     session=session,
                     draft_logfile=relative_logfile,
@@ -6319,6 +6901,29 @@ class AuthoringSession:
                     baseline_draft_text=baseline_draft_text,
                     max_rounds=request.max_rounds,
                     desired_state=request.desired_state,
+                )
+            if bool(getattr(self.backend, "supports_direct_operations", False)):
+                return await self._run_direct_operation_workflow(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    request_text=effective_feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                )
+            if bool(getattr(self.backend, "supports_scoped_intent_compatibility", False)):
+                return await self._run_desired_state_workflow(
+                    session=session,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    request_text=effective_feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                    desired_state=None,
                 )
             return await self._unsupported_provider_result(
                 session=session,

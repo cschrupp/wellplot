@@ -7,10 +7,10 @@
 
 """Compile natural-language work units into typed branch operations.
 
-This module deliberately stops before persistence.  It is the provider-facing
+This module deliberately stops before persistence. It is the provider-facing
 compiler that turns one parent-scoped group into a validated submission for
-``execute_typed_submissions``.  The authoritative route switch is deferred to
-the later agent migration slice.
+``execute_typed_submissions``. The host agent owns route selection and
+transactional execution.
 """
 
 from __future__ import annotations
@@ -287,8 +287,7 @@ async def compile_direct_branch_operations(
                 return {
                     "is_error": True,
                     "error": (
-                        "Only one initial submission and one correction submission are "
-                        "allowed."
+                        "Only one initial submission and one correction submission are allowed."
                     ),
                 }
             try:

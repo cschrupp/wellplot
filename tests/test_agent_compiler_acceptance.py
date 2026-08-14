@@ -339,6 +339,7 @@ class _RecordedCompilerBackend:
     model = "fixture-model"
     credential_source = "fixture"
     supports_desired_state = True
+    supports_scoped_intent_compatibility = True
 
     def __init__(
         self,
@@ -412,6 +413,77 @@ class _RecordedCompilerBackend:
         return SimpleNamespace(final_text=f"Submitted {scope} intent.", tool_trace=())
 
 
+class _DirectRouteBackend:
+    """Provider double for the authoritative branch-operation route."""
+
+    provider = "direct-fixture"
+    model = "direct-fixture-model"
+    credential_source = "fixture"
+    supports_direct_operations = True
+    supports_desired_state = True
+
+    def __init__(self) -> None:
+        """Record provider stages for route assertions."""
+        self.tool_names: list[str] = []
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Submit one inventory item and one typed structure operation."""
+        tool_name = str(kwargs["required_tool_name"])
+        self.tool_names.append(tool_name)
+        tool_caller = kwargs["tool_caller"]
+        if tool_name == "submit_request_inventory":
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": "request-001",
+                            "status": "mapped",
+                            "action": "add",
+                            "object_family": "track",
+                            "target": "resistivity",
+                            "natural_parent": "main section",
+                        }
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried request.", tool_trace=())
+        assert tool_name == "submit_structure_operations"
+        response = await tool_caller(
+            tool_name,
+            {
+                "branch": "structure",
+                "operations": [
+                    {
+                        "operation_id": "create-resistivity",
+                        "work_unit_id": "unit-request-001",
+                        "action": "create",
+                        "request": {
+                            "kind": "track",
+                            "section_id": "main",
+                            "track": {
+                                "id": "resistivity",
+                                "title": "Resistivity",
+                                "kind": "normal",
+                                "width_mm": 30.0,
+                            },
+                        },
+                    }
+                ],
+                "coverage": [
+                    {
+                        "unit_id": "unit-request-001",
+                        "status": "mapped",
+                        "operation_ids": ["create-resistivity"],
+                    }
+                ],
+            },
+        )
+        assert response["accepted"] is True
+        return SimpleNamespace(final_text="Compiled structure operations.", tool_trace=())
+
+
 def _run(
     tmp_path: Path,
     *,
@@ -469,6 +541,37 @@ def _assert_successful_readback(result: object, runtime: _AcceptanceRuntime) -> 
         for name, arguments in runtime.session.tool_calls
     )
     assert authoring_document_to_render(_saved(runtime))
+
+
+def test_direct_route_executes_branch_operations_and_readback(tmp_path: Path) -> None:
+    """Use inventory plus branch operations instead of scoped intent fragments."""
+    goal = "Add a resistivity track to the main section."
+    backend = _DirectRouteBackend()
+    runtime = _AcceptanceRuntime(
+        tmp_path,
+        document=_document(),
+        channels=_channels(),
+    )
+    result = anyio.run(
+        AuthoringSession(backend=backend, runtime=runtime).run_request,
+        AuthoringRequest(
+            goal=goal,
+            output_logfile="workspace/direct-route.log.yaml",
+            example_id="direct-route",
+        ),
+    )
+
+    assert result.plan is not None
+    assert result.plan.mode == "direct_operations"
+    assert result.plan.blocked is False
+    assert result.validation["valid"] is True
+    assert result.phase_summaries[0].kind == "direct_operations_tracks"
+    saved = load_authoring_document(
+        tmp_path / "workspace/direct-route.log.yaml",
+        allowed_root=tmp_path,
+    )
+    assert any(track.id == "resistivity" for track in saved.sections[0].tracks)
+    assert backend.tool_names == ["submit_request_inventory", "submit_structure_operations"]
 
 
 def test_compiler_adds_sp_with_explicit_scale_and_style(tmp_path: Path) -> None:

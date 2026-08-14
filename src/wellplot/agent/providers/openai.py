@@ -60,6 +60,7 @@ class OpenAIAuthoringBackend:
     credential_source: str | None = None
     provider: str = field(default="openai", init=False)
     supports_desired_state: bool = field(default=True, init=False)
+    supports_direct_operations: bool = field(default=True, init=False)
 
     @classmethod
     def from_local_configuration(
