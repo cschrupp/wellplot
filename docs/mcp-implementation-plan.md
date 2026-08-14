@@ -2373,6 +2373,10 @@ Commit boundary:
 
 #### 0.6-K7.8. Cross-Domain Notebook And Release Acceptance
 
+Status: in progress. The first direct-route cross-domain acceptance fixture is
+implemented; notebook execution and final package/release gates remain for the
+remaining K7.8 work.
+
 Goal:
 
 - prove that the simplified compiler serves general well-log authoring rather
@@ -2443,6 +2447,19 @@ Acceptance:
   path before `0.6.0` release
 - unit, MCP, agent, cross-domain, docs, notebook, package, and installed-wheel
   release gates pass
+
+Implementation checkpoint:
+
+- the direct-route acceptance matrix now executes one recorded request across
+  report, structure, scalar, raster, and annotation branches, including page
+  settings, remarks, three track forms, explicit logarithmic scale/style,
+  raster styling, and annotation placement
+- the fixture asserts branch ordering, dependency resolution, typed
+  postcondition evidence, exact canonical read-back, and absence of a
+  provider-issued MCP mutation trace
+- an old-capability-only backend is explicitly blocked before provider
+  compilation; `supports_desired_state` alone no longer activates the
+  superseded scoped-fragment route
 
 ## Release Gate
 

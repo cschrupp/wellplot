@@ -484,6 +484,256 @@ class _DirectRouteBackend:
         return SimpleNamespace(final_text="Compiled structure operations.", tool_trace=())
 
 
+class _MixedDirectRouteBackend:
+    """Recorded provider for a cross-branch, generic authoring request."""
+
+    provider = "direct-fixture"
+    model = "direct-fixture-model"
+    credential_source = "fixture"
+    supports_direct_operations = True
+    supports_desired_state = True
+
+    def __init__(self, request_text: str) -> None:
+        """Prepare one inventory and the typed branch submissions it should produce."""
+        self.manifest = build_request_manifest(request_text)
+        self.tool_names: list[str] = []
+        item_ids = [item.item_id for item in self.manifest.items]
+        assert len(item_ids) == 8
+        self.inventory = [
+            (item_ids[0], "update", "page", "report", None),
+            (item_ids[1], "add", "remarks", "report", None),
+            (item_ids[2], "add", "track", "structure", "main section"),
+            (item_ids[3], "add", "track", "structure", "main section"),
+            (item_ids[4], "add", "track", "structure", "main section"),
+            (item_ids[5], "add", "curve_binding", "scalar", "resistivity track"),
+            (item_ids[6], "add", "raster_binding", "raster", "waveform track"),
+            (item_ids[7], "add", "annotation", "annotation", "interpretation track"),
+        ]
+        self.submissions = self._build_submissions(item_ids)
+
+    @staticmethod
+    def _operation(
+        operation_id: str,
+        work_unit_id: str,
+        action: str,
+        request: dict[str, object],
+        *,
+        depends_on: list[str] | None = None,
+    ) -> dict[str, object]:
+        """Build one provider-shaped typed operation envelope."""
+        return {
+            "operation_id": operation_id,
+            "work_unit_id": work_unit_id,
+            "action": action,
+            "request": request,
+            "depends_on": depends_on or [],
+        }
+
+    def _build_submissions(self, item_ids: list[str]) -> dict[str, dict[str, object]]:
+        """Build generic report, structure, scalar, raster, and annotation branches."""
+        report_operations = [
+            self._operation(
+                "set-page",
+                f"unit-{item_ids[0]}",
+                "update",
+                {"kind": "page", "patch": {"orientation": "landscape", "continuous": True}},
+            ),
+            self._operation(
+                "create-note",
+                f"unit-{item_ids[1]}",
+                "create",
+                {
+                    "kind": "remark",
+                    "remark": {
+                        "remark_id": "acceptance-note",
+                        "title": "Notes",
+                        "text": "Cross-domain acceptance artifact.",
+                    },
+                },
+            ),
+        ]
+        structure_operations = [
+            self._operation(
+                "create-resistivity",
+                f"unit-{item_ids[2]}",
+                "create",
+                {
+                    "kind": "track",
+                    "section_id": "main",
+                    "track": {
+                        "id": "resistivity",
+                        "title": "Resistivity",
+                        "kind": "normal",
+                        "width_mm": 30.0,
+                        "x_scale": {
+                            "kind": "log",
+                            "minimum": 0.2,
+                            "maximum": 2000.0,
+                            "unit": "ohm.m",
+                        },
+                    },
+                },
+            ),
+            self._operation(
+                "create-waveform",
+                f"unit-{item_ids[3]}",
+                "create",
+                {
+                    "kind": "track",
+                    "section_id": "main",
+                    "track": {
+                        "id": "waveform",
+                        "title": "Waveform",
+                        "kind": "array",
+                        "width_mm": 35.0,
+                    },
+                },
+            ),
+            self._operation(
+                "create-interpretation",
+                f"unit-{item_ids[4]}",
+                "create",
+                {
+                    "kind": "track",
+                    "section_id": "main",
+                    "track": {
+                        "id": "interpretation",
+                        "title": "Interpretation",
+                        "kind": "annotation",
+                        "width_mm": 24.0,
+                    },
+                },
+            ),
+        ]
+        scalar_operations = [
+            self._operation(
+                "bind-ild",
+                f"unit-{item_ids[5]}",
+                "create",
+                {
+                    "kind": "curve_binding",
+                    "section_id": "main",
+                    "track_id": "resistivity",
+                    "binding": {
+                        "kind": "curve",
+                        "binding_id": "main.resistivity.ild.1",
+                        "channel": "ILD",
+                        "scale": {
+                            "kind": "log",
+                            "minimum": 0.2,
+                            "maximum": 2000.0,
+                            "unit": "ohm.m",
+                        },
+                        "style": {"color": "black", "line_width": 1.4},
+                    },
+                },
+                depends_on=["create-resistivity"],
+            )
+        ]
+        raster_operations = [
+            self._operation(
+                "bind-waveform",
+                f"unit-{item_ids[6]}",
+                "create",
+                {
+                    "kind": "raster_binding",
+                    "section_id": "main",
+                    "track_id": "waveform",
+                    "binding": {
+                        "kind": "raster",
+                        "binding_id": "main.waveform.wave_x.1",
+                        "channel": "WAVE_X",
+                        "style": {"colormap": "gray"},
+                    },
+                },
+                depends_on=["create-waveform"],
+            )
+        ]
+        annotation_operations = [
+            self._operation(
+                "mark-zone-a",
+                f"unit-{item_ids[7]}",
+                "create",
+                {
+                    "kind": "annotation",
+                    "section_id": "main",
+                    "track_id": "interpretation",
+                    "annotation": {
+                        "kind": "marker",
+                        "annotation_id": "main.interpretation.zone-a",
+                        "depth": 1750.0,
+                        "shape": "diamond",
+                        "color": "red",
+                        "label": "Zone A",
+                    },
+                },
+                depends_on=["create-interpretation"],
+            )
+        ]
+
+        def submission(branch: str, operations: list[dict[str, object]]) -> dict[str, object]:
+            """Add complete operation coverage for one branch."""
+            return {
+                "branch": branch,
+                "operations": operations,
+                "coverage": [
+                    {
+                        "unit_id": operation["work_unit_id"],
+                        "status": "mapped",
+                        "operation_ids": [operation["operation_id"]],
+                    }
+                    for operation in operations
+                ],
+            }
+
+        return {
+            "submit_report_operations": submission("report", report_operations),
+            "submit_structure_operations": submission("structure", structure_operations),
+            "submit_scalar_operations": submission("scalar", scalar_operations),
+            "submit_raster_operations": submission("raster", raster_operations),
+            "submit_annotation_operations": submission("annotation", annotation_operations),
+        }
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Return the recorded submission for the requested direct compiler stage."""
+        tool_name = str(kwargs["required_tool_name"])
+        self.tool_names.append(tool_name)
+        tool_caller = kwargs["tool_caller"]
+        if tool_name == "submit_request_inventory":
+            response = await tool_caller(
+                tool_name,
+                {
+                    "items": [
+                        {
+                            "request_item_id": item_id,
+                            "status": "mapped",
+                            "action": action,
+                            "object_family": family,
+                            "target": target,
+                            **({"natural_parent": parent} if parent is not None else {}),
+                        }
+                        for item_id, action, family, _branch, parent in self.inventory
+                        for target in [
+                            {
+                                "page": "page",
+                                "remarks": "remarks",
+                                "track": "track",
+                                "curve_binding": "curve",
+                                "raster_binding": "raster",
+                                "annotation": "annotation",
+                            }[family]
+                        ]
+                    ]
+                },
+            )
+            assert response["accepted"] is True
+            return SimpleNamespace(final_text="Inventoried mixed request.", tool_trace=())
+        submission = self.submissions[tool_name]
+        response = await tool_caller(tool_name, submission)
+        assert response["accepted"] is True
+        return SimpleNamespace(final_text=f"Submitted {tool_name}.", tool_trace=())
+
+
 def _run(
     tmp_path: Path,
     *,
@@ -572,6 +822,67 @@ def test_direct_route_executes_branch_operations_and_readback(tmp_path: Path) ->
     )
     assert any(track.id == "resistivity" for track in saved.sections[0].tracks)
     assert backend.tool_names == ["submit_request_inventory", "submit_structure_operations"]
+
+
+def test_direct_route_cross_domain_operations_preserve_hierarchy_and_values(
+    tmp_path: Path,
+) -> None:
+    """Read back report, form, scalar, raster, and annotation branches together."""
+    goal = """
+        - Set the page to landscape continuous layout.
+        - Add one concise remarks block.
+        - Add a logarithmic resistivity track to the main section.
+        - Add an array waveform track to the main section.
+        - Add an interpretation annotation track to the main section.
+        - Bind ILD to the resistivity track with the requested log scale and black style.
+        - Bind WAVE_X as a gray raster on the waveform track.
+        - Mark Zone A at depth 1750 with a red diamond annotation.
+    """
+    backend = _MixedDirectRouteBackend(goal)
+    runtime = _AcceptanceRuntime(
+        tmp_path,
+        document=_document(),
+        channels=_channels(),
+    )
+    result = anyio.run(
+        AuthoringSession(backend=backend, runtime=runtime).run_request,
+        AuthoringRequest(
+            goal=goal,
+            output_logfile="workspace/mixed-direct-route.log.yaml",
+            example_id="mixed-direct-route",
+        ),
+    )
+
+    assert result.plan is not None
+    assert result.plan.mode == "direct_operations"
+    assert result.plan.blocked is False, result.plan.blocked_reasons
+    assert all(phase.status == "completed" for phase in result.phase_summaries)
+    assert all(outcome["postcondition_verified"] for outcome in result.operation_outcomes)
+    assert backend.tool_names == [
+        "submit_request_inventory",
+        "submit_report_operations",
+        "submit_structure_operations",
+        "submit_scalar_operations",
+        "submit_raster_operations",
+        "submit_annotation_operations",
+    ]
+
+    saved = load_authoring_document(
+        tmp_path / "workspace/mixed-direct-route.log.yaml",
+        allowed_root=tmp_path,
+    )
+    assert saved.page.orientation == "landscape"
+    assert saved.page.continuous is True
+    assert saved.remarks[0].text == "Cross-domain acceptance artifact."
+    resistivity = _track(saved, "resistivity")
+    assert resistivity.x_scale.kind == "log"
+    assert resistivity.x_scale.minimum == 0.2
+    assert resistivity.bindings[0].style.color == "black"
+    waveform = _track(saved, "waveform")
+    assert waveform.bindings[0].channel == "WAVE_X"
+    assert waveform.bindings[0].style.colormap == "gray"
+    interpretation = _track(saved, "interpretation")
+    assert interpretation.annotations[0].label == "Zone A"
 
 
 def test_compiler_adds_sp_with_explicit_scale_and_style(tmp_path: Path) -> None:

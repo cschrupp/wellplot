@@ -499,6 +499,33 @@ def test_blocked_provider_plan_preserves_submitted_intent(tmp_path: Path) -> Non
     assert result.submitted_intent["curve_bindings"][0]["channel"] == "NOT_AVAILABLE"
 
 
+def test_old_provider_capability_does_not_fallback_to_scoped_compiler(tmp_path: Path) -> None:
+    """Block a backend that lacks the authoritative direct-operation capability."""
+
+    class _OldCapabilityOnlyBackend(_NoProviderBackend):
+        supports_desired_state = True
+
+    runtime = _TypedRuntime(tmp_path)
+    result = anyio.run(
+        AuthoringSession(
+            backend=_OldCapabilityOnlyBackend(),
+            runtime=runtime,
+        ).run_request,
+        AuthoringRequest(
+            goal="Add a remarks block.",
+            output_logfile="workspace/old-capability.log.yaml",
+            example_id="old-capability",
+        ),
+    )
+
+    assert result.plan is None
+    assert result.tool_trace == ()
+    assert any(
+        "does not support typed authoring extraction" in item
+        for item in result.user_report.why_not
+    )
+
+
 def test_merge_failure_report_preserves_the_canonical_diagnostic(tmp_path: Path) -> None:
     """Keep the exact compiler reason instead of replacing it with provider advice."""
 
