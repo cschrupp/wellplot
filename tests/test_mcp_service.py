@@ -27,6 +27,7 @@ import os
 import tempfile
 import unittest
 import unittest.mock
+from hashlib import sha256
 from pathlib import Path
 
 import yaml
@@ -38,6 +39,7 @@ except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discover
 
 from wellplot.authoring import load_authoring_document
 from wellplot.authoring_service import (
+    AuthoringService,
     CurveBindingPatch,
     DepthPatch,
     PagePatch,
@@ -129,6 +131,32 @@ class McpServiceTests(unittest.TestCase):
             },
             root=REPO_ROOT,
         )
+
+    def _canonical_logfile_hash(self, logfile_path: Path) -> str:
+        """Validate one saved draft and return its deterministic canonical fingerprint."""
+        spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+        canonical = AuthoringService.from_mapping(service.report_to_dict(spec))
+        validation = canonical.validate()
+        self.assertTrue(validation.valid, validation.errors)
+        payload = canonical.document.model_dump(mode="json")
+        return sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
+    def _round_trip_logfile(self, logfile_path: Path) -> str:
+        """Exercise serialize/reload validation independently of persistence helpers."""
+        spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+        serialized = service.report_to_yaml(spec)
+        self.assertIsInstance(serialized, str)
+        reloaded = service.load_logfile_text(
+            serialized,
+            base_dir=logfile_path.parent,
+            allowed_root=REPO_ROOT,
+        )
+        canonical = AuthoringService.from_mapping(service.report_to_dict(reloaded))
+        validation = canonical.validate()
+        self.assertTrue(validation.valid, validation.errors)
+        return self._canonical_logfile_hash(logfile_path)
 
     @staticmethod
     def _persist_without_render_validation(
@@ -521,6 +549,7 @@ class McpServiceTests(unittest.TestCase):
                 os.path.relpath(self._fixture_paths.las_path, start=output_path.parent)
             ).as_posix()
             self.assertIn(f"source_path: {expected_source_path}", saved_text)
+            self._round_trip_logfile(output_path)
 
     def test_create_logfile_draft_from_packaged_example_writes_normalized_yaml(self) -> None:
         """Create one normalized draft logfile directly from a packaged example."""
@@ -552,6 +581,303 @@ class McpServiceTests(unittest.TestCase):
             ).as_posix()
             self.assertIn(f"output_path: {expected_output_path}", saved_text)
             self.assertIn(f"source_path: {expected_main_source}", saved_text)
+
+    def test_packaged_examples_create_and_round_trip_canonically(self) -> None:
+        """Require every shipped example to enter and remain in canonical state."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            for example_id in service.PRODUCTION_EXAMPLE_IDS:
+                with self.subTest(example_id=example_id):
+                    draft_path = Path(tmpdir) / f"{example_id}.log.yaml"
+                    result = service.create_logfile_draft(
+                        str(draft_path),
+                        example_id=example_id,
+                        root=REPO_ROOT,
+                    )
+
+                    self.assertTrue(draft_path.exists())
+                    self.assertEqual(result.seed_value, example_id)
+                    self._round_trip_logfile(draft_path)
+
+    def test_forge_between_instances_fill_survives_unrelated_remarks_mutation(self) -> None:
+        """Keep local fill references valid after canonical id deduplication and reload."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "forge.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                example_id="forge16b_porosity_example",
+                root=REPO_ROOT,
+            )
+
+            def porosity_binding(section_id: str, channel: str) -> dict[str, object]:
+                mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+                return next(
+                    binding
+                    for binding in mapping["document"]["bindings"]["channels"]
+                    if binding.get("section") == section_id
+                    and binding.get("track_id") == "porosity"
+                    and binding.get("channel") == channel
+                )
+
+            initial_nphi = porosity_binding("lower_review", "NPHI")
+            initial_rhob = porosity_binding("lower_review", "RHOB")
+            self.assertEqual(
+                initial_nphi["fill"]["other_element_id"],
+                initial_rhob["id"],
+            )
+
+            remarks = [
+                {
+                    "title": "Round-trip check",
+                    "lines": ["Unrelated remarks mutation must preserve porosity fills."],
+                    "alignment": "left",
+                }
+            ]
+            service.set_remarks_content(str(draft_path), remarks=remarks, root=REPO_ROOT)
+            first_hash = self._round_trip_logfile(draft_path)
+
+            saved_nphi = porosity_binding("lower_review", "NPHI")
+            saved_rhob = porosity_binding("lower_review", "RHOB")
+            self.assertEqual(saved_nphi["fill"]["other_element_id"], saved_rhob["id"])
+
+            service.set_remarks_content(str(draft_path), remarks=remarks, root=REPO_ROOT)
+            self.assertEqual(first_hash, self._round_trip_logfile(draft_path))
+
+    @unittest.mock.patch.object(service, "_validate_logfile_spec_renderable")
+    def test_packaged_mutation_families_remain_canonical(
+        self,
+        validate_renderable: unittest.mock.MagicMock,
+    ) -> None:
+        """Require applicable mutation families to persist canonical packaged drafts."""
+        _ = validate_renderable
+
+        def add_annotation(draft_path: Path) -> None:
+            service.add_track(
+                str(draft_path),
+                section_id="main_pass",
+                id="round_trip_notes",
+                title="Round-trip Notes",
+                kind="annotation",
+                width_mm=14.0,
+                root=REPO_ROOT,
+            )
+            service.add_annotation_object(
+                str(draft_path),
+                section_id="main_pass",
+                track_id="round_trip_notes",
+                annotation={
+                    "kind": "text",
+                    "depth": 500.0,
+                    "text": "Round-trip validation",
+                    "lane_start": 0.0,
+                    "lane_end": 1.0,
+                },
+                root=REPO_ROOT,
+            )
+
+        def update_forge_fill(draft_path: Path) -> None:
+            mapping = yaml.safe_load(draft_path.read_text(encoding="utf-8"))
+            nphi_binding = next(
+                binding
+                for binding in mapping["document"]["bindings"]["channels"]
+                if binding.get("section") == "lower_review"
+                and binding.get("track_id") == "porosity"
+                and binding.get("channel") == "NPHI"
+            )
+            fill = dict(nphi_binding["fill"])
+            fill["label"] = "Round-trip crossover"
+            service.update_curve_binding(
+                str(draft_path),
+                section_id="lower_review",
+                track_id="porosity",
+                channel="NPHI",
+                binding_id=str(nphi_binding["id"]),
+                patch={"fill": fill},
+                root=REPO_ROOT,
+            )
+
+        cbl_mutations = [
+            (
+                "header",
+                lambda draft_path: service.set_heading_content(
+                    str(draft_path),
+                    patch={"provider_name": "Round-trip Logging"},
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "report_settings",
+                lambda draft_path: service.set_page_layout(
+                    str(draft_path),
+                    page_patch={"margin_top_mm": 12.0},
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "remarks",
+                lambda draft_path: service.set_remarks_content(
+                    str(draft_path),
+                    remarks=[
+                        {
+                            "title": "Round-trip remarks",
+                            "lines": ["Canonical persistence mutation smoke test."],
+                            "alignment": "left",
+                        }
+                    ],
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "section",
+                lambda draft_path: service.update_section(
+                    str(draft_path),
+                    section_id="main_pass",
+                    subtitle="Round-trip main pass",
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "track",
+                lambda draft_path: service.update_track(
+                    str(draft_path),
+                    section_id="main_pass",
+                    track_id="cbl",
+                    patch={"title": "Round-trip CBL"},
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "curve_binding",
+                lambda draft_path: service.update_curve_binding(
+                    str(draft_path),
+                    section_id="main_pass",
+                    track_id="cbl",
+                    channel="CBL",
+                    binding_id="cbl_0_100_main",
+                    patch={"label": "Round-trip CBL amplitude"},
+                    root=REPO_ROOT,
+                ),
+            ),
+            (
+                "raster_binding",
+                lambda draft_path: service.update_raster_binding(
+                    str(draft_path),
+                    section_id="main_pass",
+                    track_id="vdl",
+                    channel="VDL",
+                    patch={"label": "Round-trip VDL"},
+                    root=REPO_ROOT,
+                ),
+            ),
+            ("annotation", add_annotation),
+        ]
+        forge_mutations = [("fill", update_forge_fill)]
+
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            for example_id, mutations in (
+                ("cbl_log_example", cbl_mutations),
+                ("forge16b_porosity_example", forge_mutations),
+            ):
+                for mutation_family, mutate in mutations:
+                    with self.subTest(
+                        example_id=example_id,
+                        mutation_family=mutation_family,
+                    ):
+                        draft_path = Path(tmpdir) / f"{example_id}-{mutation_family}.log.yaml"
+                        service.create_logfile_draft(
+                            str(draft_path),
+                            example_id=example_id,
+                            root=REPO_ROOT,
+                        )
+                        mutate(draft_path)
+                        self._round_trip_logfile(draft_path)
+
+    @unittest.mock.patch.object(service, "_validate_logfile_spec_renderable")
+    def test_forge_common_mutation_families_remain_canonical(
+        self,
+        validate_renderable: unittest.mock.MagicMock,
+    ) -> None:
+        """Exercise Forge's applicable non-raster mutation families after creation."""
+        _ = validate_renderable
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "forge-common-mutations.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                example_id="forge16b_porosity_example",
+                root=REPO_ROOT,
+            )
+
+            mutations = [
+                lambda: service.set_heading_content(
+                    str(draft_path),
+                    patch={"provider_name": "Round-trip Logging"},
+                    root=REPO_ROOT,
+                ),
+                lambda: service.set_page_layout(
+                    str(draft_path),
+                    page_patch={"margin_top_mm": 12.0},
+                    root=REPO_ROOT,
+                ),
+                lambda: service.set_remarks_content(
+                    str(draft_path),
+                    remarks=[
+                        {
+                            "title": "Round-trip remarks",
+                            "lines": ["Canonical persistence mutation smoke test."],
+                            "alignment": "left",
+                        }
+                    ],
+                    root=REPO_ROOT,
+                ),
+                lambda: service.update_section(
+                    str(draft_path),
+                    section_id="upper_review",
+                    subtitle="Round-trip upper review",
+                    root=REPO_ROOT,
+                ),
+                lambda: service.update_track(
+                    str(draft_path),
+                    section_id="upper_review",
+                    track_id="porosity",
+                    patch={"title": "Round-trip porosity"},
+                    root=REPO_ROOT,
+                ),
+                lambda: service.update_curve_binding(
+                    str(draft_path),
+                    section_id="upper_review",
+                    track_id="porosity",
+                    channel="RHOB",
+                    binding_id="rhob_overlay",
+                    patch={"label": "Round-trip density"},
+                    root=REPO_ROOT,
+                ),
+            ]
+            for mutate in mutations:
+                mutate()
+                self._round_trip_logfile(draft_path)
+
+            service.add_track(
+                str(draft_path),
+                section_id="upper_review",
+                id="round_trip_notes",
+                title="Round-trip Notes",
+                kind="annotation",
+                width_mm=14.0,
+                root=REPO_ROOT,
+            )
+            service.add_annotation_object(
+                str(draft_path),
+                section_id="upper_review",
+                track_id="round_trip_notes",
+                annotation={
+                    "kind": "text",
+                    "depth": 2500.0,
+                    "text": "Round-trip validation",
+                    "lane_start": 0.0,
+                    "lane_end": 1.0,
+                },
+                root=REPO_ROOT,
+            )
+            self._round_trip_logfile(draft_path)
 
     def test_summarize_logfile_draft_returns_authoring_metadata(self) -> None:
         """Summarize one draft logfile for deterministic authoring planning."""

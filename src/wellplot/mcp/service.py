@@ -1331,18 +1331,18 @@ def _persist_rebased_logfile_mapping(
     *,
     from_base_dir: Path,
     output_path: Path,
+    root: Path,
 ) -> LogFileSpec:
     rebased_mapping = _rebase_report_paths(
         deepcopy(mapping),
         from_base_dir=from_base_dir,
         to_base_dir=output_path.parent,
     )
-    normalized_yaml = report_to_yaml(rebased_mapping)
-    if not isinstance(normalized_yaml, str):
-        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(normalized_yaml, encoding="utf-8")
-    return logfile_from_mapping(rebased_mapping)
+    return _persist_validated_logfile_mapping(
+        rebased_mapping,
+        logfile_path=output_path,
+        root=root,
+    )
 
 
 def _logfile_mapping_sections(mapping: dict[str, object]) -> list[dict[str, object]]:
@@ -1497,15 +1497,20 @@ def _persist_validated_logfile_mapping(
     logfile_path: Path,
     root: Path,
 ) -> LogFileSpec:
-    _normalize_between_instance_fill_references(mapping)
-    canonical = AuthoringService.from_mapping(mapping)
+    """Persist a renderable logfile through the canonical authoring projection."""
+    canonical_mapping = deepcopy(mapping)
+    _normalize_between_instance_fill_references(canonical_mapping)
+    canonical = AuthoringService.from_mapping(canonical_mapping)
     canonical_validation = canonical.validate()
     if not canonical_validation.valid:
         raise TemplateValidationError(
             "Logfile mapping failed canonical authoring validation: "
             + "; ".join(canonical_validation.errors)
         )
-    spec = logfile_from_mapping(mapping)
+
+    canonical_mapping = authoring_document_to_logfile_mapping(canonical.document)
+    _normalize_between_instance_fill_references(canonical_mapping)
+    spec = logfile_from_mapping(canonical_mapping)
     _validate_logfile_spec_renderable(
         spec,
         base_dir=logfile_path.parent,
@@ -1514,8 +1519,23 @@ def _persist_validated_logfile_mapping(
     normalized_yaml = report_to_yaml(spec)
     if not isinstance(normalized_yaml, str):
         raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
+    logfile_path.parent.mkdir(parents=True, exist_ok=True)
     logfile_path.write_text(normalized_yaml, encoding="utf-8")
-    return spec
+
+    persisted_spec = load_logfile(logfile_path, allowed_root=root)
+    persisted_canonical = AuthoringService.from_mapping(report_to_dict(persisted_spec))
+    persisted_validation = persisted_canonical.validate()
+    if not persisted_validation.valid:
+        raise TemplateValidationError(
+            "Persisted logfile failed canonical authoring validation: "
+            + "; ".join(persisted_validation.errors)
+        )
+    _validate_logfile_spec_renderable(
+        persisted_spec,
+        base_dir=logfile_path.parent,
+        allowed_root=root,
+    )
+    return persisted_spec
 
 
 def _renumber_section_track_positions(tracks: list[dict[str, object]]) -> None:
@@ -1575,9 +1595,7 @@ def _find_curve_binding_index(
         for ordinal, (index, binding) in enumerate(matches, start=1):
             if str(binding.get("id", "")).strip() == normalized_binding_id:
                 return index
-            canonical_id = (
-                f"{section_id}.{track_id}.{binding.get('channel', channel)}.{ordinal}"
-            )
+            canonical_id = f"{section_id}.{track_id}.{binding.get('channel', channel)}.{ordinal}"
             if canonical_id == normalized_binding_id:
                 return index
         raise TemplateValidationError(
@@ -1683,6 +1701,14 @@ def _ensure_curve_binding_element_id(
     return candidate_id
 
 
+def _binding_reference_stem(element_id: str) -> str:
+    """Return a local binding id before the serializer's numeric deduplication suffix."""
+    prefix, separator, suffix = element_id.rpartition(".")
+    if separator and prefix and suffix.isdigit():
+        return prefix
+    return element_id
+
+
 def _normalize_between_instance_fill_references(mapping: dict[str, object]) -> None:
     """Rewrite shorthand between_instances references to real sibling curve ids."""
     spec = logfile_from_mapping(mapping)
@@ -1735,6 +1761,16 @@ def _normalize_between_instance_fill_references(mapping: dict[str, object]) -> N
             (section_id, track_id, other_element_id.upper()),
             [],
         )
+        if not matching_indexes:
+            matching_indexes = [
+                candidate_index
+                for (candidate_section_id, candidate_track_id, candidate_id), candidate_index in (
+                    binding_indexes_by_id.items()
+                )
+                if candidate_section_id == section_id
+                and candidate_track_id == track_id
+                and _binding_reference_stem(candidate_id) == other_element_id
+            ]
         if len(matching_indexes) != 1:
             continue
 
@@ -4433,6 +4469,7 @@ def create_logfile_draft(
                 report_to_dict(spec),
                 from_base_dir=example_base_dir,
                 output_path=resolved_output_path,
+                root=server_root,
             )
         return LogfileDraftCreateResult(
             output_path=str(resolved_output_path),
@@ -4455,6 +4492,7 @@ def create_logfile_draft(
         mapping,
         from_base_dir=resolved_source_logfile.parent,
         output_path=resolved_output_path,
+        root=server_root,
     )
     return LogfileDraftCreateResult(
         output_path=str(resolved_output_path),
