@@ -364,6 +364,7 @@ AUTHORING_CHANNEL_ALIASES = (
     },
 )
 SUPPORTED_SOURCE_FORMATS = ("auto", "las", "dlis")
+VALIDATION_LEVELS = ("structural", "data", "render")
 
 
 @dataclass(slots=True)
@@ -375,6 +376,7 @@ class LogfileValidationResult:
     name: str
     render_backend: str
     section_ids: list[str]
+    validation_level: str
 
 
 @dataclass(slots=True)
@@ -1496,8 +1498,9 @@ def _persist_validated_logfile_mapping(
     *,
     logfile_path: Path,
     root: Path,
+    validation_level: str = "structural",
 ) -> LogFileSpec:
-    """Persist a renderable logfile through the canonical authoring projection."""
+    """Persist one logfile through the canonical authoring projection."""
     canonical_mapping = deepcopy(mapping)
     _normalize_between_instance_fill_references(canonical_mapping)
     canonical = AuthoringService.from_mapping(canonical_mapping)
@@ -1511,8 +1514,9 @@ def _persist_validated_logfile_mapping(
     canonical_mapping = authoring_document_to_logfile_mapping(canonical.document)
     _normalize_between_instance_fill_references(canonical_mapping)
     spec = logfile_from_mapping(canonical_mapping)
-    _validate_logfile_spec_renderable(
+    _validate_logfile_spec(
         spec,
+        validation_level=validation_level,
         base_dir=logfile_path.parent,
         allowed_root=root,
     )
@@ -1530,8 +1534,9 @@ def _persist_validated_logfile_mapping(
             "Persisted logfile failed canonical authoring validation: "
             + "; ".join(persisted_validation.errors)
         )
-    _validate_logfile_spec_renderable(
+    _validate_logfile_spec(
         persisted_spec,
+        validation_level=validation_level,
         base_dir=logfile_path.parent,
         allowed_root=root,
     )
@@ -1982,12 +1987,39 @@ def _normalized_section_depth_range(
     return [top, base], normalized_source_unit or normalized_target_unit or None
 
 
-def _validate_logfile_spec_renderable(
+def _normalize_validation_level(validation_level: str) -> str:
+    """Return one supported validation tier or raise a concise configuration error."""
+    normalized = str(validation_level).strip().lower()
+    if normalized not in VALIDATION_LEVELS:
+        raise TemplateValidationError(
+            "validation_level must be one of "
+            f"{list(VALIDATION_LEVELS)!r}, got {validation_level!r}."
+        )
+    return normalized
+
+
+def _validate_logfile_spec_structural(spec: LogFileSpec) -> None:
+    """Validate canonical object identities and references without loading source data."""
+    try:
+        canonical = AuthoringService.from_mapping(report_to_dict(spec))
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError(
+            "Logfile mapping failed canonical authoring validation."
+        ) from exc
+    validation = canonical.validate()
+    if not validation.valid:
+        raise TemplateValidationError(
+            "Logfile mapping failed canonical authoring validation: " + "; ".join(validation.errors)
+        )
+
+
+def _validate_logfile_spec_data(
     spec: LogFileSpec,
     *,
     base_dir: Path,
     allowed_root: Path,
-) -> None:
+) -> tuple[dict[str, WellDataset], dict[str, Path]]:
+    """Validate all configured sources and bindings without constructing render documents."""
     datasets_by_section, source_paths_by_section = load_datasets_for_logfile(
         spec,
         base_dir=base_dir,
@@ -1995,10 +2027,104 @@ def _validate_logfile_spec_renderable(
     )
     if not datasets_by_section:
         raise TemplateValidationError("No datasets were resolved for the configured log sections.")
+
+    sections_by_id = _section_map_from_spec(spec)
+    for binding in _logfile_mapping_bindings(report_to_dict(spec)):
+        if not isinstance(binding, dict):
+            continue
+        section_id = _binding_target_section_id(spec, binding)
+        if section_id is None:
+            raise TemplateValidationError(
+                "Binding must identify one section when data validation is requested."
+            )
+        dataset = datasets_by_section.get(section_id)
+        if dataset is None:
+            raise TemplateValidationError(f"Missing dataset for section {section_id!r}.")
+        channel_name = str(binding.get("channel", "")).strip()
+        channel = next(
+            (
+                candidate
+                for mnemonic, candidate in dataset.channels.items()
+                if mnemonic.upper() == channel_name.upper()
+            ),
+            None,
+        )
+        if channel is None:
+            raise TemplateValidationError(
+                f"Configured channel {channel_name!r} was not found in section {section_id!r}."
+            )
+
+        track_id = str(binding.get("track_id", "")).strip()
+        track = next(
+            (
+                candidate
+                for candidate in sections_by_id[section_id].get("tracks", [])
+                if isinstance(candidate, dict) and str(candidate.get("id", "")) == track_id
+            ),
+            None,
+        )
+        if track is None:
+            raise TemplateValidationError(
+                f"Binding track {track_id!r} was not found in section {section_id!r}."
+            )
+        binding_kind = str(binding.get("kind", "curve")).strip().lower()
+        if binding_kind == "curve" and not isinstance(channel, ScalarChannel):
+            raise TemplateValidationError(
+                f"Binding channel {channel_name!r} is not scalar and cannot be used as a curve."
+            )
+        if binding_kind == "raster":
+            if str(track.get("kind", "normal")).strip().lower() != "array":
+                raise TemplateValidationError(
+                    f"Track {track_id!r} must be array kind to accept raster bindings."
+                )
+            if not isinstance(channel, RasterChannel):
+                raise TemplateValidationError(
+                    f"Binding channel {channel_name!r} is not raster-compatible."
+                )
+
+    return datasets_by_section, source_paths_by_section
+
+
+def _validate_logfile_spec(
+    spec: LogFileSpec,
+    *,
+    validation_level: str,
+    base_dir: Path,
+    allowed_root: Path,
+) -> None:
+    """Validate a logfile at the requested structural, data, or render tier."""
+    normalized_level = _normalize_validation_level(validation_level)
+    _validate_logfile_spec_structural(spec)
+    if normalized_level == "structural":
+        return
+
+    datasets_by_section, source_paths_by_section = _validate_logfile_spec_data(
+        spec,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
+    if normalized_level == "data":
+        return
+
     _ = build_documents_for_logfile(
         spec,
         datasets_by_section,
         source_path=source_paths_by_section,
+    )
+
+
+def _validate_logfile_spec_renderable(
+    spec: LogFileSpec,
+    *,
+    base_dir: Path,
+    allowed_root: Path,
+) -> None:
+    """Compatibility helper for callers that explicitly require render validation."""
+    _validate_logfile_spec(
+        spec,
+        validation_level="render",
+        base_dir=base_dir,
+        allowed_root=allowed_root,
     )
 
 
@@ -2007,13 +2133,19 @@ def _load_validated_logfile_text_spec(
     *,
     base_dir: Path,
     root: Path,
+    validation_level: str = "structural",
 ) -> LogFileSpec:
     spec = load_logfile_text(
         yaml_text,
         base_dir=base_dir,
         allowed_root=root,
     )
-    _validate_logfile_spec_renderable(spec, base_dir=base_dir, allowed_root=root)
+    _validate_logfile_spec(
+        spec,
+        validation_level=validation_level,
+        base_dir=base_dir,
+        allowed_root=root,
+    )
     return spec
 
 
@@ -3771,11 +3903,13 @@ def authoring_channel_aliases_resource() -> ResourceContent:
 def validate_logfile(
     logfile_path: str,
     *,
+    level: str | None = "render",
     root: str | Path | None = None,
 ) -> LogfileValidationResult:
-    """Validate one logfile path under the configured server root."""
+    """Validate one logfile path at the requested tier under the server root."""
     server_root = resolve_server_root(root)
     resolved_logfile = _resolve_user_path(logfile_path, root=server_root, context="logfile_path")
+    validation_level = _normalize_validation_level("render" if level is None else level)
     try:
         spec = load_logfile(resolved_logfile, allowed_root=server_root)
     except (TemplateValidationError, yaml.YAMLError) as exc:
@@ -3785,24 +3919,38 @@ def validate_logfile(
             name="",
             render_backend="",
             section_ids=[],
+            validation_level=validation_level,
         )
     section_ids = _section_ids_from_spec(spec)
     try:
-        prepare_logfile_render(resolved_logfile, allowed_root=server_root)
-    except (TemplateValidationError, yaml.YAMLError) as exc:
+        _validate_logfile_spec(
+            spec,
+            validation_level=validation_level,
+            base_dir=resolved_logfile.parent,
+            allowed_root=server_root,
+        )
+    except (
+        DependencyUnavailableError,
+        FileNotFoundError,
+        OSError,
+        TemplateValidationError,
+        yaml.YAMLError,
+    ) as exc:
         return LogfileValidationResult(
             valid=False,
             message=str(exc),
             name=spec.name,
             render_backend=spec.render_backend,
             section_ids=section_ids,
+            validation_level=validation_level,
         )
     return LogfileValidationResult(
         valid=True,
-        message="Valid logfile.",
+        message=f"Valid logfile at {validation_level} validation level.",
         name=spec.name,
         render_backend=spec.render_backend,
         section_ids=section_ids,
+        validation_level=validation_level,
     )
 
 
@@ -3810,11 +3958,13 @@ def validate_logfile_text(
     yaml_text: str,
     *,
     base_dir: str | Path | None = None,
+    level: str | None = "render",
     root: str | Path | None = None,
 ) -> LogfileValidationResult:
-    """Validate unsaved logfile YAML text under the configured server root."""
+    """Validate unsaved logfile YAML text at the requested tier under the server root."""
     server_root = resolve_server_root(root)
     resolved_base_dir = _resolve_base_dir(base_dir, root=server_root)
+    validation_level = _normalize_validation_level("render" if level is None else level)
     try:
         spec = load_logfile_text(
             yaml_text,
@@ -3828,28 +3978,38 @@ def validate_logfile_text(
             name="",
             render_backend="",
             section_ids=[],
+            validation_level=validation_level,
         )
     section_ids = _section_ids_from_spec(spec)
     try:
-        _validate_logfile_spec_renderable(
+        _validate_logfile_spec(
             spec,
+            validation_level=validation_level,
             base_dir=resolved_base_dir,
             allowed_root=server_root,
         )
-    except (TemplateValidationError, yaml.YAMLError) as exc:
+    except (
+        DependencyUnavailableError,
+        FileNotFoundError,
+        OSError,
+        TemplateValidationError,
+        yaml.YAMLError,
+    ) as exc:
         return LogfileValidationResult(
             valid=False,
             message=str(exc),
             name=spec.name,
             render_backend=spec.render_backend,
             section_ids=section_ids,
+            validation_level=validation_level,
         )
     return LogfileValidationResult(
         valid=True,
-        message="Valid logfile.",
+        message=f"Valid logfile at {validation_level} validation level.",
         name=spec.name,
         render_backend=spec.render_backend,
         section_ids=section_ids,
+        validation_level=validation_level,
     )
 
 
@@ -4621,6 +4781,7 @@ def set_section_data_source(
         mapping,
         logfile_path=resolved_logfile,
         root=server_root,
+        validation_level="data",
     )
     saved_section = _section_map_from_spec(saved_spec)[section_id]
     resolved_sources = resolve_section_data_sources_for_logfile(
@@ -4789,6 +4950,7 @@ def replicate_section_structure(
         mapping,
         logfile_path=resolved_logfile,
         root=server_root,
+        validation_level="data" if include_bindings or source_path is not None else "structural",
     )
     saved_summary = summarize_logfile_draft(str(resolved_logfile), root=server_root)
     saved_section = next(
@@ -6705,6 +6867,7 @@ def bind_curve(
         mapping,
         logfile_path=resolved_logfile,
         root=server_root,
+        validation_level="data",
     )
     binding_count = _binding_counts_by_section(saved_spec)[section_id]["curve"]
     return BoundCurveResult(
@@ -7191,6 +7354,7 @@ def bind_raster(
         mapping,
         logfile_path=resolved_logfile,
         root=server_root,
+        validation_level="data",
     )
     binding_count = _binding_counts_by_section(saved_spec)[section_id]["raster"]
     return BoundRasterResult(
@@ -8644,6 +8808,7 @@ def apply_style_preset(
         mapping,
         logfile_path=resolved_logfile,
         root=server_root,
+        validation_level="data" if applied_bindings else "structural",
     )
     if requires_track_target:
         assert section_id is not None and track_id is not None
@@ -9022,21 +9187,16 @@ def save_logfile_text(
         base_dir=resolved_base_dir,
         root=server_root,
     )
-    normalized_mapping = report_to_dict(spec)
-    rebased_mapping = _rebase_report_paths(
-        normalized_mapping,
+    saved_spec = _persist_rebased_logfile_mapping(
+        report_to_dict(spec),
         from_base_dir=resolved_base_dir,
-        to_base_dir=resolved_output_path.parent,
+        output_path=resolved_output_path,
+        root=server_root,
     )
-    normalized_yaml = report_to_yaml(rebased_mapping)
-    if not isinstance(normalized_yaml, str):
-        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
-    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_output_path.write_text(normalized_yaml, encoding="utf-8")
     return SavedLogfileTextResult(
-        name=spec.name,
-        render_backend=spec.render_backend,
-        section_ids=_section_ids_from_spec(spec),
+        name=saved_spec.name,
+        render_backend=saved_spec.render_backend,
+        section_ids=_section_ids_from_spec(saved_spec),
         output_path=str(resolved_output_path),
     )
 
@@ -9062,20 +9222,16 @@ def save_authoring_document(
     )
     authoring = AuthoringService.from_mapping(document)
     normalized_mapping = authoring_document_to_logfile_mapping(authoring.document)
-    rebased_mapping = _rebase_report_paths(
+    saved_spec = _persist_rebased_logfile_mapping(
         normalized_mapping,
         from_base_dir=resolved_base_dir,
-        to_base_dir=resolved_output_path.parent,
+        output_path=resolved_output_path,
+        root=server_root,
     )
-    normalized_yaml = report_to_yaml(rebased_mapping)
-    if not isinstance(normalized_yaml, str):
-        raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
-    resolved_output_path.parent.mkdir(parents=True, exist_ok=True)
-    resolved_output_path.write_text(normalized_yaml, encoding="utf-8")
     return SavedAuthoringDocumentResult(
-        name=authoring.document.name,
-        render_backend=authoring.document.output.backend,
-        section_ids=[section.id for section in authoring.document.sections],
+        name=saved_spec.name,
+        render_backend=saved_spec.render_backend,
+        section_ids=_section_ids_from_spec(saved_spec),
         output_path=str(resolved_output_path),
     )
 

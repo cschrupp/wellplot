@@ -735,3 +735,4 @@ def test_stable_validation_reports_invalid_documents() -> None:
         assert result["ok"] is True
         assert result["valid"] is True
         assert result["errors"] == []
+        assert result["validation_level"] == "render"

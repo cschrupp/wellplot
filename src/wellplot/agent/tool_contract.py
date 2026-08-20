@@ -64,6 +64,7 @@ class StableValidationResult(_StableResult):
     ok: bool
     valid: bool
     errors: list[str]
+    validation_level: str
 
 
 class StableArtifactResult(_StableResult):

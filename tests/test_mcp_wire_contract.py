@@ -20,6 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 S0_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v1.json"
 S1_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v2.json"
 S2_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v3.json"
+S4_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v4.json"
 CAPTURE_SCRIPT = REPO_ROOT / "scripts" / "capture_mcp_contract_baseline.py"
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -78,7 +79,7 @@ async def _exercise_typed_results() -> list[dict[str, object]]:
             )
             validated = await session.call_tool(
                 "validate_logfile",
-                {"logfile_path": str(draft_path)},
+                {"logfile_path": str(draft_path), "level": "structural"},
             )
             rendered = await session.call_tool(
                 "render_logfile",
@@ -170,9 +171,9 @@ async def _capture_default_result_sizes() -> dict[str, int]:
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
-def test_real_stdio_surface_matches_s2_baseline() -> None:
-    """Compare real MCP protocol output with the committed S2 wire contract."""
-    expected = json.loads(S2_BASELINE_PATH.read_text(encoding="utf-8"))
+def test_real_stdio_surface_matches_s4_baseline() -> None:
+    """Compare real MCP protocol output with the committed S4 wire contract."""
+    expected = json.loads(S4_BASELINE_PATH.read_text(encoding="utf-8"))
     actual = asyncio.run(_capture_mcp_surface())
 
     assert actual == expected
@@ -208,6 +209,7 @@ def test_real_stdio_results_validate_against_declared_output_models() -> None:
     assert "applied_assignments" in structured[1]
     assert "available_channels" in structured[2]
     assert structured[3]["valid"] is True
+    assert structured[3]["validation_level"] == "structural"
     assert structured[4]["artifact"] == structured[4]["output_path"]
     assert structured[4]["page_count"] >= 1
 
@@ -226,8 +228,8 @@ def test_default_stable_result_payloads_stay_within_s2_budgets() -> None:
 
 
 def test_prior_baselines_are_retained_as_historical_evidence() -> None:
-    """Preserve S0 and S1 evidence instead of overwriting prior wire contracts."""
-    for path in (S0_BASELINE_PATH, S1_BASELINE_PATH):
+    """Preserve prior wire evidence instead of overwriting earlier contracts."""
+    for path in (S0_BASELINE_PATH, S1_BASELINE_PATH, S2_BASELINE_PATH):
         baseline = json.loads(path.read_text(encoding="utf-8"))
 
         assert baseline["version"] == 1

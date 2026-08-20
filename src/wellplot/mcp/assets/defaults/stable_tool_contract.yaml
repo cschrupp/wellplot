@@ -210,14 +210,14 @@ tools:
       annotation: object
       patch: object
   - id: validate_logfile
-    description: Validate a persisted logfile and return actionable errors.
+    description: Validate a persisted logfile at the requested tier and return actionable errors.
     mode: validation
     read_only: true
     idempotent: true
     required: [logfile_path]
     fields:
       logfile_path: string
-      strict: boolean
+      level: [structural, data, render]
   - id: preview_logfile
     description: Render a scoped preview for visual verification.
     mode: artifact

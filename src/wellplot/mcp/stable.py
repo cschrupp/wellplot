@@ -1025,11 +1025,16 @@ def dispatch_stable_tool(
         }
 
     if name == "validate_logfile":
-        result = service.validate_logfile(logfile_path, root=root)
+        result = service.validate_logfile(
+            logfile_path,
+            level=args.get("level") or "render",
+            root=root,
+        )
         return {
             "ok": result.valid,
             "valid": result.valid,
             "errors": [] if result.valid else [result.message],
+            "validation_level": result.validation_level,
             "warnings": [],
             "next_steps": [],
         }
