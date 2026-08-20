@@ -24,6 +24,7 @@ from wellplot.authoring_service import (
 from wellplot.errors import TemplateValidationError
 from wellplot.mcp import service
 from wellplot.mcp.stable import dispatch_stable_tool, register_stable_tools
+from wellplot.mcp.telemetry import TELEMETRY_PATH_ENV
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_LOGFILE = "examples/production/cbl_log_example/full_reconstruction.log.yaml"
@@ -67,6 +68,45 @@ def test_stable_projection_registers_only_contract_responsibilities() -> None:
     assert [item["name"] for item in collector.tools] == list(expected)
     assert len(collector.tools) == 17
     assert all("description" in item for item in collector.tools)
+
+
+def test_stable_dispatch_telemetry_is_opt_in_and_preserves_result(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Record metadata-only telemetry without changing a stable tool result."""
+    collector = _ToolCollector()
+    telemetry_path = tmp_path / "telemetry" / "dispatch.jsonl"
+    monkeypatch.setenv(TELEMETRY_PATH_ENV, str(telemetry_path))
+    register_stable_tools(
+        collector,
+        root=tmp_path,
+        image_factory=lambda data: data,
+        annotation_factory=lambda values: dict(values),
+    )
+    inspect_tool = next(
+        item["function"] for item in collector.tools if item["name"] == "inspect_vocab"
+    )
+
+    expected = dispatch_stable_tool("inspect_vocab", {}, root=tmp_path)
+    actual = inspect_tool()
+    events = [
+        json.loads(line)
+        for line in telemetry_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+    assert actual == expected
+    assert len(events) == 1
+    event = events[0]
+    assert event["tool_name"] == "inspect_vocab"
+    assert event["outcome"] == "success"
+    assert event["argument_bytes"] == 2
+    assert event["result_bytes"] is not None
+    assert event["changed"] is None
+    assert event["exception_type"] is None
+    assert "arguments" not in event
+    assert "result" not in event
 
 
 def test_stable_mutation_matches_direct_authoring_service() -> None:

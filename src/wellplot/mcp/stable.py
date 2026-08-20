@@ -35,6 +35,7 @@ from ..model.authoring import (
     AuthoringSectionSpec,
 )
 from . import service
+from .telemetry import dispatch_started, emit_dispatch_event, new_request_id
 
 ImageFactory = Callable[[bytes], object]
 
@@ -1210,7 +1211,31 @@ def register_stable_tools(
             arguments: Mapping[str, object],
             name: str = profile.name,
         ) -> object:
-            return dispatch_stable_tool(name, arguments, root=root, image_factory=image_factory)
+            request_id = new_request_id()
+            started_at = dispatch_started()
+            try:
+                result = dispatch_stable_tool(
+                    name, arguments, root=root, image_factory=image_factory
+                )
+            except Exception as exc:
+                emit_dispatch_event(
+                    root=root,
+                    request_id=request_id,
+                    tool_name=name,
+                    arguments=arguments,
+                    started_at=started_at,
+                    error=exc,
+                )
+                raise
+            emit_dispatch_event(
+                root=root,
+                request_id=request_id,
+                tool_name=name,
+                arguments=arguments,
+                started_at=started_at,
+                result=result,
+            )
+            return result
 
         tool = _tool_function(profile, callback)
         mcp.add_tool(

@@ -1,0 +1,1495 @@
+{
+  "probe": {
+    "arguments": {
+      "detail": "summary"
+    },
+    "content_bytes": 21687,
+    "is_error": false,
+    "result_bytes": 32553,
+    "structured_content_bytes": 10817,
+    "tool_name": "inspect_vocab"
+  },
+  "prompts": [
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "review_logfile"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "focus",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "preview_logfile"
+    },
+    {
+      "arguments": [
+        {
+          "name": "example_id",
+          "required": true
+        },
+        {
+          "name": "goal",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "start_from_example"
+    },
+    {
+      "arguments": [
+        {
+          "name": "goal",
+          "required": true
+        },
+        {
+          "name": "logfile_path",
+          "required": false
+        },
+        {
+          "name": "example_id",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "author_plot_from_request"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "feedback",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "revise_plot_from_feedback"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "source_text",
+          "required": true
+        },
+        {
+          "name": "source_description",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "ingest_header_text"
+    }
+  ],
+  "resource_templates": [
+    {
+      "description": "",
+      "mimeType": "text/markdown",
+      "name": "production_example_readme_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/README.md"
+    },
+    {
+      "description": "",
+      "mimeType": "text/yaml",
+      "name": "production_example_template_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/base.template.yaml"
+    },
+    {
+      "description": "",
+      "mimeType": "text/yaml",
+      "name": "production_example_logfile_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/full_reconstruction.log.yaml"
+    },
+    {
+      "description": "",
+      "mimeType": "text/markdown",
+      "name": "production_example_notes_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/data-notes.md"
+    }
+  ],
+  "resources": [
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "logfile_schema_resource",
+      "uri": "wellplot://schema/logfile.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "production_examples_manifest_resource",
+      "uri": "wellplot://examples/production/index.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_patch_schema_resource",
+      "uri": "wellplot://authoring/schema/patch.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_canonical_schema_resource",
+      "uri": "wellplot://authoring/schema/canonical.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_operations_schema_resource",
+      "uri": "wellplot://authoring/schema/operations.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_hierarchy_resource",
+      "uri": "wellplot://authoring/catalog/hierarchy.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_track_kinds_resource",
+      "uri": "wellplot://authoring/catalog/track-kinds.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_fill_kinds_resource",
+      "uri": "wellplot://authoring/catalog/fill-kinds.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_track_archetypes_resource",
+      "uri": "wellplot://authoring/catalog/track-archetypes.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_archetypes_resource",
+      "uri": "wellplot://authoring/catalog/header-archetypes.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_packet_blueprints_resource",
+      "uri": "wellplot://authoring/catalog/packet-blueprints.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_style_presets_resource",
+      "uri": "wellplot://authoring/catalog/style-presets.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_fields_resource",
+      "uri": "wellplot://authoring/catalog/header-fields.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_key_aliases_resource",
+      "uri": "wellplot://authoring/catalog/header-key-aliases.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_channel_aliases_resource",
+      "uri": "wellplot://authoring/catalog/channel-aliases.json"
+    }
+  ],
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create, clone, or save one logfile draft.",
+      "input_schema": {
+        "properties": {
+          "kind": {
+            "default": null,
+            "title": "Kind",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": null,
+            "title": "Overwrite",
+            "type": "boolean"
+          },
+          "source_data_file": {
+            "default": null,
+            "title": "Source Data File",
+            "type": "string"
+          },
+          "source_logfile_path": {
+            "default": null,
+            "title": "Source Logfile Path",
+            "type": "string"
+          },
+          "yaml_text": {
+            "default": null,
+            "title": "Yaml Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "create_draftArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 560,
+      "name": "create_draft",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "create_draftDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 78
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Inspect scoped canonical authoring objects and identities.",
+      "input_schema": {
+        "properties": {
+          "detail": {
+            "default": null,
+            "title": "Detail",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "object_kind": {
+            "title": "Object Kind",
+            "type": "string"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "logfile_path",
+          "object_kind"
+        ],
+        "title": "inspect_authoringArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 410,
+      "name": "inspect_authoring",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "inspect_authoringDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 83
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true,
+        "readOnlyHint": false
+      },
+      "description": "Inspect source metadata and available channels.",
+      "input_schema": {
+        "properties": {
+          "channels": {
+            "default": null,
+            "items": {},
+            "title": "Channels",
+            "type": "array"
+          },
+          "include_metadata": {
+            "default": null,
+            "title": "Include Metadata",
+            "type": "boolean"
+          },
+          "logfile_path": {
+            "default": null,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "source_format": {
+            "default": null,
+            "title": "Source Format",
+            "type": "string"
+          },
+          "source_path": {
+            "default": null,
+            "title": "Source Path",
+            "type": "string"
+          }
+        },
+        "title": "inspect_sourceArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 499,
+      "name": "inspect_source",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "inspect_sourceDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 80
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Inspect supported object families, defaults, and style vocabulary.",
+      "input_schema": {
+        "properties": {
+          "detail": {
+            "default": null,
+            "title": "Detail",
+            "type": "string"
+          },
+          "family": {
+            "default": null,
+            "title": "Family",
+            "type": "string"
+          }
+        },
+        "title": "inspect_vocabArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 183,
+      "name": "inspect_vocab",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "inspect_vocabDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 79
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Fill header slots and service titles without replacing the archetype. Use operation=apply_values with the values mapping for bulk or natural-language header assignments; slot_id is required only for set_slot and clear_slot.",
+      "input_schema": {
+        "properties": {
+          "archetype_id": {
+            "default": null,
+            "title": "Archetype Id",
+            "type": "string"
+          },
+          "availability": {
+            "default": null,
+            "title": "Availability"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite_policy": {
+            "default": null,
+            "title": "Overwrite Policy",
+            "type": "string"
+          },
+          "preserve_existing_values": {
+            "default": null,
+            "title": "Preserve Existing Values",
+            "type": "boolean"
+          },
+          "provenance": {
+            "default": null,
+            "title": "Provenance"
+          },
+          "service_title": {
+            "default": null,
+            "title": "Service Title",
+            "type": "string"
+          },
+          "slot_id": {
+            "default": null,
+            "title": "Slot Id",
+            "type": "string"
+          },
+          "source_key": {
+            "default": null,
+            "title": "Source Key"
+          },
+          "unit": {
+            "default": null,
+            "title": "Unit"
+          },
+          "value": {
+            "default": null,
+            "title": "Value"
+          },
+          "values": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_headerArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 913,
+      "name": "edit_header",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_headerDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 77
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Update report, page, output, depth, section view, or report-wide Matplotlib style.",
+      "input_schema": {
+        "properties": {
+          "depth": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Depth",
+            "type": "object"
+          },
+          "depth_range": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Depth Range",
+            "type": "object"
+          },
+          "depth_range_unit": {
+            "default": null,
+            "title": "Depth Range Unit",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "major_step": {
+            "default": null,
+            "title": "Major Step",
+            "type": "number"
+          },
+          "minor_step": {
+            "default": null,
+            "title": "Minor Step",
+            "type": "number"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "output": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Output",
+            "type": "object"
+          },
+          "page": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Page",
+            "type": "object"
+          },
+          "scale": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Scale",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "style_patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Style Patch",
+            "type": "object"
+          },
+          "subtitle": {
+            "default": null,
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "title": {
+            "default": null,
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "default": null,
+            "title": "Unit",
+            "type": "string"
+          },
+          "view": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "View",
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_report_settingsArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1290,
+      "name": "edit_report_settings",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_report_settingsDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 86
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Remarks operations: add=remark{title,text,lines,alignment}; update=remark_id+patch; remove/move=remark_id; clear=all.",
+      "input_schema": {
+        "properties": {
+          "alignment": {
+            "default": null,
+            "title": "Alignment"
+          },
+          "border": {
+            "default": null,
+            "title": "Border"
+          },
+          "font_size": {
+            "default": null,
+            "title": "Font Size"
+          },
+          "lines": {
+            "default": null,
+            "title": "Lines"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "default": null,
+            "title": "New Index",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Patch",
+            "type": "object"
+          },
+          "remark": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Remark",
+            "type": "object"
+          },
+          "remark_id": {
+            "default": null,
+            "title": "Remark Id",
+            "type": "string"
+          },
+          "remarks": {
+            "default": null,
+            "items": {},
+            "title": "Remarks",
+            "type": "array"
+          },
+          "text": {
+            "default": null,
+            "title": "Text"
+          },
+          "title": {
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_remarksArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 846,
+      "name": "edit_remarks",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_remarksDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 78
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create, update, remove, or move one report section. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.",
+      "input_schema": {
+        "properties": {
+          "depth_range": {
+            "default": null,
+            "title": "Depth Range"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "default": null,
+            "title": "New Index",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "section": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Section",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "subtitle": {
+            "default": null,
+            "title": "Subtitle"
+          },
+          "title": {
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_sectionArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 573,
+      "name": "edit_section",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_sectionDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 78
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks.",
+      "input_schema": {
+        "properties": {
+          "depth_range": {
+            "default": null,
+            "title": "Depth Range"
+          },
+          "include_bindings": {
+            "default": null,
+            "title": "Include Bindings",
+            "type": "boolean"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": null,
+            "title": "Overwrite",
+            "type": "boolean"
+          },
+          "source_format": {
+            "default": null,
+            "title": "Source Format",
+            "type": "string"
+          },
+          "source_path": {
+            "default": null,
+            "title": "Source Path",
+            "type": "string"
+          },
+          "source_section_id": {
+            "default": null,
+            "title": "Source Section Id",
+            "type": "string"
+          },
+          "subtitle": {
+            "default": null,
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "target_section_id": {
+            "default": null,
+            "title": "Target Section Id",
+            "type": "string"
+          },
+          "title": {
+            "default": null,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "replicate_section_structureArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 848,
+      "name": "replicate_section_structure",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "replicate_section_structureDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 93
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create, update, remove, move, clear, or set scales on one track. For operation=add, track_id is the new id and title, kind, and width_mm are required; add appends the track, then use operation=move for placement. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use operation=set_scales only when both are intentionally synchronized, or use update with x_scale and edit_curve_binding with scale independently. For update, remove, move, and clear_bindings, track_id must already exist.",
+      "input_schema": {
+        "properties": {
+          "annotations": {
+            "default": null,
+            "items": {},
+            "title": "Annotations",
+            "type": "array"
+          },
+          "channel_scales": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Channel Scales",
+            "type": "object"
+          },
+          "curve_scale": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Curve Scale",
+            "type": "object"
+          },
+          "grid": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Grid",
+            "type": "object"
+          },
+          "kind": {
+            "default": null,
+            "title": "Kind",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "default": null,
+            "title": "New Index",
+            "type": "integer"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "reference": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Reference",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "sync_grid_to_scale": {
+            "default": null,
+            "title": "Sync Grid To Scale",
+            "type": "boolean"
+          },
+          "title": {
+            "default": null,
+            "title": "Title",
+            "type": "string"
+          },
+          "track_header": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Track Header",
+            "type": "object"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          },
+          "width_mm": {
+            "default": null,
+            "title": "Width Mm",
+            "type": "number"
+          },
+          "x_scale": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "X Scale",
+            "type": "object"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_trackArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1306,
+      "name": "edit_track",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_trackDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 76
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear scalar curve bindings.",
+      "input_schema": {
+        "properties": {
+          "binding": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Binding",
+            "type": "object"
+          },
+          "binding_id": {
+            "default": null,
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "channel": {
+            "default": null,
+            "title": "Channel",
+            "type": "string"
+          },
+          "header_display": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Header Display",
+            "type": "object"
+          },
+          "label": {
+            "default": null,
+            "title": "Label",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Patch",
+            "type": "object"
+          },
+          "render_mode": {
+            "default": null,
+            "title": "Render Mode",
+            "type": "string"
+          },
+          "scale": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Scale",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "style": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Style",
+            "type": "object"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          },
+          "wrap": {
+            "default": null,
+            "title": "Wrap",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_curve_bindingArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1103,
+      "name": "edit_curve_binding",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_curve_bindingDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 84
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear array/raster bindings.",
+      "input_schema": {
+        "properties": {
+          "alpha": {
+            "default": null,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "binding": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Binding",
+            "type": "object"
+          },
+          "binding_id": {
+            "default": null,
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "channel": {
+            "default": null,
+            "title": "Channel",
+            "type": "string"
+          },
+          "color_limits": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Color Limits",
+            "type": "object"
+          },
+          "label": {
+            "default": null,
+            "title": "Label",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "normalization": {
+            "default": null,
+            "title": "Normalization",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Patch",
+            "type": "object"
+          },
+          "profile": {
+            "default": null,
+            "title": "Profile",
+            "type": "string"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "show_raster": {
+            "default": null,
+            "title": "Show Raster",
+            "type": "boolean"
+          },
+          "style": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Style",
+            "type": "object"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_raster_bindingArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1151,
+      "name": "edit_raster_binding",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_raster_bindingDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 85
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear a fill relation.",
+      "input_schema": {
+        "properties": {
+          "alpha": {
+            "default": null,
+            "title": "Alpha",
+            "type": "number"
+          },
+          "binding_id": {
+            "default": null,
+            "title": "Binding Id",
+            "type": "string"
+          },
+          "channel": {
+            "default": null,
+            "title": "Channel",
+            "type": "string"
+          },
+          "color": {
+            "default": null,
+            "title": "Color",
+            "type": "string"
+          },
+          "crossover": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Crossover",
+            "type": "object"
+          },
+          "fill": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Fill",
+            "type": "object"
+          },
+          "fill_id": {
+            "default": null,
+            "title": "Fill Id",
+            "type": "string"
+          },
+          "kind": {
+            "default": null,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "default": null,
+            "title": "Label",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "other_binding_id": {
+            "default": null,
+            "title": "Other Binding Id",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Patch",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_fillArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1092,
+      "name": "edit_fill",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_fillDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 75
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear typed annotations.",
+      "input_schema": {
+        "properties": {
+          "annotation": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Annotation",
+            "type": "object"
+          },
+          "annotation_id": {
+            "default": null,
+            "title": "Annotation Id",
+            "type": "string"
+          },
+          "base": {
+            "default": null,
+            "title": "Base",
+            "type": "number"
+          },
+          "color": {
+            "default": null,
+            "title": "Color",
+            "type": "string"
+          },
+          "depth": {
+            "default": null,
+            "title": "Depth",
+            "type": "number"
+          },
+          "glyph": {
+            "default": null,
+            "title": "Glyph",
+            "type": "string"
+          },
+          "kind": {
+            "default": null,
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "default": null,
+            "title": "Label",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "additionalProperties": true,
+            "default": null,
+            "title": "Patch",
+            "type": "object"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "text": {
+            "default": null,
+            "title": "Text",
+            "type": "string"
+          },
+          "top": {
+            "default": null,
+            "title": "Top",
+            "type": "number"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_annotationArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1042,
+      "name": "edit_annotation",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "edit_annotationDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 81
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Validate a persisted logfile and return actionable errors.",
+      "input_schema": {
+        "properties": {
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "strict": {
+            "default": null,
+            "title": "Strict",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "validate_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 212,
+      "name": "validate_logfile",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "validate_logfileDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 82
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Render a scoped preview for visual verification.",
+      "input_schema": {
+        "properties": {
+          "focus": {
+            "default": null,
+            "title": "Focus",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "page": {
+            "default": null,
+            "title": "Page",
+            "type": "integer"
+          },
+          "section_id": {
+            "default": null,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "track_id": {
+            "default": null,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "preview_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 394,
+      "name": "preview_logfile",
+      "output_schema": null,
+      "output_schema_bytes": 0
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Render a validated logfile to its configured artifact.",
+      "input_schema": {
+        "properties": {
+          "backend": {
+            "default": null,
+            "title": "Backend",
+            "type": "string"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "output_path": {
+            "default": null,
+            "title": "Output Path",
+            "type": "string"
+          },
+          "overwrite": {
+            "default": null,
+            "title": "Overwrite",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "render_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 346,
+      "name": "render_logfile",
+      "output_schema": {
+        "additionalProperties": true,
+        "title": "render_logfileDictOutput",
+        "type": "object"
+      },
+      "output_schema_bytes": 80
+    }
+  ],
+  "transport": "production-stdio",
+  "version": 1
+}
