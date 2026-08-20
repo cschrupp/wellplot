@@ -892,8 +892,6 @@ def dispatch_stable_tool(
                 raise TemplateValidationError(f"Unsupported draft operation {operation!r}.")
             source = args.get("source_logfile_path")
             kind = args.get("kind")
-            if args.get("source_data_file") is not None:
-                raise TemplateValidationError("source_data_file requires a logfile template.")
             return service.create_logfile_draft(
                 output,
                 source_logfile_path=str(source) if source is not None else None,

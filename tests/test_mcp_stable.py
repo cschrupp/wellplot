@@ -320,8 +320,18 @@ def test_stable_track_set_scales_updates_track_and_curve_scale() -> None:
         )
 
         assert result["changed"] is True
-        assert track["x_scale"] == {"kind": "log", "min": 0.2, "max": 2000}
-        assert binding["scale"] == {"kind": "log", "min": 0.2, "max": 2000}
+        assert track["x_scale"] == {
+            "kind": "log",
+            "min": 0.2,
+            "max": 2000,
+            "reverse": False,
+        }
+        assert binding["scale"] == {
+            "kind": "log",
+            "min": 0.2,
+            "max": 2000,
+            "reverse": False,
+        }
 
 
 def test_stable_track_update_syncs_grid_to_log_scale() -> None:
@@ -382,7 +392,12 @@ def test_stable_array_track_update_accepts_x_scale() -> None:
         vdl = next(track for track in tracks if track["id"] == "vdl")
 
         assert result["changed"] is True
-        assert vdl["x_scale"] == {"kind": "linear", "min": 250, "max": 1100}
+        assert vdl["x_scale"] == {
+            "kind": "linear",
+            "min": 250,
+            "max": 1100,
+            "reverse": False,
+        }
 
 
 def test_stable_report_settings_updates_matplotlib_style() -> None:
@@ -639,9 +654,18 @@ def test_stable_curve_add_projects_canonical_scale_to_legacy_yaml() -> None:
         )
 
         saved = yaml.safe_load(fixture.single_logfile.read_text(encoding="utf-8"))
-        binding = saved["document"]["bindings"]["channels"][-1]
+        binding = next(
+            item
+            for item in saved["document"]["bindings"]["channels"]
+            if item.get("id") == "main.cbl.GR.typed"
+        )
         assert result["ok"] is True
-        assert binding["scale"] == {"kind": "linear", "min": -80, "max": 20}
+        assert binding["scale"] == {
+            "kind": "linear",
+            "min": -80,
+            "max": 20,
+            "reverse": False,
+        }
 
 
 def test_stable_curve_add_projects_canonical_style_to_legacy_yaml() -> None:
@@ -664,8 +688,13 @@ def test_stable_curve_add_projects_canonical_style_to_legacy_yaml() -> None:
         )
 
         saved = yaml.safe_load(fixture.single_logfile.read_text(encoding="utf-8"))
-        binding = saved["document"]["bindings"]["channels"][-1]
-        assert binding["style"] == {"color": "#2e7d32", "opacity": 0.6}
+        binding = next(
+            item
+            for item in saved["document"]["bindings"]["channels"]
+            if item.get("id") == "main.cbl.GR.styled"
+        )
+        assert binding["style"]["color"] == "#2e7d32"
+        assert binding["style"]["opacity"] == 0.6
 
 
 def test_stable_scoped_preview_uses_section_renderer() -> None:

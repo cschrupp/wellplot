@@ -1778,7 +1778,9 @@ def authoring_document_to_logfile_mapping(
                 style = binding_payload.get("style")
                 if isinstance(style, Mapping):
                     style = dict(style)
-                    style.pop("alpha", None)
+                    alpha = style.pop("alpha", None)
+                    if alpha is not None:
+                        style["opacity"] = alpha
                     binding_payload["style"] = style
                 binding_payload["track_id"] = track.id
                 binding_payload["section"] = section.id

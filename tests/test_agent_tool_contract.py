@@ -133,6 +133,17 @@ def test_inspect_authoring_exposes_server_supported_object_kinds() -> None:
     }
 
 
+def test_profile_does_not_advertise_ignored_create_or_render_controls() -> None:
+    """Keep public fields limited to controls the stable dispatcher honors."""
+    profile = {tool.name: tool for tool in stable_tool_profile()}
+
+    create_fields = profile["create_draft"].input_schema["properties"]
+    render_fields = profile["render_logfile"].input_schema["properties"]
+
+    assert "source_data_file" not in create_fields
+    assert "backend" not in render_fields
+
+
 def test_all_development_tasks_map_to_existing_profile_tools() -> None:
     """The profile expresses every planned task without a task-specific tool."""
     names = {tool.name for tool in stable_tool_profile()}

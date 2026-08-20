@@ -6,7 +6,6 @@ tools:
     operations: [create, clone, save]
     fields:
       source_logfile_path: string
-      source_data_file: string
       yaml_text: string
       kind: string
       overwrite: boolean
@@ -238,5 +237,4 @@ tools:
     fields:
       logfile_path: string
       output_path: string
-      backend: [matplotlib, plotly]
       overwrite: boolean

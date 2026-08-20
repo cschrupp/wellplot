@@ -24,6 +24,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import tempfile
 import unittest
 from hashlib import sha256
@@ -36,6 +37,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.agent.tool_contract import stable_tool_profile
 from wellplot.authoring import load_authoring_document
 from wellplot.authoring_service import (
     AuthoringService,
@@ -51,6 +53,7 @@ from wellplot.errors import PathAccessError, TemplateValidationError
 from wellplot.mcp import service
 
 HAS_LAS = importlib.util.find_spec("lasio") is not None
+_PROMPT_TOOL_REFERENCE = re.compile(r"\b([a-z][a-z0-9_]*)\(\.\.\.\)")
 
 
 class McpServiceTests(unittest.TestCase):
@@ -4177,16 +4180,38 @@ class McpServiceTests(unittest.TestCase):
         self.assertEqual(first["scale"]["maximum"], 100.0)
         self.assertEqual(first["style"]["color"], "#111111")
 
-    def test_start_from_example_prompt_embeds_goal_and_example(self) -> None:
-        """Embed the requested goal and packaged example resources in the prompt."""
+    def _assert_prompt_uses_only_stable_tools(self, prompt: str) -> None:
+        """Ensure shipped prompt tool references remain within the registered surface."""
+        references = set(_PROMPT_TOOL_REFERENCE.findall(prompt))
+        self.assertTrue(references)
+        self.assertLessEqual(references, {tool.name for tool in stable_tool_profile()})
+
+    def test_review_and_preview_prompts_use_only_stable_tools(self) -> None:
+        """Keep operational guidance aligned with the registered MCP surface."""
+        review = service.review_logfile_prompt("drafts/demo.log.yaml")
+        preview = service.preview_logfile_prompt("drafts/demo.log.yaml", focus="main section")
+
+        self.assertIn("validate_logfile(...)", review)
+        self.assertIn("inspect_authoring(...)", review)
+        self.assertIn("inspect_source(...)", review)
+        self.assertIn("preview_logfile(...)", preview)
+        self._assert_prompt_uses_only_stable_tools(review)
+        self._assert_prompt_uses_only_stable_tools(preview)
+
+    def test_start_from_example_prompt_references_resources_without_inlining_them(self) -> None:
+        """Keep packaged-example guidance short and resource-backed."""
         prompt = service.start_from_example_prompt(
             "forge16b_porosity_example",
             "Create a variant with simplified headers.",
         )
 
         self.assertIn("Create a variant with simplified headers.", prompt)
+        self.assertIn("wellplot://examples/production/forge16b_porosity_example/README.md", prompt)
         self.assertIn("base.template.yaml", prompt)
         self.assertIn("full_reconstruction.log.yaml", prompt)
+        self.assertNotIn("```", prompt)
+        self.assertLess(len(prompt), 2_000)
+        self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_author_plot_from_request_prompt_mentions_authoring_tools(self) -> None:
         """Guide clients toward deterministic authoring tools for freeform requests."""
@@ -4196,32 +4221,26 @@ class McpServiceTests(unittest.TestCase):
             example_id="forge16b_porosity_example",
         )
 
-        self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
-        self.assertIn("inspect_data_source(source_path)", prompt)
-        self.assertIn("check_channel_availability(...)", prompt)
-        self.assertIn("set_section_data_source(...)", prompt)
-        self.assertIn("update_section(...)", prompt)
-        self.assertIn("set_section_view(...)", prompt)
-        self.assertIn("set_depth_axis(...)", prompt)
-        self.assertIn("set_page_layout(...)", prompt)
-        self.assertIn("inspect_header_archetypes(...)", prompt)
-        self.assertIn("apply_header_archetype(...)", prompt)
-        self.assertIn("inspect_heading_slots(...)", prompt)
-        self.assertIn("preview_header_mapping(...)", prompt)
-        self.assertIn("apply_header_values(...)", prompt)
-        self.assertIn("inspect_style_presets(...)", prompt)
-        self.assertIn("apply_style_preset(...)", prompt)
-        self.assertIn("inspect_track_bindings(...)", prompt)
-        self.assertIn("set_track_scales(...)", prompt)
-        self.assertIn("inspect_authoring_vocab(...)", prompt)
-        self.assertIn("add_annotation_object(...)", prompt)
-        self.assertIn("update_annotation_object(...)", prompt)
-        self.assertIn("remove_annotation_object(...)", prompt)
-        self.assertIn("add_curve_fill(...)", prompt)
-        self.assertIn("remove_curve_fill(...)", prompt)
-        self.assertIn("clear_track_bindings(...)", prompt)
-        self.assertIn("apply_style_preset(...)", prompt)
-        self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
+        for tool_name in (
+            "inspect_authoring",
+            "inspect_source",
+            "inspect_vocab",
+            "edit_header",
+            "edit_remarks",
+            "edit_report_settings",
+            "edit_section",
+            "edit_track",
+            "replicate_section_structure",
+            "edit_curve_binding",
+            "edit_raster_binding",
+            "edit_fill",
+            "edit_annotation",
+            "validate_logfile",
+            "preview_logfile",
+            "render_logfile",
+        ):
+            self.assertIn(f"{tool_name}(...)", prompt)
+        self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
         """Guide revision workflows toward previews and structural change summaries."""
@@ -4230,27 +4249,27 @@ class McpServiceTests(unittest.TestCase):
             "Move caliper next to depth and shorten the remarks.",
         )
 
-        self.assertIn("summarize_logfile_draft(logfile_path)", prompt)
-        self.assertIn("inspect_authoring_vocab(logfile_path=logfile_path)", prompt)
-        self.assertIn("set_section_data_source(...)", prompt)
-        self.assertIn("update_section(...)", prompt)
-        self.assertIn("set_section_view(...)", prompt)
-        self.assertIn("set_depth_axis(...)", prompt)
-        self.assertIn("set_page_layout(...)", prompt)
-        self.assertIn("inspect_header_archetypes(...)", prompt)
-        self.assertIn("apply_header_archetype(...)", prompt)
-        self.assertIn("add_annotation_object(...)", prompt)
-        self.assertIn("update_annotation_object(...)", prompt)
-        self.assertIn("remove_annotation_object(...)", prompt)
-        self.assertIn("add_curve_fill(...)", prompt)
-        self.assertIn("remove_curve_fill(...)", prompt)
-        self.assertIn("clear_track_bindings(...)", prompt)
-        self.assertIn("inspect_track_bindings(...)", prompt)
-        self.assertIn("set_track_scales(...)", prompt)
-        self.assertIn("summarize_logfile_changes(logfile_path, previous_text=...)", prompt)
+        for tool_name in (
+            "inspect_authoring",
+            "inspect_source",
+            "edit_header",
+            "edit_remarks",
+            "edit_report_settings",
+            "edit_section",
+            "edit_track",
+            "replicate_section_structure",
+            "edit_curve_binding",
+            "edit_raster_binding",
+            "edit_fill",
+            "edit_annotation",
+            "validate_logfile",
+            "preview_logfile",
+        ):
+            self.assertIn(f"{tool_name}(...)", prompt)
+        self._assert_prompt_uses_only_stable_tools(prompt)
 
-    def test_ingest_header_text_prompt_mentions_mapping_workflow(self) -> None:
-        """Guide clients toward parse -> preview -> apply for copied header text."""
+    def test_ingest_header_text_prompt_uses_stable_header_operations(self) -> None:
+        """Guide clients toward the stable header and remarks operations."""
         prompt = service.ingest_header_text_prompt(
             "drafts/demo.log.yaml",
             "Company: Acme Energy\nWell: Demo-01\n",
@@ -4258,16 +4277,12 @@ class McpServiceTests(unittest.TestCase):
         )
 
         self.assertIn("Copied contractor header packet", prompt)
-        self.assertIn("inspect_header_archetypes(...)", prompt)
-        self.assertIn("apply_header_archetype(...)", prompt)
-        self.assertIn("inspect_heading_slots(logfile_path=logfile_path)", prompt)
-        self.assertIn("parse_key_value_text(source_text, format_hint=None)", prompt)
-        self.assertIn(
-            'preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")',
-            prompt,
-        )
-        self.assertIn("apply_header_values(logfile_path, values, overwrite_policy=...)", prompt)
-        self.assertIn("set_remarks_content(...)", prompt)
+        self.assertIn("inspect_authoring(...)", prompt)
+        self.assertIn("edit_header(...)", prompt)
+        self.assertIn("edit_remarks(...)", prompt)
+        self.assertIn("validate_logfile(...)", prompt)
+        self.assertIn("preview_logfile(...)", prompt)
+        self._assert_prompt_uses_only_stable_tools(prompt)
 
 
 if __name__ == "__main__":
