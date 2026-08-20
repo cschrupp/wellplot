@@ -151,8 +151,93 @@ def test_stable_mutation_matches_direct_authoring_service() -> None:
             "object_id": "main_pass",
             "section_id": "main_pass",
         }
+        assert result["changed_fields"] == ["subtitle"]
         assert result["before"]["subtitle"] != result["after"]["subtitle"]
         assert _canonical_document(projected) == _canonical_document(direct)
+
+
+def test_stable_create_draft_returns_only_creation_evidence() -> None:
+    """Draft creation reports the new artifact identity instead of document snapshots."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "created.log.yaml"
+
+        result = dispatch_stable_tool(
+            "create_draft",
+            {
+                "operation": "clone",
+                "logfile_path": str(draft),
+                "source_logfile_path": SOURCE_LOGFILE,
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert result["ok"] is True
+        assert result["changed"] is True
+        assert result["logfile_path"] == str(draft)
+        assert result["section_ids"] == ["main_pass", "repeat_pass"]
+        assert result["section_count"] == 2
+        assert "before" not in result
+        assert "after" not in result
+
+
+def test_stable_inspections_honor_summary_full_and_family_scope() -> None:
+    """Summary inspections are compact while full and family scopes stay deliberate."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "inspection.log.yaml"
+        _seed_draft(draft)
+
+        summary = dispatch_stable_tool(
+            "inspect_authoring",
+            {
+                "logfile_path": str(draft),
+                "object_kind": "track",
+                "section_id": "main_pass",
+                "detail": "summary",
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+        full = dispatch_stable_tool(
+            "inspect_authoring",
+            {
+                "logfile_path": str(draft),
+                "object_kind": "track",
+                "section_id": "main_pass",
+                "detail": "full",
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+        track_vocabulary = dispatch_stable_tool(
+            "inspect_vocab",
+            {"family": "track", "detail": "summary"},
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+        vocabulary_index = dispatch_stable_tool(
+            "inspect_vocab",
+            {"detail": "summary"},
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert summary["items"]
+        assert set(summary["items"][0]) == {"ref", "summary"}
+        assert "object" in full["items"][0]
+        assert len(json.dumps(summary)) < len(json.dumps(full))
+
+        vocabulary = track_vocabulary["items"][0]
+        assert vocabulary["family"] == "track"
+        assert set(vocabulary["values"]) == {
+            "track_kinds",
+            "track_patch_keys",
+            "track_archetypes",
+            "move_track_selectors",
+        }
+        assert "scale_kinds" not in vocabulary["values"]
+        assert vocabulary_index["items"][0]["values"] == {}
+        assert "track" in vocabulary_index["items"][0]["available_families"]
 
 
 def test_stable_section_replication_copies_a_validated_scaffold() -> None:
@@ -286,7 +371,7 @@ def test_stable_array_track_update_accepts_x_scale() -> None:
                 "operation": "update",
                 "section_id": "main_pass",
                 "track_id": "vdl",
-                "x_scale": {"kind": "linear", "min": 200, "max": 1200},
+                "x_scale": {"kind": "linear", "min": 250, "max": 1100},
             },
             root=REPO_ROOT,
             image_factory=lambda data: data,
@@ -297,7 +382,7 @@ def test_stable_array_track_update_accepts_x_scale() -> None:
         vdl = next(track for track in tracks if track["id"] == "vdl")
 
         assert result["changed"] is True
-        assert vdl["x_scale"] == {"kind": "linear", "min": 200, "max": 1200}
+        assert vdl["x_scale"] == {"kind": "linear", "min": 250, "max": 1100}
 
 
 def test_stable_report_settings_updates_matplotlib_style() -> None:
@@ -475,7 +560,7 @@ def test_stable_fill_persists_between_instance_crossover_metadata() -> None:
 
 
 def test_stable_source_inspection_is_json_serializable() -> None:
-    """Normalize NumPy-backed LAS metadata before returning the MCP payload."""
+    """Normalize NumPy-backed LAS metadata and gate full metadata explicitly."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
         fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
 
@@ -488,10 +573,22 @@ def test_stable_source_inspection_is_json_serializable() -> None:
             root=REPO_ROOT,
             image_factory=lambda data: data,
         )
+        with_metadata = dispatch_stable_tool(
+            "inspect_source",
+            {
+                "source_path": str(fixture.las_path),
+                "source_format": "auto",
+                "include_metadata": True,
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
 
         json.dumps(result)
         assert result["available_channels"]
         assert "GR" in result["available_channels"]
+        assert "well_metadata" not in result["items"][0]
+        assert "well_metadata" in with_metadata["items"][0]
 
 
 def test_stable_binding_update_infers_channel_from_binding_id() -> None:
@@ -575,12 +672,13 @@ def test_stable_scoped_preview_uses_section_renderer() -> None:
     """A section-scoped preview must render the log section, not report page zero."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
         fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
-        with patch(
-            "wellplot.mcp.stable.service.preview_section_png",
-            return_value=b"section-preview",
-        ) as section_preview, patch(
-            "wellplot.mcp.stable.service.preview_logfile_png"
-        ) as report_preview:
+        with (
+            patch(
+                "wellplot.mcp.stable.service.preview_section_png",
+                return_value=b"section-preview",
+            ) as section_preview,
+            patch("wellplot.mcp.stable.service.preview_logfile_png") as report_preview,
+        ):
             result = dispatch_stable_tool(
                 "preview_logfile",
                 {

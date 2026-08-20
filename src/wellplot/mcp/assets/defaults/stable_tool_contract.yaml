@@ -11,7 +11,7 @@ tools:
       kind: string
       overwrite: boolean
   - id: inspect_authoring
-    description: Inspect scoped canonical authoring objects and identities.
+    description: Inspect scoped canonical authoring objects. detail=summary is the compact default; detail=full returns complete selected objects.
     mode: inspection
     read_only: true
     idempotent: true
@@ -23,7 +23,7 @@ tools:
       track_id: string
       detail: [summary, full]
   - id: inspect_source
-    description: Inspect source metadata and available channels.
+    description: Inspect source metadata and available channels. include_metadata=false returns a compact channel summary; true includes full well metadata and provenance.
     mode: inspection
     read_only: true
     idempotent: true
@@ -36,7 +36,7 @@ tools:
       channels: string_list
       include_metadata: boolean
   - id: inspect_vocab
-    description: Inspect supported object families, defaults, and style vocabulary.
+    description: Inspect supported vocabulary. family selects one object family; detail=summary is compact and detail=full returns the selected catalog payload.
     mode: inspection
     read_only: true
     idempotent: true

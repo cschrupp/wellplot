@@ -81,12 +81,24 @@ class StableRenderArtifactResult(StableArtifactResult):
     page_count: int
 
 
+class StableDraftCreationResult(_StableResult):
+    """Compact result for persisted draft creation, cloning, or saving."""
+
+    ok: bool
+    changed: bool
+    logfile_path: str
+    starter: str
+    section_ids: list[str]
+    section_count: int
+
+
 class StableMutationResult(_StableResult):
     """Structured result for one persisted authoring mutation."""
 
     ok: bool
     changed: bool
     target: dict[str, Any]
+    changed_fields: list[str]
     before: dict[str, Any]
     after: dict[str, Any]
 
@@ -285,6 +297,8 @@ def _output_model(name: str, mode: str) -> type[BaseModel] | None:
     """Return the single typed output envelope for one stable responsibility."""
     if name == "preview_logfile":
         return None
+    if name == "create_draft":
+        return StableDraftCreationResult
     if name == "inspect_source":
         return StableSourceInspectionResult
     if name == "edit_header":

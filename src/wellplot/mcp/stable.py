@@ -116,8 +116,207 @@ def _snapshot(
     except (FileNotFoundError, KeyError, TemplateValidationError, ValueError):
         return None
     if isinstance(value, BaseModel):
-        return value.model_dump(mode="json", exclude_none=True)
+        return _normalize_authoring_snapshot(value.model_dump(mode="json", exclude_none=True))
     return None
+
+
+_IDENTITY_FIELDS = (
+    "id",
+    "binding_id",
+    "fill_id",
+    "annotation_id",
+    "remark_id",
+    "slot_id",
+    "channel",
+    "title",
+    "label",
+    "kind",
+)
+_COLLECTION_FIELDS = ("tracks", "bindings", "annotations", "fills", "remarks", "rows")
+_COMPATIBILITY_DIFF_FIELDS = {"extensions"}
+
+
+def _object_summary(value: object) -> dict[str, object]:
+    """Return a bounded identity summary for an added or removed object."""
+    if not isinstance(value, Mapping):
+        return {"value": _json_safe(value)}
+    summary = {
+        key: _json_safe(value[key])
+        for key in _IDENTITY_FIELDS
+        if key in value and value[key] is not None
+    }
+    for key in _COLLECTION_FIELDS:
+        collection = value.get(key)
+        if isinstance(collection, list):
+            summary[f"{key}_count"] = len(collection)
+    return summary or {"field_count": len(value)}
+
+
+def _added_or_removed_value(value: object) -> object:
+    """Return compact evidence for a value that exists on one side only."""
+    if isinstance(value, Mapping):
+        return _object_summary(value)
+    if isinstance(value, list):
+        if len(value) <= 12 and all(not isinstance(item, (Mapping, list)) for item in value):
+            return _json_safe(value)
+        return {"count": len(value)}
+    return _json_safe(value)
+
+
+def _normalize_authoring_snapshot(value: object) -> object:
+    """Remove serialization defaults that do not represent an authored change."""
+    if isinstance(value, list):
+        return [_normalize_authoring_snapshot(item) for item in value]
+    if not isinstance(value, Mapping):
+        return value
+    normalized = {str(key): _normalize_authoring_snapshot(item) for key, item in value.items()}
+    channel = normalized.get("channel")
+    if isinstance(channel, str) and normalized.get("label") == channel:
+        normalized.pop("label", None)
+    return normalized
+
+
+def _collection_identifier(value: Mapping[str, object]) -> str | None:
+    """Return a stable identifier for one nested authoring collection item."""
+    for key in ("id", "binding_id", "fill_id", "annotation_id", "remark_id", "slot_id"):
+        candidate = value.get(key)
+        if isinstance(candidate, str) and candidate.strip():
+            return candidate
+    return None
+
+
+def _diff_collection(
+    before: list[object],
+    after: list[object],
+    *,
+    path: str,
+    changed_fields: list[str],
+) -> tuple[object, object]:
+    """Return a compact change summary for one list-valued authoring property."""
+    before_items = [item for item in before if isinstance(item, Mapping)]
+    after_items = [item for item in after if isinstance(item, Mapping)]
+    before_ids = {_collection_identifier(item): item for item in before_items}
+    after_ids = {_collection_identifier(item): item for item in after_items}
+    has_stable_ids = (
+        len(before_items) == len(before)
+        and len(after_items) == len(after)
+        and None not in before_ids
+        and None not in after_ids
+        and len(before_ids) == len(before)
+        and len(after_ids) == len(after)
+    )
+    if has_stable_ids:
+        before_changes: dict[str, object] = {}
+        after_changes: dict[str, object] = {}
+        for identifier in sorted(set(before_ids) | set(after_ids)):
+            item_path = f"{path}[{identifier}]"
+            previous = before_ids.get(identifier)
+            current = after_ids.get(identifier)
+            if previous is None:
+                changed_fields.append(item_path)
+                before_changes[identifier] = {}
+                after_changes[identifier] = _object_summary(current)
+                continue
+            if current is None:
+                changed_fields.append(item_path)
+                before_changes[identifier] = _object_summary(previous)
+                after_changes[identifier] = {}
+                continue
+            previous_change, current_change = _diff_value(
+                previous,
+                current,
+                path=item_path,
+                changed_fields=changed_fields,
+            )
+            if previous_change != {} or current_change != {}:
+                before_changes[identifier] = previous_change
+                after_changes[identifier] = current_change
+        return {"by_id": before_changes}, {"by_id": after_changes}
+    if (
+        len(before) <= 12
+        and len(after) <= 12
+        and all(not isinstance(item, (Mapping, list)) for item in [*before, *after])
+    ):
+        changed_fields.append(path)
+        return _json_safe(before), _json_safe(after)
+    changed_fields.append(path)
+    return {"count": len(before)}, {"count": len(after)}
+
+
+def _diff_value(
+    before: object,
+    after: object,
+    *,
+    path: str,
+    changed_fields: list[str],
+) -> tuple[object, object]:
+    """Return changed values only, retaining nested identities where available."""
+    if before == after:
+        return {}, {}
+    if isinstance(before, Mapping) and isinstance(after, Mapping):
+        before_changes: dict[str, object] = {}
+        after_changes: dict[str, object] = {}
+        for key in sorted(set(before) | set(after)):
+            # Compatibility extensions are materialized by legacy YAML conversion.
+            # They are not accepted by stable tools, so reporting them as an edit
+            # would bury the requested mutation under serialization noise.
+            if key in _COMPATIBILITY_DIFF_FIELDS:
+                continue
+            item_path = f"{path}.{key}" if path else str(key)
+            previous = before.get(key)
+            current = after.get(key)
+            if key not in before:
+                changed_fields.append(item_path)
+                before_changes[str(key)] = {}
+                after_changes[str(key)] = _added_or_removed_value(current)
+                continue
+            if key not in after:
+                changed_fields.append(item_path)
+                before_changes[str(key)] = _added_or_removed_value(previous)
+                after_changes[str(key)] = {}
+                continue
+            previous_change, current_change = _diff_value(
+                previous,
+                current,
+                path=item_path,
+                changed_fields=changed_fields,
+            )
+            if previous_change != {} or current_change != {}:
+                before_changes[str(key)] = previous_change
+                after_changes[str(key)] = current_change
+        return before_changes, after_changes
+    if isinstance(before, list) and isinstance(after, list):
+        return _diff_collection(before, after, path=path, changed_fields=changed_fields)
+    changed_fields.append(path or "value")
+    return _json_safe(before), _json_safe(after)
+
+
+def _mutation_evidence(
+    before: Mapping[str, object] | None,
+    after: Mapping[str, object] | None,
+) -> tuple[bool, list[str], dict[str, object], dict[str, object]]:
+    """Build compact persisted-change evidence without returning full objects."""
+    if before is None and after is None:
+        return False, [], {}, {}
+    if before is None:
+        return True, ["created"], {}, _object_summary(after)
+    if after is None:
+        return True, ["removed"], _object_summary(before), {}
+    changed_fields: list[str] = []
+    previous, current = _diff_value(before, after, path="", changed_fields=changed_fields)
+    return bool(changed_fields), changed_fields, dict(previous), dict(current)
+
+
+def _draft_text(logfile_path: str, root: str | Path) -> str | None:
+    """Return the current draft text without loading source data or rendering."""
+    resolved = service._resolve_user_path(
+        logfile_path,
+        root=service.resolve_server_root(root),
+        context="logfile_path",
+    )
+    if not resolved.is_file():
+        return None
+    return resolved.read_text(encoding="utf-8")
 
 
 def _mutation(
@@ -129,12 +328,14 @@ def _mutation(
     before = _snapshot(logfile_path, target, root)
     mutate()
     after = _snapshot(logfile_path, target, root)
+    changed, changed_fields, before_change, after_change = _mutation_evidence(before, after)
     return {
         "ok": True,
-        "changed": before != after,
+        "changed": changed,
         "target": dict(target),
-        "before": before or {},
-        "after": after or {},
+        "changed_fields": changed_fields,
+        "before": before_change,
+        "after": after_change,
         "warnings": [],
         "next_steps": [],
     }
@@ -157,8 +358,11 @@ def _scale_snapshot(
         for ref in authoring.list("curve_binding", section_id=section_id, track_id=track_id)
     ]
     return {
-        "track": track.model_dump(mode="json", exclude_none=True),
-        "bindings": [item.model_dump(mode="json", exclude_none=True) for item in bindings],
+        "track": _normalize_authoring_snapshot(track.model_dump(mode="json", exclude_none=True)),
+        "bindings": [
+            _normalize_authoring_snapshot(item.model_dump(mode="json", exclude_none=True))
+            for item in bindings
+        ],
     }
 
 
@@ -184,12 +388,14 @@ def _scale_mutation(
         track_id=track_id,
         root=root,
     )
+    changed, changed_fields, before_change, after_change = _mutation_evidence(before, after)
     return {
         "ok": True,
-        "changed": before != after,
+        "changed": changed,
         "target": _target("track", track_id, {"section_id": section_id}),
-        "before": before,
-        "after": after,
+        "changed_fields": changed_fields,
+        "before": before_change,
+        "after": after_change,
         "warnings": [],
         "next_steps": [],
     }
@@ -231,12 +437,17 @@ def _matplotlib_style_mutation(
         root=root,
     )
     after = _matplotlib_style_snapshot(logfile_path, root)
+    changed, changed_fields, before_change, after_change = _mutation_evidence(
+        {"style": before},
+        {"style": after},
+    )
     return {
         "ok": True,
-        "changed": before != after,
+        "changed": changed,
         "target": {"object_kind": "document", "object_id": "document"},
-        "before": {"style": before},
-        "after": {"style": after},
+        "changed_fields": changed_fields,
+        "before": before_change,
+        "after": after_change,
         "warnings": [],
         "next_steps": [],
     }
@@ -257,6 +468,235 @@ def _target(kind: str, object_id: str, arguments: Mapping[str, object]) -> dict[
         if arguments.get(key) is not None:
             value[key] = str(arguments[key])
     return value
+
+
+_SUMMARY_OBJECT_FIELDS = (
+    "subtitle",
+    "width_mm",
+    "depth_range",
+    "scale",
+    "value",
+    "unit",
+    "provenance",
+    "availability",
+    "render_mode",
+    "profile",
+    "normalization",
+    "show_raster",
+)
+_VOCABULARY_FAMILIES = {
+    "track": ("track_kinds", "track_patch_keys", "track_archetypes", "move_track_selectors"),
+    "scale": ("scale_kinds",),
+    "fill": ("curve_fill_kinds",),
+    "annotation": ("annotation_object_kinds", "annotation_patch_keys"),
+    "header": ("heading_patch_keys", "heading_field_catalog", "header_archetypes"),
+    "section": ("section_patch_keys",),
+    "page": (
+        "page_patch_keys",
+        "render_patch_keys",
+        "depth_axis_patch_keys",
+        "report_detail_kinds",
+    ),
+    "curve_binding": ("curve_binding_patch_keys",),
+    "raster_binding": ("raster_binding_patch_keys",),
+}
+
+
+def _authoring_object_summary(item: Mapping[str, object]) -> dict[str, object]:
+    """Project one canonical authoring object into a compact inspection row."""
+    reference = item.get("ref")
+    raw_object = item.get("object")
+    object_mapping = raw_object if isinstance(raw_object, Mapping) else {}
+    summary = _object_summary(object_mapping)
+    for field in _SUMMARY_OBJECT_FIELDS:
+        value = object_mapping.get(field)
+        if value is not None:
+            summary[field] = _json_safe(value)
+    compact_reference = (
+        {
+            key: _json_safe(reference[key])
+            for key in ("object_kind", "object_id", "section_id", "track_id", "index")
+            if isinstance(reference, Mapping) and reference.get(key) is not None
+        }
+        if isinstance(reference, Mapping)
+        else _json_safe(reference)
+    )
+    return {"ref": compact_reference, "summary": summary}
+
+
+def _compact_vocabulary_value(value: object) -> object:
+    """Summarize one vocabulary member without hiding its usable scalar values."""
+    if isinstance(value, list):
+        if all(isinstance(item, str) for item in value):
+            return list(value)
+        identifiers = [
+            str(item[key])
+            for item in value
+            if isinstance(item, Mapping)
+            for key in ("id", "key", "name")
+            if isinstance(item.get(key), str)
+        ]
+        return {"count": len(value), "ids": identifiers}
+    if isinstance(value, Mapping):
+        return {"count": len(value), "keys": sorted(str(key) for key in value)}
+    return _json_safe(value)
+
+
+def _compact_target_summary(value: object) -> dict[str, object] | None:
+    """Keep target context useful without returning binding and annotation payloads."""
+    if not isinstance(value, Mapping):
+        return None
+    keys = (
+        "target_kind",
+        "target_path",
+        "section_ids",
+        "track_ids_by_section",
+        "available_channels_by_section",
+        "heading_general_field_keys",
+        "has_heading",
+        "has_remarks",
+        "has_tail",
+    )
+    return {key: _json_safe(value[key]) for key in keys if key in value}
+
+
+def _vocabulary_inspection(
+    result: object,
+    *,
+    family: object,
+    detail: object,
+) -> dict[str, object]:
+    """Apply the public vocabulary scope and detail controls to one service result."""
+    normalized_detail = str(detail or "summary").strip().lower()
+    if normalized_detail not in {"summary", "full"}:
+        raise TemplateValidationError("inspect_vocab detail must be 'summary' or 'full'.")
+    normalized_family = str(family or "").strip().lower()
+    if normalized_family and normalized_family not in _VOCABULARY_FAMILIES:
+        allowed = ", ".join(sorted(_VOCABULARY_FAMILIES))
+        raise TemplateValidationError(
+            f"Unsupported inspect_vocab family {family!r}. Allowed: {allowed}."
+        )
+    payload = asdict(result)
+    selected_keys = (
+        _VOCABULARY_FAMILIES[normalized_family]
+        if normalized_family
+        else tuple(key for keys in _VOCABULARY_FAMILIES.values() for key in keys)
+    )
+    values = {key: payload[key] for key in selected_keys if key in payload}
+    response: dict[str, object] = {
+        "family": normalized_family or "all",
+        "detail": normalized_detail,
+        "resource_uris": payload["resource_uris"],
+    }
+    if normalized_detail == "full":
+        response["values"] = _json_safe(values)
+        response["target_summary"] = _json_safe(payload.get("target_summary"))
+        return response
+    response["available_families"] = sorted(_VOCABULARY_FAMILIES)
+    response["values"] = (
+        {key: _compact_vocabulary_value(value) for key, value in values.items()}
+        if normalized_family
+        else {}
+    )
+    response["target_summary"] = _compact_target_summary(payload.get("target_summary"))
+    return response
+
+
+def _source_inspection_summary(
+    value: Mapping[str, object],
+    *,
+    include_metadata: bool,
+) -> dict[str, object]:
+    """Project raw source metadata into the default model-facing source summary."""
+    channels = value.get("channels")
+    channel_summaries = []
+    if isinstance(channels, list):
+        channel_summaries = [
+            {
+                key: _json_safe(channel[key])
+                for key in (
+                    "mnemonic",
+                    "kind",
+                    "value_unit",
+                    "description",
+                    "value_shape",
+                    "sample_axis_count",
+                    "sample_unit",
+                )
+                if isinstance(channel, Mapping) and key in channel
+            }
+            for channel in channels
+            if isinstance(channel, Mapping)
+        ]
+    summary = {
+        key: _json_safe(value[key])
+        for key in (
+            "source_path",
+            "source_format_detected",
+            "dataset_name",
+            "index",
+            "channel_count",
+            "warnings",
+        )
+        if key in value
+    }
+    summary["channels"] = channel_summaries
+    if include_metadata:
+        summary["metadata_keys"] = _json_safe(value.get("metadata_keys", []))
+        summary["well_metadata"] = _json_safe(value.get("well_metadata", {}))
+        summary["provenance"] = _json_safe(value.get("provenance", {}))
+    return summary
+
+
+def _logfile_source_summary(value: Mapping[str, object]) -> dict[str, object]:
+    """Return source-relevant draft identity without the full page configuration."""
+    sections = value.get("sections")
+    section_summaries = (
+        [
+            {
+                key: _json_safe(section[key])
+                for key in (
+                    "id",
+                    "title",
+                    "source_path",
+                    "source_format",
+                    "depth_range",
+                    "track_ids",
+                    "track_kinds",
+                )
+                if isinstance(section, Mapping) and key in section
+            }
+            for section in sections
+            if isinstance(section, Mapping)
+        ]
+        if isinstance(sections, list)
+        else []
+    )
+    return {
+        "name": _json_safe(value.get("name")),
+        "section_ids": _json_safe(value.get("section_ids", [])),
+        "sections": section_summaries,
+    }
+
+
+def _channel_availability_summary(value: Mapping[str, object]) -> dict[str, object]:
+    """Return requested-channel evidence without echoing full source metadata."""
+    return {
+        key: _json_safe(value[key])
+        for key in (
+            "target_kind",
+            "source_path",
+            "source_format_detected",
+            "logfile_path",
+            "section_id",
+            "requested_channels",
+            "found_channels",
+            "missing_channels",
+            "resolutions",
+            "warnings",
+        )
+        if key in value
+    }
 
 
 def _direct_section_add(arguments: Mapping[str, object], root: str | Path) -> object:
@@ -462,7 +902,21 @@ def dispatch_stable_tool(
                 root=root,
             )
 
-        return _mutation(output, _target("document", "document", {}), root, create)
+        before_text = _draft_text(output, root)
+        create()
+        after_text = _draft_text(output, root)
+        summary = service.inspect_logfile(output, root=root)
+        starter = args.get("kind") or args.get("source_logfile_path") or "yaml_text"
+        return {
+            "ok": True,
+            "changed": before_text != after_text,
+            "logfile_path": output,
+            "starter": str(starter),
+            "section_ids": summary.section_ids,
+            "section_count": len(summary.section_ids),
+            "warnings": [],
+            "next_steps": [],
+        }
 
     if name == "inspect_authoring":
         result = service.inspect_authoring_objects(
@@ -472,34 +926,52 @@ def dispatch_stable_tool(
             track_id=args.get("track_id"),
             root=root,
         )
-        return {"ok": True, "items": result.objects, "warnings": [], "next_steps": []}
+        detail = str(args.get("detail", "summary")).strip().lower()
+        if detail not in {"summary", "full"}:
+            raise TemplateValidationError("inspect_authoring detail must be 'summary' or 'full'.")
+        items = (
+            result.objects
+            if detail == "full"
+            else [
+                _authoring_object_summary(item)
+                for item in result.objects
+                if isinstance(item, Mapping)
+            ]
+        )
+        return {
+            "ok": True,
+            "items": items,
+            "warnings": [],
+            "next_steps": [],
+        }
 
     if name == "inspect_source":
         items: list[object] = []
         source_path = args.get("source_path")
         source_summary: Mapping[str, object] | None = None
         if source_path is not None:
-            source_summary_value = _json_safe(
+            source_summary_value = _source_inspection_summary(
                 asdict(
                     service.inspect_data_source(
                         str(source_path),
                         source_format=str(args.get("source_format", "auto")),
                         root=root,
                     )
-                )
+                ),
+                include_metadata=bool(args.get("include_metadata", False)),
             )
-            source_summary = (
-                source_summary_value if isinstance(source_summary_value, Mapping) else None
-            )
+            source_summary = source_summary_value
             items.append(source_summary_value)
         elif logfile_path:
-            items.append(_json_safe(asdict(service.inspect_logfile(logfile_path, root=root))))
+            items.append(
+                _logfile_source_summary(asdict(service.inspect_logfile(logfile_path, root=root)))
+            )
         else:
             raise TemplateValidationError("inspect_source requires logfile_path or source_path.")
         channels = args.get("channels")
         if isinstance(channels, list) and channels:
             items.append(
-                _json_safe(
+                _channel_availability_summary(
                     asdict(
                         service.check_channel_availability(
                             [str(channel) for channel in channels],
@@ -539,7 +1011,18 @@ def dispatch_stable_tool(
 
     if name == "inspect_vocab":
         result = service.inspect_authoring_vocab(root=root)
-        return {"ok": True, "items": [asdict(result)], "warnings": [], "next_steps": []}
+        return {
+            "ok": True,
+            "items": [
+                _vocabulary_inspection(
+                    result,
+                    family=args.get("family"),
+                    detail=args.get("detail", "summary"),
+                )
+            ],
+            "warnings": [],
+            "next_steps": [],
+        }
 
     if name == "validate_logfile":
         result = service.validate_logfile(logfile_path, root=root)
@@ -616,12 +1099,17 @@ def dispatch_stable_tool(
                 root=root,
             )
             after = _snapshot(logfile_path, target, root)
+            changed, changed_fields, before_change, after_change = _mutation_evidence(
+                before,
+                after,
+            )
             return {
                 "ok": True,
-                "changed": before != after,
+                "changed": changed,
                 "target": target,
-                "before": before or {},
-                "after": after or {},
+                "changed_fields": changed_fields,
+                "before": before_change,
+                "after": after_change,
                 "logfile_path": applied.logfile_path,
                 "overwrite_policy": applied.overwrite_policy,
                 "applied_assignments": applied.applied_assignments,
