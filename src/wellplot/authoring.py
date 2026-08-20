@@ -1572,7 +1572,13 @@ def _legacy_to_authoring(
                     )
                 )
             elif kind == "array":
-                authoring_tracks.append(ArrayTrackSpec(**common, bindings=canonical_bindings))
+                authoring_tracks.append(
+                    ArrayTrackSpec(
+                        **common,
+                        x_scale=x_scale,
+                        bindings=canonical_bindings,
+                    )
+                )
             else:
                 from .model.authoring import AnnotationTrackSpec
 

@@ -123,6 +123,7 @@ style_presets:
     binding_templates:
       - alias_id: bulk_density
         label: Density
+        label_template: '{label} ({channel})'
         scale:
           kind: linear
           min: 1.95
@@ -132,10 +133,19 @@ style_presets:
           line_width: 1.3
       - alias_id: neutron_porosity
         label: Neutron
+        label_template: '{label} ({channel})'
         scale:
           kind: linear
           min: 0.45
           max: -0.15
+        scale_variants:
+          - id: percentage_porosity
+            when:
+              value_abs_max_gt: 2.0
+            scale:
+              kind: linear
+              min: 45.0
+              max: -15.0
         style:
           color: '#1d4ed8'
           line_width: 1.1
@@ -154,6 +164,52 @@ style_presets:
       - Use one shared track for RHOB and NPHI.
       - Reverse the neutron scale so low porosity plots to the right.
       - Prefer add_curve_fill(kind='between_instances', other_channel='RHOB') for crossover fill.
+  - family: gr_sp_overviews
+    id: gr_sp_overview
+    agent_recovery_only: true
+    label: GR/SP Overview
+    summary: Conventional independent GR and SP scales on one overview track.
+    use_cases:
+      - gr/sp
+      - gamma ray
+      - spontaneous potential
+      - overview
+    track_patch:
+      kind: normal
+      width_mm: 32.0
+      grid:
+        display: true
+    channel_families:
+      gamma_ray:
+        - GR
+        - SGR
+        - CGR
+      spontaneous_potential:
+        - SP
+    binding_templates:
+      - alias_id: gamma_ray
+        label: Gamma Ray
+        label_template: '{label} ({channel})'
+        scale:
+          kind: linear
+          min: 0.0
+          max: 150.0
+        style:
+          color: '#166534'
+          line_width: 1.2
+      - alias_id: spontaneous_potential
+        label: Spontaneous Potential
+        label_template: '{label} ({channel})'
+        scale:
+          kind: linear
+          min: -80.0
+          max: 20.0
+        style:
+          color: '#dc2626'
+          line_width: 1.0
+    notes:
+      - Keep GR and SP on independent linear scales in one shared overview track.
+      - Omit SP cleanly when the source does not provide it.
   - family: gamma_ray_defaults
     id: gamma_ray_clean_print
     label: Gamma Ray Clean Print
@@ -175,6 +231,7 @@ style_presets:
     binding_templates:
       - alias_id: gamma_ray
         label: Gamma Ray
+        label_template: '{label} ({channel})'
         scale:
           kind: linear
           min: 0.0
@@ -233,6 +290,7 @@ style_presets:
     binding_templates:
       - alias_id: shallow_resistivity
         label: RSH
+        label_template: '{label} ({channel})'
         scale:
           kind: log
           min: 0.2
@@ -243,6 +301,7 @@ style_presets:
           line_style: ':'
       - alias_id: medium_resistivity
         label: RME
+        label_template: '{label} ({channel})'
         scale:
           kind: log
           min: 0.2
@@ -252,6 +311,7 @@ style_presets:
           line_width: 1.0
       - alias_id: deep_resistivity
         label: RDEEP
+        label_template: '{label} ({channel})'
         scale:
           kind: log
           min: 0.2

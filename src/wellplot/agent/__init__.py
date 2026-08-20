@@ -48,6 +48,11 @@ from .notebook import (
     display_phase_previews,
     relative_path,
 )
+from .tool_contract import (
+    StableToolProfile,
+    stable_tool_budget,
+    stable_tool_profile,
+)
 
 __all__ = [
     "AuthoringRequest",
@@ -73,4 +78,7 @@ __all__ = [
     "relative_path",
     "revise_authoring_request",
     "run_authoring_request",
+    "StableToolProfile",
+    "stable_tool_budget",
+    "stable_tool_profile",
 ]

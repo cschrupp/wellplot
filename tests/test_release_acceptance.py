@@ -57,6 +57,12 @@ def test_release_metadata_and_notebook_prompts_are_user_facing() -> None:
     assert "include_phase_previews=True" in las_source
     assert "display_authoring_result" in las_source
 
+    cbl_source = _notebook_source(notebook_paths[1])
+    assert "AGENT_OPTION" in cbl_source
+    assert "provider=PROVIDER" in cbl_source
+    assert "_require_cbl_packet_ready" in cbl_source
+    assert "CBL packet acceptance failed before render" in cbl_source
+
 
 def test_release_documentation_explains_optional_defaults_and_diagnostics() -> None:
     """Keep the published guidance aligned with open-world authoring behavior."""

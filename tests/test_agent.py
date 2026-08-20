@@ -395,6 +395,45 @@ class FakeMcpSession:
                     "warnings": [],
                 }
             )
+        if name == "edit_header":
+            values = dict(arguments.get("values", {}))
+            return SimpleNamespace(
+                structuredContent={
+                    "ok": True,
+                    "changed": True,
+                    "target": {"object_kind": "header", "object_id": "header"},
+                    "before": {},
+                    "after": {},
+                    "applied_assignments": [
+                        {
+                            "input_key": key,
+                            "input_value": value,
+                            "target_key": "rm_bottom_temp",
+                            "display_label": "RM @ Bottom Temp",
+                        }
+                        for key, value in values.items()
+                    ],
+                    "skipped_assignments": [],
+                    "warnings": [],
+                    "next_steps": [],
+                }
+            )
+        if name == "inspect_authoring":
+            return SimpleNamespace(
+                structuredContent={
+                    "ok": True,
+                    "items": [
+                        {
+                            "ref": {"object_kind": "section", "object_id": "main"},
+                            "object": {"tracks": [{"id": "gamma"}]},
+                        }
+                    ],
+                    "warnings": [],
+                    "next_steps": [],
+                }
+            )
+        if name == "preview_logfile":
+            return SimpleNamespace(content=[SimpleNamespace(data=b"stable-preview")])
         if name == "inspect_authoring_vocab":
             return SimpleNamespace(
                 structuredContent={
@@ -422,7 +461,7 @@ class FakeMcpSession:
             return SimpleNamespace(content=[SimpleNamespace(data=b"report-preview")])
         if name == "preview_section_png":
             return SimpleNamespace(content=[SimpleNamespace(data=b"section-preview")])
-        if name == "render_logfile_to_file":
+        if name == "render_logfile":
             output_path = self.root / str(arguments["output_path"])
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("fake pdf output", encoding="utf-8")
@@ -759,6 +798,61 @@ class AgentTests(unittest.TestCase):
                 result.user_report_text,
             )
             self.assertIn("RM @ Measured Temp", result.user_report_text)
+
+    def test_revision_routes_qualified_header_fill_before_stable_provider_loop(self) -> None:
+        """Keep a qualified header revision out of the model's target-selection loop."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            draft_path = root / "workspace" / "demo.log.yaml"
+            draft_path.parent.mkdir(parents=True, exist_ok=True)
+            draft_path.write_text("name: Demo Draft\n", encoding="utf-8")
+
+            backend = mock.Mock()
+            backend.provider = "fake"
+            backend.model = "fake-model"
+            backend.credential_source = "fake credential"
+            backend.run_authoring = mock.AsyncMock()
+            runtime = FakeRuntime(root)
+            session = AuthoringSession(backend=backend, runtime=runtime)
+
+            with mock.patch.object(
+                AuthoringSession,
+                "_stable_tool_catalog",
+                new=mock.AsyncMock(
+                    return_value=[SimpleNamespace(name="inspect_authoring")],
+                ),
+            ) as stable_catalog:
+                result = anyio.run(
+                    session.revise_request,
+                    RevisionRequest(
+                        feedback="Set header RM at bottom temperature to 0.010 @ 100.",
+                        logfile_path="workspace/demo.log.yaml",
+                    ),
+                )
+
+            backend.run_authoring.assert_not_awaited()
+            stable_catalog.assert_awaited_once()
+            self.assertIn("deterministic stable header assignment", result.final_text)
+            assert runtime.last_session is not None
+            tool_names = [name for name, _arguments in runtime.last_session.tool_calls]
+            self.assertEqual(
+                tool_names[:4],
+                [
+                    "edit_header",
+                    "validate_logfile",
+                    "inspect_authoring",
+                    "preview_logfile",
+                ],
+            )
+            header_call = next(
+                arguments
+                for name, arguments in runtime.last_session.tool_calls
+                if name == "edit_header"
+            )
+            self.assertEqual(
+                header_call["values"],
+                {"RM at bottom temperature": "0.010 @ 100"},
+            )
 
     def test_header_clarification_follow_up_revalidates_and_applies_choice(self) -> None:
         """Resolve an ambiguous header value from a natural follow-up request."""
@@ -1150,7 +1244,7 @@ class AgentTests(unittest.TestCase):
             self.assertEqual(result["page_count"], 1)
             self.assertTrue((root / "workspace" / "demo.pdf").exists())
             assert runtime.last_session is not None
-            self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile_to_file")
+            self.assertEqual(runtime.last_session.tool_calls[0][0], "render_logfile")
 
     def test_authoring_session_plan_does_not_infer_packet_blueprint(self) -> None:
         """Freeform planning does not turn packet terminology into authority."""

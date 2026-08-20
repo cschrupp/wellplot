@@ -449,7 +449,6 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
                 "on_missing": {"type": "string", "enum": ["skip", "error"]},
                 "channels": {
                     "type": "array",
-                    "minItems": 1,
                     "items": {"$ref": "#/$defs/documentChannelBinding"},
                 },
             },

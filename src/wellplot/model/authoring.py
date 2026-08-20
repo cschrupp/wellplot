@@ -939,6 +939,7 @@ class ArrayTrackSpec(_TrackSpec):
     """Array track containing raster bindings and supported curve overlays."""
 
     kind: Literal["array"] = "array"
+    x_scale: AuthoringScale | None = None
     bindings: list[BindingSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")

@@ -507,8 +507,9 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
     assert "bootstrap_starter" in las_source
     assert "Rmf measured:" in las_source
     assert "Rmc measured:" in las_source
-    assert "Set header RM to" in las_source
-    assert "Use the measured one." in las_source
+    assert "Set header RM at bottom temperature" in las_source
+    assert "Use RM @ Bottom Temp." in las_source
+    assert "0.011 @ 110" not in las_source
     assert "needs_clarification" in las_source
     assert "detail.rm_measured_temp" not in las_source
     assert "detail.rm_bottom_temp" not in las_source

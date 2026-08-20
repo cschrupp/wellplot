@@ -1245,11 +1245,21 @@ class McpServiceTests(unittest.TestCase):
                 str(draft_path),
                 section_id="main",
                 track_id="qc",
-                x_scale={"kind": "linear", "min": 0.0, "max": 200.0},
-                curve_scale={"kind": "linear", "min": 0.0, "max": 100.0},
+                x_scale={"kind": "linear", "min": 0.0, "max": 200.0, "unit": "gAPI"},
+                curve_scale={"kind": "linear", "min": 0.0, "max": 100.0, "unit": "gAPI"},
                 channel_scales={
-                    "CALI": {"kind": "linear", "min": 5.0, "max": 15.0},
-                    "GR": {"kind": "linear", "min": 10.0, "max": 110.0},
+                    "CALI": {
+                        "kind": "linear",
+                        "min": 5.0,
+                        "max": 15.0,
+                        "unit": "in",
+                    },
+                    "GR": {
+                        "kind": "linear",
+                        "min": 10.0,
+                        "max": 110.0,
+                        "unit": "gAPI",
+                    },
                 },
                 root=REPO_ROOT,
             )
@@ -1286,6 +1296,8 @@ class McpServiceTests(unittest.TestCase):
             }
             self.assertEqual(saved_qc_bindings["CALI"]["scale"]["min"], 5.0)
             self.assertEqual(saved_qc_bindings["GR"]["scale"]["max"], 110.0)
+            self.assertNotIn("unit", saved_track["x_scale"])
+            self.assertNotIn("unit", saved_qc_bindings["CALI"]["scale"])
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_set_track_scales_syncs_vertical_grid_for_log_tracks(self) -> None:
@@ -2799,6 +2811,16 @@ class McpServiceTests(unittest.TestCase):
                 {"rm_measured_temp", "rm_bottom_temp"},
             )
 
+            bottom_result = service.preview_header_mapping(
+                str(draft_path),
+                values={"RM at bottom temperature": "0.010 @ 100"},
+                root=REPO_ROOT,
+            )
+            self.assertEqual(
+                [entry["target_key"] for entry in bottom_result.resolved_assignments],
+                ["rm_bottom_temp"],
+            )
+
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
     def test_open_hole_archetype_resolves_common_ticket_aliases_without_rebuilding_layout(
         self,
@@ -3406,6 +3428,7 @@ class McpServiceTests(unittest.TestCase):
                 and binding.get("channel") == "RT"
             ]
             self.assertEqual(len(matching), 1)
+            self.assertEqual(matching[0]["label"], "RDEEP (RT)")
             self.assertEqual(matching[0]["style"]["color"], "#111827")
             self.assertEqual(matching[0]["style"]["line_width"], 1.3)
             self.assertEqual(matching[0]["scale"]["kind"], "log")

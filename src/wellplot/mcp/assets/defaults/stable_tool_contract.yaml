@@ -1,0 +1,236 @@
+version: 1
+tools:
+  - id: create_draft
+    description: Create, clone, or save one logfile draft.
+    mode: mutation
+    operations: [create, clone, save]
+    fields:
+      source_logfile_path: string
+      source_data_file: string
+      yaml_text: string
+      kind: string
+      overwrite: boolean
+  - id: inspect_authoring
+    description: Inspect scoped canonical authoring objects and identities.
+    mode: inspection
+    required: [logfile_path, object_kind]
+    fields:
+      logfile_path: string
+      object_kind: [page, depth, header_slot, service_title, section, track, curve_binding, raster_binding, annotation, fill, remark]
+      section_id: string
+      track_id: string
+      detail: [summary, full]
+  - id: inspect_source
+    description: Inspect source metadata and available channels.
+    mode: inspection
+    open_world: true
+    fields:
+      logfile_path: string
+      source_path: string
+      source_format: string
+      section_id: string
+      channels: string_list
+      include_metadata: boolean
+  - id: inspect_vocab
+    description: Inspect supported object families, defaults, and style vocabulary.
+    mode: inspection
+    fields:
+      family: string
+      detail: [summary, full]
+  - id: edit_header
+    description: Fill header slots and service titles without replacing the archetype. Use operation=apply_values with the values mapping for bulk or natural-language header assignments; slot_id is required only for set_slot and clear_slot.
+    mode: mutation
+    operations: [set_slot, set_service_title, apply_archetype, apply_values, clear_slot]
+    canonical_fields: header
+    fields:
+      logfile_path: string
+      slot_id: string
+      service_title: string
+      archetype_id: string
+      values: object
+      preserve_existing_values: boolean
+      overwrite_policy: string
+  - id: edit_report_settings
+    description: Update report, page, output, depth, section view, or report-wide Matplotlib style.
+    mode: mutation
+    operations: [set_report, set_page, set_output, set_depth, set_section_view, set_matplotlib_style]
+    fields:
+      section_id: string
+      title: string
+      subtitle: string
+      page: object
+      output: object
+      depth: object
+      view: object
+      depth_range: object
+      depth_range_unit: string
+      unit: string
+      scale: object
+      major_step: number
+      minor_step: number
+      style_patch: object
+  - id: edit_remarks
+    description: 'Remarks operations: add=remark{title,text,lines,alignment}; update=remark_id+patch; remove/move=remark_id; clear=all.'
+    mode: mutation
+    operations: [add, update, remove, move, clear]
+    canonical_fields: remark
+    destructive: true
+    fields:
+      remark_id: string
+      new_index: index
+      remark: object
+      remarks: object_list
+      patch: object
+  - id: edit_section
+    description: Create, update, remove, or move one report section. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.
+    mode: mutation
+    operations: [add, update, remove, move]
+    canonical_fields: section
+    destructive: true
+    fields:
+      section_id: string
+      new_index: index
+      section: object
+  - id: replicate_section_structure
+    description: Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks.
+    mode: mutation
+    operations: [replicate]
+    canonical_fields: section
+    fields:
+      source_section_id: string
+      target_section_id: string
+      source_path: string
+      source_format: string
+      title: string
+      subtitle: string
+      include_bindings: boolean
+      overwrite: boolean
+  - id: edit_track
+    description: Create, update, remove, move, clear, or set scales on one track. For operation=add, track_id is the new id and title, kind, and width_mm are required; add appends the track, then use operation=move for placement. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use operation=set_scales only when both are intentionally synchronized, or use update with x_scale and edit_curve_binding with scale independently. For update, remove, move, and clear_bindings, track_id must already exist.
+    mode: mutation
+    operations: [add, update, remove, move, clear_bindings, set_scales]
+    canonical_fields: track
+    destructive: true
+    fields:
+      section_id: string
+      track_id: string
+      kind: [normal, reference, array, annotation]
+      grid: object
+      new_index: index
+      title: string
+      width_mm: number
+      x_scale: object
+      curve_scale: object
+      channel_scales: object
+      sync_grid_to_scale: boolean
+      reference: object
+      track_header: object
+      annotations: object_list
+  - id: edit_curve_binding
+    description: Add, update, remove, or clear scalar curve bindings.
+    mode: mutation
+    operations: [add, update, remove, clear]
+    canonical_fields: curve
+    destructive: true
+    fields:
+      section_id: string
+      track_id: string
+      binding_id: string
+      channel: string
+      binding: object
+      patch: object
+      label: string
+      style: object
+      scale: object
+      header_display: object
+      wrap: boolean
+      render_mode: [line, value_labels]
+  - id: edit_raster_binding
+    description: Add, update, remove, or clear array/raster bindings.
+    mode: mutation
+    operations: [add, update, remove, clear]
+    canonical_fields: raster
+    destructive: true
+    fields:
+      section_id: string
+      track_id: string
+      binding_id: string
+      channel: string
+      binding: object
+      patch: object
+      label: string
+      style: object
+      profile: string
+      normalization: string
+      show_raster: boolean
+      alpha: number
+      color_limits: object
+  - id: edit_fill
+    description: Add, update, remove, or clear a fill relation.
+    mode: mutation
+    operations: [add, update, remove, clear]
+    destructive: true
+    fields:
+      section_id: string
+      track_id: string
+      fill_id: string
+      binding_id: string
+      other_binding_id: string
+      kind: [between_curves, between_instances, baseline_split]
+      label: string
+      color: string
+      alpha: number
+      crossover: object
+      channel: string
+      fill: object
+      patch: object
+  - id: edit_annotation
+    description: Add, update, remove, or clear typed annotations.
+    mode: mutation
+    operations: [add, update, remove, clear]
+    destructive: true
+    fields:
+      section_id: string
+      track_id: string
+      annotation_id: string
+      kind: [interval, text, marker, arrow, glyph]
+      depth: number
+      top: number
+      base: number
+      text: string
+      label: string
+      glyph: string
+      color: string
+      annotation: object
+      patch: object
+  - id: validate_logfile
+    description: Validate a persisted logfile and return actionable errors.
+    mode: validation
+    read_only: true
+    idempotent: true
+    required: [logfile_path]
+    fields:
+      logfile_path: string
+      strict: boolean
+  - id: preview_logfile
+    description: Render a scoped preview for visual verification.
+    mode: artifact
+    read_only: true
+    idempotent: true
+    required: [logfile_path]
+    fields:
+      logfile_path: string
+      focus: string
+      section_id: string
+      track_id: string
+      page: index
+  - id: render_logfile
+    description: Render a validated logfile to its configured artifact.
+    mode: artifact
+    destructive: true
+    required: [logfile_path]
+    fields:
+      logfile_path: string
+      output_path: string
+      backend: [matplotlib, plotly]
+      overwrite: boolean

@@ -153,6 +153,7 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
         "response_statuses": [],
         "required_tool_name": "inspect_logfile",
         "required_submission_accepted": False,
+        "controller_stopped": False,
     }
     assert [(call.name, call.arguments) for call in result.tool_trace] == [
         ("inspect_logfile", {"logfile_path": "draft.log.yaml"})
@@ -181,6 +182,63 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
         "function": {"name": "inspect_logfile"},
     }
     assert "tool_choice" not in completions.requests[1]
+
+
+def test_chat_adapter_honors_host_feedback_loop_stop() -> None:
+    """Stop provider calls when the host controller reports a terminal state."""
+    completions = _FakeCompletions(
+        [
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(
+                            name="inspect_logfile",
+                            arguments='{"logfile_path":"draft.log.yaml"}',
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    async def stop_loop(_: str, __: dict[str, object]) -> dict[str, object]:
+        """Return the host controller's terminal feedback."""
+        return {
+            "ok": False,
+            "_agent_control": {
+                "action": "stop",
+                "status": "blocked",
+                "message": "Repeated inspection errors.",
+            },
+        }
+
+    result = anyio.run(
+        partial(
+            run_chat_completions_authoring_loop,
+            client=client,
+            model="local-model",
+            provider_label="OpenAI-compatible",
+            instructions="Use the available tools.",
+            initial_user_message="Inspect the draft.",
+            tool_definitions=[
+                FunctionToolDefinition(
+                    name="inspect_logfile",
+                    description="Inspect a draft.",
+                    parameters={"type": "object"},
+                )
+            ],
+            tool_caller=stop_loop,
+            max_rounds=12,
+        )
+    )
+
+    assert result.final_text == "Repeated inspection errors."
+    assert len(completions.requests) == 1
+    assert result.report_facts["provider_response"]["controller_stopped"] is True
 
 
 def test_chat_adapter_preserves_partial_trace_on_round_exhaustion() -> None:

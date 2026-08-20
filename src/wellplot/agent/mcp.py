@@ -166,6 +166,10 @@ class LocalStdioMcpRuntime:
         structured = getattr(result, "structuredContent", None)
         if isinstance(structured, dict):
             payload["structured"] = structured
+            if is_error:
+                error_value = structured.get("error") or structured.get("message")
+                if isinstance(error_value, str) and error_value.strip():
+                    payload["error"] = error_value.strip()
             return payload
 
         content_items: list[dict[str, object]] = []
@@ -184,4 +188,12 @@ class LocalStdioMcpRuntime:
                     }
                 )
         payload["content"] = content_items
+        if is_error:
+            error_text = "\n".join(
+                str(item["text"]).strip()
+                for item in content_items
+                if isinstance(item.get("text"), str) and item["text"].strip()
+            )
+            if error_text:
+                payload["error"] = error_text
         return payload

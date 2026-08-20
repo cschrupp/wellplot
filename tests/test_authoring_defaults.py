@@ -27,6 +27,7 @@ def test_defaults_catalog_loads_generic_track_and_style_entries() -> None:
     }
     assert {entry["id"] for entry in presets} == {
         "density_neutron_overlay",
+        "gr_sp_overview",
         "gamma_ray_clean_print",
         "triple_combo_resistivity",
         "cbl_vdl_high_contrast",

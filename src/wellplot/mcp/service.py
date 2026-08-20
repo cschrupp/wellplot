@@ -1572,8 +1572,13 @@ def _find_curve_binding_index(
             matches.append((index, binding))
     if binding_id is not None:
         normalized_binding_id = str(binding_id).strip()
-        for index, binding in matches:
+        for ordinal, (index, binding) in enumerate(matches, start=1):
             if str(binding.get("id", "")).strip() == normalized_binding_id:
+                return index
+            canonical_id = (
+                f"{section_id}.{track_id}.{binding.get('channel', channel)}.{ordinal}"
+            )
+            if canonical_id == normalized_binding_id:
                 return index
         raise TemplateValidationError(
             f"Curve binding id {binding_id!r} for channel {channel!r} was not found on "
@@ -4832,8 +4837,34 @@ def _legacy_scale_from_authoring(scale: object) -> dict[str, object]:
         "min": scale.minimum,
         "max": scale.maximum,
         **({"reverse": True} if scale.reverse else {}),
-        **({"unit": scale.unit} if scale.unit is not None else {}),
     }
+
+
+def _legacy_scale_payload(value: object) -> object:
+    """Normalize canonical or provider scale keys for the legacy logfile schema."""
+    if not isinstance(value, dict):
+        return deepcopy(value)
+
+    normalized = deepcopy(value)
+    # Units are represented by source/channel metadata, not legacy scale specs.
+    normalized.pop("unit", None)
+    domain = normalized.pop("domain", None)
+    if isinstance(domain, (list, tuple)) and len(domain) == 2:
+        normalized.setdefault("min", domain[0])
+        normalized.setdefault("max", domain[1])
+    if "minimum" in normalized:
+        normalized.setdefault("min", normalized["minimum"])
+        normalized.pop("minimum", None)
+    if "maximum" in normalized:
+        normalized.setdefault("max", normalized["maximum"])
+        normalized.pop("maximum", None)
+    if "type" in normalized and "kind" not in normalized:
+        normalized["kind"] = normalized.pop("type")
+    if normalized.get("kind") == "logarithmic":
+        normalized["kind"] = "log"
+    if normalized.get("kind") == "tangent":
+        normalized["kind"] = "tangential"
+    return normalized
 
 
 def _canonical_scale_patch(value: object) -> object:
@@ -4864,6 +4895,18 @@ def _legacy_style_from_authoring(
         normalized["opacity"] = normalized.pop("alpha")
     if fallback_color is not None:
         normalized.setdefault("color", fallback_color)
+    return normalized
+
+
+def _legacy_style_payload(value: object) -> object:
+    """Normalize canonical alpha to the legacy renderer's opacity key."""
+    if not isinstance(value, dict):
+        return deepcopy(value)
+
+    normalized = deepcopy(value)
+    if "alpha" in normalized:
+        normalized.setdefault("opacity", normalized["alpha"])
+        normalized.pop("alpha", None)
     return normalized
 
 
@@ -6016,7 +6059,7 @@ def add_track(
         "position": len(existing_track_ids) + 1,
     }
     if x_scale is not None:
-        track_mapping["x_scale"] = deepcopy(x_scale)
+        track_mapping["x_scale"] = _legacy_scale_payload(x_scale)
     if grid is not None:
         track_mapping["grid"] = deepcopy(grid)
     if track_header is not None:
@@ -6107,6 +6150,20 @@ def update_track(
             updated_track[key] = deepcopy(value)
 
         tracks[track_index] = updated_track
+
+    # A track scale defines the shared grid coordinate system unless the
+    # caller supplies an explicit grid patch. Keep the persisted grid mode in
+    # sync for both canonical and legacy track updates.
+    if "x_scale" in patch and "grid" not in patch:
+        section = _logfile_mapping_section(mapping, section_id)
+        tracks = _logfile_mapping_section_tracks(section, section_id=section_id)
+        track_index = _find_track_index(tracks, section_id=section_id, track_id=track_id)
+        track = tracks[track_index]
+        if not isinstance(track, dict):
+            raise RuntimeError("Expected a mapping track entry.")
+        x_scale = track.get("x_scale")
+        if isinstance(x_scale, dict):
+            _sync_track_grid_to_x_scale(track, x_scale)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -6212,9 +6269,9 @@ def set_track_scales(
         raise RuntimeError("Expected a mapping track entry.")
 
     if x_scale is not None:
-        track["x_scale"] = deepcopy(x_scale)
+        track["x_scale"] = _legacy_scale_payload(x_scale)
         if sync_grid_to_scale:
-            _sync_track_grid_to_x_scale(track, x_scale)
+            _sync_track_grid_to_x_scale(track, track["x_scale"])
 
     bindings = _logfile_mapping_bindings(mapping)
     curve_indexes = _curve_binding_indexes_for_track(
@@ -6231,7 +6288,7 @@ def set_track_scales(
     updated_channels: set[str] = set()
     if curve_scale is not None:
         for channel, binding_index in curve_indexes.items():
-            bindings[binding_index]["scale"] = deepcopy(curve_scale)
+            bindings[binding_index]["scale"] = _legacy_scale_payload(curve_scale)
             updated_channels.add(channel)
 
     if channel_scales:
@@ -6247,7 +6304,9 @@ def set_track_scales(
             )
         for channel, scale_patch in channel_scales.items():
             normalized_channel = str(channel).strip().upper()
-            bindings[curve_indexes[normalized_channel]]["scale"] = deepcopy(scale_patch)
+            bindings[curve_indexes[normalized_channel]]["scale"] = _legacy_scale_payload(
+                scale_patch
+            )
             updated_channels.add(normalized_channel)
 
     saved_spec = _persist_validated_logfile_mapping(
@@ -6597,9 +6656,9 @@ def bind_curve(
     if label is not None:
         binding["label"] = label
     if style is not None:
-        binding["style"] = deepcopy(style)
+        binding["style"] = _legacy_style_payload(style)
     if scale is not None:
-        binding["scale"] = deepcopy(scale)
+        binding["scale"] = _legacy_scale_payload(scale)
     if header_display is not None:
         binding["header_display"] = deepcopy(header_display)
     bindings.append(binding)
@@ -7065,7 +7124,7 @@ def bind_raster(
     if label is not None:
         binding["label"] = label
     if style is not None:
-        binding["style"] = deepcopy(style)
+        binding["style"] = _legacy_style_payload(style)
     if profile is not None:
         binding["profile"] = str(profile)
     if normalization is not None:
@@ -7165,7 +7224,10 @@ def update_curve_binding(
         bindings=bindings,
         patch=patch,
     ):
-        bindings[binding_index] = _merge_optional_patch(binding, patch)
+        fallback_patch = deepcopy(patch)
+        if "style" in fallback_patch:
+            fallback_patch["style"] = _legacy_style_payload(fallback_patch["style"])
+        bindings[binding_index] = _merge_optional_patch(binding, fallback_patch)
 
     saved_spec = _persist_validated_logfile_mapping(
         mapping,
@@ -8456,8 +8518,21 @@ def apply_style_preset(
                 template_patch = {
                     key: deepcopy(value)
                     for key, value in template.items()
-                    if key not in {"alias_id", "render_mode", "kind"}
+                    if key
+                    not in {
+                        "alias_id",
+                        "render_mode",
+                        "kind",
+                        "label_template",
+                        "scale_variants",
+                    }
                 }
+                label = template_patch.get("label")
+                label_template = template.get("label_template")
+                if isinstance(label, str) and isinstance(label_template, str):
+                    template_patch["label"] = label_template.replace("{label}", label).replace(
+                        "{channel}", resolved_channel
+                    )
                 if binding_kind == "curve" and isinstance(template_patch.get("fill"), dict):
                     template_patch["fill"] = _apply_style_template_fill_channels(
                         template_patch["fill"],

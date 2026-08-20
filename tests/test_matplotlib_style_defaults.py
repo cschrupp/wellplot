@@ -1741,6 +1741,78 @@ class MatplotlibStyleDefaultsTests(unittest.TestCase):
         finally:
             plt.close(fig)
 
+    def test_equal_curve_scales_use_shared_log_axis_grid(self) -> None:
+        """Use actual logarithmic divisions when all overlay curves share one scale."""
+        depth = np.array([1000.0, 1001.0, 1002.0], dtype=float)
+        dataset = WellDataset(name="shared log scale")
+        dataset.add_channel(
+            ScalarChannel("ILD", depth, "ft", "ohm.m", values=np.array([1.0, 2.0, 10.0]))
+        )
+        dataset.add_channel(
+            ScalarChannel("ILM", depth, "ft", "ohm.m", values=np.array([0.5, 1.5, 8.0]))
+        )
+        document = document_from_mapping(
+            {
+                "name": "shared log scale",
+                "page": {"size": "A4"},
+                "depth": {"unit": "ft", "scale": "1:200"},
+                "tracks": [
+                    {
+                        "id": "resistivity",
+                        "title": "Resistivity",
+                        "kind": "normal",
+                        "width_mm": 30,
+                        "x_scale": {"kind": "log", "min": 0.2, "max": 20.0},
+                        "grid": {
+                            "vertical": {
+                                "main": {"scale": "logarithmic", "spacing_mode": "scale"},
+                                "secondary": {
+                                    "scale": "logarithmic",
+                                    "spacing_mode": "scale",
+                                },
+                            }
+                        },
+                        "elements": [
+                            {
+                                "kind": "curve",
+                                "channel": "ILD",
+                                "scale": {"kind": "log", "min": 0.2, "max": 20.0},
+                            },
+                            {
+                                "kind": "curve",
+                                "channel": "ILM",
+                                "scale": {"kind": "log", "min": 0.2, "max": 20.0},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+
+        renderer = MatplotlibRenderer()
+        track = document.tracks[0]
+        assert renderer._uses_independent_curve_scales(track) is False
+        major_lines, secondary_lines = renderer._vertical_grid_fractions(track, dataset)
+
+        np.testing.assert_allclose(
+            major_lines,
+            [0.5],
+        )
+        assert any(
+            np.isclose(
+                value,
+                (np.log10(1.0) - np.log10(0.2)) / 2.0,
+            )
+            for value in secondary_lines
+        )
+        assert any(
+            np.isclose(
+                value,
+                (np.log10(10.0) - np.log10(0.2)) / 2.0,
+            )
+            for value in secondary_lines
+        )
+
     def test_to_lower_limit_fill_adds_single_collection(self) -> None:
         """Verify to lower limit fill adds single collection."""
         depth = np.array([1000.0, 1001.0, 1002.0, 1003.0], dtype=float)

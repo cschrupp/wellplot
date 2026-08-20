@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
@@ -93,6 +94,13 @@ from .operation_executor import (
     execute_typed_submissions,
 )
 from .reconciliation_bridge import compile_reconciliation_plan
+from .stable_fallback import (
+    build_catalog_fallback_plan,
+    catalog_channel_candidates,
+    fallback_plan_satisfied,
+    is_track_request,
+)
+from .tool_contract import stable_tool_profile
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -144,6 +152,7 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
     "summarize_logfile_changes",
 )
 
+STABLE_MCP_TOOL_NAMES = frozenset(item.name for item in stable_tool_profile())
 _PHASE_READ_ONLY_TOOLS = frozenset(
     {
         "summarize_logfile_draft",
@@ -665,6 +674,441 @@ def _structured_content(result: object) -> dict[str, object]:
     if structured is None:
         return {}
     raise RuntimeError("Expected MCP structured content to be a mapping.")
+
+
+def _quoted_request_value(text: str, label_pattern: str) -> str | None:
+    """Extract a quoted or simple unquoted value after a natural-language label."""
+    match = re.search(
+        rf"{label_pattern}\s*(?:to|=)\s*"
+        rf"(?:[`\"'](?P<quoted>[^`\"']+)[`\"']|(?P<bare>[^\n.;]+?))"
+        rf"(?=[.;\n]|$)",
+        text,
+        re.IGNORECASE,
+    )
+    if match is None:
+        return None
+    value = match.group("quoted") or match.group("bare")
+    return value.strip() if value else None
+
+
+def _request_identifier(text: str, label_pattern: str) -> str | None:
+    """Extract one identifier written after a natural-language label."""
+    quoted = re.search(
+        rf"{label_pattern}\s*(?:[:=]|is|to)?\s*[`\"'](?P<value>[^`\"']+)[`\"']",
+        text,
+        re.IGNORECASE,
+    )
+    if quoted is not None:
+        return quoted.group("value").strip()
+    bare = re.search(
+        rf"{label_pattern}\s*(?:[:=]|is|to)\s*(?P<value>[A-Za-z][\w.-]*)",
+        text,
+        re.IGNORECASE,
+    )
+    return bare.group("value").strip() if bare is not None else None
+
+
+def _resolved_authoring_value(value: object) -> object:
+    """Unwrap nested typed report values for deterministic comparisons."""
+    current = value
+    for _ in range(3):
+        nested = getattr(current, "value", None)
+        if nested is None or nested is current:
+            break
+        current = nested
+    return current
+
+
+def _stable_scope_tool_names(goal: str) -> set[str] | None:
+    """Return mutation tools named by a request, when the scope is explicit."""
+    families = {
+        "edit_header": r"\b(?:header|service\s+title)\b",
+        "edit_report_settings": (
+            r"\b(?:report\s+title|subtitle|page|output|depth|orientation|layout|settings?)\b"
+        ),
+        "edit_remarks": r"\b(?:remarks?|notes?)\b",
+        "edit_section": r"\bsections?\b",
+        "edit_track": r"\btracks?\b",
+        "edit_curve_binding": r"\b(?:curves?|bindings?)\b",
+        "edit_raster_binding": r"\b(?:arrays?|rasters?)\b",
+        "edit_fill": r"\bfills?\b",
+        "edit_annotation": r"\bannotations?\b",
+    }
+    mentioned = {tool for tool, pattern in families.items() if re.search(pattern, goal, re.I)}
+    if not mentioned:
+        return None
+    negative_remarks = re.search(
+        r"\b(?:do\s+not|don't|without)\s+(?:add|create|insert)\b[^.\n]*\bremarks?\b",
+        goal,
+        re.IGNORECASE,
+    )
+    if negative_remarks:
+        mentioned.discard("edit_remarks")
+    if "edit_section" in mentioned:
+        mentioned.add("replicate_section_structure")
+    return mentioned
+
+
+def _catalog_fallback_section_id(
+    goal: str,
+    document: AuthoringDocumentSpec,
+) -> str | None:
+    """Resolve a single section for catalog recovery, never a packet implicitly."""
+    if re.search(r"\b(?:sections\s+ids?|section\s+ids)\b", goal, re.IGNORECASE):
+        return None
+    match = re.search(
+        r"\bsection(?:\s+id)?\s+[`\"']?([A-Za-z][\w.-]*)",
+        goal,
+        re.IGNORECASE,
+    )
+    if match is not None:
+        requested = match.group(1)
+        if any(section.id == requested for section in document.sections):
+            return requested
+        return None
+    return document.sections[0].id if len(document.sections) == 1 else None
+
+
+def _stable_postcondition_errors(
+    goal: str,
+    baseline: AuthoringDocumentSpec,
+    *,
+    root: Path,
+    draft_logfile: str,
+) -> list[str]:
+    """Check explicit request clauses against baseline-relative canonical state."""
+    current_path = root / draft_logfile
+    current = load_authoring_document(current_path, allowed_root=root)
+    errors: list[str] = []
+
+    section_id = _request_identifier(goal, r"section\s+id")
+    expected_subtitle = _quoted_request_value(goal, r"section\s+subtitle")
+    if expected_subtitle is not None:
+        if section_id is None:
+            section_match = re.search(
+                r"\b([A-Za-z][\w.-]*)\s+section\s+subtitle\b",
+                goal,
+                re.IGNORECASE,
+            )
+            candidate = section_match.group(1) if section_match else None
+            section_id = candidate if candidate not in {"the", "a", "an"} else None
+        if section_id is None and len(current.sections) == 1:
+            section = current.sections[0]
+        else:
+            section = next(
+                (item for item in current.sections if item.id == section_id),
+                None,
+            )
+        if section is None:
+            errors.append(f"Requested section {section_id!r} was not found.")
+        elif section.subtitle != expected_subtitle:
+            errors.append(f"Section {section.id!r} subtitle was not set to {expected_subtitle!r}.")
+
+    expected_service_title = _quoted_request_value(goal, r"(?:first\s+)?service\s+title")
+    if expected_service_title is not None:
+        if current.header is None:
+            errors.append("The request asked for a service title, but the header is missing.")
+        else:
+            titles = [
+                _resolved_authoring_value(slot.value) for slot in current.header.service_titles
+            ]
+            if not titles or titles[0] != expected_service_title:
+                errors.append(f"First service title was not set to {expected_service_title!r}.")
+
+    baseline_payload = baseline.model_dump(mode="json")
+    current_payload = current.model_dump(mode="json")
+    if re.search(
+        r"\b(?:do\s+not|don't|without)\s+(?:add|create|insert)\b[^.\n]*\bremarks?\b",
+        goal,
+        re.IGNORECASE,
+    ) and baseline_payload.get("remarks") != current_payload.get("remarks"):
+        errors.append("The request prohibited remarks changes, but remarks were mutated.")
+
+    if re.search(r"\bdo\s+not\s+add\s+any\s+additional\s+tracks?\b", goal, re.I):
+        baseline_tracks = [track.id for section in baseline.sections for track in section.tracks]
+        current_tracks = [track.id for section in current.sections for track in section.tracks]
+        if baseline_tracks != current_tracks:
+            errors.append("The request prohibited additional tracks, but track structure changed.")
+
+    if re.search(r"\badd\s+(?:one|a|an)\b[^.\n]*\b(?:remarks?|notes?)\b", goal, re.I):
+        baseline_remarks = baseline_payload.get("remarks") or []
+        current_remarks = current_payload.get("remarks") or []
+        if len(current_remarks) != len(baseline_remarks) + 1:
+            errors.append(
+                "The request asked for one new remarks block, but the persisted count "
+                f"changed from {len(baseline_remarks)} to {len(current_remarks)}."
+            )
+        if any(not _has_persisted_remark_content(item) for item in current_remarks):
+            errors.append(
+                "Every persisted remarks block must have non-empty text or string lines."
+            )
+    return errors
+
+
+def _has_persisted_remark_content(item: object) -> bool:
+    """Return whether a serialized remark contains text or non-empty string lines."""
+    if not isinstance(item, dict):
+        return False
+    text = item.get("text")
+    if isinstance(text, str) and text.strip():
+        return True
+    lines = item.get("lines")
+    return isinstance(lines, list) and bool(lines) and all(
+        isinstance(line, str) and line.strip() for line in lines
+    )
+
+
+def _normalize_stable_tool_arguments(
+    name: str,
+    arguments: Mapping[str, object],
+) -> dict[str, object]:
+    """Normalize recoverable provider argument shapes before MCP dispatch."""
+    normalized = dict(arguments)
+    if name == "inspect_source":
+        if normalized.get("source_path") is not None:
+            # Source inspection and draft inspection are mutually exclusive.
+            # Providers often copy the draft context into every tool call.
+            normalized.pop("logfile_path", None)
+        return normalized
+    if name == "edit_report_settings":
+        return _normalize_report_settings_arguments(normalized)
+    if name == "edit_raster_binding":
+        return _normalize_raster_binding_arguments(normalized)
+    if name != "edit_remarks" or normalized.get("operation") != "add":
+        if name in {"edit_curve_binding", "edit_track"}:
+            scale_keys = ("scale", "x_scale", "curve_scale")
+            for key in scale_keys:
+                if key in normalized:
+                    normalized[key] = _normalize_scale_payload(normalized[key])
+            channel_scales = normalized.get("channel_scales")
+            if isinstance(channel_scales, Mapping):
+                normalized["channel_scales"] = {
+                    str(channel): _normalize_scale_payload(scale)
+                    for channel, scale in channel_scales.items()
+                }
+            patch = normalized.get("patch")
+            if isinstance(patch, Mapping):
+                normalized_patch = dict(patch)
+                for key in scale_keys:
+                    if key in normalized_patch:
+                        normalized_patch[key] = _normalize_scale_payload(normalized_patch[key])
+                if isinstance(normalized_patch.get("style"), Mapping):
+                    normalized_patch["style"] = _normalize_style_payload(
+                        normalized_patch["style"]
+                    )
+                normalized["patch"] = normalized_patch
+            if isinstance(normalized.get("style"), Mapping):
+                normalized["style"] = _normalize_style_payload(normalized["style"])
+        return normalized
+    remark_fields = (
+        "remark_id",
+        "title",
+        "text",
+        "lines",
+        "alignment",
+        "font_size",
+        "title_font_size",
+        "border",
+    )
+    nested_remark = normalized.get("remark")
+    if isinstance(nested_remark, Mapping):
+        remark = dict(nested_remark)
+    else:
+        remark = {
+            field: normalized[field]
+            for field in remark_fields
+            if field in normalized
+        }
+    if remark:
+        lines = remark.get("lines")
+        if isinstance(lines, str):
+            try:
+                decoded_lines = json.loads(lines)
+            except json.JSONDecodeError:
+                decoded_lines = [lines]
+            remark["lines"] = (
+                decoded_lines if isinstance(decoded_lines, list) else [lines]
+            )
+        normalized["remark"] = remark
+        for field in remark_fields:
+            normalized.pop(field, None)
+    return normalized
+
+
+_RASTER_BINDING_FIELDS = {
+    "label",
+    "profile",
+    "normalization",
+    "waveform_normalization",
+    "clip_percentiles",
+    "interpolation",
+    "show_raster",
+    "alpha",
+    "raster_alpha",
+    "color_limits",
+    "colorbar",
+    "sample_axis",
+    "waveform",
+}
+
+
+def _normalize_raster_binding_arguments(
+    arguments: Mapping[str, object],
+) -> dict[str, object]:
+    """Normalize provider raster patches into the stable binding contract."""
+    normalized = dict(arguments)
+    patch_value = normalized.get("patch")
+    patch = dict(patch_value) if isinstance(patch_value, Mapping) else {}
+    if isinstance(normalized.get("style"), Mapping):
+        patch.setdefault("style", normalized["style"])
+
+    for raster_field in _RASTER_BINDING_FIELDS:
+        if raster_field in normalized:
+            patch.setdefault(raster_field, normalized[raster_field])
+
+    style = patch.get("style")
+    if isinstance(style, Mapping):
+        style_patch = dict(style)
+        # Some providers treat a raster binding as one undifferentiated style
+        # object. Move presentation controls to their typed patch fields.
+        for raster_field in _RASTER_BINDING_FIELDS:
+            if raster_field in style_patch:
+                patch.setdefault(raster_field, style_patch.pop(raster_field))
+        patch["style"] = _normalize_style_payload(style_patch)
+
+    color_limits = patch.get("color_limits")
+    if color_limits is None or color_limits == []:
+        patch.pop("color_limits", None)
+    elif isinstance(color_limits, Mapping):
+        minimum = color_limits.get("minimum", color_limits.get("min"))
+        maximum = color_limits.get("maximum", color_limits.get("max"))
+        if minimum is not None and maximum is not None:
+            patch["color_limits"] = [minimum, maximum]
+
+    # Optional object fields with null values are not valid for the generated
+    # MCP input schema. Absence preserves the current persisted value.
+    for raster_field in _RASTER_BINDING_FIELDS:
+        if patch.get(raster_field) is None:
+            patch.pop(raster_field, None)
+
+    normalized["patch"] = patch
+    for raster_field in _RASTER_BINDING_FIELDS:
+        normalized.pop(raster_field, None)
+    normalized.update(patch)
+    return normalized
+
+
+def _normalize_report_settings_arguments(arguments: Mapping[str, object]) -> dict[str, object]:
+    """Map generic provider settings verbs to the typed settings operations."""
+    normalized = dict(arguments)
+    operation = str(normalized.get("operation", "")).strip().lower()
+    if operation not in {"update", "set"}:
+        return normalized
+
+    patch = normalized.pop("patch", None)
+    if isinstance(patch, Mapping):
+        for key, value in patch.items():
+            normalized.setdefault(str(key), value)
+
+    if "style_patch" in normalized:
+        normalized["operation"] = "set_matplotlib_style"
+        return normalized
+
+    page_fields = {
+        "size",
+        "width_mm",
+        "height_mm",
+        "orientation",
+        "continuous",
+        "bottom_track_header_enabled",
+        "margin_left_mm",
+        "margin_right_mm",
+        "margin_top_mm",
+        "margin_bottom_mm",
+        "header_height_mm",
+        "track_header_height_mm",
+        "footer_height_mm",
+        "track_gap_mm",
+    }
+    depth_fields = {"unit", "scale", "major_step", "minor_step"}
+    output_fields = {"backend", "output_path", "dpi", "continuous_strip_page_height_mm"}
+    section_fields = {"title", "subtitle", "depth_range"}
+
+    def move_fields(container: str, fields: set[str]) -> None:
+        current = normalized.get(container)
+        payload = dict(current) if isinstance(current, Mapping) else {}
+        for field_name in fields:
+            if field_name in normalized:
+                payload[field_name] = normalized.pop(field_name)
+        if payload:
+            normalized[container] = payload
+
+    if normalized.get("section_id") is not None and any(
+        field_name in normalized for field_name in section_fields | {"page", "output"}
+    ):
+        normalized["operation"] = "set_section_view"
+        move_fields("page", page_fields)
+        move_fields("output", output_fields)
+        return normalized
+    if "page" in normalized or any(field_name in normalized for field_name in page_fields):
+        normalized["operation"] = "set_page"
+        move_fields("page", page_fields)
+        return normalized
+    if "output" in normalized or any(field_name in normalized for field_name in output_fields):
+        normalized["operation"] = "set_output"
+        move_fields("output", output_fields)
+        return normalized
+    if "depth" in normalized or any(field_name in normalized for field_name in depth_fields):
+        normalized["operation"] = "set_depth"
+        move_fields("depth", depth_fields)
+        return normalized
+
+    normalized["operation"] = "set_report"
+    move_fields("patch", {"title", "subtitle"})
+    return normalized
+
+
+def _normalize_scale_payload(value: object) -> object:
+    """Map common provider scale aliases to the canonical scale shape."""
+    if not isinstance(value, Mapping):
+        return value
+    normalized = dict(value)
+    # Units belong to the source/header metadata; the legacy scale schema only
+    # accepts the transform, bounds, and reverse flag.
+    normalized.pop("unit", None)
+    domain = normalized.pop("domain", None)
+    if isinstance(domain, (list, tuple)) and len(domain) == 2:
+        normalized.setdefault("minimum", domain[0])
+        normalized.setdefault("maximum", domain[1])
+    if "min" in normalized:
+        normalized.setdefault("minimum", normalized.pop("min"))
+    if "max" in normalized:
+        normalized.setdefault("maximum", normalized.pop("max"))
+    if "type" in normalized and "kind" not in normalized:
+        normalized["kind"] = normalized.pop("type")
+    if "logarithmic" in normalized and "kind" not in normalized:
+        logarithmic = normalized.pop("logarithmic")
+        if logarithmic:
+            normalized["kind"] = "log"
+    return normalized
+
+
+def _normalize_style_payload(value: Mapping[str, object]) -> dict[str, object]:
+    """Map common drawing-library style aliases to canonical curve fields."""
+    normalized = dict(value)
+    aliases = {
+        "stroke": "color",
+        "stroke_color": "color",
+        "stroke_width": "line_width",
+        "linewidth": "line_width",
+        "linestyle": "line_style",
+        "dash": "line_style",
+    }
+    for alias, canonical in aliases.items():
+        if alias in normalized:
+            normalized.setdefault(canonical, normalized[alias])
+            normalized.pop(alias, None)
+    return normalized
 
 
 def _mcp_error_text(result: object) -> str | None:
@@ -1271,6 +1715,7 @@ def _parse_inline_header_assignment(line: str) -> tuple[str, str] | None:
         key = key[:-6].strip()
     if key.lower().endswith(" field"):
         key = key[:-6].strip()
+    value = value.rstrip(".;").rstrip()
     return key, value
 
 
@@ -1615,11 +2060,17 @@ def _normalize_remarks_payload(
             continue
         title = str(entry.get("title", "")).strip()
         lines_raw = entry.get("lines", [])
-        if not title or not isinstance(lines_raw, list):
+        if isinstance(lines_raw, list):
+            lines = tuple(
+                str(line).strip() for line in lines_raw if isinstance(line, str) and line.strip()
+            )
+        else:
+            lines = ()
+        if not lines:
+            text = entry.get("text")
+            lines = (text.strip(),) if isinstance(text, str) and text.strip() else ()
+        if not title or not lines:
             continue
-        lines = tuple(
-            str(line).strip() for line in lines_raw if isinstance(line, str) and line.strip()
-        )
         normalized.append((title, lines))
     return tuple(normalized)
 
@@ -1711,6 +2162,20 @@ def _request_seed_label(request: AuthoringRequest) -> str:
         return f"packaged example `{request.example_id}`"
     assert request.source_logfile_path is not None
     return f"starter logfile `{request.source_logfile_path}`"
+
+
+def _catalog_fallback_tool_arguments(
+    name: str,
+    arguments: Mapping[str, object],
+    draft_logfile: str,
+) -> dict[str, object]:
+    """Add the draft target without creating a dual-source inspection request."""
+    call_arguments = dict(arguments)
+    if name == "inspect_source" and call_arguments.get("source_path") is not None:
+        call_arguments.pop("logfile_path", None)
+    else:
+        call_arguments.setdefault("logfile_path", draft_logfile)
+    return call_arguments
 
 
 @dataclass
@@ -1901,6 +2366,962 @@ class AuthoringSession:
                 report_facts=getattr(provider_result, "report_facts", {}),
             ),
         )
+
+    @staticmethod
+    async def _stable_tool_catalog(session: McpSessionProtocol) -> list[object] | None:
+        try:
+            result = await session.list_tools()
+        except AssertionError:
+            return None
+        tools = list(getattr(result, "tools", []) or [])
+        names = {
+            str(getattr(tool, "name", "")).strip()
+            for tool in tools
+            if str(getattr(tool, "name", "")).strip()
+        }
+        required = {"create_draft", "inspect_authoring", "validate_logfile", "preview_logfile"}
+        if not required.issubset(names):
+            return None
+        return tools
+
+    async def _finalize_stable_result(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        provider_result: ProviderRunResult,
+        stable_tool_outcomes: list[dict[str, object]],
+        stable_tool_errors: list[str],
+    ) -> AuthoringResult:
+        output_path = self.runtime.server_root / draft_logfile
+        if not output_path.exists():
+            raise RuntimeError("The stable MCP loop finished without the expected draft logfile.")
+
+        report_facts = dict(provider_result.report_facts)
+        warnings = [*report_facts.get("warnings", []), *stable_tool_errors]
+        report_facts["stable_tool_outcomes"] = stable_tool_outcomes
+        if warnings:
+            report_facts["warnings"] = warnings
+
+        validation_result = await session.call_tool(
+            "validate_logfile",
+            {"logfile_path": draft_logfile},
+        )
+        _require_mcp_success(validation_result, action="validate_logfile")
+        validation_payload = _structured_content(validation_result)
+        inspect_result = await session.call_tool(
+            "inspect_authoring",
+            {
+                "logfile_path": draft_logfile,
+                "object_kind": "section",
+                "detail": "full",
+            },
+        )
+        _require_mcp_success(inspect_result, action="inspect_authoring")
+        inspect_payload = _structured_content(inspect_result)
+        items = inspect_payload.get("items", [])
+        items = items if isinstance(items, list) else []
+        section_ids = [
+            str(item.get("ref", {}).get("object_id", "")).strip()
+            for item in items
+            if isinstance(item, Mapping)
+            and isinstance(item.get("ref"), Mapping)
+            and str(item.get("ref", {}).get("object_id", "")).strip()
+        ]
+        sections = [
+            {
+                "id": section_id,
+                "track_ids": [
+                    str(track.get("id", "")).strip()
+                    for track in item.get("object", {}).get("tracks", [])
+                    if isinstance(track, Mapping) and str(track.get("id", "")).strip()
+                ],
+            }
+            for item, section_id in zip(items, section_ids, strict=True)
+            if isinstance(item, Mapping) and isinstance(item.get("object"), Mapping)
+        ]
+        if not section_ids:
+            warnings.append("Stable inspection returned no report sections.")
+
+        current_draft_text = output_path.read_text(encoding="utf-8")
+        changed = current_draft_text != baseline_draft_text
+        summary_lines: list[str] = []
+        for outcome in stable_tool_outcomes:
+            payload = outcome.get("payload")
+            if not isinstance(payload, Mapping):
+                continue
+            structured = payload.get("structured")
+            if not isinstance(structured, Mapping) or structured.get("changed") is not True:
+                continue
+            summary_lines.append(
+                f"Applied stable MCP tool `{outcome.get('name', 'unknown')}` to the draft."
+            )
+        if changed and not summary_lines:
+            summary_lines.append("Persisted stable MCP authoring changes to the draft.")
+        change_summary_payload = {
+            "changed": changed,
+            "summary_lines": summary_lines,
+        }
+        draft_summary_payload = {
+            "section_ids": section_ids,
+            "sections": sections,
+        }
+        inspect_summary_payload = {
+            "object_kind": "section",
+            "section_ids": section_ids,
+            "sections": sections,
+        }
+
+        report_preview_result = await session.call_tool(
+            "preview_logfile",
+            {"logfile_path": draft_logfile, "page": 0},
+        )
+        _require_mcp_success(report_preview_result, action="preview_logfile")
+        section_preview_result = await session.call_tool(
+            "preview_logfile",
+            {
+                "logfile_path": draft_logfile,
+                "section_id": section_ids[0] if section_ids else None,
+                "page": 0,
+            },
+        )
+        _require_mcp_success(section_preview_result, action="preview_logfile")
+        return AuthoringResult(
+            provider=self.backend.provider,
+            model=self.backend.model,
+            credential_source=self.backend.credential_source,
+            request_kind=request_kind,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            goal=goal,
+            draft_logfile=draft_logfile,
+            server_root=self.runtime.server_root,
+            tool_trace=provider_result.tool_trace,
+            final_text=provider_result.final_text,
+            validation=validation_payload,
+            draft_summary=draft_summary_payload,
+            inspect_summary=inspect_summary_payload,
+            change_summary=change_summary_payload,
+            draft_text=current_draft_text,
+            report_preview_png=self.runtime.image_bytes(report_preview_result),
+            section_preview_png=self.runtime.image_bytes(section_preview_result),
+            report_facts=report_facts,
+            user_report=_build_user_report(
+                request_text=goal,
+                validation=validation_payload,
+                draft_summary=draft_summary_payload,
+                change_summary=change_summary_payload,
+                tool_trace=provider_result.tool_trace,
+                report_facts=report_facts,
+            ),
+        )
+
+    async def _execute_catalog_fallback(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        goal: str,
+        stable_tool_outcomes: list[dict[str, object]],
+        stable_tool_errors: list[str],
+    ) -> tuple[bool, str]:
+        """Execute one catalog or open-world track plan after provider stagnation."""
+        candidates = catalog_channel_candidates(goal)
+        if not candidates and not is_track_request(goal):
+            return False, "No catalog or generic track request was found."
+
+        async def call_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
+            """Call and record one deterministic fallback tool operation."""
+            call_arguments = _catalog_fallback_tool_arguments(
+                name,
+                arguments,
+                draft_logfile,
+            )
+            try:
+                result = await session.call_tool(name, call_arguments)
+                payload = self.runtime.tool_result_payload(result)
+            except Exception as exc:  # noqa: BLE001 - report fallback diagnostics
+                payload = {
+                    "is_error": True,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            stable_tool_outcomes.append(
+                {
+                    "name": name,
+                    "arguments": call_arguments,
+                    "payload": payload,
+                    "source": "catalog_fallback",
+                }
+            )
+            if payload.get("is_error") is True:
+                stable_tool_errors.append(
+                    f"{name} failed: {payload.get('error', 'MCP returned an error result.')}"
+                )
+            return payload
+
+        current = load_authoring_document(
+            self.runtime.server_root / draft_logfile,
+            allowed_root=self.runtime.server_root,
+        )
+        section_id = _catalog_fallback_section_id(goal, current)
+        if section_id is None:
+            return False, "Catalog fallback requires one resolvable target section."
+        section = next(item for item in current.sections if item.id == section_id)
+        source_arguments: dict[str, object] = {"include_metadata": False}
+        if candidates:
+            source_arguments["channels"] = list(candidates)
+        if section.data_source is not None:
+            source_path = Path(section.data_source.source_path)
+            if not source_path.is_absolute():
+                source_path = Path(draft_logfile).parent / source_path
+            source_arguments.update(
+                {
+                    "source_path": source_path.as_posix(),
+                    "source_format": section.data_source.source_format,
+                }
+            )
+        source_payload = await call_tool(
+            "inspect_source",
+            source_arguments,
+        )
+        if source_payload.get("is_error") is True:
+            return False, "Catalog fallback could not inspect source-channel availability."
+
+        available: list[str] = []
+        channel_summaries: dict[str, Mapping[str, object]] = {}
+        structured = source_payload.get("structured")
+        if isinstance(structured, Mapping):
+            for key in ("available_channels", "found_channels"):
+                top_level = structured.get(key)
+                if isinstance(top_level, list):
+                    available.extend(str(channel) for channel in top_level)
+            items = structured.get("items", [])
+            if isinstance(items, list):
+                for item in items:
+                    if not isinstance(item, Mapping):
+                        continue
+                    summaries = item.get("channels")
+                    if isinstance(summaries, list):
+                        for summary in summaries:
+                            if not isinstance(summary, Mapping):
+                                continue
+                            mnemonic = summary.get("mnemonic")
+                            if isinstance(mnemonic, str) and mnemonic.strip():
+                                channel_summaries[mnemonic.upper()] = summary
+                                available.append(mnemonic)
+                    found = item.get("found_channels")
+                    if isinstance(found, list):
+                        available.extend(str(channel) for channel in found)
+                    resolutions = item.get("resolutions", [])
+                    if isinstance(resolutions, list):
+                        for resolution in resolutions:
+                            if not isinstance(resolution, Mapping):
+                                continue
+                            matched = resolution.get("matched_channels")
+                            if isinstance(matched, list):
+                                available.extend(str(channel) for channel in matched)
+
+        plan = build_catalog_fallback_plan(
+            goal,
+            section_id=section_id,
+            document=current.model_dump(mode="json"),
+            available_channels=available,
+            channel_summaries=channel_summaries,
+        )
+        if plan is None:
+            return False, "The request did not resolve to a catalog or generic track plan."
+        if fallback_plan_satisfied(plan, current.model_dump(mode="json")):
+            return (
+                True,
+                f"Catalog request is already satisfied by `{plan.track_id}`; "
+                "no recovery mutation was needed.",
+            )
+
+        for operation in plan.operations:
+            payload = await call_tool(operation.tool_name, operation.arguments)
+            if payload.get("is_error") is True:
+                return False, f"Catalog fallback stopped at {operation.tool_name}."
+
+        validation_payload = await call_tool("validate_logfile", {})
+        if validation_payload.get("is_error") is True or not bool(
+            (validation_payload.get("structured") or {}).get("valid", True)
+        ):
+            return False, "Catalog fallback mutations did not produce a valid logfile."
+
+        inspection_payload = await call_tool(
+            "inspect_authoring",
+            {
+                "object_kind": "track",
+                "section_id": plan.section_id,
+                "track_id": plan.track_id,
+                "detail": "full",
+            },
+        )
+        if inspection_payload.get("is_error") is True:
+            return False, "Catalog fallback could not read back the created track."
+        saved = load_authoring_document(
+            self.runtime.server_root / draft_logfile,
+            allowed_root=self.runtime.server_root,
+        )
+        if not fallback_plan_satisfied(plan, saved.model_dump(mode="json")):
+            return False, "Catalog fallback postconditions did not match the persisted document."
+
+        details = [
+            f"Created or reconciled `{plan.track_id}` from catalog family "
+            f"`{plan.family_id or plan.preset_id or 'generic'}`.",
+        ]
+        if plan.expected_channels:
+            details.append(f"Bound available channels: {', '.join(plan.expected_channels)}.")
+        if plan.skipped_channels:
+            details.append(
+                "Skipped unavailable catalog channels: "
+                + ", ".join(plan.skipped_channels)
+                + "."
+            )
+        return True, " ".join(details)
+
+    async def _run_stable_mcp_loop(
+        self,
+        *,
+        session: McpSessionProtocol,
+        mcp_tools: list[object],
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str | None,
+        max_rounds: int,
+    ) -> AuthoringResult:
+        if baseline_draft_text is None:
+            create_arguments: dict[str, object] = {
+                "operation": "create" if example_id is not None else "clone",
+                "logfile_path": draft_logfile,
+                "overwrite": True,
+            }
+            if example_id is not None:
+                create_arguments["kind"] = example_id
+            elif source_logfile_path is not None:
+                create_arguments["source_logfile_path"] = source_logfile_path
+            create_result = await session.call_tool("create_draft", create_arguments)
+            _require_mcp_success(create_result, action="create_draft")
+            output_path = self.runtime.server_root / draft_logfile
+            if not output_path.exists():
+                raise RuntimeError("create_draft returned without creating the requested draft.")
+            baseline_draft_text = output_path.read_text(encoding="utf-8")
+
+        baseline_document = load_authoring_document(
+            self.runtime.server_root / draft_logfile,
+            allowed_root=self.runtime.server_root,
+        )
+        preflight_header_result: ProviderRunResult | None = None
+        preflight_header_outcome: dict[str, object] | None = None
+        packet_header_intent = _extract_packet_header_fill_intent(goal)
+        if packet_header_intent is not None and packet_header_intent.values:
+            (
+                preflight_header_result,
+                preflight_header_outcome,
+            ) = await self._execute_stable_header_fill(
+                session=session,
+                draft_logfile=draft_logfile,
+                intent=packet_header_intent,
+            )
+        preflight_result = await session.call_tool(
+            "inspect_authoring",
+            {
+                "logfile_path": draft_logfile,
+                "object_kind": "section",
+                "detail": "full",
+            },
+        )
+        _require_mcp_success(preflight_result, action="inspect_authoring")
+        tool_definitions = self.runtime.build_tool_definitions(
+            mcp_tools,
+            allowed_names=set(STABLE_MCP_TOOL_NAMES),
+            excluded_names=(
+                {"edit_header"}
+                if preflight_header_result is not None
+                else set()
+            ),
+        )
+        allowed_names = {tool.name for tool in tool_definitions}
+        stable_tool_outcomes: list[dict[str, object]] = []
+        if preflight_header_outcome is not None:
+            stable_tool_outcomes.append(preflight_header_outcome)
+        stable_tool_errors: list[str] = []
+        scope_tools = _stable_scope_tool_names(goal)
+        mutation_counts: Counter[str] = Counter()
+        controller_status: str | None = None
+        controller_message = ""
+        consecutive_tool_errors = 0
+        repeated_error_count = 0
+        last_error_signature: tuple[str, str] | None = None
+        no_progress_calls = 0
+        catalog_fallback_attempted = False
+        singular_remarks_request = bool(
+            re.search(r"\badd\s+(?:one|a|an)\b[^.\n]*\b(?:remarks?|notes?)\b", goal, re.I)
+        )
+        has_checkable_postconditions = bool(
+            _quoted_request_value(goal, r"section\s+subtitle")
+            or _quoted_request_value(goal, r"(?:first\s+)?service\s+title")
+            or singular_remarks_request
+            or re.search(
+                r"\bdo\s+not\s+add\s+any\s+additional\s+tracks?\b",
+                goal,
+                re.IGNORECASE,
+            )
+        )
+        mutation_names = {
+            "edit_header",
+            "edit_report_settings",
+            "edit_remarks",
+            "edit_section",
+            "replicate_section_structure",
+            "edit_track",
+            "edit_curve_binding",
+            "edit_raster_binding",
+            "edit_fill",
+            "edit_annotation",
+        }
+
+        def rejected_tool_payload(message: str) -> dict[str, object]:
+            """Record one host-rejected call and apply the same circuit breaker."""
+            nonlocal controller_message
+            nonlocal controller_status
+            nonlocal consecutive_tool_errors
+            nonlocal last_error_signature
+            nonlocal repeated_error_count
+
+            stable_tool_errors.append(message)
+            consecutive_tool_errors += 1
+            error_signature = ("host", message)
+            if error_signature == last_error_signature:
+                repeated_error_count += 1
+            else:
+                repeated_error_count = 1
+                last_error_signature = error_signature
+            if consecutive_tool_errors >= 3 or repeated_error_count >= 2:
+                controller_status = "blocked"
+                controller_message = (
+                    "The feedback loop stopped after repeated rejected tool calls. "
+                    f"Last rejection: {message}"
+                )
+            feedback = {
+                "status": controller_status or "continue",
+                "message": controller_message
+                or "Correct the tool arguments and continue with the requested scope.",
+            }
+            payload: dict[str, object] = {
+                "is_error": True,
+                "error": message,
+                "agent_feedback": feedback,
+            }
+            if controller_status == "blocked":
+                payload["_agent_control"] = {
+                    "action": "stop",
+                    "status": "blocked",
+                    "message": controller_message,
+                }
+            return payload
+
+        def resolve_numeric_header_alias(arguments: dict[str, object]) -> None:
+            """Resolve model-friendly numeric indexes to stable header slot IDs."""
+            operation = str(arguments.get("operation") or "")
+            if operation not in {"set_slot", "clear_slot", "set_service_title"}:
+                return
+            field_name = "service_title" if operation == "set_service_title" else "slot_id"
+            raw_value = arguments.get(field_name)
+            if raw_value is None:
+                return
+            index_text = str(raw_value).strip()
+            if not index_text.isdigit():
+                return
+            try:
+                current = load_authoring_document(
+                    self.runtime.server_root / draft_logfile,
+                    allowed_root=self.runtime.server_root,
+                )
+            except Exception:
+                return
+            header = current.header
+            if header is None:
+                return
+            if field_name == "service_title":
+                slots = list(header.service_titles)
+            else:
+                slots = list(header.general_fields)
+                if header.detail is not None:
+                    for row in header.detail.rows:
+                        slots.extend(row.values)
+                        for column in row.columns:
+                            slots.extend(column.cells)
+            index = int(index_text)
+            if 0 <= index < len(slots):
+                arguments[field_name] = str(slots[index].slot_id)
+
+        async def tool_caller(name: str, arguments: dict[str, object]) -> dict[str, object]:
+            nonlocal controller_message
+            nonlocal controller_status
+            nonlocal consecutive_tool_errors
+            nonlocal last_error_signature
+            nonlocal no_progress_calls
+            nonlocal repeated_error_count
+            nonlocal catalog_fallback_attempted
+
+            if controller_status in {"blocked", "completed"}:
+                return {
+                    "ok": controller_status == "completed",
+                    "agent_feedback": {
+                        "status": controller_status,
+                        "message": controller_message,
+                    },
+                    "_agent_control": {
+                        "action": "stop",
+                        "status": controller_status,
+                        "message": controller_message,
+                    },
+                }
+            call_arguments = _normalize_stable_tool_arguments(name, arguments)
+            section_scoped_tools = {
+                "edit_report_settings",
+                "edit_section",
+                "edit_track",
+                "edit_curve_binding",
+                "edit_raster_binding",
+                "edit_fill",
+                "edit_annotation",
+            }
+            if (
+                name in section_scoped_tools
+                and call_arguments.get("section_id") is None
+                and len(baseline_document.sections) == 1
+            ):
+                call_arguments["section_id"] = baseline_document.sections[0].id
+            if name not in allowed_names:
+                message = f"Tool `{name}` is not in the stable MCP profile."
+                return rejected_tool_payload(message)
+            if scope_tools is not None and name in mutation_names and name not in scope_tools:
+                message = f"Tool `{name}` is outside the explicit request scope."
+                return rejected_tool_payload(message)
+            if singular_remarks_request and name == "edit_remarks" and mutation_counts[name] >= 1:
+                message = "The request allows one new remarks block; do not add another."
+                return rejected_tool_payload(message)
+            if name == "inspect_authoring":
+                object_kind_aliases = {
+                    "header": "header_slot",
+                    "curve": "curve_binding",
+                    "raster": "raster_binding",
+                    "remarks": "remark",
+                    "report": "page",
+                }
+                object_kind = str(call_arguments.get("object_kind") or "section").lower()
+                call_arguments["object_kind"] = object_kind_aliases.get(
+                    object_kind,
+                    object_kind,
+                )
+            if name == "inspect_source":
+                source_format = call_arguments.get("source_format")
+                if source_format is None or str(source_format).lower() == "none":
+                    call_arguments["source_format"] = "auto"
+                source_path = call_arguments.get("source_path")
+                if source_path is not None:
+                    candidate = Path(str(source_path)).expanduser()
+                    if not candidate.is_absolute():
+                        candidate = self.runtime.server_root / candidate
+                    if not candidate.exists():
+                        call_arguments.pop("source_path", None)
+            if name == "edit_header":
+                resolve_numeric_header_alias(call_arguments)
+            if name not in {"create_draft", "inspect_vocab"} and not (
+                name == "inspect_source" and call_arguments.get("source_path") is not None
+            ):
+                call_arguments.setdefault("logfile_path", draft_logfile)
+            try:
+                result = await session.call_tool(name, call_arguments)
+                payload = self.runtime.tool_result_payload(result)
+            except Exception as exc:
+                payload = {
+                    "is_error": True,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            stable_tool_outcomes.append(
+                {
+                    "name": name,
+                    "arguments": call_arguments,
+                    "payload": payload,
+                }
+            )
+            repeated_read_only_call = name not in mutation_names and any(
+                previous.get("name") == name
+                and previous.get("arguments") == call_arguments
+                for previous in stable_tool_outcomes[:-1]
+            )
+            if payload.get("is_error") is True:
+                stable_tool_errors.append(
+                    f"{name} failed: {payload.get('error', 'MCP returned an error result.')}"
+                )
+            structured = payload.get("structured")
+            if (
+                isinstance(structured, Mapping)
+                and structured.get("changed") is True
+                and name in mutation_names
+            ):
+                mutation_counts[name] += 1
+                no_progress_calls = 0
+            else:
+                no_progress_calls += 1
+
+            if payload.get("is_error") is True:
+                consecutive_tool_errors += 1
+                error_signature = (name, str(payload.get("error", "")))
+                if error_signature == last_error_signature:
+                    repeated_error_count += 1
+                else:
+                    repeated_error_count = 1
+                    last_error_signature = error_signature
+            else:
+                consecutive_tool_errors = 0
+                repeated_error_count = 0
+                last_error_signature = None
+
+            feedback: dict[str, object] = {
+                "status": "continue",
+                "message": (
+                    "Continue only if the next tool call makes measurable progress. "
+                    "Use the current persisted state and returned before/after evidence."
+                ),
+            }
+            if payload.get("is_error") is True and name == "edit_track":
+                error_text = str(payload.get("error", ""))
+                operation = str(call_arguments.get("operation") or "").strip().lower()
+                if operation == "update" and "Unknown track_ids" in error_text:
+                    feedback["message"] = (
+                        "The requested track does not exist. For a requested new track, "
+                        "call edit_track with operation='add', use track_id as the new id, "
+                        "and provide title, kind, and width_mm. The add operation appends "
+                        "the track; use operation='move' afterward if placement matters. "
+                        "Do not retry update for this missing track."
+                    )
+                elif "section_id" in error_text:
+                    feedback["message"] = (
+                        "This operation targets a section. Provide section_id explicitly; "
+                        "only a single-section draft can infer it automatically."
+                    )
+            if payload.get("is_error") is True and name == "edit_section":
+                operation = str(call_arguments.get("operation") or "").strip().lower()
+                if operation == "add":
+                    feedback["message"] = (
+                        "A section add requires a complete section object with a non-empty "
+                        "tracks list. If the requested section should copy an existing "
+                        "section, call replicate_section_structure with the source and "
+                        "target section ids, then edit the copied tracks and bindings."
+                    )
+            if payload.get("is_error") is True and name == "edit_report_settings":
+                feedback["message"] = (
+                    "Use one typed settings operation: set_report for report title/subtitle, "
+                    "set_page for page settings, set_output for output settings, set_depth "
+                    "for the depth axis, set_section_view for section title/subtitle/window, "
+                    "or set_matplotlib_style for report-wide drawing style."
+                )
+            if repeated_read_only_call and payload.get("is_error") is not True:
+                feedback["message"] = (
+                    "This identical read-only inspection already succeeded. Do not repeat it. "
+                    "Use its returned state and call the relevant edit_* mutation now; "
+                    "preserve any values not requested by the user."
+                )
+            requested_mutations = (
+                sorted(scope_tools & mutation_names) if scope_tools is not None else []
+            )
+            has_persisted_mutation = any(
+                outcome.get("name") in mutation_names
+                and isinstance(outcome.get("payload"), Mapping)
+                and isinstance(outcome["payload"].get("structured"), Mapping)
+                and outcome["payload"]["structured"].get("changed") is True
+                for outcome in stable_tool_outcomes
+            )
+            if (
+                payload.get("is_error") is not True
+                and no_progress_calls >= 3
+                and requested_mutations
+                and not has_persisted_mutation
+                and not catalog_fallback_attempted
+            ):
+                feedback["message"] = (
+                    "Several read-only inspections have succeeded without a persisted mutation. "
+                    "Stop repeating inspection tools and execute the requested mutation now. "
+                    f"Requested mutation families: {', '.join(requested_mutations)}. "
+                    "For a new track, use edit_track with operation='add', then use "
+                    "operation='move' if placement was requested; bind curves only after "
+                    "the target track exists."
+                )
+                if _catalog_fallback_section_id(goal, baseline_document) is None:
+                    feedback["message"] = (
+                        str(feedback["message"])
+                        + " This request spans multiple sections or has no resolvable target; "
+                        "do not use single-section catalog recovery."
+                    )
+                else:
+                    catalog_fallback_attempted = True
+                    fallback_succeeded, fallback_message = (
+                        await self._execute_catalog_fallback(
+                            session=session,
+                            draft_logfile=draft_logfile,
+                            goal=goal,
+                            stable_tool_outcomes=stable_tool_outcomes,
+                            stable_tool_errors=stable_tool_errors,
+                        )
+                    )
+                    if fallback_succeeded:
+                        controller_status = "completed"
+                        controller_message = fallback_message
+                        no_progress_calls = 0
+                    else:
+                        feedback["message"] = (
+                            str(feedback["message"])
+                            + " Catalog recovery was not applied: "
+                            + fallback_message
+                        )
+            remaining: list[str] | None = None
+            if payload.get("is_error") is not True and has_checkable_postconditions:
+                try:
+                    remaining = _stable_postcondition_errors(
+                        goal,
+                        baseline_document,
+                        root=self.runtime.server_root,
+                        draft_logfile=draft_logfile,
+                    )
+                except Exception as exc:  # noqa: BLE001 - return feedback to the provider
+                    remaining = [f"Postcondition inspection failed: {type(exc).__name__}: {exc}"]
+                feedback["remaining_postconditions"] = remaining
+            if payload.get("is_error") is True and (
+                consecutive_tool_errors >= 3 or repeated_error_count >= 2
+            ):
+                controller_status = "blocked"
+                controller_message = (
+                    "The feedback loop stopped after repeated MCP tool errors. "
+                    f"Last failure: {payload.get('error', 'unknown MCP error')}"
+                )
+            elif no_progress_calls >= 6:
+                controller_status = "blocked"
+                controller_message = (
+                    "The feedback loop stopped after six tool calls without a persisted "
+                    "mutation. Inspect the reported state and retry with a smaller request."
+                )
+            elif (
+                isinstance(structured, Mapping)
+                and structured.get("changed") is True
+                and has_checkable_postconditions
+            ):
+                if remaining is not None and not remaining:
+                    controller_status = "completed"
+                    controller_message = (
+                        "All explicit request postconditions are persisted and verified. "
+                        "Stop calling tools and report the completed work."
+                    )
+
+            if controller_status in {"blocked", "completed"}:
+                feedback = {
+                    "status": controller_status,
+                    "message": controller_message,
+                }
+                payload["_agent_control"] = {
+                    "action": "stop",
+                    "status": controller_status,
+                    "message": controller_message,
+                }
+            payload["agent_feedback"] = feedback
+            return payload
+
+        instructions = (
+            "You are the wellplot authoring agent. Use only the supplied stable MCP tools. "
+            "The draft has already been created at the supplied logfile path. Inspect the "
+            "current canonical objects or source before editing. Preserve unspecified values "
+            "and objects. After every mutation, use its returned before/after evidence; if a "
+            "tool reports an error, correct the arguments instead of claiming success. "
+            "For a new section copied from an existing section, use "
+            "replicate_section_structure; do not synthesize an incomplete section object. "
+            "Finish only after validation and a concise report of completed and blocked work."
+        )
+        try:
+            provider_result = await self.backend.run_authoring(
+                instructions=instructions,
+                initial_user_message=(f"Draft: {draft_logfile}\n\nRequest:\n{goal}"),
+                tool_definitions=tool_definitions,
+                tool_caller=tool_caller,
+                max_rounds=max_rounds,
+            )
+        except ProviderAdapterError as exc:
+            report_facts = dict(exc.report_facts)
+            report_facts.setdefault("warnings", []).append(f"Provider error: {exc}")
+            provider_result = ProviderRunResult(
+                final_text=exc.final_text,
+                tool_trace=exc.tool_trace,
+                report_facts=report_facts,
+            )
+        except Exception as exc:
+            provider_result = ProviderRunResult(
+                final_text="",
+                tool_trace=(),
+                report_facts={
+                    "warnings": [f"Provider error: {type(exc).__name__}: {exc}"],
+                    "reasons": ["The stable provider loop stopped before completion."],
+                },
+            )
+        report_facts = dict(provider_result.report_facts)
+        if preflight_header_result is not None:
+            preflight_facts = dict(preflight_header_result.report_facts)
+            for key in ("completed", "not_done", "reasons", "warnings"):
+                preflight_values = preflight_facts.get(key, [])
+                current_values = report_facts.get(key, [])
+                if isinstance(preflight_values, list):
+                    if not isinstance(current_values, list):
+                        current_values = []
+                    report_facts[key] = preflight_values + current_values
+            report_facts["deterministic_header_preflight"] = True
+            provider_result = replace(
+                provider_result,
+                tool_trace=preflight_header_result.tool_trace + provider_result.tool_trace,
+                report_facts=report_facts,
+            )
+        report_facts = dict(provider_result.report_facts)
+
+        def mark_header_preflight_rolled_back(facts: dict[str, object]) -> None:
+            """Keep the report truthful when the full request is rolled back."""
+            if preflight_header_result is None:
+                return
+            completed = facts.get("completed", [])
+            if isinstance(completed, list):
+                facts["completed"] = [
+                    item
+                    for item in completed
+                    if item != "Applied the qualified header value through stable `edit_header`."
+                ]
+            not_done = facts.get("not_done", [])
+            if not isinstance(not_done, list):
+                not_done = []
+            not_done.append("Deterministic header values were rolled back with the request.")
+            facts["not_done"] = not_done
+
+        warnings = report_facts.get("warnings", [])
+        provider_failed = isinstance(warnings, list) and any(
+            isinstance(item, str) and item.startswith("Provider error:") for item in warnings
+        )
+        if (
+            not provider_failed
+            and not catalog_fallback_attempted
+            and _catalog_fallback_section_id(goal, baseline_document) is not None
+            and (catalog_channel_candidates(goal) or is_track_request(goal))
+        ):
+            catalog_fallback_attempted = True
+            fallback_succeeded, fallback_message = await self._execute_catalog_fallback(
+                session=session,
+                draft_logfile=draft_logfile,
+                goal=goal,
+                stable_tool_outcomes=stable_tool_outcomes,
+                stable_tool_errors=stable_tool_errors,
+            )
+            report_facts = dict(provider_result.report_facts)
+            report_facts["catalog_recovery"] = fallback_message
+            if fallback_succeeded:
+                controller_status = "completed"
+                controller_message = fallback_message
+                completed = report_facts.get("completed", [])
+                if not isinstance(completed, list):
+                    completed = []
+                completed.append(fallback_message)
+                report_facts["completed"] = completed
+            else:
+                controller_status = "blocked"
+                controller_message = fallback_message
+                not_done = report_facts.get("not_done", [])
+                if not isinstance(not_done, list):
+                    not_done = []
+                not_done.append("Reconcile the catalog-defined track request deterministically.")
+                report_facts["not_done"] = not_done
+                reasons = report_facts.get("reasons", [])
+                if not isinstance(reasons, list):
+                    reasons = []
+                reasons.append(fallback_message)
+                report_facts["reasons"] = reasons
+            provider_result = replace(provider_result, report_facts=report_facts)
+        report_facts["feedback_loop"] = {
+            "status": controller_status or "provider_finished",
+            "consecutive_tool_errors": consecutive_tool_errors,
+            "repeated_error_count": repeated_error_count,
+            "no_progress_calls": no_progress_calls,
+        }
+        provider_result = replace(provider_result, report_facts=report_facts)
+        controller_blocked = controller_status == "blocked"
+        if provider_failed or controller_blocked:
+            output_path = self.runtime.server_root / draft_logfile
+            output_path.write_text(baseline_draft_text, encoding="utf-8")
+            report_facts["rolled_back"] = True
+            mark_header_preflight_rolled_back(report_facts)
+            not_done = report_facts.get("not_done", [])
+            if not isinstance(not_done, list):
+                not_done = []
+            not_done.append("Persist stable MCP authoring changes.")
+            report_facts["not_done"] = not_done
+            reasons = report_facts.get("reasons", [])
+            if not isinstance(reasons, list):
+                reasons = []
+            reasons.append(
+                controller_message
+                if controller_blocked
+                else "The provider failed before the request could be verified."
+            )
+            report_facts["reasons"] = reasons
+            provider_result = replace(provider_result, report_facts=report_facts)
+        if not provider_failed:
+            try:
+                scope_errors = _stable_postcondition_errors(
+                    goal,
+                    baseline_document,
+                    root=self.runtime.server_root,
+                    draft_logfile=draft_logfile,
+                )
+            except Exception as exc:  # noqa: BLE001 - report verification failures
+                scope_errors = [
+                    f"Stable request postcondition inspection failed: {type(exc).__name__}: {exc}"
+                ]
+            if scope_errors:
+                output_path = self.runtime.server_root / draft_logfile
+                output_path.write_text(baseline_draft_text, encoding="utf-8")
+                report_facts = dict(provider_result.report_facts)
+                report_facts["rolled_back"] = True
+                mark_header_preflight_rolled_back(report_facts)
+                not_done = report_facts.get("not_done", [])
+                if not isinstance(not_done, list):
+                    not_done = []
+                not_done.append(
+                    "Persist stable MCP authoring changes after postcondition verification."
+                )
+                report_facts["not_done"] = not_done
+                report_facts["reasons"] = scope_errors
+                provider_result = replace(provider_result, report_facts=report_facts)
+        try:
+            return await self._finalize_stable_result(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=goal,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                provider_result=provider_result,
+                stable_tool_outcomes=stable_tool_outcomes,
+                stable_tool_errors=stable_tool_errors,
+            )
+        except Exception:
+            output_path = self.runtime.server_root / draft_logfile
+            if output_path.exists():
+                output_path.write_text(baseline_draft_text, encoding="utf-8")
+            raise
 
     def plan(
         self,
@@ -2235,6 +3656,7 @@ class AuthoringSession:
         request_kind: str,
         feedback: str,
         baseline_draft_text: str,
+        stable_tools_available: bool = False,
     ) -> AuthoringResult | None:
         """Apply a recognized clarification choice after revalidating its target."""
         pending = self._pending_header_clarifications.get(draft_logfile, ())
@@ -2246,15 +3668,31 @@ class AuthoringSession:
         original_value = clarification.get("input_value")
         if selection_key is None or original_value is None:
             return None
+        overwrite_policy = str(clarification.get("overwrite_policy", "replace"))
+        if overwrite_policy not in {"fill_empty", "replace", "merge_lists"}:
+            overwrite_policy = "replace"
+
+        intent = _HeaderFillIntent(
+            values=((selection_key, str(original_value)),),
+            overwrite_policy=overwrite_policy,
+        )
+        if stable_tools_available:
+            return await self._run_stable_header_fill(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=feedback,
+                example_id=None,
+                source_logfile_path=None,
+                baseline_draft_text=baseline_draft_text,
+                intent=intent,
+            )
 
         inspect_result = await session.call_tool(
             "inspect_heading_slots",
             {"logfile_path": draft_logfile},
         )
         _require_mcp_success(inspect_result, action="inspect_heading_slots")
-        overwrite_policy = str(clarification.get("overwrite_policy", "replace"))
-        if overwrite_policy not in {"fill_empty", "replace", "merge_lists"}:
-            overwrite_policy = "replace"
         preview_result = await session.call_tool(
             "preview_header_mapping",
             {
@@ -2367,23 +3805,29 @@ class AuthoringSession:
         session: McpSessionProtocol,
         draft_logfile: str,
         intent: _MatplotlibStyleIntent,
+        tool_name: str = "set_matplotlib_style",
     ) -> AuthoringToolCall:
         """Apply one deterministic report-wide Matplotlib style patch."""
-        result = await session.call_tool(
-            "set_matplotlib_style",
-            {
+        if tool_name == "edit_report_settings":
+            arguments = {
+                "logfile_path": draft_logfile,
+                "operation": "set_matplotlib_style",
+                "style_patch": intent.style_patch,
+            }
+        else:
+            arguments = {
                 "logfile_path": draft_logfile,
                 "style_patch": intent.style_patch,
-            },
+            }
+        result = await session.call_tool(
+            tool_name,
+            arguments,
         )
-        _require_mcp_success(result, action="set_matplotlib_style")
+        _require_mcp_success(result, action=tool_name)
         return AuthoringToolCall(
             round=1,
-            name="set_matplotlib_style",
-            arguments={
-                "logfile_path": draft_logfile,
-                "style_patch": intent.style_patch,
-            },
+            name=tool_name,
+            arguments=arguments,
         )
 
     @staticmethod
@@ -3811,6 +5255,136 @@ class AuthoringSession:
                 else [],
             },
         )
+
+    async def _run_stable_header_fill(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        request_kind: str,
+        goal: str,
+        example_id: str | None,
+        source_logfile_path: str | None,
+        baseline_draft_text: str,
+        intent: _HeaderFillIntent,
+    ) -> AuthoringResult:
+        """Apply a narrow header request through the stable MCP projection."""
+        provider_result, stable_tool_outcome = await self._execute_stable_header_fill(
+            session=session,
+            draft_logfile=draft_logfile,
+            intent=intent,
+        )
+        return await self._finalize_stable_result(
+            session=session,
+            draft_logfile=draft_logfile,
+            request_kind=request_kind,
+            goal=goal,
+            example_id=example_id,
+            source_logfile_path=source_logfile_path,
+            baseline_draft_text=baseline_draft_text,
+            provider_result=provider_result,
+            stable_tool_outcomes=[stable_tool_outcome],
+            stable_tool_errors=[],
+        )
+
+    async def _execute_stable_header_fill(
+        self,
+        *,
+        session: McpSessionProtocol,
+        draft_logfile: str,
+        intent: _HeaderFillIntent,
+    ) -> tuple[ProviderRunResult, dict[str, object]]:
+        """Apply stable header values without finalizing the surrounding request."""
+        arguments = {
+            "logfile_path": draft_logfile,
+            "operation": "apply_values",
+            "values": intent.as_mapping(),
+            "overwrite_policy": intent.overwrite_policy,
+        }
+        result = await session.call_tool("edit_header", arguments)
+        _require_mcp_success(result, action="edit_header")
+        payload = self.runtime.tool_result_payload(result)
+        structured = payload.get("structured")
+        if not isinstance(structured, Mapping):
+            structured = {}
+
+        skipped = structured.get("skipped_assignments", [])
+        conflicts = [
+            {
+                "input_key": entry.get("input_key"),
+                "input_value": entry.get("input_value"),
+                "clarification_question": entry.get("clarification_question"),
+                "candidate_labels": entry.get("candidate_labels", []),
+                "candidate_targets": entry.get("candidate_targets", []),
+            }
+            for entry in skipped
+            if isinstance(entry, Mapping)
+            and entry.get("status") == "conflict"
+            and entry.get("clarification_question")
+        ] if isinstance(skipped, list) else []
+        applied = structured.get("applied_assignments", [])
+        applied_count = len(applied) if isinstance(applied, list) else 0
+        completed = (
+            ["Applied the qualified header value through stable `edit_header`."]
+            if applied_count
+            else []
+        )
+        not_done = (
+            [
+                f"Did not apply `{entry.get('input_key', 'the requested header value')}`; "
+                "clarification is required."
+                for entry in conflicts
+            ]
+            + [
+                f"Did not apply `{entry.get('input_key', 'the requested header value')}`."
+                for entry in skipped
+                if isinstance(entry, Mapping)
+                and entry.get("status") not in {"conflict", "unchanged"}
+            ]
+            if isinstance(skipped, list)
+            else []
+        )
+        provider_result = ProviderRunResult(
+            final_text=(
+                "Applied deterministic stable header assignment"
+                f" ({applied_count} applied, "
+                f"{len(skipped) if isinstance(skipped, list) else 0} skipped)."
+            ),
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="edit_header",
+                    arguments=arguments,
+                ),
+            ),
+            report_facts={
+                "completed": completed,
+                "not_done": not_done,
+                "reasons": [
+                    str(entry.get("reason"))
+                    for entry in skipped
+                    if (
+                        isinstance(entry, Mapping)
+                        and entry.get("status") != "unchanged"
+                        and entry.get("reason")
+                    )
+                ] if isinstance(skipped, list) else [],
+                "warnings": list(structured.get("warnings", []))
+                if isinstance(structured.get("warnings"), list)
+                else [],
+                "needs_clarification": _header_clarification_entries(
+                    {
+                        "overwrite_policy": intent.overwrite_policy,
+                        "conflicting_values": conflicts,
+                    }
+                ),
+            },
+        )
+        return provider_result, {
+            "name": "edit_header",
+            "arguments": arguments,
+            "payload": payload,
+        }
 
     async def _apply_packet_remarks(
         self,
@@ -6727,6 +8301,20 @@ class AuthoringSession:
         )
 
         async with self.runtime.open_session() as session:
+            if request.desired_state is None:
+                stable_tools = await self._stable_tool_catalog(session)
+                if stable_tools is not None:
+                    return await self._run_stable_mcp_loop(
+                        session=session,
+                        mcp_tools=stable_tools,
+                        draft_logfile=relative_output_logfile,
+                        request_kind="author",
+                        goal=request.goal,
+                        example_id=request.example_id,
+                        source_logfile_path=relative_source_logfile,
+                        baseline_draft_text=None,
+                        max_rounds=request.max_rounds,
+                    )
             baseline_result = await session.call_tool(
                 "create_logfile_draft",
                 {
@@ -6848,23 +8436,72 @@ class AuthoringSession:
 
         async with self.runtime.open_session() as session:
             baseline_draft_text = output_path.read_text(encoding="utf-8")
+            original_draft_text = baseline_draft_text
+            stable_tools = await self._stable_tool_catalog(session)
 
             preflight_tool_trace: tuple[AuthoringToolCall, ...] = ()
-            style_intent, remaining_feedback = _extract_matplotlib_style_intent(request.feedback)
+            style_intent, remaining_feedback = _extract_matplotlib_style_intent(
+                request.feedback
+            )
             effective_feedback = remaining_feedback if remaining_feedback else request.feedback
             if style_intent is not None:
-                style_tool_call = await self._apply_deterministic_matplotlib_style(
-                    session=session,
-                    draft_logfile=relative_logfile,
-                    intent=style_intent,
-                )
-                preflight_tool_trace = (style_tool_call,)
-                if not remaining_feedback.strip():
-                    provider_result = ProviderRunResult(
-                        final_text="Applied deterministic Matplotlib style update.",
-                        tool_trace=preflight_tool_trace,
+                style_tool_name = "set_matplotlib_style"
+                if stable_tools is not None:
+                    available_tool_names = {
+                        str(getattr(tool, "name", "")) for tool in stable_tools
+                    }
+                    if "set_matplotlib_style" not in available_tool_names:
+                        style_tool_name = (
+                            "edit_report_settings"
+                            if "edit_report_settings" in available_tool_names
+                            else ""
+                        )
+                if not style_tool_name:
+                    effective_feedback = request.feedback
+                else:
+                    style_tool_call = await self._apply_deterministic_matplotlib_style(
+                        session=session,
+                        draft_logfile=relative_logfile,
+                        intent=style_intent,
+                        tool_name=style_tool_name,
                     )
-                    return await self._finalize_result(
+                    preflight_tool_trace = (style_tool_call,)
+                    baseline_draft_text = output_path.read_text(encoding="utf-8")
+                    if not remaining_feedback.strip():
+                        provider_result = ProviderRunResult(
+                            final_text="Applied deterministic Matplotlib style update.",
+                            tool_trace=preflight_tool_trace,
+                        )
+                        return await self._finalize_result(
+                            session=session,
+                            draft_logfile=relative_logfile,
+                            request_kind="revise",
+                            goal=request.feedback,
+                            example_id=None,
+                            source_logfile_path=None,
+                            baseline_draft_text=original_draft_text,
+                            provider_result=provider_result,
+                        )
+
+            # Narrow header fills must use the deterministic label resolver. If
+            # they enter the provider loop first, a model can select a similar
+            # visible row even when the requested qualifier is unambiguous.
+            continuation = await self._continue_header_clarification(
+                session=session,
+                draft_logfile=relative_logfile,
+                request_kind="revise",
+                feedback=effective_feedback,
+                baseline_draft_text=baseline_draft_text,
+                stable_tools_available=stable_tools is not None,
+            )
+            if continuation is not None:
+                self._remember_header_clarifications(relative_logfile, continuation)
+                return continuation
+
+            deterministic_header_fill = _extract_header_fill_intent(effective_feedback)
+            if deterministic_header_fill is not None:
+                if stable_tools is not None:
+                    result = await self._run_stable_header_fill(
                         session=session,
                         draft_logfile=relative_logfile,
                         request_kind="revise",
@@ -6872,8 +8509,41 @@ class AuthoringSession:
                         example_id=None,
                         source_logfile_path=None,
                         baseline_draft_text=baseline_draft_text,
-                        provider_result=provider_result,
+                        intent=deterministic_header_fill,
                     )
+                else:
+                    result = await self._run_deterministic_header_fill(
+                        session=session,
+                        draft_logfile=relative_logfile,
+                        request_kind="revise",
+                        goal=request.feedback,
+                        example_id=None,
+                        source_logfile_path=None,
+                        baseline_draft_text=baseline_draft_text,
+                        intent=deterministic_header_fill,
+                    )
+                self._remember_header_clarifications(relative_logfile, result)
+                return result
+
+            if stable_tools is not None:
+                result = await self._run_stable_mcp_loop(
+                    session=session,
+                    mcp_tools=stable_tools,
+                    draft_logfile=relative_logfile,
+                    request_kind="revise",
+                    goal=effective_feedback,
+                    example_id=None,
+                    source_logfile_path=None,
+                    baseline_draft_text=baseline_draft_text,
+                    max_rounds=request.max_rounds,
+                )
+                if preflight_tool_trace:
+                    object.__setattr__(
+                        result,
+                        "tool_trace",
+                        preflight_tool_trace + result.tool_trace,
+                    )
+                return result
 
             continuation = await self._continue_header_clarification(
                 session=session,
@@ -6881,6 +8551,7 @@ class AuthoringSession:
                 request_kind="revise",
                 feedback=effective_feedback,
                 baseline_draft_text=baseline_draft_text,
+                stable_tools_available=False,
             )
             if continuation is not None:
                 self._remember_header_clarifications(relative_logfile, continuation)
@@ -7013,7 +8684,7 @@ class AuthoringSession:
         """Render one draft logfile through the local MCP server."""
         async with self.runtime.open_session() as session:
             result = await session.call_tool(
-                "render_logfile_to_file",
+                "render_logfile",
                 {
                     "logfile_path": _relative_logfile_path(
                         self.runtime.server_root,
@@ -7026,8 +8697,11 @@ class AuthoringSession:
                     "overwrite": overwrite,
                 },
             )
-            _require_mcp_success(result, action="render_logfile_to_file")
-        return _structured_content(result)
+            _require_mcp_success(result, action="render_logfile")
+        payload = _structured_content(result)
+        if "output_path" not in payload and "artifact" in payload:
+            payload["output_path"] = payload["artifact"]
+        return payload
 
     async def inspect_heading_slots(
         self,

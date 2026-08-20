@@ -566,8 +566,6 @@ def _validate_document_bindings(
         raise TemplateValidationError(f"{context}.on_missing must be either 'skip' or 'error'.")
 
     channels = _ensure_sequence(bindings["channels"], context=f"{context}.channels")
-    if not channels:
-        raise TemplateValidationError(f"{context}.channels cannot be empty.")
     for index, item in enumerate(channels):
         channel_cfg = _ensure_mapping(item, context=f"{context}.channels[{index}]")
         _ = str(channel_cfg["channel"])
@@ -1739,10 +1737,13 @@ def _build_tracks_from_layout_bindings(
             style = deepcopy(
                 _ensure_mapping(binding.get("style", {}), context=f"{binding_context}.style")
             )
-            scale = _build_scale(
-                channel.masked_values(),
-                _ensure_mapping(binding.get("scale", {}), context=f"{binding_context}.scale"),
-            )
+            binding_scale = binding.get("scale")
+            scale = None
+            if binding_scale is not None or track.get("x_scale") is None:
+                scale = _build_scale(
+                    channel.masked_values(),
+                    _ensure_mapping(binding_scale or {}, context=f"{binding_context}.scale"),
+                )
             wrap_enabled, wrap_color = _parse_binding_wrap(
                 binding.get("wrap"),
                 context=f"{binding_context}.wrap",

@@ -634,7 +634,9 @@ def generic_authoring_defaults(
     provenance: dict[str, str] = {}
     warnings: list[str] = []
     archetypes = track_archetype_catalog()
-    presets = style_preset_catalog()
+    presets = [
+        preset for preset in style_preset_catalog() if not preset.get("agent_recovery_only")
+    ]
     form_defaults = form_default_catalog()
     direct_bindings, direct_annotations = _scoped_direct_children(intent)
     if not isinstance(intent.sections, list):

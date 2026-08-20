@@ -126,6 +126,7 @@ def test_responses_adapter_ends_after_an_accepted_submission() -> None:
         "response_statuses": ["completed"],
         "required_tool_name": "submit_report_intent",
         "required_submission_accepted": True,
+        "controller_stopped": False,
     }
 
 

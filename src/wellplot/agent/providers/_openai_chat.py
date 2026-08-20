@@ -144,6 +144,7 @@ async def run_chat_completions_authoring_loop(
     final_text = ""
     finish_reasons: list[str] = []
     response_rounds = 0
+    controller_stopped = False
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -246,6 +247,11 @@ async def run_chat_completions_authoring_loop(
                     "content": json.dumps(tool_payload),
                 }
             )
+            control = tool_payload.get("_agent_control")
+            if isinstance(control, dict) and control.get("action") == "stop":
+                final_text = str(control.get("message") or "")
+                controller_stopped = True
+                break
             if required_submission_accepted:
                 message = tool_payload.get("message") if isinstance(tool_payload, dict) else None
                 final_text = message if isinstance(message, str) else ""
@@ -259,7 +265,7 @@ async def run_chat_completions_authoring_loop(
                 "tool_calls": assistant_tool_calls,
             },
         )
-        if required_submission_accepted:
+        if controller_stopped or required_submission_accepted:
             break
     else:
         raise ProviderAdapterError(
@@ -275,6 +281,7 @@ async def run_chat_completions_authoring_loop(
                     "response_statuses": [],
                     "required_tool_name": required_name,
                     "required_submission_accepted": required_submission_accepted,
+                    "controller_stopped": controller_stopped,
                 }
             },
         )
@@ -310,6 +317,7 @@ async def run_chat_completions_authoring_loop(
                 "response_statuses": [],
                 "required_tool_name": required_name,
                 "required_submission_accepted": required_submission_accepted,
+                "controller_stopped": controller_stopped,
             }
         },
     )

@@ -137,6 +137,19 @@ def build_mapping() -> dict:
 class LogFileTests(unittest.TestCase):
     """Verify logfile mappings resolve into datasets and documents."""
 
+    def test_load_logfile_accepts_empty_binding_scaffold(self) -> None:
+        """Allow a valid layout to be edited before its first channel is bound."""
+        mapping = build_mapping()
+        mapping["document"]["bindings"]["channels"] = []
+
+        with TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "empty-bindings.log.yaml"
+            path.write_text(yaml.safe_dump(mapping, sort_keys=False), encoding="utf-8")
+
+            spec = load_logfile(path)
+
+        self.assertEqual(spec.document["bindings"]["channels"], [])
+
     def build_dataset(self) -> WellDataset:
         """Create a dataset containing scalar and raster channels."""
         depth = np.linspace(1000.0, 1020.0, 50)
@@ -1166,6 +1179,28 @@ class LogFileTests(unittest.TestCase):
         self.assertIsNone(combo.x_scale)
         self.assertEqual(combo.elements[0].channel, "GR")
         self.assertEqual(combo.elements[1].channel, "RT")
+
+    def test_explicit_track_scale_is_inherited_by_unscaled_curves(self) -> None:
+        """Do not replace an explicit track scale with automatic curve scales."""
+        payload = build_mapping()
+        tracks = payload["document"]["layout"]["log_sections"][0]["tracks"]
+        resistivity = next(track for track in tracks if track["id"] == "rt")
+        resistivity["x_scale"] = {"kind": "log", "min": 0.2, "max": 2000}
+        payload["document"]["bindings"]["channels"] = [
+            {"channel": "RT", "track_id": "rt", "kind": "curve"}
+        ]
+
+        document = build_document_for_logfile(
+            logfile_from_mapping(payload),
+            self.build_dataset(),
+            source_path=Path("example_input.las"),
+        )
+        track = next(item for item in document.tracks if item.id == "rt")
+
+        assert track.x_scale is not None
+        self.assertEqual(track.x_scale.kind, ScaleKind.LOG)
+        self.assertEqual((track.x_scale.minimum, track.x_scale.maximum), (0.2, 2000.0))
+        self.assertIsNone(track.elements[0].scale)
 
     def test_page_spacing_fields_are_supported_in_logfile_yaml(self) -> None:
         """Parse page margin and track gap settings from logfile YAML."""

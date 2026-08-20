@@ -189,6 +189,7 @@ async def run_responses_authoring_loop(
     required_name = _required_tool_name(tool_definitions, required_tool_name)
     required_tool_called = False
     required_submission_accepted = False
+    controller_stopped = False
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -287,11 +288,16 @@ async def run_responses_authoring_loop(
                     "output": json.dumps(tool_payload),
                 }
             )
+            control = tool_payload.get("_agent_control")
+            if isinstance(control, Mapping) and control.get("action") == "stop":
+                final_text = str(control.get("message") or "")
+                controller_stopped = True
+                break
             if required_submission_accepted:
                 message = tool_payload.get("message") if isinstance(tool_payload, Mapping) else None
                 final_text = message if isinstance(message, str) else ""
                 break
-        if required_submission_accepted:
+        if controller_stopped or required_submission_accepted:
             break
     else:
         raise ProviderAdapterError(
@@ -307,6 +313,7 @@ async def run_responses_authoring_loop(
                     "response_statuses": response_statuses,
                     "required_tool_name": required_name,
                     "required_submission_accepted": required_submission_accepted,
+                    "controller_stopped": controller_stopped,
                 }
             },
         )
@@ -345,6 +352,7 @@ async def run_responses_authoring_loop(
                 "response_statuses": response_statuses,
                 "required_tool_name": required_name,
                 "required_submission_accepted": required_submission_accepted,
+                "controller_stopped": controller_stopped,
             }
         },
     )

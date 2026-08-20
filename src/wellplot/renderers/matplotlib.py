@@ -4575,7 +4575,17 @@ class MatplotlibRenderer(Renderer):
     def _uses_independent_curve_scales(self, track: TrackSpec) -> bool:
         if self._is_reference_track(track) or self._is_annotation_track(track):
             return False
-        return self._curve_count(track) > 1
+        curve_scales = [
+            element.scale or track.x_scale
+            for element in self._curve_elements(track)
+        ]
+        if len(curve_scales) < 2:
+            return False
+        first_scale = curve_scales[0]
+        return any(
+            not self._scales_match(first_scale, scale)
+            for scale in curve_scales[1:]
+        )
 
     def _track_has_bottom_header_on_page(self, page_layout: PageLayout, track: TrackSpec) -> bool:
         return any(frame.track is track for frame in page_layout.track_header_bottom_frames)

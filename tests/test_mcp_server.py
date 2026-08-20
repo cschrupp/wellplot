@@ -23,7 +23,6 @@ from __future__ import annotations
 
 import importlib.util
 import io
-import os
 import sys
 import tempfile
 import unittest
@@ -32,8 +31,9 @@ from pathlib import Path
 
 try:
     from tests._mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
-except ModuleNotFoundError:  # pragma: no cover - exercised by unittest discovery mode
+except ModuleNotFoundError:  # pragma: no cover - unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, McpFixturePaths, create_mcp_fixture_paths
+from wellplot.agent.tool_contract import stable_tool_profile
 from wellplot.errors import DependencyUnavailableError
 from wellplot.mcp.server import create_mcp_server, main
 
@@ -43,7 +43,7 @@ HAS_LAS = importlib.util.find_spec("lasio") is not None
 
 @unittest.skipIf(MCP_AVAILABLE, "optional mcp dependency is installed")
 class McpServerDependencyTests(unittest.TestCase):
-    """Verify the graceful behavior when the optional SDK is unavailable."""
+    """Verify graceful behavior when the optional SDK is unavailable."""
 
     def test_create_mcp_server_requires_optional_dependency(self) -> None:
         """Raise a dedicated error when the MCP SDK is not installed."""
@@ -65,8 +65,8 @@ class McpServerDependencyTests(unittest.TestCase):
 class McpServerIntegrationTests(unittest.TestCase):
     """Verify the stdio MCP surface against the real SDK."""
 
-    def test_stdio_server_exposes_tools_resources_and_prompts(self) -> None:
-        """Start the stdio server and exercise its MCP contract."""
+    def test_stdio_server_exposes_stable_surface(self) -> None:
+        """Start the stdio server and exercise the stable projection."""
         import anyio
 
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -80,18 +80,8 @@ class McpServerIntegrationTests(unittest.TestCase):
         from mcp.client.session import ClientSession
         from mcp.client.stdio import StdioServerParameters, stdio_client
 
-        export_dir = fixture_paths.fixture_dir / "exported-example"
-        draft_logfile = fixture_paths.fixture_dir / "drafts" / "single-draft.log.yaml"
-        saved_logfile = fixture_paths.fixture_dir / "saved.log.yaml"
-        replacement_las = fixture_paths.fixture_dir / "replacement.las"
-        replacement_las.write_text(
-            fixture_paths.las_path.read_text(encoding="utf-8").replace(
-                "MCP FIXTURE-01",
-                "MCP REPLACEMENT-01",
-            ),
-            encoding="utf-8",
-        )
-        example_template = "examples/production/cbl_log_example/base.template.yaml"
+        draft_logfile = fixture_paths.fixture_dir / "drafts" / "stable-draft.log.yaml"
+        rendered = fixture_paths.fixture_dir / "stable-render.pdf"
         server = StdioServerParameters(
             command=sys.executable,
             args=["-m", "wellplot.mcp.server"],
@@ -105,875 +95,151 @@ class McpServerIntegrationTests(unittest.TestCase):
             resources = await session.list_resources()
             prompts = await session.list_prompts()
             templates = await session.list_resource_templates()
-            header_prompt = await session.get_prompt(
-                "ingest_header_text",
+            source = await session.call_tool(
+                "inspect_source",
+                {
+                    "source_path": str(fixture_paths.las_path),
+                    "source_format": "auto",
+                    "channels": ["GR", "RT"],
+                },
+            )
+            created = await session.call_tool(
+                "create_draft",
+                {
+                    "operation": "clone",
+                    "logfile_path": str(draft_logfile),
+                    "source_logfile_path": fixture_paths.single_logfile_relative,
+                    "overwrite": False,
+                },
+            )
+            inspected = await session.call_tool(
+                "inspect_authoring",
                 {
                     "logfile_path": str(draft_logfile),
-                    "source_text": "Company: Acme Energy\nWell: Demo-01\nDirection: Up\n",
-                    "source_description": "Copied field ticket header packet",
+                    "object_kind": "section",
+                    "detail": "summary",
+                },
+            )
+            section_edit = await session.call_tool(
+                "edit_section",
+                {
+                    "operation": "update",
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "subtitle": "Stable MCP integration",
+                },
+            )
+            track_edit = await session.call_tool(
+                "edit_track",
+                {
+                    "operation": "add",
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "qc",
+                    "title": "QC",
+                    "kind": "normal",
+                    "width_mm": 24.0,
+                },
+            )
+            binding_edit = await session.call_tool(
+                "edit_curve_binding",
+                {
+                    "operation": "add",
+                    "logfile_path": str(draft_logfile),
+                    "section_id": "main",
+                    "track_id": "qc",
+                    "channel": "GR",
+                    "binding_id": "qc.gr.1",
+                    "label": "Gamma Ray",
+                    "style": {"color": "#008000"},
+                },
+            )
+            remarks_edit = await session.call_tool(
+                "edit_remarks",
+                {
+                    "operation": "add",
+                    "logfile_path": str(draft_logfile),
+                    "remark": {
+                        "title": "Stable projection",
+                        "lines": ["Created through the deterministic MCP surface."],
+                        "alignment": "left",
+                    },
                 },
             )
             validation = await session.call_tool(
                 "validate_logfile",
-                {"logfile_path": fixture_paths.single_logfile_relative},
-            )
-            source_inspection = await session.call_tool(
-                "inspect_data_source",
-                {"source_path": str(fixture_paths.las_path)},
-            )
-            channel_availability = await session.call_tool(
-                "check_channel_availability",
                 {
-                    "requested_channels": ["gamma ray", "RT", "NPHI"],
-                    "source_path": str(fixture_paths.las_path),
+                    "operation": "validate",
+                    "logfile_path": str(draft_logfile),
                 },
             )
-            cbl_main_inspection = await session.call_tool(
-                "inspect_logfile",
-                {"logfile_path": fixture_paths.single_logfile_relative},
-            )
-            section = cbl_main_inspection.structuredContent["sections"][0]
-            multi_inspection = await session.call_tool(
-                "inspect_logfile",
-                {"logfile_path": fixture_paths.multi_logfile_relative},
-            )
-            multi_section = multi_inspection.structuredContent["sections"][0]
             preview = await session.call_tool(
-                "preview_section_png",
+                "preview_logfile",
                 {
-                    "logfile_path": fixture_paths.single_logfile_relative,
-                    "section_id": section["id"],
-                    "dpi": 72,
-                },
-            )
-            preview_track = await session.call_tool(
-                "preview_track_png",
-                {
-                    "logfile_path": fixture_paths.single_logfile_relative,
-                    "section_id": section["id"],
-                    "track_ids": [section["track_ids"][1]],
-                    "dpi": 72,
-                },
-            )
-            preview_window = await session.call_tool(
-                "preview_window_png",
-                {
-                    "logfile_path": fixture_paths.multi_logfile_relative,
-                    "depth_range": [
-                        multi_section["depth_range"][0],
-                        multi_section["depth_range"][0] + 8.0,
-                    ],
-                    "section_ids": [multi_section["id"]],
-                    "dpi": 72,
-                },
-            )
-            text_validation = await session.call_tool(
-                "validate_logfile_text",
-                {
-                    "yaml_text": fixture_paths.single_logfile_text,
-                    "base_dir": Path(
-                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
-                    ).as_posix(),
-                },
-            )
-            formatting = await session.call_tool(
-                "format_logfile_text",
-                {
-                    "yaml_text": fixture_paths.single_logfile_text,
-                    "base_dir": Path(
-                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
-                    ).as_posix(),
-                },
-            )
-            exported = await session.call_tool(
-                "export_example_bundle",
-                {
-                    "example_id": "cbl_log_example",
-                    "output_dir": str(export_dir),
-                },
-            )
-            created_draft = await session.call_tool(
-                "create_logfile_draft",
-                {
-                    "output_path": str(draft_logfile),
-                    "source_logfile_path": fixture_paths.single_logfile_relative,
-                },
-            )
-            updated_section = await session.call_tool(
-                "update_section",
-                {
+                    "operation": "preview",
                     "logfile_path": str(draft_logfile),
                     "section_id": "main",
-                    "title": "Main Review",
-                    "subtitle": "Focused Review Window",
-                    "depth_range": [1004.0, 1014.0],
-                    "depth_range_unit": "m",
+                    "page": 0,
                 },
             )
-            updated_source = await session.call_tool(
-                "set_section_data_source",
+            render = await session.call_tool(
+                "render_logfile",
                 {
+                    "operation": "render",
                     "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "source_path": str(replacement_las),
-                    "subtitle": "Replacement LAS Source",
-                },
-            )
-            updated_depth = await session.call_tool(
-                "set_depth_axis",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "unit": "ft",
-                    "scale": 240.0,
-                    "major_step": 10.0,
-                    "minor_step": 2.0,
-                },
-            )
-            updated_page_layout = await session.call_tool(
-                "set_page_layout",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "page_patch": {
-                        "size": "Letter",
-                        "orientation": "landscape",
-                        "continuous": True,
-                    },
-                    "render_patch": {
-                        "dpi": 200,
-                        "output_path": "./updated-render.pdf",
-                    },
-                },
-            )
-            updated_matplotlib_style = await session.call_tool(
-                "set_matplotlib_style",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "style_patch": {
-                        "grid": {
-                            "depth_major_color": "#555555",
-                            "depth_minor_color": "#9a9a9a",
-                            "x_major_linewidth": 0.8,
-                        }
-                    },
-                },
-            )
-            section_view = await session.call_tool(
-                "set_section_view",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "title": "Composite Review",
-                    "subtitle": "Unified Section View",
-                    "depth_range": [3300.0, 3320.0],
-                    "depth_range_unit": "ft",
-                    "scale": 300.0,
-                    "major_step": 20.0,
-                    "minor_step": 5.0,
-                    "page_patch": {
-                        "track_header_height_mm": 26.0,
-                    },
-                    "render_patch": {
-                        "dpi": 180,
-                    },
-                },
-            )
-            added_fill = await session.call_tool(
-                "add_curve_fill",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "gr",
-                    "channel": "GR",
-                    "kind": "to_lower_limit",
-                    "label": "Gamma Fill",
-                    "color": "#8fd19e",
-                    "alpha": 0.22,
-                },
-            )
-            removed_fill = await session.call_tool(
-                "remove_curve_fill",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "gr",
-                    "channel": "GR",
-                },
-            )
-            previous_draft_text = draft_logfile.read_text(encoding="utf-8")
-            draft_summary = await session.call_tool(
-                "summarize_logfile_draft",
-                {
-                    "logfile_path": str(draft_logfile),
-                },
-            )
-            heading_slots = await session.call_tool(
-                "inspect_heading_slots",
-                {
-                    "logfile_path": str(draft_logfile),
-                },
-            )
-            template_heading_slots = await session.call_tool(
-                "inspect_heading_slots",
-                {
-                    "template_path": example_template,
-                },
-            )
-            authoring_vocab = await session.call_tool(
-                "inspect_authoring_vocab",
-                {
-                    "logfile_path": str(draft_logfile),
-                },
-            )
-            template_vocab = await session.call_tool(
-                "inspect_authoring_vocab",
-                {
-                    "template_path": example_template,
-                },
-            )
-            added_track = await session.call_tool(
-                "add_track",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "id": "porosity",
-                    "title": "Porosity",
-                    "kind": "normal",
-                    "width_mm": 32.0,
-                },
-            )
-            updated_track = await session.call_tool(
-                "update_track",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                    "patch": {
-                        "title": "Density / Neutron",
-                        "width_mm": 30.0,
-                    },
-                },
-            )
-            added_annotation_track = await session.call_tool(
-                "add_track",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "id": "notes",
-                    "title": "Notes",
-                    "kind": "annotation",
-                    "width_mm": 18.0,
-                },
-            )
-            added_annotation = await session.call_tool(
-                "add_annotation_object",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "notes",
-                    "annotation": {
-                        "kind": "text",
-                        "depth": 1008.0,
-                        "text": "Top pay",
-                    },
-                },
-            )
-            updated_annotation = await session.call_tool(
-                "update_annotation_object",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "notes",
-                    "annotation_index": 0,
-                    "patch": {"text": "Updated pay"},
-                },
-            )
-            removed_annotation = await session.call_tool(
-                "remove_annotation_object",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "notes",
-                    "annotation_index": 0,
-                },
-            )
-            bound_curve = await session.call_tool(
-                "bind_curve",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                    "channel": "GR",
-                    "label": "Gamma",
-                    "style": {"color": "#008000"},
-                },
-            )
-            updated_binding = await session.call_tool(
-                "update_curve_binding",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                    "channel": "GR",
-                    "patch": {
-                        "label": "Gamma Ray",
-                        "scale": {
-                            "kind": "linear",
-                            "min": 0.0,
-                            "max": 150.0,
-                        },
-                    },
-                },
-            )
-            inspected_track_bindings = await session.call_tool(
-                "inspect_track_bindings",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "rt",
-                },
-            )
-            scaled_track = await session.call_tool(
-                "set_track_scales",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "rt",
-                    "x_scale": {
-                        "kind": "log",
-                        "min": 2.0,
-                        "max": 200.0,
-                    },
-                    "channel_scales": {
-                        "RT": {
-                            "kind": "log",
-                            "min": 2.0,
-                            "max": 200.0,
-                        }
-                    },
-                },
-            )
-            moved_track = await session.call_tool(
-                "move_track",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                    "after_track_id": "depth",
-                },
-            )
-            removed_curve_binding = await session.call_tool(
-                "remove_curve_binding",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                    "channel": "GR",
-                },
-            )
-            cleared_track_bindings = await session.call_tool(
-                "clear_track_bindings",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "rt",
-                },
-            )
-            removed_track = await session.call_tool(
-                "remove_track",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "section_id": "main",
-                    "track_id": "porosity",
-                },
-            )
-            updated_heading = await session.call_tool(
-                "set_heading_content",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "patch": {
-                        "provider_name": "Company",
-                        "general_fields": [
-                            {
-                                "key": "company",
-                                "label": "Company",
-                                "source_key": "COMP",
-                            },
-                            {
-                                "key": "well",
-                                "label": "Well",
-                                "source_key": "WELL",
-                            },
-                            {
-                                "key": "service_company",
-                                "label": "Service Company",
-                                "value": "Legacy Header Service",
-                            },
-                        ],
-                        "service_titles": [
-                            {
-                                "value": "Legacy Title",
-                                "alignment": "left",
-                                "bold": True,
-                            }
-                        ],
-                        "detail": {
-                            "kind": "open_hole",
-                            "rows": [
-                                {
-                                    "label": "Date",
-                                    "values": [{"source_key": "DATE"}, ""],
-                                },
-                                {
-                                    "label_cells": ["Run", "Direction"],
-                                    "columns": [
-                                        {"cells": [""]},
-                                        {"cells": [""]},
-                                    ],
-                                },
-                            ],
-                        },
-                        "tail_enabled": True,
-                    },
-                },
-            )
-            preview_mapping = await session.call_tool(
-                "preview_header_mapping",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "values": {
-                        "provider": "Acme Logging",
-                        "company": "Acme Energy",
-                        "well": "Demo-01",
-                        "date": "2026-04-30",
-                        "run": "ONE",
-                        "direction": "Up",
-                        "service_title_1": "Gamma Ray Review",
-                    },
-                },
-            )
-            applied_header_values = await session.call_tool(
-                "apply_header_values",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "values": {
-                        "provider": "Acme Logging",
-                        "company": "Acme Energy",
-                        "well": "Demo-01",
-                        "date": "2026-04-30",
-                        "run": "ONE",
-                        "direction": "Up",
-                        "service_title_1": "Gamma Ray Review",
-                        "general_field.service_company": "Acme Wireline",
-                    },
-                    "overwrite_policy": "replace",
-                },
-            )
-            parsed_header_text = await session.call_tool(
-                "parse_key_value_text",
-                {
-                    "source_text": "Company: Acme Energy\nWell: Demo-01\nDirection: Up\n",
-                },
-            )
-            style_presets = await session.call_tool(
-                "inspect_style_presets",
-                {
-                    "preset_family": "cbl_vdl_variants",
-                },
-            )
-            applied_style_preset = await session.call_tool(
-                "apply_style_preset",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "preset_id": "report_header_clean",
-                },
-            )
-            updated_remarks = await session.call_tool(
-                "set_remarks_content",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "remarks": [
-                        {
-                            "title": "Generated Remarks",
-                            "lines": ["Synthetic authoring note 1."],
-                            "alignment": "center",
-                        }
-                    ],
-                },
-            )
-            change_summary = await session.call_tool(
-                "summarize_logfile_changes",
-                {
-                    "logfile_path": str(draft_logfile),
-                    "previous_text": previous_draft_text,
-                },
-            )
-            updated_draft_summary = await session.call_tool(
-                "summarize_logfile_draft",
-                {
-                    "logfile_path": str(draft_logfile),
-                },
-            )
-            saved = await session.call_tool(
-                "save_logfile_text",
-                {
-                    "yaml_text": fixture_paths.single_logfile_text,
-                    "output_path": str(saved_logfile),
-                    "base_dir": Path(
-                        os.path.relpath(fixture_paths.fixture_dir, start=REPO_ROOT)
-                    ).as_posix(),
+                    "output_path": str(rendered),
+                    "overwrite": False,
                 },
             )
 
-        self.assertEqual(
-            [tool.name for tool in tools.tools],
-            [
-                "validate_logfile",
-                "inspect_logfile",
-                "inspect_authoring_objects",
-                "inspect_authoring_hierarchy",
-                "inspect_data_source",
-                "check_channel_availability",
-                "preview_logfile_png",
-                "preview_section_png",
-                "preview_track_png",
-                "preview_window_png",
-                "render_logfile_to_file",
-                "export_example_bundle",
-                "create_logfile_draft",
-                "summarize_logfile_draft",
-                "set_section_data_source",
-                "replicate_section_structure",
-                "update_section",
-                "set_depth_axis",
-                "set_page_layout",
-                "set_matplotlib_style",
-                "set_section_view",
-                "add_track",
-                "update_track",
-                "inspect_track_bindings",
-                "set_track_scales",
-                "add_annotation_object",
-                "update_annotation_object",
-                "remove_annotation_object",
-                "remove_track",
-                "bind_curve",
-                "add_curve_fill",
-                "remove_curve_fill",
-                "bind_raster",
-                "update_curve_binding",
-                "update_raster_binding",
-                "remove_curve_binding",
-                "remove_raster_binding",
-                "clear_track_bindings",
-                "move_track",
-                "set_heading_content",
-                "update_header_slot",
-                "update_service_title",
-                "set_remarks_content",
-                "inspect_header_archetypes",
-                "inspect_packet_blueprints",
-                "apply_header_archetype",
-                "inspect_heading_slots",
-                "preview_header_mapping",
-                "apply_header_values",
-                "parse_key_value_text",
-                "inspect_style_presets",
-                "apply_style_preset",
-                "inspect_authoring_vocab",
-                "summarize_logfile_changes",
-                "validate_logfile_text",
-                "format_logfile_text",
-                "save_logfile_text",
-                "save_authoring_document",
-            ],
-        )
-        self.assertEqual(
-            [str(resource.uri) for resource in resources.resources],
-            [
-                "wellplot://schema/logfile.json",
-                "wellplot://examples/production/index.json",
-                "wellplot://authoring/schema/patch.json",
-                "wellplot://authoring/schema/canonical.json",
-                "wellplot://authoring/schema/operations.json",
-                "wellplot://authoring/catalog/hierarchy.json",
-                "wellplot://authoring/catalog/track-kinds.json",
-                "wellplot://authoring/catalog/fill-kinds.json",
-                "wellplot://authoring/catalog/track-archetypes.json",
-                "wellplot://authoring/catalog/header-archetypes.json",
-                "wellplot://authoring/catalog/packet-blueprints.json",
-                "wellplot://authoring/catalog/style-presets.json",
-                "wellplot://authoring/catalog/header-fields.json",
-                "wellplot://authoring/catalog/header-key-aliases.json",
-                "wellplot://authoring/catalog/channel-aliases.json",
-            ],
-        )
-        self.assertEqual(
-            [prompt.name for prompt in prompts.prompts],
-            [
-                "review_logfile",
-                "preview_logfile",
-                "start_from_example",
-                "author_plot_from_request",
-                "revise_plot_from_feedback",
-                "ingest_header_text",
-            ],
-        )
-        self.assertEqual(
-            [template.uriTemplate for template in templates.resourceTemplates],
-            [
-                "wellplot://examples/production/{example_id}/README.md",
-                "wellplot://examples/production/{example_id}/base.template.yaml",
-                "wellplot://examples/production/{example_id}/full_reconstruction.log.yaml",
-                "wellplot://examples/production/{example_id}/data-notes.md",
-            ],
-        )
-        self.assertEqual(len(header_prompt.messages), 1)
-        self.assertEqual(header_prompt.messages[0].role, "user")
-        self.assertIn(
-            "Copied field ticket header packet",
-            header_prompt.messages[0].content.text,
-        )
-        self.assertIn(
-            'preview_header_mapping(logfile_path, values, overwrite_policy="fill_empty")',
-            header_prompt.messages[0].content.text,
-        )
-        self.assertEqual(
-            validation.structuredContent,
-            {
-                "valid": True,
-                "message": "Valid logfile.",
-                "name": "MCP Single Fixture",
-                "render_backend": "matplotlib",
-                "section_ids": ["main"],
-            },
-        )
-        self.assertEqual(source_inspection.structuredContent["source_format_detected"], "las")
-        self.assertEqual(source_inspection.structuredContent["channel_count"], 5)
-        self.assertEqual(channel_availability.structuredContent["found_channels"], ["GR", "RT"])
-        self.assertEqual(channel_availability.structuredContent["missing_channels"], ["NPHI"])
-        self.assertEqual(len(preview.content), 1)
-        self.assertEqual(preview.content[0].type, "image")
-        self.assertEqual(getattr(preview.content[0], "mimeType", None), "image/png")
-        self.assertEqual(len(preview_track.content), 1)
-        self.assertEqual(preview_track.content[0].type, "image")
-        self.assertEqual(getattr(preview_track.content[0], "mimeType", None), "image/png")
-        self.assertEqual(len(preview_window.content), 1)
-        self.assertEqual(preview_window.content[0].type, "image")
-        self.assertEqual(getattr(preview_window.content[0], "mimeType", None), "image/png")
-        self.assertEqual(text_validation.structuredContent["valid"], True)
-        self.assertEqual(text_validation.structuredContent["section_ids"], ["main"])
-        self.assertEqual(formatting.structuredContent["name"], "MCP Single Fixture")
-        self.assertIn("version: 1", formatting.structuredContent["yaml_text"])
-        self.assertNotIn("\ntemplate:\n", formatting.structuredContent["yaml_text"])
-        self.assertEqual(exported.structuredContent["example_id"], "cbl_log_example")
-        self.assertEqual(
-            [Path(path).name for path in exported.structuredContent["written_files"]],
-            [
-                "README.md",
-                "base.template.yaml",
-                "full_reconstruction.log.yaml",
-                "data-notes.md",
-            ],
-        )
-        self.assertEqual(created_draft.structuredContent["output_path"], str(draft_logfile))
-        self.assertEqual(created_draft.structuredContent["name"], "MCP Single Fixture")
-        self.assertEqual(created_draft.structuredContent["section_ids"], ["main"])
-        self.assertEqual(created_draft.structuredContent["seed_kind"], "logfile")
-        self.assertEqual(
-            created_draft.structuredContent["seed_value"],
-            str(fixture_paths.single_logfile),
-        )
-        self.assertEqual(updated_section.structuredContent["section_id"], "main")
-        self.assertEqual(updated_section.structuredContent["title"], "Main Review")
-        self.assertEqual(updated_section.structuredContent["subtitle"], "Focused Review Window")
-        self.assertEqual(updated_section.structuredContent["depth_range"], [1004.0, 1014.0])
-        self.assertEqual(updated_section.structuredContent["depth_range_unit"], "m")
-        self.assertEqual(updated_source.structuredContent["source_path"], str(replacement_las))
-        self.assertEqual(updated_source.structuredContent["source_format"], "las")
-        self.assertEqual(updated_source.structuredContent["subtitle"], "Replacement LAS Source")
-        self.assertEqual(updated_depth.structuredContent["depth_axis"]["unit"], "ft")
-        self.assertEqual(updated_depth.structuredContent["depth_axis"]["scale"], 240.0)
-        self.assertEqual(updated_page_layout.structuredContent["page"]["size"], "Letter")
-        self.assertEqual(
-            updated_page_layout.structuredContent["page"]["orientation"],
-            "landscape",
-        )
-        self.assertEqual(updated_page_layout.structuredContent["render"]["dpi"], 200)
-        self.assertEqual(
-            updated_matplotlib_style.structuredContent["style"]["grid"]["depth_major_color"],
-            "#555555",
-        )
-        self.assertEqual(
-            updated_matplotlib_style.structuredContent["style"]["grid"]["x_major_linewidth"],
-            0.8,
-        )
-        self.assertEqual(section_view.structuredContent["section_id"], "main")
-        self.assertEqual(section_view.structuredContent["title"], "Composite Review")
-        self.assertEqual(section_view.structuredContent["subtitle"], "Unified Section View")
-        self.assertEqual(section_view.structuredContent["depth_range"], [3300.0, 3320.0])
-        self.assertEqual(section_view.structuredContent["depth_range_unit"], "ft")
-        self.assertEqual(section_view.structuredContent["depth_axis"]["scale"], 300.0)
-        self.assertEqual(
-            section_view.structuredContent["page"]["track_header_height_mm"],
-            26.0,
-        )
-        self.assertEqual(section_view.structuredContent["render"]["dpi"], 180)
-        self.assertEqual(added_fill.structuredContent["fill"]["kind"], "to_lower_limit")
-        self.assertEqual(added_fill.structuredContent["fill"]["label"], "Gamma Fill")
-        self.assertEqual(removed_fill.structuredContent["channel"], "GR")
-        self.assertEqual(draft_summary.structuredContent["name"], "MCP Single Fixture")
-        self.assertEqual(draft_summary.structuredContent["section_count"], 1)
-        self.assertEqual(draft_summary.structuredContent["section_ids"], ["main"])
-        self.assertTrue(draft_summary.structuredContent["sections"][0]["dataset_loaded"])
-        self.assertIn("GR", draft_summary.structuredContent["sections"][0]["available_channels"])
-        self.assertEqual(heading_slots.structuredContent["target_kind"], "logfile")
-        self.assertTrue(heading_slots.structuredContent["has_heading"])
-        self.assertEqual(
-            template_heading_slots.structuredContent["target_kind"],
-            "template",
-        )
-        self.assertTrue(template_heading_slots.structuredContent["detail_slots"]["enabled"])
-        self.assertIn("reference", authoring_vocab.structuredContent["track_kinds"])
-        self.assertEqual(
-            authoring_vocab.structuredContent["target_summary"]["target_kind"], "logfile"
-        )
-        self.assertEqual(
-            template_vocab.structuredContent["target_summary"]["target_kind"], "template"
-        )
-        self.assertEqual(added_track.structuredContent["track_id"], "porosity")
-        self.assertEqual(added_track.structuredContent["track_count"], 7)
-        self.assertEqual(added_track.structuredContent["track_ids"][-1], "porosity")
-        self.assertEqual(updated_track.structuredContent["track"]["title"], "Density / Neutron")
-        self.assertEqual(updated_track.structuredContent["track"]["width_mm"], 30.0)
-        self.assertEqual(added_annotation_track.structuredContent["track_id"], "notes")
-        self.assertEqual(added_annotation.structuredContent["annotation_index"], 0)
-        self.assertEqual(updated_annotation.structuredContent["annotation"]["text"], "Updated pay")
-        self.assertEqual(removed_annotation.structuredContent["annotation_count"], 0)
-        self.assertEqual(bound_curve.structuredContent["channel"], "GR")
-        self.assertEqual(bound_curve.structuredContent["binding_kind"], "curve")
-        self.assertEqual(bound_curve.structuredContent["binding_count"], 6)
-        self.assertEqual(updated_binding.structuredContent["binding"]["label"], "Gamma Ray")
-        self.assertEqual(
-            updated_binding.structuredContent["binding"]["scale"]["max"],
-            150.0,
-        )
-        self.assertEqual(inspected_track_bindings.structuredContent["track_id"], "rt")
-        self.assertEqual(inspected_track_bindings.structuredContent["curve_binding_count"], 1)
-        self.assertEqual(inspected_track_bindings.structuredContent["bindings"][0]["channel"], "RT")
-        self.assertEqual(scaled_track.structuredContent["track"]["x_scale"]["max"], 200.0)
-        self.assertEqual(
-            scaled_track.structuredContent["track"]["grid"]["vertical"]["main"]["scale"],
-            "logarithmic",
-        )
-        self.assertEqual(
-            scaled_track.structuredContent["track"]["grid"]["vertical"]["main"]["spacing_mode"],
-            "scale",
-        )
-        self.assertEqual(scaled_track.structuredContent["updated_channels"], ["RT"])
-        self.assertEqual(scaled_track.structuredContent["bindings"][0]["scale"]["min"], 2.0)
-        self.assertEqual(
-            moved_track.structuredContent["track_ids"],
-            ["depth", "porosity", "cbl", "vdl", "gr", "cali", "rt", "notes"],
-        )
-        self.assertEqual(removed_curve_binding.structuredContent["binding_count"], 5)
-        self.assertGreaterEqual(
-            cleared_track_bindings.structuredContent["removed_curve_binding_count"],
-            1,
-        )
-        self.assertEqual(removed_track.structuredContent["track_count"], 7)
-        self.assertEqual(
-            removed_track.structuredContent["track_ids"],
-            ["depth", "cbl", "vdl", "gr", "cali", "rt", "notes"],
-        )
-        self.assertEqual(
-            updated_heading.structuredContent["heading"]["provider_name"],
-            "Company",
-        )
-        self.assertEqual(updated_heading.structuredContent["heading"]["tail_enabled"], True)
-        self.assertEqual(updated_heading.structuredContent["has_tail"], True)
-        self.assertEqual(
-            preview_mapping.structuredContent["resolved_assignments"][0]["target_key"],
-            "company",
-        )
-        self.assertEqual(
-            [
-                entry["target_key"]
-                for entry in preview_mapping.structuredContent["conflicting_values"]
-            ],
-            ["provider_name", "service_title_1"],
-        )
-        self.assertEqual(
-            preview_mapping.structuredContent["predicted_heading_patch"]["general_fields"][0][
-                "value"
-            ],
-            "Acme Energy",
-        )
-        self.assertEqual(
-            [
-                entry["target_key"]
-                for entry in applied_header_values.structuredContent["applied_assignments"]
-            ],
-            [
-                "provider_name",
-                "company",
-                "well",
-                "Date",
-                "Run",
-                "Direction",
-                "service_title_1",
-                "service_company",
-            ],
-        )
-        self.assertEqual(
-            applied_header_values.structuredContent["heading_summary"]["current_values"]["heading"][
-                "provider_name"
-            ],
-            "Acme Logging",
-        )
-        self.assertEqual(
-            applied_header_values.structuredContent["heading_summary"]["current_values"]["heading"][
-                "service_titles"
-            ][0]["value"],
-            "Gamma Ray Review",
-        )
-        self.assertEqual(parsed_header_text.structuredContent["format_detected"], "colon")
-        self.assertEqual(
-            [pair["key"] for pair in parsed_header_text.structuredContent["pairs"]],
-            ["Company", "Well", "Direction"],
-        )
-        self.assertEqual(
-            style_presets.structuredContent["selected_family"],
-            "cbl_vdl_variants",
-        )
-        self.assertEqual(
-            {preset["id"] for preset in style_presets.structuredContent["presets"]},
-            {"cbl_vdl_high_contrast", "cbl_vdl_print_safe"},
-        )
-        self.assertEqual(applied_style_preset.structuredContent["preset_id"], "report_header_clean")
-        self.assertEqual(applied_style_preset.structuredContent["heading_applied"], True)
-        self.assertEqual(applied_style_preset.structuredContent["remarks_applied"], True)
-        self.assertEqual(updated_remarks.structuredContent["remarks_count"], 1)
-        self.assertEqual(
-            updated_remarks.structuredContent["remarks"][0]["title"],
-            "Generated Remarks",
-        )
-        self.assertTrue(change_summary.structuredContent["changed"])
-        self.assertTrue(change_summary.structuredContent["heading_changed"])
-        self.assertTrue(change_summary.structuredContent["remarks_changed"])
-        self.assertEqual(
-            updated_draft_summary.structuredContent["sections"][0]["curve_binding_count"],
-            4,
-        )
-        self.assertEqual(
-            updated_draft_summary.structuredContent["sections"][0]["track_ids"][1],
-            "cbl",
-        )
-        self.assertEqual(updated_draft_summary.structuredContent["has_tail"], True)
-        self.assertEqual(saved.structuredContent["name"], "MCP Single Fixture")
-        self.assertEqual(saved.structuredContent["output_path"], str(saved_logfile))
-        self.assertTrue(draft_logfile.exists())
-        self.assertTrue(export_dir.exists())
-        self.assertTrue(saved_logfile.exists())
+            self.assertEqual(
+                [tool.name for tool in tools.tools],
+                [tool.name for tool in stable_tool_profile()],
+            )
+            self.assertEqual(
+                [str(resource.uri) for resource in resources.resources],
+                [
+                    "wellplot://schema/logfile.json",
+                    "wellplot://examples/production/index.json",
+                    "wellplot://authoring/schema/patch.json",
+                    "wellplot://authoring/schema/canonical.json",
+                    "wellplot://authoring/schema/operations.json",
+                    "wellplot://authoring/catalog/hierarchy.json",
+                    "wellplot://authoring/catalog/track-kinds.json",
+                    "wellplot://authoring/catalog/fill-kinds.json",
+                    "wellplot://authoring/catalog/track-archetypes.json",
+                    "wellplot://authoring/catalog/header-archetypes.json",
+                    "wellplot://authoring/catalog/packet-blueprints.json",
+                    "wellplot://authoring/catalog/style-presets.json",
+                    "wellplot://authoring/catalog/header-fields.json",
+                    "wellplot://authoring/catalog/header-key-aliases.json",
+                    "wellplot://authoring/catalog/channel-aliases.json",
+                ],
+            )
+            self.assertEqual(
+                [prompt.name for prompt in prompts.prompts],
+                [
+                    "review_logfile",
+                    "preview_logfile",
+                    "start_from_example",
+                    "author_plot_from_request",
+                    "revise_plot_from_feedback",
+                    "ingest_header_text",
+                ],
+            )
+            self.assertGreaterEqual(len(templates.resourceTemplates), 1)
+            self.assertFalse(source.isError, source.content)
+            self.assertFalse(created.isError)
+            self.assertFalse(inspected.isError)
+            self.assertFalse(section_edit.isError, section_edit.content)
+            self.assertFalse(track_edit.isError)
+            self.assertFalse(binding_edit.isError)
+            self.assertFalse(remarks_edit.isError)
+            self.assertFalse(validation.isError)
+            self.assertFalse(preview.isError)
+            self.assertFalse(render.isError)
+            self.assertTrue(draft_logfile.exists())
+            self.assertTrue(rendered.exists())
 
 
 if __name__ == "__main__":

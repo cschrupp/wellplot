@@ -192,6 +192,33 @@ def test_legacy_mapping_normalizes_and_renders() -> None:
     assert raster_mapping["waveform"]["stride"] == 5
 
 
+def test_array_track_x_scale_round_trips_through_canonical_model() -> None:
+    """Preserve the shared sample-axis scale on array tracks."""
+    mapping = _legacy_mapping()
+    sections = mapping["document"]["layout"]["log_sections"]
+    sections[0]["tracks"][1]["x_scale"] = {
+        "kind": "linear",
+        "min": 200,
+        "max": 1200,
+    }
+
+    document = authoring_document_from_mapping(mapping)
+    vdl_track = document.sections[0].tracks[1]
+
+    assert isinstance(vdl_track, ArrayTrackSpec)
+    assert vdl_track.x_scale is not None
+    assert vdl_track.x_scale.minimum == 200
+    assert vdl_track.x_scale.maximum == 1200
+
+    normalized = authoring_document_to_mapping(document)
+    assert normalized["document"]["sections"][0]["tracks"][1]["x_scale"] == {
+        "kind": "linear",
+        "minimum": 200.0,
+        "maximum": 1200.0,
+        "reverse": False,
+    }
+
+
 def test_legacy_binding_fill_round_trips_through_canonical_track() -> None:
     """Normalize binding-level fills without losing renderer-specific fields."""
     mapping = _legacy_mapping()

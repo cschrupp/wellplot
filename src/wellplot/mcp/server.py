@@ -3,1129 +3,57 @@
 # Copyright (C) 2026 Carlos Schrupp
 # SPDX-License-Identifier: Apache-2.0
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
 ###############################################################################
 
-"""FastMCP server registration for the optional wellplot MCP surface."""
+"""FastMCP registration for the stable wellplot authoring surface."""
 
 from __future__ import annotations
 
 import sys
-from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..errors import DependencyUnavailableError
 from . import service
+from .stable import register_stable_tools
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP, Image
 
 
-def _load_mcp_runtime() -> tuple[type[FastMCP], type[Image]]:
+def _load_mcp_runtime() -> tuple[type[FastMCP], type[Image], type[object]]:
     try:
         from mcp.server.fastmcp import FastMCP, Image
+        from mcp.types import ToolAnnotations
     except ModuleNotFoundError as exc:
         raise DependencyUnavailableError(
             "wellplot MCP support requires the optional `mcp` dependency. "
             "Install `wellplot[mcp]` to use `wellplot-mcp`."
         ) from exc
-    return FastMCP, Image
+    return FastMCP, Image, ToolAnnotations
 
 
-def create_mcp_server(root: str | Path | None = None) -> FastMCP:
-    """Create and configure the wellplot FastMCP server."""
-    FastMCP, Image = _load_mcp_runtime()
-    server_root = service.resolve_server_root(root)
-    mcp = FastMCP(
-        "wellplot",
-        instructions=(
-            "wellplot MCP server for validating, inspecting, previewing, and rendering "
-            f"logfiles under the fixed server root {server_root}."
-        ),
-    )
-
-    @mcp.tool()
-    def validate_logfile(logfile_path: str) -> dict[str, object]:
-        """Validate a logfile path and return structured status."""
-        return asdict(service.validate_logfile(logfile_path, root=server_root))
-
-    @mcp.tool()
-    def inspect_logfile(logfile_path: str) -> dict[str, object]:
-        """Inspect a logfile path and return structured report metadata."""
-        return asdict(service.inspect_logfile(logfile_path, root=server_root))
-
-    @mcp.tool()
-    def inspect_authoring_objects(
-        logfile_path: str,
-        object_kind: str,
-        section_id: str | None = None,
-        track_id: str | None = None,
-    ) -> dict[str, object]:
-        """Inspect typed canonical authoring objects in one logfile draft."""
-        return asdict(
-            service.inspect_authoring_objects(
-                logfile_path,
-                object_kind=object_kind,
-                section_id=section_id,
-                track_id=track_id,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_authoring_hierarchy(object_kind: str | None = None) -> dict[str, object]:
-        """Inspect generated canonical object hierarchy and typed operations."""
-        return asdict(service.inspect_authoring_hierarchy(object_kind=object_kind))
-
-    @mcp.tool()
-    def inspect_data_source(
-        source_path: str,
-        source_format: str = "auto",
-    ) -> dict[str, object]:
-        """Inspect one raw LAS/DLIS source under the server root."""
-        return asdict(
-            service.inspect_data_source(
-                source_path,
-                source_format=source_format,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def check_channel_availability(
-        requested_channels: list[str],
-        source_path: str | None = None,
-        logfile_path: str | None = None,
-        section_id: str | None = None,
-        source_format: str = "auto",
-    ) -> dict[str, object]:
-        """Check whether requested channels or aliases exist in one source or logfile."""
-        return asdict(
-            service.check_channel_availability(
-                requested_channels,
-                source_path=source_path,
-                logfile_path=logfile_path,
-                section_id=section_id,
-                source_format=source_format,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def preview_logfile_png(
-        logfile_path: str,
-        page_index: int = 0,
-        dpi: int = 144,
-        section_id: str | None = None,
-        track_ids: list[str] | None = None,
-        depth_range: tuple[float, float] | None = None,
-        depth_range_unit: str | None = None,
-        include_report_pages: bool = True,
-    ) -> object:
-        """Render one logfile preview as an MCP image payload."""
-        png_bytes = service.preview_logfile_png(
-            logfile_path,
-            page_index=page_index,
-            dpi=dpi,
-            section_id=section_id,
-            track_ids=track_ids,
-            depth_range=depth_range,
-            depth_range_unit=depth_range_unit,
-            include_report_pages=include_report_pages,
-            root=server_root,
-        )
-        return Image(data=png_bytes, format="png")
-
-    @mcp.tool()
-    def preview_section_png(
-        logfile_path: str,
-        section_id: str,
-        page_index: int = 0,
-        dpi: int = 144,
-    ) -> object:
-        """Render one logfile section preview as an MCP image payload."""
-        png_bytes = service.preview_section_png(
-            logfile_path,
-            section_id=section_id,
-            page_index=page_index,
-            dpi=dpi,
-            root=server_root,
-        )
-        return Image(data=png_bytes, format="png")
-
-    @mcp.tool()
-    def preview_track_png(
-        logfile_path: str,
-        section_id: str,
-        track_ids: list[str],
-        page_index: int = 0,
-        dpi: int = 144,
-        depth_range: tuple[float, float] | None = None,
-        depth_range_unit: str | None = None,
-    ) -> object:
-        """Render one logfile track selection preview as an MCP image payload."""
-        png_bytes = service.preview_track_png(
-            logfile_path,
-            section_id=section_id,
-            track_ids=track_ids,
-            page_index=page_index,
-            dpi=dpi,
-            depth_range=depth_range,
-            depth_range_unit=depth_range_unit,
-            root=server_root,
-        )
-        return Image(data=png_bytes, format="png")
-
-    @mcp.tool()
-    def preview_window_png(
-        logfile_path: str,
-        depth_range: tuple[float, float],
-        depth_range_unit: str | None = None,
-        page_index: int = 0,
-        dpi: int = 144,
-        section_ids: list[str] | None = None,
-    ) -> object:
-        """Render one logfile depth-window preview as an MCP image payload."""
-        png_bytes = service.preview_window_png(
-            logfile_path,
-            depth_range=depth_range,
-            depth_range_unit=depth_range_unit,
-            page_index=page_index,
-            dpi=dpi,
-            section_ids=section_ids,
-            root=server_root,
-        )
-        return Image(data=png_bytes, format="png")
-
-    @mcp.tool()
-    def render_logfile_to_file(
-        logfile_path: str,
-        output_path: str,
-        overwrite: bool = False,
-    ) -> dict[str, object]:
-        """Render one logfile to an explicit output path."""
-        return asdict(
-            service.render_logfile_to_file(
-                logfile_path,
-                output_path,
-                overwrite=overwrite,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def export_example_bundle(
-        example_id: str,
-        output_dir: str,
-        overwrite: bool = False,
-    ) -> dict[str, object]:
-        """Export one packaged example bundle under the server root."""
-        return asdict(
-            service.export_example_bundle(
-                example_id,
-                output_dir,
-                overwrite=overwrite,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def create_logfile_draft(
-        output_path: str,
-        example_id: str | None = None,
-        source_logfile_path: str | None = None,
-        overwrite: bool = False,
-    ) -> dict[str, object]:
-        """Create one normalized draft logfile from an example or existing logfile."""
-        return asdict(
-            service.create_logfile_draft(
-                output_path,
-                example_id=example_id,
-                source_logfile_path=source_logfile_path,
-                overwrite=overwrite,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def summarize_logfile_draft(logfile_path: str) -> dict[str, object]:
-        """Summarize one draft logfile for deterministic authoring workflows."""
-        return asdict(service.summarize_logfile_draft(logfile_path, root=server_root))
-
-    @mcp.tool()
-    def set_section_data_source(
-        logfile_path: str,
-        section_id: str,
-        source_path: str,
-        source_format: str = "auto",
-        title: str | None = None,
-        subtitle: str | None = None,
-    ) -> dict[str, object]:
-        """Replace one section data source in a mutable draft logfile."""
-        return asdict(
-            service.set_section_data_source(
-                logfile_path,
-                section_id=section_id,
-                source_path=source_path,
-                source_format=source_format,
-                title=title,
-                subtitle=subtitle,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def replicate_section_structure(
-        logfile_path: str,
-        source_section_id: str,
-        target_section_id: str,
-        source_path: str | None = None,
-        source_format: str = "auto",
-        title: str | None = None,
-        subtitle: str | None = None,
-        include_bindings: bool = True,
-        overwrite: bool = False,
-    ) -> dict[str, object]:
-        """Replicate one section scaffold and optional bindings into a target section."""
-        return asdict(
-            service.replicate_section_structure(
-                logfile_path,
-                source_section_id=source_section_id,
-                target_section_id=target_section_id,
-                source_path=source_path,
-                source_format=source_format,
-                title=title,
-                subtitle=subtitle,
-                include_bindings=include_bindings,
-                overwrite=overwrite,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_section(
-        logfile_path: str,
-        section_id: str,
-        title: str | None = None,
-        subtitle: str | None = None,
-        depth_range: tuple[float, float] | None = None,
-        depth_range_unit: str | None = None,
-    ) -> dict[str, object]:
-        """Update one draft section's title, subtitle, or depth window."""
-        return asdict(
-            service.update_section(
-                logfile_path,
-                section_id=section_id,
-                title=title,
-                subtitle=subtitle,
-                depth_range=depth_range,
-                depth_range_unit=depth_range_unit,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_depth_axis(
-        logfile_path: str,
-        unit: str | None = None,
-        scale: float | None = None,
-        major_step: float | None = None,
-        minor_step: float | None = None,
-    ) -> dict[str, object]:
-        """Update one draft logfile's document-level depth axis."""
-        return asdict(
-            service.set_depth_axis(
-                logfile_path,
-                unit=unit,
-                scale=scale,
-                major_step=major_step,
-                minor_step=minor_step,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_page_layout(
-        logfile_path: str,
-        page_patch: dict[str, object] | None = None,
-        render_patch: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Update one draft logfile's page and render layout settings."""
-        return asdict(
-            service.set_page_layout(
-                logfile_path,
-                page_patch=page_patch,
-                render_patch=render_patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_matplotlib_style(
-        logfile_path: str,
-        style_patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Deep-merge one report-wide Matplotlib style patch into a draft logfile."""
-        return asdict(
-            service.set_matplotlib_style(
-                logfile_path,
-                style_patch=style_patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_section_view(
-        logfile_path: str,
-        section_id: str,
-        title: str | None = None,
-        subtitle: str | None = None,
-        depth_range: tuple[float, float] | None = None,
-        depth_range_unit: str | None = None,
-        unit: str | None = None,
-        scale: float | None = None,
-        major_step: float | None = None,
-        minor_step: float | None = None,
-        page_patch: dict[str, object] | None = None,
-        render_patch: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Update one section window together with depth-axis and page defaults."""
-        return asdict(
-            service.set_section_view(
-                logfile_path,
-                section_id=section_id,
-                title=title,
-                subtitle=subtitle,
-                depth_range=depth_range,
-                depth_range_unit=depth_range_unit,
-                unit=unit,
-                scale=scale,
-                major_step=major_step,
-                minor_step=minor_step,
-                page_patch=page_patch,
-                render_patch=render_patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def add_track(
-        logfile_path: str,
-        section_id: str,
-        id: str,
-        title: str,
-        kind: str,
-        width_mm: float,
-        x_scale: dict[str, object] | None = None,
-        grid: dict[str, object] | None = None,
-        track_header: dict[str, object] | None = None,
-        reference: dict[str, object] | None = None,
-        annotations: list[dict[str, object]] | None = None,
-    ) -> dict[str, object]:
-        """Append one track to a draft logfile."""
-        return asdict(
-            service.add_track(
-                logfile_path,
-                section_id=section_id,
-                id=id,
-                title=title,
-                kind=kind,
-                width_mm=width_mm,
-                x_scale=x_scale,
-                grid=grid,
-                track_header=track_header,
-                reference=reference,
-                annotations=annotations,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_track(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Patch one existing track inside a draft logfile."""
-        return asdict(
-            service.update_track(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_track_bindings(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-    ) -> dict[str, object]:
-        """Inspect one track's current curve/raster bindings and scales."""
-        return asdict(
-            service.inspect_track_bindings(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_track_scales(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        x_scale: dict[str, object] | None = None,
-        curve_scale: dict[str, object] | None = None,
-        channel_scales: dict[str, dict[str, object]] | None = None,
-        sync_grid_to_scale: bool = True,
-    ) -> dict[str, object]:
-        """Update one track x_scale and one or more curve scales in one call."""
-        return asdict(
-            service.set_track_scales(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                x_scale=x_scale,
-                curve_scale=curve_scale,
-                channel_scales=channel_scales,
-                sync_grid_to_scale=sync_grid_to_scale,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def add_annotation_object(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        annotation: dict[str, object],
-        position: int | None = None,
-    ) -> dict[str, object]:
-        """Append or insert one annotation object inside an annotation track."""
-        return asdict(
-            service.add_annotation_object(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                annotation=annotation,
-                position=position,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_annotation_object(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        annotation_index: int,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Patch one annotation object inside an annotation track."""
-        return asdict(
-            service.update_annotation_object(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                annotation_index=annotation_index,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def remove_annotation_object(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        annotation_index: int,
-    ) -> dict[str, object]:
-        """Remove one annotation object from an annotation track."""
-        return asdict(
-            service.remove_annotation_object(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                annotation_index=annotation_index,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def remove_track(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        remove_bindings: bool = True,
-    ) -> dict[str, object]:
-        """Remove one existing track from a draft logfile."""
-        return asdict(
-            service.remove_track(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                remove_bindings=remove_bindings,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def bind_curve(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        binding_id: str | None = None,
-        label: str | None = None,
-        style: dict[str, object] | None = None,
-        scale: dict[str, object] | None = None,
-        header_display: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Bind one scalar channel to a draft track as a curve."""
-        return asdict(
-            service.bind_curve(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                binding_id=binding_id,
-                label=label,
-                style=style,
-                scale=scale,
-                header_display=header_display,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def add_curve_fill(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        kind: str,
-        binding_id: str | None = None,
-        other_channel: str | None = None,
-        other_element_id: str | None = None,
-        baseline: dict[str, object] | None = None,
-        label: str | None = None,
-        color: str | None = None,
-        alpha: float | None = None,
-        crossover: dict[str, object] | None = None,
-    ) -> dict[str, object]:
-        """Add or replace one curve fill on an existing curve binding."""
-        return asdict(
-            service.add_curve_fill(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                binding_id=binding_id,
-                kind=kind,
-                other_channel=other_channel,
-                other_element_id=other_element_id,
-                baseline=baseline,
-                label=label,
-                color=color,
-                alpha=alpha,
-                crossover=crossover,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def remove_curve_fill(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        binding_id: str | None = None,
-    ) -> dict[str, object]:
-        """Remove one explicit curve fill from an existing curve binding."""
-        return asdict(
-            service.remove_curve_fill(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                binding_id=binding_id,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def bind_raster(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        label: str | None = None,
-        style: dict[str, object] | None = None,
-        profile: str | None = None,
-        normalization: str | None = None,
-        waveform_normalization: str | None = None,
-        clip_percentiles: list[float] | None = None,
-        interpolation: str | None = None,
-        show_raster: bool | None = None,
-        raster_alpha: float | None = None,
-        color_limits: list[float] | None = None,
-        colorbar: dict[str, object] | bool | None = None,
-        sample_axis: dict[str, object] | bool | None = None,
-        waveform: dict[str, object] | bool | None = None,
-    ) -> dict[str, object]:
-        """Bind one raster/image channel to an array track in a draft logfile."""
-        return asdict(
-            service.bind_raster(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                label=label,
-                style=style,
-                profile=profile,
-                normalization=normalization,
-                waveform_normalization=waveform_normalization,
-                clip_percentiles=clip_percentiles,
-                interpolation=interpolation,
-                show_raster=show_raster,
-                raster_alpha=raster_alpha,
-                color_limits=color_limits,
-                colorbar=colorbar,
-                sample_axis=sample_axis,
-                waveform=waveform,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_curve_binding(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        patch: dict[str, object],
-        binding_id: str | None = None,
-    ) -> dict[str, object]:
-        """Patch one existing curve binding inside a draft logfile."""
-        return asdict(
-            service.update_curve_binding(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                binding_id=binding_id,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_raster_binding(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Patch one existing raster binding inside a draft logfile."""
-        return asdict(
-            service.update_raster_binding(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def remove_curve_binding(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-        binding_id: str | None = None,
-    ) -> dict[str, object]:
-        """Remove one existing curve binding inside a draft logfile."""
-        return asdict(
-            service.remove_curve_binding(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                binding_id=binding_id,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def remove_raster_binding(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        channel: str,
-    ) -> dict[str, object]:
-        """Remove one existing raster binding inside a draft logfile."""
-        return asdict(
-            service.remove_raster_binding(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                channel=channel,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def clear_track_bindings(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-    ) -> dict[str, object]:
-        """Remove all curve and raster bindings that target one track."""
-        return asdict(
-            service.clear_track_bindings(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def move_track(
-        logfile_path: str,
-        section_id: str,
-        track_id: str,
-        before_track_id: str | None = None,
-        after_track_id: str | None = None,
-        position: int | None = None,
-    ) -> dict[str, object]:
-        """Reorder one track inside a draft logfile."""
-        return asdict(
-            service.move_track(
-                logfile_path,
-                section_id=section_id,
-                track_id=track_id,
-                before_track_id=before_track_id,
-                after_track_id=after_track_id,
-                position=position,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_heading_content(
-        logfile_path: str,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Patch the report heading block inside a draft logfile."""
-        return asdict(
-            service.set_heading_content(
-                logfile_path,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_header_slot(
-        logfile_path: str,
-        slot_id: str,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Update one stable general/detail header slot without replacing the header."""
-        return asdict(
-            service.update_header_slot(
-                logfile_path,
-                slot_id=slot_id,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def update_service_title(
-        logfile_path: str,
-        slot_id: str,
-        patch: dict[str, object],
-    ) -> dict[str, object]:
-        """Update one stable service-title slot without replacing sibling titles."""
-        return asdict(
-            service.update_service_title(
-                logfile_path,
-                slot_id=slot_id,
-                patch=patch,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def set_remarks_content(
-        logfile_path: str,
-        remarks: list[dict[str, object]],
-    ) -> dict[str, object]:
-        """Replace the first-page remarks block inside a draft logfile."""
-        return asdict(
-            service.set_remarks_content(
-                logfile_path,
-                remarks=remarks,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_header_archetypes(archetype_id: str | None = None) -> dict[str, object]:
-        """Inspect deterministic open-hole and cased-hole header archetypes."""
-        return asdict(service.inspect_header_archetypes(archetype_id=archetype_id))
-
-    @mcp.tool()
-    def inspect_packet_blueprints(blueprint_id: str | None = None) -> dict[str, object]:
-        """Inspect deterministic packet blueprints for staged packet workflows."""
-        return asdict(service.inspect_packet_blueprints(blueprint_id=blueprint_id))
-
-    @mcp.tool()
-    def apply_header_archetype(
-        logfile_path: str,
-        archetype_id: str,
-        preserve_existing_values: bool = True,
-    ) -> dict[str, object]:
-        """Apply one deterministic header archetype to a mutable draft logfile."""
-        return asdict(
-            service.apply_header_archetype(
-                logfile_path,
-                archetype_id=archetype_id,
-                preserve_existing_values=preserve_existing_values,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_heading_slots(
-        logfile_path: str | None = None,
-        template_path: str | None = None,
-    ) -> dict[str, object]:
-        """Inspect precise heading, detail-table, and remarks slots for one target."""
-        return asdict(
-            service.inspect_heading_slots(
-                logfile_path=logfile_path,
-                template_path=template_path,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def preview_header_mapping(
-        logfile_path: str,
-        values: dict[str, object],
-        overwrite_policy: str = "fill_empty",
-    ) -> dict[str, object]:
-        """Dry-run heading/report value assignment without mutating the draft."""
-        return asdict(
-            service.preview_header_mapping(
-                logfile_path,
-                values=values,
-                overwrite_policy=overwrite_policy,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def apply_header_values(
-        logfile_path: str,
-        values: dict[str, object],
-        overwrite_policy: str = "fill_empty",
-    ) -> dict[str, object]:
-        """Persist deterministic heading/report value assignment into the draft."""
-        return asdict(
-            service.apply_header_values(
-                logfile_path,
-                values=values,
-                overwrite_policy=overwrite_policy,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def parse_key_value_text(
-        source_text: str,
-        format_hint: str | None = None,
-    ) -> dict[str, object]:
-        """Parse a simple header text block into deterministic ordered key-value pairs."""
-        return asdict(
-            service.parse_key_value_text(
-                source_text,
-                format_hint=format_hint,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_style_presets(
-        preset_family: str | None = None,
-    ) -> dict[str, object]:
-        """Return curated style presets, optionally filtered to one family."""
-        return asdict(
-            service.inspect_style_presets(
-                preset_family=preset_family,
-            )
-        )
-
-    @mcp.tool()
-    def apply_style_preset(
-        logfile_path: str,
-        preset_id: str,
-        section_id: str | None = None,
-        track_id: str | None = None,
-        channel_overrides: dict[str, str] | None = None,
-        clear_existing_bindings: bool = False,
-    ) -> dict[str, object]:
-        """Apply one curated style preset to a draft or one specific track."""
-        return asdict(
-            service.apply_style_preset(
-                logfile_path,
-                preset_id=preset_id,
-                section_id=section_id,
-                track_id=track_id,
-                channel_overrides=channel_overrides,
-                clear_existing_bindings=clear_existing_bindings,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def inspect_authoring_vocab(
-        logfile_path: str | None = None,
-        template_path: str | None = None,
-    ) -> dict[str, object]:
-        """Return deterministic draft-authoring vocabularies and optional target context."""
-        return asdict(
-            service.inspect_authoring_vocab(
-                logfile_path=logfile_path,
-                template_path=template_path,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def summarize_logfile_changes(
-        logfile_path: str,
-        previous_text: str | None = None,
-    ) -> dict[str, object]:
-        """Summarize structural draft changes relative to a previous YAML snapshot."""
-        return asdict(
-            service.summarize_logfile_changes(
-                logfile_path,
-                previous_text=previous_text,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def validate_logfile_text(
-        yaml_text: str,
-        base_dir: str | None = None,
-    ) -> dict[str, object]:
-        """Validate unsaved logfile YAML text under the server root."""
-        return asdict(
-            service.validate_logfile_text(
-                yaml_text,
-                base_dir=base_dir,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def format_logfile_text(
-        yaml_text: str,
-        base_dir: str | None = None,
-    ) -> dict[str, object]:
-        """Normalize valid logfile YAML text through the canonical serializer."""
-        return asdict(
-            service.format_logfile_text(
-                yaml_text,
-                base_dir=base_dir,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def save_logfile_text(
-        yaml_text: str,
-        output_path: str,
-        overwrite: bool = False,
-        base_dir: str | None = None,
-    ) -> dict[str, object]:
-        """Validate, normalize, and save logfile YAML text under the server root."""
-        return asdict(
-            service.save_logfile_text(
-                yaml_text,
-                output_path,
-                overwrite=overwrite,
-                base_dir=base_dir,
-                root=server_root,
-            )
-        )
-
-    @mcp.tool()
-    def save_authoring_document(
-        document: dict[str, object],
-        output_path: str,
-        overwrite: bool = False,
-        base_dir: str | None = None,
-    ) -> dict[str, object]:
-        """Validate and save one canonical authoring document through the render adapter."""
-        return asdict(
-            service.save_authoring_document(
-                document,
-                output_path,
-                overwrite=overwrite,
-                base_dir=base_dir,
-                root=server_root,
-            )
-        )
+def _register_resources(mcp: FastMCP) -> None:
+    """Register discovery resources; resources are not model mutation tools."""
 
     @mcp.resource("wellplot://schema/logfile.json", mime_type="application/json")
     def logfile_schema_resource() -> str:
-        """Return the wellplot logfile JSON schema resource."""
         return service.schema_resource().text
 
     @mcp.resource("wellplot://examples/production/index.json", mime_type="application/json")
     def production_examples_manifest_resource() -> str:
-        """Return the curated production example manifest resource."""
         return service.production_example_manifest_resource().text
 
     @mcp.resource(
-        "wellplot://examples/production/{example_id}/README.md",
-        mime_type="text/markdown",
+        "wellplot://examples/production/{example_id}/README.md", mime_type="text/markdown"
     )
     def production_example_readme_resource(example_id: str) -> str:
-        """Return the packaged production example README resource."""
         return service.production_example_resource(example_id, "README.md").text
 
     @mcp.resource(
-        "wellplot://examples/production/{example_id}/base.template.yaml",
-        mime_type="text/yaml",
+        "wellplot://examples/production/{example_id}/base.template.yaml", mime_type="text/yaml"
     )
     def production_example_template_resource(example_id: str) -> str:
-        """Return the packaged production example base template resource."""
         return service.production_example_resource(example_id, "base.template.yaml").text
 
     @mcp.resource(
@@ -1133,134 +61,88 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         mime_type="text/yaml",
     )
     def production_example_logfile_resource(example_id: str) -> str:
-        """Return the packaged production example logfile resource."""
         return service.production_example_resource(example_id, "full_reconstruction.log.yaml").text
 
     @mcp.resource(
-        "wellplot://examples/production/{example_id}/data-notes.md",
-        mime_type="text/markdown",
+        "wellplot://examples/production/{example_id}/data-notes.md", mime_type="text/markdown"
     )
     def production_example_notes_resource(example_id: str) -> str:
-        """Return the packaged production example notes resource."""
         return service.production_example_resource(example_id, "data-notes.md").text
 
-    @mcp.resource(
-        "wellplot://authoring/schema/patch.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/schema/patch.json", mime_type="application/json")
     def authoring_patch_schema_resource() -> str:
-        """Return the draft-authoring patch contract resource."""
         return service.authoring_patch_schema_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/schema/canonical.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/schema/canonical.json", mime_type="application/json")
     def authoring_canonical_schema_resource() -> str:
-        """Return the generated canonical authoring object contract resource."""
         return service.authoring_canonical_schema_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/schema/operations.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/schema/operations.json", mime_type="application/json")
     def authoring_operations_schema_resource() -> str:
-        """Return generated typed authoring-operation schemas."""
         return service.authoring_operations_schema_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/hierarchy.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/hierarchy.json", mime_type="application/json")
     def authoring_hierarchy_resource() -> str:
-        """Return generated authoring hierarchy and operation metadata."""
         return service.authoring_hierarchy_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/track-kinds.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/track-kinds.json", mime_type="application/json")
     def authoring_track_kinds_resource() -> str:
-        """Return the supported draft-authoring track kinds resource."""
         return service.authoring_track_kinds_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/fill-kinds.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/fill-kinds.json", mime_type="application/json")
     def authoring_fill_kinds_resource() -> str:
-        """Return the supported draft-authoring fill kinds resource."""
         return service.authoring_fill_kinds_resource().text
 
     @mcp.resource(
-        "wellplot://authoring/catalog/track-archetypes.json",
-        mime_type="application/json",
+        "wellplot://authoring/catalog/track-archetypes.json", mime_type="application/json"
     )
     def authoring_track_archetypes_resource() -> str:
-        """Return curated draft-authoring track archetypes."""
         return service.authoring_track_archetypes_resource().text
 
     @mcp.resource(
-        "wellplot://authoring/catalog/header-archetypes.json",
-        mime_type="application/json",
+        "wellplot://authoring/catalog/header-archetypes.json", mime_type="application/json"
     )
     def authoring_header_archetypes_resource() -> str:
-        """Return curated deterministic header archetypes."""
         return service.authoring_header_archetypes_resource().text
 
     @mcp.resource(
-        "wellplot://authoring/catalog/packet-blueprints.json",
-        mime_type="application/json",
+        "wellplot://authoring/catalog/packet-blueprints.json", mime_type="application/json"
     )
     def authoring_packet_blueprints_resource() -> str:
-        """Return curated packet blueprints for staged packet workflows."""
         return service.authoring_packet_blueprints_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/style-presets.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/style-presets.json", mime_type="application/json")
     def authoring_style_presets_resource() -> str:
-        """Return curated style presets for deterministic authoring guidance."""
         return service.authoring_style_presets_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/header-fields.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/header-fields.json", mime_type="application/json")
     def authoring_header_fields_resource() -> str:
-        """Return heading and remarks field guidance for draft authoring."""
         return service.authoring_header_fields_resource().text
 
     @mcp.resource(
-        "wellplot://authoring/catalog/header-key-aliases.json",
-        mime_type="application/json",
+        "wellplot://authoring/catalog/header-key-aliases.json", mime_type="application/json"
     )
     def authoring_header_key_aliases_resource() -> str:
-        """Return deterministic header-slot lookup aliases for draft ingestion."""
         return service.authoring_header_key_aliases_resource().text
 
-    @mcp.resource(
-        "wellplot://authoring/catalog/channel-aliases.json",
-        mime_type="application/json",
-    )
+    @mcp.resource("wellplot://authoring/catalog/channel-aliases.json", mime_type="application/json")
     def authoring_channel_aliases_resource() -> str:
-        """Return channel alias guidance for deterministic source inspection."""
         return service.authoring_channel_aliases_resource().text
+
+
+def _register_prompts(mcp: FastMCP) -> None:
+    """Register workflow prompts without embedding provider behavior in tools."""
 
     @mcp.prompt()
     def review_logfile(logfile_path: str) -> str:
-        """Guide a model through the logfile review workflow."""
         return service.review_logfile_prompt(logfile_path)
 
     @mcp.prompt()
     def preview_logfile(logfile_path: str, focus: str | None = None) -> str:
-        """Guide a model through the logfile preview workflow."""
         return service.preview_logfile_prompt(logfile_path, focus)
 
     @mcp.prompt()
     def start_from_example(example_id: str, goal: str) -> str:
-        """Guide a model through adapting one packaged example to a new goal."""
         return service.start_from_example_prompt(example_id, goal)
 
     @mcp.prompt()
@@ -1269,7 +151,6 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         logfile_path: str | None = None,
         example_id: str | None = None,
     ) -> str:
-        """Guide a model through deterministic plot authoring from a freeform request."""
         return service.author_plot_from_request_prompt(
             goal,
             logfile_path=logfile_path,
@@ -1278,7 +159,6 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
 
     @mcp.prompt()
     def revise_plot_from_feedback(logfile_path: str, feedback: str) -> str:
-        """Guide a model through deterministic plot revision from user feedback."""
         return service.revise_plot_from_feedback_prompt(logfile_path, feedback)
 
     @mcp.prompt()
@@ -1287,13 +167,33 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         source_text: str,
         source_description: str | None = None,
     ) -> str:
-        """Guide a model through deterministic report-header ingestion from copied text."""
         return service.ingest_header_text_prompt(
             logfile_path,
             source_text,
             source_description=source_description,
         )
 
+
+def create_mcp_server(root: str | Path | None = None) -> FastMCP:
+    """Create the stable 16-responsibility wellplot MCP server."""
+    FastMCP, Image, ToolAnnotations = _load_mcp_runtime()
+    server_root = service.resolve_server_root(root)
+    mcp = FastMCP(
+        "wellplot",
+        instructions=(
+            "wellplot MCP server with a stable, deterministic authoring contract for "
+            f"logfiles under the fixed server root {server_root}."
+        ),
+    )
+
+    register_stable_tools(
+        mcp,
+        root=server_root,
+        image_factory=lambda data: Image(data=data, format="png"),
+        annotation_factory=lambda values: ToolAnnotations(**dict(values)),
+    )
+    _register_resources(mcp)
+    _register_prompts(mcp)
     return mcp
 
 
