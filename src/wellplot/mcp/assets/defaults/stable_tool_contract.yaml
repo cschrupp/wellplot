@@ -13,6 +13,8 @@ tools:
   - id: inspect_authoring
     description: Inspect scoped canonical authoring objects and identities.
     mode: inspection
+    read_only: true
+    idempotent: true
     required: [logfile_path, object_kind]
     fields:
       logfile_path: string
@@ -23,6 +25,8 @@ tools:
   - id: inspect_source
     description: Inspect source metadata and available channels.
     mode: inspection
+    read_only: true
+    idempotent: true
     open_world: true
     fields:
       logfile_path: string
@@ -34,6 +38,8 @@ tools:
   - id: inspect_vocab
     description: Inspect supported object families, defaults, and style vocabulary.
     mode: inspection
+    read_only: true
+    idempotent: true
     fields:
       family: string
       detail: [summary, full]

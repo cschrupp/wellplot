@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import lru_cache, reduce
 from importlib.resources import files
-from typing import Any
+from operator import or_
+from typing import Annotated, Any, Literal
 
 import yaml
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from wellplot.authoring_service import (
     HeaderValuePatch,
@@ -34,9 +35,79 @@ class StableToolProfile:
 
     name: str
     description: str
+    input_model: type[BaseModel]
     input_schema: Schema
-    output_schema: Schema
+    output_model: type[BaseModel] | None
+    output_schema: Schema | None
     annotations: dict[str, bool]
+
+
+class _StableResult(BaseModel):
+    """Common schema for compact structured stable-tool responses."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    warnings: list[str]
+    next_steps: list[str]
+
+
+class StableInspectionResult(_StableResult):
+    """Structured result for scoped deterministic inspection tools."""
+
+    ok: bool
+    items: list[dict[str, Any]]
+
+
+class StableValidationResult(_StableResult):
+    """Structured result for deterministic validation tools."""
+
+    ok: bool
+    valid: bool
+    errors: list[str]
+
+
+class StableArtifactResult(_StableResult):
+    """Structured result for persisted artifact tools."""
+
+    ok: bool
+    artifact: str
+
+
+class StableRenderArtifactResult(StableArtifactResult):
+    """Structured result for persisted renders with renderer metadata."""
+
+    output_path: str
+    backend: str
+    page_count: int
+
+
+class StableMutationResult(_StableResult):
+    """Structured result for one persisted authoring mutation."""
+
+    ok: bool
+    changed: bool
+    target: dict[str, Any]
+    before: dict[str, Any]
+    after: dict[str, Any]
+
+
+class StableHeaderMutationResult(StableMutationResult):
+    """Structured result for header fills with assignment evidence."""
+
+    logfile_path: str | None = None
+    overwrite_policy: str | None = None
+    applied_assignments: list[dict[str, Any]] = Field(default_factory=list)
+    skipped_assignments: list[dict[str, Any]] = Field(default_factory=list)
+    heading_summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class StableSourceInspectionResult(StableInspectionResult):
+    """Structured result for source inspection and channel discovery."""
+
+    source_path: str | None = None
+    source_format_detected: str | None = None
+    channel_count: int | None = None
+    available_channels: list[str] = Field(default_factory=list)
 
 
 def _resolve(value: object, root: Mapping[str, object]) -> Mapping[str, object]:
@@ -119,42 +190,114 @@ def _field_schema(value: object) -> Schema:
     return {"type": "object"}
 
 
-def _object(properties: Mapping[str, object], required: list[str] | None = None) -> Schema:
-    result: Schema = {
-        "type": "object",
-        "additionalProperties": False,
-        "properties": dict(properties),
-    }
-    if required:
-        result["required"] = required
-    return result
+def _union(variants: list[object]) -> object:
+    """Build one runtime union annotation from JSON-schema variants."""
+    if not variants:
+        return Any
+    if len(variants) == 1:
+        return variants[0]
+    return reduce(or_, variants)
 
 
-def _output(mode: str) -> Schema:
-    if mode == "inspection":
-        properties = {"ok": {"type": "boolean"}, "items": "object_list"}
-        required = ["ok", "warnings", "next_steps"]
-    elif mode == "validation":
-        properties = {
-            "ok": {"type": "boolean"},
-            "valid": {"type": "boolean"},
-            "errors": "string_list",
-        }
-        required = ["ok", "valid", "errors", "warnings", "next_steps"]
-    elif mode == "artifact":
-        properties = {"ok": {"type": "boolean"}, "artifact": "string"}
-        required = ["ok", "artifact", "warnings", "next_steps"]
+def _schema_annotation(schema: Mapping[str, object], model_name: str) -> object:
+    """Translate the compact contract schema into one Pydantic field annotation."""
+    variants = schema.get("anyOf") or schema.get("oneOf")
+    if isinstance(variants, list):
+        return _union(
+            [
+                _schema_annotation(item, f"{model_name}Variant{index}")
+                for index, item in enumerate(variants)
+                if isinstance(item, Mapping)
+            ]
+        )
+
+    schema_type = schema.get("type")
+    enum = schema.get("enum")
+    if isinstance(enum, list) and enum:
+        annotation: object = Literal[tuple(enum)]
+    elif schema_type == "string":
+        annotation = str
+    elif schema_type == "boolean":
+        annotation = bool
+    elif schema_type == "integer":
+        annotation = int
+    elif schema_type == "number":
+        annotation = float
+    elif schema_type == "null":
+        annotation = type(None)
+    elif schema_type == "array":
+        items = schema.get("items")
+        item_annotation = (
+            _schema_annotation(items, f"{model_name}Item") if isinstance(items, Mapping) else Any
+        )
+        annotation = list[item_annotation]
+    elif schema_type == "object":
+        properties = schema.get("properties")
+        annotation = (
+            _model_from_schema(model_name, schema, extra="forbid")
+            if isinstance(properties, Mapping)
+            else dict[str, Any]
+        )
     else:
-        properties = {
-            "ok": {"type": "boolean"},
-            "changed": {"type": "boolean"},
-            "target": {"type": "object"},
-            "before": {"type": "object"},
-            "after": {"type": "object"},
-        }
-        required = ["ok", "changed", "target", "before", "after", "warnings", "next_steps"]
-    properties.update({"warnings": "string_list", "next_steps": "string_list"})
-    return _object({key: _field_schema(value) for key, value in properties.items()}, required)
+        annotation = Any
+
+    constraints: dict[str, object] = {}
+    if isinstance(schema.get("minLength"), int):
+        constraints["min_length"] = schema["minLength"]
+    if isinstance(schema.get("minimum"), (int, float)):
+        constraints["ge"] = schema["minimum"]
+    if isinstance(schema.get("maximum"), (int, float)):
+        constraints["le"] = schema["maximum"]
+    if isinstance(schema.get("exclusiveMinimum"), (int, float)):
+        constraints["gt"] = schema["exclusiveMinimum"]
+    return Annotated[annotation, Field(**constraints)] if constraints else annotation
+
+
+def _model_from_schema(
+    model_name: str,
+    schema: Mapping[str, object],
+    *,
+    extra: str,
+) -> type[BaseModel]:
+    """Create one typed Pydantic model from the compact stable contract schema."""
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping):
+        raise ValueError(f"{model_name} requires an object schema with properties.")
+    required = {str(item) for item in schema.get("required", []) if isinstance(item, str)}
+    fields: dict[str, object] = {}
+    for field_name, raw_schema in properties.items():
+        if not isinstance(raw_schema, Mapping):
+            continue
+        name = str(field_name)
+        annotation = _schema_annotation(raw_schema, f"{model_name}{name.title().replace('_', '')}")
+        if name in required:
+            fields[name] = (annotation, ...)
+            continue
+        fields[name] = (annotation | None, raw_schema.get("default"))
+    return create_model(
+        model_name,
+        __config__=ConfigDict(extra=extra),
+        **fields,
+    )
+
+
+def _output_model(name: str, mode: str) -> type[BaseModel] | None:
+    """Return the single typed output envelope for one stable responsibility."""
+    if name == "preview_logfile":
+        return None
+    if name == "inspect_source":
+        return StableSourceInspectionResult
+    if name == "edit_header":
+        return StableHeaderMutationResult
+    if name == "render_logfile":
+        return StableRenderArtifactResult
+    if mode == "inspection":
+        return StableInspectionResult
+    if mode == "validation":
+        return StableValidationResult
+    if mode == "artifact":
+        return StableArtifactResult
+    return StableMutationResult
 
 
 @lru_cache(maxsize=1)
@@ -194,6 +337,7 @@ def _contract_data() -> tuple[dict[str, object], ...]:
     return tuple(dict(item) for item in tools)
 
 
+@lru_cache(maxsize=1)
 def stable_tool_profile() -> tuple[StableToolProfile, ...]:
     """Return the bounded model-facing profile without registering MCP tools."""
     canonical = _canonical_fields()
@@ -206,8 +350,10 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
         if isinstance(canonical_name, str):
             fields = {**canonical.get(canonical_name, {}), **fields}
         if entry.get("id") == "edit_remarks":
-            fields["remark"] = _object(
-                _fields(
+            fields["remark"] = {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": _fields(
                     AuthoringRemarkSpec,
                     "",
                     (
@@ -220,8 +366,8 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
                         "title_font_size",
                         "border",
                     ),
-                )
-            )
+                ),
+            }
         mode = str(entry.get("mode", "mutation"))
         operations = entry.get("operations")
         if isinstance(operations, list):
@@ -236,12 +382,31 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
             "destructiveHint": bool(entry.get("destructive", False)),
             "openWorldHint": bool(entry.get("open_world", False)),
         }
+        input_model = _model_from_schema(
+            f"{entry['id']}Arguments",
+            {
+                "type": "object",
+                "properties": fields,
+                "required": required,
+            },
+            # FastMCP builds the public top-level parameter model from a callable
+            # signature with its default extra-value behavior. Keep this model in
+            # lockstep so the profile matches the stdio schema byte-for-byte.
+            extra="ignore",
+        )
+        output_model = _output_model(str(entry["id"]), mode)
         profile.append(
             StableToolProfile(
                 name=str(entry["id"]),
                 description=str(entry["description"]),
-                input_schema=_object(fields, required or None),
-                output_schema=_output(mode),
+                input_model=input_model,
+                input_schema=input_model.model_json_schema(by_alias=True),
+                output_model=output_model,
+                output_schema=(
+                    output_model.model_json_schema(by_alias=True)
+                    if output_model is not None
+                    else None
+                ),
                 annotations=annotations,
             )
         )
@@ -257,7 +422,9 @@ def stable_tool_budget() -> dict[str, int]:
             len(json.dumps(item.input_schema, sort_keys=True)) for item in profile
         ),
         "output_schema_chars": sum(
-            len(json.dumps(item.output_schema, sort_keys=True)) for item in profile
+            len(json.dumps(item.output_schema, sort_keys=True))
+            for item in profile
+            if item.output_schema is not None
         ),
         "description_chars": sum(len(item.description) for item in profile),
         "combined_schema_chars": sum(

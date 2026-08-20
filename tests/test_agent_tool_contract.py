@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 
+import pytest
+from pydantic import ValidationError
+
 from wellplot.agent.tool_contract import (
     stable_tool_budget,
     stable_tool_profile,
@@ -44,7 +47,9 @@ def test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract() -> Non
 
     assert budget["tool_count"] <= 17
     assert budget["combined_schema_chars"] <= 40_000
-    assert budget["combined_schema_chars"] < diagnostic_chars * 0.3
+    # Typed nested fields cost more than the former coarse ``object`` annotations.
+    # The wire contract remains substantially smaller than the canonical union.
+    assert budget["combined_schema_chars"] < diagnostic_chars * 0.35
 
 
 def test_profile_does_not_expose_internal_canonical_unions() -> None:
@@ -92,7 +97,11 @@ def test_remarks_tool_explains_operation_payloads() -> None:
     assert "remove/move=remark_id" in remarks.description
     assert "clear=all" in remarks.description
     remark = remarks.input_schema["properties"]["remark"]
-    assert {"title", "text", "lines", "alignment"} <= set(remark["properties"])
+    variants = remark.get("anyOf", [])
+    reference = next(item["$ref"] for item in variants if isinstance(item, dict) and "$ref" in item)
+    definition_name = reference.rsplit("/", 1)[-1]
+    definition = remarks.input_schema["$defs"][definition_name]
+    assert {"title", "text", "lines", "alignment"} <= set(definition["properties"])
 
 
 def test_track_tool_explains_add_and_existing_target_semantics() -> None:
@@ -136,3 +145,48 @@ def test_all_development_tasks_map_to_existing_profile_tools() -> None:
     )
     assert "caliper" not in names
     assert "cbl" not in names
+
+
+def test_profile_models_enforce_declared_operation_and_nested_payloads() -> None:
+    """The models behind the advertised profile reject invalid typed values."""
+    profile = {tool.name: tool for tool in stable_tool_profile()}
+
+    with pytest.raises(ValidationError):
+        profile["create_draft"].input_model.model_validate(
+            {"logfile_path": "draft.log.yaml", "operation": "replace"}
+        )
+    with pytest.raises(ValidationError):
+        profile["inspect_authoring"].input_model.model_validate(
+            {
+                "logfile_path": "draft.log.yaml",
+                "object_kind": "document",
+            }
+        )
+    with pytest.raises(ValidationError):
+        profile["edit_remarks"].input_model.model_validate(
+            {
+                "logfile_path": "draft.log.yaml",
+                "operation": "add",
+                "remark": {"title": "Notes", "unsupported": "value"},
+            }
+        )
+
+
+def test_profile_output_models_reject_undeclared_fields() -> None:
+    """The structured response envelopes cannot silently drift at runtime."""
+    mutation = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
+    assert mutation.output_model is not None
+
+    with pytest.raises(ValidationError):
+        mutation.output_model.model_validate(
+            {
+                "ok": True,
+                "changed": False,
+                "target": {},
+                "before": {},
+                "after": {},
+                "warnings": [],
+                "next_steps": [],
+                "unexpected": True,
+            }
+        )

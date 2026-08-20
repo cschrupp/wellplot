@@ -501,13 +501,13 @@ def dispatch_stable_tool(
             items.append(
                 _json_safe(
                     asdict(
-                    service.check_channel_availability(
-                        [str(channel) for channel in channels],
-                        source_path=str(source_path) if source_path is not None else None,
-                        logfile_path=(logfile_path or None) if source_path is None else None,
-                        section_id=args.get("section_id"),
-                        root=root,
-                    )
+                        service.check_channel_availability(
+                            [str(channel) for channel in channels],
+                            source_path=str(source_path) if source_path is not None else None,
+                            logfile_path=(logfile_path or None) if source_path is None else None,
+                            section_id=args.get("section_id"),
+                            root=root,
+                        )
                     )
                 )
             )
@@ -516,17 +516,25 @@ def dispatch_stable_tool(
             "items": items,
             "warnings": [],
             "next_steps": [],
+            "source_path": None,
+            "source_format_detected": None,
+            "channel_count": None,
+            "available_channels": [],
         }
         if source_summary is not None:
             channels = source_summary.get("channels", [])
             response["source_path"] = source_summary.get("source_path")
             response["source_format_detected"] = source_summary.get("source_format_detected")
             response["channel_count"] = source_summary.get("channel_count")
-            response["available_channels"] = [
-                channel.get("mnemonic")
-                for channel in channels
-                if isinstance(channel, Mapping) and channel.get("mnemonic")
-            ] if isinstance(channels, list) else []
+            response["available_channels"] = (
+                [
+                    channel.get("mnemonic")
+                    for channel in channels
+                    if isinstance(channel, Mapping) and channel.get("mnemonic")
+                ]
+                if isinstance(channels, list)
+                else []
+            )
         return response
 
     if name == "inspect_vocab":
@@ -608,18 +616,20 @@ def dispatch_stable_tool(
                 root=root,
             )
             after = _snapshot(logfile_path, target, root)
-            result = asdict(applied)
-            result.update(
-                {
-                    "ok": True,
-                    "changed": before != after,
-                    "target": target,
-                    "before": before or {},
-                    "after": after or {},
-                    "next_steps": [],
-                }
-            )
-            return result
+            return {
+                "ok": True,
+                "changed": before != after,
+                "target": target,
+                "before": before or {},
+                "after": after or {},
+                "logfile_path": applied.logfile_path,
+                "overwrite_policy": applied.overwrite_policy,
+                "applied_assignments": applied.applied_assignments,
+                "skipped_assignments": applied.skipped_assignments,
+                "heading_summary": applied.heading_summary,
+                "warnings": applied.warnings,
+                "next_steps": [],
+            }
         if operation == "apply_archetype":
             target = _target("header", "header", args)
             return _mutation(
@@ -1147,51 +1157,34 @@ def dispatch_stable_tool(
     raise TemplateValidationError(f"Unsupported stable MCP tool or operation: {name}/{operation}.")
 
 
-def _annotation_type(schema: Mapping[str, object]) -> object:
-    value_type = schema.get("type")
-    if value_type == "string":
-        return str
-    if value_type == "boolean":
-        return bool
-    if value_type == "number":
-        return float
-    if value_type == "integer":
-        return int
-    if value_type == "array":
-        return list[object]
-    if value_type == "object":
-        return dict[str, object]
-    return object
-
-
 def _tool_function(
     profile: StableToolProfile,
     callback: Callable[[Mapping[str, object]], object],
 ) -> Callable[..., object]:
-    properties = profile.input_schema.get("properties", {})
-    required = set(profile.input_schema.get("required", []))
     parameters: list[inspect.Parameter] = []
-    for name, schema in properties.items():
-        if not isinstance(schema, Mapping):
-            schema = {}
-        default = inspect.Parameter.empty if name in required else None
+    for name, field in profile.input_model.model_fields.items():
+        default = inspect.Parameter.empty if field.is_required() else field.default
         parameters.append(
             inspect.Parameter(
                 name,
                 inspect.Parameter.KEYWORD_ONLY,
-                annotation=_annotation_type(schema),
+                annotation=field.rebuild_annotation(),
                 default=default,
             )
         )
 
     def invoke(**kwargs: object) -> object:
-        return callback(kwargs)
+        arguments = profile.input_model.model_validate(kwargs).model_dump(
+            mode="python",
+            exclude_none=True,
+        )
+        return callback(arguments)
 
     invoke.__name__ = profile.name
     invoke.__doc__ = profile.description
     invoke.__signature__ = inspect.Signature(
         parameters,
-        return_annotation=dict[str, object],
+        return_annotation=profile.output_model or object,
     )
     return invoke
 
