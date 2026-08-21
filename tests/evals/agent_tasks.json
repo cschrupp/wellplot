@@ -1,0 +1,514 @@
+{
+    "suite": "development",
+    "version": 2,
+    "tasks": [
+        {
+            "id": "initial_open_hole",
+            "kind": "run",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_clean_starter",
+                "preconditions": [
+                    {"path": "/sections", "operator": "length", "value": 1},
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {
+                            "id": "main",
+                            "tracks": [{"id": "gr_sp"}, {"id": "depth", "kind": "reference"}]
+                        }
+                    },
+                    {"path": "/remarks", "operator": "length", "value": 0}
+                ]
+            },
+            "goal": "Start from the existing open-hole starter. Keep section `main`, set its subtitle to `Interactive LAS tutorial draft`, preserve `gr_sp` before `depth`, preserve the open-hole header archetype, fill only available LAS metadata, set the first service title to `Open Hole Quicklook`, and add no remarks or tracks.",
+            "expected": [
+                {"path": "/sections", "operator": "length", "value": 1},
+                {
+                    "path": "/sections",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "main",
+                        "subtitle": "Interactive LAS tutorial draft",
+                        "tracks": [{"id": "gr_sp"}, {"id": "depth", "kind": "reference"}]
+                    }
+                },
+                {"path": "/header/detail/kind", "operator": "equals", "value": "open_hole"},
+                {
+                    "path": "/header/service_titles",
+                    "operator": "contains_object",
+                    "value": {
+                        "slot_id": "service_title.1",
+                        "value": {"value": "Open Hole Quicklook"}
+                    }
+                },
+                {"path": "/remarks", "operator": "length", "value": 0}
+            ],
+            "allowed_change_paths": ["/sections/0/subtitle", "/header"],
+            "prohibited_change_paths": ["/page", "/depth", "/output", "/remarks"]
+        },
+        {
+            "id": "remarks_only",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_initial_draft",
+                "preconditions": [
+                    {"path": "/sections", "operator": "contains_object", "value": {"id": "main"}},
+                    {"path": "/remarks", "operator": "length", "value": 0}
+                ]
+            },
+            "feedback": "Add one concise first-page remarks block. It must say this is an open-hole quicklook built from a user-supplied LAS file, that only channels confirmed through source inspection should be plotted, and that the packet is an iterative interpretation artifact rather than a vendor-issued original.",
+            "expected": [
+                {"path": "/remarks", "operator": "length", "value": 1},
+                {"path": "/remarks", "operator": "contains_ci", "value": "open-hole quicklook"},
+                {"path": "/remarks", "operator": "contains_ci", "value": "user-supplied LAS"},
+                {
+                    "path": "/remarks",
+                    "operator": "contains_ci",
+                    "value": "iterative interpretation artifact"
+                }
+            ],
+            "allowed_change_paths": ["/remarks"],
+            "prohibited_change_paths": ["/sections", "/header", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "natural_language_header_fill",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_header_starter",
+                "preconditions": [
+                    {
+                        "path": "/header/detail/rows",
+                        "operator": "contains_object",
+                        "value": {"key": "rm_measured_temp"}
+                    },
+                    {
+                        "path": "/header/detail/rows",
+                        "operator": "contains_object",
+                        "value": {"key": "rm_bottom_temp"}
+                    }
+                ]
+            },
+            "feedback": "Set header RM at measured temperature to `0.005 @ 35` and header RM at bottom temperature to `0.010 @ 100`. Do not infer or change any other header value.",
+            "expected": [
+                {
+                    "path": "/header/detail/rows",
+                    "operator": "contains_object",
+                    "value": {
+                        "key": "rm_measured_temp",
+                        "columns": [
+                            {
+                                "cells": [
+                                    {"value": {"value": "0.005"}},
+                                    {"value": {"value": "@"}},
+                                    {"value": {"value": "35"}}
+                                ]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "path": "/header/detail/rows",
+                    "operator": "contains_object",
+                    "value": {
+                        "key": "rm_bottom_temp",
+                        "columns": [
+                            {
+                                "cells": [
+                                    {"value": {"value": "0.010"}},
+                                    {"value": {"value": "@"}},
+                                    {"value": {"value": "100"}}
+                                ]
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/header/detail/rows"],
+            "prohibited_change_paths": ["/sections", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "sp_overview_curve",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_gr_sp_seed",
+                "preconditions": [
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {
+                            "id": "main",
+                            "tracks": [
+                                {"id": "gr_sp", "bindings": [{"channel": "GR"}]},
+                                {"id": "depth", "kind": "reference"}
+                            ]
+                        }
+                    }
+                ]
+            },
+            "feedback": "On the existing `gr_sp` track, add SP when available. Set SP to a linear scale from -80 to 20 mV. Keep GR on a readable green linear scale. Do not alter the depth track or create a new track.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "gr_sp",
+                        "bindings": [
+                            {"channel": "GR", "style": {"color": "#008000"}},
+                            {
+                                "channel": "SP",
+                                "scale": {"kind": "linear", "minimum": -80.0, "maximum": 20.0}
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks/0"],
+            "prohibited_change_paths": [
+                "/sections/0/tracks/1",
+                "/header",
+                "/remarks",
+                "/page",
+                "/depth",
+                "/output"
+            ]
+        },
+        {
+            "id": "resistivity_track",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_gr_sp_seed",
+                "preconditions": [
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {
+                            "id": "main",
+                            "tracks": [{"id": "gr_sp"}, {"id": "depth", "kind": "reference"}]
+                        }
+                    }
+                ]
+            },
+            "feedback": "Add one resistivity track after depth. Use a logarithmic 0.2 to 2000 ohm.m scale. Bind available deep, medium, and shallow resistivity curves. Give the deep curve a 1.2 line width and all other resistivity curves a line width no greater than 0.9.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "resistivity",
+                        "kind": "normal",
+                        "x_scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+                        "bindings": [
+                            {
+                                "channel": "ILD",
+                                "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+                                "style": {"line_width": 1.2}
+                            },
+                            {
+                                "channel": "ILM",
+                                "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0}
+                            },
+                            {
+                                "channel": "MSFL",
+                                "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0}
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks"],
+            "prohibited_change_paths": ["/header", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "uncatalogued_scalar_track",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_gr_sp_seed",
+                "preconditions": [
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {"id": "main", "tracks": [{"id": "gr_sp"}, {"id": "depth"}]}
+                    }
+                ]
+            },
+            "feedback": "Add a normal track titled `Potassium` after the depth track and bind available channel `POTA.`. Use generic scalar form defaults with a linear 0 to 20 scale. Do not route this request through any named curve-family default.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "potassium",
+                        "title": "Potassium",
+                        "kind": "normal",
+                        "bindings": [
+                            {
+                                "channel": "POTA.",
+                                "scale": {"kind": "linear", "minimum": 0.0, "maximum": 20.0}
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks"],
+            "prohibited_change_paths": ["/header", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "duplicate_mirrored_fill",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_gr_sp_seed",
+                "preconditions": [
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {"id": "main", "tracks": [{"id": "depth"}]}
+                    }
+                ]
+            },
+            "feedback": "Add a normal `Caliper` track after depth. Bind CALI twice with distinct binding ids: a primary linear 6 to 16 scale and a mirrored linear 6 to 16 scale with reverse true. Add a light-brown `between_instances` fill between the two binding instances.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "caliper",
+                        "kind": "normal",
+                        "bindings": [
+                            {
+                                "channel": "CALI",
+                                "scale": {
+                                    "kind": "linear",
+                                    "minimum": 6.0,
+                                    "maximum": 16.0,
+                                    "reverse": false
+                                }
+                            },
+                            {
+                                "channel": "CALI",
+                                "scale": {
+                                    "kind": "linear",
+                                    "minimum": 6.0,
+                                    "maximum": 16.0,
+                                    "reverse": true
+                                }
+                            }
+                        ],
+                        "fills": [{"kind": "between_instances", "color": "#c4a484"}]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks"],
+            "prohibited_change_paths": ["/header", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "array_raster_track",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "cased_hole_main_starter",
+                "preconditions": [
+                    {"path": "/sections", "operator": "length", "value": 1},
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {"id": "main_pass"}
+                    }
+                ]
+            },
+            "feedback": "Add an array track `vdl` after the CBL track. Bind available VDL as a raster with VDL profile, grayscale reversed colormap, and a linear sample axis from 200 to 1200 us. Do not add a scalar surrogate for VDL.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "vdl",
+                        "kind": "array",
+                        "x_scale": {"kind": "linear", "minimum": 200.0, "maximum": 1200.0},
+                        "bindings": [
+                            {
+                                "kind": "raster",
+                                "channel": "VDL",
+                                "profile": "vdl",
+                                "style": {"colormap": "gray_r"}
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks"],
+            "prohibited_change_paths": ["/header", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "annotation_objects",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_annotation_seed",
+                "preconditions": [
+                    {
+                        "path": "/sections/0/tracks",
+                        "operator": "contains_object",
+                        "value": {
+                            "id": "events",
+                            "kind": "annotation",
+                            "annotations": [{"annotation_id": "provisional_marker"}]
+                        }
+                    }
+                ]
+            },
+            "feedback": "On the existing `events` annotation track, add a marker annotation `casing_shoe` at 8800 ft, update its label to `Casing shoe confirmed`, and remove `provisional_marker`. Do not replace the track or modify curve tracks.",
+            "expected": [
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "events",
+                        "kind": "annotation",
+                        "annotations": [
+                            {
+                                "kind": "marker",
+                                "annotation_id": "casing_shoe",
+                                "depth": 8800.0,
+                                "label": "Casing shoe confirmed"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "not_contains_object",
+                    "value": {
+                        "id": "events",
+                        "annotations": [{"annotation_id": "provisional_marker"}]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections/0/tracks"],
+            "prohibited_change_paths": ["/header", "/remarks", "/page", "/depth", "/output"]
+        },
+        {
+            "id": "page_output_depth_settings",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_initial_draft",
+                "preconditions": [
+                    {"path": "/sections", "operator": "contains_object", "value": {"id": "main"}},
+                    {"path": "/page/orientation", "operator": "equals", "value": "portrait"}
+                ]
+            },
+            "feedback": "Set the report to landscape A3 continuous layout. Set output DPI to 240. Set the depth axis to ft at 1:200 with 20 ft major and 5 ft minor steps. Set section `main` depth range to 8400 to 9300. Do not alter header, remarks, tracks, or bindings.",
+            "expected": [
+                {"path": "/page/size", "operator": "equals", "value": "A3"},
+                {"path": "/page/orientation", "operator": "equals", "value": "landscape"},
+                {"path": "/page/continuous", "operator": "equals", "value": true},
+                {"path": "/output/dpi", "operator": "equals", "value": 240},
+                {"path": "/depth/scale", "operator": "equals", "value": "1:200"},
+                {"path": "/depth/major_step", "operator": "equals", "value": 20.0},
+                {"path": "/depth/minor_step", "operator": "equals", "value": 5.0},
+                {
+                    "path": "/sections",
+                    "operator": "contains_object",
+                    "value": {"id": "main", "depth_range": [8400.0, 9300.0]}
+                }
+            ],
+            "allowed_change_paths": ["/page", "/output", "/depth", "/sections/0/depth_range"],
+            "prohibited_change_paths": ["/header", "/remarks", "/sections/0/tracks"]
+        },
+        {
+            "id": "flexible_main_repeat_sections",
+            "kind": "run",
+            "status": "active",
+            "initial_state": {
+                "fixture": "cased_hole_main_starter",
+                "preconditions": [
+                    {"path": "/sections", "operator": "length", "value": 1},
+                    {
+                        "path": "/sections",
+                        "operator": "contains_object",
+                        "value": {"id": "main_pass"}
+                    }
+                ]
+            },
+            "goal": "Starting with main section `main_pass`, create a second section `repeat_pass` with its own data source. Both sections must contain `combo`, `depth`, `cbl`, and `vdl` tracks, including two distinct CBL scalar bindings and one VDL raster binding. Use generic section and track operations; do not depend on a packet-specific route.",
+            "expected": [
+                {"path": "/sections", "operator": "length", "value": 2},
+                {
+                    "path": "/sections",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "main_pass",
+                        "tracks": [
+                            {"id": "combo"},
+                            {"id": "depth", "kind": "reference"},
+                            {"id": "cbl", "bindings": [{"channel": "CBL"}, {"channel": "CBL"}]},
+                            {
+                                "id": "vdl",
+                                "kind": "array",
+                                "bindings": [{"kind": "raster", "channel": "VDL"}]
+                            }
+                        ]
+                    }
+                },
+                {
+                    "path": "/sections",
+                    "operator": "contains_object",
+                    "value": {
+                        "id": "repeat_pass",
+                        "data_source": {"source_format": "dlis"},
+                        "tracks": [
+                            {"id": "combo"},
+                            {"id": "depth", "kind": "reference"},
+                            {"id": "cbl", "bindings": [{"channel": "CBL"}, {"channel": "CBL"}]},
+                            {
+                                "id": "vdl",
+                                "kind": "array",
+                                "bindings": [{"kind": "raster", "channel": "VDL"}]
+                            }
+                        ]
+                    }
+                }
+            ],
+            "allowed_change_paths": ["/sections", "/header", "/remarks"],
+            "prohibited_change_paths": ["/page", "/depth", "/output"]
+        },
+        {
+            "id": "reject_ambiguous_unavailable_requests",
+            "kind": "revise",
+            "status": "active",
+            "initial_state": {
+                "fixture": "open_hole_initial_draft",
+                "preconditions": [
+                    {"path": "/sections", "operator": "length", "value": 1},
+                    {"path": "/sections", "operator": "contains_object", "value": {"id": "main"}}
+                ]
+            },
+            "feedback": "Add unavailable channel `DOES_NOT_EXIST` to the track named `overview`, then set `RM` to `0.01 @ 25` without specifying measured or bottom temperature. Do not choose a substitute channel or header slot; ask for clarification and persist no mutation.",
+            "expected": [
+                {"path": "/sections", "operator": "length", "value": 1},
+                {
+                    "path": "/sections/0/tracks",
+                    "operator": "not_contains_object",
+                    "value": {"bindings": [{"channel": "DOES_NOT_EXIST"}]}
+                }
+            ],
+            "allowed_change_paths": [],
+            "prohibited_change_paths": [
+                "/header",
+                "/sections",
+                "/remarks",
+                "/page",
+                "/depth",
+                "/output"
+            ],
+            "expected_outcome": {"needs_clarification": true, "has_persisted_mutation": false}
+        }
+    ]
+}

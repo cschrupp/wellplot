@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import sys
 from pathlib import Path
 
@@ -39,10 +40,24 @@ def test_correct_and_wrong_documents_are_graded_by_end_state(tmp_path: Path) -> 
     _write_control(correct_path, correct=True)
     _write_control(wrong_path, correct=False)
 
-    assert grade_document(correct_path, initial_task)["status"] == "passed"
-    wrong_result = grade_document(wrong_path, initial_task)
+    assert (
+        grade_document(correct_path, initial_task, baseline_path=correct_path)["status"] == "passed"
+    )
+    wrong_result = grade_document(wrong_path, initial_task, baseline_path=wrong_path)
     assert wrong_result["status"] == "failed"
-    assert any("subtitle" in error for error in wrong_result["errors"])
+    assert any("Interactive LAS tutorial draft" in error for error in wrong_result["errors"])
+
+
+def test_document_cannot_pass_without_a_baseline(tmp_path: Path) -> None:
+    """Initial-state and isolation checks are mandatory for a final grade."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    path = tmp_path / "correct.log.yaml"
+    _write_control(path, correct=True)
+
+    result = grade_document(path, tasks[0])
+
+    assert result["status"] == "failed"
+    assert any("baseline document is required" in error for error in result["errors"])
 
 
 def test_canonical_diff_is_independent_of_mapping_order() -> None:
@@ -61,7 +76,7 @@ def test_remarks_grader_checks_content_and_isolation(tmp_path: Path) -> None:
     final_path = tmp_path / "final.log.yaml"
     baseline_payload = _control_document(correct=True)
     _write_document(baseline_path, baseline_payload)
-    final_payload = dict(baseline_payload)
+    final_payload = copy.deepcopy(baseline_payload)
     final_payload["remarks"] = [
         {
             "remark_id": "remark-1",
@@ -79,14 +94,105 @@ def test_remarks_grader_checks_content_and_isolation(tmp_path: Path) -> None:
     assert result["status"] == "passed"
 
 
-def test_pending_tasks_are_not_reported_as_success() -> None:
-    """Unimplemented task rows remain explicit and cannot pass accidentally."""
+def test_every_development_task_has_a_complete_deterministic_contract() -> None:
+    """The provider matrix cannot run a task that lacks executable semantics."""
     _, tasks = load_task_suite(TASK_SUITE)
 
-    result = grade_document(None, tasks[2])
+    assert len(tasks) == 12
+    assert all(task.status == "active" for task in tasks)
+    assert all(task.initial_state["fixture"] for task in tasks)
+    assert all(task.initial_state["preconditions"] for task in tasks)
+    assert all(task.expected for task in tasks)
+    assert all(task.prohibited_change_paths for task in tasks)
 
-    assert result["status"] == "not_run"
-    assert "pending" in result["reason"]
+
+def test_resistivity_grader_matches_bindings_by_semantic_identity(tmp_path: Path) -> None:
+    """Track verification does not depend on list positions or provider binding ids."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    resistivity_task = next(task for task in tasks if task.task_id == "resistivity_track")
+    baseline_path = tmp_path / "baseline.log.yaml"
+    final_path = tmp_path / "final.log.yaml"
+    baseline_payload = _control_document(correct=True)
+    _write_document(baseline_path, baseline_payload)
+    final_payload = copy.deepcopy(baseline_payload)
+    final_payload["sections"][0]["tracks"].append(
+        {
+            "id": "resistivity",
+            "title": "Resistivity",
+            "kind": "normal",
+            "width_mm": 28,
+            "x_scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+            "bindings": [
+                {
+                    "binding_id": "provider-chosen-deep-id",
+                    "channel": "ILD",
+                    "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+                    "style": {"line_width": 1.2},
+                },
+                {
+                    "binding_id": "provider-chosen-medium-id",
+                    "channel": "ILM",
+                    "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+                },
+                {
+                    "binding_id": "provider-chosen-shallow-id",
+                    "channel": "MSFL",
+                    "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000.0},
+                },
+            ],
+        }
+    )
+    _write_document(final_path, final_payload)
+
+    result = grade_document(final_path, resistivity_task, baseline_path=baseline_path)
+
+    assert result["status"] == "passed"
+
+
+def test_isolation_check_rejects_an_unrelated_mutation(tmp_path: Path) -> None:
+    """A correct requested remark cannot hide a changed section title."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    remarks_task = next(task for task in tasks if task.task_id == "remarks_only")
+    baseline_path = tmp_path / "baseline.log.yaml"
+    final_path = tmp_path / "final.log.yaml"
+    baseline_payload = _control_document(correct=True)
+    _write_document(baseline_path, baseline_payload)
+    final_payload = copy.deepcopy(baseline_payload)
+    final_payload["remarks"] = [
+        {
+            "text": (
+                "Open-hole quicklook built from a user-supplied LAS file. "
+                "Only channels confirmed through source inspection should be plotted. "
+                "This is an iterative interpretation artifact."
+            )
+        }
+    ]
+    final_payload["sections"][0]["title"] = "Unexpected mutation"
+    _write_document(final_path, final_payload)
+
+    result = grade_document(final_path, remarks_task, baseline_path=baseline_path)
+
+    assert result["status"] == "failed"
+    assert any("prohibited unrelated mutation" in error for error in result["errors"])
+
+
+def test_rejection_task_requires_clarification_without_a_mutation(tmp_path: Path) -> None:
+    """Expected rejections grade both the saved state and result outcome."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    rejection_task = next(
+        task for task in tasks if task.task_id == "reject_ambiguous_unavailable_requests"
+    )
+    baseline_path = tmp_path / "baseline.log.yaml"
+    _write_document(baseline_path, _control_document(correct=True))
+
+    result = grade_document(
+        baseline_path,
+        rejection_task,
+        baseline_path=baseline_path,
+        outcome={"needs_clarification": True, "has_persisted_mutation": False},
+    )
+
+    assert result["status"] == "passed"
 
 
 def test_redaction_removes_credentials_from_nested_evidence() -> None:
@@ -128,6 +234,29 @@ def test_live_mode_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> 
                 base_url=None,
                 api_key_file=None,
                 source_logfile=None,
+                initial_document=None,
+                project_dir=REPOSITORY_ROOT / "tmp-agent-eval-test",
+                max_rounds=1,
+            )
+        )
+
+
+def test_live_mode_rejects_mixed_fixture_groups(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A provider run cannot accidentally chain unrelated starter states."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    monkeypatch.setenv("WELLPLOT_RUN_LIVE_AGENT_EVALS", "1")
+
+    with pytest.raises(RuntimeError, match="one initial-state fixture"):
+        asyncio.run(
+            _run_live(
+                tasks,
+                repo_root=REPOSITORY_ROOT,
+                provider="openai",
+                model=None,
+                base_url=None,
+                api_key_file=None,
+                source_logfile=None,
+                initial_document=None,
                 project_dir=REPOSITORY_ROOT / "tmp-agent-eval-test",
                 max_rounds=1,
             )
