@@ -1088,6 +1088,35 @@ At minimum:
 
 For each provider run the same task suite multiple times if budget permits.
 
+The evaluator now requires an explicit fixture catalog at
+`tests/evals/agent_fixture_catalog.json`. Each fixture directory contains the
+declared starter, initial draft, and canonical baseline artifacts for its task
+family. The live runner never falls back to a notebook draft: an absent fixture
+is reported as `not_run` before provider creation.
+
+Run one isolated fixture group per provider, for example:
+
+```bash
+WELLPLOT_RUN_LIVE_AGENT_EVALS=1 uv run python scripts/run_agent_evals.py \
+  --suite development --mode live --provider nvidia_cloud \
+  --task remarks_only --fixture-catalog tests/evals/agent_fixture_catalog.json \
+  --output docs/evaluations/mcp-agent/nvidia-remarks.json
+```
+
+The runner creates an independent case directory and baseline for every task;
+revision tasks are never chained through the previous task's mutated draft.
+Aggregate redacted provider reports without contacting a model:
+
+```bash
+uv run python scripts/run_agent_evals.py --suite development --mode matrix \
+  --matrix-evidence docs/evaluations/mcp-agent/nvidia-remarks.json \
+  --matrix-evidence docs/evaluations/mcp-agent/unsloth-remarks.json
+```
+
+Matrix output reports `pass_at_1`, `not_run` cases, and one failure category
+from the controlled remediation vocabulary. Missing credentials, missing
+fixtures, and provider transport failures are not counted as successful cases.
+
 ### Step 6 — Track the right metrics
 
 Per task/provider:

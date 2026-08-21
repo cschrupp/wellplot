@@ -1,0 +1,70 @@
+{
+  "slice": "0.6-L6",
+  "git_commit": "pending finalization after validation",
+  "objective": "Make provider evaluation fixture-driven, independent per task, and comparable across redacted provider evidence.",
+  "changed_surface": [
+    "scripts/agent_eval_matrix.py",
+    "scripts/run_agent_evals.py",
+    "tests/evals/agent_fixture_catalog.json",
+    "tests/evals/fixtures/README.md",
+    "tests/test_agent_evals.py",
+    "docs/wellplot-mcp-remediation-playbook.md"
+  ],
+  "architecture": {
+    "production_lines_changed": 0,
+    "model_facing_tool_count_observed": 17,
+    "combined_stable_schema_chars_observed": 36113,
+    "provider_context_chars": "not measured; no provider call was made"
+  },
+  "compliance": [
+    {
+      "name": "agent_evaluation_tests",
+      "command": "env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run pytest -q tests/test_agent_evals.py",
+      "status": "passed",
+      "result": "16 passed"
+    },
+    {
+      "name": "ruff",
+      "command": "env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run ruff check scripts/agent_eval_matrix.py scripts/run_agent_evals.py tests/test_agent_evals.py && env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run ruff format --check scripts/agent_eval_matrix.py scripts/run_agent_evals.py tests/test_agent_evals.py",
+      "status": "passed"
+    },
+    {
+      "name": "deterministic_evaluator",
+      "command": "env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run python scripts/run_agent_evals.py --suite development --mode deterministic",
+      "status": "passed",
+      "result": "controls passed; no user document supplied"
+    },
+    {
+      "name": "matrix_aggregator",
+      "command": "env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run python scripts/run_agent_evals.py --suite development --mode matrix --matrix-evidence docs/evaluations/mcp-agent/0.6-L0.json --matrix-evidence docs/evaluations/mcp-agent/0.6-L1.json",
+      "status": "passed",
+      "result": "redacted evidence aggregated without provider contact"
+    },
+    {
+      "name": "live_fixture_guard",
+      "command": "env WELLPLOT_RUN_LIVE_AGENT_EVALS=1 uv run python scripts/run_agent_evals.py --suite development --mode live --task initial_open_hole --provider openai",
+      "status": "passed",
+      "result": "missing fixture reported as not_run; provider was not contacted"
+    },
+    {
+      "name": "json_and_diff",
+      "command": "env UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run python -m json.tool tests/evals/agent_fixture_catalog.json && git diff --check",
+      "status": "passed"
+    }
+  ],
+  "live_provider_matrix": {
+    "status": "not_run",
+    "reason": "The declared fixture directories are not populated in this checkout; no live pass is claimed.",
+    "provider_rounds": "not measured",
+    "tool_calls": "not measured",
+    "tool_errors": "not measured",
+    "latency": "not measured",
+    "tokens": "not measured"
+  },
+  "known_limitations": [
+    "The catalog defines portable artifact locations but does not redistribute proprietary LAS or DLIS inputs.",
+    "Provider-specific model and credential settings remain explicit CLI or environment configuration.",
+    "The matrix aggregates one-provider evidence files; it does not launch multiple providers in one command."
+  ],
+  "decision": "proceed after populating clean task fixtures and collecting at least two live provider reports"
+}

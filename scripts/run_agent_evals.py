@@ -25,6 +25,11 @@ from wellplot.authoring import (
 )
 
 try:
+    from scripts.agent_eval_matrix import (
+        FixtureSpec,
+        aggregate_matrix,
+        load_fixture_catalog,
+    )
     from scripts.agent_eval_support import (
         EvalTask,
         collect_architecture_metrics,
@@ -33,6 +38,11 @@ try:
         redact,
     )
 except ModuleNotFoundError:
+    from agent_eval_matrix import (  # type: ignore[no-redef]
+        FixtureSpec,
+        aggregate_matrix,
+        load_fixture_catalog,
+    )
     from agent_eval_support import (  # type: ignore[no-redef]
         EvalTask,
         collect_architecture_metrics,
@@ -44,6 +54,7 @@ except ModuleNotFoundError:
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = REPO_ROOT / "tests" / "evals" / "agent_tasks.json"
+DEFAULT_FIXTURE_CATALOG = REPO_ROOT / "tests" / "evals" / "agent_fixture_catalog.json"
 
 
 def _control_document(*, correct: bool) -> dict[str, Any]:
@@ -198,6 +209,27 @@ def _task_fixture_name(task: EvalTask) -> str:
     return str(task.initial_state["fixture"])
 
 
+def _live_task_inputs(
+    task: EvalTask,
+    *,
+    fixture: FixtureSpec | None,
+    source_logfile: Path | None,
+    initial_document: Path | None,
+    baseline_document: Path | None,
+) -> tuple[Path | None, Path | None, Path | None]:
+    """Resolve one task's source, initial, and grading paths without I/O."""
+    task_source = source_logfile
+    task_initial = initial_document
+    task_baseline = baseline_document
+    if fixture is not None:
+        task_source = task_source or fixture.starter_logfile
+        task_initial = task_initial or fixture.initial_document
+        task_baseline = task_baseline or fixture.baseline_document
+    if task.kind == "run":
+        return task_source, task_initial, task_baseline or task_initial
+    return task_source, task_initial, task_baseline or task_initial
+
+
 async def _run_live(
     tasks: tuple[EvalTask, ...],
     *,
@@ -208,6 +240,8 @@ async def _run_live(
     api_key_file: Path | None,
     source_logfile: Path | None,
     initial_document: Path | None,
+    baseline_document: Path | None = None,
+    fixture_catalog: Path | None = None,
     project_dir: Path,
     max_rounds: int,
 ) -> list[dict[str, Any]]:
@@ -221,8 +255,66 @@ async def _run_live(
             "Live evaluation accepts tasks from one initial-state fixture per invocation. "
             "Select one fixture group with --task."
         )
+    fixture = None
+    if fixture_names:
+        catalog_path = fixture_catalog or DEFAULT_FIXTURE_CATALOG
+        catalog = load_fixture_catalog(catalog_path, repo_root=repo_root)
+        fixture = catalog.get(next(iter(fixture_names)))
+        if fixture is None:
+            raise RuntimeError(f"No fixture catalog entry for {next(iter(fixture_names))!r}.")
+        if not fixture.root.is_dir() and source_logfile is None and initial_document is None:
+            return [
+                {
+                    "task_id": task.task_id,
+                    "status": "not_run",
+                    "fixture": _task_fixture_name(task),
+                    "reason": f"fixture directory is missing: {fixture.root}",
+                }
+                for task in tasks
+                if task.status == "active"
+            ]
     if initial_document is not None and not initial_document.exists():
         raise RuntimeError(f"Initial document does not exist: {initial_document}")
+    preflight_not_run: dict[str, dict[str, Any]] = {}
+    for task in tasks:
+        if task.status != "active":
+            continue
+        task_source, task_initial, task_baseline = _live_task_inputs(
+            task,
+            fixture=fixture,
+            source_logfile=source_logfile,
+            initial_document=initial_document,
+            baseline_document=baseline_document,
+        )
+        required_paths = [task_baseline]
+        if task.kind == "run":
+            required_paths.insert(0, task_source)
+            missing_reason = "live run requires a fixture starter_logfile or --source-logfile"
+        else:
+            required_paths.insert(0, task_initial)
+            missing_reason = (
+                "live revision requires a fixture initial_document or --initial-document"
+            )
+        if any(path is None for path in required_paths):
+            preflight_not_run[task.task_id] = {
+                "task_id": task.task_id,
+                "status": "not_run",
+                "fixture": _task_fixture_name(task),
+                "reason": missing_reason,
+            }
+        else:
+            missing = [str(path) for path in required_paths if not path.exists()]
+            if missing:
+                preflight_not_run[task.task_id] = {
+                    "task_id": task.task_id,
+                    "status": "not_run",
+                    "fixture": _task_fixture_name(task),
+                    "reason": f"fixture artifact is missing: {', '.join(missing)}",
+                }
+    if preflight_not_run and len(preflight_not_run) == sum(
+        task.status == "active" for task in tasks
+    ):
+        return [preflight_not_run[task.task_id] for task in tasks if task.status == "active"]
     from wellplot.agent.notebook import create_project_session
 
     api_key = _credential_from_file(api_key_file)
@@ -237,8 +329,6 @@ async def _run_live(
         run_max_rounds=max_rounds,
         revise_max_rounds=max_rounds,
     )
-    output_logfile = project_dir / "agent_l0_draft.log.yaml"
-    current_document = initial_document
     results: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="wellplot-agent-eval-baselines-") as temporary_dir:
         baseline_dir = Path(temporary_dir)
@@ -252,45 +342,96 @@ async def _run_live(
                     }
                 )
                 continue
+            if task.task_id in preflight_not_run:
+                results.append(preflight_not_run[task.task_id])
+                continue
+            task_source, task_initial, task_baseline = _live_task_inputs(
+                task,
+                fixture=fixture,
+                source_logfile=source_logfile,
+                initial_document=initial_document,
+                baseline_document=baseline_document,
+            )
             if task.kind == "run":
-                if source_logfile is None:
+                if task_source is None:
                     results.append(
                         {
                             "task_id": task.task_id,
                             "status": "not_run",
-                            "reason": "live run requires --source-logfile",
+                            "fixture": _task_fixture_name(task),
+                            "reason": (
+                                "live run requires a fixture starter_logfile or --source-logfile"
+                            ),
                         }
                     )
                     continue
-                baseline_source = source_logfile
-            elif current_document is None:
+                baseline_source = task_baseline
+            elif task_initial is None:
                 results.append(
                     {
                         "task_id": task.task_id,
                         "status": "not_run",
-                        "reason": "live revision requires --initial-document or a preceding run",
+                        "fixture": _task_fixture_name(task),
+                        "reason": (
+                            "live revision requires a fixture initial_document or "
+                            "--initial-document"
+                        ),
                     }
                 )
                 continue
             else:
-                baseline_source = current_document
+                baseline_source = task_baseline
+            if baseline_source is None:
+                results.append(
+                    {
+                        "task_id": task.task_id,
+                        "status": "not_run",
+                        "fixture": _task_fixture_name(task),
+                        "reason": "live grading requires a canonical baseline_document",
+                    }
+                )
+                continue
+            required_paths = [baseline_source]
+            if task.kind == "run":
+                required_paths.insert(0, task_source)
+            else:
+                required_paths.insert(0, task_initial)
+            missing = [str(path) for path in required_paths if path is None or not path.exists()]
+            if missing:
+                results.append(
+                    {
+                        "task_id": task.task_id,
+                        "status": "not_run",
+                        "fixture": _task_fixture_name(task),
+                        "reason": f"fixture artifact is missing: {', '.join(missing)}",
+                    }
+                )
+                continue
 
             baseline_path = baseline_dir / f"{task.task_id}.baseline.log.yaml"
             shutil.copy2(baseline_source, baseline_path)
             baseline_payload = load_authoring_document(baseline_path).model_dump(mode="json")
+            task_dir = project_dir / "cases" / task.task_id
+            task_dir.mkdir(parents=True, exist_ok=True)
+            task_input = task_dir / "input.log.yaml"
+            if task.kind == "run":
+                task_input = task_source
+            else:
+                shutil.copy2(task_initial, task_input)
+            output_logfile = task_dir / "output.log.yaml"
             started = time.perf_counter()
             try:
                 if task.kind == "run":
                     result = await session.run(
                         goal=task.goal or "",
                         output_logfile=output_logfile,
-                        source_logfile_path=source_logfile,
+                        source_logfile_path=task_input,
                         max_rounds=max_rounds,
                     )
                 else:
                     result = await session.revise(
                         feedback=task.feedback or "",
-                        logfile_path=current_document,
+                        logfile_path=task_input,
                         max_rounds=max_rounds,
                     )
             except Exception as exc:  # noqa: BLE001 - evidence records provider failures.
@@ -299,6 +440,7 @@ async def _run_live(
                         {
                             "task_id": task.task_id,
                             "status": "failed",
+                            "fixture": _task_fixture_name(task),
                             "errors": [str(exc)],
                             "metrics": {
                                 "latency_ms": round((time.perf_counter() - started) * 1000, 2)
@@ -307,10 +449,10 @@ async def _run_live(
                     )
                 )
                 continue
-            current_document = result.draft_path
-            final_payload = load_authoring_document(current_document).model_dump(mode="json")
+            final_document = result.draft_path
+            final_payload = load_authoring_document(final_document).model_dump(mode="json")
             graded = grade_document(
-                current_document,
+                final_document,
                 task,
                 baseline_path=baseline_path,
                 outcome=_result_outcome(
@@ -331,9 +473,9 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--suite", default=str(DEFAULT_SUITE), help="JSON evaluation suite path.")
     parser.add_argument(
         "--mode",
-        choices=("deterministic", "adapter", "live"),
+        choices=("deterministic", "adapter", "live", "matrix"),
         default="deterministic",
-        help="Evaluation mode; only live can contact a provider.",
+        help="Evaluation mode; only live can contact a provider; matrix aggregates evidence.",
     )
     parser.add_argument("--provider", default="openai", help="Provider name for live mode.")
     parser.add_argument("--model", default=None, help="Optional provider model override.")
@@ -354,6 +496,16 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         help="Clean canonical draft used as the baseline for live revision tasks.",
     )
     parser.add_argument(
+        "--baseline-document",
+        default=None,
+        help="Canonical baseline document for live isolation grading.",
+    )
+    parser.add_argument(
+        "--fixture-catalog",
+        default=str(DEFAULT_FIXTURE_CATALOG),
+        help="Fixture catalog used by live mode.",
+    )
+    parser.add_argument(
         "--task",
         action="append",
         default=[],
@@ -362,9 +514,10 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--project-dir", default=None, help="Live evaluation project directory.")
     parser.add_argument("--document", default=None, help="Persisted document to grade.")
     parser.add_argument(
-        "--baseline-document",
-        default=None,
-        help="Baseline document for isolation checks.",
+        "--matrix-evidence",
+        action="append",
+        default=[],
+        help="Redacted provider evidence JSON to aggregate in matrix mode.",
     )
     parser.add_argument("--max-rounds", type=int, default=12)
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
@@ -391,7 +544,14 @@ def main(argv: list[str] | None = None) -> int:
         tasks = tuple(task for task in tasks if task.task_id in requested_task_ids)
     document = Path(args.document).resolve() if args.document else None
     baseline = Path(args.baseline_document).resolve() if args.baseline_document else None
-    if args.mode in {"deterministic", "adapter"}:
+    if args.mode == "matrix":
+        if not args.matrix_evidence:
+            raise ValueError("Matrix mode requires at least one --matrix-evidence file.")
+        evidence = [
+            json.loads(Path(path).read_text(encoding="utf-8")) for path in args.matrix_evidence
+        ]
+        report = aggregate_matrix(evidence)
+    elif args.mode in {"deterministic", "adapter"}:
         report = run_deterministic_suite(tasks, document=document, baseline=baseline)
         report["mode"] = args.mode
     else:
@@ -412,6 +572,10 @@ def main(argv: list[str] | None = None) -> int:
                 initial_document=(
                     Path(args.initial_document).resolve() if args.initial_document else None
                 ),
+                baseline_document=(
+                    Path(args.baseline_document).resolve() if args.baseline_document else None
+                ),
+                fixture_catalog=Path(args.fixture_catalog).resolve(),
                 project_dir=project_dir,
                 max_rounds=args.max_rounds,
             )

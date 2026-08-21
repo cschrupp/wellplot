@@ -11,6 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
+from scripts.agent_eval_matrix import aggregate_matrix, load_fixture_catalog
 from scripts.agent_eval_support import (
     canonical_diff,
     collect_architecture_metrics,
@@ -261,3 +262,104 @@ def test_live_mode_rejects_mixed_fixture_groups(monkeypatch: pytest.MonkeyPatch)
                 max_rounds=1,
             )
         )
+
+
+def test_fixture_catalog_resolves_paths_without_allowing_escape(tmp_path: Path) -> None:
+    """Fixture paths are explicit and remain confined to the catalog root."""
+    catalog_path = tmp_path / "catalog.json"
+    fixture_root = tmp_path / "fixtures" / "open_hole"
+    fixture_root.mkdir(parents=True)
+    (fixture_root / "starter.log.yaml").write_text("starter", encoding="utf-8")
+    catalog_path.write_text(
+        '{"version": 1, "root": "fixtures", "fixtures": {'
+        '"open_hole": {"starter_logfile": "starter.log.yaml"}}}',
+        encoding="utf-8",
+    )
+
+    catalog = load_fixture_catalog(catalog_path, repo_root=tmp_path)
+
+    fixture = catalog["open_hole"]
+    assert fixture.starter_logfile == (fixture_root / "starter.log.yaml").resolve()
+    assert fixture.missing_paths == ()
+
+
+def test_fixture_catalog_reports_missing_artifacts(tmp_path: Path) -> None:
+    """A clean checkout never silently substitutes a notebook draft."""
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(
+        '{"version": 1, "root": "fixtures", "fixtures": {'
+        '"open_hole": {"initial_document": "draft.log.yaml"}}}',
+        encoding="utf-8",
+    )
+
+    fixture = load_fixture_catalog(catalog_path, repo_root=tmp_path)["open_hole"]
+
+    assert fixture.missing_paths
+    assert fixture.initial_document is not None
+    assert fixture.initial_document.name == "draft.log.yaml"
+
+
+def test_missing_live_fixture_is_not_reported_as_a_pass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Live evaluation stops before provider creation when the fixture is absent."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    task = tasks[0]
+    catalog_path = tmp_path / "catalog.json"
+    catalog_path.write_text(
+        '{"version": 1, "root": "fixtures", "fixtures": {'
+        '"open_hole_clean_starter": {"starter_logfile": "starter.log.yaml", '
+        '"baseline_document": "baseline.log.yaml"}}}',
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("WELLPLOT_RUN_LIVE_AGENT_EVALS", "1")
+
+    results = asyncio.run(
+        _run_live(
+            (task,),
+            repo_root=tmp_path,
+            provider="openai",
+            model=None,
+            base_url=None,
+            api_key_file=None,
+            source_logfile=None,
+            initial_document=None,
+            fixture_catalog=catalog_path,
+            project_dir=tmp_path / "project",
+            max_rounds=1,
+        )
+    )
+
+    assert results[0]["status"] == "not_run"
+    assert "fixture directory is missing" in results[0]["reason"]
+
+
+def test_matrix_aggregation_reports_pass_at_one_and_failure_category() -> None:
+    """Matrix summaries preserve provider/task status and classify failures."""
+    report = aggregate_matrix(
+        [
+            {
+                "provider": "nvidia_cloud",
+                "model": "model-a",
+                "tasks": [
+                    {"task_id": "remarks_only", "status": "passed"},
+                    {
+                        "task_id": "resistivity_track",
+                        "status": "failed",
+                        "errors": ["schema validation failed"],
+                    },
+                ],
+            },
+            {
+                "provider": "unsloth",
+                "model": "model-b",
+                "tasks": [{"task_id": "remarks_only", "status": "not_run", "reason": "no key"}],
+            },
+        ]
+    )
+
+    assert report["providers"]["nvidia_cloud"]["pass_at_1"] == 0.5
+    assert report["providers"]["unsloth"]["pass_at_1"] is None
+    assert report["failure_categories"] == {"contract/schema": 1}
+    assert report["not_run_cases"] == 1

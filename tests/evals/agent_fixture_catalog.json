@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "root": "tests/evals/fixtures/agent_tasks",
+  "fixtures": {
+    "open_hole_clean_starter": {
+      "starter_logfile": "starter.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Clean open-hole starter used by the initial run task."
+    },
+    "open_hole_initial_draft": {
+      "initial_document": "draft.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Open-hole draft used by isolated revision tasks."
+    },
+    "open_hole_header_starter": {
+      "initial_document": "draft.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Open-hole header scaffold with the RM slots present."
+    },
+    "open_hole_gr_sp_seed": {
+      "initial_document": "draft.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Open-hole draft with the seeded overview and depth tracks."
+    },
+    "open_hole_annotation_seed": {
+      "initial_document": "draft.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Open-hole draft with a seeded annotation track."
+    },
+    "cased_hole_main_starter": {
+      "starter_logfile": "starter.log.yaml",
+      "baseline_document": "baseline.log.yaml",
+      "description": "Cased-hole main-pass starter for packet-scale tasks."
+    }
+  }
+}
