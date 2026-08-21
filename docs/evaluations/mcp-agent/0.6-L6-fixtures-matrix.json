@@ -1,6 +1,6 @@
 {
   "slice": "0.6-L6",
-  "git_commit": "pending finalization after validation",
+  "git_commit": "09cf230",
   "objective": "Make provider evaluation fixture-driven, independent per task, and comparable across redacted provider evidence.",
   "changed_surface": [
     "scripts/agent_eval_matrix.py",
