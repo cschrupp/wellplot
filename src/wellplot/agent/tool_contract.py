@@ -161,11 +161,13 @@ def _compact(value: object, root: Mapping[str, object], depth: int = 0) -> Schem
     if isinstance(properties, Mapping):
         result["type"] = "object"
         result["properties"] = {
-            str(name): _compact(item, root, depth + 1) for name, item in properties.items()
+            str(name): _compact(item, root, depth + 1)
+            for name, item in properties.items()
+            if str(name) != "extensions"
         }
     required = resolved.get("required")
     if isinstance(required, list):
-        result["required"] = [str(item) for item in required]
+        result["required"] = [str(item) for item in required if str(item) != "extensions"]
     if resolved.get("additionalProperties") is False:
         result["additionalProperties"] = False
     return result or {"type": "object"}
@@ -362,8 +364,18 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
             str(name): _field_schema(value) for name, value in dict(entry.get("fields", {})).items()
         }
         canonical_name = entry.get("canonical_fields")
-        if isinstance(canonical_name, str):
-            fields = {**canonical.get(canonical_name, {}), **fields}
+        if isinstance(canonical_name, str) and canonical_name in {
+            "header",
+            "track",
+            "curve",
+            "raster",
+        }:
+            # Canonical Pydantic constraints are authoritative for the high-risk
+            # nested fields that providers repeatedly mis-shaped. YAML may add
+            # tool-only fields, but it must not downgrade these typed fields to
+            # unconstrained objects/strings. Keep the selection narrow to protect
+            # the MCP schema budget.
+            fields = {**fields, **canonical.get(canonical_name, {})}
         if entry.get("id") == "edit_remarks":
             fields["remark"] = {
                 "type": "object",

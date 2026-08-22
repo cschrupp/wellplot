@@ -23,6 +23,24 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--baseline", required=True, help="L0 JSON evidence path.")
     parser.add_argument("--repo-root", default=str(REPO_ROOT))
     parser.add_argument("--output", default=None, help="Write JSON evidence to this path.")
+    parser.add_argument(
+        "--max-agent-line-growth",
+        type=int,
+        default=None,
+        help=(
+            "Fail if total src/wellplot/agent Python LOC grows by more than this "
+            "amount relative to the baseline. Use 0 during stabilization."
+        ),
+    )
+    parser.add_argument(
+        "--max-production-file-growth",
+        type=int,
+        default=None,
+        help=(
+            "Fail if any production file present in both baseline and current metrics "
+            "grows by more than this many lines. Use 0 during stabilization."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -87,6 +105,45 @@ def main(argv: list[str] | None = None) -> int:
             new = current.get(key)
             if isinstance(old, (int, float)) and isinstance(new, (int, float)):
                 deltas[key] = new - old
+
+    if args.max_agent_line_growth is not None:
+        growth = deltas.get("agent_python_lines")
+        checks.append(
+            {
+                "name": "agent_python_line_budget",
+                "passed": isinstance(growth, (int, float))
+                and growth <= args.max_agent_line_growth,
+                "actual_growth": growth,
+                "allowed_growth": args.max_agent_line_growth,
+            }
+        )
+
+    if args.max_production_file_growth is not None and isinstance(
+        baseline_architecture, dict
+    ):
+        baseline_counts = baseline_architecture.get("production_line_counts")
+        current_counts = current.get("production_line_counts")
+        if isinstance(baseline_counts, dict) and isinstance(current_counts, dict):
+            file_deltas = {
+                path: current_counts[path] - old
+                for path, old in baseline_counts.items()
+                if isinstance(old, int)
+                and isinstance(current_counts.get(path), int)
+            }
+            deltas["production_line_counts"] = file_deltas
+            violating = {
+                path: growth
+                for path, growth in file_deltas.items()
+                if growth > args.max_production_file_growth
+            }
+            checks.append(
+                {
+                    "name": "production_file_line_budget",
+                    "passed": not violating,
+                    "violations": violating,
+                    "allowed_growth_per_file": args.max_production_file_growth,
+                }
+            )
     report = {
         "baseline": str(baseline_path),
         "current": current,

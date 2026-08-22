@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "path": "src/wellplot/agent/core.py",
+      "base_lines": 9153,
+      "patched_lines": 8684,
+      "line_delta": -469,
+      "sha256": "4ffa10a19797dd63e417236f7b5c2f2102cfc6d7e27ed8bc932a3621825ae37f"
+    },
+    {
+      "path": "src/wellplot/agent/tool_contract.py",
+      "base_lines": 449,
+      "patched_lines": 461,
+      "line_delta": 12,
+      "sha256": "120cad917398dbbc61b24f468bd4cebae711402579bdfac8beb46befbd02d8bb"
+    },
+    {
+      "path": "src/wellplot/mcp/stable.py",
+      "base_lines": 1733,
+      "patched_lines": 1734,
+      "line_delta": 1,
+      "sha256": "5755cd70a78c56670e23f620218255592d898f66510b1c760a8cd9df27285221"
+    },
+    {
+      "path": "src/wellplot/mcp/assets/defaults/stable_tool_contract.yaml",
+      "base_lines": 240,
+      "patched_lines": 227,
+      "line_delta": -13,
+      "sha256": "56341ce6038a24f7b2dbf6f7786a6aca5c3c583678b5ad5a22c1467e5b711e5d"
+    },
+    {
+      "path": "scripts/agent_eval_support.py",
+      "base_lines": 531,
+      "patched_lines": 533,
+      "line_delta": 2,
+      "sha256": "b45629b6c40ccefa92c7b05545365fbbe7e654866d1057dc9832cd46fe16565c"
+    },
+    {
+      "path": "scripts/check_agent_architecture.py",
+      "base_lines": 107,
+      "patched_lines": 164,
+      "line_delta": 57,
+      "sha256": "2da4acfabf8514228ef0fe4f4c90565478cc1e692ce81ba8f4da02b3023acf6c"
+    },
+    {
+      "path": "tests/test_agent_tool_contract.py",
+      "base_lines": 203,
+      "patched_lines": 237,
+      "line_delta": 34,
+      "sha256": "a6c9cc2eb0ef3ad7818244f2567e94369b87a4e531251a936f74d8ba8707117e"
+    },
+    {
+      "path": "tests/test_agent_stable_loop.py",
+      "base_lines": 1707,
+      "patched_lines": 1489,
+      "line_delta": -218,
+      "sha256": "aa42c8c26952f596f5a0afab670b9a7d1916ee7bb20d84f301d9cf98dfb9d932"
+    }
+  ]
+}

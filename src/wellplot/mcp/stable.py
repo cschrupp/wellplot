@@ -1217,9 +1217,10 @@ def dispatch_stable_tool(
         }.get(operation)
         if kind is None:
             raise TemplateValidationError(f"Unsupported report-settings operation {operation!r}.")
-        payload = args.get(
-            {"report": "patch", "page": "page", "output": "output", "depth": "depth"}[kind], {}
-        )
+        if kind == "report":
+            payload = _flat_patch(args, {"title", "subtitle"})
+        else:
+            payload = args.get({"page": "page", "output": "output", "depth": "depth"}[kind], {})
 
         def apply_settings() -> object:
             path, authoring = _rooted_authoring(logfile_path, root)

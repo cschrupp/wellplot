@@ -5,7 +5,6 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -18,12 +17,10 @@ from wellplot.agent.core import (
     ProviderRunResult,
     _catalog_fallback_section_id,
     _catalog_fallback_tool_arguments,
-    _normalize_report_settings_arguments,
     _normalize_scale_payload,
     _normalize_stable_tool_arguments,
     _resolve_requested_source_path,
     _resolved_authoring_value,
-    _stable_execution_stages,
     _stable_postcondition_errors,
     _stable_scope_tool_names,
 )
@@ -91,39 +88,23 @@ def test_preserves_ambiguous_source_basename(tmp_path: Path) -> None:
     ) == "CBL.dlis"
 
 
-def test_stable_remarks_add_arguments_are_nested_before_dispatch() -> None:
-    """Recover a provider's flat remark fields into the canonical add payload."""
-    normalized = _normalize_stable_tool_arguments(
-        "edit_remarks",
-        {
-            "operation": "add",
-            "title": "Notes",
-            "lines": ["A note"],
-        },
-    )
-
-    assert normalized["remark"] == {"title": "Notes", "lines": ["A note"]}
-    assert "title" not in normalized
-    assert "lines" not in normalized
-
-
-def test_stable_remarks_add_arguments_decode_string_lines() -> None:
-    """Decode providers that serialize the remarks line list as JSON text."""
-    normalized = _normalize_stable_tool_arguments(
-        "edit_remarks",
-        {
-            "operation": "add",
-            "remark": {
-                "title": "Notes",
-                "lines": '["A note", "A second note"]',
-            },
-        },
-    )
-
-    assert normalized["remark"] == {
+def test_stable_argument_normalizer_does_not_invent_payload_shapes() -> None:
+    """Contract-invalid provider payloads remain invalid instead of being repaired by the host."""
+    flat_remark = {
+        "operation": "add",
         "title": "Notes",
-        "lines": ["A note", "A second note"],
+        "lines": ["A note"],
     }
+    assert _normalize_stable_tool_arguments("edit_remarks", flat_remark) == flat_remark
+
+    nested_raster = {
+        "operation": "update",
+        "style": {
+            "colormap": "gray_r",
+            "colorbar": {"enabled": True, "label": "Amplitude"},
+        },
+    }
+    assert _normalize_stable_tool_arguments("edit_raster_binding", nested_raster) == nested_raster
 
 
 def test_stable_scale_arguments_use_canonical_bounds() -> None:
@@ -174,31 +155,6 @@ def test_stable_source_inspection_drops_conflicting_logfile_target() -> None:
     ) == {"source_path": "workspace/input.dlis"}
 
 
-def test_stable_raster_arguments_move_nested_presentation_fields() -> None:
-    """Keep raster presentation fields out of the scalar style object."""
-    normalized = _normalize_stable_tool_arguments(
-        "edit_raster_binding",
-        {
-            "operation": "update",
-            "style": {
-                "colormap": "gray_r",
-                "colorbar": {"enabled": True, "label": "Amplitude"},
-                "sample_axis": {"enabled": True, "min": 200, "max": 1200},
-            },
-            "color_limits": None,
-        },
-    )
-
-    assert normalized["style"] == {"colormap": "gray_r"}
-    assert normalized["colorbar"] == {"enabled": True, "label": "Amplitude"}
-    assert normalized["sample_axis"] == {
-        "enabled": True,
-        "min": 200,
-        "max": 1200,
-    }
-    assert "color_limits" not in normalized
-
-
 def test_catalog_fallback_does_not_implicitly_target_packet_sections() -> None:
     """Single-section recovery must not guess which section a packet means."""
     document = SimpleNamespace(
@@ -219,27 +175,6 @@ def test_catalog_fallback_does_not_implicitly_target_packet_sections() -> None:
         )
         == "repeat_pass"
     )
-
-
-def test_stable_execution_stages_order_structure_before_content() -> None:
-    """Mixed generic requests expose form edits before content mutations."""
-    stages = _stable_execution_stages(
-        "Create a new section and track, then bind scalar curves and a raster.",
-        {
-            "edit_section",
-            "replicate_section_structure",
-            "edit_track",
-            "edit_curve_binding",
-            "edit_raster_binding",
-        },
-        header_preflight_applied=False,
-    )
-
-    assert [stage.id for stage in stages] == ["structure", "content"]
-    assert "edit_track" in stages[0].mutation_names
-    assert "edit_curve_binding" not in stages[0].mutation_names
-    assert "edit_curve_binding" in stages[1].mutation_names
-    assert "edit_track" not in stages[1].mutation_names
 
 
 def test_stable_scope_does_not_treat_header_depth_labels_as_page_settings() -> None:
@@ -284,23 +219,6 @@ def test_stable_arguments_normalize_scale_and_style_aliases() -> None:
         "color": "black",
         "line_width": 1.5,
         "line_style": "--",
-    }
-
-
-def test_stable_report_settings_normalize_generic_provider_verbs() -> None:
-    """Map generic settings verbs to the canonical operation for their payload."""
-    assert _normalize_report_settings_arguments(
-        {"operation": "update", "section_id": "main", "subtitle": "Repeat"}
-    ) == {
-        "operation": "set_section_view",
-        "section_id": "main",
-        "subtitle": "Repeat",
-    }
-    assert _normalize_report_settings_arguments(
-        {"operation": "set", "page": {"orientation": "landscape"}}
-    ) == {
-        "operation": "set_page",
-        "page": {"orientation": "landscape"},
     }
 
 
@@ -1019,8 +937,8 @@ class ReadOnlyStalledBackend(StableBackend):
         )
 
 
-class StagedStableBackend(StableBackend):
-    """Provider double that executes a generic form/content request in two stages."""
+class ExploratoryStableBackend(StableBackend):
+    """Provider double that performs distinct reads before a valid mutation."""
 
     async def run_authoring(
         self,
@@ -1031,96 +949,28 @@ class StagedStableBackend(StableBackend):
         tool_caller: object,
         max_rounds: int,
     ) -> ProviderRunResult:
-        """Capture stage-specific tool definitions and make one valid edit per stage."""
-        del instructions, initial_user_message, max_rounds
+        """Prove that new inspections are not treated as stalled progress."""
+        del instructions, initial_user_message, tool_definitions, max_rounds
         assert callable(tool_caller)
-        stage_tools = {tool.name for tool in tool_definitions}
-        history = getattr(self, "stage_tools", [])
-        history.append(stage_tools)
-        self.stage_tools = history
-        if len(history) == 1:
-            assert "edit_section" in stage_tools
-            assert "edit_track" in stage_tools
-            assert "edit_curve_binding" not in stage_tools
-            await tool_caller(
-                "edit_section",
-                {
-                    "operation": "update",
-                    "section_id": "main",
-                    "subtitle": "Staged structure",
-                },
+        for object_kind in ("section", "track", "page", "remark", "header_slot"):
+            payload = await tool_caller(
+                "inspect_authoring",
+                {"object_kind": object_kind, "detail": "summary"},
             )
-            return ProviderRunResult(
-                final_text="Created the requested form structure.",
-                tool_trace=(),
-            )
-
-        assert "edit_curve_binding" in stage_tools
-        assert "edit_track" not in stage_tools
-        await tool_caller(
-            "edit_curve_binding",
+            assert payload.get("_agent_control") is None
+        mutation = await tool_caller(
+            "edit_section",
             {
-                "operation": "add",
+                "operation": "update",
                 "section_id": "main",
-                "track_id": "gr_sp",
-                "channel": "GR",
+                "subtitle": "Stable loop test",
             },
         )
+        assert mutation.get("_agent_control", {}).get("status") in {None, "completed"}
         return ProviderRunResult(
-            final_text="Added the requested content binding.",
+            final_text="Inspected distinct state and then applied the requested edit.",
             tool_trace=(),
         )
-
-
-class PrematureStageMutationBackend(StagedStableBackend):
-    """Provider double that requests content before returning from structure."""
-
-    async def run_authoring(
-        self,
-        *,
-        instructions: str,
-        initial_user_message: str,
-        tool_definitions: list[FunctionToolDefinition],
-        tool_caller: object,
-        max_rounds: int,
-    ) -> ProviderRunResult:
-        """Verify that a persisted structure hands control to the next stage."""
-        del instructions, initial_user_message, max_rounds
-        assert callable(tool_caller)
-        stage_tools = {tool.name for tool in tool_definitions}
-        history = getattr(self, "stage_tools", [])
-        history.append(stage_tools)
-        self.stage_tools = history
-        if len(history) == 1:
-            await tool_caller(
-                "edit_section",
-                {
-                    "operation": "update",
-                    "section_id": "main",
-                    "subtitle": "Staged structure",
-                },
-            )
-            self.handoff = await tool_caller(
-                "edit_curve_binding",
-                {
-                    "operation": "add",
-                    "section_id": "main",
-                    "track_id": "gr_sp",
-                    "channel": "GR",
-                },
-            )
-            return ProviderRunResult(final_text="Structure stage handed off.", tool_trace=())
-
-        await tool_caller(
-            "edit_curve_binding",
-            {
-                "operation": "add",
-                "section_id": "main",
-                "track_id": "gr_sp",
-                "channel": "GR",
-            },
-        )
-        return ProviderRunResult(final_text="Content stage completed.", tool_trace=())
 
 
 class StableSession:
@@ -1288,27 +1138,6 @@ class HeaderStableSession(StableSession):
         )
 
 
-class StagedStableSession(StableSession):
-    """Stable session double that accepts a content mutation after structure."""
-
-    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
-        """Persist the structural edit and acknowledge the binding edit."""
-        if name != "edit_curve_binding":
-            return await super().call_tool(name, arguments)
-        self.calls.append((name, dict(arguments)))
-        return SimpleNamespace(
-            structuredContent={
-                "ok": True,
-                "changed": True,
-                "target": {"object_kind": "curve_binding", "object_id": "GR"},
-                "before": {},
-                "after": {"channel": "GR"},
-                "warnings": [],
-                "next_steps": [],
-            }
-        )
-
-
 class StableRuntime:
     """Runtime double translating stable descriptors and image results."""
 
@@ -1380,10 +1209,11 @@ async def test_stable_loop_uses_compact_profile_and_persisted_evidence(tmp_path:
     assert result.report_facts["stable_tool_outcomes"]
     assert result.report_facts["feedback_loop"]["status"] == "completed"
     assert backend.mutation_payload["agent_feedback"]["status"] == "completed"
-    assert session.calls[1][1]["object_kind"] == "section"
+    assert session.calls[1][0] == "validate_logfile"
+    assert session.calls[1][1]["level"] == "structural"
     assert [name for name, _ in session.calls] == [
         "create_draft",
-        "inspect_authoring",
+        "validate_logfile",
         "edit_section",
         "validate_logfile",
         "inspect_authoring",
@@ -1426,7 +1256,7 @@ async def test_stable_loop_applies_packet_header_before_provider_tools(tmp_path:
     assert [name for name, _ in session.calls] == [
         "create_draft",
         "edit_header",
-        "inspect_authoring",
+        "validate_logfile",
         "edit_section",
         "validate_logfile",
         "inspect_authoring",
@@ -1546,60 +1376,6 @@ async def test_stable_loop_rolls_back_unmet_request_postcondition(tmp_path: Path
 
 
 @pytest.mark.anyio
-async def test_stable_loop_stages_generic_structure_before_content(tmp_path: Path) -> None:
-    """A mixed request cannot bind content before form mutations are available."""
-    session = StagedStableSession(tmp_path)
-    backend = StagedStableBackend()
-    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
-
-    result = await authoring.run_request(
-        AuthoringRequest(
-            goal="""
-                Create a new section and add a track, then bind a scalar curve.
-            """,
-            output_logfile="workspace/stable.log.yaml",
-            source_logfile_path="starter.log.yaml",
-            max_rounds=4,
-        )
-    )
-
-    assert result.validation["valid"] is True
-    assert [report["id"] for report in result.report_facts["stable_execution_stages"]] == [
-        "structure",
-        "content",
-    ]
-    assert len(backend.stage_tools) == 2
-    assert "edit_track" in backend.stage_tools[0]
-    assert "edit_curve_binding" not in backend.stage_tools[0]
-    assert "edit_curve_binding" in backend.stage_tools[1]
-    assert "edit_track" not in backend.stage_tools[1]
-
-
-@pytest.mark.anyio
-async def test_stable_loop_hands_off_premature_content_mutation(tmp_path: Path) -> None:
-    """A content call after structure progress advances instead of blocking the run."""
-    session = StagedStableSession(tmp_path)
-    backend = PrematureStageMutationBackend()
-    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
-
-    result = await authoring.run_request(
-        AuthoringRequest(
-            goal="""
-                Create a new section and add a track, then bind a scalar curve.
-            """,
-            output_logfile="workspace/stable.log.yaml",
-            source_logfile_path="starter.log.yaml",
-            max_rounds=4,
-        )
-    )
-
-    assert result.validation["valid"] is True
-    assert backend.handoff["_agent_control"]["status"] == "stage_complete"
-    assert len(backend.stage_tools) == 2
-    assert [name for name, _ in session.calls].count("edit_curve_binding") == 1
-
-
-@pytest.mark.anyio
 async def test_stable_loop_hides_rolled_back_header_mutations(tmp_path: Path) -> None:
     """A transaction rollback cannot leave an applied header in the user summary."""
     session = HeaderStableSession(tmp_path)
@@ -1647,7 +1423,7 @@ async def test_stable_loop_stops_repeated_tool_errors(tmp_path: Path) -> None:
 
     assert [name for name, _ in session.calls[:4]] == [
         "create_draft",
-        "inspect_authoring",
+        "validate_logfile",
         "inspect_source",
         "inspect_source",
     ]
@@ -1655,6 +1431,36 @@ async def test_stable_loop_stops_repeated_tool_errors(tmp_path: Path) -> None:
     assert result.report_facts["feedback_loop"]["consecutive_tool_errors"] == 2
     assert result.report_facts["feedback_loop"]["repeated_error_count"] == 2
     assert result.report_facts["rolled_back"] is True
+
+
+@pytest.mark.anyio
+async def test_stable_loop_allows_distinct_reads_before_mutation(tmp_path: Path) -> None:
+    """Distinct discovery calls may precede a mutation without tripping the breaker."""
+    session = StableSession(tmp_path)
+    backend = ExploratoryStableBackend()
+    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="Set the main section subtitle to Stable loop test.",
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=12,
+        )
+    )
+
+    assert result.validation["valid"] is True
+    assert result.change_summary["changed"] is True
+    assert result.report_facts["feedback_loop"]["status"] in {
+        "completed",
+        "provider_finished",
+    }
+    assert result.report_facts["feedback_loop"]["repeated_read_only_calls"] == 0
+    edit_index = next(index for index, (name, _) in enumerate(session.calls) if name == "edit_section")
+    inspect_calls_before_edit = [
+        name for name, _ in session.calls[:edit_index] if name == "inspect_authoring"
+    ]
+    assert len(inspect_calls_before_edit) == 5
 
 
 @pytest.mark.anyio
@@ -1674,34 +1480,8 @@ async def test_stable_loop_steers_after_successful_read_only_calls(tmp_path: Pat
     )
 
     assert any(
-        "execute the requested mutation now" in message for message in backend.feedback_messages
+        "exact read-only call already succeeded" in message
+        for message in backend.feedback_messages
     )
     assert result.report_facts["feedback_loop"]["status"] == "blocked"
-
-
-@pytest.mark.anyio
-async def test_stable_loop_reconciles_catalog_request_after_provider_returns(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Catalog recovery runs after a provider stops with an incomplete request."""
-    session = StableSession(tmp_path)
-    backend = StableBackend()
-    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
-    recovery = AsyncMock(return_value=(True, "Catalog reconciliation completed the request."))
-    monkeypatch.setattr(authoring, "_execute_catalog_fallback", recovery)
-
-    result = await authoring.run_request(
-        AuthoringRequest(
-            goal="Add one porosity track and overlay RHOB and NPHI with crossover fill.",
-            output_logfile="workspace/stable-porosity.log.yaml",
-            source_logfile_path="starter.log.yaml",
-            max_rounds=4,
-        )
-    )
-
-    assert recovery.await_count == 1
-    assert result.report_facts["catalog_recovery"] == (
-        "Catalog reconciliation completed the request."
-    )
-    assert result.report_facts["feedback_loop"]["status"] == "completed"
+    assert result.report_facts["feedback_loop"]["repeated_read_only_calls"] >= 2

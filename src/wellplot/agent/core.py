@@ -153,13 +153,6 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
 )
 
 STABLE_MCP_TOOL_NAMES = frozenset(item.name for item in stable_tool_profile())
-_STABLE_READ_ONLY_TOOL_NAMES = frozenset(
-    {
-        "inspect_authoring",
-        "inspect_source",
-        "inspect_vocab",
-    }
-)
 _STABLE_MUTATION_TOOL_NAMES = frozenset(
     {
         "edit_header",
@@ -168,24 +161,6 @@ _STABLE_MUTATION_TOOL_NAMES = frozenset(
         "edit_section",
         "replicate_section_structure",
         "edit_track",
-        "edit_curve_binding",
-        "edit_raster_binding",
-        "edit_fill",
-        "edit_annotation",
-    }
-)
-_STABLE_STRUCTURE_MUTATION_TOOL_NAMES = frozenset(
-    {
-        "edit_report_settings",
-        "edit_section",
-        "replicate_section_structure",
-        "edit_track",
-    }
-)
-_STABLE_CONTENT_MUTATION_TOOL_NAMES = frozenset(
-    {
-        "edit_header",
-        "edit_remarks",
         "edit_curve_binding",
         "edit_raster_binding",
         "edit_fill",
@@ -790,80 +765,6 @@ def _stable_scope_tool_names(goal: str) -> set[str] | None:
     return mentioned
 
 
-@dataclass(frozen=True)
-class _StableExecutionStage:
-    """One generic, ordered subset of the stable mutation surface."""
-
-    id: str
-    summary: str
-    mutation_names: frozenset[str]
-
-
-def _stable_request_creates_structure(goal: str) -> bool:
-    """Return whether a request explicitly changes sections or track structure."""
-    expression = re.compile(
-        r"\b(?:add|create|build|insert|remove|delete|move|reorder|replicate|copy)\b"
-        r"[^.\n]{0,120}\b(?:sections?|tracks?)\b",
-        re.IGNORECASE,
-    )
-    return expression.search(goal) is not None
-
-
-def _stable_execution_stages(
-    goal: str,
-    scope_tools: set[str] | None,
-    *,
-    header_preflight_applied: bool,
-) -> tuple[_StableExecutionStage, ...]:
-    """Order mixed structure/content requests without imposing a domain blueprint.
-
-    A mixed request that creates or rearranges form objects before adding content
-    needs different tools at each step. Restricting one provider turn to the
-    relevant generic object family keeps the model from treating repeated
-    inspection as progress while preserving the normal one-turn path for small
-    revisions.
-    """
-    requested_mutations = (
-        set(_STABLE_MUTATION_TOOL_NAMES)
-        if scope_tools is None
-        else set(scope_tools & _STABLE_MUTATION_TOOL_NAMES)
-    )
-    if header_preflight_applied:
-        requested_mutations.discard("edit_header")
-    if not requested_mutations:
-        requested_mutations = set(_STABLE_MUTATION_TOOL_NAMES)
-        if header_preflight_applied:
-            requested_mutations.discard("edit_header")
-
-    structure_mutations = requested_mutations & _STABLE_STRUCTURE_MUTATION_TOOL_NAMES
-    content_mutations = requested_mutations & _STABLE_CONTENT_MUTATION_TOOL_NAMES
-    if (
-        structure_mutations
-        and content_mutations
-        and _stable_request_creates_structure(goal)
-    ):
-        return (
-            _StableExecutionStage(
-                id="structure",
-                summary="Create or reconcile requested sections and tracks.",
-                mutation_names=frozenset(structure_mutations),
-            ),
-            _StableExecutionStage(
-                id="content",
-                summary="Add requested report content and track bindings.",
-                mutation_names=frozenset(content_mutations),
-            ),
-        )
-
-    return (
-        _StableExecutionStage(
-            id="authoring",
-            summary="Apply the requested stable authoring mutations.",
-            mutation_names=frozenset(requested_mutations),
-        ),
-    )
-
-
 def _is_header_only_request(goal: str, intent: _HeaderFillIntent | None) -> bool:
     """Return whether a request contains header values but no other object scope."""
     if intent is None or not intent.values:
@@ -1002,210 +903,37 @@ def _normalize_stable_tool_arguments(
     name: str,
     arguments: Mapping[str, object],
 ) -> dict[str, object]:
-    """Normalize recoverable provider argument shapes before MCP dispatch."""
+    """Apply only lossless aliases at the provider/MCP boundary.
+
+    The stable MCP schema is the public contract. This function must not invent
+    operations, move fields between unrelated objects, or repair payload shapes
+    that the advertised schema should have rejected.
+    """
     normalized = dict(arguments)
     if name == "inspect_source":
         if normalized.get("source_path") is not None:
             # Source inspection and draft inspection are mutually exclusive.
-            # Providers often copy the draft context into every tool call.
             normalized.pop("logfile_path", None)
             normalized.pop("section_id", None)
         return normalized
-    if name == "edit_report_settings":
-        return _normalize_report_settings_arguments(normalized)
-    if name == "edit_raster_binding":
-        return _normalize_raster_binding_arguments(normalized)
-    if name != "edit_remarks" or normalized.get("operation") != "add":
-        if name in {"edit_curve_binding", "edit_track"}:
-            scale_keys = ("scale", "x_scale", "curve_scale")
-            for key in scale_keys:
-                if key in normalized:
-                    normalized[key] = _normalize_scale_payload(normalized[key])
-            channel_scales = normalized.get("channel_scales")
-            if isinstance(channel_scales, Mapping):
-                normalized["channel_scales"] = {
-                    str(channel): _normalize_scale_payload(scale)
-                    for channel, scale in channel_scales.items()
-                }
-            patch = normalized.get("patch")
-            if isinstance(patch, Mapping):
-                normalized_patch = dict(patch)
-                for key in scale_keys:
-                    if key in normalized_patch:
-                        normalized_patch[key] = _normalize_scale_payload(normalized_patch[key])
-                if isinstance(normalized_patch.get("style"), Mapping):
-                    normalized_patch["style"] = _normalize_style_payload(
-                        normalized_patch["style"]
-                    )
-                normalized["patch"] = normalized_patch
-            if isinstance(normalized.get("style"), Mapping):
-                normalized["style"] = _normalize_style_payload(normalized["style"])
-        return normalized
-    remark_fields = (
-        "remark_id",
-        "title",
-        "text",
-        "lines",
-        "alignment",
-        "font_size",
-        "title_font_size",
-        "border",
-    )
-    nested_remark = normalized.get("remark")
-    if isinstance(nested_remark, Mapping):
-        remark = dict(nested_remark)
-    else:
-        remark = {
-            field: normalized[field]
-            for field in remark_fields
-            if field in normalized
-        }
-    if remark:
-        lines = remark.get("lines")
-        if isinstance(lines, str):
-            try:
-                decoded_lines = json.loads(lines)
-            except json.JSONDecodeError:
-                decoded_lines = [lines]
-            remark["lines"] = (
-                decoded_lines if isinstance(decoded_lines, list) else [lines]
-            )
-        normalized["remark"] = remark
-        for field in remark_fields:
-            normalized.pop(field, None)
-    return normalized
 
+    if name in {"edit_curve_binding", "edit_track"}:
+        scale_keys = ("scale", "x_scale", "curve_scale")
+        for key in scale_keys:
+            if key in normalized:
+                normalized[key] = _normalize_scale_payload(normalized[key])
+        channel_scales = normalized.get("channel_scales")
+        if isinstance(channel_scales, Mapping):
+            normalized["channel_scales"] = {
+                str(channel): _normalize_scale_payload(scale)
+                for channel, scale in channel_scales.items()
+            }
 
-_RASTER_BINDING_FIELDS = {
-    "label",
-    "profile",
-    "normalization",
-    "waveform_normalization",
-    "clip_percentiles",
-    "interpolation",
-    "show_raster",
-    "alpha",
-    "raster_alpha",
-    "color_limits",
-    "colorbar",
-    "sample_axis",
-    "waveform",
-}
+    if name in {"edit_curve_binding", "edit_raster_binding"}:
+        style = normalized.get("style")
+        if isinstance(style, Mapping):
+            normalized["style"] = _normalize_style_payload(style)
 
-
-def _normalize_raster_binding_arguments(
-    arguments: Mapping[str, object],
-) -> dict[str, object]:
-    """Normalize provider raster patches into the stable binding contract."""
-    normalized = dict(arguments)
-    patch_value = normalized.get("patch")
-    patch = dict(patch_value) if isinstance(patch_value, Mapping) else {}
-    if isinstance(normalized.get("style"), Mapping):
-        patch.setdefault("style", normalized["style"])
-
-    for raster_field in _RASTER_BINDING_FIELDS:
-        if raster_field in normalized:
-            patch.setdefault(raster_field, normalized[raster_field])
-
-    style = patch.get("style")
-    if isinstance(style, Mapping):
-        style_patch = dict(style)
-        # Some providers treat a raster binding as one undifferentiated style
-        # object. Move presentation controls to their typed patch fields.
-        for raster_field in _RASTER_BINDING_FIELDS:
-            if raster_field in style_patch:
-                patch.setdefault(raster_field, style_patch.pop(raster_field))
-        patch["style"] = _normalize_style_payload(style_patch)
-
-    color_limits = patch.get("color_limits")
-    if color_limits is None or color_limits == []:
-        patch.pop("color_limits", None)
-    elif isinstance(color_limits, Mapping):
-        minimum = color_limits.get("minimum", color_limits.get("min"))
-        maximum = color_limits.get("maximum", color_limits.get("max"))
-        if minimum is not None and maximum is not None:
-            patch["color_limits"] = [minimum, maximum]
-
-    # Optional object fields with null values are not valid for the generated
-    # MCP input schema. Absence preserves the current persisted value.
-    for raster_field in _RASTER_BINDING_FIELDS:
-        if patch.get(raster_field) is None:
-            patch.pop(raster_field, None)
-
-    normalized["patch"] = patch
-    for raster_field in _RASTER_BINDING_FIELDS:
-        normalized.pop(raster_field, None)
-    normalized.update(patch)
-    return normalized
-
-
-def _normalize_report_settings_arguments(arguments: Mapping[str, object]) -> dict[str, object]:
-    """Map generic provider settings verbs to the typed settings operations."""
-    normalized = dict(arguments)
-    operation = str(normalized.get("operation", "")).strip().lower()
-    if operation not in {"update", "set"}:
-        return normalized
-
-    patch = normalized.pop("patch", None)
-    if isinstance(patch, Mapping):
-        for key, value in patch.items():
-            normalized.setdefault(str(key), value)
-
-    if "style_patch" in normalized:
-        normalized["operation"] = "set_matplotlib_style"
-        return normalized
-
-    page_fields = {
-        "size",
-        "width_mm",
-        "height_mm",
-        "orientation",
-        "continuous",
-        "bottom_track_header_enabled",
-        "margin_left_mm",
-        "margin_right_mm",
-        "margin_top_mm",
-        "margin_bottom_mm",
-        "header_height_mm",
-        "track_header_height_mm",
-        "footer_height_mm",
-        "track_gap_mm",
-    }
-    depth_fields = {"unit", "scale", "major_step", "minor_step"}
-    output_fields = {"backend", "output_path", "dpi", "continuous_strip_page_height_mm"}
-    section_fields = {"title", "subtitle", "depth_range"}
-
-    def move_fields(container: str, fields: set[str]) -> None:
-        current = normalized.get(container)
-        payload = dict(current) if isinstance(current, Mapping) else {}
-        for field_name in fields:
-            if field_name in normalized:
-                payload[field_name] = normalized.pop(field_name)
-        if payload:
-            normalized[container] = payload
-
-    if normalized.get("section_id") is not None and any(
-        field_name in normalized for field_name in section_fields | {"page", "output"}
-    ):
-        normalized["operation"] = "set_section_view"
-        move_fields("page", page_fields)
-        move_fields("output", output_fields)
-        return normalized
-    if "page" in normalized or any(field_name in normalized for field_name in page_fields):
-        normalized["operation"] = "set_page"
-        move_fields("page", page_fields)
-        return normalized
-    if "output" in normalized or any(field_name in normalized for field_name in output_fields):
-        normalized["operation"] = "set_output"
-        move_fields("output", output_fields)
-        return normalized
-    if "depth" in normalized or any(field_name in normalized for field_name in depth_fields):
-        normalized["operation"] = "set_depth"
-        move_fields("depth", depth_fields)
-        return normalized
-
-    normalized["operation"] = "set_report"
-    move_fields("patch", {"title", "subtitle"})
     return normalized
 
 
@@ -2931,35 +2659,45 @@ class AuthoringSession:
                 draft_logfile=draft_logfile,
                 intent=packet_header_intent,
             )
+        # Structural preflight should prove that the draft is loadable without
+        # injecting a full document snapshot into the host/provider context.
         preflight_result = await session.call_tool(
-            "inspect_authoring",
+            "validate_logfile",
             {
                 "logfile_path": draft_logfile,
-                "object_kind": "section",
-                "detail": "full",
+                "level": "structural",
             },
         )
-        _require_mcp_success(preflight_result, action="inspect_authoring")
+        _require_mcp_success(preflight_result, action="validate_logfile(structural)")
+        preflight_payload = _structured_content(preflight_result)
+        if preflight_payload.get("valid") is not True:
+            raise RuntimeError(
+                "The stable draft failed structural validation before provider execution: "
+                + "; ".join(str(item) for item in preflight_payload.get("errors", []))
+            )
+
+        tool_definitions = self.runtime.build_tool_definitions(
+            mcp_tools,
+            allowed_names=set(STABLE_MCP_TOOL_NAMES),
+            excluded_names=(
+                {"edit_header"}
+                if preflight_header_result is not None
+                else set()
+            ),
+        )
+        allowed_names = {tool.name for tool in tool_definitions}
         stable_tool_outcomes: list[dict[str, object]] = []
         if preflight_header_outcome is not None:
             stable_tool_outcomes.append(preflight_header_outcome)
         stable_tool_errors: list[str] = []
-        scope_tools = _stable_scope_tool_names(goal)
-        execution_stages = _stable_execution_stages(
-            goal,
-            scope_tools,
-            header_preflight_applied=preflight_header_result is not None,
-        )
-        active_allowed_names: set[str] = set()
-        active_stage: _StableExecutionStage | None = None
         mutation_counts: Counter[str] = Counter()
         controller_status: str | None = None
         controller_message = ""
         consecutive_tool_errors = 0
         repeated_error_count = 0
         last_error_signature: tuple[str, str] | None = None
-        no_progress_calls = 0
-        catalog_fallback_attempted = False
+        read_signature_counts: Counter[tuple[str, str]] = Counter()
+        repeated_read_only_calls = 0
         singular_remarks_request = bool(
             re.search(r"\badd\s+(?:one|a|an)\b[^.\n]*\b(?:remarks?|notes?)\b", goal, re.I)
         )
@@ -2976,7 +2714,7 @@ class AuthoringSession:
         mutation_names = set(_STABLE_MUTATION_TOOL_NAMES)
 
         def rejected_tool_payload(message: str) -> dict[str, object]:
-            """Record one host-rejected call and apply the same circuit breaker."""
+            """Record one host-rejected call and apply the error circuit breaker."""
             nonlocal controller_message
             nonlocal controller_status
             nonlocal consecutive_tool_errors
@@ -3000,7 +2738,7 @@ class AuthoringSession:
             feedback = {
                 "status": controller_status or "continue",
                 "message": controller_message
-                or "Correct the tool arguments and continue with the requested scope.",
+                or "Correct the tool arguments and continue with the requested work.",
             }
             payload: dict[str, object] = {
                 "is_error": True,
@@ -3055,9 +2793,8 @@ class AuthoringSession:
             nonlocal controller_status
             nonlocal consecutive_tool_errors
             nonlocal last_error_signature
-            nonlocal no_progress_calls
             nonlocal repeated_error_count
-            nonlocal catalog_fallback_attempted
+            nonlocal repeated_read_only_calls
 
             if controller_status in {"blocked", "completed"}:
                 return {
@@ -3072,6 +2809,7 @@ class AuthoringSession:
                         "message": controller_message,
                     },
                 }
+
             call_arguments = _normalize_stable_tool_arguments(name, arguments)
             if "source_path" in call_arguments:
                 call_arguments["source_path"] = _resolve_requested_source_path(
@@ -3079,6 +2817,7 @@ class AuthoringSession:
                     request_text=goal,
                     server_root=self.runtime.server_root,
                 )
+
             section_scoped_tools = {
                 "edit_report_settings",
                 "edit_section",
@@ -3094,48 +2833,17 @@ class AuthoringSession:
                 and len(baseline_document.sections) == 1
             ):
                 call_arguments["section_id"] = baseline_document.sections[0].id
-            if staged_execution and active_stage is not None:
-                current_stage_index = execution_stages.index(active_stage)
-                later_stage_mutations = set().union(
-                    *(
-                        stage.mutation_names
-                        for stage in execution_stages[current_stage_index + 1 :]
-                    )
-                )
-                stage_has_persisted_mutation = (
-                    sum(mutation_counts.values()) > stage_mutations_before
-                )
-                if (
-                    current_stage_index < len(execution_stages) - 1
-                    and stage_has_persisted_mutation
-                    and name in later_stage_mutations
-                ):
-                    message = (
-                        f"The `{active_stage.id}` stage has persisted its structural changes. "
-                        "The requested content mutation will be handled in the next stage."
-                    )
-                    return {
-                        "ok": True,
-                        "agent_feedback": {
-                            "status": "stage_complete",
-                            "message": message,
-                        },
-                        "_agent_control": {
-                            "action": "stop",
-                            "status": "stage_complete",
-                            "message": message,
-                        },
-                    }
-            if name not in active_allowed_names:
-                stage_label = active_stage.id if active_stage is not None else "authoring"
-                message = f"Tool `{name}` is not available during the `{stage_label}` stage."
-                return rejected_tool_payload(message)
-            if scope_tools is not None and name in mutation_names and name not in scope_tools:
-                message = f"Tool `{name}` is outside the explicit request scope."
-                return rejected_tool_payload(message)
+
+            if name not in allowed_names:
+                return rejected_tool_payload(f"Tool `{name}` is not in the stable MCP profile.")
+
+            # Keep only narrow cardinality protection that is explicit in the user
+            # request. Do not infer a mutation whitelist from natural language.
             if singular_remarks_request and name == "edit_remarks" and mutation_counts[name] >= 1:
-                message = "The request allows one new remarks block; do not add another."
-                return rejected_tool_payload(message)
+                return rejected_tool_payload(
+                    "The request allows one new remarks block; do not add another."
+                )
+
             if name == "inspect_authoring":
                 object_kind_aliases = {
                     "header": "header_slot",
@@ -3166,6 +2874,7 @@ class AuthoringSession:
                 name == "inspect_source" and call_arguments.get("source_path") is not None
             ):
                 call_arguments.setdefault("logfile_path", draft_logfile)
+
             try:
                 result = await session.call_tool(name, call_arguments)
                 payload = self.runtime.tool_result_payload(result)
@@ -3174,6 +2883,7 @@ class AuthoringSession:
                     "is_error": True,
                     "error": f"{type(exc).__name__}: {exc}",
                 }
+
             stable_tool_outcomes.append(
                 {
                     "name": name,
@@ -3181,25 +2891,21 @@ class AuthoringSession:
                     "payload": payload,
                 }
             )
-            repeated_read_only_call = name not in mutation_names and any(
-                previous.get("name") == name
-                and previous.get("arguments") == call_arguments
-                for previous in stable_tool_outcomes[:-1]
-            )
             if payload.get("is_error") is True:
                 stable_tool_errors.append(
                     f"{name} failed: {payload.get('error', 'MCP returned an error result.')}"
                 )
+
             structured = payload.get("structured")
-            if (
-                isinstance(structured, Mapping)
+            changed = (
+                name in mutation_names
+                and isinstance(structured, Mapping)
                 and structured.get("changed") is True
-                and name in mutation_names
-            ):
+            )
+            if changed:
                 mutation_counts[name] += 1
-                no_progress_calls = 0
-            else:
-                no_progress_calls += 1
+                read_signature_counts.clear()
+                repeated_read_only_calls = 0
 
             if payload.get("is_error") is True:
                 consecutive_tool_errors += 1
@@ -3214,15 +2920,26 @@ class AuthoringSession:
                 repeated_error_count = 0
                 last_error_signature = None
 
+            repeated_read_only_call = False
+            if payload.get("is_error") is not True and name not in mutation_names:
+                signature = (
+                    name,
+                    json.dumps(call_arguments, sort_keys=True, separators=(",", ":"), default=str),
+                )
+                read_signature_counts[signature] += 1
+                repeated_read_only_calls = max(
+                    repeated_read_only_calls,
+                    read_signature_counts[signature] - 1,
+                )
+                repeated_read_only_call = read_signature_counts[signature] >= 2
+
             feedback: dict[str, object] = {
                 "status": "continue",
                 "message": (
-                    "Continue only if the next tool call makes measurable progress. "
-                    "Use the current persisted state and returned before/after evidence."
+                    "Continue only if the next tool call advances the request. "
+                    "Reuse successful inspection results instead of requesting the same state again."
                 ),
             }
-            if active_stage is not None:
-                feedback["stage"] = active_stage.id
             if payload.get("is_error") is True and name == "edit_track":
                 error_text = str(payload.get("error", ""))
                 operation = str(call_arguments.get("operation") or "").strip().lower()
@@ -3230,9 +2947,8 @@ class AuthoringSession:
                     feedback["message"] = (
                         "The requested track does not exist. For a requested new track, "
                         "call edit_track with operation='add', use track_id as the new id, "
-                        "and provide title, kind, and width_mm. The add operation appends "
-                        "the track; use operation='move' afterward if placement matters. "
-                        "Do not retry update for this missing track."
+                        "and provide title, kind, and width_mm. Do not retry update for this "
+                        "missing track."
                     )
                 elif "section_id" in error_text:
                     feedback["message"] = (
@@ -3244,75 +2960,21 @@ class AuthoringSession:
                 if operation == "add":
                     feedback["message"] = (
                         "A section add requires a complete section object with a non-empty "
-                        "tracks list. If the requested section should copy an existing "
-                        "section, call replicate_section_structure with the source and "
-                        "target section ids, then edit the copied tracks and bindings."
+                        "tracks list. To clone an existing section, use "
+                        "replicate_section_structure instead."
                     )
             if payload.get("is_error") is True and name == "edit_report_settings":
                 feedback["message"] = (
-                    "Use one typed settings operation: set_report for report title/subtitle, "
-                    "set_page for page settings, set_output for output settings, set_depth "
-                    "for the depth axis, set_section_view for section title/subtitle/window, "
-                    "or set_matplotlib_style for report-wide drawing style."
+                    "Use one declared settings operation and the fields shown by its MCP schema. "
+                    "Do not invent legacy settings verbs."
                 )
             if repeated_read_only_call and payload.get("is_error") is not True:
                 feedback["message"] = (
-                    "This identical read-only inspection already succeeded. Do not repeat it. "
-                    "Use its returned state and call the relevant edit_* mutation now; "
-                    "preserve any values not requested by the user."
+                    "This exact read-only call already succeeded for the current draft state. "
+                    "Reuse the prior result. Make the relevant mutation or choose a different "
+                    "inspection only if it provides new information."
                 )
-            requested_mutations = (
-                sorted(scope_tools & mutation_names) if scope_tools is not None else []
-            )
-            has_persisted_mutation = any(
-                outcome.get("name") in mutation_names
-                and isinstance(outcome.get("payload"), Mapping)
-                and isinstance(outcome["payload"].get("structured"), Mapping)
-                and outcome["payload"]["structured"].get("changed") is True
-                for outcome in stable_tool_outcomes
-            )
-            if (
-                payload.get("is_error") is not True
-                and no_progress_calls >= 3
-                and requested_mutations
-                and not has_persisted_mutation
-                and not catalog_fallback_attempted
-            ):
-                feedback["message"] = (
-                    "Several read-only inspections have succeeded without a persisted mutation. "
-                    "Stop repeating inspection tools and execute the requested mutation now. "
-                    f"Requested mutation families: {', '.join(requested_mutations)}. "
-                    "For a new track, use edit_track with operation='add', then use "
-                    "operation='move' if placement was requested; bind curves only after "
-                    "the target track exists."
-                )
-                if _catalog_fallback_section_id(goal, baseline_document) is None:
-                    feedback["message"] = (
-                        str(feedback["message"])
-                        + " This request spans multiple sections or has no resolvable target; "
-                        "do not use single-section catalog recovery."
-                    )
-                else:
-                    catalog_fallback_attempted = True
-                    fallback_succeeded, fallback_message = (
-                        await self._execute_catalog_fallback(
-                            session=session,
-                            draft_logfile=draft_logfile,
-                            goal=goal,
-                            stable_tool_outcomes=stable_tool_outcomes,
-                            stable_tool_errors=stable_tool_errors,
-                        )
-                    )
-                    if fallback_succeeded:
-                        controller_status = "completed"
-                        controller_message = fallback_message
-                        no_progress_calls = 0
-                    else:
-                        feedback["message"] = (
-                            str(feedback["message"])
-                            + " Catalog recovery was not applied: "
-                            + fallback_message
-                        )
+
             remaining: list[str] | None = None
             if payload.get("is_error") is not True and has_checkable_postconditions:
                 try:
@@ -3325,6 +2987,7 @@ class AuthoringSession:
                 except Exception as exc:  # noqa: BLE001 - return feedback to the provider
                     remaining = [f"Postcondition inspection failed: {type(exc).__name__}: {exc}"]
                 feedback["remaining_postconditions"] = remaining
+
             if payload.get("is_error") is True and (
                 consecutive_tool_errors >= 3 or repeated_error_count >= 2
             ):
@@ -3333,21 +2996,19 @@ class AuthoringSession:
                     "The feedback loop stopped after repeated MCP tool errors. "
                     f"Last failure: {payload.get('error', 'unknown MCP error')}"
                 )
-            elif no_progress_calls >= 6:
-                controller_status = "blocked"
-                controller_message = (
-                    "The feedback loop stopped after six tool calls without a persisted "
-                    "mutation. Inspect the reported state and retry with a smaller request."
+            elif repeated_read_only_call:
+                signature = (
+                    name,
+                    json.dumps(call_arguments, sort_keys=True, separators=(",", ":"), default=str),
                 )
-            elif (
-                isinstance(structured, Mapping)
-                and structured.get("changed") is True
-                and has_checkable_postconditions
-                and (
-                    active_stage is None
-                    or active_stage is execution_stages[-1]
-                )
-            ):
+                if read_signature_counts[signature] >= 3:
+                    controller_status = "blocked"
+                    controller_message = (
+                        "The feedback loop stopped after the same successful read-only tool call "
+                        "was repeated three times without an intervening mutation. Reuse the "
+                        "inspection result instead of polling unchanged state."
+                    )
+            elif changed and has_checkable_postconditions:
                 if remaining is not None and not remaining:
                     controller_status = "completed"
                     controller_message = (
@@ -3370,130 +3031,38 @@ class AuthoringSession:
 
         instructions = (
             "You are the wellplot authoring agent. Use only the supplied stable MCP tools. "
-            "The draft has already been created at the supplied logfile path. Inspect the "
-            "current canonical objects or source before editing. Preserve unspecified values "
-            "and objects. After every mutation, use its returned before/after evidence; if a "
-            "tool reports an error, correct the arguments instead of claiming success. "
-            "For a new section copied from an existing section, use "
-            "replicate_section_structure; do not synthesize an incomplete section object. "
+            "The draft has already been created at the supplied logfile path. Inspect only "
+            "the state needed to identify a target or source channel; do not repeat an "
+            "identical successful inspection while the draft is unchanged. Preserve "
+            "unspecified values and objects. Prefer the smallest direct mutation that satisfies "
+            "the request. After every mutation, use its returned before/after evidence; if a "
+            "tool reports an error, correct the arguments instead of claiming success. For a "
+            "new section copied from an existing section, use replicate_section_structure. "
             "Finish only after validation and a concise report of completed and blocked work."
         )
-        staged_execution = len(execution_stages) > 1
-        stage_results: list[ProviderRunResult] = []
-        stage_reports: list[dict[str, object]] = []
-        for stage in execution_stages:
-            active_stage = stage
-            if staged_execution:
-                active_allowed_names = set(_STABLE_READ_ONLY_TOOL_NAMES | stage.mutation_names)
-            else:
-                active_allowed_names = set(STABLE_MCP_TOOL_NAMES)
-                if preflight_header_result is not None:
-                    active_allowed_names.discard("edit_header")
-            stage_tool_definitions = self.runtime.build_tool_definitions(
-                mcp_tools,
-                allowed_names=active_allowed_names,
+        try:
+            provider_result = await self.backend.run_authoring(
+                instructions=instructions,
+                initial_user_message=(f"Draft: {draft_logfile}\n\nRequest:\n{goal}"),
+                tool_definitions=tool_definitions,
+                tool_caller=tool_caller,
+                max_rounds=max_rounds,
             )
-            stage_mutations_before = sum(mutation_counts.values())
-            stage_instructions = instructions
-            stage_message = f"Draft: {draft_logfile}\n\nRequest:\n{goal}"
-            if staged_execution:
-                stage_instructions = (
-                    f"{instructions}\n\n"
-                    f"Current execution stage: {stage.id}. {stage.summary} "
-                    "Complete only this stage before returning control. Do not spend the "
-                    "turn repeating an identical inspection: once the needed state is known, "
-                    "make the next permitted mutation. The host validates the draft between "
-                    "stages, so do not request preview, render, or final validation tools."
-                )
-                stage_message = (
-                    f"Draft: {draft_logfile}\n\n"
-                    f"Stage `{stage.id}`: {stage.summary}\n\n"
-                    "Only tools for this stage are available. The full request is included "
-                    "for values and identities; defer work owned by later stages.\n\n"
-                    f"Full request:\n{goal}"
-                )
-            try:
-                stage_result = await self.backend.run_authoring(
-                    instructions=stage_instructions,
-                    initial_user_message=stage_message,
-                    tool_definitions=stage_tool_definitions,
-                    tool_caller=tool_caller,
-                    max_rounds=max_rounds,
-                )
-            except ProviderAdapterError as exc:
-                stage_facts = dict(exc.report_facts)
-                stage_facts.setdefault("warnings", []).append(f"Provider error: {exc}")
-                stage_result = ProviderRunResult(
-                    final_text=exc.final_text,
-                    tool_trace=exc.tool_trace,
-                    report_facts=stage_facts,
-                )
-            except Exception as exc:
-                stage_result = ProviderRunResult(
-                    final_text="",
-                    tool_trace=(),
-                    report_facts={
-                        "warnings": [f"Provider error: {type(exc).__name__}: {exc}"],
-                        "reasons": ["The stable provider loop stopped before completion."],
-                    },
-                )
-
-            stage_results.append(stage_result)
-            stage_mutation_count = sum(mutation_counts.values()) - stage_mutations_before
-            stage_report = {
-                "id": stage.id,
-                "summary": stage.summary,
-                "mutation_count": stage_mutation_count,
-                "status": controller_status or "provider_finished",
-            }
-            stage_reports.append(stage_report)
-            stage_warnings = stage_result.report_facts.get("warnings", [])
-            provider_stage_failed = isinstance(stage_warnings, list) and any(
-                isinstance(item, str) and item.startswith("Provider error:")
-                for item in stage_warnings
-            )
-            if provider_stage_failed or controller_status in {"blocked", "completed"}:
-                break
-            if stage.id == "structure" and stage_mutation_count == 0:
-                controller_status = "blocked"
-                controller_message = (
-                    "The structural stage completed without a persisted section or track "
-                    "mutation. Inspect the current structure once, then create, update, move, "
-                    "or replicate the requested form objects before binding content."
-                )
-                stage_report["status"] = controller_status
-                break
-
-        if stage_results:
-            combined_facts: dict[str, object] = {}
-            for stage_result in stage_results:
-                for key, value in stage_result.report_facts.items():
-                    if key in {"completed", "not_done", "reasons", "warnings"}:
-                        existing = combined_facts.get(key, [])
-                        if not isinstance(existing, list):
-                            existing = []
-                        if isinstance(value, list):
-                            combined_facts[key] = [*existing, *value]
-                        else:
-                            combined_facts[key] = existing
-                    else:
-                        combined_facts[key] = value
-            combined_facts["stable_execution_stages"] = stage_reports
+        except ProviderAdapterError as exc:
+            report_facts = dict(exc.report_facts)
+            report_facts.setdefault("warnings", []).append(f"Provider error: {exc}")
             provider_result = ProviderRunResult(
-                final_text=stage_results[-1].final_text,
-                tool_trace=tuple(
-                    tool_call
-                    for stage_result in stage_results
-                    for tool_call in stage_result.tool_trace
-                ),
-                report_facts=combined_facts,
+                final_text=exc.final_text,
+                tool_trace=exc.tool_trace,
+                report_facts=report_facts,
             )
-        else:
+        except Exception as exc:
             provider_result = ProviderRunResult(
                 final_text="",
                 tool_trace=(),
                 report_facts={
-                    "reasons": ["The stable provider loop did not start an execution stage."],
+                    "warnings": [f"Provider error: {type(exc).__name__}: {exc}"],
+                    "reasons": ["The stable provider loop stopped before completion."],
                 },
             )
         report_facts = dict(provider_result.report_facts)
@@ -3535,49 +3104,11 @@ class AuthoringSession:
         provider_failed = isinstance(warnings, list) and any(
             isinstance(item, str) and item.startswith("Provider error:") for item in warnings
         )
-        if (
-            not provider_failed
-            and not catalog_fallback_attempted
-            and _catalog_fallback_section_id(goal, baseline_document) is not None
-            and (catalog_channel_candidates(goal) or is_track_request(goal))
-        ):
-            catalog_fallback_attempted = True
-            fallback_succeeded, fallback_message = await self._execute_catalog_fallback(
-                session=session,
-                draft_logfile=draft_logfile,
-                goal=goal,
-                stable_tool_outcomes=stable_tool_outcomes,
-                stable_tool_errors=stable_tool_errors,
-            )
-            report_facts = dict(provider_result.report_facts)
-            report_facts["catalog_recovery"] = fallback_message
-            if fallback_succeeded:
-                controller_status = "completed"
-                controller_message = fallback_message
-                completed = report_facts.get("completed", [])
-                if not isinstance(completed, list):
-                    completed = []
-                completed.append(fallback_message)
-                report_facts["completed"] = completed
-            else:
-                controller_status = "blocked"
-                controller_message = fallback_message
-                not_done = report_facts.get("not_done", [])
-                if not isinstance(not_done, list):
-                    not_done = []
-                not_done.append("Reconcile the catalog-defined track request deterministically.")
-                report_facts["not_done"] = not_done
-                reasons = report_facts.get("reasons", [])
-                if not isinstance(reasons, list):
-                    reasons = []
-                reasons.append(fallback_message)
-                report_facts["reasons"] = reasons
-            provider_result = replace(provider_result, report_facts=report_facts)
         report_facts["feedback_loop"] = {
             "status": controller_status or "provider_finished",
             "consecutive_tool_errors": consecutive_tool_errors,
             "repeated_error_count": repeated_error_count,
-            "no_progress_calls": no_progress_calls,
+            "repeated_read_only_calls": repeated_read_only_calls,
         }
         provider_result = replace(provider_result, report_facts=report_facts)
         controller_blocked = controller_status == "blocked"

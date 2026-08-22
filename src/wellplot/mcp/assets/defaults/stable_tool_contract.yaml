@@ -66,41 +66,34 @@ tools:
       page: object
       output: object
       depth: object
-      view: object
       depth_range: object
-      depth_range_unit: string
-      unit: string
-      scale: object
-      major_step: number
-      minor_step: number
       style_patch: object
   - id: edit_remarks
     description: 'Remarks operations: add=remark{title,text,lines,alignment}; update=remark_id+patch; remove/move=remark_id; clear=all.'
     mode: mutation
     operations: [add, update, remove, move, clear]
-    canonical_fields: remark
     destructive: true
     fields:
       remark_id: string
       new_index: index
       remark: object
-      remarks: object_list
       patch: object
   - id: edit_section
     description: Create, update, remove, or move one report section. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.
     mode: mutation
     operations: [add, update, remove, move]
-    canonical_fields: section
     destructive: true
     fields:
       section_id: string
       new_index: index
       section: object
+      title: string
+      subtitle: string
+      depth_range: object
   - id: replicate_section_structure
     description: Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks.
     mode: mutation
     operations: [replicate]
-    canonical_fields: section
     fields:
       source_section_id: string
       target_section_id: string
@@ -142,8 +135,6 @@ tools:
       track_id: string
       binding_id: string
       channel: string
-      binding: object
-      patch: object
       label: string
       style: object
       scale: object
@@ -161,8 +152,6 @@ tools:
       track_id: string
       binding_id: string
       channel: string
-      binding: object
-      patch: object
       label: string
       style: object
       profile: string
@@ -187,8 +176,6 @@ tools:
       alpha: number
       crossover: object
       channel: string
-      fill: object
-      patch: object
   - id: edit_annotation
     description: Add, update, remove, or clear typed annotations.
     mode: mutation

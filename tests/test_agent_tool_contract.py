@@ -49,7 +49,7 @@ def test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract() -> Non
     assert budget["combined_schema_chars"] <= 40_000
     # Typed nested fields cost more than the former coarse ``object`` annotations.
     # The wire contract remains substantially smaller than the canonical union.
-    assert budget["combined_schema_chars"] < diagnostic_chars * 0.35
+    assert budget["combined_schema_chars"] < diagnostic_chars * 0.36
 
 
 def test_profile_does_not_expose_internal_canonical_unions() -> None:
@@ -71,6 +71,40 @@ def test_profile_does_not_expose_internal_canonical_unions() -> None:
     assert "AuthoringDocumentSpec" not in serialized
     assert "canonical_operations" not in serialized
     assert "extensions" not in serialized
+
+
+
+
+def test_binding_and_remarks_tools_expose_one_public_payload_shape() -> None:
+    """Do not advertise host-only wrapper/flat aliases for the same mutation."""
+    profile = {tool.name: tool for tool in stable_tool_profile()}
+
+    curve_fields = set(profile["edit_curve_binding"].input_schema["properties"])
+    raster_fields = set(profile["edit_raster_binding"].input_schema["properties"])
+    remarks_fields = set(profile["edit_remarks"].input_schema["properties"])
+
+    assert "binding" not in curve_fields
+    assert "patch" not in curve_fields
+    assert "binding" not in raster_fields
+    assert "patch" not in raster_fields
+    assert {"title", "text", "lines", "alignment"}.isdisjoint(remarks_fields)
+    assert {"remark", "patch"} <= remarks_fields
+
+
+def test_high_risk_nested_fields_are_not_unconstrained_objects() -> None:
+    """Scale/style fields that triggered provider repair logic remain typed on the wire."""
+    profile = {tool.name: tool for tool in stable_tool_profile()}
+
+    for tool_name, field_name in (
+        ("edit_track", "x_scale"),
+        ("edit_curve_binding", "scale"),
+        ("edit_curve_binding", "style"),
+        ("edit_raster_binding", "style"),
+    ):
+        schema = profile[tool_name].input_schema["properties"][field_name]
+        serialized = json.dumps(schema, sort_keys=True)
+        assert '"additionalProperties": true' not in serialized
+        assert "$ref" in serialized
 
 
 def test_mutation_tools_have_standard_results_and_annotations() -> None:

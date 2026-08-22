@@ -468,12 +468,14 @@ def collect_architecture_metrics(repo_root: str | Path) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     production_paths = (
         "src/wellplot/agent/core.py",
+        "src/wellplot/agent/tool_contract.py",
         "src/wellplot/agent/compilation.py",
         "src/wellplot/agent/branch_compiler.py",
         "src/wellplot/agent/operation_executor.py",
         "src/wellplot/agent/providers/_openai_chat.py",
         "src/wellplot/agent/providers/_openai_responses.py",
         "src/wellplot/mcp/server.py",
+        "src/wellplot/mcp/stable.py",
         "src/wellplot/mcp/service.py",
     )
     line_counts = {
