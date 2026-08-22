@@ -401,6 +401,11 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
             fields = {"operation": {"type": "string", "enum": operations}, **fields}
             fields["logfile_path"] = _STRING
             required = ["logfile_path", "operation"]
+            required.extend(
+                str(item)
+                for item in entry.get("required", [])
+                if isinstance(item, str) and item not in required
+            )
         else:
             required = [str(item) for item in entry.get("required", [])]
         annotations = {

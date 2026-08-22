@@ -160,10 +160,11 @@ tools:
       alpha: number
       color_limits: object
   - id: edit_fill
-    description: Add, update, remove, or clear a fill relation.
+    description: Add, update, remove, or clear a fill relation. section_id, track_id, and channel are required for every operation; add and update also require kind.
     mode: mutation
     operations: [add, update, remove, clear]
     destructive: true
+    required: [section_id, track_id, channel]
     fields:
       section_id: string
       track_id: string

@@ -138,6 +138,25 @@ def test_remarks_tool_explains_operation_payloads() -> None:
     assert {"title", "text", "lines", "alignment"} <= set(definition["properties"])
 
 
+def test_fill_tool_requires_dispatch_target_fields() -> None:
+    """The fill schema requires fields that every dispatcher branch consumes."""
+    fill = next(tool for tool in stable_tool_profile() if tool.name == "edit_fill")
+
+    assert {"section_id", "track_id", "channel"} <= set(fill.input_schema["required"])
+    with pytest.raises(ValidationError):
+        fill.input_model.model_validate(
+            {
+                "logfile_path": "draft.log.yaml",
+                "operation": "add",
+                "section_id": "main",
+                "track_id": "porosity",
+                "kind": "between_instances",
+                "binding_id": "porosity.nphi",
+                "other_binding_id": "porosity.rhob",
+            }
+        )
+
+
 def test_track_tool_explains_add_and_existing_target_semantics() -> None:
     """Track operation guidance distinguishes creation from edits."""
     track = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
