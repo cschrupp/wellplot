@@ -153,6 +153,45 @@ DEFAULT_ALLOWED_MCP_TOOLS = (
 )
 
 STABLE_MCP_TOOL_NAMES = frozenset(item.name for item in stable_tool_profile())
+_STABLE_READ_ONLY_TOOL_NAMES = frozenset(
+    {
+        "inspect_authoring",
+        "inspect_source",
+        "inspect_vocab",
+    }
+)
+_STABLE_MUTATION_TOOL_NAMES = frozenset(
+    {
+        "edit_header",
+        "edit_report_settings",
+        "edit_remarks",
+        "edit_section",
+        "replicate_section_structure",
+        "edit_track",
+        "edit_curve_binding",
+        "edit_raster_binding",
+        "edit_fill",
+        "edit_annotation",
+    }
+)
+_STABLE_STRUCTURE_MUTATION_TOOL_NAMES = frozenset(
+    {
+        "edit_report_settings",
+        "edit_section",
+        "replicate_section_structure",
+        "edit_track",
+    }
+)
+_STABLE_CONTENT_MUTATION_TOOL_NAMES = frozenset(
+    {
+        "edit_header",
+        "edit_remarks",
+        "edit_curve_binding",
+        "edit_raster_binding",
+        "edit_fill",
+        "edit_annotation",
+    }
+)
 _PHASE_READ_ONLY_TOOLS = frozenset(
     {
         "summarize_logfile_draft",
@@ -724,7 +763,9 @@ def _stable_scope_tool_names(goal: str) -> set[str] | None:
     families = {
         "edit_header": r"\b(?:header|service\s+title)\b",
         "edit_report_settings": (
-            r"\b(?:report\s+title|subtitle|page|output|depth|orientation|layout|settings?)\b"
+            r"\b(?:report\s+(?:title|subtitle|layout|settings)|page\s+"
+            r"(?:size|orientation|layout|settings)|output(?:\s+settings)?|orientation)\b"
+            r"|\bdepth\s+(?:axis|scale|settings?)\b"
         ),
         "edit_remarks": r"\b(?:remarks?|notes?)\b",
         "edit_section": r"\bsections?\b",
@@ -747,6 +788,105 @@ def _stable_scope_tool_names(goal: str) -> set[str] | None:
     if "edit_section" in mentioned:
         mentioned.add("replicate_section_structure")
     return mentioned
+
+
+@dataclass(frozen=True)
+class _StableExecutionStage:
+    """One generic, ordered subset of the stable mutation surface."""
+
+    id: str
+    summary: str
+    mutation_names: frozenset[str]
+
+
+def _stable_request_creates_structure(goal: str) -> bool:
+    """Return whether a request explicitly changes sections or track structure."""
+    expression = re.compile(
+        r"\b(?:add|create|build|insert|remove|delete|move|reorder|replicate|copy)\b"
+        r"[^.\n]{0,120}\b(?:sections?|tracks?)\b",
+        re.IGNORECASE,
+    )
+    return expression.search(goal) is not None
+
+
+def _stable_execution_stages(
+    goal: str,
+    scope_tools: set[str] | None,
+    *,
+    header_preflight_applied: bool,
+) -> tuple[_StableExecutionStage, ...]:
+    """Order mixed structure/content requests without imposing a domain blueprint.
+
+    A mixed request that creates or rearranges form objects before adding content
+    needs different tools at each step. Restricting one provider turn to the
+    relevant generic object family keeps the model from treating repeated
+    inspection as progress while preserving the normal one-turn path for small
+    revisions.
+    """
+    requested_mutations = (
+        set(_STABLE_MUTATION_TOOL_NAMES)
+        if scope_tools is None
+        else set(scope_tools & _STABLE_MUTATION_TOOL_NAMES)
+    )
+    if header_preflight_applied:
+        requested_mutations.discard("edit_header")
+    if not requested_mutations:
+        requested_mutations = set(_STABLE_MUTATION_TOOL_NAMES)
+        if header_preflight_applied:
+            requested_mutations.discard("edit_header")
+
+    structure_mutations = requested_mutations & _STABLE_STRUCTURE_MUTATION_TOOL_NAMES
+    content_mutations = requested_mutations & _STABLE_CONTENT_MUTATION_TOOL_NAMES
+    if (
+        structure_mutations
+        and content_mutations
+        and _stable_request_creates_structure(goal)
+    ):
+        return (
+            _StableExecutionStage(
+                id="structure",
+                summary="Create or reconcile requested sections and tracks.",
+                mutation_names=frozenset(structure_mutations),
+            ),
+            _StableExecutionStage(
+                id="content",
+                summary="Add requested report content and track bindings.",
+                mutation_names=frozenset(content_mutations),
+            ),
+        )
+
+    return (
+        _StableExecutionStage(
+            id="authoring",
+            summary="Apply the requested stable authoring mutations.",
+            mutation_names=frozenset(requested_mutations),
+        ),
+    )
+
+
+def _is_header_only_request(goal: str, intent: _HeaderFillIntent | None) -> bool:
+    """Return whether a request contains header values but no other object scope."""
+    if intent is None or not intent.values:
+        return False
+    non_header_patterns = (
+        r"\bsections?\b",
+        r"\btracks?\b",
+        r"\bcurves?\b",
+        r"\bbindings?\b",
+        r"\b(?:arrays?|rasters?)\b",
+        r"\bremarks?\b",
+        r"\bnotes?\b",
+        r"\bannotations?\b",
+        r"\bpages?\b",
+        r"\boutputs?\b",
+        r"\bdepth(?:\s+axis)?\b",
+        r"\blayout\b",
+        r"\bgrids?\b",
+        r"\bstyles?\b",
+        r"\bscales?\b",
+        r"\bchannels?\b",
+    )
+    return not any(re.search(pattern, goal, re.IGNORECASE) for pattern in non_header_patterns)
 
 
 def _catalog_fallback_section_id(
@@ -869,6 +1009,7 @@ def _normalize_stable_tool_arguments(
             # Source inspection and draft inspection are mutually exclusive.
             # Providers often copy the draft context into every tool call.
             normalized.pop("logfile_path", None)
+            normalized.pop("section_id", None)
         return normalized
     if name == "edit_report_settings":
         return _normalize_report_settings_arguments(normalized)
@@ -1507,7 +1648,12 @@ def _build_user_report(
             "and available channels."
         )
 
-    if not done and tool_trace and not bool(report_facts.get("authoritative_completed")):
+    if (
+        not done
+        and tool_trace
+        and not bool(report_facts.get("authoritative_completed"))
+        and not bool(report_facts.get("rolled_back"))
+    ):
         done.append(
             "Executed deterministic tools: "
             + ", ".join(item.name for item in tool_trace[:3])
@@ -1999,6 +2145,48 @@ def _request_source_paths(text: str, source_slots: Mapping[str, str]) -> dict[st
     return paths
 
 
+def _resolve_requested_source_path(
+    source_path: object,
+    *,
+    request_text: str,
+    server_root: Path,
+) -> object:
+    """Resolve a provider source basename from the request's declared files."""
+    if not isinstance(source_path, str) or not source_path.strip():
+        return source_path
+
+    raw_path = source_path.strip()
+    if "://" in raw_path:
+        return source_path
+
+    candidate = Path(raw_path.replace("\\", "/")).expanduser()
+    if candidate.is_absolute():
+        if candidate.is_file():
+            return source_path
+    elif (server_root / candidate).is_file():
+        return candidate.as_posix()
+
+    declared = _request_source_paths(
+        request_text,
+        _parse_source_slot_mapping(request_text),
+    )
+    matches = [
+        declared_path
+        for declared_path in declared.values()
+        if Path(declared_path.replace("\\", "/")).name.casefold()
+        == candidate.name.casefold()
+    ]
+    if len(matches) != 1:
+        return source_path
+
+    resolved = Path(matches[0].replace("\\", "/")).expanduser()
+    if resolved.is_absolute():
+        return resolved.as_posix() if resolved.is_file() else source_path
+    if (server_root / resolved).is_file():
+        return resolved.as_posix()
+    return source_path
+
+
 def _source_format_for_path(source_path: str) -> str:
     """Infer a safe inspection format from a source filename."""
     suffix = Path(source_path).suffix.lower()
@@ -2451,16 +2639,17 @@ class AuthoringSession:
         current_draft_text = output_path.read_text(encoding="utf-8")
         changed = current_draft_text != baseline_draft_text
         summary_lines: list[str] = []
-        for outcome in stable_tool_outcomes:
-            payload = outcome.get("payload")
-            if not isinstance(payload, Mapping):
-                continue
-            structured = payload.get("structured")
-            if not isinstance(structured, Mapping) or structured.get("changed") is not True:
-                continue
-            summary_lines.append(
-                f"Applied stable MCP tool `{outcome.get('name', 'unknown')}` to the draft."
-            )
+        if not bool(report_facts.get("rolled_back")):
+            for outcome in stable_tool_outcomes:
+                payload = outcome.get("payload")
+                if not isinstance(payload, Mapping):
+                    continue
+                structured = payload.get("structured")
+                if not isinstance(structured, Mapping) or structured.get("changed") is not True:
+                    continue
+                summary_lines.append(
+                    f"Applied stable MCP tool `{outcome.get('name', 'unknown')}` to the draft."
+                )
         if changed and not summary_lines:
             summary_lines.append("Persisted stable MCP authoring changes to the draft.")
         change_summary_payload = {
@@ -2722,6 +2911,17 @@ class AuthoringSession:
         preflight_header_result: ProviderRunResult | None = None
         preflight_header_outcome: dict[str, object] | None = None
         packet_header_intent = _extract_packet_header_fill_intent(goal)
+        if _is_header_only_request(goal, packet_header_intent):
+            return await self._run_stable_header_fill(
+                session=session,
+                draft_logfile=draft_logfile,
+                request_kind=request_kind,
+                goal=goal,
+                example_id=example_id,
+                source_logfile_path=source_logfile_path,
+                baseline_draft_text=baseline_draft_text,
+                intent=packet_header_intent,
+            )
         if packet_header_intent is not None and packet_header_intent.values:
             (
                 preflight_header_result,
@@ -2740,21 +2940,18 @@ class AuthoringSession:
             },
         )
         _require_mcp_success(preflight_result, action="inspect_authoring")
-        tool_definitions = self.runtime.build_tool_definitions(
-            mcp_tools,
-            allowed_names=set(STABLE_MCP_TOOL_NAMES),
-            excluded_names=(
-                {"edit_header"}
-                if preflight_header_result is not None
-                else set()
-            ),
-        )
-        allowed_names = {tool.name for tool in tool_definitions}
         stable_tool_outcomes: list[dict[str, object]] = []
         if preflight_header_outcome is not None:
             stable_tool_outcomes.append(preflight_header_outcome)
         stable_tool_errors: list[str] = []
         scope_tools = _stable_scope_tool_names(goal)
+        execution_stages = _stable_execution_stages(
+            goal,
+            scope_tools,
+            header_preflight_applied=preflight_header_result is not None,
+        )
+        active_allowed_names: set[str] = set()
+        active_stage: _StableExecutionStage | None = None
         mutation_counts: Counter[str] = Counter()
         controller_status: str | None = None
         controller_message = ""
@@ -2776,18 +2973,7 @@ class AuthoringSession:
                 re.IGNORECASE,
             )
         )
-        mutation_names = {
-            "edit_header",
-            "edit_report_settings",
-            "edit_remarks",
-            "edit_section",
-            "replicate_section_structure",
-            "edit_track",
-            "edit_curve_binding",
-            "edit_raster_binding",
-            "edit_fill",
-            "edit_annotation",
-        }
+        mutation_names = set(_STABLE_MUTATION_TOOL_NAMES)
 
         def rejected_tool_payload(message: str) -> dict[str, object]:
             """Record one host-rejected call and apply the same circuit breaker."""
@@ -2887,6 +3073,12 @@ class AuthoringSession:
                     },
                 }
             call_arguments = _normalize_stable_tool_arguments(name, arguments)
+            if "source_path" in call_arguments:
+                call_arguments["source_path"] = _resolve_requested_source_path(
+                    call_arguments["source_path"],
+                    request_text=goal,
+                    server_root=self.runtime.server_root,
+                )
             section_scoped_tools = {
                 "edit_report_settings",
                 "edit_section",
@@ -2902,8 +3094,41 @@ class AuthoringSession:
                 and len(baseline_document.sections) == 1
             ):
                 call_arguments["section_id"] = baseline_document.sections[0].id
-            if name not in allowed_names:
-                message = f"Tool `{name}` is not in the stable MCP profile."
+            if staged_execution and active_stage is not None:
+                current_stage_index = execution_stages.index(active_stage)
+                later_stage_mutations = set().union(
+                    *(
+                        stage.mutation_names
+                        for stage in execution_stages[current_stage_index + 1 :]
+                    )
+                )
+                stage_has_persisted_mutation = (
+                    sum(mutation_counts.values()) > stage_mutations_before
+                )
+                if (
+                    current_stage_index < len(execution_stages) - 1
+                    and stage_has_persisted_mutation
+                    and name in later_stage_mutations
+                ):
+                    message = (
+                        f"The `{active_stage.id}` stage has persisted its structural changes. "
+                        "The requested content mutation will be handled in the next stage."
+                    )
+                    return {
+                        "ok": True,
+                        "agent_feedback": {
+                            "status": "stage_complete",
+                            "message": message,
+                        },
+                        "_agent_control": {
+                            "action": "stop",
+                            "status": "stage_complete",
+                            "message": message,
+                        },
+                    }
+            if name not in active_allowed_names:
+                stage_label = active_stage.id if active_stage is not None else "authoring"
+                message = f"Tool `{name}` is not available during the `{stage_label}` stage."
                 return rejected_tool_payload(message)
             if scope_tools is not None and name in mutation_names and name not in scope_tools:
                 message = f"Tool `{name}` is outside the explicit request scope."
@@ -2996,6 +3221,8 @@ class AuthoringSession:
                     "Use the current persisted state and returned before/after evidence."
                 ),
             }
+            if active_stage is not None:
+                feedback["stage"] = active_stage.id
             if payload.get("is_error") is True and name == "edit_track":
                 error_text = str(payload.get("error", ""))
                 operation = str(call_arguments.get("operation") or "").strip().lower()
@@ -3116,6 +3343,10 @@ class AuthoringSession:
                 isinstance(structured, Mapping)
                 and structured.get("changed") is True
                 and has_checkable_postconditions
+                and (
+                    active_stage is None
+                    or active_stage is execution_stages[-1]
+                )
             ):
                 if remaining is not None and not remaining:
                     controller_status = "completed"
@@ -3147,29 +3378,122 @@ class AuthoringSession:
             "replicate_section_structure; do not synthesize an incomplete section object. "
             "Finish only after validation and a concise report of completed and blocked work."
         )
-        try:
-            provider_result = await self.backend.run_authoring(
-                instructions=instructions,
-                initial_user_message=(f"Draft: {draft_logfile}\n\nRequest:\n{goal}"),
-                tool_definitions=tool_definitions,
-                tool_caller=tool_caller,
-                max_rounds=max_rounds,
+        staged_execution = len(execution_stages) > 1
+        stage_results: list[ProviderRunResult] = []
+        stage_reports: list[dict[str, object]] = []
+        for stage in execution_stages:
+            active_stage = stage
+            if staged_execution:
+                active_allowed_names = set(_STABLE_READ_ONLY_TOOL_NAMES | stage.mutation_names)
+            else:
+                active_allowed_names = set(STABLE_MCP_TOOL_NAMES)
+                if preflight_header_result is not None:
+                    active_allowed_names.discard("edit_header")
+            stage_tool_definitions = self.runtime.build_tool_definitions(
+                mcp_tools,
+                allowed_names=active_allowed_names,
             )
-        except ProviderAdapterError as exc:
-            report_facts = dict(exc.report_facts)
-            report_facts.setdefault("warnings", []).append(f"Provider error: {exc}")
+            stage_mutations_before = sum(mutation_counts.values())
+            stage_instructions = instructions
+            stage_message = f"Draft: {draft_logfile}\n\nRequest:\n{goal}"
+            if staged_execution:
+                stage_instructions = (
+                    f"{instructions}\n\n"
+                    f"Current execution stage: {stage.id}. {stage.summary} "
+                    "Complete only this stage before returning control. Do not spend the "
+                    "turn repeating an identical inspection: once the needed state is known, "
+                    "make the next permitted mutation. The host validates the draft between "
+                    "stages, so do not request preview, render, or final validation tools."
+                )
+                stage_message = (
+                    f"Draft: {draft_logfile}\n\n"
+                    f"Stage `{stage.id}`: {stage.summary}\n\n"
+                    "Only tools for this stage are available. The full request is included "
+                    "for values and identities; defer work owned by later stages.\n\n"
+                    f"Full request:\n{goal}"
+                )
+            try:
+                stage_result = await self.backend.run_authoring(
+                    instructions=stage_instructions,
+                    initial_user_message=stage_message,
+                    tool_definitions=stage_tool_definitions,
+                    tool_caller=tool_caller,
+                    max_rounds=max_rounds,
+                )
+            except ProviderAdapterError as exc:
+                stage_facts = dict(exc.report_facts)
+                stage_facts.setdefault("warnings", []).append(f"Provider error: {exc}")
+                stage_result = ProviderRunResult(
+                    final_text=exc.final_text,
+                    tool_trace=exc.tool_trace,
+                    report_facts=stage_facts,
+                )
+            except Exception as exc:
+                stage_result = ProviderRunResult(
+                    final_text="",
+                    tool_trace=(),
+                    report_facts={
+                        "warnings": [f"Provider error: {type(exc).__name__}: {exc}"],
+                        "reasons": ["The stable provider loop stopped before completion."],
+                    },
+                )
+
+            stage_results.append(stage_result)
+            stage_mutation_count = sum(mutation_counts.values()) - stage_mutations_before
+            stage_report = {
+                "id": stage.id,
+                "summary": stage.summary,
+                "mutation_count": stage_mutation_count,
+                "status": controller_status or "provider_finished",
+            }
+            stage_reports.append(stage_report)
+            stage_warnings = stage_result.report_facts.get("warnings", [])
+            provider_stage_failed = isinstance(stage_warnings, list) and any(
+                isinstance(item, str) and item.startswith("Provider error:")
+                for item in stage_warnings
+            )
+            if provider_stage_failed or controller_status in {"blocked", "completed"}:
+                break
+            if stage.id == "structure" and stage_mutation_count == 0:
+                controller_status = "blocked"
+                controller_message = (
+                    "The structural stage completed without a persisted section or track "
+                    "mutation. Inspect the current structure once, then create, update, move, "
+                    "or replicate the requested form objects before binding content."
+                )
+                stage_report["status"] = controller_status
+                break
+
+        if stage_results:
+            combined_facts: dict[str, object] = {}
+            for stage_result in stage_results:
+                for key, value in stage_result.report_facts.items():
+                    if key in {"completed", "not_done", "reasons", "warnings"}:
+                        existing = combined_facts.get(key, [])
+                        if not isinstance(existing, list):
+                            existing = []
+                        if isinstance(value, list):
+                            combined_facts[key] = [*existing, *value]
+                        else:
+                            combined_facts[key] = existing
+                    else:
+                        combined_facts[key] = value
+            combined_facts["stable_execution_stages"] = stage_reports
             provider_result = ProviderRunResult(
-                final_text=exc.final_text,
-                tool_trace=exc.tool_trace,
-                report_facts=report_facts,
+                final_text=stage_results[-1].final_text,
+                tool_trace=tuple(
+                    tool_call
+                    for stage_result in stage_results
+                    for tool_call in stage_result.tool_trace
+                ),
+                report_facts=combined_facts,
             )
-        except Exception as exc:
+        else:
             provider_result = ProviderRunResult(
                 final_text="",
                 tool_trace=(),
                 report_facts={
-                    "warnings": [f"Provider error: {type(exc).__name__}: {exc}"],
-                    "reasons": ["The stable provider loop stopped before completion."],
+                    "reasons": ["The stable provider loop did not start an execution stage."],
                 },
             )
         report_facts = dict(provider_result.report_facts)

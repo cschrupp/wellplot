@@ -203,7 +203,7 @@ Behavior:
 - validates that the depth range has positive height
 - validates requested section ids when provided
 
-### `render_logfile_to_file(logfile_path, output_path, overwrite=False)`
+### `render_logfile(logfile_path, output_path, overwrite=False)`
 
 Purpose: render the full report to an explicit file path.
 
@@ -1362,7 +1362,7 @@ For existing files:
 1. `validate_logfile(...)`
 2. `inspect_logfile(...)`
 3. a narrow preview tool
-4. `render_logfile_to_file(...)` only when you want an artifact on disk
+4. `render_logfile(...)` only when you want an artifact on disk
 
 For new YAML authoring:
 

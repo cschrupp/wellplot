@@ -1,0 +1,57 @@
+{
+  "commands": [
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run python scripts/check_agent_architecture.py --baseline docs/evaluations/mcp-agent/0.6-L0.json > docs/evaluations/mcp-agent/0.6-L1-architecture-check.json"
+  ],
+  "baseline": "/home/user/projects/well_log_os/docs/evaluations/mcp-agent/0.6-L0.json",
+  "checks": [
+    {
+      "name": "baseline_architecture_present",
+      "passed": true
+    },
+    {
+      "name": "correct_document_control_passes",
+      "passed": true
+    },
+    {
+      "name": "wrong_document_control_fails",
+      "passed": true
+    },
+    {
+      "name": "pending_tasks_are_explicit",
+      "passed": true
+    }
+  ],
+  "current": {
+    "agent_python_lines": 12567,
+    "authoring_operation_schema_chars": 104728,
+    "generated_submit_symbol_count": 4,
+    "git_commit": "b21d2b515921cbd6312cfffa98270605d653b06b",
+    "mcp_tool_count": 58,
+    "production_line_counts": {
+      "src/wellplot/agent/branch_compiler.py": 427,
+      "src/wellplot/agent/compilation.py": 1374,
+      "src/wellplot/agent/core.py": 7155,
+      "src/wellplot/agent/operation_executor.py": 624,
+      "src/wellplot/agent/providers/_openai_chat.py": 315,
+      "src/wellplot/agent/providers/_openai_responses.py": 350,
+      "src/wellplot/mcp/server.py": 1314,
+      "src/wellplot/mcp/service.py": 9212
+    },
+    "schema_error": null,
+    "stable_tool_budget": {
+      "combined_schema_chars": 18308,
+      "description_chars": 845,
+      "input_schema_chars": 11271,
+      "output_schema_chars": 6669,
+      "tool_count": 16
+    },
+    "stable_tool_contract_error": null
+  },
+  "deltas_from_baseline": {
+    "agent_python_lines": 257,
+    "authoring_operation_schema_chars": 0,
+    "generated_submit_symbol_count": 0,
+    "mcp_tool_count": 0
+  },
+  "status": "passed"
+}

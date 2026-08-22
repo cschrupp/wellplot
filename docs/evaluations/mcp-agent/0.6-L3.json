@@ -1,0 +1,52 @@
+{
+  "slice": "0.6-L3",
+  "git_commit": "b21d2b515921cbd6312cfffa98270605d653b06b",
+  "working_tree_note": "L3 evidence recorded before commit; unrelated notebook and prior slice changes remain in the worktree.",
+  "objective": "Route natural-language authoring through one bounded stable MCP tool loop with persisted verification evidence.",
+  "architecture": {
+    "agent_python_lines": 12864,
+    "agent_python_lines_delta_from_L2": 297,
+    "mcp_tool_count": 16,
+    "stable_tool_budget": {
+      "tool_count": 16,
+      "input_schema_chars": 9492,
+      "output_schema_chars": 6669,
+      "description_chars": 845,
+      "combined_schema_chars": 16529
+    },
+    "generated_submit_symbol_count": 4,
+    "provider_compiler_removed": false
+  },
+  "compliance": [
+    {
+      "name": "stable_loop_acceptance",
+      "command": "pytest -q tests/test_agent_stable_loop.py tests/test_agent.py tests/test_mcp_stable.py tests/test_mcp_server.py",
+      "status": "passed",
+      "result": "79 passed, 2 skipped"
+    },
+    {
+      "name": "architecture_budget",
+      "command": "python scripts/check_agent_architecture.py --baseline docs/evaluations/mcp-agent/0.6-L2.json",
+      "status": "passed",
+      "result": "297 net production lines; 16 tools; stable schema budget unchanged"
+    },
+    {
+      "name": "ruff",
+      "command": "ruff check and ruff format --check on L3 files",
+      "status": "passed"
+    },
+    {
+      "name": "git_diff_check",
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "live_execution": false,
+  "provider_rounds": "not measured; provider matrix deferred to L6",
+  "known_limitations": [
+    "The old compiler modules and generated submit symbols remain until L5.",
+    "Stable finalization reads section inspection only; richer outcome grading belongs to L4.",
+    "No live provider or notebook acceptance is claimed by this slice."
+  ],
+  "decision": "proceed_to_L4"
+}

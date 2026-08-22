@@ -1,6 +1,12 @@
 # MCP Natural-Language Authoring Plan
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
+
+> **Active implementation sequence:**
+> [MCP Agent Simplification And Recovery Plan](mcp-agent-recovery-plan.md).
+> The earlier provider inventory, desired-state, and branch-operation compiler
+> programs are historical. New work must use the recovery plan's eval, context,
+> tool-count, line-budget, and deletion gates.
 
 ## Summary
 
@@ -233,14 +239,13 @@ family, hierarchy branch, and arbitrary intent paths, then merges partial
 `AuthoringDocumentIntent` fragments before bridging the result back into typed
 service operations.
 
-The active correction is `0.6-K7.4` through `0.6-K7.8` in
-[docs/mcp-implementation-plan.md](mcp-implementation-plan.md). It derives branch
-ownership deterministically, tracks coverage by work-unit id, compiles directly
-into generated canonical service-operation contracts, removes the superseded
-provider fragment path, and closes with cross-domain notebook acceptance. This
-work must reduce permanent compiler complexity and must not add MCP mutation
-tools, provider-specific prompt branches, packet authority, or
-scientific-family special cases.
+The active correction is `0.6-L0` through `0.6-L7` in
+[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md). It first measures
+real end-state capability, then replaces generated provider compilation with a
+small stable MCP tool profile and a simple provider/tool loop. The inventory,
+scoped-intent, branch-operation, and compatibility paths are deleted only after
+the replacement passes deterministic and live-provider gates. Each slice has a
+line budget, context/tool budget, expected metric movement, and stop condition.
 
 The detailed inventory is
 [docs/authoring-contract-inventory.md](authoring-contract-inventory.md).

@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 ## Scope Summary
 
@@ -31,13 +31,22 @@ not require users to understand hidden internal orchestration rules.
 The canonical MCP/agent direction for that mission is documented in
 [docs/mcp-authoring-model.md](mcp-authoring-model.md).
 
+The active agent recovery sequence is
+[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md). It supersedes the
+provider-facing compiler portions of the earlier `0.6-G`, `0.6-J`, and `0.6-K`
+programs. The project is now under an eval-first feature freeze: each agent
+slice must improve a named end-state evaluation or reduce measured complexity,
+and the completed recovery must be a net deletion of production code.
+
 ## Current Release Assessment
 
 The repository contains substantial post-`0.3.0` capability. The deterministic
 `0.6.0` contract foundation passes its focused repository tests, but live
-notebook execution reopened the provider-compilation release gate. Publication
-requires compiler stabilization, unchanged-prompt notebook acceptance, and the
-maintainer release workflow.
+notebook execution reopened the provider-compilation release gate. Existing
+recorded-provider acceptance proves deterministic payload execution, not real
+model tool use. Publication requires the `0.6-L` simplification and evidence
+gates, unchanged-prompt notebook acceptance, and the maintainer release
+workflow.
 
 Current assessment:
 
@@ -49,7 +58,7 @@ Current assessment:
 | Python construction API | implemented | retain with typed compatibility path |
 | Python object editing API | partial | complete before release |
 | MCP deterministic tools | broad capability roster | route through canonical object service |
-| provider-neutral agent | typed execution works, but the normal provider path still compiles scoped partial document intents before bridging back to operations | replace that path with direct hierarchy-scoped service-operation compilation and delete the superseded fragment compiler before release |
+| provider-neutral agent | deterministic execution works, but generated inventories and `submit_*` compiler tools fail with real providers | replace compiler layers with one simple loop over a small stable MCP tool profile, then delete superseded paths |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
 | release metadata | `0.6.0` | publish through the verified release workflow |
 
@@ -164,6 +173,12 @@ before further agent expansion:
    contracts and end-to-end notebook acceptance
 10. `0.6-K`: expose the natural authoring hierarchy and compile bounded
     canonical object operations parent-first
+11. `0.6-L`: replace the unsuccessful provider compiler with an eval-first,
+    simple loop over a small stable MCP tool profile and delete superseded paths
+
+Slices `0.6-A` through `0.6-F` remain the deterministic foundation. The
+provider-facing implementation portions of `0.6-G`, `0.6-J`, and `0.6-K` are
+historical and are superseded by `0.6-L`.
 
 Core direction:
 
@@ -175,25 +190,27 @@ Core direction:
 - defaults fill omissions only
 - explicit user instructions override existing defaults and scaffolds
 - packet assets are scaffolds or regression fixtures, not hidden authority
-- provider-facing compilation contracts should be small and scoped; the full
+- the model-facing MCP tool profile should be small and scoped; the full
   canonical document remains the deterministic validation authority
 - report settings, header content, remarks, sections, tracks, and track content
-  are separate hierarchy contexts; a provider stage sees only one relevant
-  branch and parent
-- providers submit typed object operations, while deterministic code owns YAML
+  are separate tool responsibilities; each inspection or mutation returns only
+  its relevant hierarchy context
+- providers invoke stable MCP tools, while deterministic code owns YAML
   assembly, identities, defaults, dependency ordering, and verification
-- a provider extraction failure must not be reported as an MCP mutation or as
+- a provider tool-use failure must not be reported as an MCP mutation or as
   missing internal user fields
 
 Detailed plans:
 
 - [docs/authoring-contract-inventory.md](authoring-contract-inventory.md)
 - [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
+- [docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md)
 
 Release rule:
 
-- do not publish `0.6.0` until the deterministic contract slices and reopened
-  `0.6-H`, `0.6-I`, `0.6-J`, and `0.6-K` acceptance gates pass
+- do not publish `0.6.0` until the deterministic contract remains green and all
+  `0.6-L` simplification, live-provider, held-out, notebook, deletion, and
+  release gates pass
 
 ## Completed Slice: Experimental MCP Server (2026-04-28)
 
@@ -580,65 +597,22 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- `0.6-K1` is implemented: the generated hierarchy/operation catalog and
-  focused inspection parity are available through the canonical service and
-  MCP resource/tool surface.
-- `0.6-K2` is implemented for bounded canonical mutation parity: stable
-  header-slot and service-title updates now preserve sibling header objects,
-  return typed read-back objects, and are exposed through MCP tools. The
-  canonical-to-legacy adapter also preserves nested header values across
-  reloads.
-- `0.6-K3` has its initial clause-routing contract: inventories normalize
-  hierarchy branches and produce parent-scoped work units that preserve the
-  original clause, explicit values, assertions, and dependencies. Complete
-  the parent-first operation compiler in K4 before removing the old desired
-  state path.
-- `0.6-K4` has its typed branch-operation contract foundation: canonical
-  service request variants are scoped by branch and checked for work-unit
-  coverage and parent-first ordering.
-- `0.6-K5` now has a standalone deterministic transaction executor: branch
-  dependencies are ordered, operations are read back, conflicting retries
-  block, and failed runs do not publish partial documents. The normal agent
-  path remains unchanged until K7 migration and parity acceptance.
-- `0.6-K6` now records typed clause/parent/default context and canonical
-  before/after evidence, exposes deterministic operation outcomes in
-  `AuthoringResult`, and suppresses phase previews until verified mutation.
-- `0.6-K7.1` now provides a generic bridge from reconciliation operations to
-  typed report, structure, scalar, raster, and annotation submissions. It is
-  covered across non-packet-specific object families and keeps the normal
-  agent path unchanged until parity is demonstrated.
-- `0.6-K7.2` now routes typed desired-state execution through the generic
-  bridge, deterministic transaction executor, and verifier. Phase checkpoints
-  and typed before/after evidence feed the existing agent report and preview
-  surface.
-- `0.6-K7.3` closed the public broad provider-to-MCP mutation fallback, but a
-  live notebook run proved that normal natural-language extraction still uses
-  scoped partial `AuthoringDocumentIntent` fragments and redundant
-  provider-authored branch/path metadata before reaching typed execution.
-- Complete corrective slices `0.6-K7.4` through `0.6-K7.8`: characterize the
-  failing path and repair diagnostics, derive hierarchy branches
-  deterministically, compile work units directly into generated service
-  operations, switch and delete the old provider fragment route, and pass the
-  cross-domain/notebook release matrix.
-- Do not run the maintainer release workflow until hierarchical object-operation
-  compilation replaces the normal scoped desired-state path and the unchanged
-  notebook prompts pass canonical read-back acceptance.
-- G2 is implemented: typed desired-state intent models now distinguish omitted,
-  explicit, clear, and remove semantics without adding provider or packet logic.
-- G3 is implemented: contextual alias/source resolution and explicit precedence
-  now return typed decisions and blocking issues without mutating drafts.
-- G4 is implemented: `wellplot.authoring_reconciler` now emits ordered,
-  idempotent typed operations for report/header, sections, tracks, bindings,
-  content, presentation, ordering, and explicit removals. It blocks immutable
-  track-kind and binding-channel changes instead of guessing.
-- G5 is implemented: `wellplot.authoring_executor` applies plans through
-  `AuthoringService`, verifies each persisted postcondition, stops on the first
-  failure, and exposes phase snapshots plus optional previews.
-- G6 deterministic foundation and G7 cross-domain/provider-boundary fixtures,
-  notebook diagnostics, and release checks are implemented. Live provider runs
-  remain manual because credentials and model behavior are external state.
-- Add contract-parity, round-trip, atomic-mutation, contextual-reference,
-  reconciliation, and idempotency tests as release gates.
+- Start `0.6-L0` by freezing agent behavior and recording end-state, context,
+  tool, provider, and code-size baselines for the unchanged notebook prompts.
+- Complete `0.6-L1` and `0.6-L2` only after a stable MCP authoring profile meets
+  its tool-count, schema-size, service-parity, and model-selection gates.
+- Replace natural-language compiler paths with one direct MCP tool loop in
+  `0.6-L3`; do not add LangGraph, memory, generated submission tools, or another
+  fallback route.
+- Make later ergonomic corrections only when a named evaluation fails and a
+  generic cross-domain test proves the correction is not example-specific.
+- Delete superseded inventory, intent, branch compiler, reconciliation bridge,
+  compatibility routing, and their compiler-only fixtures in `0.6-L5`.
+- Run the OpenAI, NVIDIA-compatible, local-compatible, held-out, notebook,
+  package, and documentation gates before release.
+- Do not run the maintainer release workflow until the complete `0.6-L`
+  evidence chain passes and production agent code is at least 2,500 lines below
+  the diagnostic baseline.
 - Maintain release hardening:
   - keep PyPI trusted publishing and post-release install verification healthy
   - clean up remaining workflow maintenance noise such as action runtime deprecation warnings

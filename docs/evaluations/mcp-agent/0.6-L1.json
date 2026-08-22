@@ -1,0 +1,164 @@
+{
+  "commands": [
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run pytest -q tests/test_agent_tool_contract.py tests/test_agent_evals.py",
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run ruff check src/wellplot/agent/tool_contract.py scripts/agent_eval_support.py tests/test_agent_tool_contract.py",
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run ruff format --check src/wellplot/agent/tool_contract.py scripts/agent_eval_support.py tests/test_agent_tool_contract.py",
+    "git diff --check",
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run python scripts/run_agent_evals.py --suite development --mode deterministic --output docs/evaluations/mcp-agent/0.6-L1.json",
+    "env XDG_CACHE_HOME=/tmp/codex-xdg UV_CACHE_DIR=/tmp/codex-uv uv run python scripts/check_agent_architecture.py --baseline docs/evaluations/mcp-agent/0.6-L0.json > docs/evaluations/mcp-agent/0.6-L1-architecture-check.json"
+  ],
+  "architecture": {
+    "agent_python_lines": 12567,
+    "authoring_operation_schema_chars": 104728,
+    "generated_submit_symbol_count": 4,
+    "git_commit": "b21d2b515921cbd6312cfffa98270605d653b06b",
+    "mcp_tool_count": 58,
+    "production_line_counts": {
+      "src/wellplot/agent/branch_compiler.py": 427,
+      "src/wellplot/agent/compilation.py": 1374,
+      "src/wellplot/agent/core.py": 7155,
+      "src/wellplot/agent/operation_executor.py": 624,
+      "src/wellplot/agent/providers/_openai_chat.py": 315,
+      "src/wellplot/agent/providers/_openai_responses.py": 350,
+      "src/wellplot/mcp/server.py": 1314,
+      "src/wellplot/mcp/service.py": 9212
+    },
+    "schema_error": null,
+    "stable_tool_budget": {
+      "combined_schema_chars": 18308,
+      "description_chars": 845,
+      "input_schema_chars": 11271,
+      "output_schema_chars": 6669,
+      "tool_count": 16
+    },
+    "stable_tool_contract_error": null
+  },
+  "controls": [
+    {
+      "name": "correct_document_passes",
+      "result": {
+        "canonical_diff": [],
+        "canonical_document": "<temporary-control-correct>",
+        "errors": [],
+        "kind": "run",
+        "status": "passed",
+        "task_id": "initial_open_hole"
+      }
+    },
+    {
+      "name": "wrong_document_fails",
+      "result": {
+        "canonical_diff": [],
+        "canonical_document": "<temporary-control-wrong>",
+        "errors": [
+          "/sections/0/subtitle: expected 'Interactive LAS tutorial draft', got 'Wrong result'"
+        ],
+        "kind": "run",
+        "status": "failed",
+        "task_id": "initial_open_hole"
+      }
+    }
+  ],
+  "live_execution": false,
+  "mode": "deterministic",
+  "suite": "development",
+  "suite_path": "/home/user/projects/well_log_os/tests/evals/agent_tasks.json",
+  "tasks": [
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "run",
+      "reason": "no persisted document was provided",
+      "status": "not_run",
+      "task_id": "initial_open_hole"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "no persisted document was provided",
+      "status": "not_run",
+      "task_id": "remarks_only"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "natural_language_header_fill"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "sp_overview_curve"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "resistivity_track"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "uncatalogued_scalar_track"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "duplicate_mirrored_fill"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "array_raster_track"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "annotation_objects"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "page_output_depth_settings"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "run",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "flexible_main_repeat_sections"
+    },
+    {
+      "canonical_diff": [],
+      "errors": [],
+      "kind": "revise",
+      "reason": "task is marked pending",
+      "status": "not_run",
+      "task_id": "reject_ambiguous_unavailable_requests"
+    }
+  ]
+}

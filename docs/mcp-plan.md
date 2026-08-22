@@ -58,7 +58,7 @@ complete canonical contract.
 - `preview_section_png(logfile_path, section_id, page_index=0, dpi=144)`
 - `preview_track_png(logfile_path, section_id, track_ids, page_index=0, dpi=144, depth_range=None, depth_range_unit=None)`
 - `preview_window_png(logfile_path, depth_range, depth_range_unit=None, page_index=0, dpi=144, section_ids=None)`
-- `render_logfile_to_file(logfile_path, output_path, overwrite=False)`
+- `render_logfile(logfile_path, output_path, overwrite=False)`
 - `export_example_bundle(example_id, output_dir, overwrite=False)`
 - `create_logfile_draft(output_path, example_id=None, source_logfile_path=None, overwrite=False)`
 - `summarize_logfile_draft(logfile_path)`
@@ -147,7 +147,7 @@ Packaged example ids:
 - Preview tools are read-only and always return in-memory PNG content rendered
   through Matplotlib.
 - Explicit writes only happen through:
-  - `render_logfile_to_file(...)`
+  - `render_logfile(...)`
   - `export_example_bundle(...)`
   - `create_logfile_draft(...)`
   - `set_section_data_source(...)`

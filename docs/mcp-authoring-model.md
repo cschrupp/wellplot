@@ -1,6 +1,6 @@
 # MCP Authoring Model
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
 
 ## Mission
 
@@ -49,23 +49,16 @@ That means:
 - defaults fill missing details only
 - explicit user instructions override defaults
 
-Provider request classification is represented as short hierarchy work units:
-each unit retains the original clause, normalized branch, natural parent,
-explicit values, preserve assertions, and dependencies. This is routing
-context only; canonical Pydantic objects and deterministic MCP operations
-remain the mutation authority.
+The provider-facing boundary is the stable MCP tool surface itself. The model
+may inspect one relevant hierarchy scope, invoke deterministic object-family
+tools, and use their canonical results to choose the next action. It does not
+first author a request inventory, partial document intent, hierarchy work-unit
+graph, or generated `submit_*` operation payload.
 
-The next boundary is a branch-scoped operation submission. Its request payloads
-are generated from the deterministic service request models, so a structure
-compiler can submit section/track operations but cannot submit curve, raster,
-or header mutations. Parent dependencies are checked before execution.
-
-The provider does not author hierarchy branches or coverage paths. It
-classifies the user-facing object family and supplies natural targets and
-explicit values; deterministic code derives branch ownership from the
-canonical hierarchy and tracks coverage by request work-unit id. This avoids
-asking a model to keep redundant `object_family`, `top_level_branch`, and
-JSON/YAML path representations consistent.
+Canonical Pydantic requests still define every mutation behind the MCP tools.
+Deterministic code owns defaults, identities, compatibility, ordering,
+validation, persistence, and read-after-write evidence. The provider owns only
+natural-language interpretation and tool selection.
 
 The MCP should not drift toward an example-reconstruction engine that only
 works when a hidden packet specification is present.
@@ -233,50 +226,51 @@ Each hierarchy node must publish, from the canonical typed contract:
 This metadata must be generated rather than copied into provider prompts or a
 separately maintained vocabulary.
 
-### Hierarchy-Aware Agent Exposure
+### Hierarchy-Aware MCP Exposure
 
-Natural-language compilation should traverse the hierarchy instead of asking a
-model to solve a partial YAML graph:
+Natural-language authoring should traverse the hierarchy through stable tools
+instead of asking a model to solve a partial YAML graph or generate an
+intermediate operation language:
 
-1. split the request into user clauses and classify only their top-level branch
-2. inspect the smallest current parent context needed by each clause
-3. compile one small typed object operation for that branch and parent
-4. resolve human targets, omitted defaults, and contextual references
-   deterministically
-5. order parent operations before child operations
-6. execute each operation through the canonical service and read it back
-7. validate and preview only after the requested object outcomes pass
+1. inspect the smallest relevant report, section, track, or content context
+2. call the MCP tool for that object family
+3. let the deterministic service resolve identities, omitted defaults, and
+   contextual references
+4. return the canonical before/after object and actionable errors
+5. use the persisted result to select the next tool
+6. validate and preview after the requested mutations complete
 
-A mixed request may therefore create independent report-content and log-section
-work units, but no individual provider stage receives both contracts. Preserve
-and negative instructions become assertions or postconditions rather than
-synthetic mutations.
+A mixed request may invoke independent report-content and log-section tools in
+sequence, but each tool remains scoped to one clear object-family
+responsibility. Preserve and negative instructions do not become synthetic
+mutations; scoped tools and canonical diffs make unrelated changes visible.
 
-The agent must compile canonical object operations, not raw YAML paths and not
-large partial `AuthoringDocumentIntent` fragments. YAML assembly, identity
-generation, defaults, compatibility checks, atomic persistence, and operation
-ordering remain deterministic responsibilities.
+The agent calls canonical MCP operations rather than compiling raw YAML paths,
+large partial `AuthoringDocumentIntent` fragments, or generated branch
+submissions. YAML assembly, identity generation, defaults, compatibility
+checks, atomic persistence, and operation ordering remain deterministic
+responsibilities.
 
-### Authoritative Provider Compilation Flow
+### Authoritative Provider Tool Flow
 
 The normal natural-language route is:
 
-1. split the request into stable manifest clauses
-2. ask the provider only for action, object family, natural target/parent,
-   explicit values, and clause status
-3. derive the hierarchy branch and parent-scoped work-unit identity
-   deterministically
-4. compile each work-unit group through the generated service-operation schema
-   for that branch
-5. resolve stable ids, defaults, dependencies, and assertions in deterministic
-   code
-6. execute one atomic typed transaction and verify every outcome through the
-   canonical getter
+1. create or open the draft deterministically
+2. expose a small stable set of actual MCP authoring tools
+3. let the provider inspect only the relevant object and source context
+4. invoke scoped header, report, section, track, binding, raster, fill,
+   annotation, or page/output tools directly
+5. return concise canonical before/after evidence to the provider
+6. validate the persisted document and build the user report from verified
+   tool outcomes
 
-Provider-authored partial document fragments and arbitrary intent coverage
-paths are not part of this route. Explicit caller-supplied typed desired state
-may remain a compatibility API, but it is not the interchange format used to
-interpret natural-language requests.
+There is no provider-authored inventory, branch compiler, partial-document
+merge, generated final-submission tool, or automatic desired-state fallback in
+this route. Explicit caller-supplied typed operations may remain a Python API,
+but they are not the natural-language interchange format.
+
+The detailed recovery and deletion sequence is documented in
+[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md).
 
 ## Values And Constraints
 

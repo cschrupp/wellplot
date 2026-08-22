@@ -1098,7 +1098,9 @@ Run one isolated fixture group per provider, for example:
 
 ```bash
 WELLPLOT_RUN_LIVE_AGENT_EVALS=1 uv run python scripts/run_agent_evals.py \
-  --suite development --mode live --provider nvidia_cloud \
+  --suite development --mode live --provider openai_compat \
+  --model z-ai/glm-5.2 --base-url https://integrate.api.nvidia.com/v1 \
+  --api-key-file NVIDIA_API_KEY.txt \
   --task remarks_only --fixture-catalog tests/evals/agent_fixture_catalog.json \
   --output docs/evaluations/mcp-agent/nvidia-remarks.json
 ```
@@ -1110,7 +1112,8 @@ Aggregate redacted provider reports without contacting a model:
 ```bash
 uv run python scripts/run_agent_evals.py --suite development --mode matrix \
   --matrix-evidence docs/evaluations/mcp-agent/nvidia-remarks.json \
-  --matrix-evidence docs/evaluations/mcp-agent/unsloth-remarks.json
+  --matrix-evidence docs/evaluations/mcp-agent/nvidia-nemotron-remarks.json \
+  --matrix-evidence docs/evaluations/mcp-agent/unsloth-backup-remarks.json
 ```
 
 Matrix output reports `pass_at_1`, `not_run` cases, and one failure category

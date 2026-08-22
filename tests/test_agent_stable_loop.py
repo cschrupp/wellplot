@@ -21,8 +21,11 @@ from wellplot.agent.core import (
     _normalize_report_settings_arguments,
     _normalize_scale_payload,
     _normalize_stable_tool_arguments,
+    _resolve_requested_source_path,
     _resolved_authoring_value,
+    _stable_execution_stages,
     _stable_postcondition_errors,
+    _stable_scope_tool_names,
 )
 from wellplot.agent.stable_fallback import (
     build_catalog_fallback_plan,
@@ -33,6 +36,9 @@ from wellplot.agent.tool_contract import stable_tool_profile
 from wellplot.authoring import authoring_document_to_yaml
 from wellplot.model.authoring import (
     AuthoringDocumentSpec,
+    AuthoringHeaderFieldSpec,
+    AuthoringHeaderSpec,
+    AuthoringReportValueSpec,
     AuthoringSectionSpec,
     NormalTrackSpec,
 )
@@ -43,6 +49,46 @@ def test_stable_postcondition_value_unwraps_typed_report_values() -> None:
     wrapped = SimpleNamespace(value=SimpleNamespace(value="Open Hole Quicklook"))
 
     assert _resolved_authoring_value(wrapped) == "Open Hole Quicklook"
+
+
+def test_resolves_declared_source_basename(tmp_path: Path) -> None:
+    """Resolve a shortened provider path from an unambiguous declared source."""
+    source = tmp_path / "workspace" / "packet" / "CBL_Repeat.dlis"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"source")
+
+    request = """
+    Data Sources:
+    - main: workspace/packet/CBL_Main.dlis
+    - repeat: workspace/packet/CBL_Repeat.dlis
+    """
+
+    assert _resolve_requested_source_path(
+        "CBL_Repeat.dlis",
+        request_text=request,
+        server_root=tmp_path,
+    ) == "workspace/packet/CBL_Repeat.dlis"
+
+    assert _resolve_requested_source_path(
+        str(tmp_path / "CBL_Repeat.dlis"),
+        request_text=request,
+        server_root=tmp_path,
+    ) == "workspace/packet/CBL_Repeat.dlis"
+
+
+def test_preserves_ambiguous_source_basename(tmp_path: Path) -> None:
+    """Do not guess when the same basename is declared more than once."""
+    request = """
+    Data Sources:
+    - first: one/CBL.dlis
+    - second: two/CBL.dlis
+    """
+
+    assert _resolve_requested_source_path(
+        "CBL.dlis",
+        request_text=request,
+        server_root=tmp_path,
+    ) == "CBL.dlis"
 
 
 def test_stable_remarks_add_arguments_are_nested_before_dispatch() -> None:
@@ -123,6 +169,7 @@ def test_stable_source_inspection_drops_conflicting_logfile_target() -> None:
         {
             "source_path": "workspace/input.dlis",
             "logfile_path": "workspace/draft.log.yaml",
+            "section_id": "repeat",
         },
     ) == {"source_path": "workspace/input.dlis"}
 
@@ -172,6 +219,49 @@ def test_catalog_fallback_does_not_implicitly_target_packet_sections() -> None:
         )
         == "repeat_pass"
     )
+
+
+def test_stable_execution_stages_order_structure_before_content() -> None:
+    """Mixed generic requests expose form edits before content mutations."""
+    stages = _stable_execution_stages(
+        "Create a new section and track, then bind scalar curves and a raster.",
+        {
+            "edit_section",
+            "replicate_section_structure",
+            "edit_track",
+            "edit_curve_binding",
+            "edit_raster_binding",
+        },
+        header_preflight_applied=False,
+    )
+
+    assert [stage.id for stage in stages] == ["structure", "content"]
+    assert "edit_track" in stages[0].mutation_names
+    assert "edit_curve_binding" not in stages[0].mutation_names
+    assert "edit_curve_binding" in stages[1].mutation_names
+    assert "edit_track" not in stages[1].mutation_names
+
+
+def test_stable_scope_does_not_treat_header_depth_labels_as_page_settings() -> None:
+    """Header labels such as ``Depth Driller`` must not widen the report scope."""
+    scope = _stable_scope_tool_names(
+        """
+        Header Values:
+        - Depth Driller: 4980 ft
+        - Schlumberger Depth: TD not tagged
+        """
+    )
+
+    assert scope == {"edit_header"}
+
+
+def test_stable_scope_keeps_explicit_page_and_depth_axis_settings() -> None:
+    """Narrower scope matching still exposes genuine document-settings requests."""
+    scope = _stable_scope_tool_names(
+        "Set the page orientation to landscape and the depth axis scale to 200."
+    )
+
+    assert scope == {"edit_report_settings"}
 
 
 def test_stable_arguments_normalize_scale_and_style_aliases() -> None:
@@ -929,6 +1019,110 @@ class ReadOnlyStalledBackend(StableBackend):
         )
 
 
+class StagedStableBackend(StableBackend):
+    """Provider double that executes a generic form/content request in two stages."""
+
+    async def run_authoring(
+        self,
+        *,
+        instructions: str,
+        initial_user_message: str,
+        tool_definitions: list[FunctionToolDefinition],
+        tool_caller: object,
+        max_rounds: int,
+    ) -> ProviderRunResult:
+        """Capture stage-specific tool definitions and make one valid edit per stage."""
+        del instructions, initial_user_message, max_rounds
+        assert callable(tool_caller)
+        stage_tools = {tool.name for tool in tool_definitions}
+        history = getattr(self, "stage_tools", [])
+        history.append(stage_tools)
+        self.stage_tools = history
+        if len(history) == 1:
+            assert "edit_section" in stage_tools
+            assert "edit_track" in stage_tools
+            assert "edit_curve_binding" not in stage_tools
+            await tool_caller(
+                "edit_section",
+                {
+                    "operation": "update",
+                    "section_id": "main",
+                    "subtitle": "Staged structure",
+                },
+            )
+            return ProviderRunResult(
+                final_text="Created the requested form structure.",
+                tool_trace=(),
+            )
+
+        assert "edit_curve_binding" in stage_tools
+        assert "edit_track" not in stage_tools
+        await tool_caller(
+            "edit_curve_binding",
+            {
+                "operation": "add",
+                "section_id": "main",
+                "track_id": "gr_sp",
+                "channel": "GR",
+            },
+        )
+        return ProviderRunResult(
+            final_text="Added the requested content binding.",
+            tool_trace=(),
+        )
+
+
+class PrematureStageMutationBackend(StagedStableBackend):
+    """Provider double that requests content before returning from structure."""
+
+    async def run_authoring(
+        self,
+        *,
+        instructions: str,
+        initial_user_message: str,
+        tool_definitions: list[FunctionToolDefinition],
+        tool_caller: object,
+        max_rounds: int,
+    ) -> ProviderRunResult:
+        """Verify that a persisted structure hands control to the next stage."""
+        del instructions, initial_user_message, max_rounds
+        assert callable(tool_caller)
+        stage_tools = {tool.name for tool in tool_definitions}
+        history = getattr(self, "stage_tools", [])
+        history.append(stage_tools)
+        self.stage_tools = history
+        if len(history) == 1:
+            await tool_caller(
+                "edit_section",
+                {
+                    "operation": "update",
+                    "section_id": "main",
+                    "subtitle": "Staged structure",
+                },
+            )
+            self.handoff = await tool_caller(
+                "edit_curve_binding",
+                {
+                    "operation": "add",
+                    "section_id": "main",
+                    "track_id": "gr_sp",
+                    "channel": "GR",
+                },
+            )
+            return ProviderRunResult(final_text="Structure stage handed off.", tool_trace=())
+
+        await tool_caller(
+            "edit_curve_binding",
+            {
+                "operation": "add",
+                "section_id": "main",
+                "track_id": "gr_sp",
+                "channel": "GR",
+            },
+        )
+        return ProviderRunResult(final_text="Content stage completed.", tool_trace=())
+
+
 class StableSession:
     """Stateful MCP double exposing only the stable tool profile."""
 
@@ -1045,6 +1239,74 @@ class StableSession:
         if name == "preview_logfile":
             return SimpleNamespace(content=[SimpleNamespace(data=b"stable-preview")])
         raise AssertionError(f"Unexpected stable MCP tool call: {name}")
+
+
+class HeaderStableSession(StableSession):
+    """Stable MCP double that persists header assignments."""
+
+    @staticmethod
+    def _document(*, subtitle: str | None = None) -> AuthoringDocumentSpec:
+        """Build a document with independently writable header slots."""
+        document = StableSession._document(subtitle=subtitle)
+        document.header = AuthoringHeaderSpec(
+            general_fields=[
+                AuthoringHeaderFieldSpec(
+                    slot_id="rmf_measured_temp",
+                    key="rmf_measured_temp",
+                    label="RMF @ Measured Temp",
+                    value=AuthoringReportValueSpec(value=""),
+                )
+            ]
+        )
+        return document
+
+    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+        """Persist stable header assignments before returning MCP evidence."""
+        if name != "edit_header":
+            return await super().call_tool(name, arguments)
+        self.calls.append((name, dict(arguments)))
+        path = self.root / str(arguments["logfile_path"])
+        document = self._document()
+        values = arguments["values"]
+        assert isinstance(values, dict)
+        value = next(iter(values.values()))
+        document.header.general_fields = [
+            field.model_copy(update={"value": AuthoringReportValueSpec(value=value)})
+            for field in document.header.general_fields
+        ]
+        authoring_document_to_yaml(document, path)
+        return SimpleNamespace(
+            structuredContent={
+                "ok": True,
+                "changed": True,
+                "applied_assignments": [
+                    {"input_key": key, "value": value} for key, value in values.items()
+                ],
+                "skipped_assignments": [],
+                "warnings": [],
+            }
+        )
+
+
+class StagedStableSession(StableSession):
+    """Stable session double that accepts a content mutation after structure."""
+
+    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+        """Persist the structural edit and acknowledge the binding edit."""
+        if name != "edit_curve_binding":
+            return await super().call_tool(name, arguments)
+        self.calls.append((name, dict(arguments)))
+        return SimpleNamespace(
+            structuredContent={
+                "ok": True,
+                "changed": True,
+                "target": {"object_kind": "curve_binding", "object_id": "GR"},
+                "before": {},
+                "after": {"channel": "GR"},
+                "warnings": [],
+                "next_steps": [],
+            }
+        )
 
 
 class StableRuntime:
@@ -1181,6 +1443,40 @@ async def test_stable_loop_applies_packet_header_before_provider_tools(tmp_path:
 
 
 @pytest.mark.anyio
+async def test_stable_run_routes_header_only_request_without_provider_loop(tmp_path: Path) -> None:
+    """Persist pure header fills directly instead of exposing them to the provider loop."""
+    session = HeaderStableSession(tmp_path)
+    backend = StableBackend()
+    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="""
+                Fill the following header fields with the following values:
+                - Rmf measured: 0.01 @ 25
+            """,
+            output_logfile="workspace/header-only.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert backend.tool_names == []
+    assert result.validation["valid"] is True
+    assert result.change_summary["changed"] is True
+    assert [name for name, _ in session.calls] == [
+        "create_draft",
+        "edit_header",
+        "validate_logfile",
+        "inspect_authoring",
+        "preview_logfile",
+        "preview_logfile",
+    ]
+    persisted_path = tmp_path / "workspace/header-only.log.yaml"
+    assert "0.01 @ 25" in persisted_path.read_text(encoding="utf-8")
+
+
+@pytest.mark.anyio
 async def test_stable_loop_maps_report_inspection_to_page(tmp_path: Path) -> None:
     """Keep legacy report inspection requests inside the stable object contract."""
     session = StableSession(tmp_path)
@@ -1247,6 +1543,90 @@ async def test_stable_loop_rolls_back_unmet_request_postcondition(tmp_path: Path
     assert result.change_summary["changed"] is False
     assert result.report_facts["rolled_back"] is True
     assert "subtitle" in " ".join(result.report_facts["reasons"])
+
+
+@pytest.mark.anyio
+async def test_stable_loop_stages_generic_structure_before_content(tmp_path: Path) -> None:
+    """A mixed request cannot bind content before form mutations are available."""
+    session = StagedStableSession(tmp_path)
+    backend = StagedStableBackend()
+    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="""
+                Create a new section and add a track, then bind a scalar curve.
+            """,
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert result.validation["valid"] is True
+    assert [report["id"] for report in result.report_facts["stable_execution_stages"]] == [
+        "structure",
+        "content",
+    ]
+    assert len(backend.stage_tools) == 2
+    assert "edit_track" in backend.stage_tools[0]
+    assert "edit_curve_binding" not in backend.stage_tools[0]
+    assert "edit_curve_binding" in backend.stage_tools[1]
+    assert "edit_track" not in backend.stage_tools[1]
+
+
+@pytest.mark.anyio
+async def test_stable_loop_hands_off_premature_content_mutation(tmp_path: Path) -> None:
+    """A content call after structure progress advances instead of blocking the run."""
+    session = StagedStableSession(tmp_path)
+    backend = PrematureStageMutationBackend()
+    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="""
+                Create a new section and add a track, then bind a scalar curve.
+            """,
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert result.validation["valid"] is True
+    assert backend.handoff["_agent_control"]["status"] == "stage_complete"
+    assert len(backend.stage_tools) == 2
+    assert [name for name, _ in session.calls].count("edit_curve_binding") == 1
+
+
+@pytest.mark.anyio
+async def test_stable_loop_hides_rolled_back_header_mutations(tmp_path: Path) -> None:
+    """A transaction rollback cannot leave an applied header in the user summary."""
+    session = HeaderStableSession(tmp_path)
+    backend = FailingStableBackend()
+    authoring = AuthoringSession(backend=backend, runtime=StableRuntime(tmp_path, session))
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="""
+                Header Values:
+                - Rmf measured: 0.01 @ 25
+
+                Set the main section subtitle to Stable loop test.
+            """,
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert result.report_facts["rolled_back"] is True
+    assert result.change_summary["changed"] is False
+    assert result.change_summary["summary_lines"] == []
+    assert result.user_report.done == ()
+    assert "Deterministic header values were rolled back with the request." in result.report_facts[
+        "not_done"
+    ]
 
 
 @pytest.mark.anyio

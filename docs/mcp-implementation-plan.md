@@ -1,6 +1,14 @@
 # MCP Implementation Plan
 
-Last updated: 2026-08-13
+Last updated: 2026-08-14
+
+> **Active correction:** The provider-facing compilation portions of `0.6-G`,
+> `0.6-J`, and `0.6-K` are superseded by the eval-first
+> [MCP Agent Simplification And Recovery Plan](mcp-agent-recovery-plan.md).
+> Their deterministic contract, service, validation, and rendering work remain
+> valid. The historical compiler slices below must not be extended with more
+> request inventories, generated `submit_*` tools, compatibility routes, or
+> request-specific bypasses.
 
 ## Purpose
 
@@ -1066,7 +1074,8 @@ Acceptance completed:
 Status: complete.
 
 - update the notebook to use natural header language
-- verify unique phrases, ambiguous phrases, and follow-up clarification
+- verify qualified phrases and keep ambiguous follow-up behavior covered by
+  deterministic agent tests
 - keep canonical keys in advanced API documentation only
 - run MCP, agent, model, notebook, and documentation gates before closing H
 
@@ -1074,9 +1083,10 @@ Implementation checkpoint:
 
 - the canonical LAS walkthrough uses qualified phrases such as `Rmf measured`
   and `Rmc measured` without exposing internal mapping keys
-- the walkthrough includes an intentionally ambiguous `RM` request and displays
-  the structured clarification result before replying with `Use the measured
-  one.` when clarification is requested
+- the walkthrough uses the qualified `RM at bottom temperature` phrase and
+  never invents a value or redirects it to the measured-temperature field
+- ambiguous `RM` follow-up behavior remains covered by deterministic agent
+  tests rather than being mixed into the canonical notebook flow
 - the structural notebook gate checks the natural-language examples and rejects
   internal `detail.*` keys in the user notebook source
 - the API reference retains canonical keys only for programmatic callers and
@@ -2472,37 +2482,34 @@ Implementation checkpoint:
 
 ## Release Gate
 
-Do not publish `0.6.0` until the repository release gates below pass. Slices
-`0.6-A` through `0.6-G7.2`, plus the reopened `0.6-H1` through `0.6-H6`
-header-language slices, are the completed contract baseline. Reopened slices
-`0.6-I1` through `0.6-I6`, compiler slices `0.6-J1` through `0.6-J6`, and
-hierarchy slices `0.6-K1` through `0.6-K7` are release blockers because
-open-world construction, provider compilation, and deterministic hierarchical
-object operations are all required for the user-facing authoring promise.
-Corrective sub-slices `0.6-K7.4` through `0.6-K7.8` must all close before the
-K7 gate is considered complete.
+Do not publish `0.6.0` until the deterministic contract remains green and the
+active `0.6-L0` through `0.6-L7` recovery gates pass. Earlier provider compiler
+acceptance is historical evidence and does not substitute for the new
+end-state, context-budget, tool-budget, deletion, and live-provider evidence.
+The authoritative checklist and thresholds are in
+[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md).
 
 Release-gate checklist:
 
 - unit, MCP, agent, and cross-domain acceptance tests pass
 - strict documentation build passes
 - package and installed-wheel smoke checks pass
-- canonical LAS notebook and experimental CBL notebook remain structurally
-  discoverable and request per-phase previews
+- canonical LAS notebook completes with unchanged prompts and the experimental
+  CBL notebook passes as a stress test rather than a source of hidden rules
 - catalogued and uncatalogued track requests both complete through generic
   canonical construction without packet-specific authority
-- provider compilation uses direct bounded branch-operation contracts and
-  reports exact extraction failures before any deterministic authoring stage
-  runs
+- providers invoke the small stable MCP profile directly; production traces
+  contain no generated `submit_*` inventory, intent, or operation tools
 - unchanged SP and resistivity notebook requests persist and read back the
   requested objects and values
-- provider compilation follows the natural authoring hierarchy and submits
-  bounded canonical object operations rather than partial document graphs
-- header, report-content, section, track, and track-content work is compiled in
-  separate parent-scoped contexts and verified through canonical getters
-- the scoped `AuthoringDocumentIntent` fragment compiler is no longer used by
-  the normal agent path
-- credentialed live-provider acceptance is recorded manually when available
+- header, report-content, section, track, and track-content tools remain scoped
+  and are verified through canonical getters
+- one provider-backed natural-language route remains and superseded compiler
+  modules are unreachable and removed
+- context, schema, tool-count, production-line, provider, and held-out thresholds
+  pass and have committed evidence records
+- credentialed live-provider acceptance is recorded as a release requirement,
+  not an optional substitute for recorded fixtures
 
 Provider expansion, remote MCP transport, persistent/vector memory, and new
 packet-specific blueprints remain deferred. They do not block this contract
@@ -2519,6 +2526,8 @@ Required new test groups:
 - Python API/MCP schema parity
 - defaults precedence and explicit-value preservation
 - generic agent scenarios not backed by packet-specific assets
+- canonical end-state, mutation-isolation, context-budget, and live-provider
+  capability evaluations
 - installed-wheel and MCP stdio integration
 
 The current behavioral tests remain regression protection. They do not replace

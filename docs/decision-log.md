@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-08-06
+Last updated: 2026-08-14
 
 ## Purpose
 
@@ -15,6 +15,29 @@ This file records project decisions that should remain stable unless explicitly 
 - Domain focus: wireline logs, including triple-combo, image/raster logs, and petrophysical outputs.
 
 ## Architecture Decisions
+
+### MCP And Agent Recovery Decisions (2026-08-14)
+
+- The canonical Pydantic authoring models and `AuthoringService` remain the
+  deterministic mutation authority.
+- The provider-facing contract is a small stable set of actual MCP tools, not a
+  generated request inventory, partial document intent, branch work-unit graph,
+  or `submit_*` operation language.
+- `wellplot.agent` uses one simple provider/tool loop for natural-language
+  `run()` and `revise()` requests. It must not retain an automatic compiler or
+  desired-state fallback.
+- Tool and context budgets, real-provider end-state evaluations, mutation
+  isolation, and production-line deltas are release evidence.
+- A passing recorded backend proves deterministic contract behavior only; it
+  does not count as model-capability acceptance.
+- Every recovery slice has a predefined metric, code budget, stop condition,
+  and evidence record. The complete recovery must be a net deletion of
+  production code.
+- LangGraph, persistent memory, new packet authority, and request-specific
+  routing are not remedies for the current provider boundary.
+
+Detailed implementation and compliance gates:
+[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md).
 
 - Renderer-first architecture with three layers:
   - `WellDataset` for normalized data
