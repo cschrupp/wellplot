@@ -8,7 +8,7 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ..agent.tool_contract import StableToolProfile, stable_tool_profile
 from ..authoring_service import (
@@ -20,13 +20,11 @@ from ..authoring_service import (
     RemarkPatch,
     RemoveRequest,
     ReportPatch,
-    SectionPatch,
     UpdateDepthRequest,
     UpdateOutputRequest,
     UpdatePageRequest,
     UpdateRemarkRequest,
     UpdateReportRequest,
-    UpdateSectionRequest,
 )
 from ..errors import TemplateValidationError
 from ..model.authoring import (
@@ -43,6 +41,45 @@ _REMARK_CONTENT_ERROR = (
     "Provide either non-empty remark.text or at least one item in remark.lines. "
     "A title/alignment alone is not a valid remark."
 )
+_DEPTH_RANGE_ERROR = (
+    "depth_range must use {minimum: number, maximum: number, unit: string?} "
+    "with maximum greater than minimum and no extra fields."
+)
+
+
+class DepthRangeInput(BaseModel):
+    """Public MCP representation of one ordered section depth range."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    minimum: float
+    maximum: float
+    unit: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def validate_order(self) -> DepthRangeInput:
+        """Reject zero-height and reversed section windows at the boundary."""
+        if self.maximum <= self.minimum:
+            raise ValueError("maximum must be greater than minimum")
+        return self
+
+
+def _depth_range_input(
+    value: object,
+    *,
+    tool_name: str,
+) -> tuple[tuple[float, float], str | None]:
+    """Convert the public range object to the domain tuple and unit pair."""
+    if not isinstance(value, Mapping):
+        raise TemplateValidationError(
+            f"{tool_name} depth_range must use an object with numeric minimum and maximum "
+            "and optional unit; lists are not supported."
+        )
+    try:
+        parsed = DepthRangeInput.model_validate(value)
+    except ValidationError as exc:
+        raise TemplateValidationError(f"{tool_name} {_DEPTH_RANGE_ERROR}") from exc
+    return (parsed.minimum, parsed.maximum), parsed.unit
 
 
 def _json_safe(value: object) -> object:
@@ -727,17 +764,26 @@ def _direct_section_remove(arguments: Mapping[str, object], root: str | Path) ->
 
 
 def _direct_section_update(arguments: Mapping[str, object], root: str | Path) -> object:
-    path, authoring = _rooted_authoring(_path(arguments), root)
+    logfile_path = _path(arguments)
     section_id = str(_required(arguments, "section_id"))
     patch = _flat_patch(arguments, {"title", "subtitle", "depth_range"})
-    result = authoring.update(
-        UpdateSectionRequest(
-            section_id=section_id,
-            patch=SectionPatch.model_validate(patch),
+    depth_range = patch.pop("depth_range", None)
+    normalized_range: tuple[float, float] | None = None
+    depth_range_unit: str | None = None
+    if depth_range is not None:
+        normalized_range, depth_range_unit = _depth_range_input(
+            depth_range,
+            tool_name="edit_section",
         )
+    return service.update_section(
+        logfile_path,
+        section_id=section_id,
+        title=patch.get("title"),
+        subtitle=patch.get("subtitle"),
+        depth_range=normalized_range,
+        depth_range_unit=depth_range_unit,
+        root=root,
     )
-    _persist_authoring(path, authoring, root)
-    return result
 
 
 def _direct_section_move(arguments: Mapping[str, object], root: str | Path) -> object:
@@ -1213,6 +1259,14 @@ def dispatch_stable_tool(
             )
         if operation == "set_section_view":
             section_id = str(_required(args, "section_id"))
+            depth_range = args.get("depth_range")
+            normalized_range: tuple[float, float] | None = None
+            depth_range_unit: str | None = None
+            if depth_range is not None:
+                normalized_range, depth_range_unit = _depth_range_input(
+                    depth_range,
+                    tool_name="edit_report_settings",
+                )
             return _mutation(
                 logfile_path,
                 _target("section", section_id, args),
@@ -1222,7 +1276,8 @@ def dispatch_stable_tool(
                     section_id=section_id,
                     title=args.get("title"),
                     subtitle=args.get("subtitle"),
-                    depth_range=args.get("depth_range"),
+                    depth_range=normalized_range,
+                    depth_range_unit=depth_range_unit,
                     page_patch=args.get("page"),
                     render_patch=args.get("output"),
                     root=root,
@@ -1697,6 +1752,15 @@ def _tool_function(
         try:
             validated = profile.input_model.model_validate(kwargs)
         except ValidationError as exc:
+            depth_range_error = any(
+                error.get("loc", ())
+                and error["loc"][0] == "depth_range"
+                for error in exc.errors()
+            )
+            if profile.name in {"edit_section", "edit_report_settings"} and depth_range_error:
+                raise TemplateValidationError(
+                    f"{profile.name} {_DEPTH_RANGE_ERROR}"
+                ) from exc
             if profile.name == "edit_remarks" and kwargs.get("operation") == "add":
                 payload = kwargs.get("remark")
                 text = payload.get("text") if isinstance(payload, Mapping) else None

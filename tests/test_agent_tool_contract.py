@@ -50,7 +50,7 @@ def test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract() -> Non
     # Typed nested fields and conditional remark content cost more than the
     # former coarse ``object`` annotations.
     # The wire contract remains substantially smaller than the canonical union.
-    assert budget["combined_schema_chars"] < diagnostic_chars * 0.361
+    assert budget["combined_schema_chars"] < diagnostic_chars * 0.38
 
 
 def test_profile_does_not_expose_internal_canonical_unions() -> None:

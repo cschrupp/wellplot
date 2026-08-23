@@ -187,6 +187,32 @@ def _fields(model: type[BaseModel], field_name: str, names: tuple[str, ...]) -> 
 
 
 def _field_schema(value: object) -> Schema:
+    if isinstance(value, Mapping):
+        schema: Schema = {}
+        for key in (
+            "type",
+            "enum",
+            "minimum",
+            "maximum",
+            "exclusiveMinimum",
+            "minLength",
+            "minItems",
+            "default",
+            "required",
+            "additionalProperties",
+        ):
+            if key in value:
+                schema[key] = value[key]
+        properties = value.get("properties")
+        if isinstance(properties, Mapping):
+            schema["type"] = "object"
+            schema["properties"] = {
+                str(name): _field_schema(item) for name, item in properties.items()
+            }
+        items = value.get("items")
+        if isinstance(items, Mapping):
+            schema["items"] = _field_schema(items)
+        return schema or {"type": "object"}
     if value == "string":
         return dict(_STRING)
     if value == "string_list":

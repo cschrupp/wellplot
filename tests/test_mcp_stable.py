@@ -156,6 +156,109 @@ def test_stable_mutation_matches_direct_authoring_service() -> None:
         assert _canonical_document(projected) == _canonical_document(direct)
 
 
+def test_stable_section_depth_range_adapts_public_object_to_domain_tuple() -> None:
+    """Convert one MCP depth-range object before constructing the domain patch."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "depth-range.log.yaml"
+        _seed_draft(draft)
+
+        result = dispatch_stable_tool(
+            "edit_section",
+            {
+                "logfile_path": str(draft),
+                "operation": "update",
+                "section_id": "main_pass",
+                "depth_range": {"minimum": 25.0, "maximum": 4845.0, "unit": "ft"},
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        saved = yaml.safe_load(draft.read_text(encoding="utf-8"))
+        section = saved["document"]["layout"]["log_sections"][0]
+        assert result["ok"] is True
+        assert result["changed"] is True
+        assert result["changed_fields"] == ["depth_range"]
+        assert section["depth_range"] == [25.0, 4845.0]
+
+
+def test_stable_section_view_reuses_depth_range_adapter() -> None:
+    """Keep the composite section-view mutation on the same public contract."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "section-view-depth-range.log.yaml"
+        _seed_draft(draft)
+
+        result = dispatch_stable_tool(
+            "edit_report_settings",
+            {
+                "logfile_path": str(draft),
+                "operation": "set_section_view",
+                "section_id": "main_pass",
+                "depth_range": {"minimum": 25.0, "maximum": 4845.0, "unit": "ft"},
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert result["ok"] is True
+        assert result["changed"] is True
+
+
+@pytest.mark.parametrize(
+    ("depth_range", "message"),
+    [
+        ([25.0, 4845.0], "object"),
+        ({"minimum": 4845.0, "maximum": 25.0}, "maximum greater"),
+        ({"minimum": 25.0, "maximum": 4845.0, "extra": 1}, "no extra"),
+    ],
+)
+def test_stable_section_depth_range_rejects_ambiguous_public_shapes(
+    depth_range: object,
+    message: str,
+) -> None:
+    """Reject list, reversed, and extra-field depth ranges at the stable boundary."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "depth-range-invalid.log.yaml"
+        _seed_draft(draft)
+
+        with pytest.raises(TemplateValidationError, match=message):
+            dispatch_stable_tool(
+                "edit_section",
+                {
+                    "logfile_path": str(draft),
+                    "operation": "update",
+                    "section_id": "main_pass",
+                    "depth_range": depth_range,
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
+def test_stable_section_depth_range_rejects_unsupported_unit() -> None:
+    """Keep unsupported depth units explicit instead of silently persisting them."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "depth-range-unit.log.yaml"
+        _seed_draft(draft)
+
+        with pytest.raises(TemplateValidationError, match="Unsupported conversion"):
+            dispatch_stable_tool(
+                "edit_section",
+                {
+                    "logfile_path": str(draft),
+                    "operation": "update",
+                    "section_id": "main_pass",
+                    "depth_range": {
+                        "minimum": 25.0,
+                        "maximum": 4845.0,
+                        "unit": "furlong",
+                    },
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
 def test_stable_create_draft_returns_only_creation_evidence() -> None:
     """Draft creation reports the new artifact identity instead of document snapshots."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:

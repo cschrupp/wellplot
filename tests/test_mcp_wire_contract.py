@@ -29,7 +29,7 @@ S0_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v1.
 S1_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v2.json"
 S2_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v3.json"
 S4_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v4.json"
-S9_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v9.json"
+S10_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v10.json"
 CAPTURE_SCRIPT = REPO_ROOT / "scripts" / "capture_mcp_contract_baseline.py"
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -428,9 +428,9 @@ async def _exercise_discovery_content() -> tuple[dict[str, int], dict[str, str]]
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
-def test_real_stdio_surface_matches_s9_baseline() -> None:
-    """Compare real MCP protocol output with the committed S9 wire contract."""
-    expected = json.loads(S9_BASELINE_PATH.read_text(encoding="utf-8"))
+def test_real_stdio_surface_matches_s10_baseline() -> None:
+    """Compare real MCP protocol output with the committed S10 wire contract."""
+    expected = json.loads(S10_BASELINE_PATH.read_text(encoding="utf-8"))
     actual = asyncio.run(_capture_mcp_surface())
 
     assert actual == expected
@@ -469,6 +469,72 @@ def test_real_stdio_results_validate_against_declared_output_models() -> None:
     assert structured[3]["validation_level"] == "structural"
     assert structured[4]["artifact"] == structured[4]["output_path"]
     assert structured[4]["page_count"] >= 1
+
+
+@pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
+def test_real_stdio_uses_one_object_depth_range_representation() -> None:
+    """Exercise valid and invalid depth-range shapes through production stdio."""
+
+    async def exercise() -> dict[str, dict[str, object]]:
+        with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+            fixture = create_mcp_fixture_paths(Path(temporary_directory), repo_root=REPO_ROOT)
+            runtime = LocalStdioMcpRuntime(server_root=REPO_ROOT)
+            async with runtime.open_session() as session:
+                valid = await session.call_tool(
+                    "edit_section",
+                    {
+                        "operation": "update",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "depth_range": {"minimum": 1000.0, "maximum": 1020.0, "unit": "m"},
+                    },
+                )
+                invalid_list = await session.call_tool(
+                    "edit_section",
+                    {
+                        "operation": "update",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "depth_range": [1000.0, 1020.0],
+                    },
+                )
+                invalid_order = await session.call_tool(
+                    "edit_section",
+                    {
+                        "operation": "update",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "depth_range": {"minimum": 1020.0, "maximum": 1000.0},
+                    },
+                )
+                invalid_extra = await session.call_tool(
+                    "edit_section",
+                    {
+                        "operation": "update",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "depth_range": {
+                            "minimum": 1000.0,
+                            "maximum": 1020.0,
+                            "unexpected": "field",
+                        },
+                    },
+                )
+            return {
+                "valid": _result_mapping(valid),
+                "invalid_list": _result_mapping(invalid_list),
+                "invalid_order": _result_mapping(invalid_order),
+                "invalid_extra": _result_mapping(invalid_extra),
+            }
+
+    results = asyncio.run(exercise())
+    assert results["valid"].get("isError", False) is False
+    assert results["invalid_list"].get("isError", False) is True
+    assert results["invalid_order"].get("isError", False) is True
+    assert results["invalid_extra"].get("isError", False) is True
+    assert "depth_range" in _content_text(results["invalid_list"])
+    assert "depth_range" in _content_text(results["invalid_order"])
+    assert "depth_range" in _content_text(results["invalid_extra"])
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")

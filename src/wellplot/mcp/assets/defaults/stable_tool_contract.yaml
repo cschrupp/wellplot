@@ -56,7 +56,7 @@ tools:
       preserve_existing_values: boolean
       overwrite_policy: string
   - id: edit_report_settings
-    description: Update report, page, output, depth, section view, or report-wide Matplotlib style.
+    description: 'Update report, page, output, depth, section view, or report-wide Matplotlib style. For set_section_view, depth_range must be an object with numeric minimum and maximum and optional unit, for example {minimum: 25, maximum: 4845, unit: ft}.'
     mode: mutation
     operations: [set_report, set_page, set_output, set_depth, set_section_view, set_matplotlib_style]
     fields:
@@ -66,7 +66,16 @@ tools:
       page: object
       output: object
       depth: object
-      depth_range: object
+      depth_range:
+        type: object
+        additionalProperties: false
+        required: [minimum, maximum]
+        properties:
+          minimum: number
+          maximum: number
+          unit:
+            type: string
+            minLength: 1
       style_patch: object
   - id: edit_remarks
     description: 'Remarks operations: add=remark{title,text,lines,alignment}; add requires actual content in non-empty remark.text or at least one item in remark.lines; title/alignment alone is invalid. update=remark_id+patch; remove/move=remark_id; clear=all.'
@@ -79,7 +88,7 @@ tools:
       remark: object
       patch: object
   - id: edit_section
-    description: Create, update, remove, or move one report section. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.
+    description: 'Create, update, remove, or move one report section. For operation=update, depth_range must be an object with numeric minimum and maximum and optional unit, for example {minimum: 25, maximum: 4845, unit: ft}. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.'
     mode: mutation
     operations: [add, update, remove, move]
     destructive: true
@@ -89,7 +98,16 @@ tools:
       section: object
       title: string
       subtitle: string
-      depth_range: object
+      depth_range:
+        type: object
+        additionalProperties: false
+        required: [minimum, maximum]
+        properties:
+          minimum: number
+          maximum: number
+          unit:
+            type: string
+            minLength: 1
   - id: replicate_section_structure
     description: Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks.
     mode: mutation
