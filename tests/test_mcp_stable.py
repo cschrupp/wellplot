@@ -334,6 +334,83 @@ def test_stable_track_set_scales_updates_track_and_curve_scale() -> None:
         }
 
 
+def test_stable_track_add_validates_all_creation_fields_at_once() -> None:
+    """A malformed add reports every missing creation field in one response."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "track-add.log.yaml"
+        _seed_draft(draft)
+
+        with pytest.raises(
+            TemplateValidationError,
+            match="Missing: title, kind, width_mm",
+        ):
+            dispatch_stable_tool(
+                "edit_track",
+                {
+                    "logfile_path": str(draft),
+                    "operation": "add",
+                    "section_id": "main_pass",
+                    "track_id": "resistivity",
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
+def test_stable_track_add_is_idempotent_for_equivalent_definition() -> None:
+    """A retry of an equivalent track add is a successful, non-mutating no-op."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "track-add.log.yaml"
+        _seed_draft(draft)
+        original = draft.read_bytes()
+
+        result = dispatch_stable_tool(
+            "edit_track",
+            {
+                "logfile_path": str(draft),
+                "operation": "add",
+                "section_id": "main_pass",
+                "track_id": "depth",
+                "title": "depth",
+                "kind": "reference",
+                "width_mm": 36,
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert result["ok"] is True
+        assert result["changed"] is False
+        assert result["already_exists"] is True
+        assert draft.read_bytes() == original
+
+
+def test_stable_track_add_rejects_conflicting_existing_definition() -> None:
+    """A conflicting add tells the provider to use update instead."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "track-add.log.yaml"
+        _seed_draft(draft)
+
+        with pytest.raises(
+            TemplateValidationError,
+            match="different properties .*operation='update'",
+        ):
+            dispatch_stable_tool(
+                "edit_track",
+                {
+                    "logfile_path": str(draft),
+                    "operation": "add",
+                    "section_id": "main_pass",
+                    "track_id": "depth",
+                    "title": "Different Depth",
+                    "kind": "reference",
+                    "width_mm": 36,
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
 def test_stable_track_update_syncs_grid_to_log_scale() -> None:
     """Keep logarithmic grid metadata synchronized for ordinary track updates."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:

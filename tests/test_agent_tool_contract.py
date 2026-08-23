@@ -162,8 +162,27 @@ def test_track_tool_explains_add_and_existing_target_semantics() -> None:
     track = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
 
     assert "operation=add" in track.description
-    assert "title, kind, and width_mm are required" in track.description
+    assert "section_id and track_id are required for every operation" in track.description
+    assert "title, kind, and width_mm must be supplied in the same call" in track.description
+    assert "successful no-op" in track.description
     assert "track_id must already exist" in track.description
+    assert {"section_id", "track_id"} <= set(track.input_schema["required"])
+
+
+def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
+    """The stable profile requires the track identity on every operation."""
+    track = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
+
+    with pytest.raises(ValidationError):
+        track.input_model.model_validate(
+            {
+                "logfile_path": "draft.log.yaml",
+                "operation": "add",
+                "title": "Resistivity",
+                "kind": "normal",
+                "width_mm": 30,
+            }
+        )
 
 
 def test_inspect_authoring_exposes_server_supported_object_kinds() -> None:

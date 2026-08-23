@@ -29,7 +29,7 @@ S0_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v1.
 S1_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v2.json"
 S2_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v3.json"
 S4_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v4.json"
-S7_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v7.json"
+S8_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v8.json"
 CAPTURE_SCRIPT = REPO_ROOT / "scripts" / "capture_mcp_contract_baseline.py"
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -428,9 +428,9 @@ async def _exercise_discovery_content() -> tuple[dict[str, int], dict[str, str]]
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
-def test_real_stdio_surface_matches_s7_baseline() -> None:
-    """Compare real MCP protocol output with the committed S7 wire contract."""
-    expected = json.loads(S7_BASELINE_PATH.read_text(encoding="utf-8"))
+def test_real_stdio_surface_matches_s8_baseline() -> None:
+    """Compare real MCP protocol output with the committed S8 wire contract."""
+    expected = json.loads(S8_BASELINE_PATH.read_text(encoding="utf-8"))
     actual = asyncio.run(_capture_mcp_surface())
 
     assert actual == expected

@@ -691,6 +691,8 @@ class AddedTrackResult:
     track_id: str
     track_ids: list[str]
     track_count: int
+    changed: bool = True
+    already_exists: bool = False
 
 
 @dataclass(slots=True)
@@ -6247,8 +6249,54 @@ def add_track(
         raise TemplateValidationError("Track id must be non-empty.")
     existing_track_ids = [str(track.get("id", "")) for track in tracks if isinstance(track, dict)]
     if track_id in existing_track_ids:
-        raise TemplateValidationError(
-            f"Track id {track_id!r} already exists in section {section_id!r}."
+        existing_track = next(
+            track
+            for track in tracks
+            if isinstance(track, dict) and str(track.get("id", "")) == track_id
+        )
+        requested_track: dict[str, object] = {
+            "id": track_id,
+            "title": str(title),
+            "kind": str(kind),
+            "width_mm": float(width_mm),
+        }
+        optional_values = {
+            "x_scale": x_scale,
+            "grid": grid,
+            "track_header": track_header,
+            "reference": reference,
+            "annotations": annotations,
+        }
+        for key, value in optional_values.items():
+            if value is not None:
+                requested_track[key] = (
+                    _legacy_scale_payload(value) if key == "x_scale" else deepcopy(value)
+                )
+
+        conflicting_fields: list[str] = []
+        for key, requested_value in requested_track.items():
+            if key == "id":
+                continue
+            existing_value = existing_track.get(key)
+            if key == "x_scale":
+                existing_value = _legacy_scale_payload(existing_value)
+            if existing_value != requested_value:
+                conflicting_fields.append(key)
+        if conflicting_fields:
+            raise TemplateValidationError(
+                f"Track {track_id!r} already exists in section {section_id!r} with "
+                f"different properties ({', '.join(conflicting_fields)}). "
+                "Use edit_track(operation='update') instead of add."
+            )
+
+        return AddedTrackResult(
+            logfile_path=str(resolved_logfile),
+            section_id=section_id,
+            track_id=track_id,
+            track_ids=existing_track_ids,
+            track_count=len(existing_track_ids),
+            changed=False,
+            already_exists=True,
         )
 
     track_mapping: dict[str, object] = {
@@ -6287,6 +6335,8 @@ def add_track(
         track_id=track_id,
         track_ids=saved_track_ids,
         track_count=len(saved_track_ids),
+        changed=True,
+        already_exists=False,
     )
 
 
@@ -9315,8 +9365,11 @@ def author_plot_from_request_prompt(
         "edit_annotation(...) only for the matching child object.\n"
         "7. Call validate_logfile(...) after mutations. Call preview_logfile(...) before calling "
         "render_logfile(...).\n"
-        "8. Treat an error result as a blocker. Do not claim an edit succeeded until "
-        "its tool reports a persisted change.\n"
+        "8. Trust a successful mutation result: do not immediately call inspect_authoring(...) "
+        "just to verify changed=true or a successful no-op with already_exists=true. Re-inspect "
+        "only when the mutation did not return the state needed by a dependent operation.\n"
+        "9. Treat an error result as a blocker. Do not claim an edit succeeded until "
+        "its tool reports success.\n"
     )
 
 
@@ -9335,7 +9388,10 @@ def revise_plot_from_feedback_prompt(logfile_path: str, feedback: str) -> str:
         "for layout.\n"
         "5. Use edit_curve_binding(...), edit_raster_binding(...), edit_fill(...), or "
         "edit_annotation(...) for child content.\n"
-        "6. Call validate_logfile(...) and preview_logfile(...) after the smallest "
+        "6. Trust successful mutation results, including changed=true and successful no-ops "
+        "with already_exists=true; do not immediately re-inspect solely to verify them. "
+        "Re-inspect only when a dependent operation needs unknown state.\n"
+        "7. Call validate_logfile(...) and preview_logfile(...) after the smallest "
         "valid edit sequence.\n"
     )
 

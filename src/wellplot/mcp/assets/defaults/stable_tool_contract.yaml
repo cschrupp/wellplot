@@ -104,11 +104,12 @@ tools:
       include_bindings: boolean
       overwrite: boolean
   - id: edit_track
-    description: Create, update, remove, move, clear, or set scales on one track. For operation=add, track_id is the new id and title, kind, and width_mm are required; add appends the track, then use operation=move for placement. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use operation=set_scales only when both are intentionally synchronized, or use update with x_scale and edit_curve_binding with scale independently. For update, remove, move, and clear_bindings, track_id must already exist.
+    description: Create, update, remove, move, clear, or set scales on one track. section_id and track_id are required for every operation. For operation=add, title, kind, and width_mm must be supplied in the same call; add appends the track, then use operation=move for placement. A retry of an equivalent add is a successful no-op; an add with conflicting properties must use operation=update. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use operation=set_scales only when both are intentionally synchronized, or use update with x_scale and edit_curve_binding with scale independently. For update, remove, move, and clear_bindings, track_id must already exist.
     mode: mutation
     operations: [add, update, remove, move, clear_bindings, set_scales]
     canonical_fields: track
     destructive: true
+    required: [section_id, track_id]
     fields:
       section_id: string
       track_id: string

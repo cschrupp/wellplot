@@ -102,6 +102,7 @@ class StableMutationResult(_StableResult):
     changed_fields: list[str]
     before: dict[str, Any]
     after: dict[str, Any]
+    already_exists: bool = False
 
 
 class StableHeaderMutationResult(StableMutationResult):

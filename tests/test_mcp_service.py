@@ -1447,8 +1447,8 @@ class McpServiceTests(unittest.TestCase):
             self.assertEqual(tracks[-1]["position"], 7)
 
     @unittest.skipUnless(HAS_LAS, "lasio is not installed")
-    def test_add_track_rejects_duplicate_track_id(self) -> None:
-        """Reject duplicate track identifiers inside one draft section."""
+    def test_add_track_is_idempotent_for_equivalent_track_definition(self) -> None:
+        """Treat a retry of an equivalent track add as a successful no-op."""
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
             draft_path = Path(tmpdir) / "draft.log.yaml"
             service.create_logfile_draft(
@@ -1457,14 +1457,43 @@ class McpServiceTests(unittest.TestCase):
                 root=REPO_ROOT,
             )
 
-            with self.assertRaises(TemplateValidationError):
+            original = draft_path.read_bytes()
+            result = service.add_track(
+                str(draft_path),
+                section_id="main",
+                id="gr",
+                title="GR",
+                kind="normal",
+                width_mm=28.0,
+                root=REPO_ROOT,
+            )
+
+            self.assertFalse(result.changed)
+            self.assertTrue(result.already_exists)
+            self.assertEqual(draft_path.read_bytes(), original)
+
+    @unittest.skipUnless(HAS_LAS, "lasio is not installed")
+    def test_add_track_rejects_conflicting_duplicate_track_id(self) -> None:
+        """Reject a duplicate track whose requested definition conflicts."""
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            draft_path = Path(tmpdir) / "draft.log.yaml"
+            service.create_logfile_draft(
+                str(draft_path),
+                source_logfile_path=self._fixture_paths.single_logfile_relative,
+                root=REPO_ROOT,
+            )
+
+            with self.assertRaisesRegex(
+                TemplateValidationError,
+                "different properties .*operation='update'",
+            ):
                 service.add_track(
                     str(draft_path),
                     section_id="main",
                     id="gr",
-                    title="Duplicate GR",
+                    title="Different GR",
                     kind="normal",
-                    width_mm=24.0,
+                    width_mm=28.0,
                     root=REPO_ROOT,
                 )
 
@@ -4240,6 +4269,8 @@ class McpServiceTests(unittest.TestCase):
             "render_logfile",
         ):
             self.assertIn(f"{tool_name}(...)", prompt)
+        self.assertIn("Trust a successful mutation result", prompt)
+        self.assertIn("already_exists=true", prompt)
         self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -4266,6 +4297,8 @@ class McpServiceTests(unittest.TestCase):
             "preview_logfile",
         ):
             self.assertIn(f"{tool_name}(...)", prompt)
+        self.assertIn("Trust successful mutation results", prompt)
+        self.assertIn("already_exists=true", prompt)
         self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_ingest_header_text_prompt_uses_stable_header_operations(self) -> None:

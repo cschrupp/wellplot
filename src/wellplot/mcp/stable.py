@@ -326,7 +326,7 @@ def _mutation(
     mutate: Callable[[], object],
 ) -> dict[str, object]:
     before = _snapshot(logfile_path, target, root)
-    mutate()
+    mutation_result = mutate()
     after = _snapshot(logfile_path, target, root)
     changed, changed_fields, before_change, after_change = _mutation_evidence(before, after)
     return {
@@ -336,6 +336,7 @@ def _mutation(
         "changed_fields": changed_fields,
         "before": before_change,
         "after": after_change,
+        "already_exists": bool(getattr(mutation_result, "already_exists", False)),
         "warnings": [],
         "next_steps": [],
     }
@@ -1297,6 +1298,15 @@ def dispatch_stable_tool(
         )
 
     if name == "edit_track":
+        if operation == "add":
+            required_fields = ("section_id", "track_id", "title", "kind", "width_mm")
+            missing = [field for field in required_fields if args.get(field) is None]
+            if missing:
+                raise TemplateValidationError(
+                    "edit_track(operation='add') requires section_id, track_id, title, "
+                    "kind, and width_mm in the same call. "
+                    f"Missing: {', '.join(missing)}."
+                )
         section_id = str(_required(args, "section_id"))
         track_id = str(_required(args, "track_id"))
         target = _target("track", track_id, args)
