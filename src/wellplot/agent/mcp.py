@@ -37,11 +37,15 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
 
 
+# def _server_command() -> tuple[str, list[str]]:
+#     """Return the preferred command for launching the local stdio MCP server."""
+#     sibling_entry_point = Path(sys.executable).with_name("wellplot-mcp")
+#     if sibling_entry_point.exists():
+#         return str(sibling_entry_point), []
+#     return sys.executable, ["-m", "wellplot.mcp.server"]
+
 def _server_command() -> tuple[str, list[str]]:
-    """Return the preferred command for launching the local stdio MCP server."""
-    sibling_entry_point = Path(sys.executable).with_name("wellplot-mcp")
-    if sibling_entry_point.exists():
-        return str(sibling_entry_point), []
+    """Launch the MCP server with the same Python interpreter as the host."""
     return sys.executable, ["-m", "wellplot.mcp.server"]
 
 

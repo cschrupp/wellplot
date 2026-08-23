@@ -2996,18 +2996,18 @@ class AuthoringSession:
                     "The feedback loop stopped after repeated MCP tool errors. "
                     f"Last failure: {payload.get('error', 'unknown MCP error')}"
                 )
-            elif repeated_read_only_call:
-                signature = (
-                    name,
-                    json.dumps(call_arguments, sort_keys=True, separators=(",", ":"), default=str),
-                )
-                if read_signature_counts[signature] >= 3:
-                    controller_status = "blocked"
-                    controller_message = (
-                        "The feedback loop stopped after the same successful read-only tool call "
-                        "was repeated three times without an intervening mutation. Reuse the "
-                        "inspection result instead of polling unchanged state."
-                    )
+            # elif repeated_read_only_call:
+            #     signature = (
+            #         name,
+            #         json.dumps(call_arguments, sort_keys=True, separators=(",", ":"), default=str),
+            #     )
+            #     if read_signature_counts[signature] >= 3:
+            #         controller_status = "blocked"
+            #         controller_message = (
+            #             "The feedback loop stopped after the same successful read-only tool call "
+            #             "was repeated three times without an intervening mutation. Reuse the "
+            #             "inspection result instead of polling unchanged state."
+            #         )
             elif changed and has_checkable_postconditions:
                 if remaining is not None and not remaining:
                     controller_status = "completed"
