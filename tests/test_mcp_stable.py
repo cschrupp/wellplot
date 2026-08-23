@@ -581,6 +581,60 @@ def test_stable_remarks_accept_line_based_content() -> None:
         ]
 
 
+def test_stable_remarks_reject_missing_content_with_actionable_error() -> None:
+    """Reject title-only remarks without exposing a Pydantic traceback."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+
+        with pytest.raises(
+            TemplateValidationError,
+            match=r"edit_remarks\(operation='add'\) requires actual remark content\.",
+        ) as error:
+            dispatch_stable_tool(
+                "edit_remarks",
+                {
+                    "logfile_path": str(fixture.single_logfile),
+                    "operation": "add",
+                    "remark": {
+                        "title": "Notes",
+                        "alignment": "left",
+                    },
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+        message = str(error.value)
+        assert "Provide either non-empty remark.text" in message
+        assert "validation error for AuthoringRemarkSpec" not in message
+
+
+def test_registered_remarks_tool_translates_schema_validation_error() -> None:
+    """The registered MCP callback does not leak Pydantic validation text."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+        collector = _ToolCollector()
+        register_stable_tools(
+            collector,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+            annotation_factory=lambda values: dict(values),
+        )
+        remarks_tool = next(
+            item["function"] for item in collector.tools if item["name"] == "edit_remarks"
+        )
+
+        with pytest.raises(
+            TemplateValidationError,
+            match=r"edit_remarks\(operation='add'\) requires actual remark content\.",
+        ):
+            remarks_tool(
+                logfile_path=str(fixture.single_logfile),
+                operation="add",
+                remark={"title": "Notes", "lines": []},
+            )
+
+
 def test_stable_fill_persists_between_instance_crossover_metadata() -> None:
     """The stable fill operation preserves catalog-driven crossover styling."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:

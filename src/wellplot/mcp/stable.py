@@ -8,7 +8,7 @@ from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ..agent.tool_contract import StableToolProfile, stable_tool_profile
 from ..authoring_service import (
@@ -38,6 +38,11 @@ from . import service
 from .telemetry import dispatch_started, emit_dispatch_event, new_request_id
 
 ImageFactory = Callable[[bytes], object]
+_REMARK_CONTENT_ERROR = (
+    "edit_remarks(operation='add') requires actual remark content. "
+    "Provide either non-empty remark.text or at least one item in remark.lines. "
+    "A title/alignment alone is not a valid remark."
+)
 
 
 def _json_safe(value: object) -> object:
@@ -829,10 +834,23 @@ def _remarks_mutation(arguments: Mapping[str, object], root: str | Path) -> obje
     elif operation == "add":
         payload = arguments.get("remark")
         if not isinstance(payload, Mapping):
-            raise TemplateValidationError("remark is required for adding a remark.")
+            raise TemplateValidationError(_REMARK_CONTENT_ERROR)
+        text = payload.get("text")
+        lines = payload.get("lines")
+        if not (isinstance(text, str) and text) and not (
+            isinstance(lines, list) and lines
+        ):
+            raise TemplateValidationError(_REMARK_CONTENT_ERROR)
+        try:
+            remark = AuthoringRemarkSpec.model_validate(dict(payload))
+        except ValidationError as exc:
+            detail = exc.errors()[0].get("msg", "invalid remark fields")
+            raise TemplateValidationError(
+                f"edit_remarks(operation='add') received invalid remark fields: {detail}."
+            ) from exc
         result = authoring.create(
             CreateRemarkRequest(
-                remark=AuthoringRemarkSpec.model_validate(dict(payload)),
+                remark=remark,
                 index=arguments.get("new_index"),
             )
         )
@@ -1676,10 +1694,24 @@ def _tool_function(
         )
 
     def invoke(**kwargs: object) -> object:
-        arguments = profile.input_model.model_validate(kwargs).model_dump(
-            mode="python",
-            exclude_none=True,
-        )
+        try:
+            validated = profile.input_model.model_validate(kwargs)
+        except ValidationError as exc:
+            if profile.name == "edit_remarks" and kwargs.get("operation") == "add":
+                payload = kwargs.get("remark")
+                text = payload.get("text") if isinstance(payload, Mapping) else None
+                lines = payload.get("lines") if isinstance(payload, Mapping) else None
+                if not (isinstance(text, str) and text) and not (
+                    isinstance(lines, list) and lines
+                ):
+                    raise TemplateValidationError(_REMARK_CONTENT_ERROR) from exc
+                detail = exc.errors()[0].get("msg", "invalid remark fields")
+                raise TemplateValidationError(
+                    "edit_remarks(operation='add') received invalid remark fields: "
+                    f"{detail}."
+                ) from exc
+            raise
+        arguments = validated.model_dump(mode="python", exclude_none=True)
         return callback(arguments)
 
     invoke.__name__ = profile.name

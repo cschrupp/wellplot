@@ -47,9 +47,10 @@ def test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract() -> Non
 
     assert budget["tool_count"] <= 17
     assert budget["combined_schema_chars"] <= 40_000
-    # Typed nested fields cost more than the former coarse ``object`` annotations.
+    # Typed nested fields and conditional remark content cost more than the
+    # former coarse ``object`` annotations.
     # The wire contract remains substantially smaller than the canonical union.
-    assert budget["combined_schema_chars"] < diagnostic_chars * 0.36
+    assert budget["combined_schema_chars"] < diagnostic_chars * 0.361
 
 
 def test_profile_does_not_expose_internal_canonical_unions() -> None:
@@ -127,6 +128,8 @@ def test_remarks_tool_explains_operation_payloads() -> None:
     remarks = next(tool for tool in stable_tool_profile() if tool.name == "edit_remarks")
 
     assert "add=remark" in remarks.description
+    assert "actual content" in remarks.description
+    assert "non-empty remark.text" in remarks.description
     assert "update=remark_id+patch" in remarks.description
     assert "remove/move=remark_id" in remarks.description
     assert "clear=all" in remarks.description
@@ -136,6 +139,22 @@ def test_remarks_tool_explains_operation_payloads() -> None:
     definition_name = reference.rsplit("/", 1)[-1]
     definition = remarks.input_schema["$defs"][definition_name]
     assert {"title", "text", "lines", "alignment"} <= set(definition["properties"])
+    text_schema = next(
+        item
+        for item in definition["properties"]["text"]["anyOf"]
+        if item.get("type") == "string"
+    )
+    lines_schema = next(
+        item
+        for item in definition["properties"]["lines"]["anyOf"]
+        if item.get("type") == "array"
+    )
+    assert text_schema["minLength"] == 1
+    assert lines_schema["minItems"] == 1
+    assert {tuple(item["required"]) for item in definition["anyOf"]} == {
+        ("text",),
+        ("lines",),
+    }
 
 
 def test_fill_tool_requires_dispatch_target_fields() -> None:

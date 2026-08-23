@@ -218,7 +218,10 @@ def _union(variants: list[object]) -> object:
 def _schema_annotation(schema: Mapping[str, object], model_name: str) -> object:
     """Translate the compact contract schema into one Pydantic field annotation."""
     variants = schema.get("anyOf") or schema.get("oneOf")
-    if isinstance(variants, list):
+    has_object_properties = (
+        schema.get("type") == "object" and isinstance(schema.get("properties"), Mapping)
+    )
+    if isinstance(variants, list) and not has_object_properties:
         return _union(
             [
                 _schema_annotation(item, f"{model_name}Variant{index}")
@@ -260,6 +263,8 @@ def _schema_annotation(schema: Mapping[str, object], model_name: str) -> object:
     constraints: dict[str, object] = {}
     if isinstance(schema.get("minLength"), int):
         constraints["min_length"] = schema["minLength"]
+    if isinstance(schema.get("minItems"), int):
+        constraints["min_length"] = schema["minItems"]
     if isinstance(schema.get("minimum"), (int, float)):
         constraints["ge"] = schema["minimum"]
     if isinstance(schema.get("maximum"), (int, float)):
@@ -290,9 +295,15 @@ def _model_from_schema(
             fields[name] = (annotation, ...)
             continue
         fields[name] = (annotation | None, raw_schema.get("default"))
+    model_config: dict[str, object] = {"extra": extra}
+    for conditional_key in ("anyOf", "oneOf"):
+        conditional_schema = schema.get(conditional_key)
+        if isinstance(conditional_schema, list):
+            model_config["json_schema_extra"] = {conditional_key: conditional_schema}
+            break
     return create_model(
         model_name,
-        __config__=ConfigDict(extra=extra),
+        __config__=ConfigDict(**model_config),
         **fields,
     )
 
@@ -378,23 +389,34 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
             # the MCP schema budget.
             fields = {**fields, **canonical.get(canonical_name, {})}
         if entry.get("id") == "edit_remarks":
+            remark_properties = _fields(
+                AuthoringRemarkSpec,
+                "",
+                (
+                    "remark_id",
+                    "title",
+                    "text",
+                    "lines",
+                    "alignment",
+                    "font_size",
+                    "title_font_size",
+                    "border",
+                ),
+            )
+            remark_properties["text"] = {"type": "string", "minLength": 1}
+            remark_properties["lines"] = {
+                "type": "array",
+                "items": {"type": "string"},
+                "minItems": 1,
+            }
             fields["remark"] = {
                 "type": "object",
                 "additionalProperties": False,
-                "properties": _fields(
-                    AuthoringRemarkSpec,
-                    "",
-                    (
-                        "remark_id",
-                        "title",
-                        "text",
-                        "lines",
-                        "alignment",
-                        "font_size",
-                        "title_font_size",
-                        "border",
-                    ),
-                ),
+                "properties": remark_properties,
+                "anyOf": [
+                    {"required": ["text"]},
+                    {"required": ["lines"]},
+                ],
             }
         mode = str(entry.get("mode", "mutation"))
         operations = entry.get("operations")

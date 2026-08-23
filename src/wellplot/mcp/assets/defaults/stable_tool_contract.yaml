@@ -69,7 +69,7 @@ tools:
       depth_range: object
       style_patch: object
   - id: edit_remarks
-    description: 'Remarks operations: add=remark{title,text,lines,alignment}; update=remark_id+patch; remove/move=remark_id; clear=all.'
+    description: 'Remarks operations: add=remark{title,text,lines,alignment}; add requires actual content in non-empty remark.text or at least one item in remark.lines; title/alignment alone is invalid. update=remark_id+patch; remove/move=remark_id; clear=all.'
     mode: mutation
     operations: [add, update, remove, move, clear]
     destructive: true
