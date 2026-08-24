@@ -206,6 +206,24 @@ def test_raster_display_contract_validates_nested_controls() -> None:
         AuthoringRasterSampleAxisSpec(source_origin=40, source_step=0)
 
 
+def test_raster_color_limits_match_profile_normalization() -> None:
+    """Reject ranges that cannot be consumed by the selected raster profile."""
+    with pytest.raises(ValidationError, match="VDL color_limits must straddle zero"):
+        RasterBindingSpec(
+            binding_id="vdl_invalid_limits",
+            channel="VDL",
+            profile=AuthoringRasterProfileKind.VDL,
+            color_limits=(0, 1),
+        )
+
+    with pytest.raises(ValidationError, match="strictly increasing"):
+        RasterBindingSpec(
+            binding_id="raster_invalid_limits",
+            channel="IMAGE",
+            color_limits=(1, 1),
+        )
+
+
 def test_grid_contract_validates_logarithmic_spacing_and_alpha() -> None:
     """Expose deterministic grid properties with the same validation rules as scales."""
     grid = AuthoringGridSpec(

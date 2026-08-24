@@ -614,6 +614,19 @@ class RasterBindingSpec(_AuthoringModel):
     waveform: AuthoringRasterWaveformSpec = Field(default_factory=AuthoringRasterWaveformSpec)
     extensions: dict[str, Any] = Field(default_factory=dict)
 
+    @model_validator(mode="after")
+    def validate_color_limits(self) -> RasterBindingSpec:
+        """Validate limits against the normalization used by the raster profile."""
+        if self.color_limits is None:
+            return self
+
+        minimum, maximum = self.color_limits
+        if minimum >= maximum:
+            raise ValueError("Raster color_limits must be strictly increasing.")
+        if self.profile == AuthoringRasterProfileKind.VDL and not minimum < 0 < maximum:
+            raise ValueError("VDL color_limits must straddle zero for centered normalization.")
+        return self
+
 
 BindingSpec: TypeAlias = Annotated[
     CurveBindingSpec | RasterBindingSpec,

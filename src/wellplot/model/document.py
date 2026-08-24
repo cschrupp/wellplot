@@ -1120,6 +1120,12 @@ class RasterElement:
                 raise ValueError("Raster clip_percentiles must be increasing.")
         if self.raster_alpha < 0 or self.raster_alpha > 1:
             raise ValueError("Raster raster_alpha must be between 0 and 1.")
+        if self.color_limits is not None:
+            minimum, maximum = self.color_limits
+            if minimum >= maximum:
+                raise ValueError("Raster color_limits must be strictly increasing.")
+            if self.profile == RasterProfileKind.VDL and not minimum < 0 < maximum:
+                raise ValueError("VDL color_limits must straddle zero for centered normalization.")
         if self.colorbar_label is not None and not str(self.colorbar_label).strip():
             raise ValueError("Raster colorbar_label must be non-empty when provided.")
         if self.sample_axis_label is not None and not str(self.sample_axis_label).strip():

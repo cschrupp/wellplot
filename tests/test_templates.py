@@ -718,6 +718,33 @@ class TemplateTests(unittest.TestCase):
         self.assertFalse(element.show_raster)
         self.assertTrue(element.waveform.enabled)
 
+    def test_vdl_color_limits_reject_renderer_invalid_range(self) -> None:
+        """Reject VDL limits that would make centered normalization invalid."""
+        with self.assertRaisesRegex(ValueError, "VDL color_limits must straddle zero"):
+            document_from_mapping(
+                {
+                    "name": "invalid VDL limits",
+                    "page": {"size": "A4"},
+                    "depth": {"unit": "m", "scale": "1:200"},
+                    "tracks": [
+                        {
+                            "id": "vdl",
+                            "title": "VDL",
+                            "kind": "array",
+                            "width_mm": 40,
+                            "elements": [
+                                {
+                                    "kind": "raster",
+                                    "channel": "VDL",
+                                    "profile": "vdl",
+                                    "color_limits": [0, 1],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+
     def test_curve_track_rejects_raster_elements(self) -> None:
         """Reject raster elements inside scalar curve tracks."""
         with self.assertRaises(ValueError):
