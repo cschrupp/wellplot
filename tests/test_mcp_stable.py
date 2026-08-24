@@ -638,6 +638,78 @@ def test_stable_track_add_rejects_conflicting_existing_definition() -> None:
             )
 
 
+def test_stable_curve_add_is_idempotent_for_equivalent_definition() -> None:
+    """A retry of an equivalent curve add is a successful, non-mutating no-op."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "curve-add.log.yaml"
+        _seed_draft(draft)
+        arguments = {
+            "logfile_path": str(draft),
+            "operation": "add",
+            "section_id": "main_pass",
+            "track_id": "depth",
+            "channel": "ECGR_STGC",
+            "binding_id": "test.depth.ECGR_STGC.1",
+            "label": "Gamma Ray",
+            "style": {"color": "#16a34a"},
+        }
+
+        first = dispatch_stable_tool(
+            "edit_curve_binding",
+            arguments,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+        first_bytes = draft.read_bytes()
+        second = dispatch_stable_tool(
+            "edit_curve_binding",
+            arguments,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert first["ok"] is True
+        assert first["changed"] is True
+        assert first["already_exists"] is False
+        assert second["ok"] is True
+        assert second["changed"] is False
+        assert second["already_exists"] is True
+        assert draft.read_bytes() == first_bytes
+
+
+def test_stable_curve_add_rejects_conflicting_existing_definition() -> None:
+    """A conflicting curve add tells the provider to use update instead."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "curve-add.log.yaml"
+        _seed_draft(draft)
+        arguments = {
+            "logfile_path": str(draft),
+            "operation": "add",
+            "section_id": "main_pass",
+            "track_id": "depth",
+            "channel": "ECGR_STGC",
+            "binding_id": "test.depth.ECGR_STGC.1",
+            "label": "Gamma Ray",
+        }
+        dispatch_stable_tool(
+            "edit_curve_binding",
+            arguments,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        with pytest.raises(
+            TemplateValidationError,
+            match=r"Use edit_curve_binding\(operation='update'\)",
+        ):
+            dispatch_stable_tool(
+                "edit_curve_binding",
+                {**arguments, "label": "Different Gamma Ray"},
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
 def test_stable_track_update_syncs_grid_to_log_scale() -> None:
     """Keep logarithmic grid metadata synchronized for ordinary track updates."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:

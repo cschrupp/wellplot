@@ -791,6 +791,8 @@ class BoundCurveResult:
     channel: str
     binding_kind: str
     binding_count: int
+    changed: bool = True
+    already_exists: bool = False
 
 
 @dataclass(slots=True)
@@ -4860,6 +4862,44 @@ def _binding_content(binding: dict[str, object]) -> dict[str, object]:
     return content
 
 
+def _canonical_curve_binding_content(
+    mapping: dict[str, object],
+    binding: dict[str, object],
+) -> dict[str, object]:
+    """Normalize one curve binding through the typed authoring model."""
+    binding_id = str(binding.get("id", "")).strip()
+    section_id = str(binding.get("section", "")).strip()
+    track_id = str(binding.get("track_id", "")).strip()
+    if not binding_id or not section_id or not track_id:
+        return _binding_content(binding)
+
+    projected_mapping = deepcopy(mapping)
+    projected_bindings = _logfile_mapping_bindings(projected_mapping)
+    replacement_index = next(
+        (
+            index
+            for index, existing in enumerate(projected_bindings)
+            if isinstance(existing, dict) and str(existing.get("id", "")).strip() == binding_id
+        ),
+        None,
+    )
+    if replacement_index is None:
+        projected_bindings.append(deepcopy(binding))
+    else:
+        projected_bindings[replacement_index] = deepcopy(binding)
+
+    authoring = AuthoringService.from_mapping(projected_mapping)
+    canonical = authoring.get(
+        AuthoringTarget(
+            object_kind="curve_binding",
+            object_id=binding_id,
+            section_id=section_id,
+            track_id=track_id,
+        )
+    )
+    return canonical.model_dump(mode="json", exclude={"extensions"})
+
+
 def _binding_lists_equivalent(
     source_bindings: list[dict[str, object]],
     target_bindings: list[dict[str, object]],
@@ -7143,14 +7183,6 @@ def bind_curve(
         normalized_binding_id = str(binding_id).strip()
         if not normalized_binding_id:
             raise TemplateValidationError("binding_id must be non-empty when provided.")
-        if any(
-            isinstance(binding, dict)
-            and str(binding.get("id", "")).strip() == normalized_binding_id
-            for binding in bindings
-        ):
-            raise TemplateValidationError(
-                f"Curve binding id {normalized_binding_id!r} already exists in this draft."
-            )
     else:
         normalized_binding_id = None
 
@@ -7170,6 +7202,38 @@ def bind_curve(
         binding["scale"] = _legacy_scale_payload(scale)
     if header_display is not None:
         binding["header_display"] = deepcopy(header_display)
+
+    if normalized_binding_id is not None:
+        existing_binding = next(
+            (
+                existing
+                for existing in bindings
+                if isinstance(existing, dict)
+                and str(existing.get("id", "")).strip() == normalized_binding_id
+            ),
+            None,
+        )
+        if existing_binding is not None:
+            if _canonical_curve_binding_content(mapping, existing_binding) == (
+                _canonical_curve_binding_content(mapping, binding)
+            ):
+                binding_count = _binding_counts_by_section(current_spec)[section_id]["curve"]
+                return BoundCurveResult(
+                    logfile_path=str(resolved_logfile),
+                    section_id=section_id,
+                    track_id=track_id,
+                    channel=resolved_channel,
+                    binding_kind="curve",
+                    binding_count=binding_count,
+                    changed=False,
+                    already_exists=True,
+                )
+            raise TemplateValidationError(
+                f"Curve binding id {normalized_binding_id!r} already exists with "
+                "different properties. Use edit_curve_binding(operation='update') "
+                "instead of add."
+            )
+
     bindings.append(binding)
 
     saved_spec = _persist_validated_logfile_mapping(
@@ -7186,6 +7250,8 @@ def bind_curve(
         channel=resolved_channel,
         binding_kind="curve",
         binding_count=binding_count,
+        changed=True,
+        already_exists=False,
     )
 
 

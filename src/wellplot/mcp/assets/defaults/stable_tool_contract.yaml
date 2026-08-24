@@ -144,11 +144,12 @@ tools:
       track_header: object
       annotations: object_list
   - id: edit_curve_binding
-    description: Add, update, remove, or clear scalar curve bindings.
+    description: Add, update, remove, or clear scalar curve bindings. section_id, track_id, and channel are required for every operation. A retry of an equivalent add with the same binding_id is a successful no-op; a conflicting definition must use operation=update.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: curve
     destructive: true
+    required: [section_id, track_id, channel]
     fields:
       section_id: string
       track_id: string
@@ -161,11 +162,12 @@ tools:
       wrap: boolean
       render_mode: [line, value_labels]
   - id: edit_raster_binding
-    description: Add, update, remove, or clear array/raster bindings.
+    description: Add, update, remove, or clear array/raster bindings. section_id, track_id, and channel are required for every operation.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: raster
     destructive: true
+    required: [section_id, track_id, channel]
     fields:
       section_id: string
       track_id: string

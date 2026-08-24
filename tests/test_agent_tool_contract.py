@@ -92,6 +92,15 @@ def test_binding_and_remarks_tools_expose_one_public_payload_shape() -> None:
     assert {"remark", "patch"} <= remarks_fields
 
 
+def test_binding_tools_require_target_scope_and_channel() -> None:
+    """Binding calls carry the complete target identity on the public wire."""
+    profile = {tool.name: tool for tool in stable_tool_profile()}
+
+    for tool_name in ("edit_curve_binding", "edit_raster_binding"):
+        required = set(profile[tool_name].input_schema["required"])
+        assert {"section_id", "track_id", "channel"} <= required
+
+
 def test_high_risk_nested_fields_are_not_unconstrained_objects() -> None:
     """Scale/style fields that triggered provider repair logic remain typed on the wire."""
     profile = {tool.name: tool for tool in stable_tool_profile()}
