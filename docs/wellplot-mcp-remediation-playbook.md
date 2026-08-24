@@ -1221,6 +1221,31 @@ failure. This slice is complete only when those checks pass through both the
 service and stable MCP projections. The later S7 host-loop reductions must not
 be used to compensate for a failing boundary contract.
 
+## S7.1 - Measure trajectory efficiency without suppressing inspection
+
+The successful CBL trajectory established that the remaining cost is mostly
+real authoring work plus repeated inspection, not controller failure. Before
+removing any inspection behavior, capture enough metadata to classify it.
+
+Stable mutation and inspection results expose a content-derived `revision`
+hash. Opt-in MCP telemetry records only metadata: argument hash, operation,
+object scope, inspection detail, draft revision, result size, elapsed time, and
+error class. It must not write argument or document payloads.
+
+Classify inspections by revision and scope:
+
+- initial discovery or dependency discovery: retain;
+- state required by a dependent mutation: retain;
+- immediate verification after a successful mutation: candidate for guidance
+  improvement, not a runtime suppression rule;
+- exact duplicate at the same revision: provider inefficiency;
+- broad inspection when a narrow scope was sufficient: guidance/catalog issue.
+
+Run the complete benchmark repeatedly and record total operations, inspection
+counts, tool errors, result volume, latency, and final-state verifier status.
+Do not add an anti-inspection controller branch. Any later reduction must be
+justified by this evidence and preserve the frozen CBL verifier result.
+
 ## Goal
 
 Remove compensating logic made unnecessary by the repaired MCP boundary.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import asdict, is_dataclass
@@ -361,6 +362,21 @@ def _draft_text(logfile_path: str, root: str | Path) -> str | None:
     return resolved.read_text(encoding="utf-8")
 
 
+def _document_revision(logfile_path: str, root: str | Path) -> str | None:
+    """Return a stable content revision for one persisted draft."""
+    try:
+        resolved = service._resolve_user_path(
+            logfile_path,
+            root=service.resolve_server_root(root),
+            context="logfile_path",
+        )
+        if not resolved.is_file():
+            return None
+        return hashlib.sha256(resolved.read_bytes()).hexdigest()
+    except (OSError, ValueError, TemplateValidationError):
+        return None
+
+
 def _mutation(
     logfile_path: str,
     target: Mapping[str, object],
@@ -380,6 +396,7 @@ def _mutation(
         "after": after_change,
         "already_exists": bool(getattr(mutation_result, "already_exists", False)),
         "id_map": dict(getattr(mutation_result, "id_map", {}) or {}),
+        "revision": _document_revision(logfile_path, root),
         "warnings": [],
         "next_steps": [],
     }
@@ -440,6 +457,7 @@ def _scale_mutation(
         "changed_fields": changed_fields,
         "before": before_change,
         "after": after_change,
+        "revision": _document_revision(logfile_path, root),
         "warnings": [],
         "next_steps": [],
     }
@@ -492,6 +510,7 @@ def _matplotlib_style_mutation(
         "changed_fields": changed_fields,
         "before": before_change,
         "after": after_change,
+        "revision": _document_revision(logfile_path, root),
         "warnings": [],
         "next_steps": [],
     }
@@ -978,6 +997,7 @@ def dispatch_stable_tool(
             "starter": str(starter),
             "section_ids": summary.section_ids,
             "section_count": len(summary.section_ids),
+            "revision": _document_revision(output, root),
             "warnings": [],
             "next_steps": [],
         }
@@ -1005,6 +1025,7 @@ def dispatch_stable_tool(
         return {
             "ok": True,
             "items": items,
+            "revision": _document_revision(logfile_path, root),
             "warnings": [],
             "next_steps": [],
         }
@@ -1050,6 +1071,7 @@ def dispatch_stable_tool(
         response: dict[str, object] = {
             "ok": True,
             "items": items,
+            "revision": _document_revision(logfile_path, root) if logfile_path else None,
             "warnings": [],
             "next_steps": [],
             "source_path": None,
@@ -1099,6 +1121,7 @@ def dispatch_stable_tool(
             "valid": result.valid,
             "errors": [] if result.valid else [result.message],
             "validation_level": result.validation_level,
+            "revision": _document_revision(logfile_path, root),
             "warnings": [],
             "next_steps": [],
         }
@@ -1179,6 +1202,7 @@ def dispatch_stable_tool(
                 "changed_fields": changed_fields,
                 "before": before_change,
                 "after": after_change,
+                "revision": _document_revision(logfile_path, root),
                 "logfile_path": applied.logfile_path,
                 "overwrite_policy": applied.overwrite_policy,
                 "applied_assignments": applied.applied_assignments,

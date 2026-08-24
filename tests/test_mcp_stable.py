@@ -109,6 +109,54 @@ def test_stable_dispatch_telemetry_is_opt_in_and_preserves_result(
     assert "result" not in event
 
 
+def test_stable_telemetry_classifies_scope_and_revision(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Record inspect scope and a shared draft revision without payload contents."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+        telemetry_path = Path(temp_dir) / "telemetry" / "dispatch.jsonl"
+        monkeypatch.setenv(TELEMETRY_PATH_ENV, str(telemetry_path))
+        collector = _ToolCollector()
+        register_stable_tools(
+            collector,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+            annotation_factory=lambda values: dict(values),
+        )
+        tools = {str(item["name"]): item["function"] for item in collector.tools}
+
+        mutation = tools["edit_section"](
+            logfile_path=str(fixture.single_logfile),
+            operation="update",
+            section_id="main",
+            subtitle="Telemetry revision",
+        )
+        inspection = tools["inspect_authoring"](
+            logfile_path=str(fixture.single_logfile),
+            object_kind="track",
+            section_id="main",
+            detail="summary",
+        )
+        events = [
+            json.loads(line)
+            for line in telemetry_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+
+        assert mutation["revision"]
+        assert inspection["revision"] == mutation["revision"]
+        assert events[0]["operation"] == "update"
+        assert events[0]["section_id"] == "main"
+        assert events[0]["draft_revision"] == mutation["revision"]
+        assert events[1]["object_kind"] == "track"
+        assert events[1]["detail"] == "summary"
+        assert events[1]["draft_revision"] == mutation["revision"]
+        assert len(events[1]["argument_sha256"]) == 64
+        assert "arguments" not in events[1]
+        assert "result" not in events[1]
+
+
 def test_stable_mutation_matches_direct_authoring_service() -> None:
     """A projected section edit produces the same canonical document as the API."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:

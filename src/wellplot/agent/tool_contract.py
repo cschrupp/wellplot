@@ -49,6 +49,7 @@ class _StableResult(BaseModel):
 
     warnings: list[str]
     next_steps: list[str]
+    revision: str | None = None
 
 
 class StableInspectionResult(_StableResult):
