@@ -1152,6 +1152,30 @@ transient infrastructure
 
 Do not add a heuristic until the failure has a category and repeatable reproduction.
 
+### Step 8 — Green baseline certification for the CBL packet
+
+The CBL/VDL one-shot notebook is a stress benchmark, not an authority for
+deciding whether the packet is complete. After the last mutation, run the
+independent deterministic verifier before rendering:
+
+```bash
+uv run python scripts/verify_cbl_packet.py workspace/tutorials/agent_cbl_log_example_from_prompt/agent_cbl_log_example_draft.log.yaml
+```
+
+The verifier loads the typed document and checks the requested header values,
+remarks, section order and sources, track kinds and widths, curve scales and
+styles, duplicate CBL bindings, VDL raster presentation, grid visibility, and
+page/report settings. It emits a SHA-256 hash of the checked YAML and exits
+non-zero on any defect. The notebook must use this result in the order
+`last mutation -> verifier -> final render`; a provider report is not a
+substitute for the verifier.
+
+Freeze the verifier JSON, final YAML hash, notebook output, tool trace,
+provider/model, round limit, schema fingerprint, validation result, and final
+render as one evidence bundle for each successful provider run. The verifier
+is intentionally CBL-specific evaluation code and must not become a runtime
+packet builder or a new host-agent heuristic.
+
 ## Acceptance criteria
 
 Before S7 starts:
@@ -1161,6 +1185,8 @@ Before S7 starts:
 - Deterministic suite has complete expected assertions.
 - Live baseline exists for at least two materially different providers.
 - Remaining failures are categorized.
+- The CBL packet has a green deterministic final-state verification result
+  before its final render is accepted.
 
 ## Suggested PR / evidence package
 

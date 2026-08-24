@@ -60,8 +60,11 @@ def test_release_metadata_and_notebook_prompts_are_user_facing() -> None:
     cbl_source = _notebook_source(notebook_paths[1])
     assert "AGENT_OPTION" in cbl_source
     assert "provider=PROVIDER" in cbl_source
-    assert "_require_cbl_packet_ready" in cbl_source
+    assert "verify_cbl_packet" in cbl_source
+    assert '"preview_logfile"' in cbl_source
     assert "CBL packet acceptance failed before render" in cbl_source
+    assert cbl_source.index("verify_cbl_packet") < cbl_source.index('"preview_logfile"')
+    assert cbl_source.index('"preview_logfile"') < cbl_source.index("render_logfile_to_file")
 
 
 def test_release_documentation_explains_optional_defaults_and_diagnostics() -> None:
