@@ -109,7 +109,7 @@ tools:
             type: string
             minLength: 1
   - id: replicate_section_structure
-    description: Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks.
+    description: 'Copy one existing section''s validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks. The operation is retry-safe: an equivalent existing target returns a successful no-op with already_exists=true and a stable source-to-target id_map; a conflicting target fails unless overwrite=true.'
     mode: mutation
     operations: [replicate]
     fields:

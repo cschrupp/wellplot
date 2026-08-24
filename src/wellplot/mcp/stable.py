@@ -379,6 +379,7 @@ def _mutation(
         "before": before_change,
         "after": after_change,
         "already_exists": bool(getattr(mutation_result, "already_exists", False)),
+        "id_map": dict(getattr(mutation_result, "id_map", {}) or {}),
         "warnings": [],
         "next_steps": [],
     }

@@ -1198,6 +1198,29 @@ Store evaluation reports as versioned artifacts under the existing evidence stru
 
 # 14. Slice S7 — Simplify the Host Agent Loop
 
+## S7.0 — Repair mutation idempotency before host simplification
+
+The first S7 boundary slice keeps `core.py` frozen and repairs the generic
+section replication contract at the MCP service boundary. This is deliberately
+not a packet-specific recovery path.
+
+For `replicate_section_structure(operation="replicate")`:
+
+- an absent target is created and returns `changed=true`;
+- an equivalent existing target is a successful no-op with
+  `changed=false` and `already_exists=true`;
+- a conflicting existing target returns an explicit error and is not silently
+  overwritten;
+- copied bindings receive deterministic target identities and the mutation
+  receipt returns a source-to-target `id_map`;
+- `overwrite=true` remains the explicit replacement behavior.
+
+The acceptance tests must verify the first-call mutation, an identical retry
+without file-byte changes, stable `id_map` values, and a conflicting-target
+failure. This slice is complete only when those checks pass through both the
+service and stable MCP projections. The later S7 host-loop reductions must not
+be used to compensate for a failing boundary contract.
+
 ## Goal
 
 Remove compensating logic made unnecessary by the repaired MCP boundary.
@@ -1614,9 +1637,12 @@ Use this section during implementation reviews.
 ## `replicate_section_structure`
 
 - [ ] Schema clearly defines source/target semantics.
-- [ ] Result summarizes created/changed IDs only.
+- [x] Equivalent retries are successful no-ops with `changed=false` and
+  `already_exists=true`.
+- [x] Result returns a deterministic source-to-target binding `id_map`.
+- [x] Conflicting targets fail without silent overwrite.
 - [ ] Canonical references remain valid after replication.
-- [ ] Cross-section ID collision tests exist.
+- [x] Cross-section ID collision and retry tests exist.
 
 ## `validate_logfile`
 

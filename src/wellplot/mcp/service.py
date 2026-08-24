@@ -1044,6 +1044,9 @@ class ReplicatedSectionStructureResult:
     copied_track_ids: list[str]
     curve_binding_count: int
     raster_binding_count: int
+    id_map: dict[str, str]
+    changed: bool
+    already_exists: bool
 
 
 @dataclass(slots=True)
@@ -4809,6 +4812,179 @@ def set_section_data_source(
     )
 
 
+def _section_bindings(
+    spec: LogFileSpec,
+    bindings: list[dict[str, object]],
+    section_id: str,
+) -> list[dict[str, object]]:
+    """Return bindings resolved to one section in their persisted order."""
+    return [
+        binding
+        for binding in bindings
+        if isinstance(binding, dict) and _binding_target_section_id(spec, binding) == section_id
+    ]
+
+
+def _binding_identity(
+    binding: dict[str, object],
+    *,
+    section_id: str,
+    sibling_bindings: list[dict[str, object]],
+    index: int,
+) -> str:
+    """Return the persisted or canonical identity of one binding occurrence."""
+    raw_id = str(binding.get("id", "")).strip()
+    if raw_id:
+        return raw_id
+
+    kind = str(binding.get("kind", "curve")).strip().lower()
+    track_id = str(binding.get("track_id", "")).strip()
+    channel = str(binding.get("channel", "")).strip()
+    occurrence = 1
+    for previous in sibling_bindings[:index]:
+        if (
+            str(previous.get("kind", "curve")).strip().lower() == kind
+            and str(previous.get("track_id", "")).strip() == track_id
+            and str(previous.get("channel", "")).strip().upper() == channel.upper()
+        ):
+            occurrence += 1
+    return f"{section_id}.{track_id}.{channel}.{occurrence}"
+
+
+def _binding_content(binding: dict[str, object]) -> dict[str, object]:
+    """Remove identities that must not affect replication equivalence."""
+    content = deepcopy(binding)
+    content.pop("id", None)
+    content.pop("section", None)
+    return content
+
+
+def _binding_lists_equivalent(
+    source_bindings: list[dict[str, object]],
+    target_bindings: list[dict[str, object]],
+) -> bool:
+    """Compare binding definitions while ignoring section and instance ids."""
+    if len(source_bindings) != len(target_bindings):
+        return False
+    return all(
+        _binding_content(source) == _binding_content(target)
+        for source, target in zip(source_bindings, target_bindings, strict=True)
+    )
+
+
+def _unique_binding_id(base_id: str, taken_ids: set[str]) -> str:
+    """Return a deterministic unused binding id."""
+    candidate = base_id
+    suffix = 2
+    while candidate in taken_ids:
+        candidate = f"{base_id}.{suffix}"
+        suffix += 1
+    taken_ids.add(candidate)
+    return candidate
+
+
+def _clone_section_bindings(
+    source_bindings: list[dict[str, object]],
+    *,
+    source_section_id: str,
+    target_section_id: str,
+    taken_ids: set[str],
+) -> tuple[list[dict[str, object]], dict[str, str]]:
+    """Clone bindings with deterministic target identities and an id map."""
+    copied_bindings: list[dict[str, object]] = []
+    id_map: dict[str, str] = {}
+    source_prefix = f"{source_section_id}."
+    for index, binding in enumerate(source_bindings):
+        cloned_binding = deepcopy(binding)
+        source_id = _binding_identity(
+            binding,
+            section_id=source_section_id,
+            sibling_bindings=source_bindings,
+            index=index,
+        )
+        raw_id = str(binding.get("id", "")).strip()
+        if raw_id.startswith(source_prefix):
+            target_base_id = f"{target_section_id}.{raw_id[len(source_prefix) :]}"
+        elif raw_id:
+            target_base_id = f"{target_section_id}.{raw_id}"
+        else:
+            target_base_id = source_id.replace(
+                source_prefix,
+                f"{target_section_id}.",
+                1,
+            )
+        target_id = _unique_binding_id(target_base_id, taken_ids)
+        cloned_binding["id"] = target_id
+        cloned_binding["section"] = target_section_id
+        copied_bindings.append(cloned_binding)
+        id_map[source_id] = target_id
+    return copied_bindings, id_map
+
+
+def _existing_binding_id_map(
+    source_bindings: list[dict[str, object]],
+    target_bindings: list[dict[str, object]],
+    *,
+    source_section_id: str,
+    target_section_id: str,
+) -> dict[str, str]:
+    """Map source binding identities to equivalent persisted target identities."""
+    id_map: dict[str, str] = {}
+    for index, (source, target) in enumerate(zip(source_bindings, target_bindings, strict=True)):
+        source_id = _binding_identity(
+            source,
+            section_id=source_section_id,
+            sibling_bindings=source_bindings,
+            index=index,
+        )
+        target_id = _binding_identity(
+            target,
+            section_id=target_section_id,
+            sibling_bindings=target_bindings,
+            index=index,
+        )
+        id_map[source_id] = target_id
+    return id_map
+
+
+def _replication_section_candidate(
+    source_section: dict[str, object],
+    *,
+    target_section_id: str,
+    title: str | None,
+    subtitle: str | None,
+    source_path: str | None,
+    source_format: str,
+    logfile_path: Path,
+    root: Path,
+) -> dict[str, object]:
+    """Build the section definition used for replication comparison."""
+    candidate = deepcopy(source_section)
+    candidate["id"] = target_section_id
+    if title is not None:
+        candidate["title"] = str(title)
+    if subtitle is not None:
+        candidate["subtitle"] = str(subtitle)
+    if source_path is not None:
+        resolved_source = _resolve_user_path(source_path, root=root, context="source_path")
+        detected_format = _detect_source_format(resolved_source, source_format)
+        source_data = candidate.get("data")
+        if not isinstance(source_data, dict):
+            source_data = {}
+            candidate["data"] = source_data
+        source_data["source_path"] = Path(
+            os.path.relpath(resolved_source, start=logfile_path.parent)
+        ).as_posix()
+        source_data["source_format"] = detected_format
+    elif source_format != "auto":
+        source_data = candidate.get("data")
+        if not isinstance(source_data, dict):
+            source_data = {}
+            candidate["data"] = source_data
+        source_data["source_format"] = _normalize_source_format(source_format)
+    return candidate
+
+
 def replicate_section_structure(
     logfile_path: str,
     *,
@@ -4842,12 +5018,9 @@ def replicate_section_structure(
         if str(section.get("id", "")) == target_section_id:
             existing_target_index = index
             break
-    if existing_target_index is not None and not overwrite:
-        raise TemplateValidationError(
-            f"Section {target_section_id!r} already exists. Pass overwrite=True to replace it."
-        )
-
-    bindings = _logfile_mapping_bindings(mapping)
+    working_mapping = deepcopy(mapping)
+    working_sections = _logfile_mapping_sections(working_mapping)
+    working_bindings = _logfile_mapping_bindings(working_mapping)
 
     # Once one section is replicated, track ids usually repeat across sections.
     # Materialize explicit section ids on existing bindings first so previously
@@ -4864,7 +5037,7 @@ def replicate_section_structure(
             if not section_name or not track_id:
                 continue
             track_sections.setdefault(track_id, []).append(section_name)
-    for binding in bindings:
+    for binding in working_bindings:
         if not isinstance(binding, dict):
             continue
         if str(binding.get("section", "")).strip():
@@ -4884,43 +5057,104 @@ def replicate_section_structure(
             "Set document.bindings.channels[].section explicitly."
         )
 
+    source_bindings = _section_bindings(current_spec, working_bindings, source_section_id)
+    target_bindings = (
+        _section_bindings(current_spec, working_bindings, target_section_id)
+        if existing_target_index is not None
+        else []
+    )
+    candidate_section = _replication_section_candidate(
+        source_section,
+        target_section_id=target_section_id,
+        title=title,
+        subtitle=subtitle,
+        source_path=source_path,
+        source_format=source_format,
+        logfile_path=resolved_logfile,
+        root=server_root,
+    )
+    candidate_bindings: list[dict[str, object]] = []
+    id_map: dict[str, str] = {}
+    if include_bindings:
+        taken_ids = {
+            str(binding.get("id", "")).strip()
+            for binding in working_bindings
+            if isinstance(binding, dict) and str(binding.get("id", "")).strip()
+        }
+        if existing_target_index is not None:
+            for binding in target_bindings:
+                taken_ids.discard(str(binding.get("id", "")).strip())
+        candidate_bindings, id_map = _clone_section_bindings(
+            source_bindings,
+            source_section_id=source_section_id,
+            target_section_id=target_section_id,
+            taken_ids=taken_ids,
+        )
+
     if existing_target_index is not None:
-        sections.pop(existing_target_index)
+        existing_target = sections[existing_target_index]
+        target_matches = (
+            isinstance(existing_target, dict)
+            and existing_target == candidate_section
+            and (
+                include_bindings
+                and _binding_lists_equivalent(source_bindings, target_bindings)
+                or not include_bindings
+                and not target_bindings
+            )
+        )
+        if target_matches and not overwrite:
+            counts = {"curve": 0, "raster": 0}
+            for binding in target_bindings:
+                kind = str(binding.get("kind", "curve")).strip().lower()
+                if kind in counts:
+                    counts[kind] += 1
+            return ReplicatedSectionStructureResult(
+                logfile_path=str(resolved_logfile),
+                source_section_id=source_section_id,
+                target_section_id=target_section_id,
+                include_bindings=include_bindings,
+                copied_track_ids=[
+                    str(track.get("id", ""))
+                    for track in list(candidate_section.get("tracks", []))
+                    if isinstance(track, dict)
+                ],
+                curve_binding_count=counts["curve"],
+                raster_binding_count=counts["raster"],
+                id_map=_existing_binding_id_map(
+                    source_bindings,
+                    target_bindings,
+                    source_section_id=source_section_id,
+                    target_section_id=target_section_id,
+                )
+                if include_bindings
+                else {},
+                changed=False,
+                already_exists=True,
+            )
+        if not overwrite:
+            raise TemplateValidationError(
+                f"Section {target_section_id!r} already exists with different properties. "
+                "Use overwrite=True to replace it."
+            )
+
+        working_sections.pop(existing_target_index)
         remaining_bindings: list[dict[str, object]] = []
-        for binding in bindings:
+        for binding in working_bindings:
             if not isinstance(binding, dict):
                 continue
             if _binding_target_section_id(current_spec, binding) == target_section_id:
                 continue
             remaining_bindings.append(binding)
-        bindings[:] = remaining_bindings
+        working_bindings[:] = remaining_bindings
 
-    source_section["id"] = target_section_id
-    if title is not None:
-        source_section["title"] = str(title)
-    if subtitle is not None:
-        source_section["subtitle"] = str(subtitle)
     if source_path is not None:
-        _, resolved_source_path, detected_format = _load_dataset_from_source_path(
+        _load_dataset_from_source_path(
             source_path,
             source_format=source_format,
             root=server_root,
         )
-        source_data = source_section.get("data")
-        if not isinstance(source_data, dict):
-            source_data = {}
-            source_section["data"] = source_data
-        source_data["source_path"] = Path(
-            os.path.relpath(resolved_source_path, start=resolved_logfile.parent)
-        ).as_posix()
-        source_data["source_format"] = detected_format
-    elif source_format != "auto":
-        source_data = source_section.get("data")
-        if not isinstance(source_data, dict):
-            source_data = {}
-            source_section["data"] = source_data
-        source_data["source_format"] = _normalize_source_format(source_format)
-
+    source_section = candidate_section
     source_track_ids = [
         str(track.get("id", ""))
         for track in list(source_section.get("tracks", []))
@@ -4929,27 +5163,18 @@ def replicate_section_structure(
     insert_index = next(
         (
             index + 1
-            for index, section in enumerate(sections)
+            for index, section in enumerate(working_sections)
             if isinstance(section, dict) and str(section.get("id", "")) == source_section_id
         ),
-        len(sections),
+        len(working_sections),
     )
-    sections.insert(insert_index, source_section)
+    working_sections.insert(insert_index, source_section)
 
     if include_bindings:
-        copied_bindings: list[dict[str, object]] = []
-        for binding in list(bindings):
-            if not isinstance(binding, dict):
-                continue
-            if _binding_target_section_id(current_spec, binding) != source_section_id:
-                continue
-            cloned_binding = deepcopy(binding)
-            cloned_binding["section"] = target_section_id
-            copied_bindings.append(cloned_binding)
-        bindings.extend(copied_bindings)
+        working_bindings.extend(candidate_bindings)
 
-    _persist_validated_logfile_mapping(
-        mapping,
+    saved_spec = _persist_validated_logfile_mapping(
+        working_mapping,
         logfile_path=resolved_logfile,
         root=server_root,
         validation_level="data" if include_bindings or source_path is not None else "structural",
@@ -4957,6 +5182,17 @@ def replicate_section_structure(
     saved_summary = summarize_logfile_draft(str(resolved_logfile), root=server_root)
     saved_section = next(
         section for section in saved_summary.sections if section.id == target_section_id
+    )
+    saved_bindings = _logfile_mapping_bindings(report_to_dict(saved_spec))
+    persisted_id_map = (
+        _existing_binding_id_map(
+            _section_bindings(saved_spec, saved_bindings, source_section_id),
+            _section_bindings(saved_spec, saved_bindings, target_section_id),
+            source_section_id=source_section_id,
+            target_section_id=target_section_id,
+        )
+        if include_bindings
+        else {}
     )
     return ReplicatedSectionStructureResult(
         logfile_path=str(resolved_logfile),
@@ -4966,6 +5202,9 @@ def replicate_section_structure(
         copied_track_ids=source_track_ids,
         curve_binding_count=saved_section.curve_binding_count,
         raster_binding_count=saved_section.raster_binding_count,
+        id_map=persisted_id_map,
+        changed=True,
+        already_exists=existing_target_index is not None,
     )
 
 

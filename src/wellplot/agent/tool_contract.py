@@ -103,6 +103,7 @@ class StableMutationResult(_StableResult):
     before: dict[str, Any]
     after: dict[str, Any]
     already_exists: bool = False
+    id_map: dict[str, str] = Field(default_factory=dict)
 
 
 class StableHeaderMutationResult(StableMutationResult):

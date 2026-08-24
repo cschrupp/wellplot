@@ -378,6 +378,82 @@ def test_stable_section_replication_copies_a_validated_scaffold() -> None:
         assert repeat["data"]["source_format"] == "las"
 
 
+def test_stable_section_replication_is_retry_safe_and_returns_id_map() -> None:
+    """Equivalent section replication is a stable no-op on retry."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+        arguments = {
+            "logfile_path": str(fixture.single_logfile),
+            "operation": "replicate",
+            "source_section_id": "main",
+            "target_section_id": "repeat",
+            "title": "Repeat",
+            "subtitle": "Retry-safe Repeat",
+            "include_bindings": True,
+        }
+
+        first = dispatch_stable_tool(
+            "replicate_section_structure",
+            arguments,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+        first_bytes = fixture.single_logfile.read_bytes()
+        second = dispatch_stable_tool(
+            "replicate_section_structure",
+            arguments,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        assert first["ok"] is True
+        assert first["changed"] is True
+        assert first["already_exists"] is False
+        assert first["id_map"]
+        assert second["ok"] is True
+        assert second["changed"] is False
+        assert second["already_exists"] is True
+        assert second["id_map"] == first["id_map"]
+        assert fixture.single_logfile.read_bytes() == first_bytes
+
+
+def test_stable_section_replication_rejects_conflicting_existing_target() -> None:
+    """A conflicting target remains an explicit error instead of being overwritten."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+        dispatch_stable_tool(
+            "replicate_section_structure",
+            {
+                "logfile_path": str(fixture.single_logfile),
+                "operation": "replicate",
+                "source_section_id": "main",
+                "target_section_id": "repeat",
+                "title": "Repeat",
+                "include_bindings": False,
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        with pytest.raises(
+            TemplateValidationError,
+            match="different properties.*overwrite=True",
+        ):
+            dispatch_stable_tool(
+                "replicate_section_structure",
+                {
+                    "logfile_path": str(fixture.single_logfile),
+                    "operation": "replicate",
+                    "source_section_id": "main",
+                    "target_section_id": "repeat",
+                    "title": "Conflicting Repeat",
+                    "include_bindings": False,
+                },
+                root=REPO_ROOT,
+                image_factory=lambda data: data,
+            )
+
+
 def test_stable_track_set_scales_updates_track_and_curve_scale() -> None:
     """Expose one deterministic operation for synchronized track-scale edits."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
