@@ -2542,7 +2542,7 @@ class McpServiceTests(unittest.TestCase):
                 track_id="vdl",
                 channel="VDL",
                 patch={
-                    "raster_alpha": 0.45,
+                    "alpha": 0.45,
                     "waveform_normalization": "trace_maxabs",
                     "clip_percentiles": [1, 99],
                     "interpolation": "bilinear",

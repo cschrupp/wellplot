@@ -182,7 +182,8 @@ def test_track_tool_explains_add_and_existing_target_semantics() -> None:
 
     assert "operation=add" in track.description
     assert "section_id and track_id are required for every operation" in track.description
-    assert "title, kind, and width_mm must be supplied in the same call" in track.description
+    assert "title, kind, and width_mm in the same call" in track.description
+    assert "Never call set_scales without a scale payload" in track.description
     assert "successful no-op" in track.description
     assert "track_id must already exist" in track.description
     assert {"section_id", "track_id"} <= set(track.input_schema["required"])
@@ -201,6 +202,40 @@ def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
                 "kind": "normal",
                 "width_mm": 30,
             }
+        )
+
+
+def test_raster_schema_uses_canonical_alpha_field() -> None:
+    """Keep the advertised raster opacity name aligned with the service patch."""
+    raster = next(tool for tool in stable_tool_profile() if tool.name == "edit_raster_binding")
+
+    assert "alpha" in raster.input_schema["properties"]
+    assert "raster_alpha" not in raster.input_schema["properties"]
+
+
+def test_raster_schema_exposes_typed_array_presentation_fields() -> None:
+    """Expose the existing typed VDL presentation controls at the stable boundary."""
+    raster = next(tool for tool in stable_tool_profile() if tool.name == "edit_raster_binding")
+
+    for field_name in (
+        "waveform_normalization",
+        "clip_percentiles",
+        "interpolation",
+        "colorbar",
+        "sample_axis",
+        "waveform",
+    ):
+        field = raster.input_schema["properties"][field_name]
+        variants = field.get("anyOf", [])
+        assert isinstance(variants, list)
+        assert any(
+            isinstance(variant, dict)
+            and (
+                "$ref" in variant
+                or variant.get("type") in {"array", "string"}
+                or "enum" in variant
+            )
+            for variant in variants
         )
 
 

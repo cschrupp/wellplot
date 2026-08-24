@@ -371,7 +371,21 @@ def _canonical_fields() -> dict[str, dict[str, Schema]]:
         "raster": _fields(
             UpdateRasterBindingRequest,
             "patch",
-            ("label", "style", "profile", "normalization", "show_raster", "alpha", "color_limits"),
+            (
+                "label",
+                "style",
+                "profile",
+                "normalization",
+                "waveform_normalization",
+                "clip_percentiles",
+                "interpolation",
+                "show_raster",
+                "alpha",
+                "color_limits",
+                "colorbar",
+                "sample_axis",
+                "waveform",
+            ),
         ),
         "remark": _fields(
             UpdateRemarkRequest,

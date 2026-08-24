@@ -122,7 +122,7 @@ tools:
       include_bindings: boolean
       overwrite: boolean
   - id: edit_track
-    description: Create, update, remove, move, clear, or set scales on one track. section_id and track_id are required for every operation. For operation=add, title, kind, and width_mm must be supplied in the same call; add appends the track, then use operation=move for placement. A retry of an equivalent add is a successful no-op; an add with conflicting properties must use operation=update. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use operation=set_scales only when both are intentionally synchronized, or use update with x_scale and edit_curve_binding with scale independently. For update, remove, move, and clear_bindings, track_id must already exist.
+    description: 'Create or edit one track. Required call shapes: operation=add requires section_id, track_id, title, kind, and width_mm in the same call; operation=set_scales requires section_id, track_id, and at least one of x_scale, curve_scale, or channel_scales. Never call set_scales without a scale payload. section_id and track_id are required for every operation. Add appends the track, then use operation=move for placement. A retry of an equivalent add is a successful no-op; an add with conflicting properties must use operation=update. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use set_scales only when both track and curve scales are intentionally synchronized; otherwise use update with x_scale or edit_curve_binding with scale. For update, remove, move, and clear_bindings, track_id must already exist.'
     mode: mutation
     operations: [add, update, remove, move, clear_bindings, set_scales]
     canonical_fields: track
@@ -175,9 +175,15 @@ tools:
       style: object
       profile: string
       normalization: string
+      waveform_normalization: string
+      clip_percentiles: object
+      interpolation: string
       show_raster: boolean
       alpha: number
       color_limits: object
+      colorbar: object
+      sample_axis: object
+      waveform: object
   - id: edit_fill
     description: Add, update, remove, or clear a fill relation. section_id, track_id, and channel are required for every operation; add and update also require kind.
     mode: mutation

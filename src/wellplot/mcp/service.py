@@ -113,6 +113,7 @@ from ..model.authoring import (
     AuthoringCurveFillBaselineSpec,
     AuthoringCurveFillCrossoverSpec,
     AuthoringCurveFillKind,
+    AuthoringRasterSampleAxisSpec,
     AuthoringRemarkSpec,
     AuthoringStyle,
     CurveFillSpec,
@@ -225,7 +226,7 @@ AUTHORING_RASTER_BINDING_PATCH_KEYS = (
     "clip_percentiles",
     "interpolation",
     "show_raster",
-    "raster_alpha",
+    "alpha",
     "color_limits",
     "colorbar",
     "sample_axis",
@@ -5762,7 +5763,7 @@ def _apply_canonical_raster_binding_update(
         "clip_percentiles",
         "interpolation",
         "show_raster",
-        "raster_alpha",
+        "alpha",
         "color_limits",
         "colorbar",
         "sample_axis",
@@ -5776,8 +5777,6 @@ def _apply_canonical_raster_binding_update(
         if style_patch is None:
             return False
         canonical_patch["style"] = style_patch
-    if "raster_alpha" in canonical_patch:
-        canonical_patch["alpha"] = canonical_patch.pop("raster_alpha")
     for nested_key in ("colorbar", "sample_axis", "waveform"):
         if nested_key not in canonical_patch:
             continue
@@ -5840,7 +5839,7 @@ def _apply_canonical_raster_binding_update(
         binding["interpolation"] = updated.interpolation
     if "show_raster" in patch:
         binding["show_raster"] = updated.show_raster
-    if "raster_alpha" in patch:
+    if "alpha" in patch:
         binding["raster_alpha"] = updated.alpha
     if "color_limits" in patch:
         if updated.color_limits is None:
@@ -5854,6 +5853,27 @@ def _apply_canonical_raster_binding_update(
     if "waveform" in patch:
         binding["waveform"] = authoring_raster_waveform_to_mapping(updated.waveform)
     return True
+
+
+def _legacy_sample_axis_payload(value: object) -> object:
+    """Project canonical or legacy sample-axis settings to the YAML shape."""
+    if isinstance(value, bool):
+        data: dict[str, object] = {"enabled": value}
+    elif isinstance(value, Mapping):
+        data = deepcopy(dict(value))
+        if "min" in data:
+            data["minimum"] = data.pop("min")
+        if "max" in data:
+            data["maximum"] = data.pop("max")
+        if "ticks" in data:
+            data["tick_count"] = data.pop("ticks")
+    else:
+        return value
+    try:
+        typed = AuthoringRasterSampleAxisSpec.model_validate(data)
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise TemplateValidationError("Invalid sample_axis.") from exc
+    return authoring_raster_sample_axis_to_mapping(typed)
 
 
 _REMARK_CORE_KEYS = {
@@ -7634,7 +7654,7 @@ def bind_raster(
     if colorbar is not None:
         binding["colorbar"] = deepcopy(colorbar)
     if sample_axis is not None:
-        binding["sample_axis"] = deepcopy(sample_axis)
+        binding["sample_axis"] = _legacy_sample_axis_payload(sample_axis)
     if waveform is not None:
         binding["waveform"] = deepcopy(waveform)
     bindings.append(binding)
