@@ -66,6 +66,22 @@ def test_cbl_packet_verifier_accepts_repaired_packet(tmp_path: Path) -> None:
     assert len(result["document_sha256"]) == 64
 
 
+def test_cbl_packet_verifier_accepts_descriptive_dotted_style(tmp_path: Path) -> None:
+    """Accept the descriptive style name emitted by the notebook provider."""
+    payload = _repaired_payload()
+    for section in payload["sections"]:
+        depth = next(track for track in section["tracks"] if track["id"] == "depth")
+        tdsp = next(binding for binding in depth["bindings"] if binding["channel"] == "TDSP")
+        tdsp["style"]["line_style"] = "dotted"
+    path = tmp_path / "cbl-dotted.log.yaml"
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+    result = verify_cbl_packet(path)
+
+    assert result["ok"] is True
+    assert result["errors"] == []
+
+
 def test_cbl_packet_verifier_reports_exact_final_state_defect(tmp_path: Path) -> None:
     """A requested raster setting cannot be hidden by a successful mutation report."""
     payload = _repaired_payload()

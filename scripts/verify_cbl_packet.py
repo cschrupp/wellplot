@@ -69,6 +69,10 @@ _EXPECTED_SERVICE_TITLES = (
     "Variable Density Log",
     "Gamma Ray - CCL",
 )
+_LINE_STYLE_ALIASES = {
+    ":": ":",
+    "dotted": ":",
+}
 
 
 def _close(left: object, right: float) -> bool:
@@ -76,6 +80,15 @@ def _close(left: object, right: float) -> bool:
         return abs(float(left) - right) < 1e-9
     except (TypeError, ValueError):
         return False
+
+
+def _line_style_matches(actual: object, expected: object) -> bool:
+    """Treat canonical Matplotlib shorthand and descriptive dotted style equally."""
+    actual_style = str(actual)
+    expected_style = str(expected)
+    return _LINE_STYLE_ALIASES.get(actual_style, actual_style) == _LINE_STYLE_ALIASES.get(
+        expected_style, expected_style
+    )
 
 
 def _values_for_header_key(header: Mapping[str, Any], key: str) -> list[str]:
@@ -201,7 +214,7 @@ def _check_curve(
         return
     if style.get("color") != color:
         errors.append(f"{requirement}: color is {style.get('color')!r}")
-    if style.get("line_style") != line_style:
+    if not _line_style_matches(style.get("line_style"), line_style):
         errors.append(f"{requirement}: line style is {style.get('line_style')!r}")
     if not _close(style.get("line_width"), float(line_width)):
         errors.append(f"{requirement}: line width is {style.get('line_width')!r}")

@@ -704,6 +704,109 @@ def test_stable_array_track_update_accepts_x_scale() -> None:
         }
 
 
+def test_stable_raster_update_persists_canonical_alpha() -> None:
+    """Project the advertised alpha field to the legacy raster_alpha value."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "raster-alpha.log.yaml"
+        _seed_draft(draft)
+
+        result = dispatch_stable_tool(
+            "edit_raster_binding",
+            {
+                "logfile_path": str(draft),
+                "operation": "update",
+                "section_id": "main_pass",
+                "track_id": "vdl",
+                "channel": "VDL",
+                "alpha": 0.45,
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        saved = yaml.safe_load(draft.read_text(encoding="utf-8"))
+        binding = next(
+            item
+            for item in saved["document"]["bindings"]["channels"]
+            if item.get("section") == "main_pass"
+            and item.get("track_id") == "vdl"
+            and item.get("channel") == "VDL"
+        )
+
+        assert result["changed"] is True
+        assert binding["raster_alpha"] == 0.45
+
+
+def test_stable_raster_add_persists_typed_array_presentation_fields() -> None:
+    """Forward all advertised raster presentation fields when adding a binding."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        draft = Path(temp_dir) / "raster-add.log.yaml"
+        service.create_logfile_draft(
+            str(draft),
+            source_logfile_path="examples/cbl_vdl_array_mvp.log.yaml",
+            root=REPO_ROOT,
+        )
+        service.remove_raster_binding(
+            str(draft),
+            section_id="main",
+            track_id="vdl_array",
+            channel="VDL",
+            root=REPO_ROOT,
+        )
+
+        result = dispatch_stable_tool(
+            "edit_raster_binding",
+            {
+                "logfile_path": str(draft),
+                "operation": "add",
+                "section_id": "main",
+                "track_id": "vdl_array",
+                "channel": "VDL",
+                "profile": "vdl",
+                "waveform_normalization": "trace_maxabs",
+                "clip_percentiles": [1, 99],
+                "interpolation": "bilinear",
+                "show_raster": True,
+                "alpha": 0.8,
+                "color_limits": [-1, 1],
+                "colorbar": {
+                    "enabled": True,
+                    "label": "Amplitude",
+                    "position": "header",
+                },
+                "sample_axis": {
+                    "enabled": True,
+                    "unit": "us",
+                    "minimum": 200,
+                    "maximum": 1200,
+                    "tick_count": 7,
+                    "source_origin": 40,
+                    "source_step": 10,
+                },
+            },
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+        )
+
+        saved = yaml.safe_load(draft.read_text(encoding="utf-8"))
+        binding = next(
+            item
+            for item in saved["document"]["bindings"]["channels"]
+            if item.get("section") == "main"
+            and item.get("track_id") == "vdl_array"
+            and item.get("channel") == "VDL"
+        )
+
+        assert result["changed"] is True
+        assert binding["waveform_normalization"] == "trace_maxabs"
+        assert binding["clip_percentiles"] == [1, 99]
+        assert binding["interpolation"] == "bilinear"
+        assert binding["raster_alpha"] == 0.8
+        assert binding["color_limits"] == [-1.0, 1.0]
+        assert binding["colorbar"]["enabled"] is True
+        assert binding["sample_axis"]["ticks"] == 7
+
+
 def test_stable_report_settings_updates_matplotlib_style() -> None:
     """Keep report-wide style edits inside the stable report-settings tool."""
     with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
