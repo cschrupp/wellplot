@@ -70,6 +70,8 @@ _EXPECTED_SERVICE_TITLES = (
     "Gamma Ray - CCL",
 )
 _LINE_STYLE_ALIASES = {
+    "--": "--",
+    "dashed": "--",
     ":": ":",
     "dotted": ":",
 }
@@ -83,7 +85,7 @@ def _close(left: object, right: float) -> bool:
 
 
 def _line_style_matches(actual: object, expected: object) -> bool:
-    """Treat canonical Matplotlib shorthand and descriptive dotted style equally."""
+    """Treat Matplotlib shorthand and equivalent descriptive styles equally."""
     actual_style = str(actual)
     expected_style = str(expected)
     return _LINE_STYLE_ALIASES.get(actual_style, actual_style) == _LINE_STYLE_ALIASES.get(

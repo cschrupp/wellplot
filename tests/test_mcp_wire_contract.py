@@ -29,7 +29,7 @@ S0_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v1.
 S1_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v2.json"
 S2_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v3.json"
 S4_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v4.json"
-S10_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v16.json"
+S10_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v17.json"
 CAPTURE_SCRIPT = REPO_ROOT / "scripts" / "capture_mcp_contract_baseline.py"
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -614,6 +614,61 @@ def test_real_stdio_rejects_missing_required_and_invalid_operation_values() -> N
     outcomes = asyncio.run(exercise())
     assert outcomes
     assert all(outcomes.values()), outcomes
+
+
+@pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
+def test_real_stdio_binding_identity_contract_matches_service_semantics() -> None:
+    """Stable-id updates work while invalid creation and empty strings stay explicit."""
+
+    async def exercise() -> dict[str, dict[str, object]]:
+        with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+            fixture = create_mcp_fixture_paths(Path(temporary_directory), repo_root=REPO_ROOT)
+            runtime = LocalStdioMcpRuntime(server_root=REPO_ROOT)
+            async with runtime.open_session() as session:
+                updated = await session.call_tool(
+                    "edit_curve_binding",
+                    {
+                        "operation": "update",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "track_id": "cbl",
+                        "binding_id": "main.cbl.CBL.1",
+                        "label": "CBL amplitude",
+                    },
+                )
+                missing_channel = await session.call_tool(
+                    "edit_curve_binding",
+                    {
+                        "operation": "add",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "track_id": "cbl",
+                    },
+                )
+                empty_label = await session.call_tool(
+                    "edit_raster_binding",
+                    {
+                        "operation": "add",
+                        "logfile_path": str(fixture.single_logfile),
+                        "section_id": "main",
+                        "track_id": "vdl",
+                        "channel": "VDL",
+                        "sample_axis": {"enabled": True, "label": ""},
+                    },
+                )
+        return {
+            "updated": _result_mapping(updated),
+            "missing_channel": _result_mapping(missing_channel),
+            "empty_label": _result_mapping(empty_label),
+        }
+
+    results = asyncio.run(exercise())
+    assert results["updated"].get("isError", False) is False
+    assert results["updated"]["structuredContent"]["changed"] is True
+    assert results["missing_channel"].get("isError", False) is True
+    assert "channel" in _content_text(results["missing_channel"])
+    assert results["empty_label"].get("isError", False) is True
+    assert "sample_axis.label" in _content_text(results["empty_label"])
 
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")

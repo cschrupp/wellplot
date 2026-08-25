@@ -49,6 +49,33 @@ _DEPTH_RANGE_ERROR = (
 )
 
 
+def _tool_input_validation_error(tool_name: str, error: ValidationError) -> str:
+    """Return concise corrective guidance for one rejected stable-tool call."""
+    details: list[str] = []
+    for item in error.errors():
+        location = ".".join(str(part) for part in item.get("loc", ()))
+        error_type = str(item.get("type", ""))
+        message = str(item.get("msg", "invalid value"))
+        if message.startswith("Value error, "):
+            message = message.removeprefix("Value error, ")
+        if error_type == "missing":
+            detail = f"{location or 'argument'} is required"
+        elif error_type == "string_too_short":
+            detail = (
+                f"{location or 'string argument'} must be a non-empty string when supplied; "
+                "omit this optional field when no value is requested"
+            )
+        else:
+            detail = f"{location}: {message}" if location else message
+        if detail not in details:
+            details.append(detail)
+    joined = "; ".join(details) or "the arguments do not match the advertised schema"
+    return (
+        f"{tool_name} received invalid arguments: {joined}. "
+        "Correct the arguments and retry the same operation before reporting completion."
+    )
+
+
 class DepthRangeInput(BaseModel):
     """Public MCP representation of one ordered section depth range."""
 
@@ -1806,7 +1833,9 @@ def _tool_function(
                     "edit_remarks(operation='add') received invalid remark fields: "
                     f"{detail}."
                 ) from exc
-            raise
+            raise TemplateValidationError(
+                _tool_input_validation_error(profile.name, exc)
+            ) from exc
         arguments = validated.model_dump(mode="python", exclude_none=True)
         return callback(arguments)
 

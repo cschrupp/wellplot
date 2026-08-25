@@ -92,13 +92,21 @@ def test_binding_and_remarks_tools_expose_one_public_payload_shape() -> None:
     assert {"remark", "patch"} <= remarks_fields
 
 
-def test_binding_tools_require_target_scope_and_channel() -> None:
-    """Binding calls carry the complete target identity on the public wire."""
+def test_binding_tools_require_scope_globally_and_channel_for_add() -> None:
+    """Binding creation requires source identity while stable-id edits remain valid."""
     profile = {tool.name: tool for tool in stable_tool_profile()}
 
     for tool_name in ("edit_curve_binding", "edit_raster_binding"):
-        required = set(profile[tool_name].input_schema["required"])
-        assert {"section_id", "track_id", "channel"} <= required
+        tool = profile[tool_name]
+        required = set(tool.input_schema["required"])
+        assert {"section_id", "track_id"} <= required
+        assert "channel" not in required
+        add_branch = next(
+            branch
+            for branch in tool.wire_input_schema["allOf"]
+            if branch["if"]["properties"]["operation"]["const"] == "add"
+        )
+        assert add_branch["then"]["required"] == ["channel"]
 
 
 def test_high_risk_nested_fields_are_not_unconstrained_objects() -> None:
@@ -220,6 +228,38 @@ def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
         if branch["if"]["properties"]["operation"]["const"] == "add"
     )
     assert {"title", "kind", "width_mm"} <= set(add_branch["then"]["required"])
+
+
+@pytest.mark.parametrize("tool_name", ["edit_curve_binding", "edit_raster_binding"])
+def test_binding_operations_advertise_identity_by_operation(tool_name: str) -> None:
+    """Binding edits accept stable ids while binding creation requires a channel."""
+    binding = next(tool for tool in stable_tool_profile() if tool.name == tool_name)
+    base = {
+        "logfile_path": "draft.log.yaml",
+        "section_id": "main",
+        "track_id": "binding_track",
+    }
+
+    assert {"section_id", "track_id"} <= set(binding.input_schema["required"])
+    assert "channel" not in binding.input_schema["required"]
+    with pytest.raises(ValidationError):
+        binding.input_model.model_validate({**base, "operation": "add"})
+    binding.input_model.model_validate(
+        {**base, "operation": "update", "binding_id": "main.binding_track.CH.1"}
+    )
+    binding.input_model.model_validate(
+        {**base, "operation": "remove", "channel": "CH"}
+    )
+    binding.input_model.model_validate({**base, "operation": "clear"})
+
+    branches = {
+        branch["if"]["properties"]["operation"]["const"]: branch["then"]
+        for branch in binding.wire_input_schema["allOf"]
+    }
+    assert branches["add"]["required"] == ["channel"]
+    for operation in ("update", "remove"):
+        alternatives = {tuple(item["required"]) for item in branches[operation]["anyOf"]}
+        assert alternatives == {("channel",), ("binding_id",)}
 
 
 def test_raster_schema_uses_canonical_alpha_field() -> None:

@@ -13,13 +13,20 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 # isort: on
 
 yaml = import_module("yaml")
-verify_cbl_packet = import_module("scripts.verify_cbl_packet").verify_cbl_packet
+cbl_packet_verifier = import_module("scripts.verify_cbl_packet")
+verify_cbl_packet = cbl_packet_verifier.verify_cbl_packet
 load_authoring_document = import_module("wellplot.authoring").load_authoring_document
 
 
 _DRAFT = Path(
     "workspace/tutorials/agent_cbl_log_example_from_prompt/agent_cbl_log_example_draft.log.yaml"
 )
+
+
+def test_cbl_packet_verifier_accepts_descriptive_line_style_aliases() -> None:
+    """Provider-facing style names remain equivalent to Matplotlib shorthand."""
+    assert cbl_packet_verifier._line_style_matches("dashed", "--")
+    assert cbl_packet_verifier._line_style_matches("dotted", ":")
 
 
 def _repaired_payload() -> dict[str, object]:
@@ -29,9 +36,14 @@ def _repaired_payload() -> dict[str, object]:
     main_tracks = {track["id"]: track for track in main_section["tracks"]}
     repeat_tracks = {track["id"]: track for track in repeat_section["tracks"]}
 
-    repeat_tracks["combo"]["bindings"] = copy.deepcopy(main_tracks["combo"]["bindings"])
-    for index, binding in enumerate(repeat_tracks["combo"]["bindings"], start=1):
-        binding["binding_id"] = f"repeat_pass.combo.{binding['channel']}.{index}"
+    for track_id in ("combo", "cbl", "vdl"):
+        repeat_track = repeat_tracks[track_id]
+        main_track = main_tracks[track_id]
+        repeat_track["bindings"] = copy.deepcopy(main_track["bindings"])
+        for index, binding in enumerate(repeat_track["bindings"], start=1):
+            binding["binding_id"] = f"repeat_pass.{track_id}.{binding['channel']}.{index}"
+    repeat_tracks["vdl"]["x_scale"] = copy.deepcopy(main_tracks["vdl"]["x_scale"])
+    repeat_tracks["vdl"]["grid"] = copy.deepcopy(main_tracks["vdl"]["grid"])
 
     for section in payload["sections"]:
         raster = next(track for track in section["tracks"] if track["id"] == "vdl")["bindings"][0]

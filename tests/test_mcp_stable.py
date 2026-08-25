@@ -113,6 +113,31 @@ def test_stable_projection_publishes_operation_specific_track_schema() -> None:
     assert {"title", "kind", "width_mm"} <= set(add_branch["then"]["required"])
 
 
+@pytest.mark.parametrize("tool_name", ["edit_curve_binding", "edit_raster_binding"])
+def test_stable_projection_publishes_operation_specific_binding_schema(
+    tool_name: str,
+) -> None:
+    """Registered binding tools distinguish creation from stable-id edits."""
+    collector = _FastMcpCollector()
+    register_stable_tools(
+        collector,
+        root=REPO_ROOT,
+        image_factory=lambda data: data,
+        annotation_factory=lambda values: dict(values),
+    )
+
+    schema = collector._tool_manager.get_tool(tool_name).parameters
+    assert "channel" not in schema["required"]
+    branches = {
+        branch["if"]["properties"]["operation"]["const"]: branch["then"]
+        for branch in schema["allOf"]
+    }
+    assert branches["add"]["required"] == ["channel"]
+    for operation in ("update", "remove"):
+        alternatives = {tuple(item["required"]) for item in branches[operation]["anyOf"]}
+        assert alternatives == {("channel",), ("binding_id",)}
+
+
 def test_stable_dispatch_telemetry_is_opt_in_and_preserves_result(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -1202,6 +1227,83 @@ def test_stable_binding_update_infers_channel_from_binding_id() -> None:
 
         assert result["ok"] is True
         assert result["changed"] is True
+
+
+def test_registered_curve_update_accepts_binding_id_without_channel() -> None:
+    """The model-facing callback preserves stable-id update semantics."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir), repo_root=REPO_ROOT)
+        collector = _ToolCollector()
+        register_stable_tools(
+            collector,
+            root=REPO_ROOT,
+            image_factory=lambda data: data,
+            annotation_factory=lambda values: dict(values),
+        )
+        curve_tool = next(
+            item["function"]
+            for item in collector.tools
+            if item["name"] == "edit_curve_binding"
+        )
+
+        result = curve_tool(
+            logfile_path=str(fixture.single_logfile),
+            operation="update",
+            section_id="main",
+            track_id="cbl",
+            binding_id="main.cbl.CBL.1",
+            label="CBL amplitude",
+        )
+
+        assert result["ok"] is True
+        assert result["changed"] is True
+
+
+def test_registered_binding_validation_returns_retryable_guidance() -> None:
+    """Rejected binding calls explain the correction without Pydantic noise."""
+    collector = _ToolCollector()
+    register_stable_tools(
+        collector,
+        root=REPO_ROOT,
+        image_factory=lambda data: data,
+        annotation_factory=lambda values: dict(values),
+    )
+    curve_tool = next(
+        item["function"]
+        for item in collector.tools
+        if item["name"] == "edit_curve_binding"
+    )
+    raster_tool = next(
+        item["function"]
+        for item in collector.tools
+        if item["name"] == "edit_raster_binding"
+    )
+
+    with pytest.raises(TemplateValidationError) as missing_channel:
+        curve_tool(
+            logfile_path="draft.log.yaml",
+            operation="add",
+            section_id="main",
+            track_id="cbl",
+        )
+    missing_message = str(missing_channel.value)
+    assert "channel" in missing_message
+    assert "retry the same operation" in missing_message
+    assert "validation error" not in missing_message
+
+    with pytest.raises(TemplateValidationError) as empty_label:
+        raster_tool(
+            logfile_path="draft.log.yaml",
+            operation="add",
+            section_id="main",
+            track_id="vdl",
+            channel="VDL",
+            sample_axis={"enabled": True, "label": ""},
+        )
+    label_message = str(empty_label.value)
+    assert "sample_axis.label must be a non-empty string" in label_message
+    assert "omit this optional field" in label_message
+    assert "validation error" not in label_message
 
 
 def test_stable_curve_add_projects_canonical_scale_to_legacy_yaml() -> None:

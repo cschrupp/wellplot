@@ -151,12 +151,19 @@ tools:
       track_header: object
       annotations: object_list
   - id: edit_curve_binding
-    description: Add, update, remove, or clear scalar curve bindings. section_id, track_id, and channel are required for every operation. A retry of an equivalent add with the same binding_id is a successful no-op; a conflicting definition must use operation=update.
+    description: Add, update, remove, or clear scalar curve bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all scalar bindings from the track and needs neither channel nor binding_id. A retry of an equivalent add with the same binding_id is a successful no-op; a conflicting definition must use operation=update. Correct a failed mutation and retry it before reporting completion.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: curve
     destructive: true
-    required: [section_id, track_id, channel]
+    required: [section_id, track_id]
+    operation_variants:
+      add:
+        required: [channel]
+      update:
+        any_required: [channel, binding_id]
+      remove:
+        any_required: [channel, binding_id]
     fields:
       section_id: string
       track_id: string
@@ -169,12 +176,19 @@ tools:
       wrap: boolean
       render_mode: [line, value_labels]
   - id: edit_raster_binding
-    description: Add, update, remove, or clear array/raster bindings. section_id, track_id, and channel are required for every operation.
+    description: Add, update, remove, or clear array/raster bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all raster bindings from the track and needs neither channel nor binding_id. Optional nested strings such as sample_axis.label and sample_axis.unit must be non-empty when supplied; omit them when no value is requested. Correct a failed mutation and retry it before reporting completion.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: raster
     destructive: true
-    required: [section_id, track_id, channel]
+    required: [section_id, track_id]
+    operation_variants:
+      add:
+        required: [channel]
+      update:
+        any_required: [channel, binding_id]
+      remove:
+        any_required: [channel, binding_id]
     fields:
       section_id: string
       track_id: string
