@@ -38,6 +38,30 @@ class _ToolCollector:
         self.tools.append({"function": function, **metadata})
 
 
+class _RegisteredTool:
+    def __init__(self) -> None:
+        self.parameters: dict[str, object] = {}
+
+
+class _ToolManager:
+    def __init__(self) -> None:
+        self.tools: dict[str, _RegisteredTool] = {}
+
+    def get_tool(self, name: str) -> _RegisteredTool | None:
+        return self.tools.get(name)
+
+
+class _FastMcpCollector(_ToolCollector):
+    def __init__(self) -> None:
+        super().__init__()
+        self._tool_manager = _ToolManager()
+
+    def add_tool(self, function: object, **metadata: object) -> None:
+        super().add_tool(function, **metadata)
+        name = str(metadata["name"])
+        self._tool_manager.tools[name] = _RegisteredTool()
+
+
 def _seed_draft(path: Path) -> None:
     service.create_logfile_draft(
         str(path),
@@ -68,6 +92,25 @@ def test_stable_projection_registers_only_contract_responsibilities() -> None:
     assert [item["name"] for item in collector.tools] == list(expected)
     assert len(collector.tools) == 17
     assert all("description" in item for item in collector.tools)
+
+
+def test_stable_projection_publishes_operation_specific_track_schema() -> None:
+    """Registered FastMCP tools expose the reviewed operation branches."""
+    collector = _FastMcpCollector()
+    register_stable_tools(
+        collector,
+        root=REPO_ROOT,
+        image_factory=lambda data: data,
+        annotation_factory=lambda values: dict(values),
+    )
+
+    schema = collector._tool_manager.get_tool("edit_track").parameters
+    add_branch = next(
+        branch
+        for branch in schema["allOf"]
+        if branch["if"]["properties"]["operation"]["const"] == "add"
+    )
+    assert {"title", "kind", "width_mm"} <= set(add_branch["then"]["required"])
 
 
 def test_stable_dispatch_telemetry_is_opt_in_and_preserves_result(

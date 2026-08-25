@@ -11,7 +11,7 @@ from operator import or_
 from typing import Annotated, Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 
 from wellplot.authoring_service import (
     HeaderValuePatch,
@@ -37,6 +37,7 @@ class StableToolProfile:
     description: str
     input_model: type[BaseModel]
     input_schema: Schema
+    wire_input_schema: Schema
     output_model: type[BaseModel] | None
     output_schema: Schema | None
     annotations: dict[str, bool]
@@ -324,16 +325,104 @@ def _model_from_schema(
             continue
         fields[name] = (annotation | None, raw_schema.get("default"))
     model_config: dict[str, object] = {"extra": extra}
-    for conditional_key in ("anyOf", "oneOf"):
+    for conditional_key in ("anyOf", "oneOf", "allOf"):
         conditional_schema = schema.get(conditional_key)
         if isinstance(conditional_schema, list):
             model_config["json_schema_extra"] = {conditional_key: conditional_schema}
             break
+    operation_variants = schema.get("operation_variants")
+    validators: dict[str, object] = {}
+    if isinstance(operation_variants, Mapping):
+        validators["validate_operation_variant"] = _operation_variant_validator(
+            model_name,
+            operation_variants,
+        )
     return create_model(
         model_name,
         __config__=ConfigDict(**model_config),
+        __validators__=validators,
         **fields,
     )
+
+
+def _operation_variant_validator(
+    model_name: str,
+    variants: Mapping[str, object],
+) -> object:
+    """Create a validator for operation-specific required fields."""
+    normalized_variants = {
+        str(operation): dict(rule)
+        for operation, rule in variants.items()
+        if isinstance(rule, Mapping)
+    }
+
+    @model_validator(mode="after")
+    def validate_operation_variant(model: BaseModel) -> BaseModel:
+        operation = str(getattr(model, "operation", ""))
+        rule = normalized_variants.get(operation)
+        if rule is None:
+            return model
+
+        missing = [
+            str(field)
+            for field in rule.get("required", [])
+            if isinstance(field, str) and getattr(model, field, None) is None
+        ]
+        if missing:
+            raise ValueError(
+                f"{model_name}(operation={operation!r}) requires "
+                f"{', '.join(missing)} in the same call. "
+                f"Missing: {', '.join(missing)}."
+            )
+
+        any_required = rule.get("any_required", [])
+        if isinstance(any_required, list) and any_required:
+            available = [
+                str(field)
+                for field in any_required
+                if isinstance(field, str) and getattr(model, field, None) is not None
+            ]
+            if not available:
+                joined = ", ".join(str(field) for field in any_required)
+                raise ValueError(
+                    f"{model_name}(operation={operation!r}) requires at least one of: "
+                    f"{joined}."
+                )
+        return model
+
+    return validate_operation_variant
+
+
+def _operation_variant_schema(
+    variants: Mapping[str, object],
+) -> list[Schema]:
+    """Build compact conditional rules for operation-specific requirements."""
+    branches: list[Schema] = []
+    for operation, raw_rule in variants.items():
+        if not isinstance(raw_rule, Mapping):
+            continue
+        required = [
+            str(field)
+            for field in raw_rule.get("required", [])
+            if isinstance(field, str)
+        ]
+        then_schema: Schema = {"required": required}
+        any_required = raw_rule.get("any_required", [])
+        if isinstance(any_required, list) and any_required:
+            then_schema["anyOf"] = [
+                {"required": [str(field)]}
+                for field in any_required
+                if isinstance(field, str)
+            ]
+        branches.append(
+            {
+                "if": {
+                    "properties": {"operation": {"const": str(operation)}},
+                },
+                "then": then_schema,
+            }
+        )
+    return branches
 
 
 def _output_model(name: str, mode: str) -> type[BaseModel] | None:
@@ -473,31 +562,45 @@ def stable_tool_profile() -> tuple[StableToolProfile, ...]:
             )
         else:
             required = [str(item) for item in entry.get("required", [])]
+        input_schema_definition: Schema = {
+            "type": "object",
+            "properties": fields,
+            "required": required,
+        }
+        operation_variants = entry.get("operation_variants")
+        if isinstance(operation_variants, Mapping):
+            input_schema_definition["operation_variants"] = operation_variants
+            input_schema_definition["allOf"] = _operation_variant_schema(
+                operation_variants,
+            )
         annotations = {
             "readOnlyHint": bool(entry.get("read_only", False)),
             "idempotentHint": bool(entry.get("idempotent", False)),
             "destructiveHint": bool(entry.get("destructive", False)),
             "openWorldHint": bool(entry.get("open_world", False)),
         }
+        model_schema = dict(input_schema_definition)
+        model_schema.pop("allOf", None)
         input_model = _model_from_schema(
             f"{entry['id']}Arguments",
-            {
-                "type": "object",
-                "properties": fields,
-                "required": required,
-            },
+            model_schema,
             # FastMCP builds the public top-level parameter model from a callable
             # signature with its default extra-value behavior. Keep this model in
             # lockstep so the profile matches the stdio schema byte-for-byte.
             extra="ignore",
         )
+        input_schema = input_model.model_json_schema(by_alias=True)
+        wire_input_schema = dict(input_schema)
+        if isinstance(operation_variants, Mapping):
+            wire_input_schema["allOf"] = _operation_variant_schema(operation_variants)
         output_model = _output_model(str(entry["id"]), mode)
         profile.append(
             StableToolProfile(
                 name=str(entry["id"]),
                 description=str(entry["description"]),
                 input_model=input_model,
-                input_schema=input_model.model_json_schema(by_alias=True),
+                input_schema=input_schema,
+                wire_input_schema=wire_input_schema,
                 output_model=output_model,
                 output_schema=(
                     output_model.model_json_schema(by_alias=True)

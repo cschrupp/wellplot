@@ -199,7 +199,7 @@ def test_track_tool_explains_add_and_existing_target_semantics() -> None:
 
 
 def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
-    """The stable profile requires the track identity on every operation."""
+    """The stable profile requires all creation fields for track adds."""
     track = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
 
     with pytest.raises(ValidationError):
@@ -207,11 +207,19 @@ def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
             {
                 "logfile_path": "draft.log.yaml",
                 "operation": "add",
+                "section_id": "main",
+                "track_id": "resistivity",
                 "title": "Resistivity",
                 "kind": "normal",
-                "width_mm": 30,
             }
         )
+
+    add_branch = next(
+        branch
+        for branch in track.wire_input_schema["allOf"]
+        if branch["if"]["properties"]["operation"]["const"] == "add"
+    )
+    assert {"title", "kind", "width_mm"} <= set(add_branch["then"]["required"])
 
 
 def test_raster_schema_uses_canonical_alpha_field() -> None:

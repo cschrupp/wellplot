@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 from collections.abc import Callable, Mapping
+from copy import deepcopy
 from dataclasses import asdict, is_dataclass
 from enum import Enum
 from pathlib import Path
@@ -1818,6 +1819,21 @@ def _tool_function(
     return invoke
 
 
+def _synchronize_registered_tool_schema(
+    mcp: object,
+    profile: StableToolProfile,
+) -> None:
+    """Expose the reviewed profile schema through FastMCP's tool registry."""
+    tool_manager = getattr(mcp, "_tool_manager", None)
+    get_tool = getattr(tool_manager, "get_tool", None)
+    if not callable(get_tool):
+        return
+    registered_tool = get_tool(profile.name)
+    if registered_tool is None:
+        raise RuntimeError(f"FastMCP did not register stable tool {profile.name!r}.")
+    registered_tool.parameters = deepcopy(profile.wire_input_schema)
+
+
 def register_stable_tools(
     mcp: object,
     *,
@@ -1867,5 +1883,6 @@ def register_stable_tools(
             annotations=annotation_factory(profile.annotations),
             structured_output=profile.name not in {"preview_logfile"},
         )
+        _synchronize_registered_tool_schema(mcp, profile)
         names.append(profile.name)
     return tuple(names)

@@ -29,7 +29,7 @@ S0_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v1.
 S1_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v2.json"
 S2_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v3.json"
 S4_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v4.json"
-S10_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v15.json"
+S10_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "mcp_contract_baseline_v16.json"
 CAPTURE_SCRIPT = REPO_ROOT / "scripts" / "capture_mcp_contract_baseline.py"
 MCP_AVAILABLE = importlib.util.find_spec("mcp") is not None
 
@@ -441,7 +441,7 @@ def test_real_stdio_surface_matches_s10_baseline() -> None:
 
 @pytest.mark.skipif(not MCP_AVAILABLE, reason="optional mcp dependency is not installed")
 def test_real_stdio_tool_schemas_equal_typed_profile() -> None:
-    """Keep the profile, callable signature, and public stdio schema identical."""
+    """Keep the public stdio schema aligned with the reviewed wire profile."""
     actual = asyncio.run(_capture_mcp_surface())
     actual_by_name = {str(tool["name"]): tool for tool in actual["tools"]}
 
@@ -449,7 +449,7 @@ def test_real_stdio_tool_schemas_equal_typed_profile() -> None:
     for profile in stable_tool_profile():
         observed = actual_by_name[profile.name]
         assert observed["description"] == profile.description
-        assert observed["input_schema"] == profile.input_schema
+        assert observed["input_schema"] == profile.wire_input_schema
         assert observed["output_schema"] == profile.output_schema
         assert observed["annotations"] == profile.annotations
 
