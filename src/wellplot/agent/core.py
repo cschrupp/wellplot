@@ -167,6 +167,50 @@ _STABLE_MUTATION_TOOL_NAMES = frozenset(
         "edit_annotation",
     }
 )
+
+
+def _stable_mutation_target_key(
+    name: str,
+    arguments: Mapping[str, object],
+) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Return the canonical object identity used to reconcile mutation retries."""
+    identity_fields: tuple[str, ...]
+    if name == "edit_section":
+        identity_fields = ("section_id",)
+    elif name == "replicate_section_structure":
+        identity_fields = ("target_section_id",)
+    elif name == "edit_track":
+        identity_fields = ("section_id", "track_id")
+    elif name in {"edit_curve_binding", "edit_raster_binding"}:
+        binding_field = "binding_id" if arguments.get("binding_id") is not None else "channel"
+        identity_fields = ("section_id", "track_id", binding_field)
+    elif name == "edit_fill":
+        fill_field = "fill_id" if arguments.get("fill_id") is not None else "channel"
+        identity_fields = ("section_id", "track_id", fill_field)
+    elif name == "edit_annotation":
+        identity_fields = ("section_id", "track_id", "annotation_id")
+    elif name == "edit_header":
+        header_field = "slot_id" if arguments.get("slot_id") is not None else "service_title"
+        identity_fields = (header_field,)
+    elif name == "edit_remarks":
+        identity_fields = ("remark_id",)
+    elif name == "edit_report_settings":
+        identity_fields = ("section_id",)
+    else:
+        identity_fields = ()
+
+    identity: list[tuple[str, str]] = []
+    for field_name in identity_fields:
+        value = arguments.get(field_name)
+        if value is not None and str(value).strip():
+            identity.append((field_name, str(value).strip()))
+
+    if not identity:
+        operation = str(arguments.get("operation") or "mutation").strip()
+        identity.append(("operation", operation))
+    return name, tuple(identity)
+
+
 _PHASE_READ_ONLY_TOOLS = frozenset(
     {
         "summarize_logfile_draft",
@@ -2690,6 +2734,8 @@ class AuthoringSession:
         if preflight_header_outcome is not None:
             stable_tool_outcomes.append(preflight_header_outcome)
         stable_tool_errors: list[str] = []
+        unresolved_mutation_errors: dict[tuple[str, tuple[tuple[str, str], ...]], str] = {}
+        recovered_mutation_failures = 0
         mutation_counts: Counter[str] = Counter()
         controller_status: str | None = None
         controller_message = ""
@@ -2795,6 +2841,7 @@ class AuthoringSession:
             nonlocal last_error_signature
             nonlocal repeated_error_count
             nonlocal repeated_read_only_calls
+            nonlocal recovered_mutation_failures
 
             if controller_status in {"blocked", "completed"}:
                 return {
@@ -2891,10 +2938,22 @@ class AuthoringSession:
                     "payload": payload,
                 }
             )
+            mutation_target = (
+                _stable_mutation_target_key(name, call_arguments)
+                if name in mutation_names
+                else None
+            )
             if payload.get("is_error") is True:
-                stable_tool_errors.append(
+                error_message = (
                     f"{name} failed: {payload.get('error', 'MCP returned an error result.')}"
                 )
+                if mutation_target is None:
+                    stable_tool_errors.append(error_message)
+                else:
+                    unresolved_mutation_errors[mutation_target] = error_message
+            elif mutation_target is not None and mutation_target in unresolved_mutation_errors:
+                unresolved_mutation_errors.pop(mutation_target)
+                recovered_mutation_failures += 1
 
             structured = payload.get("structured")
             changed = (
@@ -2937,7 +2996,8 @@ class AuthoringSession:
                 "status": "continue",
                 "message": (
                     "Continue only if the next tool call advances the request. "
-                    "Reuse successful inspection results instead of requesting the same state again."
+                    "Reuse successful inspection results instead of requesting the same "
+                    "state again."
                 ),
             }
             if payload.get("is_error") is True and name == "edit_track":
@@ -2999,7 +3059,12 @@ class AuthoringSession:
             # elif repeated_read_only_call:
             #     signature = (
             #         name,
-            #         json.dumps(call_arguments, sort_keys=True, separators=(",", ":"), default=str),
+            #         json.dumps(
+            #             call_arguments,
+            #             sort_keys=True,
+            #             separators=(",", ":"),
+            #             default=str,
+            #         ),
             #     )
             #     if read_signature_counts[signature] >= 3:
             #         controller_status = "blocked"
@@ -3104,15 +3169,25 @@ class AuthoringSession:
         provider_failed = isinstance(warnings, list) and any(
             isinstance(item, str) and item.startswith("Provider error:") for item in warnings
         )
+        unresolved_error_messages = list(unresolved_mutation_errors.values())
         report_facts["feedback_loop"] = {
-            "status": controller_status or "provider_finished",
+            "status": (
+                "blocked"
+                if unresolved_error_messages
+                else controller_status or "provider_finished"
+            ),
             "consecutive_tool_errors": consecutive_tool_errors,
             "repeated_error_count": repeated_error_count,
             "repeated_read_only_calls": repeated_read_only_calls,
+            "recovered_mutation_failures": recovered_mutation_failures,
+            "unresolved_mutation_failures": len(unresolved_mutation_errors),
         }
+        if unresolved_error_messages:
+            report_facts["unresolved_mutation_failures"] = unresolved_error_messages
         provider_result = replace(provider_result, report_facts=report_facts)
         controller_blocked = controller_status == "blocked"
-        if provider_failed or controller_blocked:
+        completion_blocked = bool(unresolved_error_messages)
+        if provider_failed or controller_blocked or completion_blocked:
             output_path = self.runtime.server_root / draft_logfile
             output_path.write_text(baseline_draft_text, encoding="utf-8")
             report_facts["rolled_back"] = True
@@ -3125,14 +3200,15 @@ class AuthoringSession:
             reasons = report_facts.get("reasons", [])
             if not isinstance(reasons, list):
                 reasons = []
-            reasons.append(
-                controller_message
-                if controller_blocked
-                else "The provider failed before the request could be verified."
-            )
+            if completion_blocked:
+                reasons.extend(unresolved_error_messages)
+            elif controller_blocked:
+                reasons.append(controller_message)
+            else:
+                reasons.append("The provider failed before the request could be verified.")
             report_facts["reasons"] = reasons
             provider_result = replace(provider_result, report_facts=report_facts)
-        if not provider_failed:
+        if not (provider_failed or controller_blocked or completion_blocked):
             try:
                 scope_errors = _stable_postcondition_errors(
                     goal,
@@ -3170,7 +3246,10 @@ class AuthoringSession:
                 baseline_draft_text=baseline_draft_text,
                 provider_result=provider_result,
                 stable_tool_outcomes=stable_tool_outcomes,
-                stable_tool_errors=stable_tool_errors,
+                stable_tool_errors=[
+                    *stable_tool_errors,
+                    *unresolved_error_messages,
+                ],
             )
         except Exception:
             output_path = self.runtime.server_root / draft_logfile

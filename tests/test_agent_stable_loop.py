@@ -973,6 +973,46 @@ class ExploratoryStableBackend(StableBackend):
         )
 
 
+class MutationRetryBackend(StableBackend):
+    """Provider double that may correct one rejected mutation."""
+
+    def __init__(self, *, correct_failure: bool) -> None:
+        """Configure whether the provider retries the rejected target."""
+        super().__init__()
+        self.correct_failure = correct_failure
+
+    async def run_authoring(
+        self,
+        *,
+        instructions: str,
+        initial_user_message: str,
+        tool_definitions: list[FunctionToolDefinition],
+        tool_caller: object,
+        max_rounds: int,
+    ) -> ProviderRunResult:
+        """Submit one rejected mutation and optionally retry its stable target."""
+        del instructions, initial_user_message, tool_definitions, max_rounds
+        assert callable(tool_caller)
+        await tool_caller(
+            "edit_section",
+            {
+                "operation": "update",
+                "section_id": "main",
+                "subtitle": "Rejected subtitle",
+            },
+        )
+        if self.correct_failure:
+            await tool_caller(
+                "edit_section",
+                {
+                    "operation": "update",
+                    "section_id": "main",
+                    "subtitle": "Recovered subtitle",
+                },
+            )
+        return ProviderRunResult(final_text="Finished mutation attempts.", tool_trace=())
+
+
 class StableSession:
     """Stateful MCP double exposing only the stable tool profile."""
 
@@ -1138,6 +1178,29 @@ class HeaderStableSession(StableSession):
         )
 
 
+class MutationRetrySession(StableSession):
+    """Reject the first section mutation and persist a corrected retry."""
+
+    def __init__(self, root: Path) -> None:
+        """Initialize one rejected-attempt counter."""
+        super().__init__(root)
+        self.section_attempts = 0
+
+    async def call_tool(self, name: str, arguments: dict[str, object]) -> object:
+        """Return one semantic mutation failure before normal stable behavior."""
+        if name != "edit_section":
+            return await super().call_tool(name, arguments)
+        self.section_attempts += 1
+        if self.section_attempts > 1:
+            return await super().call_tool(name, arguments)
+        self.calls.append((name, dict(arguments)))
+        return SimpleNamespace(
+            isError=True,
+            error="The requested subtitle is invalid.",
+            structuredContent={"ok": False},
+        )
+
+
 class StableRuntime:
     """Runtime double translating stable descriptors and image results."""
 
@@ -1182,6 +1245,19 @@ class StableRuntime:
             "is_error": bool(getattr(result, "isError", False)),
             "structured": getattr(result, "structuredContent", {}),
         }
+
+
+class ErrorAwareStableRuntime(StableRuntime):
+    """Expose fake MCP error text to the stable transaction ledger."""
+
+    @staticmethod
+    def tool_result_payload(result: object) -> dict[str, object]:
+        """Include semantic error evidence from the fake MCP response."""
+        payload = StableRuntime.tool_result_payload(result)
+        error = getattr(result, "error", None)
+        if isinstance(error, str):
+            payload["error"] = error
+        return payload
 
 
 @pytest.mark.anyio
@@ -1353,6 +1429,61 @@ async def test_stable_loop_rolls_back_provider_failure(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
+async def test_stable_loop_commits_after_corrected_mutation_failure(tmp_path: Path) -> None:
+    """A successful retry clears the failure for the same canonical target."""
+    session = MutationRetrySession(tmp_path)
+    backend = MutationRetryBackend(correct_failure=True)
+    authoring = AuthoringSession(
+        backend=backend,
+        runtime=ErrorAwareStableRuntime(tmp_path, session),
+    )
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="Update the main section.",
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert result.change_summary["changed"] is True
+    assert result.report_facts.get("rolled_back") is not True
+    assert result.report_facts["feedback_loop"]["recovered_mutation_failures"] == 1
+    assert result.report_facts["feedback_loop"]["unresolved_mutation_failures"] == 0
+    assert not any(
+        "requested subtitle is invalid" in warning.lower()
+        for warning in result.report_facts.get("warnings", [])
+    )
+
+
+@pytest.mark.anyio
+async def test_stable_loop_rolls_back_unresolved_mutation_failure(tmp_path: Path) -> None:
+    """A mutation error cannot be finalized without a successful target retry."""
+    session = MutationRetrySession(tmp_path)
+    backend = MutationRetryBackend(correct_failure=False)
+    authoring = AuthoringSession(
+        backend=backend,
+        runtime=ErrorAwareStableRuntime(tmp_path, session),
+    )
+
+    result = await authoring.run_request(
+        AuthoringRequest(
+            goal="Update the main section.",
+            output_logfile="workspace/stable.log.yaml",
+            source_logfile_path="starter.log.yaml",
+            max_rounds=4,
+        )
+    )
+
+    assert result.change_summary["changed"] is False
+    assert result.report_facts["rolled_back"] is True
+    assert result.report_facts["feedback_loop"]["status"] == "blocked"
+    assert result.report_facts["feedback_loop"]["unresolved_mutation_failures"] == 1
+    assert "requested subtitle is invalid" in " ".join(result.report_facts["reasons"]).lower()
+
+
+@pytest.mark.anyio
 async def test_stable_loop_rolls_back_unmet_request_postcondition(tmp_path: Path) -> None:
     """A persisted but incorrect mutation is not reported as successful."""
     session = StableSession(tmp_path)
@@ -1456,7 +1587,9 @@ async def test_stable_loop_allows_distinct_reads_before_mutation(tmp_path: Path)
         "provider_finished",
     }
     assert result.report_facts["feedback_loop"]["repeated_read_only_calls"] == 0
-    edit_index = next(index for index, (name, _) in enumerate(session.calls) if name == "edit_section")
+    edit_index = next(
+        index for index, (name, _) in enumerate(session.calls) if name == "edit_section"
+    )
     inspect_calls_before_edit = [
         name for name, _ in session.calls[:edit_index] if name == "inspect_authoring"
     ]
