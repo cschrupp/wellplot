@@ -394,6 +394,99 @@ def test_chat_adapter_preserves_and_enforces_correction_message_order() -> None:
     }
 
 
+def test_chat_adapter_rejects_schema_invalid_nested_arguments_before_dispatch() -> None:
+    """Return nested type errors to the provider without calling MCP."""
+    completions = _FakeCompletions(
+        [
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(
+                            name="edit_curve_binding",
+                            arguments=(
+                                '{"track_id":"cbl","style":'
+                                '"{\\"color\\":\\"#2142ff\\",\\"line_width\\":0.075}"}'
+                            ),
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            ),
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-2",
+                        function=SimpleNamespace(
+                            name="edit_curve_binding",
+                            arguments=(
+                                '{"track_id":"cbl","style":{"color":"#2142ff","line_width":0.075}}'
+                            ),
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            ),
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    dispatched: list[dict[str, object]] = []
+
+    async def call_tool(_: str, arguments: dict[str, object]) -> dict[str, object]:
+        dispatched.append(arguments)
+        return {"accepted": True, "message": "Binding updated."}
+
+    result = anyio.run(
+        partial(
+            run_chat_completions_authoring_loop,
+            client=client,
+            model="local-model",
+            provider_label="OpenAI-compatible",
+            instructions="Update the binding.",
+            initial_user_message="Make the CBL curve blue.",
+            tool_definitions=[
+                FunctionToolDefinition(
+                    name="edit_curve_binding",
+                    description="Edit one curve binding.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "track_id": {"type": "string"},
+                            "style": {
+                                "type": "object",
+                                "properties": {
+                                    "color": {"type": "string"},
+                                    "line_width": {"type": "number"},
+                                },
+                                "additionalProperties": False,
+                            },
+                        },
+                        "required": ["track_id", "style"],
+                        "additionalProperties": False,
+                    },
+                )
+            ],
+            tool_caller=call_tool,
+            max_rounds=2,
+            required_tool_name="edit_curve_binding",
+        )
+    )
+
+    assert dispatched == [
+        {
+            "track_id": "cbl",
+            "style": {"color": "#2142ff", "line_width": 0.075},
+        }
+    ]
+    assert result.final_text == "Binding updated."
+    assert result.report_facts["provider_response"]["schema_validation_retries"] == 1
+    retry_messages = completions.requests[1]["messages"]
+    tool_message = next(message for message in retry_messages if message["role"] == "tool")
+    assert "native JSON types" in str(tool_message["content"])
+
+
 @pytest.mark.parametrize(
     ("response", "expected_status"),
     [

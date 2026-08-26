@@ -220,6 +220,92 @@ def test_responses_adapter_preserves_and_enforces_correction_exchange() -> None:
     }
 
 
+def test_responses_adapter_rejects_schema_invalid_nested_arguments_before_dispatch() -> None:
+    """Return nested type errors to the provider without calling MCP."""
+    responses = _FakeResponses(
+        [
+            _response(
+                response_id="response-1",
+                output=[
+                    _function_call(
+                        call_id="call-1",
+                        name="edit_curve_binding",
+                        arguments=(
+                            '{"track_id":"cbl","style":'
+                            '"{\\"color\\":\\"#2142ff\\",\\"line_width\\":0.075}"}'
+                        ),
+                    )
+                ],
+            ),
+            _response(
+                response_id="response-2",
+                output=[
+                    _function_call(
+                        call_id="call-2",
+                        name="edit_curve_binding",
+                        arguments=(
+                            '{"track_id":"cbl","style":{"color":"#2142ff","line_width":0.075}}'
+                        ),
+                    )
+                ],
+            ),
+        ]
+    )
+    client = SimpleNamespace(responses=responses)
+    dispatched: list[dict[str, object]] = []
+
+    async def call_tool(_: str, arguments: dict[str, object]) -> dict[str, object]:
+        dispatched.append(arguments)
+        return {"accepted": True, "message": "Binding updated."}
+
+    result = anyio.run(
+        partial(
+            run_responses_authoring_loop,
+            client=client,
+            model="openai-model",
+            provider_label="OpenAI",
+            instructions="Update the binding.",
+            initial_user_message="Make the CBL curve blue.",
+            tool_definitions=[
+                FunctionToolDefinition(
+                    name="edit_curve_binding",
+                    description="Edit one curve binding.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "track_id": {"type": "string"},
+                            "style": {
+                                "type": "object",
+                                "properties": {
+                                    "color": {"type": "string"},
+                                    "line_width": {"type": "number"},
+                                },
+                                "additionalProperties": False,
+                            },
+                        },
+                        "required": ["track_id", "style"],
+                        "additionalProperties": False,
+                    },
+                )
+            ],
+            tool_caller=call_tool,
+            max_rounds=2,
+            required_tool_name="edit_curve_binding",
+        )
+    )
+
+    assert dispatched == [
+        {
+            "track_id": "cbl",
+            "style": {"color": "#2142ff", "line_width": 0.075},
+        }
+    ]
+    assert result.final_text == "Binding updated."
+    assert result.report_facts["provider_response"]["schema_validation_retries"] == 1
+    retry_output = responses.requests[1]["input"][0]["output"]
+    assert "native JSON types" in str(retry_output)
+
+
 @pytest.mark.parametrize(
     ("response", "expected_status"),
     [

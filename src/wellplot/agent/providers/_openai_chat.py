@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import json
 
+from jsonschema import Draft202012Validator
+
 from ..core import (
     AuthoringToolCall,
     FunctionToolDefinition,
@@ -30,7 +32,11 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
-from ._openai_responses import _required_tool_name, _required_tool_submission_outcome
+from ._openai_responses import (
+    _required_tool_name,
+    _required_tool_submission_outcome,
+    _tool_argument_schema_error,
+)
 
 
 def _message_text(message: object) -> str:
@@ -137,6 +143,9 @@ async def run_chat_completions_authoring_loop(
         }
         for tool in tool_definitions
     ]
+    tool_argument_validators = {
+        tool.name: Draft202012Validator(tool.parameters) for tool in tool_definitions
+    }
     required_name = _required_tool_name(tool_definitions, required_tool_name)
     required_tool_called = False
     required_submission_accepted = False
@@ -145,6 +154,7 @@ async def run_chat_completions_authoring_loop(
     finish_reasons: list[str] = []
     response_rounds = 0
     controller_stopped = False
+    schema_validation_retries = 0
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -235,7 +245,19 @@ async def run_chat_completions_authoring_loop(
                     arguments=arguments,
                 )
             )
-            tool_payload = await tool_caller(call_name, arguments)
+            schema_error = _tool_argument_schema_error(
+                tool_name=call_name,
+                arguments=arguments,
+                validators=tool_argument_validators,
+            )
+            if schema_error is None:
+                tool_payload = await tool_caller(call_name, arguments)
+            else:
+                schema_validation_retries += 1
+                tool_payload = {
+                    "is_error": True,
+                    "error": schema_error,
+                }
             if call_name == required_name:
                 submission_outcome = _required_tool_submission_outcome(tool_payload)
                 required_tool_called = submission_outcome is not False
@@ -268,22 +290,23 @@ async def run_chat_completions_authoring_loop(
         if controller_stopped or required_submission_accepted:
             break
     else:
+        provider_response_facts: dict[str, object] = {
+            "adapter": "chat_completions",
+            "rounds": response_rounds,
+            "tool_calls_emitted": bool(tool_trace),
+            "finish_reasons": finish_reasons,
+            "response_statuses": [],
+            "required_tool_name": required_name,
+            "required_submission_accepted": required_submission_accepted,
+            "controller_stopped": controller_stopped,
+        }
+        if schema_validation_retries:
+            provider_response_facts["schema_validation_retries"] = schema_validation_retries
         raise ProviderAdapterError(
             "round_budget_exhausted",
             f"The {provider_label} authoring loop exceeded {max_rounds} rounds.",
             tool_trace=tuple(tool_trace),
-            report_facts={
-                "provider_response": {
-                    "adapter": "chat_completions",
-                    "rounds": response_rounds,
-                    "tool_calls_emitted": bool(tool_trace),
-                    "finish_reasons": finish_reasons,
-                    "response_statuses": [],
-                    "required_tool_name": required_name,
-                    "required_submission_accepted": required_submission_accepted,
-                    "controller_stopped": controller_stopped,
-                }
-            },
+            report_facts={"provider_response": provider_response_facts},
         )
 
     if not final_text.strip() and not required_submission_accepted:
@@ -305,19 +328,20 @@ async def run_chat_completions_authoring_loop(
         if summary_finish_reason is not None:
             finish_reasons.append(summary_finish_reason)
 
+    provider_response_facts = {
+        "adapter": "chat_completions",
+        "rounds": response_rounds,
+        "tool_calls_emitted": bool(tool_trace),
+        "finish_reasons": finish_reasons,
+        "response_statuses": [],
+        "required_tool_name": required_name,
+        "required_submission_accepted": required_submission_accepted,
+        "controller_stopped": controller_stopped,
+    }
+    if schema_validation_retries:
+        provider_response_facts["schema_validation_retries"] = schema_validation_retries
     return ProviderRunResult(
         final_text=final_text,
         tool_trace=tuple(tool_trace),
-        report_facts={
-            "provider_response": {
-                "adapter": "chat_completions",
-                "rounds": response_rounds,
-                "tool_calls_emitted": bool(tool_trace),
-                "finish_reasons": finish_reasons,
-                "response_statuses": [],
-                "required_tool_name": required_name,
-                "required_submission_accepted": required_submission_accepted,
-                "controller_stopped": controller_stopped,
-            }
-        },
+        report_facts={"provider_response": provider_response_facts},
     )

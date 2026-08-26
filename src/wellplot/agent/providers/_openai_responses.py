@@ -26,6 +26,8 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 from wellplot.errors import DependencyUnavailableError
 
 from ..core import (
@@ -146,6 +148,35 @@ def _required_tool_submission_outcome(payload: object) -> bool | None:
     return None
 
 
+def _tool_argument_schema_error(
+    *,
+    tool_name: str,
+    arguments: dict[str, object],
+    validators: Mapping[str, Draft202012Validator],
+) -> str | None:
+    """Return the first advertised-schema violation for one provider tool call."""
+    validator = validators.get(tool_name)
+    if validator is None:
+        return f"Tool {tool_name!r} is not part of the advertised MCP contract."
+
+    errors = sorted(
+        validator.iter_errors(arguments),
+        key=lambda error: tuple(str(part) for part in error.absolute_path),
+    )
+    if not errors:
+        return None
+
+    error = errors[0]
+    path = ".".join(str(part) for part in error.absolute_path)
+    location = f" at {path!r}" if path else ""
+    return (
+        f"Tool {tool_name!r} arguments do not match the advertised MCP schema"
+        f"{location}: {error.message}. Correct the arguments and retry the same "
+        "tool using native JSON types; do not serialize nested objects or arrays "
+        "as strings."
+    )
+
+
 async def run_responses_authoring_loop(
     *,
     client: object,
@@ -184,12 +215,16 @@ async def run_responses_authoring_loop(
         }
         for tool in tool_definitions
     ]
+    tool_argument_validators = {
+        tool.name: Draft202012Validator(tool.parameters) for tool in tool_definitions
+    }
     if not function_tools:
         raise RuntimeError(f"No function tools were provided to the {provider_label} backend.")
     required_name = _required_tool_name(tool_definitions, required_tool_name)
     required_tool_called = False
     required_submission_accepted = False
     controller_stopped = False
+    schema_validation_retries = 0
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
@@ -276,7 +311,19 @@ async def run_responses_authoring_loop(
                     arguments=arguments,
                 )
             )
-            tool_payload = await tool_caller(call_name, arguments)
+            schema_error = _tool_argument_schema_error(
+                tool_name=call_name,
+                arguments=arguments,
+                validators=tool_argument_validators,
+            )
+            if schema_error is None:
+                tool_payload = await tool_caller(call_name, arguments)
+            else:
+                schema_validation_retries += 1
+                tool_payload = {
+                    "is_error": True,
+                    "error": schema_error,
+                }
             if call_name == required_name:
                 submission_outcome = _required_tool_submission_outcome(tool_payload)
                 required_tool_called = submission_outcome is not False
@@ -300,22 +347,23 @@ async def run_responses_authoring_loop(
         if controller_stopped or required_submission_accepted:
             break
     else:
+        provider_response_facts: dict[str, object] = {
+            "adapter": "responses",
+            "rounds": response_rounds,
+            "tool_calls_emitted": bool(tool_trace),
+            "finish_reasons": response_statuses,
+            "response_statuses": response_statuses,
+            "required_tool_name": required_name,
+            "required_submission_accepted": required_submission_accepted,
+            "controller_stopped": controller_stopped,
+        }
+        if schema_validation_retries:
+            provider_response_facts["schema_validation_retries"] = schema_validation_retries
         raise ProviderAdapterError(
             "round_budget_exhausted",
             f"The {provider_label} authoring loop exceeded {max_rounds} rounds.",
             tool_trace=tuple(tool_trace),
-            report_facts={
-                "provider_response": {
-                    "adapter": "responses",
-                    "rounds": response_rounds,
-                    "tool_calls_emitted": bool(tool_trace),
-                    "finish_reasons": response_statuses,
-                    "response_statuses": response_statuses,
-                    "required_tool_name": required_name,
-                    "required_submission_accepted": required_submission_accepted,
-                    "controller_stopped": controller_stopped,
-                }
-            },
+            report_facts={"provider_response": provider_response_facts},
         )
 
     if response is not None and not final_text.strip() and not required_submission_accepted:
@@ -340,19 +388,20 @@ async def run_responses_authoring_loop(
         summary_text = getattr(summary_response, "output_text", "")
         final_text = summary_text if isinstance(summary_text, str) else ""
 
+    provider_response_facts = {
+        "adapter": "responses",
+        "rounds": response_rounds,
+        "tool_calls_emitted": bool(tool_trace),
+        "finish_reasons": response_statuses,
+        "response_statuses": response_statuses,
+        "required_tool_name": required_name,
+        "required_submission_accepted": required_submission_accepted,
+        "controller_stopped": controller_stopped,
+    }
+    if schema_validation_retries:
+        provider_response_facts["schema_validation_retries"] = schema_validation_retries
     return ProviderRunResult(
         final_text=final_text,
         tool_trace=tuple(tool_trace),
-        report_facts={
-            "provider_response": {
-                "adapter": "responses",
-                "rounds": response_rounds,
-                "tool_calls_emitted": bool(tool_trace),
-                "finish_reasons": response_statuses,
-                "response_statuses": response_statuses,
-                "required_tool_name": required_name,
-                "required_submission_accepted": required_submission_accepted,
-                "controller_stopped": controller_stopped,
-            }
-        },
+        report_facts={"provider_response": provider_response_facts},
     )
