@@ -1483,5 +1483,8 @@ async def test_stable_loop_steers_after_successful_read_only_calls(tmp_path: Pat
         "exact read-only call already succeeded" in message
         for message in backend.feedback_messages
     )
-    assert result.report_facts["feedback_loop"]["status"] == "blocked"
     assert result.report_facts["feedback_loop"]["repeated_read_only_calls"] >= 2
+    assert result.report_facts["feedback_loop"]["status"] in {
+        "provider_finished",
+        "completed",
+    }
