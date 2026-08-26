@@ -1,0 +1,4655 @@
+{
+  "probe": {
+    "arguments": {
+      "detail": "summary"
+    },
+    "content_bytes": 1321,
+    "is_error": false,
+    "result_bytes": 2284,
+    "structured_content_bytes": 914,
+    "tool_name": "inspect_vocab"
+  },
+  "prompts": [
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "review_logfile"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "focus",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "preview_logfile"
+    },
+    {
+      "arguments": [
+        {
+          "name": "example_id",
+          "required": true
+        },
+        {
+          "name": "goal",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "start_from_example"
+    },
+    {
+      "arguments": [
+        {
+          "name": "goal",
+          "required": true
+        },
+        {
+          "name": "logfile_path",
+          "required": false
+        },
+        {
+          "name": "example_id",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "author_plot_from_request"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "feedback",
+          "required": true
+        }
+      ],
+      "description": "",
+      "name": "revise_plot_from_feedback"
+    },
+    {
+      "arguments": [
+        {
+          "name": "logfile_path",
+          "required": true
+        },
+        {
+          "name": "source_text",
+          "required": true
+        },
+        {
+          "name": "source_description",
+          "required": false
+        }
+      ],
+      "description": "",
+      "name": "ingest_header_text"
+    }
+  ],
+  "resource_templates": [
+    {
+      "description": "",
+      "mimeType": "text/markdown",
+      "name": "production_example_readme_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/README.md"
+    },
+    {
+      "description": "",
+      "mimeType": "text/yaml",
+      "name": "production_example_template_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/base.template.yaml"
+    },
+    {
+      "description": "",
+      "mimeType": "text/yaml",
+      "name": "production_example_logfile_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/full_reconstruction.log.yaml"
+    },
+    {
+      "description": "",
+      "mimeType": "text/markdown",
+      "name": "production_example_notes_resource",
+      "uriTemplate": "wellplot://examples/production/{example_id}/data-notes.md"
+    }
+  ],
+  "resources": [
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "logfile_schema_resource",
+      "uri": "wellplot://schema/logfile.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "production_examples_manifest_resource",
+      "uri": "wellplot://examples/production/index.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_patch_schema_resource",
+      "uri": "wellplot://authoring/schema/patch.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_canonical_schema_resource",
+      "uri": "wellplot://authoring/schema/canonical.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_operations_schema_resource",
+      "uri": "wellplot://authoring/schema/operations.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_hierarchy_resource",
+      "uri": "wellplot://authoring/catalog/hierarchy.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_track_kinds_resource",
+      "uri": "wellplot://authoring/catalog/track-kinds.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_fill_kinds_resource",
+      "uri": "wellplot://authoring/catalog/fill-kinds.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_track_archetypes_resource",
+      "uri": "wellplot://authoring/catalog/track-archetypes.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_archetypes_resource",
+      "uri": "wellplot://authoring/catalog/header-archetypes.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_packet_blueprints_resource",
+      "uri": "wellplot://authoring/catalog/packet-blueprints.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_style_presets_resource",
+      "uri": "wellplot://authoring/catalog/style-presets.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_fields_resource",
+      "uri": "wellplot://authoring/catalog/header-fields.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_header_key_aliases_resource",
+      "uri": "wellplot://authoring/catalog/header-key-aliases.json"
+    },
+    {
+      "description": "",
+      "mimeType": "application/json",
+      "name": "authoring_channel_aliases_resource",
+      "uri": "wellplot://authoring/catalog/channel-aliases.json"
+    }
+  ],
+  "tools": [
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create, clone, or save one logfile draft.",
+      "input_schema": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "create",
+              "clone",
+              "save"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overwrite"
+          },
+          "source_logfile_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Logfile Path"
+          },
+          "yaml_text": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Yaml Text"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "create_draftArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 682,
+      "name": "create_draft",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Compact result for persisted draft creation, cloning, or saving.",
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "logfile_path": {
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "section_count": {
+            "title": "Section Count",
+            "type": "integer"
+          },
+          "section_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Section Ids",
+            "type": "array"
+          },
+          "starter": {
+            "title": "Starter",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "logfile_path",
+          "starter",
+          "section_ids",
+          "section_count"
+        ],
+        "title": "StableDraftCreationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 850
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Inspect scoped canonical authoring objects. detail=summary is the compact default; detail=full returns complete selected objects.",
+      "input_schema": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "enum": [
+                  "summary",
+                  "full"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "object_kind": {
+            "enum": [
+              "page",
+              "depth",
+              "header_slot",
+              "service_title",
+              "section",
+              "track",
+              "curve_binding",
+              "raster_binding",
+              "annotation",
+              "fill",
+              "remark"
+            ],
+            "title": "Object Kind",
+            "type": "string"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track Id"
+          }
+        },
+        "required": [
+          "logfile_path",
+          "object_kind"
+        ],
+        "title": "inspect_authoringArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 696,
+      "name": "inspect_authoring",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for scoped deterministic inspection tools.",
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "items"
+        ],
+        "title": "StableInspectionResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 594
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true,
+        "readOnlyHint": true
+      },
+      "description": "Inspect source metadata and available channels. include_metadata=false returns a compact channel summary; true includes full well metadata and provenance.",
+      "input_schema": {
+        "properties": {
+          "channels": {
+            "anyOf": [
+              {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Channels"
+          },
+          "include_metadata": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Include Metadata"
+          },
+          "logfile_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Logfile Path"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "source_format": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Format"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Path"
+          }
+        },
+        "title": "inspect_sourceArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 752,
+      "name": "inspect_source",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for source inspection and channel discovery.",
+        "properties": {
+          "available_channels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Available Channels",
+            "type": "array"
+          },
+          "channel_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Channel Count"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "source_format_detected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Format Detected"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Path"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "items"
+        ],
+        "title": "StableSourceInspectionResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1013
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Inspect supported vocabulary. family selects one object family; detail=summary is compact and detail=full returns the selected catalog payload.",
+      "input_schema": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "enum": [
+                  "summary",
+                  "full"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Family"
+          }
+        },
+        "title": "inspect_vocabArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 279,
+      "name": "inspect_vocab",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for scoped deterministic inspection tools.",
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "items"
+        ],
+        "title": "StableInspectionResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 594
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Fill header slots and service titles without replacing the archetype. Use operation=apply_values with the values mapping for bulk or natural-language header assignments; slot_id is required only for set_slot and clear_slot.",
+      "input_schema": {
+        "properties": {
+          "archetype_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Archetype Id"
+          },
+          "availability": {
+            "anyOf": [
+              {
+                "enum": [
+                  "unknown",
+                  "available",
+                  "missing",
+                  "not_applicable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Availability"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "set_slot",
+              "set_service_title",
+              "apply_archetype",
+              "apply_values",
+              "clear_slot"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite_policy": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overwrite Policy"
+          },
+          "preserve_existing_values": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Preserve Existing Values"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "unknown",
+                  "source",
+                  "user",
+                  "default",
+                  "preserved"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Provenance"
+          },
+          "service_title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Service Title"
+          },
+          "slot_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Slot Id"
+          },
+          "source_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Key"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Value"
+          },
+          "values": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Values"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_headerArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1572,
+      "name": "edit_header",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for header fills with assignment evidence.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "applied_assignments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Applied Assignments",
+            "type": "array"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "heading_summary": {
+            "additionalProperties": true,
+            "title": "Heading Summary",
+            "type": "object"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "logfile_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Logfile Path"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "overwrite_policy": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overwrite Policy"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "skipped_assignments": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Skipped Assignments",
+            "type": "array"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableHeaderMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1598
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Update report, page, output, depth, section view, or report-wide Matplotlib style. For set_section_view, depth_range must be an object with numeric minimum and maximum and optional unit, for example {minimum: 25, maximum: 4845, unit: ft}.",
+      "input_schema": {
+        "$defs": {
+          "edit_report_settingsArgumentsDepthRange": {
+            "additionalProperties": false,
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "edit_report_settingsArgumentsDepthRange",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "depth": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depth"
+          },
+          "depth_range": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_report_settingsArgumentsDepthRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "set_report",
+              "set_page",
+              "set_output",
+              "set_depth",
+              "set_section_view",
+              "set_matplotlib_style"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "style_patch": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Style Patch"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_report_settingsArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1611,
+      "name": "edit_report_settings",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Remarks operations: add=remark{title,text,lines,alignment}; add requires actual content in non-empty remark.text or at least one item in remark.lines; title/alignment alone is invalid. update=remark_id+patch; remove/move=remark_id; clear=all.",
+      "input_schema": {
+        "$defs": {
+          "edit_remarksArgumentsRemark": {
+            "additionalProperties": false,
+            "anyOf": [
+              {
+                "required": [
+                  "text"
+                ]
+              },
+              {
+                "required": [
+                  "lines"
+                ]
+              }
+            ],
+            "properties": {
+              "alignment": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "left",
+                      "center",
+                      "right"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": "left",
+                "title": "Alignment"
+              },
+              "border": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Border"
+              },
+              "font_size": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Font Size"
+              },
+              "lines": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Lines"
+              },
+              "remark_id": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Remark Id"
+              },
+              "text": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Text"
+              },
+              "title": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Title"
+              },
+              "title_font_size": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Title Font Size"
+              }
+            },
+            "title": "edit_remarksArgumentsRemark",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "New Index"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "move",
+              "clear"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Patch"
+          },
+          "remark": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_remarksArgumentsRemark"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "remark_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Remark Id"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_remarksArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1774,
+      "name": "edit_remarks",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create, update, remove, or move one report section. For operation=update, depth_range must be an object with numeric minimum and maximum and optional unit, for example {minimum: 25, maximum: 4845, unit: ft}. For operation=add, section must be a complete section object with a non-empty tracks list; to clone an existing section structure, use replicate_section_structure instead.",
+      "input_schema": {
+        "$defs": {
+          "edit_sectionArgumentsDepthRange": {
+            "additionalProperties": false,
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "edit_sectionArgumentsDepthRange",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "depth_range": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_sectionArgumentsDepthRange"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "New Index"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "move"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_sectionArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1278,
+      "name": "edit_section",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks. The operation is retry-safe: an equivalent existing target returns a successful no-op with already_exists=true and a stable source-to-target id_map; a conflicting target fails unless overwrite=true.",
+      "input_schema": {
+        "properties": {
+          "include_bindings": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Include Bindings"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "const": "replicate",
+            "title": "Operation",
+            "type": "string"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overwrite"
+          },
+          "source_format": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Format"
+          },
+          "source_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Path"
+          },
+          "source_section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Section Id"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "target_section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Section Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "replicate_section_structureArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1137,
+      "name": "replicate_section_structure",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Create or edit one track. Required call shapes: operation=add requires section_id, track_id, title, kind, and width_mm in the same call; operation=set_scales requires section_id, track_id, and at least one of x_scale, curve_scale, or channel_scales. Never call set_scales without a scale payload. section_id and track_id are required for every operation. Add appends the track, then use operation=move for placement. A retry of an equivalent add is a successful no-op; an add with conflicting properties must use operation=update. Track x_scale is the shared horizontal axis/grid scale for normal and array tracks; curve binding scale is independent content scale. Array raster presentation belongs on edit_raster_binding fields such as profile, colorbar, sample_axis, and color_limits. Use set_scales only when both track and curve scales are intentionally synchronized; otherwise use update with x_scale or edit_curve_binding with scale. For update, remove, move, and clear_bindings, track_id must already exist.",
+      "input_schema": {
+        "$defs": {
+          "edit_trackArgumentsXScaleVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "linear",
+                      "log",
+                      "tangential"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Kind"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": false,
+                "title": "Reverse"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "edit_trackArgumentsXScaleVariant0",
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "add"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "title",
+                "kind",
+                "width_mm"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "move"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "new_index"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "set_scales"
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "x_scale"
+                  ]
+                },
+                {
+                  "required": [
+                    "curve_scale"
+                  ]
+                },
+                {
+                  "required": [
+                    "channel_scales"
+                  ]
+                }
+              ],
+              "required": []
+            }
+          }
+        ],
+        "properties": {
+          "annotations": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Annotations"
+          },
+          "channel_scales": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Channel Scales"
+          },
+          "curve_scale": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Curve Scale"
+          },
+          "grid": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Grid"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "normal",
+                  "reference",
+                  "array",
+                  "annotation"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "new_index": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "New Index"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "move",
+              "clear_bindings",
+              "set_scales"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reference"
+          },
+          "section_id": {
+            "minLength": 1,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "sync_grid_to_scale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sync Grid To Scale"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Title"
+          },
+          "track_header": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track Header"
+          },
+          "track_id": {
+            "minLength": 1,
+            "title": "Track Id",
+            "type": "string"
+          },
+          "width_mm": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Width Mm"
+          },
+          "x_scale": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_trackArgumentsXScaleVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "operation",
+          "section_id",
+          "track_id",
+          "logfile_path"
+        ],
+        "title": "edit_trackArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 2824,
+      "name": "edit_track",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear scalar curve bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all scalar bindings from the track and needs neither channel nor binding_id. Trust a successful mutation result and do not immediately repeat the same add. A retry of an equivalent add with the same binding_id is a successful no-op; to add another instance of a channel already on the track, provide a new distinct binding_id; an add without one is rejected. Use operation=update when changing an existing binding. Correct a failed mutation and retry it before reporting completion.",
+      "input_schema": {
+        "$defs": {
+          "edit_curve_bindingArgumentsScaleVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "linear",
+                      "log",
+                      "tangential"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Kind"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": false,
+                "title": "Reverse"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "edit_curve_bindingArgumentsScaleVariant0",
+            "type": "object"
+          },
+          "edit_curve_bindingArgumentsStyleVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "alpha": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Alpha"
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Color"
+              },
+              "colormap": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Colormap"
+              },
+              "fill_alpha": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Fill Alpha"
+              },
+              "fill_color": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Fill Color"
+              },
+              "line_style": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line Style"
+              },
+              "line_width": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line Width"
+              }
+            },
+            "title": "edit_curve_bindingArgumentsStyleVariant0",
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "add"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "channel"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "update"
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "channel"
+                  ]
+                },
+                {
+                  "required": [
+                    "binding_id"
+                  ]
+                }
+              ],
+              "required": []
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "remove"
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "channel"
+                  ]
+                },
+                {
+                  "required": [
+                    "binding_id"
+                  ]
+                }
+              ],
+              "required": []
+            }
+          }
+        ],
+        "properties": {
+          "binding_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Binding Id"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Channel"
+          },
+          "header_display": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Header Display"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "clear"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "render_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "line",
+                  "value_labels"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Render Mode"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_curve_bindingArgumentsScaleVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "section_id": {
+            "minLength": 1,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_curve_bindingArgumentsStyleVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "track_id": {
+            "minLength": 1,
+            "title": "Track Id",
+            "type": "string"
+          },
+          "wrap": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Wrap"
+          }
+        },
+        "required": [
+          "operation",
+          "section_id",
+          "track_id",
+          "logfile_path"
+        ],
+        "title": "edit_curve_bindingArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 3126,
+      "name": "edit_curve_binding",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear array/raster bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all raster bindings from the track and needs neither channel nor binding_id. Optional nested strings such as sample_axis.label and sample_axis.unit must be non-empty when supplied; omit them when no value is requested. Correct a failed mutation and retry it before reporting completion.",
+      "input_schema": {
+        "$defs": {
+          "edit_raster_bindingArgumentsColorbarVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Enabled"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label"
+              },
+              "position": {
+                "anyOf": [
+                  {
+                    "enum": [
+                      "right",
+                      "header"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Position"
+              }
+            },
+            "title": "edit_raster_bindingArgumentsColorbarVariant0",
+            "type": "object"
+          },
+          "edit_raster_bindingArgumentsSampleAxisVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Enabled"
+              },
+              "label": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Label"
+              },
+              "maximum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Maximum"
+              },
+              "minimum": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Minimum"
+              },
+              "source_origin": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Origin"
+              },
+              "source_step": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Source Step"
+              },
+              "tick_count": {
+                "anyOf": [
+                  {
+                    "minimum": 2,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Tick Count"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              }
+            },
+            "title": "edit_raster_bindingArgumentsSampleAxisVariant0",
+            "type": "object"
+          },
+          "edit_raster_bindingArgumentsStyleVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "alpha": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Alpha"
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Color"
+              },
+              "colormap": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Colormap"
+              },
+              "fill_alpha": {
+                "anyOf": [
+                  {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Fill Alpha"
+              },
+              "fill_color": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Fill Color"
+              },
+              "line_style": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line Style"
+              },
+              "line_width": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line Width"
+              }
+            },
+            "title": "edit_raster_bindingArgumentsStyleVariant0",
+            "type": "object"
+          },
+          "edit_raster_bindingArgumentsWaveformVariant0": {
+            "additionalProperties": false,
+            "properties": {
+              "amplitude_scale": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Amplitude Scale"
+              },
+              "color": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Color"
+              },
+              "enabled": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Enabled"
+              },
+              "fill": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Fill"
+              },
+              "invert_fill_polarity": {
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Invert Fill Polarity"
+              },
+              "line_width": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Line Width"
+              },
+              "max_traces": {
+                "anyOf": [
+                  {
+                    "exclusiveMinimum": 0,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Max Traces"
+              },
+              "negative_fill_color": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Negative Fill Color"
+              },
+              "positive_fill_color": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Positive Fill Color"
+              },
+              "stride": {
+                "anyOf": [
+                  {
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Stride"
+              }
+            },
+            "title": "edit_raster_bindingArgumentsWaveformVariant0",
+            "type": "object"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "add"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "channel"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "update"
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "channel"
+                  ]
+                },
+                {
+                  "required": [
+                    "binding_id"
+                  ]
+                }
+              ],
+              "required": []
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "remove"
+                }
+              }
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "channel"
+                  ]
+                },
+                {
+                  "required": [
+                    "binding_id"
+                  ]
+                }
+              ],
+              "required": []
+            }
+          }
+        ],
+        "properties": {
+          "alpha": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Alpha"
+          },
+          "binding_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Binding Id"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Channel"
+          },
+          "clip_percentiles": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Clip Percentiles"
+          },
+          "color_limits": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Color Limits"
+          },
+          "colorbar": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_raster_bindingArgumentsColorbarVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "interpolation": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Interpolation"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "normalization": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "none",
+                  "trace_maxabs",
+                  "global_maxabs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Normalization"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "clear"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "generic",
+                  "vdl",
+                  "waveform"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Profile"
+          },
+          "sample_axis": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_raster_bindingArgumentsSampleAxisVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "section_id": {
+            "minLength": 1,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "show_raster": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Show Raster"
+          },
+          "style": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_raster_bindingArgumentsStyleVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "track_id": {
+            "minLength": 1,
+            "title": "Track Id",
+            "type": "string"
+          },
+          "waveform": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/edit_raster_bindingArgumentsWaveformVariant0"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "waveform_normalization": {
+            "anyOf": [
+              {
+                "enum": [
+                  "auto",
+                  "none",
+                  "trace_maxabs",
+                  "global_maxabs"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Waveform Normalization"
+          }
+        },
+        "required": [
+          "operation",
+          "section_id",
+          "track_id",
+          "logfile_path"
+        ],
+        "title": "edit_raster_bindingArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 6121,
+      "name": "edit_raster_binding",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear a fill relation. section_id, track_id, and channel are required for every operation; add and update also require kind.",
+      "input_schema": {
+        "properties": {
+          "alpha": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Alpha"
+          },
+          "binding_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Binding Id"
+          },
+          "channel": {
+            "minLength": 1,
+            "title": "Channel",
+            "type": "string"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Color"
+          },
+          "crossover": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Crossover"
+          },
+          "fill_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Fill Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "between_curves",
+                  "between_instances",
+                  "baseline_split"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "clear"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "other_binding_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Other Binding Id"
+          },
+          "section_id": {
+            "minLength": 1,
+            "title": "Section Id",
+            "type": "string"
+          },
+          "track_id": {
+            "minLength": 1,
+            "title": "Track Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "section_id",
+          "track_id",
+          "channel",
+          "logfile_path"
+        ],
+        "title": "edit_fillArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1367,
+      "name": "edit_fill",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Add, update, remove, or clear typed annotations.",
+      "input_schema": {
+        "properties": {
+          "annotation": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Annotation"
+          },
+          "annotation_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Annotation Id"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Base"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Color"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Depth"
+          },
+          "glyph": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Glyph"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "interval",
+                  "text",
+                  "marker",
+                  "arrow",
+                  "glyph"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Kind"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Label"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "operation": {
+            "enum": [
+              "add",
+              "update",
+              "remove",
+              "clear"
+            ],
+            "title": "Operation",
+            "type": "string"
+          },
+          "patch": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Patch"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Text"
+          },
+          "top": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Top"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track Id"
+          }
+        },
+        "required": [
+          "operation",
+          "logfile_path"
+        ],
+        "title": "edit_annotationArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 1611,
+      "name": "edit_annotation",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for one persisted authoring mutation.",
+        "properties": {
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "already_exists": {
+            "default": false,
+            "title": "Already Exists",
+            "type": "boolean"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Fields",
+            "type": "array"
+          },
+          "id_map": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Id Map",
+            "type": "object"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "target": {
+            "additionalProperties": true,
+            "title": "Target",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "changed",
+          "target",
+          "changed_fields",
+          "before",
+          "after"
+        ],
+        "title": "StableMutationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 1045
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Validate a persisted logfile at the requested tier and return actionable errors.",
+      "input_schema": {
+        "properties": {
+          "level": {
+            "anyOf": [
+              {
+                "enum": [
+                  "structural",
+                  "data",
+                  "render"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Level"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "validate_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 289,
+      "name": "validate_logfile",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for deterministic validation tools.",
+        "properties": {
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          },
+          "validation_level": {
+            "title": "Validation Level",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "valid",
+          "errors",
+          "validation_level"
+        ],
+        "title": "StableValidationResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 696
+    },
+    {
+      "annotations": {
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Render a scoped preview for visual verification.",
+      "input_schema": {
+        "properties": {
+          "focus": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Focus"
+          },
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "section_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section Id"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Track Id"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "preview_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 574,
+      "name": "preview_logfile",
+      "output_schema": null,
+      "output_schema_bytes": 0
+    },
+    {
+      "annotations": {
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      },
+      "description": "Render a validated logfile to its configured artifact.",
+      "input_schema": {
+        "properties": {
+          "logfile_path": {
+            "minLength": 1,
+            "title": "Logfile Path",
+            "type": "string"
+          },
+          "output_path": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output Path"
+          },
+          "overwrite": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Overwrite"
+          }
+        },
+        "required": [
+          "logfile_path"
+        ],
+        "title": "render_logfileArguments",
+        "type": "object"
+      },
+      "input_schema_bytes": 369,
+      "name": "render_logfile",
+      "output_schema": {
+        "additionalProperties": false,
+        "description": "Structured result for persisted renders with renderer metadata.",
+        "properties": {
+          "artifact": {
+            "title": "Artifact",
+            "type": "string"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Next Steps",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          },
+          "page_count": {
+            "title": "Page Count",
+            "type": "integer"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Revision"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "warnings",
+          "next_steps",
+          "ok",
+          "artifact",
+          "output_path",
+          "backend",
+          "page_count"
+        ],
+        "title": "StableRenderArtifactResult",
+        "type": "object"
+      },
+      "output_schema_bytes": 747
+    }
+  ],
+  "transport": "production-stdio",
+  "version": 1
+}

@@ -212,6 +212,14 @@ def _field_schema(value: object) -> Schema:
             schema["properties"] = {
                 str(name): _field_schema(item) for name, item in properties.items()
             }
+        for key in ("anyOf", "oneOf"):
+            variants = value.get(key)
+            if isinstance(variants, list):
+                schema[key] = [
+                    _field_schema(item)
+                    for item in variants
+                    if isinstance(item, Mapping)
+                ]
         items = value.get("items")
         if isinstance(items, Mapping):
             schema["items"] = _field_schema(items)

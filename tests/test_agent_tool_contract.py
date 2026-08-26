@@ -206,6 +206,56 @@ def test_track_tool_explains_add_and_existing_target_semantics() -> None:
     assert {"section_id", "track_id"} <= set(track.input_schema["required"])
 
 
+def test_curve_binding_tool_explains_retry_and_duplicate_identity() -> None:
+    """Binding guidance prevents repeated adds and ambiguous same-channel instances."""
+    curve = next(tool for tool in stable_tool_profile() if tool.name == "edit_curve_binding")
+
+    assert "Trust a successful mutation result" in curve.description
+    assert "another instance of a channel already on the track" in curve.description
+    assert "new distinct binding_id" in curve.description
+    assert "Use operation=update" in curve.description
+
+
+def test_report_settings_advertises_operation_specific_payloads() -> None:
+    """Depth-axis and section-view payloads cannot be confused on the wire."""
+    settings = next(tool for tool in stable_tool_profile() if tool.name == "edit_report_settings")
+
+    depth = settings.input_model.model_validate(
+        {
+            "logfile_path": "draft.log.yaml",
+            "operation": "set_depth",
+            "depth": {
+                "unit": "ft",
+                "scale": 240,
+                "major_step": 100,
+                "minor_step": 20,
+            },
+        }
+    )
+    assert depth.depth.unit == "ft"
+
+    with pytest.raises(ValidationError):
+        settings.input_model.model_validate(
+            {
+                "logfile_path": "draft.log.yaml",
+                "operation": "set_depth",
+                "depth": {"minimum": 25, "maximum": 4845},
+            }
+        )
+
+    branches = settings.wire_input_schema["allOf"]
+    section_view_branch = next(
+        branch
+        for branch in branches
+        if branch["if"]["properties"]["operation"]["const"] == "set_section_view"
+    )
+    assert section_view_branch["then"]["required"] == ["section_id"]
+    assert {"depth_range"} in [
+        set(condition["required"])
+        for condition in section_view_branch["then"]["anyOf"]
+    ]
+
+
 def test_track_add_requires_all_creation_fields_in_the_profile() -> None:
     """The stable profile requires all creation fields for track adds."""
     track = next(tool for tool in stable_tool_profile() if tool.name == "edit_track")
