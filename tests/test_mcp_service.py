@@ -4271,6 +4271,8 @@ class McpServiceTests(unittest.TestCase):
             self.assertIn(f"{tool_name}(...)", prompt)
         self.assertIn("Trust a successful mutation result", prompt)
         self.assertIn("already_exists=true", prompt)
+        self.assertIn("binding_id never replaces track_id", prompt)
+        self.assertIn("omit sample_axis unless its label and unit are non-empty", prompt)
         self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_revise_plot_from_feedback_prompt_mentions_change_summary(self) -> None:
@@ -4299,6 +4301,8 @@ class McpServiceTests(unittest.TestCase):
             self.assertIn(f"{tool_name}(...)", prompt)
         self.assertIn("Trust successful mutation results", prompt)
         self.assertIn("already_exists=true", prompt)
+        self.assertIn("binding_id never replaces track_id", prompt)
+        self.assertIn("omit sample_axis unless its label and unit are non-empty", prompt)
         self._assert_prompt_uses_only_stable_tools(prompt)
 
     def test_ingest_header_text_prompt_uses_stable_header_operations(self) -> None:

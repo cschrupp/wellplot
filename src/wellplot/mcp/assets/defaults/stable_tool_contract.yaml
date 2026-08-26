@@ -176,7 +176,7 @@ tools:
       track_header: object
       annotations: object_list
   - id: edit_curve_binding
-    description: Add, update, remove, or clear scalar curve bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all scalar bindings from the track and needs neither channel nor binding_id. Trust a successful mutation result and do not immediately repeat the same add. A retry of an equivalent add with the same binding_id is a successful no-op; to add another instance of a channel already on the track, provide a new distinct binding_id; an add without one is rejected. Use operation=update when changing an existing binding. Correct a failed mutation and retry it before reporting completion.
+    description: Add, update, remove, or clear scalar curve bindings. Every call requires logfile_path, section_id, and track_id; binding_id identifies a child binding and never replaces track_id. Add also requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all scalar bindings from the track and needs neither channel nor binding_id. Trust a successful mutation result and do not immediately repeat the same add. A retry of an equivalent add with the same binding_id is a successful no-op; to add another instance of a channel already on the track, provide a new distinct binding_id; an add without one is rejected. Use operation=update when changing an existing binding. Correct a failed mutation and retry it before reporting completion.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: curve
@@ -201,7 +201,7 @@ tools:
       wrap: boolean
       render_mode: [line, value_labels]
   - id: edit_raster_binding
-    description: Add, update, remove, or clear array/raster bindings. Every operation requires section_id and track_id. Add requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all raster bindings from the track and needs neither channel nor binding_id. Optional nested strings such as sample_axis.label and sample_axis.unit must be non-empty when supplied; omit them when no value is requested. Correct a failed mutation and retry it before reporting completion.
+    description: Add, update, remove, or clear array/raster bindings. Every call requires logfile_path, section_id, and track_id; binding_id identifies a child binding and never replaces track_id. Add also requires channel. Update and remove require either channel or the binding_id of an existing binding; the service resolves channel from binding_id when channel is omitted. Clear removes all raster bindings from the track and needs neither channel nor binding_id. Optional nested strings such as sample_axis.label and sample_axis.unit must be non-empty when supplied; never send sample_axis with an empty label or unit, and omit the optional field when no value is requested. Correct a failed mutation and retry it before reporting completion.
     mode: mutation
     operations: [add, update, remove, clear]
     canonical_fields: raster
