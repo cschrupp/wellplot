@@ -1,0 +1,2028 @@
+{
+  "source_manifest": {
+    "main_pass": {
+      "source_format": "dlis",
+      "channels": [
+        "ECGR_STGC",
+        "TT",
+        "TENS",
+        "MTEM",
+        "STIT",
+        "TDSP",
+        "VSEC",
+        "CBL",
+        "VDL"
+      ]
+    },
+    "repeat_pass": {
+      "source_format": "dlis",
+      "channels": [
+        "ECGR_STGC",
+        "TT",
+        "TENS",
+        "MTEM",
+        "STIT",
+        "TDSP",
+        "VSEC",
+        "CBL",
+        "VDL"
+      ]
+    }
+  },
+  "reconstruction_plan": {
+    "summary": "Reconstruct the supported cased-hole CBL/VDL packet subset.",
+    "report_capability_id": "report.standard",
+    "report_goal": "Compile the requested header, remarks, page, output, and tail settings.",
+    "report_values": {
+      "service_titles": [
+        "Cement Bond Log",
+        "Variable Density Log",
+        "Gamma Ray - CCL"
+      ]
+    },
+    "sections": [
+      {
+        "section_id": "main_pass",
+        "capability_id": "section.log_plot",
+        "goal": "Compile the main pass CBL/VDL strip section.",
+        "values": {
+          "source_path": "workspace/data/CBL_Main.dlis"
+        },
+        "components": [
+          {
+            "component_id": "main_pass.combo",
+            "capability_id": "track.normal",
+            "goal": "Create the combo scalar track.",
+            "values": {
+              "track_id": "combo",
+              "width_mm": 50
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "main_pass.depth",
+            "capability_id": "track.reference",
+            "goal": "Create the depth reference track.",
+            "values": {
+              "track_id": "depth",
+              "width_mm": 10
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "main_pass.cbl",
+            "capability_id": "track.normal",
+            "goal": "Create the CBL amplitude track.",
+            "values": {
+              "track_id": "cbl",
+              "width_mm": 44
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "main_pass.vdl",
+            "capability_id": "track.array",
+            "goal": "Create the VDL raster track.",
+            "values": {
+              "track_id": "vdl",
+              "width_mm": 48
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "main_pass.combo.ECGR_STGC",
+            "capability_id": "binding.curve",
+            "goal": "Bind ECGR_STGC on combo.",
+            "values": {
+              "channel": "ECGR_STGC"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.combo"
+            ]
+          },
+          {
+            "component_id": "main_pass.combo.TT",
+            "capability_id": "binding.curve",
+            "goal": "Bind TT on combo.",
+            "values": {
+              "channel": "TT"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.combo"
+            ]
+          },
+          {
+            "component_id": "main_pass.combo.TENS",
+            "capability_id": "binding.curve",
+            "goal": "Bind TENS on combo.",
+            "values": {
+              "channel": "TENS"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.combo"
+            ]
+          },
+          {
+            "component_id": "main_pass.combo.MTEM",
+            "capability_id": "binding.curve",
+            "goal": "Bind MTEM on combo.",
+            "values": {
+              "channel": "MTEM"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.combo"
+            ]
+          },
+          {
+            "component_id": "main_pass.depth.STIT",
+            "capability_id": "binding.curve",
+            "goal": "Bind STIT on depth.",
+            "values": {
+              "channel": "STIT"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.depth"
+            ]
+          },
+          {
+            "component_id": "main_pass.depth.TDSP",
+            "capability_id": "binding.curve",
+            "goal": "Bind TDSP on depth.",
+            "values": {
+              "channel": "TDSP"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.depth"
+            ]
+          },
+          {
+            "component_id": "main_pass.depth.VSEC",
+            "capability_id": "binding.curve",
+            "goal": "Bind VSEC on depth.",
+            "values": {
+              "channel": "VSEC"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.depth"
+            ]
+          },
+          {
+            "component_id": "main_pass.cbl.CBL.1",
+            "capability_id": "binding.curve",
+            "goal": "Bind the 0 to 100 CBL instance.",
+            "values": {
+              "channel": "CBL",
+              "binding_id": "main_pass.cbl.CBL.1"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.cbl"
+            ]
+          },
+          {
+            "component_id": "main_pass.cbl.CBL.2",
+            "capability_id": "binding.curve",
+            "goal": "Bind the 0 to 10 CBL instance.",
+            "values": {
+              "channel": "CBL",
+              "binding_id": "main_pass.cbl.CBL.2"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.cbl"
+            ]
+          },
+          {
+            "component_id": "main_pass.vdl.VDL",
+            "capability_id": "binding.raster",
+            "goal": "Bind the VDL waveform raster.",
+            "values": {
+              "channel": "VDL"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "main_pass.vdl"
+            ]
+          }
+        ],
+        "constraints": [],
+        "depends_on": []
+      },
+      {
+        "section_id": "repeat_pass",
+        "capability_id": "section.log_plot",
+        "goal": "Compile the repeat pass CBL/VDL strip section.",
+        "values": {
+          "source_path": "workspace/data/CBL_Repeat.dlis"
+        },
+        "components": [
+          {
+            "component_id": "repeat_pass.combo",
+            "capability_id": "track.normal",
+            "goal": "Create the combo scalar track.",
+            "values": {
+              "track_id": "combo",
+              "width_mm": 50
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "repeat_pass.depth",
+            "capability_id": "track.reference",
+            "goal": "Create the depth reference track.",
+            "values": {
+              "track_id": "depth",
+              "width_mm": 10
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "repeat_pass.cbl",
+            "capability_id": "track.normal",
+            "goal": "Create the CBL amplitude track.",
+            "values": {
+              "track_id": "cbl",
+              "width_mm": 44
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "repeat_pass.vdl",
+            "capability_id": "track.array",
+            "goal": "Create the VDL raster track.",
+            "values": {
+              "track_id": "vdl",
+              "width_mm": 48
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": []
+          },
+          {
+            "component_id": "repeat_pass.combo.ECGR_STGC",
+            "capability_id": "binding.curve",
+            "goal": "Bind ECGR_STGC on combo.",
+            "values": {
+              "channel": "ECGR_STGC"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.combo"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.combo.TT",
+            "capability_id": "binding.curve",
+            "goal": "Bind TT on combo.",
+            "values": {
+              "channel": "TT"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.combo"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.combo.TENS",
+            "capability_id": "binding.curve",
+            "goal": "Bind TENS on combo.",
+            "values": {
+              "channel": "TENS"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.combo"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.combo.MTEM",
+            "capability_id": "binding.curve",
+            "goal": "Bind MTEM on combo.",
+            "values": {
+              "channel": "MTEM"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.combo"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.depth.STIT",
+            "capability_id": "binding.curve",
+            "goal": "Bind STIT on depth.",
+            "values": {
+              "channel": "STIT"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.depth"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.depth.TDSP",
+            "capability_id": "binding.curve",
+            "goal": "Bind TDSP on depth.",
+            "values": {
+              "channel": "TDSP"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.depth"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.depth.VSEC",
+            "capability_id": "binding.curve",
+            "goal": "Bind VSEC on depth.",
+            "values": {
+              "channel": "VSEC"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.depth"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.cbl.CBL.1",
+            "capability_id": "binding.curve",
+            "goal": "Bind the 0 to 100 CBL instance.",
+            "values": {
+              "channel": "CBL",
+              "binding_id": "repeat_pass.cbl.CBL.1"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.cbl"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.cbl.CBL.2",
+            "capability_id": "binding.curve",
+            "goal": "Bind the 0 to 10 CBL instance.",
+            "values": {
+              "channel": "CBL",
+              "binding_id": "repeat_pass.cbl.CBL.2"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.cbl"
+            ]
+          },
+          {
+            "component_id": "repeat_pass.vdl.VDL",
+            "capability_id": "binding.raster",
+            "goal": "Bind the VDL waveform raster.",
+            "values": {
+              "channel": "VDL"
+            },
+            "source_hints": [],
+            "constraints": [],
+            "depends_on": [
+              "repeat_pass.vdl"
+            ]
+          }
+        ],
+        "constraints": [],
+        "depends_on": []
+      }
+    ],
+    "postconditions": [
+      "Both CBL/VDL sections retain ordered combo, depth, cbl, and vdl tracks."
+    ],
+    "unresolved_requirements": [
+      "Well diagram, calibration reports, and vendor parameter tables are unsupported."
+    ]
+  },
+  "capability_ids": [
+    "report.standard",
+    "section.log_plot",
+    "track.normal",
+    "track.reference",
+    "track.array",
+    "binding.curve",
+    "binding.raster"
+  ],
+  "artifacts": {
+    "report": {
+      "intent": {
+        "title": "Cased Hole Quicklook",
+        "page": {
+          "size": "A4",
+          "orientation": "portrait",
+          "continuous": false
+        },
+        "output": {
+          "backend": "matplotlib"
+        },
+        "tail": {
+          "enabled": true
+        },
+        "header": {
+          "general_fields": [
+            {
+              "slot_id": "company",
+              "key": "company",
+              "label": "Company",
+              "value": {
+                "value": "University of Utah"
+              }
+            },
+            {
+              "slot_id": "well",
+              "key": "well",
+              "label": "Well",
+              "value": {
+                "value": "FORGE 16B (78)-32"
+              }
+            },
+            {
+              "slot_id": "field",
+              "key": "field",
+              "label": "Field",
+              "value": {
+                "value": "Utah Forge"
+              }
+            },
+            {
+              "slot_id": "county",
+              "key": "county",
+              "label": "County",
+              "value": {
+                "value": "Beaver"
+              }
+            },
+            {
+              "slot_id": "state_or_country",
+              "key": "state_or_country",
+              "label": "State Or Country",
+              "value": {
+                "value": "Utah"
+              }
+            },
+            {
+              "slot_id": "section",
+              "key": "section",
+              "label": "Section",
+              "value": {
+                "value": "NWSW 32"
+              }
+            },
+            {
+              "slot_id": "township",
+              "key": "township",
+              "label": "Township",
+              "value": {
+                "value": "26"
+              }
+            },
+            {
+              "slot_id": "range",
+              "key": "range",
+              "label": "Range",
+              "value": {
+                "value": "9"
+              }
+            },
+            {
+              "slot_id": "footage",
+              "key": "footage",
+              "label": "Footage",
+              "value": {
+                "value": "972' FSL & 523' FWL"
+              }
+            },
+            {
+              "slot_id": "latitude",
+              "key": "latitude",
+              "label": "Latitude",
+              "value": {
+                "value": "38.501242"
+              }
+            },
+            {
+              "slot_id": "longitude",
+              "key": "longitude",
+              "label": "Longitude",
+              "value": {
+                "value": "-112.882661"
+              }
+            },
+            {
+              "slot_id": "logging_date",
+              "key": "logging_date",
+              "label": "Logging Date",
+              "value": {
+                "value": "08-May-2023"
+              }
+            },
+            {
+              "slot_id": "measured_from",
+              "key": "measured_from",
+              "label": "Measured From",
+              "value": {
+                "value": "Kelly Bushing"
+              }
+            },
+            {
+              "slot_id": "log_measured_from",
+              "key": "log_measured_from",
+              "label": "Log Measured From",
+              "value": {
+                "value": "Kelly Bushing"
+              }
+            },
+            {
+              "slot_id": "elevation_kb",
+              "key": "elevation_kb",
+              "label": "Elevation Kb",
+              "value": {
+                "value": "5445.50 ft"
+              }
+            },
+            {
+              "slot_id": "elevation_gl",
+              "key": "elevation_gl",
+              "label": "Elevation Gl",
+              "value": {
+                "value": "5415.00 ft"
+              }
+            },
+            {
+              "slot_id": "elevation_df",
+              "key": "elevation_df",
+              "label": "Elevation Df",
+              "value": {
+                "value": "5445.00 ft"
+              }
+            },
+            {
+              "slot_id": "top_log_interval",
+              "key": "top_log_interval",
+              "label": "Top Log Interval",
+              "value": {
+                "value": "25.00 ft"
+              }
+            },
+            {
+              "slot_id": "bottom_log_interval",
+              "key": "bottom_log_interval",
+              "label": "Bottom Log Interval",
+              "value": {
+                "value": "4845.00 ft"
+              }
+            },
+            {
+              "slot_id": "fluid_type",
+              "key": "fluid_type",
+              "label": "Fluid Type",
+              "value": {
+                "value": "Fresh Water"
+              }
+            },
+            {
+              "slot_id": "run_number",
+              "key": "run_number",
+              "label": "Run Number",
+              "value": {
+                "value": "ONE"
+              }
+            },
+            {
+              "slot_id": "driller_depth",
+              "key": "driller_depth",
+              "label": "Driller Depth",
+              "value": {
+                "value": "4980.00 ft"
+              }
+            },
+            {
+              "slot_id": "logged_depth",
+              "key": "logged_depth",
+              "label": "Logged Depth",
+              "value": {
+                "value": "TD Not Tag"
+              }
+            },
+            {
+              "slot_id": "fluid_density",
+              "key": "fluid_density",
+              "label": "Fluid Density",
+              "value": {
+                "value": "8.4 lbm/gal"
+              }
+            },
+            {
+              "slot_id": "bottom_temperature",
+              "key": "bottom_temperature",
+              "label": "Bottom Temperature",
+              "value": {
+                "value": "177.2 degF"
+              }
+            },
+            {
+              "slot_id": "logged_by",
+              "key": "logged_by",
+              "label": "Logged By",
+              "value": {
+                "value": "D. May / D. Jones"
+              }
+            },
+            {
+              "slot_id": "witnessed_by",
+              "key": "witnessed_by",
+              "label": "Witnessed By",
+              "value": {
+                "value": "Leroy Swearingen"
+              }
+            }
+          ],
+          "service_titles": [
+            {
+              "slot_id": "service_1",
+              "value": {
+                "value": "Cement Bond Log"
+              }
+            },
+            {
+              "slot_id": "service_2",
+              "value": {
+                "value": "Variable Density Log"
+              }
+            },
+            {
+              "slot_id": "service_3",
+              "value": {
+                "value": "Gamma Ray - CCL"
+              }
+            }
+          ]
+        },
+        "remarks": [
+          {
+            "remark_id": "supported_scope",
+            "title": "Supported Reconstruction Scope",
+            "lines": [
+              "Reconstruct only the supported subset: heading page, remarks, main pass, repeat pass, and tail.",
+              "Do not improvise unsupported packet pieces such as the well diagram, calibration reports, or vendor parameter tables."
+            ]
+          },
+          {
+            "remark_id": "data_sources",
+            "title": "Data Sources",
+            "lines": [
+              "Use the staged DLIS files under the project directory as the main and repeat packet sources."
+            ]
+          },
+          {
+            "remark_id": "public_data",
+            "title": "Public Data and IP Notice",
+            "lines": [
+              "Keep the wellplot reproduction boundary explicit and avoid vendor-specific disclaimer artwork."
+            ]
+          }
+        ]
+      }
+    },
+    "sections": {
+      "main_pass": {
+        "section": {
+          "section_id": "main_pass",
+          "title": "Main Pass",
+          "data_source": {
+            "source_path": "workspace/data/CBL_Main.dlis",
+            "source_format": "dlis"
+          },
+          "tracks": [
+            {
+              "section_id": "main_pass",
+              "track_id": "combo",
+              "title": "Combo",
+              "kind": "normal",
+              "width_mm": 50,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.combo.ECGR_STGC.1",
+                  "section_id": "main_pass",
+                  "track_id": "combo",
+                  "channel": "ECGR_STGC",
+                  "label": "Gamma Ray (ECGR_STGC) QTGC-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 150,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#16a34a",
+                    "line_width": 0.8,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.combo.TT.1",
+                  "section_id": "main_pass",
+                  "track_id": "combo",
+                  "channel": "TT",
+                  "label": "Transit Time for CBL (TT) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 200,
+                    "maximum": 400,
+                    "reverse": true
+                  },
+                  "style": {
+                    "color": "#2142ff",
+                    "line_width": 0.75,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.combo.TENS.1",
+                  "section_id": "main_pass",
+                  "track_id": "combo",
+                  "channel": "TENS",
+                  "label": "Cable Tension (TENS)",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 5000,
+                    "maximum": 0,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.combo.MTEM.1",
+                  "section_id": "main_pass",
+                  "track_id": "combo",
+                  "channel": "MTEM",
+                  "label": "Mud Temperature (MTEM) LEH-MT",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 100,
+                    "maximum": 500,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.9,
+                    "line_style": "-"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "main_pass",
+              "track_id": "depth",
+              "title": "Depth",
+              "kind": "reference",
+              "width_mm": 10,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.depth.STIT.1",
+                  "section_id": "main_pass",
+                  "track_id": "depth",
+                  "channel": "STIT",
+                  "label": "Stuck Tool Indicator, Total (STIT)",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.65,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.depth.TDSP.1",
+                  "section_id": "main_pass",
+                  "track_id": "depth",
+                  "channel": "TDSP",
+                  "label": "Cable Drag",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#92400e",
+                    "line_width": 0.65,
+                    "line_style": ":"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.depth.VSEC.1",
+                  "section_id": "main_pass",
+                  "track_id": "depth",
+                  "channel": "VSEC",
+                  "label": "Tool_Tot. Drag",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#1d4ed8",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "main_pass",
+              "track_id": "cbl",
+              "title": "CBL Amplitude",
+              "kind": "normal",
+              "width_mm": 44,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.cbl.CBL.1",
+                  "section_id": "main_pass",
+                  "track_id": "cbl",
+                  "channel": "CBL",
+                  "label": "CBL Amplitude (CBL) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.75,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "main_pass.cbl.CBL.2",
+                  "section_id": "main_pass",
+                  "track_id": "cbl",
+                  "channel": "CBL",
+                  "label": "CBL Amplitude (CBL) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#2563eb",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "main_pass",
+              "track_id": "vdl",
+              "title": "VDL",
+              "kind": "array",
+              "width_mm": 48,
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "binding_id": "main_pass.vdl.VDL.1",
+                  "section_id": "main_pass",
+                  "track_id": "vdl",
+                  "channel": "VDL",
+                  "label": "VDL VariableDensity (VDL) QSLT-B",
+                  "style": {
+                    "colormap": "gray_r"
+                  },
+                  "profile": "vdl",
+                  "colorbar": {
+                    "enabled": true,
+                    "label": "Amplitude",
+                    "position": "header"
+                  },
+                  "sample_axis": {
+                    "enabled": true,
+                    "unit": "us",
+                    "minimum": 200,
+                    "maximum": 1200,
+                    "tick_count": 7,
+                    "source_origin": 40,
+                    "source_step": 10
+                  }
+                }
+              ],
+              "x_scale": {
+                "kind": "linear",
+                "minimum": 200,
+                "maximum": 1200,
+                "reverse": false
+              },
+              "grid": {
+                "vertical_main_visible": false,
+                "vertical_secondary_visible": false
+              }
+            }
+          ]
+        }
+      },
+      "repeat_pass": {
+        "section": {
+          "section_id": "repeat_pass",
+          "title": "Repeat Pass",
+          "data_source": {
+            "source_path": "workspace/data/CBL_Repeat.dlis",
+            "source_format": "dlis"
+          },
+          "tracks": [
+            {
+              "section_id": "repeat_pass",
+              "track_id": "combo",
+              "title": "Combo",
+              "kind": "normal",
+              "width_mm": 50,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.combo.ECGR_STGC.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "combo",
+                  "channel": "ECGR_STGC",
+                  "label": "Gamma Ray (ECGR_STGC) QTGC-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 150,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#16a34a",
+                    "line_width": 0.8,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.combo.TT.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "combo",
+                  "channel": "TT",
+                  "label": "Transit Time for CBL (TT) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 200,
+                    "maximum": 400,
+                    "reverse": true
+                  },
+                  "style": {
+                    "color": "#2142ff",
+                    "line_width": 0.75,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.combo.TENS.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "combo",
+                  "channel": "TENS",
+                  "label": "Cable Tension (TENS)",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 5000,
+                    "maximum": 0,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.combo.MTEM.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "combo",
+                  "channel": "MTEM",
+                  "label": "Mud Temperature (MTEM) LEH-MT",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 100,
+                    "maximum": 500,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.9,
+                    "line_style": "-"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "repeat_pass",
+              "track_id": "depth",
+              "title": "Depth",
+              "kind": "reference",
+              "width_mm": 10,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.depth.STIT.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "depth",
+                  "channel": "STIT",
+                  "label": "Stuck Tool Indicator, Total (STIT)",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.65,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.depth.TDSP.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "depth",
+                  "channel": "TDSP",
+                  "label": "Cable Drag",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#92400e",
+                    "line_width": 0.65,
+                    "line_style": ":"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.depth.VSEC.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "depth",
+                  "channel": "VSEC",
+                  "label": "Tool_Tot. Drag",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 50,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#1d4ed8",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "repeat_pass",
+              "track_id": "cbl",
+              "title": "CBL Amplitude",
+              "kind": "normal",
+              "width_mm": 44,
+              "bindings": [
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.cbl.CBL.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "cbl",
+                  "channel": "CBL",
+                  "label": "CBL Amplitude (CBL) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#111111",
+                    "line_width": 0.75,
+                    "line_style": "-"
+                  }
+                },
+                {
+                  "kind": "curve",
+                  "binding_id": "repeat_pass.cbl.CBL.2",
+                  "section_id": "repeat_pass",
+                  "track_id": "cbl",
+                  "channel": "CBL",
+                  "label": "CBL Amplitude (CBL) QSLT-B",
+                  "scale": {
+                    "kind": "linear",
+                    "minimum": 0,
+                    "maximum": 10,
+                    "reverse": false
+                  },
+                  "style": {
+                    "color": "#2563eb",
+                    "line_width": 0.65,
+                    "line_style": "--"
+                  }
+                }
+              ]
+            },
+            {
+              "section_id": "repeat_pass",
+              "track_id": "vdl",
+              "title": "VDL",
+              "kind": "array",
+              "width_mm": 48,
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "binding_id": "repeat_pass.vdl.VDL.1",
+                  "section_id": "repeat_pass",
+                  "track_id": "vdl",
+                  "channel": "VDL",
+                  "label": "VDL VariableDensity (VDL) QSLT-B",
+                  "style": {
+                    "colormap": "gray_r"
+                  },
+                  "profile": "vdl",
+                  "colorbar": {
+                    "enabled": true,
+                    "label": "Amplitude",
+                    "position": "header"
+                  },
+                  "sample_axis": {
+                    "enabled": true,
+                    "unit": "us",
+                    "minimum": 200,
+                    "maximum": 1200,
+                    "tick_count": 7,
+                    "source_origin": 40,
+                    "source_step": 10
+                  }
+                }
+              ],
+              "x_scale": {
+                "kind": "linear",
+                "minimum": 200,
+                "maximum": 1200,
+                "reverse": false
+              },
+              "grid": {
+                "vertical_main_visible": false,
+                "vertical_secondary_visible": false
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "merged_intent": {
+    "title": "Cased Hole Quicklook",
+    "output": {
+      "backend": "matplotlib"
+    },
+    "page": {
+      "size": "A4",
+      "orientation": "portrait",
+      "continuous": false
+    },
+    "header": {
+      "general_fields": [
+        {
+          "slot_id": "company",
+          "key": "company",
+          "label": "Company",
+          "value": {
+            "value": "University of Utah"
+          }
+        },
+        {
+          "slot_id": "well",
+          "key": "well",
+          "label": "Well",
+          "value": {
+            "value": "FORGE 16B (78)-32"
+          }
+        },
+        {
+          "slot_id": "field",
+          "key": "field",
+          "label": "Field",
+          "value": {
+            "value": "Utah Forge"
+          }
+        },
+        {
+          "slot_id": "county",
+          "key": "county",
+          "label": "County",
+          "value": {
+            "value": "Beaver"
+          }
+        },
+        {
+          "slot_id": "state_or_country",
+          "key": "state_or_country",
+          "label": "State Or Country",
+          "value": {
+            "value": "Utah"
+          }
+        },
+        {
+          "slot_id": "section",
+          "key": "section",
+          "label": "Section",
+          "value": {
+            "value": "NWSW 32"
+          }
+        },
+        {
+          "slot_id": "township",
+          "key": "township",
+          "label": "Township",
+          "value": {
+            "value": "26"
+          }
+        },
+        {
+          "slot_id": "range",
+          "key": "range",
+          "label": "Range",
+          "value": {
+            "value": "9"
+          }
+        },
+        {
+          "slot_id": "footage",
+          "key": "footage",
+          "label": "Footage",
+          "value": {
+            "value": "972' FSL & 523' FWL"
+          }
+        },
+        {
+          "slot_id": "latitude",
+          "key": "latitude",
+          "label": "Latitude",
+          "value": {
+            "value": "38.501242"
+          }
+        },
+        {
+          "slot_id": "longitude",
+          "key": "longitude",
+          "label": "Longitude",
+          "value": {
+            "value": "-112.882661"
+          }
+        },
+        {
+          "slot_id": "logging_date",
+          "key": "logging_date",
+          "label": "Logging Date",
+          "value": {
+            "value": "08-May-2023"
+          }
+        },
+        {
+          "slot_id": "measured_from",
+          "key": "measured_from",
+          "label": "Measured From",
+          "value": {
+            "value": "Kelly Bushing"
+          }
+        },
+        {
+          "slot_id": "log_measured_from",
+          "key": "log_measured_from",
+          "label": "Log Measured From",
+          "value": {
+            "value": "Kelly Bushing"
+          }
+        },
+        {
+          "slot_id": "elevation_kb",
+          "key": "elevation_kb",
+          "label": "Elevation Kb",
+          "value": {
+            "value": "5445.50 ft"
+          }
+        },
+        {
+          "slot_id": "elevation_gl",
+          "key": "elevation_gl",
+          "label": "Elevation Gl",
+          "value": {
+            "value": "5415.00 ft"
+          }
+        },
+        {
+          "slot_id": "elevation_df",
+          "key": "elevation_df",
+          "label": "Elevation Df",
+          "value": {
+            "value": "5445.00 ft"
+          }
+        },
+        {
+          "slot_id": "top_log_interval",
+          "key": "top_log_interval",
+          "label": "Top Log Interval",
+          "value": {
+            "value": "25.00 ft"
+          }
+        },
+        {
+          "slot_id": "bottom_log_interval",
+          "key": "bottom_log_interval",
+          "label": "Bottom Log Interval",
+          "value": {
+            "value": "4845.00 ft"
+          }
+        },
+        {
+          "slot_id": "fluid_type",
+          "key": "fluid_type",
+          "label": "Fluid Type",
+          "value": {
+            "value": "Fresh Water"
+          }
+        },
+        {
+          "slot_id": "run_number",
+          "key": "run_number",
+          "label": "Run Number",
+          "value": {
+            "value": "ONE"
+          }
+        },
+        {
+          "slot_id": "driller_depth",
+          "key": "driller_depth",
+          "label": "Driller Depth",
+          "value": {
+            "value": "4980.00 ft"
+          }
+        },
+        {
+          "slot_id": "logged_depth",
+          "key": "logged_depth",
+          "label": "Logged Depth",
+          "value": {
+            "value": "TD Not Tag"
+          }
+        },
+        {
+          "slot_id": "fluid_density",
+          "key": "fluid_density",
+          "label": "Fluid Density",
+          "value": {
+            "value": "8.4 lbm/gal"
+          }
+        },
+        {
+          "slot_id": "bottom_temperature",
+          "key": "bottom_temperature",
+          "label": "Bottom Temperature",
+          "value": {
+            "value": "177.2 degF"
+          }
+        },
+        {
+          "slot_id": "logged_by",
+          "key": "logged_by",
+          "label": "Logged By",
+          "value": {
+            "value": "D. May / D. Jones"
+          }
+        },
+        {
+          "slot_id": "witnessed_by",
+          "key": "witnessed_by",
+          "label": "Witnessed By",
+          "value": {
+            "value": "Leroy Swearingen"
+          }
+        }
+      ],
+      "service_titles": [
+        {
+          "slot_id": "service_1",
+          "value": {
+            "value": "Cement Bond Log"
+          }
+        },
+        {
+          "slot_id": "service_2",
+          "value": {
+            "value": "Variable Density Log"
+          }
+        },
+        {
+          "slot_id": "service_3",
+          "value": {
+            "value": "Gamma Ray - CCL"
+          }
+        }
+      ]
+    },
+    "tail": {
+      "enabled": true
+    },
+    "sections": [
+      {
+        "section_id": "main_pass",
+        "title": "Main Pass",
+        "data_source": {
+          "source_path": "workspace/data/CBL_Main.dlis",
+          "source_format": "dlis"
+        },
+        "tracks": [
+          {
+            "track_id": "combo",
+            "section_id": "main_pass",
+            "title": "Combo",
+            "kind": "normal",
+            "width_mm": 50.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.combo.ECGR_STGC.1",
+                "section_id": "main_pass",
+                "track_id": "combo",
+                "channel": "ECGR_STGC",
+                "label": "Gamma Ray (ECGR_STGC) QTGC-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 150.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#16a34a",
+                  "line_style": "-",
+                  "line_width": 0.8
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.combo.TT.1",
+                "section_id": "main_pass",
+                "track_id": "combo",
+                "channel": "TT",
+                "label": "Transit Time for CBL (TT) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 200.0,
+                  "maximum": 400.0,
+                  "reverse": true
+                },
+                "style": {
+                  "color": "#2142ff",
+                  "line_style": "-",
+                  "line_width": 0.75
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.combo.TENS.1",
+                "section_id": "main_pass",
+                "track_id": "combo",
+                "channel": "TENS",
+                "label": "Cable Tension (TENS)",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 5000.0,
+                  "maximum": 0.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.combo.MTEM.1",
+                "section_id": "main_pass",
+                "track_id": "combo",
+                "channel": "MTEM",
+                "label": "Mud Temperature (MTEM) LEH-MT",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 100.0,
+                  "maximum": 500.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.9
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "depth",
+            "section_id": "main_pass",
+            "title": "Depth",
+            "kind": "reference",
+            "width_mm": 10.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.depth.STIT.1",
+                "section_id": "main_pass",
+                "track_id": "depth",
+                "channel": "STIT",
+                "label": "Stuck Tool Indicator, Total (STIT)",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.depth.TDSP.1",
+                "section_id": "main_pass",
+                "track_id": "depth",
+                "channel": "TDSP",
+                "label": "Cable Drag",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#92400e",
+                  "line_style": ":",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.depth.VSEC.1",
+                "section_id": "main_pass",
+                "track_id": "depth",
+                "channel": "VSEC",
+                "label": "Tool_Tot. Drag",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#1d4ed8",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "cbl",
+            "section_id": "main_pass",
+            "title": "CBL Amplitude",
+            "kind": "normal",
+            "width_mm": 44.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.cbl.CBL.1",
+                "section_id": "main_pass",
+                "track_id": "cbl",
+                "channel": "CBL",
+                "label": "CBL Amplitude (CBL) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 100.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.75
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "main_pass.cbl.CBL.2",
+                "section_id": "main_pass",
+                "track_id": "cbl",
+                "channel": "CBL",
+                "label": "CBL Amplitude (CBL) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 10.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#2563eb",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "vdl",
+            "section_id": "main_pass",
+            "title": "VDL",
+            "kind": "array",
+            "width_mm": 48.0,
+            "x_scale": {
+              "kind": "linear",
+              "minimum": 200.0,
+              "maximum": 1200.0,
+              "reverse": false
+            },
+            "grid": {
+              "vertical_main_visible": false,
+              "vertical_secondary_visible": false
+            },
+            "bindings": [
+              {
+                "kind": "raster",
+                "binding_id": "main_pass.vdl.VDL.1",
+                "section_id": "main_pass",
+                "track_id": "vdl",
+                "channel": "VDL",
+                "label": "VDL VariableDensity (VDL) QSLT-B",
+                "style": {
+                  "colormap": "gray_r"
+                },
+                "profile": "vdl",
+                "colorbar": {
+                  "enabled": true,
+                  "label": "Amplitude",
+                  "position": "header"
+                },
+                "sample_axis": {
+                  "enabled": true,
+                  "unit": "us",
+                  "source_origin": 40.0,
+                  "source_step": 10.0,
+                  "minimum": 200.0,
+                  "maximum": 1200.0,
+                  "tick_count": 7
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "section_id": "repeat_pass",
+        "title": "Repeat Pass",
+        "data_source": {
+          "source_path": "workspace/data/CBL_Repeat.dlis",
+          "source_format": "dlis"
+        },
+        "tracks": [
+          {
+            "track_id": "combo",
+            "section_id": "repeat_pass",
+            "title": "Combo",
+            "kind": "normal",
+            "width_mm": 50.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.combo.ECGR_STGC.1",
+                "section_id": "repeat_pass",
+                "track_id": "combo",
+                "channel": "ECGR_STGC",
+                "label": "Gamma Ray (ECGR_STGC) QTGC-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 150.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#16a34a",
+                  "line_style": "-",
+                  "line_width": 0.8
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.combo.TT.1",
+                "section_id": "repeat_pass",
+                "track_id": "combo",
+                "channel": "TT",
+                "label": "Transit Time for CBL (TT) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 200.0,
+                  "maximum": 400.0,
+                  "reverse": true
+                },
+                "style": {
+                  "color": "#2142ff",
+                  "line_style": "-",
+                  "line_width": 0.75
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.combo.TENS.1",
+                "section_id": "repeat_pass",
+                "track_id": "combo",
+                "channel": "TENS",
+                "label": "Cable Tension (TENS)",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 5000.0,
+                  "maximum": 0.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.combo.MTEM.1",
+                "section_id": "repeat_pass",
+                "track_id": "combo",
+                "channel": "MTEM",
+                "label": "Mud Temperature (MTEM) LEH-MT",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 100.0,
+                  "maximum": 500.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.9
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "depth",
+            "section_id": "repeat_pass",
+            "title": "Depth",
+            "kind": "reference",
+            "width_mm": 10.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.depth.STIT.1",
+                "section_id": "repeat_pass",
+                "track_id": "depth",
+                "channel": "STIT",
+                "label": "Stuck Tool Indicator, Total (STIT)",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.depth.TDSP.1",
+                "section_id": "repeat_pass",
+                "track_id": "depth",
+                "channel": "TDSP",
+                "label": "Cable Drag",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#92400e",
+                  "line_style": ":",
+                  "line_width": 0.65
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.depth.VSEC.1",
+                "section_id": "repeat_pass",
+                "track_id": "depth",
+                "channel": "VSEC",
+                "label": "Tool_Tot. Drag",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 50.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#1d4ed8",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "cbl",
+            "section_id": "repeat_pass",
+            "title": "CBL Amplitude",
+            "kind": "normal",
+            "width_mm": 44.0,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.cbl.CBL.1",
+                "section_id": "repeat_pass",
+                "track_id": "cbl",
+                "channel": "CBL",
+                "label": "CBL Amplitude (CBL) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 100.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#111111",
+                  "line_style": "-",
+                  "line_width": 0.75
+                }
+              },
+              {
+                "kind": "curve",
+                "binding_id": "repeat_pass.cbl.CBL.2",
+                "section_id": "repeat_pass",
+                "track_id": "cbl",
+                "channel": "CBL",
+                "label": "CBL Amplitude (CBL) QSLT-B",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 10.0,
+                  "reverse": false
+                },
+                "style": {
+                  "color": "#2563eb",
+                  "line_style": "--",
+                  "line_width": 0.65
+                }
+              }
+            ]
+          },
+          {
+            "track_id": "vdl",
+            "section_id": "repeat_pass",
+            "title": "VDL",
+            "kind": "array",
+            "width_mm": 48.0,
+            "x_scale": {
+              "kind": "linear",
+              "minimum": 200.0,
+              "maximum": 1200.0,
+              "reverse": false
+            },
+            "grid": {
+              "vertical_main_visible": false,
+              "vertical_secondary_visible": false
+            },
+            "bindings": [
+              {
+                "kind": "raster",
+                "binding_id": "repeat_pass.vdl.VDL.1",
+                "section_id": "repeat_pass",
+                "track_id": "vdl",
+                "channel": "VDL",
+                "label": "VDL VariableDensity (VDL) QSLT-B",
+                "style": {
+                  "colormap": "gray_r"
+                },
+                "profile": "vdl",
+                "colorbar": {
+                  "enabled": true,
+                  "label": "Amplitude",
+                  "position": "header"
+                },
+                "sample_axis": {
+                  "enabled": true,
+                  "unit": "us",
+                  "source_origin": 40.0,
+                  "source_step": 10.0,
+                  "minimum": 200.0,
+                  "maximum": 1200.0,
+                  "tick_count": 7
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "remarks": [
+      {
+        "remark_id": "supported_scope",
+        "title": "Supported Reconstruction Scope",
+        "lines": [
+          "Reconstruct only the supported subset: heading page, remarks, main pass, repeat pass, and tail.",
+          "Do not improvise unsupported packet pieces such as the well diagram, calibration reports, or vendor parameter tables."
+        ]
+      },
+      {
+        "remark_id": "data_sources",
+        "title": "Data Sources",
+        "lines": [
+          "Use the staged DLIS files under the project directory as the main and repeat packet sources."
+        ]
+      },
+      {
+        "remark_id": "public_data",
+        "title": "Public Data and IP Notice",
+        "lines": [
+          "Keep the wellplot reproduction boundary explicit and avoid vendor-specific disclaimer artwork."
+        ]
+      }
+    ]
+  },
+  "model_call_count": 4,
+  "correction_count": 0,
+  "prompt_sha256": "e2092b2f6c2404c13c542731304e10377404ca967b4082eb75d9bad78b76f9fc"
+}

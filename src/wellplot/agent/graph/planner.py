@@ -66,7 +66,6 @@ class ReconstructionPlanner:
 
     def _validate_capabilities(self, plan: ReconstructionPlan) -> None:
         self.registry.get(plan.report_capability_id)
-        component_ids: set[str] = set()
         for section in plan.sections:
             section_spec = self.registry.get(section.capability_id)
             if section_spec.category != "section":
@@ -74,15 +73,32 @@ class ReconstructionPlanner:
                     f"Plan assigned non-section capability {section.capability_id!r} "
                     f"to section {section.section_id!r}."
                 )
+
+            components_by_id: dict[str, str] = {}
             for component in section.components:
-                if component.component_id in component_ids:
+                if component.component_id in components_by_id:
                     raise ValueError(
-                        f"Component id {component.component_id!r} appears more than once."
+                        f"Component id {component.component_id!r} appears more than once "
+                        f"in section {section.section_id!r}."
                     )
-                component_ids.add(component.component_id)
+                self.registry.get(component.capability_id)
+                components_by_id[component.component_id] = component.capability_id
+
+            for component in section.components:
                 spec = self.registry.get(component.capability_id)
-                if spec.allowed_parents and section.capability_id not in spec.allowed_parents:
+                parent_capability_ids = {section.capability_id}
+                for dependency_id in component.depends_on:
+                    dependency_capability_id = components_by_id.get(dependency_id)
+                    if dependency_capability_id is None:
+                        raise ValueError(
+                            f"Component {component.component_id!r} in section "
+                            f"{section.section_id!r} depends on unknown component "
+                            f"{dependency_id!r}."
+                        )
+                    parent_capability_ids.add(dependency_capability_id)
+                if spec.allowed_parents and not (parent_capability_ids & set(spec.allowed_parents)):
                     raise ValueError(
-                        f"Capability {spec.capability_id!r} cannot be a direct component of "
-                        f"{section.capability_id!r}."
+                        f"Capability {spec.capability_id!r} cannot be a component of section "
+                        f"{section.section_id!r} without a parent capability in "
+                        f"{list(spec.allowed_parents)!r}."
                     )

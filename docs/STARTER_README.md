@@ -35,11 +35,19 @@ Not implemented yet:
 
 That boundary is deliberate. The first integration PR should prove the new compiler decomposition without putting the working persistence path at risk.
 
-## Verification performed in this environment
+## Verification in the full repository
 
-- All starter Python files pass `py_compile` syntax validation.
-- `test_graph_architecture_invariants.py` passes.
-- Full import/test execution could not be performed from the supplied expert-review ZIP because that review bundle omits application modules imported by `wellplot.model` (for example `wellplot.errors`).
-- LangGraph itself is not cached in this offline container, so the graph execution test is included but uses `pytest.importorskip("langgraph")`.
+Install the optional graph dependency, then run the focused compile-only suite:
 
-Run the complete test suite in the full repository/environment after installing the new optional `graph` extra.
+```bash
+uv run --extra graph pytest -q \
+  tests/test_capability_registry.py \
+  tests/test_graph_architecture_invariants.py \
+  tests/test_reconstruction_compile_graph.py \
+  tests/test_cbl_compile_only_graph.py
+```
+
+The CBL test uses a frozen prompt and structured-output fixtures. It records the
+semantic plan, selected capabilities, report and section artifacts, merged
+intent, model-call count, and correction count without executing MCP tools or
+persisting a draft.

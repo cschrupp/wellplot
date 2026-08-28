@@ -35,7 +35,7 @@ class ReconstructionState(TypedDict, total=False):
     repair_attempt: int
 
 
-class CompilationWorkerState(TypedDict):
+class CompilationWorkerState(TypedDict, total=False):
     """Read-only context supplied to one dynamically dispatched compiler worker."""
 
     request: str
@@ -44,3 +44,4 @@ class CompilationWorkerState(TypedDict):
     work_unit: Literal["report", "section"]
     plan: NotRequired[dict[str, Any]]
     section_plan: NotRequired[dict[str, Any]]
+    compiled_artifacts: Annotated[list[dict[str, Any]], operator.add]

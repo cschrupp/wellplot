@@ -1,0 +1,118 @@
+Reconstruct the supported portion of a cased-hole CBL/VDL packet from the staged DLIS files.
+
+Data Sources:
+- main: workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Main.dlis
+- repeat: workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis
+
+Header Values:
+LOG / SERVICE
+- Cement Bond Log
+- Variable Density Log
+- Gamma Ray - CCL
+
+COMPANY / WELL IDENTIFICATION
+- Company: University of Utah
+- Well: FORGE 16B (78)-32
+- Field: Utah Forge
+- County: Beaver
+- State: Utah
+
+LOCATION
+- Section: NWSW 32
+- Township: 26
+- Range: 9
+- Footage: 972' FSL & 523' FWL
+- Latitude: 38.501242
+- Longitude: -112.882661
+
+ELEVATION / DATUM
+- K.B.: 5445.50 ft
+- G.L.: 5415.00 ft
+- D.F.: 5445.00 ft
+- Log Measured From: Kelly Bushing
+- Drilling Measured From: Kelly Bushing
+- Ground Level Elevation: 5415.00 ft
+
+WELL / LOGGING DETAILS
+- Date: 08-May-2023
+- Run Number: ONE
+- Depth Driller: 4980.00 ft
+- Schlumberger Depth: TD Not Tag
+- Bottom Log Interval: 4845.00 ft
+- Top Log Interval: 25.00 ft
+- Fluid Type: Fresh Water
+- Density: 8.4 lbm/gal
+- Max Recorded Temperature: 177.2 degF
+- Logged By: D. May / D. Jones
+- Witnessed By: Leroy Swearingen
+
+Remarks:
+- title: Supported Reconstruction Scope
+  - Reconstruct only the supported subset: heading page, remarks, main pass, repeat pass, and tail.
+  - Do not improvise unsupported packet pieces such as the well diagram, calibration reports, or vendor parameter tables.
+- title: Data Sources
+  - Use the staged DLIS files under the project directory as the main and repeat packet sources.
+- title: Public Data and IP Notice
+  - Keep the wellplot reproduction boundary explicit and avoid vendor-specific disclaimer artwork.
+
+Packet Instructions:
+- Keep the cased-hole scaffold intact.
+- Keep the section ids `main_pass` and `repeat_pass`.
+- Build only the supported subset: heading page, remarks, the two strip sections, and the tail.
+- On both sections, create the tracks `combo`, `depth`, `cbl`, and `vdl` in that left-to-right order.
+- Use these widths and kinds on both sections:
+  - `combo`: normal track, width 50 mm
+  - `depth`: reference track, width 10 mm
+  - `cbl`: normal track, width 44 mm
+  - `vdl`: array track, width 48 mm
+- Bind only channels that are confirmed in the staged DLIS sources.
+- On `combo`, bind these scalar curves with the exact labels, scales, and styles shown below:
+  - `ECGR_STGC`:
+    - label: Gamma Ray (ECGR_STGC) QTGC-B
+    - scale: linear 0 to 150
+    - style: color #16a34a, line width 0.8
+  - `TT`:
+    - label: Transit Time for CBL (TT) QSLT-B
+    - scale: linear 200 to 400, reversed
+    - style: color #2142ff, line width 0.75
+  - `TENS`:
+    - label: Cable Tension (TENS)
+    - scale: linear 5000 to 0
+    - style: color #111111, dashed, line width 0.65
+  - `MTEM`:
+    - label: Mud Temperature (MTEM) LEH-MT
+    - scale: linear 100 to 500
+    - style: color #111111, line width 0.9
+- On `depth`, keep `STIT`, `TDSP`, and `VSEC` as scalar overlays with these exact labels, scales, and styles:
+  - `STIT`:
+    - label: Stuck Tool Indicator, Total (STIT)
+    - scale: linear 0 to 50
+    - style: color #111111, line width 0.65
+  - `TDSP`:
+    - label: Cable Drag
+    - scale: linear 0 to 50
+    - style: color #92400e, dotted, line width 0.65
+  - `VSEC`:
+    - label: Tool_Tot. Drag
+    - scale: linear 0 to 50
+    - style: color #1d4ed8, dashed, line width 0.65
+- On `cbl`, bind `CBL` twice on the same track with distinct binding ids and preserve both bindings on both sections.
+  - first instance:
+    - label: CBL Amplitude (CBL) QSLT-B
+    - scale: linear 0 to 100
+    - style: color #111111, line width 0.75
+  - second instance:
+    - label: CBL Amplitude (CBL) QSLT-B
+    - scale: linear 0 to 10
+    - style: color #2563eb, dashed, line width 0.65
+- On `vdl`, bind `VDL` as a waveform raster with these exact presentation settings:
+  - label: VDL VariableDensity (VDL) QSLT-B
+  - track x-scale: linear 200 to 1200
+  - style: colormap gray_r
+  - profile: vdl
+  - colorbar: enabled, label Amplitude, position header
+  - sample axis: enabled, unit us, min 200, max 1200, ticks 7, source origin 40, source step 10
+  - hide the VDL track's vertical main and secondary grid lines
+- Do not shorten labels to generic aliases like `GR` or `CBL` if a full production label is given above.
+- If a requested binding already exists, update it so the persisted YAML matches the requested label, scale, and style exactly.
+- Keep the overall styling restrained and readable.
