@@ -792,6 +792,7 @@ class StableBackend:
         self.tool_names: list[str] = []
         self.max_rounds: int | None = None
         self.mutation_payload: dict[str, object] | None = None
+        self.instructions: str | None = None
         self.subtitle = subtitle
 
     async def run_authoring(
@@ -804,7 +805,8 @@ class StableBackend:
         max_rounds: int,
     ) -> ProviderRunResult:
         """Replay one stable section mutation."""
-        del instructions, initial_user_message
+        del initial_user_message
+        self.instructions = instructions
         self.tool_names = [tool.name for tool in tool_definitions]
         self.max_rounds = max_rounds
         assert callable(tool_caller)
@@ -1278,6 +1280,10 @@ async def test_stable_loop_uses_compact_profile_and_persisted_evidence(tmp_path:
 
     assert backend.max_rounds == 4
     assert set(backend.tool_names) == STABLE_MCP_TOOL_NAMES
+    assert backend.instructions is not None
+    assert "finish the source section first" in backend.instructions
+    assert "Replication is a point-in-time copy" in backend.instructions
+    assert "resynchronize it with overwrite=true" in backend.instructions
     assert result.validation["valid"] is True
     assert result.change_summary["changed"] is True
     assert result.report_preview_png == b"stable-preview"

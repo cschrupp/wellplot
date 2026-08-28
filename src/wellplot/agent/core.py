@@ -3102,7 +3102,10 @@ class AuthoringSession:
             "unspecified values and objects. Prefer the smallest direct mutation that satisfies "
             "the request. After every mutation, use its returned before/after evidence; if a "
             "tool reports an error, correct the arguments instead of claiming success. For a "
-            "new section copied from an existing section, use replicate_section_structure. "
+            "new section copied from an existing section, finish the source section first and "
+            "then use replicate_section_structure with include_bindings=true when bindings "
+            "should match. Replication is a point-in-time copy; if the source changes later "
+            "and the target must remain equivalent, resynchronize it with overwrite=true. "
             "Finish only after validation and a concise report of completed and blocked work."
         )
         try:

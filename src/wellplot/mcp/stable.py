@@ -415,7 +415,7 @@ def _mutation(
     mutation_result = mutate()
     after = _snapshot(logfile_path, target, root)
     changed, changed_fields, before_change, after_change = _mutation_evidence(before, after)
-    return {
+    response = {
         "ok": True,
         "changed": changed,
         "target": dict(target),
@@ -428,6 +428,19 @@ def _mutation(
         "warnings": [],
         "next_steps": [],
     }
+    source_section_id = getattr(mutation_result, "source_section_id", None)
+    target_section_id = getattr(mutation_result, "target_section_id", None)
+    if isinstance(source_section_id, str) and isinstance(target_section_id, str):
+        curve_count = int(getattr(mutation_result, "curve_binding_count", 0))
+        raster_count = int(getattr(mutation_result, "raster_binding_count", 0))
+        response["next_steps"] = [
+            f"Copied {curve_count} curve binding(s) and {raster_count} raster binding(s) "
+            f"from section {source_section_id!r} to {target_section_id!r}. Replication is "
+            "a point-in-time copy. If the source section changes later and the target must "
+            "remain equivalent, call replicate_section_structure again with overwrite=true "
+            "after the source is complete."
+        ]
+    return response
 
 
 def _scale_snapshot(

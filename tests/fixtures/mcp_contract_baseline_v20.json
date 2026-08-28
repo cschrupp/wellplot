@@ -2110,7 +2110,7 @@
         "openWorldHint": false,
         "readOnlyHint": false
       },
-      "description": "Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. Use this for multi-section packets instead of synthesizing a section object without tracks. The operation is retry-safe: an equivalent existing target returns a successful no-op with already_exists=true and a stable source-to-target id_map; a conflicting target fails unless overwrite=true.",
+      "description": "Copy one existing section's validated track structure to a new section, optionally with bindings and a new source. This is a point-in-time copy, not a live link: finish the source section before copying when the target should match it. If the source changes later and the target must remain equivalent, call this tool again with include_bindings=true and overwrite=true after the source is complete. Use this for multi-section packets instead of synthesizing a section object without tracks. The operation is retry-safe: an equivalent existing target returns a successful no-op with changed=false, already_exists=true, copied binding counts, and a stable source-to-target id_map; a conflicting target fails unless overwrite=true.",
       "input_schema": {
         "properties": {
           "include_bindings": {

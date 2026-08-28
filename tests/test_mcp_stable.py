@@ -526,10 +526,14 @@ def test_stable_section_replication_is_retry_safe_and_returns_id_map() -> None:
         assert first["changed"] is True
         assert first["already_exists"] is False
         assert first["id_map"]
+        assert "Copied 5 curve binding(s) and 0 raster binding(s)" in first["next_steps"][0]
+        assert "point-in-time copy" in first["next_steps"][0]
+        assert "overwrite=true" in first["next_steps"][0]
         assert second["ok"] is True
         assert second["changed"] is False
         assert second["already_exists"] is True
         assert second["id_map"] == first["id_map"]
+        assert second["next_steps"] == first["next_steps"]
         assert fixture.single_logfile.read_bytes() == first_bytes
 
 
