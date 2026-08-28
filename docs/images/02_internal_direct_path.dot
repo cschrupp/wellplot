@@ -1,0 +1,10 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.38, ranksep=0.4];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7];
+  lg [label="Internal LangGraph\nnatural-language compiler", fillcolor="#ECECEC"];
+  app [label="Wellplot application / domain API"];
+  auth [label="AuthoringService"];
+  canon [label="Canonical models", shape=cylinder];
+  lg -> app -> auth -> canon;
+}

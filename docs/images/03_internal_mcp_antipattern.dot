@@ -1,0 +1,10 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.38, ranksep=0.4];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7];
+  lg [label="Internal LangGraph", fillcolor="#ECECEC"];
+  client [label="MCP client"];
+  server [label="MCP server"];
+  auth [label="AuthoringService"];
+  lg -> client -> server -> auth;
+}

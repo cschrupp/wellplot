@@ -1,0 +1,13 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.32, ranksep=0.4];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7];
+  nl [label="IR-0\nNatural language"];
+  semantic [label="IR-1\nReconstructionPlan"];
+  cap [label="IR-2\nCapability artifacts"];
+  intent [label="IR-3\nAuthoringDocumentIntent"];
+  ops [label="IR-4\nReconciliation operations"];
+  canonical [label="IR-5\nAuthoringDocumentSpec"];
+  render [label="Rendered output", shape=box3d];
+  nl -> semantic -> cap -> intent -> ops -> canonical -> render;
+}

@@ -1,0 +1,41 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.45];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10, margin="0.14,0.08"];
+  edge [color="#666666", arrowsize=0.7, fontname="DejaVu Sans", fontsize=9];
+  user [label="Scientist\nnatural-language request", fillcolor="#EFEFEF"];
+  context [label="Compact current document\n+ source manifest"];
+  planner [label="Semantic planner"];
+  registry [label="Capability registry", shape=cylinder, fillcolor="#ECECEC"];
+  report [label="Report compiler"];
+  sec1 [label="Section worker A"];
+  sec2 [label="Section worker B"];
+  secn [label="Section worker N"];
+  merge [label="Deterministic artifact merge"];
+  intent [label="AuthoringDocumentIntent", fillcolor="#EFEFEF"];
+  reconcile [label="Resolve + reconcile"];
+  execute [label="Direct Wellplot execution\n(transactional)"];
+  validate [label="Deterministic validation"];
+  preview [label="Final render / preview"];
+  qa [label="Visual QA"];
+  repair [label="Targeted repair workers\n(max 1-2 cycles)"];
+  done [label="Final artifact", shape=box3d, fillcolor="#EFEFEF"];
+
+  user -> context -> planner;
+  registry -> planner;
+  planner -> report;
+  planner -> sec1;
+  planner -> sec2;
+  planner -> secn;
+  registry -> report [style=dashed];
+  registry -> sec1 [style=dashed];
+  registry -> sec2 [style=dashed];
+  registry -> secn [style=dashed];
+  report -> merge;
+  sec1 -> merge;
+  sec2 -> merge;
+  secn -> merge;
+  merge -> intent -> reconcile -> execute -> validate -> preview -> qa;
+  qa -> done [label=" accepted"];
+  qa -> repair [label=" corrections"];
+  repair -> merge;
+}

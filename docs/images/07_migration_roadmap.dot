@@ -1,0 +1,17 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.25, ranksep=0.4];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=9, margin="0.1,0.06"];
+  edge [color="#666666", arrowsize=0.6];
+  l0 [label="LG-0\nFreeze baseline"];
+  l1 [label="LG-1\nRegistry"];
+  l2 [label="LG-2\nPlanner"];
+  l3 [label="LG-3\nOne section"];
+  l4 [label="LG-4\nFan-out + merge", fillcolor="#ECECEC"];
+  l5 [label="LG-5\nDirect executor"];
+  l6 [label="LG-6\nVerifier"];
+  l7 [label="LG-7\nVisual QA"];
+  l8 [label="LG-8\nRevision"];
+  l9 [label="LG-9\nHigh-level MCP"];
+  l10 [label="LG-10\nDelete legacy"];
+  l0 -> l1 -> l2 -> l3 -> l4 -> l5 -> l6 -> l7 -> l8 -> l9 -> l10;
+}

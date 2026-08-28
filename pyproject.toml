@@ -58,6 +58,9 @@ interactive = [
 mcp = [
   "mcp>=1,<2",
 ]
+graph = [
+  "langgraph>=1.0,<2",
+]
 agent = [
   "mcp>=1,<2",
   "openai>=1.0",

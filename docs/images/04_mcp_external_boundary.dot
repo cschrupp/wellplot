@@ -1,0 +1,22 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.4];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7, fontname="DejaVu Sans", fontsize=9];
+  ext [label="External AI clients\nClaude / Codex / ChatGPT"];
+  mcp [label="MCP server\nexternal interoperability", fillcolor="#ECECEC"];
+  lg [label="Internal LangGraph\nnatural-language compiler", fillcolor="#ECECEC"];
+  gui [label="GUI / editor"];
+  py [label="Python API"];
+  app [label="Wellplot application API"];
+  auth [label="AuthoringService"];
+  canon [label="Canonical models", shape=cylinder];
+  registry [label="Capability registry", shape=cylinder];
+
+  ext -> mcp -> app;
+  lg -> app;
+  gui -> app;
+  py -> app;
+  registry -> lg [style=dashed];
+  registry -> app [style=dashed];
+  app -> auth -> canon;
+}

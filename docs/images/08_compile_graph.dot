@@ -1,0 +1,17 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad=0.2, nodesep=0.4, ranksep=0.5];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7];
+  start [label="START", shape=circle, fillcolor="#ECECEC"];
+  plan [label="plan"];
+  report [label="compile_report"];
+  section [label="compile_section × N\n(dynamic Send)"];
+  merge [label="merge\n(deterministic)"];
+  end [label="END\nmerged_intent", shape=doublecircle, fillcolor="#ECECEC"];
+  start -> plan;
+  plan -> report;
+  plan -> section;
+  report -> merge;
+  section -> merge;
+  merge -> end;
+}

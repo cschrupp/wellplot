@@ -1,0 +1,14 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad=0.2, nodesep=0.35, ranksep=0.42];
+  node [shape=box, style="rounded,filled", fillcolor="#F7F7F7", color="#555555", fontname="DejaVu Sans", fontsize=10];
+  edge [color="#666666", arrowsize=0.7];
+  impl [label="Implement new canonical\nmodel + renderer"];
+  cap [label="Register capability\nschema + semantics + compiler"];
+  reg [label="Capability registry", shape=cylinder, fillcolor="#ECECEC"];
+  planner [label="Planner discovers capability"];
+  worker [label="Generic section worker\nreceives scoped schema"];
+  lg [label="LangGraph topology", fillcolor="#ECECEC"];
+  result [label="New capability available\nin natural language", shape=box3d];
+  impl -> cap -> reg -> planner -> worker -> result;
+  lg -> worker [style=dashed, label=" unchanged"];
+}
