@@ -80,6 +80,7 @@ from .compilation import (
     AuthoringCompilationScope,
     AuthoringRequestWorkUnit,
     branch_operation_submission_model,
+    operation_request_object_kind,
 )
 
 _OBJECT_SCOPE: dict[AuthoringOperationObjectKind, AuthoringCompilationScope] = {
@@ -105,7 +106,7 @@ _OBJECT_FAMILY_BRANCH: dict[AuthoringOperationObjectKind, str] = {
     AuthoringOperationObjectKind.DEPTH: "depth",
     AuthoringOperationObjectKind.OUTPUT: "output",
     AuthoringOperationObjectKind.HEADER: "header",
-    AuthoringOperationObjectKind.HEADER_SLOT: "header_slot",
+    AuthoringOperationObjectKind.HEADER_SLOT: "header",
     AuthoringOperationObjectKind.TAIL: "tail",
     AuthoringOperationObjectKind.REMARK: "remarks",
     AuthoringOperationObjectKind.SECTION: "section",
@@ -168,6 +169,26 @@ def _omit_undefined(value: object) -> object:
     if isinstance(value, list):
         return [_omit_undefined(item) for item in value]
     return value
+
+
+def _header_value_patch(
+    value: object,
+    *,
+    service_title: bool = False,
+) -> dict[str, Any]:
+    """Flatten an intent report value for the stable header-slot contract."""
+    patch = _resolve_clears(value)
+    if not isinstance(patch, Mapping):
+        return {}
+    flattened = dict(patch)
+    report_value = flattened.get("value")
+    if isinstance(report_value, Mapping):
+        flattened.pop("value")
+        flattened.update(report_value)
+    allowed = {"value", "source_key", "unit", "provenance", "availability"}
+    if service_title:
+        allowed.update({"font_size", "auto_adjust", "bold", "italic", "alignment"})
+    return {key: item for key, item in flattened.items() if key in allowed}
 
 
 def _scope_for(operation: AuthoringOperation) -> AuthoringCompilationScope:
@@ -250,9 +271,11 @@ def _update_request(
     if kind == AuthoringOperationObjectKind.HEADER_SLOT:
         service_title_ids = {ref.object_id for ref in service.list("service_title")}
         if operation.object_id in service_title_ids:
-            patch = ServiceTitlePatch.model_validate(raw_patch)
+            patch = ServiceTitlePatch.model_validate(
+                _header_value_patch(raw_patch, service_title=True)
+            )
             return UpdateServiceTitleRequest(slot_id=operation.object_id, patch=patch)
-        patch = HeaderValuePatch.model_validate(raw_patch)
+        patch = HeaderValuePatch.model_validate(_header_value_patch(raw_patch))
         return UpdateHeaderSlotRequest(slot_id=operation.object_id, patch=patch)
     if kind == AuthoringOperationObjectKind.SECTION:
         return UpdateSectionRequest(
@@ -436,6 +459,8 @@ def compile_reconciliation_plan(
             if operation.object_kind == AuthoringOperationObjectKind.REMARK
             else operation.object_kind.value
         )
+        if operation.object_kind == AuthoringOperationObjectKind.HEADER_SLOT:
+            family = operation_request_object_kind(request)
         branch = _OBJECT_FAMILY_BRANCH[operation.object_kind]
         parent = operation.track_id or operation.section_id
         action = (

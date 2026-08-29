@@ -1,0 +1,44 @@
+template:
+  path: base.template.yaml
+version: 1
+name: Agent CBL Starter
+render:
+  output_path: agent_cbl_log_example.pdf
+document:
+  layout:
+    log_sections:
+    - id: main_pass
+      title: Main Pass
+      subtitle: CBL/VDL packet stress test starter
+      data:
+        source_path: CBL_Main.dlis
+        source_format: dlis
+      tracks:
+      - id: combo
+        title: Combo
+        kind: normal
+        width_mm: 30
+        position: 1
+      - id: depth
+        title: Depth
+        kind: reference
+        width_mm: 18
+        reference:
+          axis: depth
+          define_layout: true
+          unit: ft
+          scale_ratio: 240
+          major_step: 100
+          secondary_grid:
+            display: true
+            line_count: 4
+        position: 2
+  bindings:
+    on_missing: skip
+    channels:
+    - channel: ECGR_STGC
+      track_id: combo
+      kind: curve
+      label: GR
+      style:
+        color: '#2e7d32'

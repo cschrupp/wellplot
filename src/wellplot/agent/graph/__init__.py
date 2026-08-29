@@ -1,5 +1,6 @@
 """Agentic natural-language compiler graph for Wellplot."""
 
+from .executor import DirectIntentExecutionResult, execute_document_intent
 from .models import (
     CompiledArtifact,
     ReconstructionDiagnostic,
@@ -16,6 +17,7 @@ from .workflow import ReconstructionGraphDependencies, build_compile_graph
 
 __all__ = [
     "CompiledArtifact",
+    "DirectIntentExecutionResult",
     "ExistingProviderStructuredAdapter",
     "ReconstructionDiagnostic",
     "ReconstructionGraphDependencies",
@@ -28,4 +30,5 @@ __all__ = [
     "StructuredModelProtocol",
     "VisualCorrection",
     "build_compile_graph",
+    "execute_document_intent",
 ]

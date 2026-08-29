@@ -3,30 +3,45 @@
     "main_pass": {
       "source_format": "dlis",
       "channels": [
-        "ECGR_STGC",
-        "TT",
-        "TENS",
-        "MTEM",
-        "STIT",
-        "TDSP",
-        "VSEC",
-        "CBL",
-        "VDL"
+        {"mnemonic": "ECGR_STGC", "kind": "scalar"},
+        {"mnemonic": "TT", "kind": "scalar"},
+        {"mnemonic": "TENS", "kind": "scalar"},
+        {"mnemonic": "MTEM", "kind": "scalar"},
+        {"mnemonic": "STIT", "kind": "scalar"},
+        {"mnemonic": "TDSP", "kind": "scalar"},
+        {"mnemonic": "VSEC", "kind": "scalar"},
+        {"mnemonic": "CBL", "kind": "scalar"},
+        {"mnemonic": "VDL", "kind": "array"}
       ]
     },
     "repeat_pass": {
       "source_format": "dlis",
       "channels": [
-        "ECGR_STGC",
-        "TT",
-        "TENS",
-        "MTEM",
-        "STIT",
-        "TDSP",
-        "VSEC",
-        "CBL",
-        "VDL"
+        {"mnemonic": "ECGR_STGC", "kind": "scalar"},
+        {"mnemonic": "TT", "kind": "scalar"},
+        {"mnemonic": "TENS", "kind": "scalar"},
+        {"mnemonic": "MTEM", "kind": "scalar"},
+        {"mnemonic": "STIT", "kind": "scalar"},
+        {"mnemonic": "TDSP", "kind": "scalar"},
+        {"mnemonic": "VSEC", "kind": "scalar"},
+        {"mnemonic": "CBL", "kind": "scalar"},
+        {"mnemonic": "VDL", "kind": "array"}
       ]
+    }
+  },
+  "execution_context": {
+    "header_aliases": {
+      "state_or_country": ["country"],
+      "service_1": ["service_title.1"],
+      "service_2": ["service_title.2"],
+      "service_3": ["service_title.3"],
+      "run_number": ["detail.row_2.column_1.cell_1"],
+      "driller_depth": ["detail.row_4.column_1.cell_1"],
+      "logged_depth": ["detail.row_5.column_1.cell_1"],
+      "fluid_density": ["detail.row_12.value_1"],
+      "bottom_temperature": ["detail.row_19.column_1.cell_1"],
+      "logged_by": ["detail.row_23.value_1"],
+      "witnessed_by": ["detail.row_24.value_1"]
     }
   },
   "reconstruction_plan": {

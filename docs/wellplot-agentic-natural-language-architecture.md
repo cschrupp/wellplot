@@ -934,6 +934,13 @@ Preserve atomic rollback semantics.
 
 **Gate:** applying the graph-generated CBL intent produces the same or verifier-equivalent canonical document as the frozen baseline.
 
+**Implemented:** `wellplot.agent.graph.execute_document_intent(...)` composes
+the existing context resolver, reconciler, reconciliation bridge, and typed
+transaction executor without MCP, provider, persistence, or rendering
+dependencies. Its fixture-backed CBL evaluation verifies a successful atomic
+application against a cased-hole scaffold with typed source channel metadata.
+The final semantic verifier remains LG-6 work.
+
 ---
 
 ### LG-6 - Deterministic verifier

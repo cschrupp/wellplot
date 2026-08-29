@@ -705,13 +705,22 @@ def _resolve_header_aliases(
             if not isinstance(item, BaseModel):
                 continue
             item_path = f"header.{collection_name}[{index}]"
-            lookup_tokens = {_normalize_token(item.slot_id)}
-            for field_name in ("key", "label"):
-                value = getattr(item, field_name, None)
-                if isinstance(value, str):
-                    normalized = _normalize_token(value)
-                    lookup_tokens.add(normalized)
-                    lookup_tokens.update(aliases_by_key.get(normalized, set()))
+            requested_slot = _normalize_token(item.slot_id)
+            explicit_slot_aliases = {
+                token
+                for token in aliases_by_key.get(requested_slot, set())
+                if token != requested_slot
+            }
+            lookup_tokens = (
+                set(explicit_slot_aliases) if explicit_slot_aliases else {requested_slot}
+            )
+            if not explicit_slot_aliases:
+                for field_name in ("key", "label"):
+                    value = getattr(item, field_name, None)
+                    if isinstance(value, str):
+                        normalized = _normalize_token(value)
+                        lookup_tokens.add(normalized)
+                        lookup_tokens.update(aliases_by_key.get(normalized, set()))
             matches = [slot_id for slot_id, tokens in slots if lookup_tokens.intersection(tokens)]
             if len(matches) != 1:
                 code = "header_slot_missing" if not matches else "header_slot_ambiguous"
@@ -728,8 +737,8 @@ def _resolve_header_aliases(
                 )
                 continue
             resolved_slot = matches[0]
-            requested_slot = item.slot_id
-            if requested_slot != resolved_slot:
+            requested_slot_id = item.slot_id
+            if requested_slot_id != resolved_slot:
                 item.slot_id = resolved_slot
             decisions.append(
                 AuthoringResolutionDecision(
@@ -737,8 +746,12 @@ def _resolve_header_aliases(
                     source=AuthoringResolutionSource.EXPLICIT,
                     status=AuthoringResolutionStatus.RESOLVED,
                     value=resolved_slot,
-                    requested=requested_slot,
-                    matched_alias=requested_slot if requested_slot != resolved_slot else None,
+                    requested=requested_slot_id,
+                    matched_alias=(
+                        requested_slot_id
+                        if explicit_slot_aliases or requested_slot_id != resolved_slot
+                        else None
+                    ),
                     candidates=[resolved_slot],
                 )
             )

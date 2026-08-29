@@ -1,6 +1,7 @@
 # Wellplot Agentic Architecture Starter Kit
 
-This kit is an **additive compile-only migration starter** for the August 27 Wellplot architecture.
+This kit is an **additive compiler and direct-execution migration starter** for
+the August 27 Wellplot architecture.
 
 ## Contents
 
@@ -22,32 +23,39 @@ Implemented conceptually/code-wise:
 6. LangGraph dynamic worker fan-out using `Send`;
 7. deterministic artifact merge into `AuthoringDocumentIntent`;
 8. architecture invariant test preventing domain capability names in graph topology.
+9. direct, transactional application of merged intent through the existing
+   resolution, reconciliation, and typed service layers.
 
 Not implemented yet:
 
-- persistence/execution;
-- direct reconciliation bridge;
 - deterministic final verifier;
 - final rendering;
 - visual QA/repair;
 - high-level MCP wrapper;
 - deletion of legacy orchestration paths.
 
-That boundary is deliberate. The first integration PR should prove the new compiler decomposition without putting the working persistence path at risk.
+The direct executor does not call MCP, a provider, filesystem persistence, or
+the renderer. It is deliberately limited to the existing canonical service
+transaction boundary so a blocked resolution or failed operation rolls back
+without mutating the supplied document.
 
 ## Verification in the full repository
 
-Install the optional graph dependency, then run the focused compile-only suite:
+Install the optional graph dependency, then run the focused compiler and
+direct-execution suite:
 
 ```bash
 uv run --extra graph pytest -q \
   tests/test_capability_registry.py \
   tests/test_graph_architecture_invariants.py \
   tests/test_reconstruction_compile_graph.py \
-  tests/test_cbl_compile_only_graph.py
+  tests/test_cbl_compile_only_graph.py \
+  tests/test_direct_graph_executor.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
 semantic plan, selected capabilities, report and section artifacts, merged
-intent, model-call count, and correction count without executing MCP tools or
-persisting a draft.
+intent, model-call count, and correction count without executing MCP tools.
+The direct-executor test applies that frozen CBL intent to tracked scaffold and
+source-context fixtures, including typed source channel kinds and explicit
+header-slot aliases.

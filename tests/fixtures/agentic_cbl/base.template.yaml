@@ -1,0 +1,337 @@
+render:
+  backend: matplotlib
+  dpi: 144
+  continuous_strip_page_height_mm: 297
+  matplotlib:
+    style:
+      report:
+        summary_label_fontsize: 8.0
+        summary_value_fontsize: 10.5
+        provider_fontsize: 16.0
+        service_fontsize: 8.0
+        tail_service_fontsize: 8.0
+        field_label_fontsize: 7.0
+        field_value_fontsize: 7.8
+        detail_header_fontsize: 9.0
+        detail_label_fontsize: 6.4
+        detail_value_fontsize: 6.4
+        tail_frame_y: 0.74
+        tail_frame_height: 0.22
+      section_title:
+        background_color: '#0d3fb3'
+        border_mode: box
+        border_color: '#0d3fb3'
+        border_linewidth: 0.8
+        padding_left: 0.03
+        padding_right: 0.03
+        title_align: center
+        subtitle_align: center
+        title_fontsize: 11.0
+        subtitle_fontsize: 6.6
+        title_color: '#ffffff'
+        subtitle_color: '#eaf0ff'
+        title_y: 0.68
+        subtitle_y: 0.22
+      track_header:
+        background_color: '#eef2f8'
+      track:
+        x_tick_labelsize: 6.0
+      grid:
+        depth_major_linewidth: 0.65
+document:
+  page:
+    size: A4
+    orientation: portrait
+    continuous: false
+    bottom_track_header_enabled: true
+    margin_left_mm: 0
+    margin_right_mm: 8
+    margin_top_mm: 0
+    margin_bottom_mm: 0
+    track_gap_mm: 0
+    header_height_mm: 0
+    track_header_height_mm: 30
+    footer_height_mm: 0
+  depth:
+    unit: ft
+    scale: 240
+    major_step: 10
+    minor_step: 2
+  layout:
+    heading:
+      enabled: true
+      provider_name: Company
+      general_fields:
+      - key: archive_no
+        label: Archive No.
+        value: ''
+      - key: api_no
+        label: API No.
+        value: ''
+      - key: version
+        label: Version
+        value: ''
+      - key: company
+        label: Company
+        source_key: COMP
+      - key: well
+        label: Well
+        source_key: WELL
+      - key: field
+        label: Field
+        source_key: FLD
+      - key: county
+        label: County
+        source_key: CNTY
+      - key: country
+        label: Country
+        source_key: CTRY
+      - key: location
+        label: Location
+        source_key: LOC
+      - key: section
+        label: Section
+        value: ''
+      - key: township
+        label: Township
+        value: ''
+      - key: range
+        label: Range
+        value: ''
+      - key: footage
+        label: Footage
+        value: ''
+      - key: latitude
+        label: Latitude
+        source_key: LATI
+      - key: longitude
+        label: Longitude
+        source_key: LONG
+      - key: logging_date
+        label: Logging Date
+        source_key: DATE
+      - key: scale
+        label: Scale
+        value: ft 1:240
+      - key: measured_from
+        label: Measured From
+        value: ''
+      - key: log_measured_from
+        label: Log Measured From
+        source_key: LMF
+      - key: perforation_measured_from
+        label: Perforation Measured From
+        value: ''
+      - key: elevation_kb
+        label: KB
+        source_key: EKB
+      - key: elevation_gl
+        label: GL
+        source_key: EGL
+      - key: elevation_df
+        label: DF
+        source_key: EDF
+      - key: top_log_interval
+        label: Top Log Interval
+        source_key: STRT
+      - key: bottom_log_interval
+        label: Bottom Log Interval
+        source_key: STOP
+      - key: fluid_type
+        label: Fluid Type
+        value: ''
+      - key: service_company
+        label: Service Company
+        source_key: SRVC
+      service_titles:
+      - value: Cased Hole Quicklook
+        alignment: center
+        bold: true
+      - value: ''
+        alignment: center
+      - value: ''
+        alignment: center
+      detail:
+        kind: cased_hole
+        title: Cased Hole Metadata
+        rows:
+        - key: date
+          label: Date
+          values:
+          - source_key: DATE
+          - ''
+        - keys:
+          - run_number
+          - direction
+          label_cells:
+          - Run
+          - Direction
+          columns:
+          - cells:
+            - ''
+          - cells:
+            - ''
+        - key: service_order
+          label: Service Order
+          values:
+          - ''
+          - ''
+        - key: driller_depth
+          label: Driller Depth
+          columns:
+          - cells:
+            - ''
+            - ft
+          - cells:
+            - ''
+        - key: logged_depth
+          label: Logged Depth
+          columns:
+          - cells:
+            - ''
+            - ft
+          - cells:
+            - ''
+        - key: first_reading_bottom
+          label: First Reading (Bottom)
+          columns:
+          - cells:
+            - source_key: STOP
+            - ft
+          - cells:
+            - ''
+        - key: last_reading
+          label: Last Reading
+          columns:
+          - cells:
+            - source_key: STRT
+            - ft
+          - cells:
+            - ''
+        - key: start_time
+          label: Start Time
+          values:
+          - ''
+          - ''
+        - key: end_time
+          label: End Time
+          values:
+          - ''
+          - ''
+        - key: drill_time
+          label: Drill Time
+          values:
+          - ''
+          - ''
+        - key: injection_type
+          label: Injection Type
+          values:
+          - ''
+          - ''
+        - key: fluid_density
+          label: Fluid Density
+          values:
+          - ''
+          - ''
+        - key: fluid_salinity
+          label: Fluid Salinity
+          values:
+          - ''
+          - ''
+        - key: fluid_level
+          label: Fluid Level
+          columns:
+          - cells:
+            - ''
+            - ft
+          - cells:
+            - ''
+        - key: cement_top
+          label: Cement Top
+          columns:
+          - cells:
+            - ''
+            - ft
+          - cells:
+            - ''
+        - key: head_pressure
+          label: Head Pressure
+          columns:
+          - cells:
+            - ''
+            - psi
+          - cells:
+            - ''
+        - key: maximum_deviation
+          label: Maximum Deviation
+          columns:
+          - cells:
+            - ''
+            - deg
+          - cells:
+            - ''
+        - key: nominal_speed
+          label: Nominal Speed
+          columns:
+          - cells:
+            - ''
+            - ft/min
+          - cells:
+            - ''
+        - key: bottom_temperature
+          label: Bottom Temperature
+          columns:
+          - cells:
+            - ''
+            - degF
+          - cells:
+            - ''
+        - key: reference_log
+          label: Reference Log
+          values:
+          - ''
+          - ''
+        - key: reference_date
+          label: Reference Date
+          values:
+          - ''
+          - ''
+        - keys:
+          - equipment_number
+          - base
+          label_cells:
+          - Equipment No.
+          - Base
+          columns:
+          - cells:
+            - ''
+          - cells:
+            - ''
+        - key: logged_by
+          label: Logged By
+          values:
+          - ''
+          - ''
+        - key: witnessed_by
+          label: Witnessed By
+          values:
+          - ''
+          - ''
+    remarks:
+    - title: Public Data and IP Notice
+      lines:
+      - This example uses publicly available or repository-provided demonstration
+        data intended for educational use.
+      - Rendered layouts are independent reproductions generated by wellplot, not
+        vendor-authored originals or official service-company deliverables.
+      - Original trademarks and service names remain the property of their respective
+        owners.
+      - Confirm data provenance and redistribution rights before reusing outputs outside
+        this repository.
+      alignment: left
+    log_sections: []
+    tail:
+      enabled: true
+  bindings:
+    on_missing: skip
+    channels: []
