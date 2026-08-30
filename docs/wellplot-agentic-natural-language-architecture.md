@@ -1004,6 +1004,15 @@ pre-revision `AuthoringDocumentSpec`; no semantically unverified revision is
 published. This facade has no MCP, persistence, renderer, or visual-QA
 dependency.
 
+**Implemented (LG-9 prerequisite):** `compile_document_reconstruction(...)`
+and `execute_document_reconstruction(...)` provide the equivalent graph-only
+boundary for a full request. Reconstruction compilation receives a JSON-safe
+starting-document snapshot in explicit `reconstruct` mode. Execution uses the
+same canonical direct executor and semantic verifier as revisions, restoring
+the starting document if final verification fails. This keeps a future
+high-level MCP adapter thin: it can invoke one application operation rather
+than recreate compiler or transaction behavior.
+
 ---
 
 ### LG-9 - High-level MCP adapter

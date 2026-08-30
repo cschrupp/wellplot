@@ -22,6 +22,11 @@ from .models import (
 )
 from .planner import ReconstructionPlanner
 from .provider_adapter import ExistingProviderStructuredAdapter, StructuredModelProtocol
+from .reconstruction import ReconstructionCompilationResult, compile_document_reconstruction
+from .reconstruction_execution import (
+    ReconstructionExecutionResult,
+    execute_document_reconstruction,
+)
 from .report_worker import ReportCompiler
 from .revision import RevisionCompilationResult, compile_document_revision
 from .revision_execution import RevisionExecutionResult, execute_document_revision
@@ -45,6 +50,8 @@ __all__ = [
     "IntentVerificationIssue",
     "MAX_VISUAL_REPAIR_CYCLES",
     "ReconstructionDiagnostic",
+    "ReconstructionCompilationResult",
+    "ReconstructionExecutionResult",
     "ReconstructionGraphDependencies",
     "ReconstructionPlan",
     "ReconstructionPlanner",
@@ -61,7 +68,9 @@ __all__ = [
     "VisualReviewResult",
     "build_compile_graph",
     "compile_document_revision",
+    "compile_document_reconstruction",
     "execute_document_intent",
+    "execute_document_reconstruction",
     "execute_document_revision",
     "finalize_document_intent",
     "verify_document_intent",

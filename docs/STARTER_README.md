@@ -33,6 +33,8 @@ Implemented conceptually/code-wise:
     sections and records unaffected sections for deterministic preservation.
 13. transactional revision facade that compiles, executes, verifies, and rolls
     back the canonical document when final semantic verification fails.
+14. transactional reconstruction facade that compiles, executes, verifies, and
+    rolls back the canonical document when final semantic verification fails.
 
 Not implemented yet:
 
@@ -61,7 +63,8 @@ uv run --extra graph pytest -q \
   tests/test_graph_intent_verifier.py \
   tests/test_graph_finalization.py \
   tests/test_graph_revision.py \
-  tests/test_graph_revision_execution.py
+  tests/test_graph_revision_execution.py \
+  tests/test_graph_reconstruction_execution.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -82,3 +85,6 @@ intent for only planner-selected sections; existing sections outside that scope
 remain owned by deterministic reconciliation.
 The revision execution facade uses the existing direct executor and verifier;
 it restores the pre-revision canonical snapshot if final verification fails.
+The reconstruction execution facade provides the equivalent transaction for a
+full graph-compiled request. This is the application boundary required before a
+high-level MCP adapter can be added without duplicating execution logic.
