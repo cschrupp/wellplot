@@ -27,11 +27,13 @@ Implemented conceptually/code-wise:
    resolution, reconciliation, and typed service layers.
 10. read-only semantic verification of final canonical state against merged
     intent through the same resolution and reconciliation rules.
+11. verified final-render and visual-review boundary with typed correction
+    output and no direct mutation path.
 
 Not implemented yet:
 
-- final rendering;
-- visual QA/repair;
+- production canonical-render adapter and vision-provider adapter;
+- typed visual-correction repair routing;
 - high-level MCP wrapper;
 - deletion of legacy orchestration paths.
 
@@ -52,7 +54,8 @@ uv run --extra graph pytest -q \
   tests/test_reconstruction_compile_graph.py \
   tests/test_cbl_compile_only_graph.py \
   tests/test_direct_graph_executor.py \
-  tests/test_graph_intent_verifier.py
+  tests/test_graph_intent_verifier.py \
+  tests/test_graph_finalization.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -64,3 +67,6 @@ header-slot aliases.
 The graph verifier reruns the same canonical resolution and reconciliation
 rules against the final document and passes only when no repair operations are
 required.
+Finalization verifies the in-memory document before calling a supplied renderer
+and exposes visual-review corrections as typed data for a later compiler-owned
+repair stage.

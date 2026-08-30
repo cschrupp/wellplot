@@ -1,6 +1,16 @@
 """Agentic natural-language compiler graph for Wellplot."""
 
 from .executor import DirectIntentExecutionResult, execute_document_intent
+from .finalization import (
+    MAX_VISUAL_REPAIR_CYCLES,
+    CanonicalDocumentRenderer,
+    DocumentFinalizationResult,
+    FinalRenderArtifact,
+    VisualReviewer,
+    VisualReviewRequest,
+    VisualReviewResult,
+    finalize_document_intent,
+)
 from .models import (
     CompiledArtifact,
     ReconstructionDiagnostic,
@@ -22,10 +32,14 @@ from .workflow import ReconstructionGraphDependencies, build_compile_graph
 
 __all__ = [
     "CompiledArtifact",
+    "CanonicalDocumentRenderer",
+    "DocumentFinalizationResult",
     "DocumentIntentVerificationResult",
     "DirectIntentExecutionResult",
     "ExistingProviderStructuredAdapter",
+    "FinalRenderArtifact",
     "IntentVerificationIssue",
+    "MAX_VISUAL_REPAIR_CYCLES",
     "ReconstructionDiagnostic",
     "ReconstructionGraphDependencies",
     "ReconstructionPlan",
@@ -36,7 +50,11 @@ __all__ = [
     "SemanticComponentPlan",
     "StructuredModelProtocol",
     "VisualCorrection",
+    "VisualReviewer",
+    "VisualReviewRequest",
+    "VisualReviewResult",
     "build_compile_graph",
     "execute_document_intent",
+    "finalize_document_intent",
     "verify_document_intent",
 ]

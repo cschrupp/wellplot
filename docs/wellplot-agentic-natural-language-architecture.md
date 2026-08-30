@@ -969,6 +969,14 @@ Add final render after final deterministic mutation. Add structured correction o
 
 **Gate:** visual QA cannot directly mutate canonical state; repairs route through typed capability compilers.
 
+**Implemented:** `wellplot.agent.graph.finalize_document_intent(...)` verifies
+the in-memory canonical document before invoking an injected canonical renderer.
+It can pass the resulting immutable render artifact to an injected visual
+reviewer, which returns only validated `VisualCorrection` objects. Failed
+semantic verification prevents rendering; visual corrections are returned with
+a maximum two-cycle repair budget but are not applied in this stage. The
+boundary has no MCP, persistence, or provider dependency.
+
 ---
 
 ### LG-8 - Revision mode
