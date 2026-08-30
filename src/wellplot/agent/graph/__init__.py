@@ -24,6 +24,7 @@ from .planner import ReconstructionPlanner
 from .provider_adapter import ExistingProviderStructuredAdapter, StructuredModelProtocol
 from .report_worker import ReportCompiler
 from .revision import RevisionCompilationResult, compile_document_revision
+from .revision_execution import RevisionExecutionResult, execute_document_revision
 from .section_worker import SectionCompiler
 from .verifier import (
     DocumentIntentVerificationResult,
@@ -48,6 +49,7 @@ __all__ = [
     "ReconstructionPlan",
     "ReconstructionPlanner",
     "RevisionCompilationResult",
+    "RevisionExecutionResult",
     "ReportCompiler",
     "SectionCompiler",
     "SectionPlan",
@@ -60,6 +62,7 @@ __all__ = [
     "build_compile_graph",
     "compile_document_revision",
     "execute_document_intent",
+    "execute_document_revision",
     "finalize_document_intent",
     "verify_document_intent",
 ]

@@ -31,6 +31,8 @@ Implemented conceptually/code-wise:
     output and no direct mutation path.
 12. compile-only revision entry point that scopes graph work to planner-selected
     sections and records unaffected sections for deterministic preservation.
+13. transactional revision facade that compiles, executes, verifies, and rolls
+    back the canonical document when final semantic verification fails.
 
 Not implemented yet:
 
@@ -58,7 +60,8 @@ uv run --extra graph pytest -q \
   tests/test_direct_graph_executor.py \
   tests/test_graph_intent_verifier.py \
   tests/test_graph_finalization.py \
-  tests/test_graph_revision.py
+  tests/test_graph_revision.py \
+  tests/test_graph_revision_execution.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -77,3 +80,5 @@ Revision compilation passes a JSON-safe snapshot of the existing canonical
 document to the same graph in explicit `revise` mode. It returns a partial
 intent for only planner-selected sections; existing sections outside that scope
 remain owned by deterministic reconciliation.
+The revision execution facade uses the existing direct executor and verifier;
+it restores the pre-revision canonical snapshot if final verification fails.

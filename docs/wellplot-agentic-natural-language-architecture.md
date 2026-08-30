@@ -996,6 +996,14 @@ preserved section ids. A deterministic scope check rejects artifacts that
 introduce sections outside the revision plan; the existing reconciliation layer
 preserves omitted sections when applying the partial intent.
 
+**Implemented (LG-8B):** `execute_document_revision(...)` composes scoped
+revision compilation with the direct transactional executor and read-only
+semantic verifier. It returns inspectable evidence for all three stages. If
+the final verifier finds an unmet postcondition, it restores the validated
+pre-revision `AuthoringDocumentSpec`; no semantically unverified revision is
+published. This facade has no MCP, persistence, renderer, or visual-QA
+dependency.
+
 ---
 
 ### LG-9 - High-level MCP adapter
