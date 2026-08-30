@@ -987,6 +987,15 @@ Planner receives current document and may emit only affected sections.
 
 **Gate:** unrelated sections are preserved without being regenerated.
 
+**Implemented (LG-8A):** `compile_document_revision(...)` invokes the same
+planner/workers/merge graph with an independent JSON-safe snapshot of the current
+`AuthoringDocumentSpec` and explicit `revise` mode. Revision prompts direct the
+planner to select only changed or newly requested sections, while the compiler
+returns a partial `AuthoringDocumentIntent` and records both affected and
+preserved section ids. A deterministic scope check rejects artifacts that
+introduce sections outside the revision plan; the existing reconciliation layer
+preserves omitted sections when applying the partial intent.
+
 ---
 
 ### LG-9 - High-level MCP adapter

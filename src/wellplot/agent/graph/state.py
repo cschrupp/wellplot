@@ -14,6 +14,8 @@ from typing import Annotated, Any, Literal, NotRequired
 
 from typing_extensions import TypedDict
 
+from .models import CompilationMode
+
 
 class ReconstructionState(TypedDict, total=False):
     """JSON-serializable graph state.
@@ -24,6 +26,7 @@ class ReconstructionState(TypedDict, total=False):
     """
 
     request: str
+    mode: CompilationMode
     current_document: dict[str, Any]
     source_manifest: dict[str, Any]
     plan: dict[str, Any]
@@ -39,6 +42,7 @@ class CompilationWorkerState(TypedDict, total=False):
     """Read-only context supplied to one dynamically dispatched compiler worker."""
 
     request: str
+    mode: CompilationMode
     current_document: dict[str, Any]
     source_manifest: dict[str, Any]
     work_unit: Literal["report", "section"]

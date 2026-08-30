@@ -29,6 +29,8 @@ Implemented conceptually/code-wise:
     intent through the same resolution and reconciliation rules.
 11. verified final-render and visual-review boundary with typed correction
     output and no direct mutation path.
+12. compile-only revision entry point that scopes graph work to planner-selected
+    sections and records unaffected sections for deterministic preservation.
 
 Not implemented yet:
 
@@ -55,7 +57,8 @@ uv run --extra graph pytest -q \
   tests/test_cbl_compile_only_graph.py \
   tests/test_direct_graph_executor.py \
   tests/test_graph_intent_verifier.py \
-  tests/test_graph_finalization.py
+  tests/test_graph_finalization.py \
+  tests/test_graph_revision.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -70,3 +73,7 @@ required.
 Finalization verifies the in-memory document before calling a supplied renderer
 and exposes visual-review corrections as typed data for a later compiler-owned
 repair stage.
+Revision compilation passes a JSON-safe snapshot of the existing canonical
+document to the same graph in explicit `revise` mode. It returns a partial
+intent for only planner-selected sections; existing sections outside that scope
+remain owned by deterministic reconciliation.

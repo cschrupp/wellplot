@@ -19,6 +19,7 @@ planner/worker compiler is proven against the frozen reconstruction baseline.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -27,7 +28,7 @@ from langgraph.types import Send
 from ...capabilities import CapabilityRegistry
 from ...model.intent import AuthoringDocumentIntent
 from .merge import merge_compiled_artifacts
-from .models import CompiledArtifact, ReconstructionPlan, SectionPlan
+from .models import CompilationMode, CompiledArtifact, ReconstructionPlan, SectionPlan
 from .planner import ReconstructionPlanner
 from .report_worker import ReportCompiler
 from .section_worker import SectionCompiler
@@ -44,25 +45,36 @@ class ReconstructionGraphDependencies:
     registry: CapabilityRegistry
 
 
+def _compilation_mode(value: object) -> CompilationMode:
+    """Validate the explicit compilation mode carried in graph state."""
+    if value not in {"reconstruct", "revise"}:
+        raise ValueError("Graph compilation mode must be 'reconstruct' or 'revise'.")
+    return cast(CompilationMode, value)
+
+
 def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> CompiledStateGraph:
     """Build planner -> dynamic workers -> deterministic merge graph."""
 
     async def plan_node(state: ReconstructionState) -> dict[str, object]:
+        mode = _compilation_mode(state.get("mode", "reconstruct"))
         plan = await dependencies.planner.plan(
             request=state["request"],
             current_document=state.get("current_document", {}),
             source_manifest=state.get("source_manifest", {}),
+            mode=mode,
         )
         return {"plan": plan.model_dump(mode="json")}
 
     async def dispatch_workers(state: ReconstructionState) -> list[Send]:
         """Fan out independent report and section compiler work units."""
         plan = ReconstructionPlan.model_validate(state["plan"])
+        mode = _compilation_mode(state.get("mode", "reconstruct"))
         sends: list[Send] = [
             Send(
                 "compile_artifact",
                 CompilationWorkerState(
                     request=state["request"],
+                    mode=mode,
                     current_document=state.get("current_document", {}),
                     source_manifest=state.get("source_manifest", {}),
                     work_unit="report",
@@ -76,6 +88,7 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
                     "compile_artifact",
                     CompilationWorkerState(
                         request=state["request"],
+                        mode=mode,
                         current_document=state.get("current_document", {}),
                         source_manifest=state.get("source_manifest", {}),
                         work_unit="section",
@@ -86,6 +99,7 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
         return sends
 
     async def compile_artifact_node(state: CompilationWorkerState) -> dict[str, object]:
+        mode = _compilation_mode(state.get("mode", "reconstruct"))
         if state["work_unit"] == "report":
             plan = ReconstructionPlan.model_validate(state["plan"])
             artifact = await dependencies.report_compiler.compile(
@@ -93,6 +107,7 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
                 plan=plan,
                 current_document=state["current_document"],
                 source_manifest=state["source_manifest"],
+                mode=mode,
             )
         else:
             section_plan = SectionPlan.model_validate(state["section_plan"])
@@ -101,6 +116,7 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
                 plan=section_plan,
                 current_document=state["current_document"],
                 source_manifest=state["source_manifest"],
+                mode=mode,
             )
         return {"compiled_artifacts": [artifact.model_dump(mode="json")]}
 

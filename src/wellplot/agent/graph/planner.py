@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
-from .models import ReconstructionPlan
+from .models import CompilationMode, ReconstructionPlan
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -30,9 +30,21 @@ class ReconstructionPlanner:
         request: str,
         current_document: dict[str, object],
         source_manifest: dict[str, object],
+        mode: CompilationMode = "reconstruct",
     ) -> ReconstructionPlan:
         """Return a validated plan using only registered capabilities."""
         catalog = self.registry.planning_catalog()
+        if mode == "revise":
+            mode_instruction = (
+                "This is a revision of the current document. Plan only sections that are "
+                "materially changed or newly requested. Do not include unchanged sections "
+                "solely to reproduce them; omitted sections are preserved deterministically. "
+                "Plan report-wide changes only when the request explicitly changes them."
+            )
+        else:
+            mode_instruction = (
+                "This is a reconstruction. Plan every section needed to satisfy the request."
+            )
         instructions = (
             "You are the semantic planning stage of Wellplot's natural-language compiler. "
             "Decompose the scientist's request into report requirements and independently "
@@ -41,10 +53,11 @@ class ReconstructionPlanner:
             "Preserve explicit values and constraints exactly. A section is a semantic/layout "
             "isolation boundary, not a tool family. Use components to describe the capabilities "
             "needed inside each section. If a requested capability is unavailable, record it in "
-            "unresolved_requirements rather than inventing one."
+            "unresolved_requirements rather than inventing one. " + mode_instruction
         )
         context = {
             "request": request,
+            "mode": mode,
             "current_document": current_document,
             "source_manifest": source_manifest,
             "available_capabilities": catalog,

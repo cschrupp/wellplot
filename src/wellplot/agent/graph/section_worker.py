@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from ...capabilities import CapabilityRegistry
-from .models import CompiledArtifact, SectionPlan
+from .models import CompilationMode, CompiledArtifact, SectionPlan
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -33,6 +33,7 @@ class SectionCompiler:
         plan: SectionPlan,
         current_document: dict[str, object],
         source_manifest: dict[str, object],
+        mode: CompilationMode = "reconstruct",
     ) -> CompiledArtifact:
         """Compile the requested section without mutating shared document state."""
         section_spec = self.registry.get(plan.capability_id)
@@ -41,15 +42,23 @@ class SectionCompiler:
 
         selected_ids = [plan.capability_id, *(item.capability_id for item in plan.components)]
         worker_catalog = self.registry.worker_catalog(selected_ids)
+        revision_instruction = (
+            " In revision mode, this selected section is the only section you may compile; omit "
+            "unchanged fields so deterministic reconciliation preserves them."
+            if mode == "revise"
+            else ""
+        )
         instructions = (
             "You are one isolated Wellplot section compiler. Compile only the supplied section "
             "plan. Do not modify other sections or report-wide settings. Use only the supplied "
             "capabilities and source information. Return the typed artifact required by the "
             "section capability. Do not emit MCP calls or an operation sequence. The result is "
-            "desired state; Wellplot's deterministic compiler/executor will decide how to reach it."
+            "desired state; Wellplot's deterministic compiler/executor will decide how to "
+            "reach it." + revision_instruction
         )
         context = {
             "original_request": request,
+            "mode": mode,
             "section_plan": plan.model_dump(mode="json"),
             "current_document": current_document,
             "source_manifest": source_manifest,

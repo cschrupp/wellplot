@@ -9,9 +9,11 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+CompilationMode: TypeAlias = Literal["reconstruct", "revise"]
 
 
 class SemanticComponentPlan(BaseModel):

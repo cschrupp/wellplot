@@ -13,7 +13,7 @@ import json
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
-from .models import CompiledArtifact, ReconstructionPlan
+from .models import CompilationMode, CompiledArtifact, ReconstructionPlan
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -31,16 +31,24 @@ class ReportCompiler:
         plan: ReconstructionPlan,
         current_document: dict[str, object],
         source_manifest: dict[str, object],
+        mode: CompilationMode = "reconstruct",
     ) -> CompiledArtifact:
         """Compile only report-wide requirements from one semantic plan."""
         spec = self.registry.get(plan.report_capability_id)
         if spec.category != "report":
             raise ValueError(f"{plan.report_capability_id!r} is not a report capability.")
+        revision_instruction = (
+            " In revision mode, omit unchanged report-wide values so their current state is "
+            "preserved."
+            if mode == "revise"
+            else ""
+        )
         context = {
             "original_request": request,
             "report_goal": plan.report_goal,
             "report_values": plan.report_values,
             "postconditions": plan.postconditions,
+            "mode": mode,
             "current_document": current_document,
             "source_manifest": source_manifest,
             "capability": spec.worker_descriptor(),
@@ -49,7 +57,8 @@ class ReportCompiler:
             instructions=(
                 "You are the report-wide compiler. Compile only report/header/page/depth/output/"
                 "remarks/tail requirements. Do not author section-local tracks, bindings, fills, "
-                "or annotations. Return desired state, not an operation sequence or MCP calls."
+                "or annotations. Return desired state, not an operation sequence or MCP calls. "
+                + revision_instruction
             ),
             user_message=(
                 "Compile the report-wide portion of the reconstruction.\n\nContext:\n"

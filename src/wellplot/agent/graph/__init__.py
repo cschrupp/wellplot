@@ -12,6 +12,7 @@ from .finalization import (
     finalize_document_intent,
 )
 from .models import (
+    CompilationMode,
     CompiledArtifact,
     ReconstructionDiagnostic,
     ReconstructionPlan,
@@ -22,6 +23,7 @@ from .models import (
 from .planner import ReconstructionPlanner
 from .provider_adapter import ExistingProviderStructuredAdapter, StructuredModelProtocol
 from .report_worker import ReportCompiler
+from .revision import RevisionCompilationResult, compile_document_revision
 from .section_worker import SectionCompiler
 from .verifier import (
     DocumentIntentVerificationResult,
@@ -32,6 +34,7 @@ from .workflow import ReconstructionGraphDependencies, build_compile_graph
 
 __all__ = [
     "CompiledArtifact",
+    "CompilationMode",
     "CanonicalDocumentRenderer",
     "DocumentFinalizationResult",
     "DocumentIntentVerificationResult",
@@ -44,6 +47,7 @@ __all__ = [
     "ReconstructionGraphDependencies",
     "ReconstructionPlan",
     "ReconstructionPlanner",
+    "RevisionCompilationResult",
     "ReportCompiler",
     "SectionCompiler",
     "SectionPlan",
@@ -54,6 +58,7 @@ __all__ = [
     "VisualReviewRequest",
     "VisualReviewResult",
     "build_compile_graph",
+    "compile_document_revision",
     "execute_document_intent",
     "finalize_document_intent",
     "verify_document_intent",
