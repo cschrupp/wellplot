@@ -325,6 +325,7 @@ def test_reconciler_handles_arbitrary_new_sections_and_order_moves() -> None:
                     }
                 ],
             },
+            {"section_id": "repeat", "tracks": []},
             {"section_id": "main", "tracks": []},
         ]
     )

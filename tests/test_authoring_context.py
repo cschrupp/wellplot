@@ -191,6 +191,34 @@ def test_header_alias_resolves_to_existing_stable_slot() -> None:
     assert result.resolved_values["header.general_fields[general.well].value.value"] == "FORGE-1"
 
 
+def test_header_alias_preserves_existing_slot_presentation() -> None:
+    """A semantic header alias must not rename the template field it resolves."""
+    intent = AuthoringDocumentIntent(
+        header={
+            "general_fields": [
+                AuthoringHeaderFieldIntent(
+                    slot_id="company_name",
+                    key="company_name",
+                    label="Company Name",
+                    value={"value": "University of Utah"},
+                )
+            ]
+        }
+    )
+    result = resolve_authoring_context(
+        intent,
+        existing=_document(),
+        header_aliases={"company_name": ["general.well"]},
+    )
+
+    field = result.resolved_intent.header.general_fields[0]
+    assert result.ready is True
+    assert field.slot_id == "general.well"
+    assert "key" not in field.model_fields_set
+    assert "label" not in field.model_fields_set
+    assert field.value.value == "University of Utah"
+
+
 def test_channel_alias_resolves_and_preserves_explicit_curve_style() -> None:
     """Resolve a semantic channel alias while retaining explicit presentation values."""
     intent = AuthoringDocumentIntent(

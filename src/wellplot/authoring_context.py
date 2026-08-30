@@ -740,6 +740,12 @@ def _resolve_header_aliases(
             requested_slot_id = item.slot_id
             if requested_slot_id != resolved_slot:
                 item.slot_id = resolved_slot
+                # Alias resolution identifies a pre-existing template slot.
+                # Its key and label belong to that template, not to the
+                # semantic alias used by the request.
+                item.__pydantic_fields_set__.difference_update(
+                    {"key", "label", "aliases", "layout_path"}
+                )
             decisions.append(
                 AuthoringResolutionDecision(
                     path=f"{item_path}.slot_id",

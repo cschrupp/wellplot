@@ -799,7 +799,8 @@ def _add_fill_operation(
                 operation.operation_id
                 for operation in builder.operations[AuthoringOperationPhase.BINDINGS]
                 if operation.section_id == section_id and operation.track_id == track_id
-            ] or ([track_dependency] if track_dependency else []),
+            ]
+            or ([track_dependency] if track_dependency else []),
         )
         return
     patch = _patch_for_model(
@@ -1062,11 +1063,22 @@ def _add_order_operations(
     parent_dependencies: Mapping[str, str],
     unchanged: list[str],
 ) -> None:
-    """Plan stable ordering changes after create operations."""
-    for desired_index, object_id in enumerate(desired_ids):
-        if object_id not in current_ids:
-            continue
-        current_index = list(current_ids).index(object_id)
+    """Plan ordering changes among the explicitly requested existing objects.
+
+    A partial desired-state collection does not define absolute positions for
+    siblings it omits. New objects are created by their own operations; this
+    function only reorders already-persisted objects when their relative order
+    conflicts with the explicit request.
+    """
+    current = list(current_ids)
+    desired_existing = [object_id for object_id in desired_ids if object_id in current]
+    current_requested = [object_id for object_id in current if object_id in desired_existing]
+    if current_requested == desired_existing:
+        return
+
+    requested_positions = sorted(current.index(object_id) for object_id in desired_existing)
+    for object_id, desired_index in zip(desired_existing, requested_positions, strict=True):
+        current_index = current.index(object_id)
         if current_index == desired_index:
             continue
         builder.add(
@@ -1079,6 +1091,8 @@ def _add_order_operations(
             depends_on=[parent_dependencies[object_id]] if object_id in parent_dependencies else [],
             reason=f"Place {object_kind} {object_id!r} at the requested ordered position.",
         )
+        current.pop(current_index)
+        current.insert(desired_index, object_id)
 
 
 def _process_remark(

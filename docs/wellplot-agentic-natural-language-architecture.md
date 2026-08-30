@@ -951,6 +951,14 @@ Build plan-to-document postcondition checks.
 
 **Gate:** intentionally damaged final documents fail the verifier; baseline passes.
 
+**Implemented:** `wellplot.agent.graph.verify_document_intent(...)` is a
+read-only semantic verifier. It resolves the original intent against the final
+canonical document and reuses the canonical reconciler as the only comparison
+authority. A result passes only when resolution is ready and reconciliation
+requires no operations. Unresolved context and each remaining operation are
+returned as structured verification issues; the verifier does not mutate the
+document, call MCP, invoke a provider, persist files, or render output.
+
 ---
 
 ### LG-7 - Final render and visual QA
