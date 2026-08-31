@@ -44,7 +44,6 @@ Not implemented yet:
 
 - production canonical-render adapter and vision-provider adapter;
 - typed visual-correction repair routing;
-- high-level MCP wrapper;
 - deletion of legacy orchestration paths.
 
 The direct executor does not call MCP, a provider, filesystem persistence, or
