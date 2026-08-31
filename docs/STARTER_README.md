@@ -35,6 +35,8 @@ Implemented conceptually/code-wise:
     back the canonical document when final semantic verification fails.
 14. transactional reconstruction facade that compiles, executes, verifies, and
     rolls back the canonical document when final semantic verification fails.
+15. deterministic source-context assembly from a canonical logfile and its
+    declared LAS/DLIS section sources.
 
 Not implemented yet:
 
@@ -64,7 +66,8 @@ uv run --extra graph pytest -q \
   tests/test_graph_finalization.py \
   tests/test_graph_revision.py \
   tests/test_graph_revision_execution.py \
-  tests/test_graph_reconstruction_execution.py
+  tests/test_graph_reconstruction_execution.py \
+  tests/test_graph_source_context.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -88,3 +91,6 @@ it restores the pre-revision canonical snapshot if final verification fails.
 The reconstruction execution facade provides the equivalent transaction for a
 full graph-compiled request. This is the application boundary required before a
 high-level MCP adapter can be added without duplicating execution logic.
+Source-context assembly loads the canonical starter document and all declared
+section data sources before compilation. It exposes JSON-safe graph facts and
+typed channel candidates, without depending on MCP, a provider, or persistence.

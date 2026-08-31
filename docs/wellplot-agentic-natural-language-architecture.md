@@ -1013,6 +1013,13 @@ the starting document if final verification fails. This keeps a future
 high-level MCP adapter thin: it can invoke one application operation rather
 than recreate compiler or transaction behavior.
 
+**Implemented (LG-9 source context):** `build_graph_authoring_context(...)`
+loads a logfile and all of its declared section sources through the existing
+canonical logfile APIs. It produces a JSON-safe source manifest for graph
+workers plus typed channel candidates for execution and verification. The
+boundary enforces the supplied application root and has no MCP, provider,
+renderer, or persistence dependency.
+
 ---
 
 ### LG-9 - High-level MCP adapter
