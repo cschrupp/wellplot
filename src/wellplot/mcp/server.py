@@ -20,6 +20,8 @@ from .stable import register_stable_tools
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP, Image
 
+    from .agentic import GraphAuthoringMcpOperations
+
 
 def _load_mcp_runtime() -> tuple[type[FastMCP], type[Image], type[object]]:
     try:
@@ -174,8 +176,12 @@ def _register_prompts(mcp: FastMCP) -> None:
         )
 
 
-def create_mcp_server(root: str | Path | None = None) -> FastMCP:
-    """Create the stable 16-responsibility wellplot MCP server."""
+def create_mcp_server(
+    root: str | Path | None = None,
+    *,
+    agentic_operations: GraphAuthoringMcpOperations | None = None,
+) -> FastMCP:
+    """Create the stable server with optional injected graph-authoring tools."""
     FastMCP, Image, ToolAnnotations = _load_mcp_runtime()
     server_root = service.resolve_server_root(root)
     mcp = FastMCP(
@@ -192,6 +198,12 @@ def create_mcp_server(root: str | Path | None = None) -> FastMCP:
         image_factory=lambda data: Image(data=data, format="png"),
         annotation_factory=lambda values: ToolAnnotations(**dict(values)),
     )
+    if agentic_operations is not None:
+        if agentic_operations.root != server_root:
+            raise ValueError("agentic_operations must use the same resolved server root.")
+        from .agentic import register_agentic_tools
+
+        register_agentic_tools(mcp, operations=agentic_operations)
     _register_resources(mcp)
     _register_prompts(mcp)
     return mcp

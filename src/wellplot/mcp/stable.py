@@ -166,10 +166,10 @@ def _persist_authoring(
     authoring: AuthoringService,
     root: str | Path,
 ) -> None:
-    service._persist_validated_logfile_mapping(
-        service.authoring_document_to_logfile_mapping(authoring.document),
+    service.persist_authoring_document(
+        authoring.document,
         logfile_path=logfile_path,
-        root=service.resolve_server_root(root),
+        root=root,
     )
 
 
@@ -944,9 +944,7 @@ def _remarks_mutation(arguments: Mapping[str, object], root: str | Path) -> obje
             raise TemplateValidationError(_REMARK_CONTENT_ERROR)
         text = payload.get("text")
         lines = payload.get("lines")
-        if not (isinstance(text, str) and text) and not (
-            isinstance(lines, list) and lines
-        ):
+        if not (isinstance(text, str) and text) and not (isinstance(lines, list) and lines):
             raise TemplateValidationError(_REMARK_CONTENT_ERROR)
         try:
             remark = AuthoringRemarkSpec.model_validate(dict(payload))
@@ -1825,30 +1823,21 @@ def _tool_function(
             validated = profile.input_model.model_validate(kwargs)
         except ValidationError as exc:
             depth_range_error = any(
-                error.get("loc", ())
-                and error["loc"][0] == "depth_range"
-                for error in exc.errors()
+                error.get("loc", ()) and error["loc"][0] == "depth_range" for error in exc.errors()
             )
             if profile.name in {"edit_section", "edit_report_settings"} and depth_range_error:
-                raise TemplateValidationError(
-                    f"{profile.name} {_DEPTH_RANGE_ERROR}"
-                ) from exc
+                raise TemplateValidationError(f"{profile.name} {_DEPTH_RANGE_ERROR}") from exc
             if profile.name == "edit_remarks" and kwargs.get("operation") == "add":
                 payload = kwargs.get("remark")
                 text = payload.get("text") if isinstance(payload, Mapping) else None
                 lines = payload.get("lines") if isinstance(payload, Mapping) else None
-                if not (isinstance(text, str) and text) and not (
-                    isinstance(lines, list) and lines
-                ):
+                if not (isinstance(text, str) and text) and not (isinstance(lines, list) and lines):
                     raise TemplateValidationError(_REMARK_CONTENT_ERROR) from exc
                 detail = exc.errors()[0].get("msg", "invalid remark fields")
                 raise TemplateValidationError(
-                    "edit_remarks(operation='add') received invalid remark fields: "
-                    f"{detail}."
+                    f"edit_remarks(operation='add') received invalid remark fields: {detail}."
                 ) from exc
-            raise TemplateValidationError(
-                _tool_input_validation_error(profile.name, exc)
-            ) from exc
+            raise TemplateValidationError(_tool_input_validation_error(profile.name, exc)) from exc
         arguments = validated.model_dump(mode="python", exclude_none=True)
         return callback(arguments)
 

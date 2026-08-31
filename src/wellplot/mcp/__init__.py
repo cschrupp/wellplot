@@ -28,12 +28,18 @@ if TYPE_CHECKING:
 
     from mcp.server.fastmcp import FastMCP
 
+    from .agentic import GraphAuthoringMcpOperations
 
-def create_mcp_server(root: str | Path | None = None) -> FastMCP:
+
+def create_mcp_server(
+    root: str | Path | None = None,
+    *,
+    agentic_operations: GraphAuthoringMcpOperations | None = None,
+) -> FastMCP:
     """Create and configure the wellplot MCP server."""
     from .server import create_mcp_server as _create_mcp_server
 
-    return _create_mcp_server(root)
+    return _create_mcp_server(root, agentic_operations=agentic_operations)
 
 
 __all__ = ["create_mcp_server"]

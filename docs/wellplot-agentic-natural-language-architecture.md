@@ -1020,6 +1020,14 @@ workers plus typed channel candidates for execution and verification. The
 boundary enforces the supplied application root and has no MCP, provider,
 renderer, or persistence dependency.
 
+**Implemented (LG-9 MCP edge):** `GraphAuthoringMcpOperations` registers
+`build_plot_from_request` and `revise_plot_from_request` only when a hosting
+application injects a configured compiled graph at server startup. Each request
+rebuilds deterministic source context, runs the corresponding graph
+transaction, and persists only a successful semantically verified document.
+The default stable MCP server remains unchanged, and neither tool accepts
+provider credentials or internal graph context from MCP clients.
+
 ---
 
 ### LG-9 - High-level MCP adapter

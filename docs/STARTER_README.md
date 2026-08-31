@@ -37,6 +37,8 @@ Implemented conceptually/code-wise:
     rolls back the canonical document when final semantic verification fails.
 15. deterministic source-context assembly from a canonical logfile and its
     declared LAS/DLIS section sources.
+16. opt-in high-level MCP operations that invoke injected graph dependencies
+    and persist only verified canonical documents.
 
 Not implemented yet:
 
@@ -67,7 +69,8 @@ uv run --extra graph pytest -q \
   tests/test_graph_revision.py \
   tests/test_graph_revision_execution.py \
   tests/test_graph_reconstruction_execution.py \
-  tests/test_graph_source_context.py
+  tests/test_graph_source_context.py \
+  tests/test_mcp_agentic.py
 ```
 
 The CBL test uses a frozen prompt and structured-output fixtures. It records the
@@ -94,3 +97,7 @@ high-level MCP adapter can be added without duplicating execution logic.
 Source-context assembly loads the canonical starter document and all declared
 section data sources before compilation. It exposes JSON-safe graph facts and
 typed channel candidates, without depending on MCP, a provider, or persistence.
+The high-level MCP operations are opt-in server registrations. Their hosting
+application injects a configured compiled graph at startup; clients provide
+only a logfile path and natural-language request, never provider credentials or
+internal source context.

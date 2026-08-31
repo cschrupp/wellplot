@@ -1623,8 +1623,16 @@ def _legacy_to_authoring(
     heading = _mapping(layout.get("heading", {}), context="document.layout.heading")
     header = _header_from_legacy(heading)
     tail_data = _mapping(layout.get("tail", {}), context="document.layout.tail")
-    title = _as_text(heading.get("title"), context="heading.title")
-    subtitle = _as_text(heading.get("subtitle"), context="heading.subtitle")
+    legacy_header = _mapping(document.get("header", {}), context="document.header")
+    title = _as_text(legacy_header.get("title"), context="document.header.title")
+    if title is None:
+        title = _as_text(heading.get("title"), context="heading.title")
+    subtitle = _as_text(
+        legacy_header.get("subtitle"),
+        context="document.header.subtitle",
+    )
+    if subtitle is None:
+        subtitle = _as_text(heading.get("subtitle"), context="heading.subtitle")
     extension = {
         "compatibility": {
             "format": "wellplot-logfile-v1",
@@ -1768,9 +1776,7 @@ def authoring_document_to_logfile_mapping(
         elif "depth_range" in section_payload:
             section_payload.pop("depth_range")
         if section.data_source is not None:
-            section_payload["data"] = section.data_source.model_dump(
-                mode="json", exclude_none=True
-            )
+            section_payload["data"] = section.data_source.model_dump(mode="json", exclude_none=True)
         rendered_sections.append(section_payload)
         for track in section.tracks:
             for binding in getattr(track, "bindings", ()):
@@ -1814,9 +1820,7 @@ def authoring_document_to_logfile_mapping(
     canonical["name"] = document.name
     render = canonical.get("render")
     if isinstance(render, Mapping):
-        canonical["render"] = {
-            key: value for key, value in render.items() if value is not None
-        }
+        canonical["render"] = {key: value for key, value in render.items() if value is not None}
     return canonical
 
 
@@ -2014,9 +2018,7 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
                 if document.header is not None
                 else deepcopy(layout.get("heading", {}))
             )
-            layout_sections["remarks"] = [
-                _remark_to_legacy(remark) for remark in document.remarks
-            ]
+            layout_sections["remarks"] = [_remark_to_legacy(remark) for remark in document.remarks]
             layout_sections["log_sections"] = deepcopy(layout.get("log_sections", []))
             legacy_tail = layout.get("tail", {})
             tail_payload = dict(legacy_tail) if isinstance(legacy_tail, Mapping) else {}
@@ -2035,9 +2037,7 @@ def authoring_document_to_render(document: AuthoringDocumentSpec) -> LogDocument
     )
     if document.header is not None:
         layout_sections["heading"] = _header_to_legacy(document.header)
-    layout_sections["remarks"] = [
-        _remark_to_legacy(remark) for remark in document.remarks
-    ]
+    layout_sections["remarks"] = [_remark_to_legacy(remark) for remark in document.remarks]
     layout_sections["log_sections"] = [
         {
             "id": section.id,

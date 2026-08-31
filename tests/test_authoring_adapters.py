@@ -15,6 +15,7 @@ from wellplot import (
     load_authoring_document,
     load_authoring_document_text,
 )
+from wellplot.authoring import authoring_document_to_logfile_mapping
 from wellplot.errors import TemplateValidationError
 from wellplot.model.authoring import ArrayTrackSpec, NormalTrackSpec
 
@@ -257,6 +258,26 @@ def test_canonical_mapping_round_trips() -> None:
 
     assert normalized["version"] == 1
     assert restored == document
+
+
+def test_logfile_projection_round_trips_document_title_and_subtitle() -> None:
+    """Preserve root document titles through the legacy logfile envelope."""
+    document = authoring_document_from_mapping(_legacy_mapping()).model_copy(
+        update={
+            "title": "Projected document title",
+            "subtitle": "Projected document subtitle",
+        }
+    )
+
+    projected = authoring_document_to_logfile_mapping(document)
+    restored = authoring_document_from_mapping(projected)
+
+    assert projected["document"]["header"] == {
+        "title": "Projected document title",
+        "subtitle": "Projected document subtitle",
+    }
+    assert restored.title == "Projected document title"
+    assert restored.subtitle == "Projected document subtitle"
 
 
 def test_canonical_yaml_loads_without_legacy_logfile_validation() -> None:

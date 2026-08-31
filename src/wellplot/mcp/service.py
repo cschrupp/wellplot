@@ -113,6 +113,7 @@ from ..model.authoring import (
     AuthoringCurveFillBaselineSpec,
     AuthoringCurveFillCrossoverSpec,
     AuthoringCurveFillKind,
+    AuthoringDocumentSpec,
     AuthoringRasterSampleAxisSpec,
     AuthoringRemarkSpec,
     AuthoringStyle,
@@ -1549,6 +1550,28 @@ def _persist_validated_logfile_mapping(
         allowed_root=root,
     )
     return persisted_spec
+
+
+def persist_authoring_document(
+    document: AuthoringDocumentSpec,
+    *,
+    logfile_path: str | Path,
+    root: str | Path | None = None,
+    validation_level: str = "structural",
+) -> LogFileSpec:
+    """Persist one canonical authoring document through the logfile projection."""
+    server_root = resolve_server_root(root)
+    resolved_logfile = _resolve_user_path(
+        logfile_path,
+        root=server_root,
+        context="logfile_path",
+    )
+    return _persist_validated_logfile_mapping(
+        authoring_document_to_logfile_mapping(document),
+        logfile_path=resolved_logfile,
+        root=server_root,
+        validation_level=validation_level,
+    )
 
 
 def _renumber_section_track_positions(tracks: list[dict[str, object]]) -> None:
