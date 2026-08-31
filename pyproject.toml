@@ -91,6 +91,7 @@ all = [
 [project.scripts]
 wellplot = "wellplot.cli:main"
 wellplot-mcp = "wellplot.mcp.server:main"
+wellplot-agentic-mcp = "wellplot.mcp.agentic_server:main"
 
 [dependency-groups]
 dev = [

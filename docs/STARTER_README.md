@@ -100,3 +100,23 @@ The high-level MCP operations are opt-in server registrations. Their hosting
 application injects a configured compiled graph at startup; clients provide
 only a logfile path and natural-language request, never provider credentials or
 internal source context.
+
+## Agentic MCP Host
+
+The stable `wellplot-mcp` entry point remains deterministic and provider-free.
+Use the separate `wellplot-agentic-mcp` entry point only for graph-compiled
+natural-language requests. It requires both optional dependencies:
+
+```bash
+uv sync --extra agent --extra graph
+export WELLPLOT_AGENTIC_PROVIDER=openai_compat
+export WELLPLOT_AGENTIC_MODEL='provider/model-name'
+export WELLPLOT_AGENTIC_BASE_URL='https://provider.example/v1'
+export WELLPLOT_AGENTIC_API_KEY='...'
+wellplot-agentic-mcp
+```
+
+`WELLPLOT_AGENTIC_SERVER_ROOT` optionally fixes the allowed project root, and
+`WELLPLOT_AGENTIC_TIMEOUT` configures the provider request timeout in seconds.
+Credentials are process configuration only; they are never accepted by the MCP
+tools or written to the logfile.

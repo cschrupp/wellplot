@@ -1025,8 +1025,9 @@ renderer, or persistence dependency.
 application injects a configured compiled graph at server startup. Each request
 rebuilds deterministic source context, runs the corresponding graph
 transaction, and persists only a successful semantically verified document.
-The default stable MCP server remains unchanged, and neither tool accepts
-provider credentials or internal graph context from MCP clients.
+`wellplot-agentic-mcp` is the explicit provider-backed stdio composition root;
+the default stable MCP server remains unchanged. Neither high-level tool
+accepts provider credentials or internal graph context from MCP clients.
 
 ---
 
