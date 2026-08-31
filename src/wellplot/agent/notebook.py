@@ -26,6 +26,7 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from textwrap import dedent
+from typing import TYPE_CHECKING
 
 import yaml
 
@@ -34,7 +35,12 @@ from ..mcp.header_archetypes import (
     default_service_title_for_starter_kind,
     header_archetype_heading,
 )
+from ..mcp.service import create_logfile_draft
 from .core import AuthoringResult, AuthoringSession
+from .mcp import AGENTIC_MCP_SERVER_MODULE, LocalStdioMcpRuntime
+
+if TYPE_CHECKING:
+    from ..mcp.agentic import GraphAuthoringToolResult
 
 OPENAI_PROVIDER_NAME = "openai"
 OPENAI_COMPAT_PROVIDER_NAME = "openai_compat"
@@ -423,6 +429,30 @@ class ProjectSession:
             self.render_output_path = render_output_path
         return self
 
+    def create_draft_from_starter(
+        self,
+        *,
+        source_logfile_path: str | Path,
+        output_logfile_path: str | Path,
+        overwrite: bool = False,
+    ) -> Path:
+        """Materialize one normalized draft from a staged starter logfile."""
+        source = self._resolve_server_file(
+            source_logfile_path,
+            field_name="source_logfile_path",
+        )
+        output = self._resolve_project_file(
+            output_logfile_path,
+            field_name="output_logfile_path",
+        )
+        result = create_logfile_draft(
+            str(output),
+            source_logfile_path=str(source),
+            overwrite=overwrite,
+            root=self.paths.server_root,
+        )
+        return Path(result.output_path)
+
     def _require_default_path(
         self,
         path: str | Path | None,
@@ -777,6 +807,97 @@ class ProjectSession:
         )
 
 
+@dataclass(frozen=True)
+class AgenticMcpClient:
+    """Notebook client for the explicit graph-authoring MCP server.
+
+    It accepts only a logfile path and request at the MCP boundary. Provider
+    configuration is supplied to the local child process, never as tool input.
+    """
+
+    runtime: LocalStdioMcpRuntime
+
+    def _relative_server_path(self, path: str | Path) -> str:
+        """Render one server-rooted path for MCP tool arguments."""
+        root = Path(self.runtime.server_root).resolve()
+        raw_path = Path(path).expanduser()
+        resolved = raw_path.resolve() if raw_path.is_absolute() else (root / raw_path).resolve()
+        try:
+            return resolved.relative_to(root).as_posix()
+        except ValueError:
+            return str(resolved)
+
+    async def _call(self, name: str, arguments: dict[str, object]) -> dict[str, object]:
+        """Call one agentic-server tool and require structured success output."""
+        async with self.runtime.open_session() as session:
+            result = await session.call_tool(name, arguments)
+        payload = self.runtime.tool_result_payload(result)
+        if payload.get("is_error") is True:
+            error = payload.get("error")
+            detail = error if isinstance(error, str) and error else repr(payload)
+            raise RuntimeError(f"{name} failed: {detail}")
+        structured = payload.get("structured")
+        if not isinstance(structured, dict):
+            raise RuntimeError(f"{name} returned no structured MCP result.")
+        return structured
+
+    async def build(
+        self,
+        *,
+        request: str,
+        logfile_path: str | Path,
+    ) -> GraphAuthoringToolResult:
+        """Compile and persist one full graph-authoring request."""
+        from ..mcp.agentic import GraphAuthoringToolResult
+
+        payload = await self._call(
+            "build_plot_from_request",
+            {
+                "logfile_path": self._relative_server_path(logfile_path),
+                "request": ProjectSession._normalize_text(request),
+            },
+        )
+        return GraphAuthoringToolResult.model_validate(payload)
+
+    async def revise(
+        self,
+        *,
+        feedback: str,
+        logfile_path: str | Path,
+    ) -> GraphAuthoringToolResult:
+        """Compile and persist one scoped graph-authoring revision."""
+        from ..mcp.agentic import GraphAuthoringToolResult
+
+        payload = await self._call(
+            "revise_plot_from_request",
+            {
+                "logfile_path": self._relative_server_path(logfile_path),
+                "request": ProjectSession._normalize_text(feedback),
+            },
+        )
+        return GraphAuthoringToolResult.model_validate(payload)
+
+    async def render_logfile_to_file(
+        self,
+        *,
+        logfile_path: str | Path,
+        output_path: str | Path,
+        overwrite: bool = False,
+    ) -> dict[str, object]:
+        """Render one accepted draft through the same explicit MCP server."""
+        payload = await self._call(
+            "render_logfile",
+            {
+                "logfile_path": self._relative_server_path(logfile_path),
+                "output_path": self._relative_server_path(output_path),
+                "overwrite": overwrite,
+            },
+        )
+        if "output_path" not in payload and "artifact" in payload:
+            payload["output_path"] = payload["artifact"]
+        return payload
+
+
 def _first_env_value(*names: str) -> str | None:
     """Return the first non-empty environment value among the given names."""
     for name in names:
@@ -860,6 +981,46 @@ def create_project_session(
     )
 
 
+def create_agentic_mcp_client(
+    *,
+    server_root: str | Path,
+    provider: str = "openai",
+    model: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    timeout: float | None = None,
+) -> AgenticMcpClient:
+    """Create a notebook client for the explicit graph-authoring MCP server."""
+    resolved_provider, resolved_model, resolved_base_url = _resolve_provider_defaults(
+        provider=provider,
+        model=model,
+        base_url=base_url,
+    )
+    if resolved_provider == OPENAI_COMPAT_PROVIDER_NAME and not resolved_base_url:
+        raise ValueError("provider='openai_compat' requires a non-empty base_url.")
+    if timeout is not None and timeout <= 0:
+        raise ValueError("Agentic MCP timeout must be greater than zero seconds.")
+
+    environment = {
+        "WELLPLOT_AGENTIC_PROVIDER": resolved_provider,
+        "WELLPLOT_AGENTIC_MODEL": resolved_model,
+    }
+    if api_key is not None and api_key.strip():
+        environment["WELLPLOT_AGENTIC_API_KEY"] = api_key.strip()
+    if resolved_base_url is not None:
+        environment["WELLPLOT_AGENTIC_BASE_URL"] = resolved_base_url
+    if timeout is not None:
+        environment["WELLPLOT_AGENTIC_TIMEOUT"] = str(timeout)
+
+    return AgenticMcpClient(
+        runtime=LocalStdioMcpRuntime(
+            server_root=server_root,
+            server_module=AGENTIC_MCP_SERVER_MODULE,
+            server_environment=environment,
+        )
+    )
+
+
 def relative_path(path: str | Path, *, root: str | Path) -> str:
     """Return one path rendered relative to a configured root when possible."""
     resolved_root = Path(root).resolve()
@@ -870,6 +1031,23 @@ def relative_path(path: str | Path, *, root: str | Path) -> str:
         return resolved_path.relative_to(resolved_root).as_posix()
     except ValueError:
         return str(resolved_path)
+
+
+def display_agentic_result(title: str, result: GraphAuthoringToolResult) -> None:
+    """Display compact evidence from one graph-authoring MCP operation."""
+    print(title)
+    print("Draft:", result.logfile_path)
+    print("Mode:", result.mode)
+    print("Success:", result.success)
+    print("Changed:", result.changed)
+    if result.rolled_back:
+        print("Rolled back:", True)
+    if result.plan_summary:
+        print("Plan:", result.plan_summary)
+    if result.errors:
+        print("Errors:")
+        for error in result.errors:
+            print(" -", error)
 
 
 def display_authoring_result(

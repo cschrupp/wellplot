@@ -3418,6 +3418,16 @@ class AgentTests(unittest.TestCase):
                 starter.template_path,
                 session.paths.path("drafts", "base.template.yaml"),
             )
+            draft = session.create_draft_from_starter(
+                source_logfile_path=starter.logfile_path,
+                output_logfile_path="drafts/agent_open_hole_draft.log.yaml",
+                overwrite=True,
+            )
+            self.assertEqual(
+                draft,
+                session.paths.path("drafts", "agent_open_hole_draft.log.yaml"),
+            )
+            self.assertTrue(draft.exists())
             logfile_payload = yaml.safe_load(starter.logfile_yaml)
             self.assertEqual(
                 logfile_payload["render"]["output_path"],

@@ -118,5 +118,10 @@ wellplot-agentic-mcp
 
 `WELLPLOT_AGENTIC_SERVER_ROOT` optionally fixes the allowed project root, and
 `WELLPLOT_AGENTIC_TIMEOUT` configures the provider request timeout in seconds.
+
+The CBL notebook stages its starter and source files with `ProjectSession`, then
+uses `create_agentic_mcp_client` for graph-backed build, preview, and render
+calls. Do not route that one-shot reconstruction through `session.run`; the
+legacy session is retained there only for deterministic project setup.
 Credentials are process configuration only; they are never accepted by the MCP
 tools or written to the logfile.

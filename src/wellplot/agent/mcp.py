@@ -24,8 +24,9 @@ from __future__ import annotations
 import base64
 import os
 import sys
+from collections.abc import Mapping
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -37,19 +38,24 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
 
 
-# def _server_command() -> tuple[str, list[str]]:
-#     """Return the preferred command for launching the local stdio MCP server."""
-#     sibling_entry_point = Path(sys.executable).with_name("wellplot-mcp")
-#     if sibling_entry_point.exists():
-#         return str(sibling_entry_point), []
-#     return sys.executable, ["-m", "wellplot.mcp.server"]
-
-def _server_command() -> tuple[str, list[str]]:
-    """Launch the MCP server with the same Python interpreter as the host."""
-    return sys.executable, ["-m", "wellplot.mcp.server"]
+STABLE_MCP_SERVER_MODULE = "wellplot.mcp.server"
+AGENTIC_MCP_SERVER_MODULE = "wellplot.mcp.agentic_server"
+_SUPPORTED_SERVER_MODULES = frozenset(
+    {
+        STABLE_MCP_SERVER_MODULE,
+        AGENTIC_MCP_SERVER_MODULE,
+    }
+)
 
 
-def _server_env() -> dict[str, str]:
+def _server_command(server_module: str) -> tuple[str, list[str]]:
+    """Launch one supported local MCP server with the host interpreter."""
+    if server_module not in _SUPPORTED_SERVER_MODULES:
+        raise ValueError(f"Unsupported local MCP server module: {server_module!r}.")
+    return sys.executable, ["-m", server_module]
+
+
+def _server_env(extra_environment: Mapping[str, str]) -> dict[str, str]:
     """Build one child environment that preserves the current import resolution."""
     env = dict(os.environ)
     pythonpath_entries: list[str] = []
@@ -69,6 +75,7 @@ def _server_env() -> dict[str, str]:
                 pythonpath_entries.append(entry)
     if pythonpath_entries:
         env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    env.update(extra_environment)
     return env
 
 
@@ -86,26 +93,38 @@ def _load_mcp_runtime() -> tuple[type[object], type[object], object]:
 
 @dataclass(frozen=True)
 class LocalStdioMcpRuntime:
-    """Runtime adapter that launches `wellplot-mcp` over local stdio."""
+    """Runtime adapter that launches one supported local MCP server over stdio."""
 
     server_root: Path | str | None = None
+    server_module: str = STABLE_MCP_SERVER_MODULE
+    server_environment: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Normalize the configured server root into one absolute path."""
+        """Normalize the configured root, entry point, and child environment."""
         root = (
             Path.cwd().resolve() if self.server_root is None else Path(self.server_root).resolve()
         )
+        if self.server_module not in _SUPPORTED_SERVER_MODULES:
+            raise ValueError(f"Unsupported local MCP server module: {self.server_module!r}.")
+        environment: dict[str, str] = {}
+        for key, value in self.server_environment.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError("MCP child environment keys must be non-empty strings.")
+            if not isinstance(value, str):
+                raise ValueError("MCP child environment values must be strings.")
+            environment[key] = value
         object.__setattr__(self, "server_root", root)
+        object.__setattr__(self, "server_environment", environment)
 
     @asynccontextmanager
     async def open_session(self) -> AsyncIterator[object]:
         """Open one MCP client session rooted at the configured local directory."""
         ClientSession, StdioServerParameters, stdio_client = _load_mcp_runtime()
-        command, args = _server_command()
+        command, args = _server_command(self.server_module)
         server = StdioServerParameters(
             command=command,
             args=args,
-            env=_server_env(),
+            env=_server_env(self.server_environment),
             cwd=str(self.server_root),
         )
         async with stdio_client(server) as streams, ClientSession(*streams) as session:

@@ -495,14 +495,14 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
             if cell.get("cell_type") in {"markdown", "code"}
         )
         assert "wellplot.agent" in source
-        assert "display_authoring_result" in source
-        assert "include_phase_previews=True" in source
-        assert "session.run" in source
 
     las_source = "\n".join(
         "".join(cell.get("source", []))
         for cell in json.loads(notebook_paths["las"].read_text(encoding="utf-8")).get("cells", [])
     )
+    assert "display_authoring_result" in las_source
+    assert "include_phase_previews=True" in las_source
+    assert "session.run" in las_source
     assert "create_project_session" in las_source
     assert "bootstrap_starter" in las_source
     assert "Rmf measured:" in las_source
@@ -513,6 +513,17 @@ def test_agent_notebook_gates_are_credential_free_and_structurally_present() -> 
     assert "needs_clarification" in las_source
     assert "detail.rm_measured_temp" not in las_source
     assert "detail.rm_bottom_temp" not in las_source
+
+    cbl_source = "\n".join(
+        "".join(cell.get("source", []))
+        for cell in json.loads(notebook_paths["cbl"].read_text(encoding="utf-8")).get("cells", [])
+    )
+    assert "create_project_session" in cbl_source
+    assert "bootstrap_starter" in cbl_source
+    assert "create_agentic_mcp_client" in cbl_source
+    assert "display_agentic_result" in cbl_source
+    assert "agentic_session.build" in cbl_source
+    assert "await session.run(" not in cbl_source
 
 
 def _recorded_scope_payload(
