@@ -74,7 +74,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "main_pass.depth",
@@ -86,7 +86,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "main_pass.cbl",
@@ -98,7 +98,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "main_pass.vdl",
@@ -110,7 +110,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "main_pass.combo.ECGR_STGC",
@@ -121,9 +121,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.combo"
-            ]
+            "parent_component_id": "main_pass.combo"
           },
           {
             "component_id": "main_pass.combo.TT",
@@ -134,9 +132,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.combo"
-            ]
+            "parent_component_id": "main_pass.combo"
           },
           {
             "component_id": "main_pass.combo.TENS",
@@ -147,9 +143,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.combo"
-            ]
+            "parent_component_id": "main_pass.combo"
           },
           {
             "component_id": "main_pass.combo.MTEM",
@@ -160,9 +154,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.combo"
-            ]
+            "parent_component_id": "main_pass.combo"
           },
           {
             "component_id": "main_pass.depth.STIT",
@@ -173,9 +165,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.depth"
-            ]
+            "parent_component_id": "main_pass.depth"
           },
           {
             "component_id": "main_pass.depth.TDSP",
@@ -186,9 +176,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.depth"
-            ]
+            "parent_component_id": "main_pass.depth"
           },
           {
             "component_id": "main_pass.depth.VSEC",
@@ -199,9 +187,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.depth"
-            ]
+            "parent_component_id": "main_pass.depth"
           },
           {
             "component_id": "main_pass.cbl.CBL.1",
@@ -213,9 +199,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.cbl"
-            ]
+            "parent_component_id": "main_pass.cbl"
           },
           {
             "component_id": "main_pass.cbl.CBL.2",
@@ -227,9 +211,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.cbl"
-            ]
+            "parent_component_id": "main_pass.cbl"
           },
           {
             "component_id": "main_pass.vdl.VDL",
@@ -240,13 +222,10 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "main_pass.vdl"
-            ]
+            "parent_component_id": "main_pass.vdl"
           }
         ],
-        "constraints": [],
-        "depends_on": []
+        "constraints": []
       },
       {
         "section_id": "repeat_pass",
@@ -266,7 +245,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "repeat_pass.depth",
@@ -278,7 +257,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "repeat_pass.cbl",
@@ -290,7 +269,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "repeat_pass.vdl",
@@ -302,7 +281,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": []
+            "parent_component_id": null
           },
           {
             "component_id": "repeat_pass.combo.ECGR_STGC",
@@ -313,9 +292,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.combo"
-            ]
+            "parent_component_id": "repeat_pass.combo"
           },
           {
             "component_id": "repeat_pass.combo.TT",
@@ -326,9 +303,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.combo"
-            ]
+            "parent_component_id": "repeat_pass.combo"
           },
           {
             "component_id": "repeat_pass.combo.TENS",
@@ -339,9 +314,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.combo"
-            ]
+            "parent_component_id": "repeat_pass.combo"
           },
           {
             "component_id": "repeat_pass.combo.MTEM",
@@ -352,9 +325,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.combo"
-            ]
+            "parent_component_id": "repeat_pass.combo"
           },
           {
             "component_id": "repeat_pass.depth.STIT",
@@ -365,9 +336,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.depth"
-            ]
+            "parent_component_id": "repeat_pass.depth"
           },
           {
             "component_id": "repeat_pass.depth.TDSP",
@@ -378,9 +347,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.depth"
-            ]
+            "parent_component_id": "repeat_pass.depth"
           },
           {
             "component_id": "repeat_pass.depth.VSEC",
@@ -391,9 +358,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.depth"
-            ]
+            "parent_component_id": "repeat_pass.depth"
           },
           {
             "component_id": "repeat_pass.cbl.CBL.1",
@@ -405,9 +370,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.cbl"
-            ]
+            "parent_component_id": "repeat_pass.cbl"
           },
           {
             "component_id": "repeat_pass.cbl.CBL.2",
@@ -419,9 +382,7 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.cbl"
-            ]
+            "parent_component_id": "repeat_pass.cbl"
           },
           {
             "component_id": "repeat_pass.vdl.VDL",
@@ -432,13 +393,10 @@
             },
             "source_hints": [],
             "constraints": [],
-            "depends_on": [
-              "repeat_pass.vdl"
-            ]
+            "parent_component_id": "repeat_pass.vdl"
           }
         ],
-        "constraints": [],
-        "depends_on": []
+        "constraints": []
       }
     ],
     "postconditions": [

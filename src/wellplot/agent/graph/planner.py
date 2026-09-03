@@ -55,7 +55,11 @@ class ReconstructionPlanner:
             "Preserve explicit values and constraints exactly. A section is a semantic/layout "
             "isolation boundary, not a tool family. Use components to describe the capabilities "
             "needed inside each section. If a requested capability is unavailable, record it in "
-            "unresolved_requirements rather than inventing one. " + mode_instruction
+            "unresolved_requirements rather than inventing one. Every component must set "
+            "parent_component_id: use null only for a direct child of its section; otherwise "
+            "reference a parent component_id in that same section. This field expresses "
+            "structural ownership, not execution order. In revision mode, include an unchanged "
+            "parent component as context when a changed child needs it. " + mode_instruction
         )
         context = {
             "request": request,
@@ -98,31 +102,20 @@ class ReconstructionPlanner:
                     f"to section {section.section_id!r}."
                 )
 
-            components_by_id: dict[str, str] = {}
+            components_by_id = {}
             for component in section.components:
-                if component.component_id in components_by_id:
-                    raise ValueError(
-                        f"Component id {component.component_id!r} appears more than once "
-                        f"in section {section.section_id!r}."
-                    )
                 self.registry.get(component.capability_id)
-                components_by_id[component.component_id] = component.capability_id
+                components_by_id[component.component_id] = component
 
             for component in section.components:
                 spec = self.registry.get(component.capability_id)
-                parent_capability_ids = {section.capability_id}
-                for dependency_id in component.depends_on:
-                    dependency_capability_id = components_by_id.get(dependency_id)
-                    if dependency_capability_id is None:
-                        raise ValueError(
-                            f"Component {component.component_id!r} in section "
-                            f"{section.section_id!r} depends on unknown component "
-                            f"{dependency_id!r}."
-                        )
-                    parent_capability_ids.add(dependency_capability_id)
-                if spec.allowed_parents and not (parent_capability_ids & set(spec.allowed_parents)):
+                parent_capability_id = section.capability_id
+                if component.parent_component_id is not None:
+                    parent_component = components_by_id[component.parent_component_id]
+                    parent_capability_id = parent_component.capability_id
+                if spec.allowed_parents and parent_capability_id not in spec.allowed_parents:
                     raise ValueError(
-                        f"Capability {spec.capability_id!r} cannot be a component of section "
-                        f"{section.section_id!r} without a parent capability in "
-                        f"{list(spec.allowed_parents)!r}."
+                        f"Capability {spec.capability_id!r} cannot have parent capability "
+                        f"{parent_capability_id!r} in section {section.section_id!r}. "
+                        f"Allowed parents: {list(spec.allowed_parents)!r}."
                     )

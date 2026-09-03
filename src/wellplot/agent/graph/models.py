@@ -32,7 +32,12 @@ class SemanticComponentPlan(BaseModel):
     values: dict[str, Any] = Field(default_factory=dict)
     source_hints: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
-    depends_on: list[str] = Field(default_factory=list)
+    parent_component_id: str | None = Field(
+        description=(
+            "Structural parent component in this section. Use null only when the section "
+            "is the direct parent; otherwise reference a component_id from the same section."
+        )
+    )
 
 
 class SectionPlan(BaseModel):
@@ -46,7 +51,46 @@ class SectionPlan(BaseModel):
     values: dict[str, Any] = Field(default_factory=dict)
     components: list[SemanticComponentPlan] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
-    depends_on: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_component_hierarchy(self) -> SectionPlan:
+        """Require an acyclic local ownership tree for section components."""
+        components_by_id: dict[str, SemanticComponentPlan] = {}
+        for component in self.components:
+            if component.component_id in components_by_id:
+                raise ValueError(
+                    f"Component id {component.component_id!r} appears more than once "
+                    f"in section {self.section_id!r}."
+                )
+            components_by_id[component.component_id] = component
+
+        for component in self.components:
+            parent_id = component.parent_component_id
+            if parent_id is None:
+                continue
+            if parent_id == component.component_id:
+                raise ValueError(
+                    f"Component {component.component_id!r} in section {self.section_id!r} "
+                    "cannot be its own parent."
+                )
+            if parent_id not in components_by_id:
+                raise ValueError(
+                    f"Component {component.component_id!r} in section {self.section_id!r} "
+                    f"references unknown parent component {parent_id!r}."
+                )
+
+        for component in self.components:
+            seen = {component.component_id}
+            parent_id = component.parent_component_id
+            while parent_id is not None:
+                if parent_id in seen:
+                    raise ValueError(
+                        f"Component parent relationship in section {self.section_id!r} "
+                        f"contains a cycle at {parent_id!r}."
+                    )
+                seen.add(parent_id)
+                parent_id = components_by_id[parent_id].parent_component_id
+        return self
 
 
 class ReconstructionPlan(BaseModel):

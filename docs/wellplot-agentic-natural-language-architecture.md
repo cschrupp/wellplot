@@ -1720,3 +1720,68 @@ capabilities / graph -> application/domain models/services
 MCP -> application/domain services and optionally high-level graph API
 application/domain layer -> neither LangGraph nor MCP
 ```
+
+---
+
+## Appendix D - Planner hierarchy remediation
+
+### Observed live failure
+
+The first live CBL request reached the planner with a syntactically valid
+`ReconstructionPlan`, but every binding used an empty `depends_on` list despite
+correctly naming its target track in free-form values. The planner validator
+then rejected each binding because `binding.curve` requires a normal or
+reference-track parent.
+
+This is a semantic IR contract defect, not a LangGraph fan-out, deterministic
+executor, MCP mutation, or CBL-specific problem. The previous `depends_on`
+field incorrectly combined structural containment with execution ordering, even
+though section components are compiled atomically and no graph stage schedules
+them from that field.
+
+### Contract decision
+
+Every `SemanticComponentPlan` must declare `parent_component_id` explicitly:
+
+- `null` means the containing section is the parent;
+- a non-null value references a `component_id` in the same section;
+- parent links describe containment only, never execution order;
+- a revision that changes a child must include its existing parent component as
+  non-mutating context in the same section plan.
+
+The semantic model validates duplicate, unknown, self-referential, and cyclic
+links. The capability registry validates that the selected parent capability is
+allowed. No graph code may infer containment from capability-specific keys such
+as `track_id`.
+
+### Remediation slices
+
+`LG-R0` freezes the live planner failure as a reduced regression fixture and
+records provider/trace evidence. It changes no runtime behavior.
+
+`LG-R1` replaces planner-level `depends_on` with the explicit parent contract,
+migrates frozen graph fixtures, and covers normal/reference/array/annotation
+parent relationships plus invalid hierarchy cases.
+
+`LG-R2` moves registry semantic validation into the existing required-tool
+submission boundary, so an invalid plan receives one bounded correction within
+the provider conversation. It adds no LangGraph retry node or controller.
+
+`LG-R3` converts expected graph compilation failures into structured high-level
+MCP results without persistence; programming faults still propagate.
+
+`LG-R4` scopes current-document and source context to each worker and records
+context/artifact sizes. This begins only after the hierarchy contract is green.
+
+`LG-R5` reruns the unchanged CBL prompt with two providers and requires valid
+hierarchy, verified canonical state, and a final render. The target remains one
+planner, one report worker, and one worker per planned section.
+
+### Gates
+
+Each slice is independently committed only after targeted deterministic tests,
+Ruff checks, and the frozen CBL graph evaluation pass. Live evaluation evidence
+records provider, model, call count, correction count, context size, trace, and
+final verifier/render result. A failure returns to the earliest responsible
+slice; it does not authorize a new controller heuristic or domain-specific
+branch.
