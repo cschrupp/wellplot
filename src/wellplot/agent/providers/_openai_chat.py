@@ -32,7 +32,7 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
-from ..execution_trace import current_agent_trace
+from ..execution_trace import assistant_response_trace_payload, current_agent_trace
 from ._openai_responses import (
     _required_tool_name,
     _required_tool_submission_outcome,
@@ -226,6 +226,7 @@ async def run_chat_completions_authoring_loop(
                     "tool_names": [call["name"] for call in function_calls],
                     "text_characters": len(response_text),
                 },
+                payload={"assistant_response": assistant_response_trace_payload(response_text)},
             )
         if finish_reason is not None:
             finish_reasons.append(finish_reason)

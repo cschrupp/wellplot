@@ -37,7 +37,7 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
-from ..execution_trace import current_agent_trace
+from ..execution_trace import assistant_response_trace_payload, current_agent_trace
 
 
 def load_api_key_from_sources(
@@ -277,6 +277,8 @@ async def run_responses_authoring_loop(
                 )
         output = getattr(response, "output", [])
         function_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
+        response_text = getattr(response, "output_text", "")
+        response_text = response_text if isinstance(response_text, str) else ""
         if trace is not None:
             trace.record(
                 "provider_round_finished",
@@ -285,12 +287,12 @@ async def run_responses_authoring_loop(
                     "round": round_index,
                     "response_status": response_status,
                     "tool_names": [str(getattr(call, "name", "") or "") for call in function_calls],
-                    "text_characters": len(str(getattr(response, "output_text", "") or "")),
+                    "text_characters": len(response_text),
                 },
+                payload={"assistant_response": assistant_response_trace_payload(response_text)},
             )
         if not function_calls:
-            response_text = getattr(response, "output_text", "")
-            final_text = response_text if isinstance(response_text, str) else ""
+            final_text = response_text
             if not final_text.strip():
                 raise ProviderAdapterError(
                     "empty_response",

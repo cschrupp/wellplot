@@ -27,6 +27,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TRACE_VERSION = 1
 _MAX_PAYLOAD_CHARACTERS = 64_000
+_MAX_RESPONSE_EXCERPT_CHARACTERS = 16_384
+_RESPONSE_EXCERPT_HEAD_CHARACTERS = 12_288
 _SENSITIVE_KEY_PARTS = ("api_key", "authorization", "password", "secret", "token")
 _SENSITIVE_TOKEN_PATTERN = re.compile(r"(?i)\b(?:sk|nvapi|hf|ghp)[-_][A-Za-z0-9_-]{8,}\b")
 
@@ -103,6 +105,36 @@ def _bounded_payload(value: object) -> object:
         "original_characters": len(encoded),
         "sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
         "excerpt": encoded[:_MAX_PAYLOAD_CHARACTERS],
+    }
+
+
+def assistant_response_trace_payload(response_text: str) -> dict[str, object]:
+    """Return a redacted, bounded response record suitable for a JSONL trace.
+
+    The trace intentionally does not store prompts. A provider can nevertheless
+    return unstructured prose instead of its required tool call, so preserving a
+    bounded response excerpt is necessary to diagnose that behavior. The record
+    keeps both ends of verbose responses and a digest of the complete redacted
+    content without allowing one provider response to grow the trace unbounded.
+    """
+    sanitized = _sanitize_text(response_text)
+    digest = hashlib.sha256(sanitized.encode("utf-8")).hexdigest()
+    if len(sanitized) <= _MAX_RESPONSE_EXCERPT_CHARACTERS:
+        excerpt = sanitized
+        truncated = False
+    else:
+        tail_characters = _MAX_RESPONSE_EXCERPT_CHARACTERS - _RESPONSE_EXCERPT_HEAD_CHARACTERS
+        excerpt = (
+            f"{sanitized[:_RESPONSE_EXCERPT_HEAD_CHARACTERS]}"
+            "\n\n[... assistant response excerpt truncated ...]\n\n"
+            f"{sanitized[-tail_characters:]}"
+        )
+        truncated = True
+    return {
+        "original_characters": len(response_text),
+        "sha256": digest,
+        "truncated": truncated,
+        "excerpt": excerpt,
     }
 
 
@@ -232,6 +264,7 @@ def read_agent_trace(path: str | Path) -> list[AgentTraceEvent]:
 __all__ = [
     "AgentRunTrace",
     "AgentTraceEvent",
+    "assistant_response_trace_payload",
     "bind_agent_trace",
     "current_agent_trace",
     "read_agent_trace",

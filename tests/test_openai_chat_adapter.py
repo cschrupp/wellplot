@@ -23,12 +23,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from functools import partial
+from pathlib import Path
 from types import SimpleNamespace
 
 import anyio
 import pytest
 
 from wellplot.agent.core import FunctionToolDefinition, ProviderAdapterError
+from wellplot.agent.execution_trace import AgentRunTrace, bind_agent_trace, read_agent_trace
 from wellplot.agent.providers._openai_chat import run_chat_completions_authoring_loop
 
 
@@ -221,6 +223,53 @@ def test_chat_adapter_normalizes_stream_transport_failure() -> None:
         )
 
     assert exc_info.value.status == "transport_failure"
+
+
+def test_chat_adapter_records_provider_response_excerpt(tmp_path: Path) -> None:
+    """Trace the assistant prose when a provider declines the required tool call."""
+    response_text = "I will answer in prose instead of using a tool."
+    completions = _FakeCompletions([_chat_response(content=response_text, finish_reason="stop")])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
+
+    async def call_tool(_: str, __: dict[str, object]) -> dict[str, object]:
+        raise AssertionError("the provider did not emit a tool call")
+
+    async def run_with_trace() -> None:
+        with bind_agent_trace(trace):
+            await run_chat_completions_authoring_loop(
+                client=client,
+                model="local-model",
+                provider_label="OpenAI-compatible",
+                instructions="Use the available tools.",
+                initial_user_message="Inspect the draft.",
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name="inspect_logfile",
+                        description="Inspect a draft.",
+                        parameters={"type": "object"},
+                    )
+                ],
+                tool_caller=call_tool,
+                max_rounds=1,
+                required_tool_name="inspect_logfile",
+            )
+
+    with pytest.raises(ProviderAdapterError, match="required tool"):
+        anyio.run(run_with_trace)
+
+    received = next(
+        event
+        for event in read_agent_trace(trace.path)
+        if event.event == "provider_round_finished" and event.status == "received"
+    )
+
+    assert isinstance(received.payload, dict)
+    response_payload = received.payload["assistant_response"]
+    assert response_payload["original_characters"] == len(response_text)
+    assert len(response_payload["sha256"]) == 64
+    assert response_payload["truncated"] is False
+    assert response_payload["excerpt"] == response_text
 
 
 def test_chat_adapter_honors_host_feedback_loop_stop() -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,7 +13,12 @@ from pydantic import BaseModel
 pytest.importorskip("langgraph")
 
 from wellplot.agent.core import AuthoringToolCall, ProviderRunResult
-from wellplot.agent.execution_trace import AgentRunTrace, bind_agent_trace, read_agent_trace
+from wellplot.agent.execution_trace import (
+    AgentRunTrace,
+    assistant_response_trace_payload,
+    bind_agent_trace,
+    read_agent_trace,
+)
 from wellplot.agent.graph import (
     ExistingProviderStructuredAdapter,
     ReconstructionGraphDependencies,
@@ -126,6 +132,27 @@ def test_agent_run_trace_redacts_sensitive_values_and_flushes_events(tmp_path: P
     assert trace.path.exists()
     assert [event.sequence for event in events] == list(range(1, len(events) + 1))
     assert payload == {"api_key": "[REDACTED]", "message": "Bearer [REDACTED]"}
+
+
+def test_assistant_response_trace_payload_is_redacted_and_keeps_both_ends() -> None:
+    """Verbose non-tool prose remains diagnosable without unbounded trace files."""
+    response_text = (
+        "start sk-testtoken123456789 " + ("x" * 20_000) + " Bearer nvapi-token123456789 tail"
+    )
+
+    payload = assistant_response_trace_payload(response_text)
+
+    assert payload["original_characters"] == len(response_text)
+    assert (
+        payload["sha256"]
+        == hashlib.sha256(
+            ("start [REDACTED] " + ("x" * 20_000) + " Bearer [REDACTED] tail").encode("utf-8")
+        ).hexdigest()
+    )
+    assert payload["truncated"] is True
+    assert "start [REDACTED]" in str(payload["excerpt"])
+    assert "Bearer [REDACTED] tail" in str(payload["excerpt"])
+    assert "token123456789" not in str(payload["excerpt"])
 
 
 def test_compile_graph_trace_records_stage_outputs(tmp_path: Path) -> None:
