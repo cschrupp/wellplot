@@ -51,9 +51,10 @@ class _FixtureStructuredModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Return the frozen planner or compiler output for its exact target."""
-        del instructions, tool_description, max_rounds
+        del instructions, tool_description, max_rounds, response_validator
         self.tool_calls.append(tool_name)
         artifacts = self.contract["artifacts"]
         if tool_name == "submit_reconstruction_plan":

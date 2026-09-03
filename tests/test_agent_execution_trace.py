@@ -43,9 +43,10 @@ class _TraceStructuredModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Produce each typed planner or compiler output without a provider."""
-        del instructions, tool_description, max_rounds
+        del instructions, tool_description, max_rounds, response_validator
         if response_model is ReconstructionPlan:
             return ReconstructionPlan.model_validate(
                 {
@@ -109,6 +110,45 @@ class _ProviderBackend:
                 ),
             ),
             report_facts={"provider_response": {"rounds": 1}},
+        )
+
+
+@dataclass
+class _CorrectingProviderBackend:
+    """Resubmit one typed value after the semantic validator rejects it."""
+
+    async def run_authoring(
+        self,
+        *,
+        instructions: str,
+        initial_user_message: str,
+        tool_definitions: list[object],
+        tool_caller: object,
+        max_rounds: int,
+        required_tool_name: str | None = None,
+    ) -> ProviderRunResult:
+        """Model the existing provider loop receiving one rejected submission."""
+        del instructions, initial_user_message, tool_definitions, max_rounds
+        assert required_tool_name == "submit_trace"
+        rejected = await tool_caller("submit_trace", {"title": "Rejected"})  # type: ignore[misc]
+        assert rejected["is_error"] is True
+        accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]
+        assert accepted == {"accepted": True}
+        return ProviderRunResult(
+            final_text="Submitted corrected typed output.",
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="submit_trace",
+                    arguments={"title": "Rejected"},
+                ),
+                AuthoringToolCall(
+                    round=2,
+                    name="submit_trace",
+                    arguments={"title": "Accepted"},
+                ),
+            ),
+            report_facts={"provider_response": {"rounds": 2}},
         )
 
 
@@ -222,3 +262,33 @@ def test_provider_adapter_trace_records_validated_agent_submission(tmp_path: Pat
 
     assert result.title == "Agent output"
     assert completed.payload == {"title": "Agent output"}
+
+
+def test_provider_adapter_returns_semantic_rejections_to_the_same_provider(tmp_path: Path) -> None:
+    """A semantic rejection is traceable and can be corrected within one conversation."""
+    trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
+    adapter = ExistingProviderStructuredAdapter(backend=_CorrectingProviderBackend())
+
+    def require_accepted_title(submission: _Submission) -> None:
+        if submission.title != "Accepted":
+            raise ValueError("title must be 'Accepted'.")
+
+    async def generate() -> _Submission:
+        with bind_agent_trace(trace), trace.stage("planner"):
+            return await adapter.generate(
+                instructions="Submit the response.",
+                user_message="Set the title.",
+                response_model=_Submission,
+                tool_name="submit_trace",
+                tool_description="Submit one trace response.",
+                response_validator=require_accepted_title,
+            )
+
+    result = asyncio.run(generate())
+    events = read_agent_trace(trace.path)
+    rejection = next(event for event in events if event.event == "structured_submission_rejected")
+
+    assert result.title == "Accepted"
+    assert rejection.status == "invalid_semantics"
+    assert rejection.payload == {"title": "Rejected"}
+    assert "title must be 'Accepted'" in rejection.details["error"]

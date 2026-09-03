@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
+from pydantic import BaseModel
 
 from wellplot.agent.graph import ReconstructionPlanner
 from wellplot.agent.graph.models import ReconstructionPlan
@@ -46,6 +49,47 @@ def _validate_capabilities(plan: ReconstructionPlan) -> None:
     planner._validate_capabilities(plan)
 
 
+class _PlannerValidationModel:
+    """Expose the planner's structured semantic validator to a focused test."""
+
+    response_validator: object | None = None
+
+    async def generate(
+        self,
+        *,
+        instructions: str,
+        user_message: str,
+        response_model: type[BaseModel],
+        tool_name: str,
+        tool_description: str,
+        max_rounds: int = 3,
+        response_validator: object | None = None,
+    ) -> BaseModel:
+        """Submit a Pydantic-valid plan with a registry-invalid parent relationship."""
+        del instructions, user_message, tool_description, max_rounds
+        assert tool_name == "submit_reconstruction_plan"
+        self.response_validator = response_validator
+        plan = response_model.model_validate(
+            {
+                "summary": "Compile one invalid parent relationship.",
+                "sections": [
+                    {
+                        "section_id": "main",
+                        "capability_id": "section.log_plot",
+                        "goal": "Compile main.",
+                        "components": [
+                            _component("array", "track.array", None),
+                            _component("curve", "binding.curve", "array"),
+                        ],
+                    }
+                ],
+            }
+        )
+        assert callable(response_validator)
+        response_validator(plan)
+        return plan
+
+
 def test_component_parent_is_required_by_the_advertised_schema() -> None:
     """Providers must see an explicit structural-parent field in the plan schema."""
     schema = ReconstructionPlan.model_json_schema()
@@ -86,6 +130,23 @@ def test_registry_rejects_incompatible_component_parent_capability() -> None:
 
     with pytest.raises(ValueError, match="Allowed parents"):
         _validate_capabilities(plan)
+
+
+def test_planner_supplies_registry_validation_to_the_structured_submission() -> None:
+    """Provider adapters receive capability validation before accepting a plan."""
+    model = _PlannerValidationModel()
+    planner = ReconstructionPlanner(model=model, registry=create_builtin_registry())
+
+    with pytest.raises(ValueError, match="Allowed parents"):
+        asyncio.run(
+            planner.plan(
+                request="Add a scalar curve under an array track.",
+                current_document={},
+                source_manifest={},
+            )
+        )
+
+    assert callable(model.response_validator)
 
 
 @pytest.mark.parametrize(

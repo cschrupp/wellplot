@@ -82,8 +82,8 @@ class ReconstructionPlanner:
                 tool_name="submit_reconstruction_plan",
                 tool_description="Submit the semantic reconstruction plan.",
                 max_rounds=3,
+                response_validator=self._validate_capabilities,
             )
-            self._validate_capabilities(plan)
             if trace is not None:
                 trace.record(
                     "structured_output",

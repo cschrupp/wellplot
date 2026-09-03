@@ -44,9 +44,10 @@ class _RevisionModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Return deterministic scoped revision artifacts."""
-        del tool_description, max_rounds
+        del tool_description, max_rounds, response_validator
         self.tool_calls.append(tool_name)
         if tool_name == "submit_reconstruction_plan":
             self.planner_instructions = instructions

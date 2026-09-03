@@ -49,9 +49,10 @@ class _ReconstructionModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Return the exact reconstruction plan and artifacts for this test."""
-        del instructions, user_message, tool_description, max_rounds
+        del instructions, user_message, tool_description, max_rounds, response_validator
         if tool_name == "submit_reconstruction_plan":
             return response_model.model_validate(
                 {
@@ -89,9 +90,10 @@ class _FrozenCblModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Return the fixture response for the planned compiler target."""
-        del instructions, tool_description, max_rounds
+        del instructions, tool_description, max_rounds, response_validator
         artifacts = self.contract["artifacts"]
         if tool_name == "submit_reconstruction_plan":
             payload = self.contract["reconstruction_plan"]

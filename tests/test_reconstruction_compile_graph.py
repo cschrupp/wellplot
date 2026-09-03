@@ -35,8 +35,9 @@ class _FakeStructuredModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
-        del instructions, tool_description, max_rounds
+        del instructions, tool_description, max_rounds, response_validator
         if response_model is ReconstructionPlan:
             return ReconstructionPlan.model_validate(
                 {

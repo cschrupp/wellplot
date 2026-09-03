@@ -43,9 +43,10 @@ class _RevisionModel:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: object | None = None,
     ) -> BaseModel:
         """Return the exact revision plan and artifacts for this test."""
-        del instructions, user_message, tool_description, max_rounds
+        del instructions, user_message, tool_description, max_rounds, response_validator
         if tool_name == "submit_reconstruction_plan":
             return response_model.model_validate(
                 {

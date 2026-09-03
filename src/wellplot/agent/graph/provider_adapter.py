@@ -15,6 +15,7 @@ start without replacing the provider layer at the same time.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
 
@@ -35,8 +36,9 @@ class StructuredModelProtocol(Protocol):
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: Callable[[TModel], None] | None = None,
     ) -> TModel:
-        """Return exactly one validated structured result."""
+        """Return exactly one schema- and semantics-validated structured result."""
 
 
 @dataclass(slots=True)
@@ -60,6 +62,7 @@ class ExistingProviderStructuredAdapter:
         tool_name: str,
         tool_description: str,
         max_rounds: int = 3,
+        response_validator: Callable[[TModel], None] | None = None,
     ) -> TModel:
         """Generate and validate one required structured response."""
         from ..core import FunctionToolDefinition, ProviderAdapterError
@@ -76,12 +79,32 @@ class ExistingProviderStructuredAdapter:
                     "error": f"Only {tool_name!r} is available in this graph stage.",
                 }
             try:
-                accepted = response_model.model_validate(arguments)
+                candidate = response_model.model_validate(arguments)
             except Exception as exc:
                 return {
                     "is_error": True,
                     "error": f"Invalid {response_model.__name__}: {exc}",
                 }
+            if response_validator is not None:
+                try:
+                    response_validator(candidate)
+                except Exception as exc:
+                    if trace is not None:
+                        trace.record(
+                            "structured_submission_rejected",
+                            status="invalid_semantics",
+                            details={
+                                "tool_name": tool_name,
+                                "response_model": response_model.__name__,
+                                "error": str(exc),
+                            },
+                            payload=arguments,
+                        )
+                    return {
+                        "is_error": True,
+                        "error": f"Rejected {response_model.__name__}: {exc}",
+                    }
+            accepted = candidate
             return {"accepted": True}
 
         if trace is not None:
