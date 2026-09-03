@@ -31,6 +31,21 @@ class _Session:
         self.calls.append((name, arguments))
         if name == "render_logfile":
             return _Result({"artifact": "workspace/output.pdf"})
+        if arguments.get("request") == "Provider unavailable.":
+            return _Result(
+                {
+                    "logfile_path": str(arguments["logfile_path"]),
+                    "mode": "reconstruct" if name.startswith("build_") else "revise",
+                    "success": False,
+                    "changed": False,
+                    "rolled_back": False,
+                    "section_ids": ["main"],
+                    "errors": [
+                        "Provider request failed before graph compilation completed "
+                        "(transport_failure)."
+                    ],
+                }
+            )
         return _Result(
             {
                 "logfile_path": str(arguments["logfile_path"]),
@@ -120,4 +135,23 @@ def test_agentic_notebook_client_uses_graph_host_tools(tmp_path: Path) -> None:
                 "overwrite": True,
             },
         ),
+    ]
+
+
+def test_agentic_notebook_client_returns_structured_provider_failure(tmp_path: Path) -> None:
+    """Notebook callers can display a provider failure without an MCP exception."""
+    runtime = _Runtime(tmp_path)
+    client = AgenticMcpClient(runtime=runtime)  # type: ignore[arg-type]
+
+    result = asyncio.run(
+        client.build(
+            request="Provider unavailable.",
+            logfile_path=tmp_path / "workspace" / "draft.log.yaml",
+        )
+    )
+
+    assert result.success is False
+    assert result.changed is False
+    assert result.errors == [
+        "Provider request failed before graph compilation completed (transport_failure)."
     ]

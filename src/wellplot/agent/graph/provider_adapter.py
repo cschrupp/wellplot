@@ -62,9 +62,11 @@ class ExistingProviderStructuredAdapter:
         max_rounds: int = 3,
     ) -> TModel:
         """Generate and validate one required structured response."""
-        from ..core import FunctionToolDefinition
+        from ..core import FunctionToolDefinition, ProviderAdapterError
+        from ..execution_trace import current_agent_trace
 
         accepted: TModel | None = None
+        trace = current_agent_trace()
 
         async def capture(name: str, arguments: dict[str, object]) -> dict[str, object]:
             nonlocal accepted
@@ -82,22 +84,71 @@ class ExistingProviderStructuredAdapter:
                 }
             return {"accepted": True}
 
-        await self.backend.run_authoring(
-            instructions=instructions,
-            initial_user_message=user_message,
-            tool_definitions=[
-                FunctionToolDefinition(
-                    name=tool_name,
-                    description=tool_description,
-                    parameters=response_model.model_json_schema(),
+        if trace is not None:
+            trace.record(
+                "structured_request_started",
+                status="started",
+                details={
+                    "tool_name": tool_name,
+                    "response_model": response_model.__name__,
+                    "max_rounds": max_rounds,
+                },
+            )
+        try:
+            provider_result = await self.backend.run_authoring(
+                instructions=instructions,
+                initial_user_message=user_message,
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name=tool_name,
+                        description=tool_description,
+                        parameters=response_model.model_json_schema(),
+                    )
+                ],
+                tool_caller=capture,
+                max_rounds=max_rounds,
+                required_tool_name=tool_name,
+            )
+        except ProviderAdapterError as exc:
+            if trace is not None:
+                trace.record(
+                    "structured_request_finished",
+                    status=exc.status,
+                    details={
+                        "tool_name": tool_name,
+                        "error": str(exc),
+                        "provider_response": exc.report_facts.get("provider_response", {}),
+                    },
+                    payload={
+                        "tool_trace": [
+                            {
+                                "round": call.round,
+                                "name": call.name,
+                                "arguments": call.arguments,
+                            }
+                            for call in exc.tool_trace
+                        ]
+                    },
                 )
-            ],
-            tool_caller=capture,
-            max_rounds=max_rounds,
-            required_tool_name=tool_name,
-        )
+            raise
         if accepted is None:
+            if trace is not None:
+                trace.record(
+                    "structured_request_finished",
+                    status="missing_submission",
+                    details={"tool_name": tool_name},
+                )
             raise RuntimeError(
                 f"Provider finished without submitting required structured output {tool_name!r}."
+            )
+        if trace is not None:
+            trace.record(
+                "structured_request_finished",
+                status="succeeded",
+                details={
+                    "tool_name": tool_name,
+                    "provider_response": provider_result.report_facts.get("provider_response", {}),
+                },
+                payload=accepted.model_dump(mode="json"),
             )
         return accepted

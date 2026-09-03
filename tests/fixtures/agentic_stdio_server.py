@@ -6,6 +6,7 @@ import os
 from copy import deepcopy
 from pathlib import Path
 
+from wellplot.agent.core import ProviderAdapterError
 from wellplot.mcp import create_mcp_server
 from wellplot.mcp.agentic import GraphAuthoringMcpOperations
 from wellplot.mcp.stdio import run_stdio
@@ -23,6 +24,11 @@ class FixtureGraph:
             "capability_id": "section.log_plot",
             "goal": "Update the main section.",
         }
+        if "provider failure" in request:
+            raise ProviderAdapterError(
+                "transport_failure",
+                "The OpenAI-compatible chat request failed while receiving a response.",
+            )
         if "invalid" in request:
             intent: dict[str, object] = {
                 "sections": [

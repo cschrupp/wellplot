@@ -32,6 +32,7 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
+from ..execution_trace import current_agent_trace
 from ._openai_responses import (
     _required_tool_name,
     _required_tool_submission_outcome,
@@ -112,6 +113,25 @@ def _chat_response_parts(
     )
 
 
+def _request_chat_response(
+    *,
+    client: object,
+    request_kwargs: dict[str, object],
+    provider_label: str,
+) -> tuple[str, list[dict[str, str]], str | None]:
+    """Send one streamed request and normalize provider transport failures."""
+    try:
+        response = client.chat.completions.create(**request_kwargs)
+        return _chat_response_parts(response)
+    except ProviderAdapterError:
+        raise
+    except Exception as exc:
+        raise ProviderAdapterError(
+            "transport_failure",
+            f"The {provider_label} chat request failed while receiving a response.",
+        ) from exc
+
+
 async def run_chat_completions_authoring_loop(
     *,
     client: object,
@@ -158,6 +178,19 @@ async def run_chat_completions_authoring_loop(
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
+        trace = current_agent_trace()
+        if trace is not None:
+            trace.record(
+                "provider_round_started",
+                status="started",
+                details={
+                    "adapter": "chat_completions",
+                    "provider": provider_label,
+                    "model": model,
+                    "round": round_index,
+                    "required_tool_name": required_name,
+                },
+            )
         request_kwargs: dict[str, object] = {
             "model": model,
             "messages": messages,
@@ -169,8 +202,31 @@ async def run_chat_completions_authoring_loop(
                 "type": "function",
                 "function": {"name": required_name},
             }
-        response = client.chat.completions.create(**request_kwargs)
-        response_text, function_calls, finish_reason = _chat_response_parts(response)
+        try:
+            response_text, function_calls, finish_reason = _request_chat_response(
+                client=client,
+                request_kwargs=request_kwargs,
+                provider_label=provider_label,
+            )
+        except ProviderAdapterError as exc:
+            if trace is not None:
+                trace.record(
+                    "provider_round_finished",
+                    status=exc.status,
+                    details={"round": round_index, "error": str(exc)},
+                )
+            raise
+        if trace is not None:
+            trace.record(
+                "provider_round_finished",
+                status="received",
+                details={
+                    "round": round_index,
+                    "finish_reason": finish_reason,
+                    "tool_names": [call["name"] for call in function_calls],
+                    "text_characters": len(response_text),
+                },
+            )
         if finish_reason is not None:
             finish_reasons.append(finish_reason)
             if finish_reason.lower() in {"length", "content_filter"}:
@@ -254,6 +310,17 @@ async def run_chat_completions_authoring_loop(
                 tool_payload = await tool_caller(call_name, arguments)
             else:
                 schema_validation_retries += 1
+                if trace is not None:
+                    trace.record(
+                        "provider_submission_rejected",
+                        status="invalid_schema",
+                        details={
+                            "round": round_index,
+                            "tool_name": call_name,
+                            "error": schema_error,
+                        },
+                        payload=arguments,
+                    )
                 tool_payload = {
                     "is_error": True,
                     "error": schema_error,
@@ -319,12 +386,15 @@ async def run_chat_completions_authoring_loop(
                 ),
             }
         )
-        summary_response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
+        final_text, _, summary_finish_reason = _request_chat_response(
+            client=client,
+            request_kwargs={
+                "model": model,
+                "messages": messages,
+                "stream": True,
+            },
+            provider_label=provider_label,
         )
-        final_text, _, summary_finish_reason = _chat_response_parts(summary_response)
         if summary_finish_reason is not None:
             finish_reasons.append(summary_finish_reason)
 

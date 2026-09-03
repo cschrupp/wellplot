@@ -37,6 +37,7 @@ from ..core import (
     ProviderRunResult,
     ToolCaller,
 )
+from ..execution_trace import current_agent_trace
 
 
 def load_api_key_from_sources(
@@ -228,6 +229,19 @@ async def run_responses_authoring_loop(
 
     for round_index in range(1, max_rounds + 1):
         response_rounds = round_index
+        trace = current_agent_trace()
+        if trace is not None:
+            trace.record(
+                "provider_round_started",
+                status="started",
+                details={
+                    "adapter": "responses",
+                    "provider": provider_label,
+                    "model": model,
+                    "round": round_index,
+                    "required_tool_name": required_name,
+                },
+            )
         request_kwargs: dict[str, object] = {
             "model": model,
             "tools": function_tools,
@@ -243,7 +257,16 @@ async def run_responses_authoring_loop(
                 "type": "function",
                 "name": required_name,
             }
-        response = client.responses.create(**request_kwargs)
+        try:
+            response = client.responses.create(**request_kwargs)
+        except ProviderAdapterError as exc:
+            if trace is not None:
+                trace.record(
+                    "provider_round_finished",
+                    status=exc.status,
+                    details={"round": round_index, "error": str(exc)},
+                )
+            raise
         response_status = getattr(response, "status", None)
         if response_status is not None:
             response_statuses.append(str(response_status))
@@ -254,6 +277,17 @@ async def run_responses_authoring_loop(
                 )
         output = getattr(response, "output", [])
         function_calls = [item for item in output if getattr(item, "type", None) == "function_call"]
+        if trace is not None:
+            trace.record(
+                "provider_round_finished",
+                status="received",
+                details={
+                    "round": round_index,
+                    "response_status": response_status,
+                    "tool_names": [str(getattr(call, "name", "") or "") for call in function_calls],
+                    "text_characters": len(str(getattr(response, "output_text", "") or "")),
+                },
+            )
         if not function_calls:
             response_text = getattr(response, "output_text", "")
             final_text = response_text if isinstance(response_text, str) else ""
@@ -320,6 +354,17 @@ async def run_responses_authoring_loop(
                 tool_payload = await tool_caller(call_name, arguments)
             else:
                 schema_validation_retries += 1
+                if trace is not None:
+                    trace.record(
+                        "provider_submission_rejected",
+                        status="invalid_schema",
+                        details={
+                            "round": round_index,
+                            "tool_name": call_name,
+                            "error": schema_error,
+                        },
+                        payload=arguments,
+                    )
                 tool_payload = {
                     "is_error": True,
                     "error": schema_error,

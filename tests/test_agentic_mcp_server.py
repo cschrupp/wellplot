@@ -106,9 +106,17 @@ def test_real_stdio_agentic_surface_persists_and_rolls_back() -> None:
                         "request": "Create an invalid curve.",
                     },
                 )
+                before_provider_failure = fixture_paths.single_logfile.read_text(encoding="utf-8")
+                provider_failure = await session.call_tool(
+                    "build_plot_from_request",
+                    {
+                        "logfile_path": str(fixture_paths.single_logfile),
+                        "request": "Simulate a provider failure.",
+                    },
+                )
 
             persisted = _canonical_document(fixture_paths.single_logfile)
-            after_invalid = fixture_paths.single_logfile.read_text(encoding="utf-8")
+            after_provider_failure = fixture_paths.single_logfile.read_text(encoding="utf-8")
 
         assert [tool.name for tool in tools.tools] == [
             *(tool.name for tool in stable_tool_profile()),
@@ -121,8 +129,15 @@ def test_real_stdio_agentic_surface_persists_and_rolls_back() -> None:
         assert revision.structuredContent["success"] is True
         assert invalid.isError is False
         assert invalid.structuredContent["success"] is False
+        assert provider_failure.isError is False
+        assert provider_failure.structuredContent["success"] is False
+        assert provider_failure.structuredContent["changed"] is False
+        assert provider_failure.structuredContent["errors"] == [
+            "Provider request failed before graph compilation completed (transport_failure)."
+        ]
         assert persisted["title"] == "Graph stdio reconstruction"
         assert persisted["sections"][0]["subtitle"] == "Revised"
-        assert before_invalid == after_invalid
+        assert before_invalid == before_provider_failure
+        assert before_provider_failure == after_provider_failure
 
     anyio.run(exercise)

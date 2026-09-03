@@ -10,9 +10,11 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
+from ..execution_trace import current_agent_trace
 from .models import CompilationMode, ReconstructionPlan
 from .provider_adapter import StructuredModelProtocol
 
@@ -62,19 +64,28 @@ class ReconstructionPlanner:
             "source_manifest": source_manifest,
             "available_capabilities": catalog,
         }
-        plan = await self.model.generate(
-            instructions=instructions,
-            user_message=(
-                "Create the ReconstructionPlan for this request. The response schema is supplied "
-                "as the required function schema.\n\nContext:\n"
-                + json.dumps(context, indent=2, default=str)
-            ),
-            response_model=ReconstructionPlan,
-            tool_name="submit_reconstruction_plan",
-            tool_description="Submit the semantic reconstruction plan.",
-            max_rounds=3,
-        )
-        self._validate_capabilities(plan)
+        trace = current_agent_trace()
+        stage = trace.stage("planner") if trace is not None else nullcontext()
+        with stage:
+            plan = await self.model.generate(
+                instructions=instructions,
+                user_message=(
+                    "Create the ReconstructionPlan for this request. The response schema is "
+                    "supplied as the required function schema.\n\nContext:\n"
+                    + json.dumps(context, indent=2, default=str)
+                ),
+                response_model=ReconstructionPlan,
+                tool_name="submit_reconstruction_plan",
+                tool_description="Submit the semantic reconstruction plan.",
+                max_rounds=3,
+            )
+            self._validate_capabilities(plan)
+            if trace is not None:
+                trace.record(
+                    "structured_output",
+                    status="accepted",
+                    payload=plan.model_dump(mode="json"),
+                )
         return plan
 
     def _validate_capabilities(self, plan: ReconstructionPlan) -> None:

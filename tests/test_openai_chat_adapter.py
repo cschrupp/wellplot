@@ -58,6 +58,13 @@ class _FakeStream:
         return iter(self.chunks)
 
 
+class _BrokenStream:
+    """Raise a representative gateway failure while reading a response body."""
+
+    def __iter__(self) -> Iterator[object]:
+        raise RuntimeError("peer closed connection without sending complete message body")
+
+
 def _chat_response(
     *,
     content: str | None,
@@ -182,6 +189,38 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
         "function": {"name": "inspect_logfile"},
     }
     assert "tool_choice" not in completions.requests[1]
+
+
+def test_chat_adapter_normalizes_stream_transport_failure() -> None:
+    """Expose interrupted streamed responses through a stable provider status."""
+    completions = _FakeCompletions([_BrokenStream()])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+
+    async def call_tool(_: str, __: dict[str, object]) -> dict[str, object]:
+        raise AssertionError("the provider must fail before calling a tool")
+
+    with pytest.raises(ProviderAdapterError) as exc_info:
+        anyio.run(
+            partial(
+                run_chat_completions_authoring_loop,
+                client=client,
+                model="local-model",
+                provider_label="OpenAI-compatible",
+                instructions="Use the available tools.",
+                initial_user_message="Inspect the draft.",
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name="inspect_logfile",
+                        description="Inspect a draft.",
+                        parameters={"type": "object"},
+                    )
+                ],
+                tool_caller=call_tool,
+                max_rounds=1,
+            )
+        )
+
+    assert exc_info.value.status == "transport_failure"
 
 
 def test_chat_adapter_honors_host_feedback_loop_stop() -> None:

@@ -1048,6 +1048,9 @@ def display_agentic_result(title: str, result: GraphAuthoringToolResult) -> None
         print("Errors:")
         for error in result.errors:
             print(" -", error)
+    if result.trace_path:
+        print("Trace:", result.trace_path)
+        print("Trace events:", result.trace_event_count)
 
 
 def display_authoring_result(

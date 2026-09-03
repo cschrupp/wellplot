@@ -39,6 +39,7 @@ from .core import (
     revise_authoring_request,
     run_authoring_request,
 )
+from .execution_trace import AgentTraceEvent, read_agent_trace
 from .notebook import (
     AgenticMcpClient,
     ProjectPaths,
@@ -66,6 +67,7 @@ __all__ = [
     "AuthoringSession",
     "AuthoringToolCall",
     "AuthoringUserReport",
+    "AgentTraceEvent",
     "AgenticMcpClient",
     "BranchOperationGroup",
     "DirectBranchCompilationResult",
@@ -82,6 +84,7 @@ __all__ = [
     "display_agentic_result",
     "display_phase_previews",
     "relative_path",
+    "read_agent_trace",
     "revise_authoring_request",
     "run_authoring_request",
     "StableToolProfile",

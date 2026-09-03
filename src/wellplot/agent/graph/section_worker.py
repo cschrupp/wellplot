@@ -10,11 +10,13 @@
 from __future__ import annotations
 
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass
 
 from pydantic import BaseModel
 
 from ...capabilities import CapabilityRegistry
+from ..execution_trace import current_agent_trace
 from .models import CompilationMode, CompiledArtifact, SectionPlan
 from .provider_adapter import StructuredModelProtocol
 
@@ -64,18 +66,31 @@ class SectionCompiler:
             "source_manifest": source_manifest,
             "capabilities": worker_catalog,
         }
-        artifact: BaseModel = await self.model.generate(
-            instructions=instructions,
-            user_message=(
-                f"Compile section {plan.section_id!r}. The artifact schema is supplied as the "
-                "required function schema.\n\nContext:\n"
-                + json.dumps(context, indent=2, default=str)
-            ),
-            response_model=section_spec.artifact_model,
-            tool_name="submit_section_artifact",
-            tool_description=f"Submit the typed artifact for section {plan.section_id!r}.",
-            max_rounds=3,
+        trace = current_agent_trace()
+        stage = (
+            trace.stage("section", target_id=plan.section_id)
+            if trace is not None
+            else nullcontext()
         )
+        with stage:
+            artifact: BaseModel = await self.model.generate(
+                instructions=instructions,
+                user_message=(
+                    f"Compile section {plan.section_id!r}. The artifact schema is supplied as "
+                    "the required function schema.\n\nContext:\n"
+                    + json.dumps(context, indent=2, default=str)
+                ),
+                response_model=section_spec.artifact_model,
+                tool_name="submit_section_artifact",
+                tool_description=f"Submit the typed artifact for section {plan.section_id!r}.",
+                max_rounds=3,
+            )
+            if trace is not None:
+                trace.record(
+                    "structured_output",
+                    status="accepted",
+                    payload=artifact.model_dump(mode="json", exclude_unset=True),
+                )
         return CompiledArtifact(
             worker_id=f"section:{plan.section_id}",
             capability_id=section_spec.capability_id,

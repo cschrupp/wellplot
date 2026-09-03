@@ -15,6 +15,8 @@ try:
     from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 except ModuleNotFoundError:  # pragma: no cover - unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
+from wellplot.agent.core import ProviderAdapterError
+from wellplot.agent.execution_trace import read_agent_trace
 from wellplot.authoring_service import AuthoringService
 from wellplot.mcp import service
 from wellplot.mcp.agentic import GraphAuthoringMcpOperations, register_agentic_tools
@@ -53,6 +55,17 @@ class _Graph:
             },
             "merged_intent": self.intent,
         }
+
+
+class _ProviderFailureGraph:
+    """Raise one normalized provider failure before graph compilation completes."""
+
+    async def ainvoke(self, _: dict[str, object]) -> dict[str, object]:
+        """Simulate an unavailable configured provider."""
+        raise ProviderAdapterError(
+            "transport_failure",
+            "The OpenAI-compatible chat request failed while receiving a response.",
+        )
 
 
 def _canonical_document(path: Path) -> dict[str, object]:
@@ -110,10 +123,13 @@ def test_agentic_tools_persist_successful_build_and_revision() -> None:
         )
 
         persisted = _canonical_document(fixture_paths.single_logfile)
+        build_events = read_agent_trace(build_result.trace_path or "")
 
     assert build_result.success is True, build_result.errors
     assert build_result.changed is True
     assert build_result.mode == "reconstruct"
+    assert build_result.trace_path is not None
+    assert build_result.trace_event_count >= 3
     assert revision_result.success is True, revision_result.errors
     assert revision_result.changed is True
     assert revision_result.mode == "revise"
@@ -121,6 +137,7 @@ def test_agentic_tools_persist_successful_build_and_revision() -> None:
     assert revision_graph.states[0]["mode"] == "revise"
     assert persisted["title"] == "Graph reconstruction"
     assert persisted["sections"][0]["subtitle"] == "Graph revision"
+    assert any(event.event == "run_finished" for event in build_events)
 
 
 def test_agentic_tools_do_not_persist_blocked_execution() -> None:
@@ -167,4 +184,35 @@ def test_agentic_tools_do_not_persist_blocked_execution() -> None:
     assert result.success is False
     assert result.changed is False
     assert result.errors
+    assert before == after
+
+
+def test_agentic_tools_return_structured_provider_failure_without_persistence() -> None:
+    """Provider interruptions are graph results rather than MCP protocol errors."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+        fixture_paths = create_mcp_fixture_paths(Path(temporary_directory))
+        before = fixture_paths.single_logfile.read_text(encoding="utf-8")
+        operations = GraphAuthoringMcpOperations.create(
+            graph=_ProviderFailureGraph(),
+            root=REPO_ROOT,
+        )
+
+        result = asyncio.run(
+            operations.build(
+                logfile_path=str(fixture_paths.single_logfile),
+                request="Build the plot.",
+            )
+        )
+
+        after = fixture_paths.single_logfile.read_text(encoding="utf-8")
+        trace_events = read_agent_trace(result.trace_path or "")
+
+    assert result.success is False
+    assert result.changed is False
+    assert result.rolled_back is False
+    assert result.errors == [
+        "Provider request failed before graph compilation completed (transport_failure)."
+    ]
+    assert result.trace_path is not None
+    assert any(event.status == "transport_failure" for event in trace_events)
     assert before == after

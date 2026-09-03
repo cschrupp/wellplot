@@ -15,6 +15,8 @@ from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..agent.core import ProviderAdapterError
+from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
 from ..agent.graph import (
     build_graph_authoring_context,
     execute_document_reconstruction,
@@ -44,6 +46,8 @@ class GraphAuthoringToolResult(BaseModel):
     plan_summary: str | None = None
     section_ids: list[str]
     errors: list[str] = Field(default_factory=list)
+    trace_path: str | None = None
+    trace_event_count: int = Field(default=0, ge=0)
 
 
 @dataclass(frozen=True)
@@ -78,23 +82,58 @@ class GraphAuthoringMcpOperations:
         context = build_graph_authoring_context(logfile_path, root=self.root)
         authoring = AuthoringService(context.document)
         before = authoring.document.model_dump(mode="json")
-        result = await execute_document_reconstruction(
-            self.graph,  # type: ignore[arg-type]
-            authoring,
-            request=request,
-            source_manifest=context.source_manifest,
-            available_channels=context.available_channels,
-        )
-        return self._finalize(
-            logfile_path=context.logfile_path,
-            authoring=authoring,
-            before=before,
-            mode="reconstruct",
-            success=result.success,
-            rolled_back=result.rolled_back,
-            plan_summary=result.reconstruction.plan.summary,
-            errors=result.errors,
-        )
+        trace = AgentRunTrace.create(logfile_path=context.logfile_path, mode="reconstruct")
+        with bind_agent_trace(trace):
+            trace.record(
+                "graph_context_ready",
+                status="ready",
+                details={"section_ids": [section.id for section in authoring.document.sections]},
+            )
+            try:
+                result = await execute_document_reconstruction(
+                    self.graph,  # type: ignore[arg-type]
+                    authoring,
+                    request=request,
+                    source_manifest=context.source_manifest,
+                    available_channels=context.available_channels,
+                )
+            except ProviderAdapterError as exc:
+                trace.record(
+                    "run_finished",
+                    status=exc.status,
+                    details={"error": str(exc)},
+                )
+                return self._provider_failure(
+                    logfile_path=context.logfile_path,
+                    authoring=authoring,
+                    mode="reconstruct",
+                    status=exc.status,
+                    trace=trace,
+                )
+            except Exception as exc:
+                trace.record("run_finished", status="failed", details={"error": str(exc)})
+                raise
+            final_result = self._finalize(
+                logfile_path=context.logfile_path,
+                authoring=authoring,
+                before=before,
+                mode="reconstruct",
+                success=result.success,
+                rolled_back=result.rolled_back,
+                plan_summary=result.reconstruction.plan.summary,
+                errors=result.errors,
+                trace=trace,
+            )
+            trace.record(
+                "run_finished",
+                status="succeeded" if final_result.success else "failed",
+                details={
+                    "changed": final_result.changed,
+                    "rolled_back": final_result.rolled_back,
+                    "errors": final_result.errors,
+                },
+            )
+            return self._result_with_trace(final_result, trace)
 
     async def revise(
         self,
@@ -106,23 +145,58 @@ class GraphAuthoringMcpOperations:
         context = build_graph_authoring_context(logfile_path, root=self.root)
         authoring = AuthoringService(context.document)
         before = authoring.document.model_dump(mode="json")
-        result = await execute_document_revision(
-            self.graph,  # type: ignore[arg-type]
-            authoring,
-            request=request,
-            source_manifest=context.source_manifest,
-            available_channels=context.available_channels,
-        )
-        return self._finalize(
-            logfile_path=context.logfile_path,
-            authoring=authoring,
-            before=before,
-            mode="revise",
-            success=result.success,
-            rolled_back=result.rolled_back,
-            plan_summary=result.revision.plan.summary,
-            errors=result.errors,
-        )
+        trace = AgentRunTrace.create(logfile_path=context.logfile_path, mode="revise")
+        with bind_agent_trace(trace):
+            trace.record(
+                "graph_context_ready",
+                status="ready",
+                details={"section_ids": [section.id for section in authoring.document.sections]},
+            )
+            try:
+                result = await execute_document_revision(
+                    self.graph,  # type: ignore[arg-type]
+                    authoring,
+                    request=request,
+                    source_manifest=context.source_manifest,
+                    available_channels=context.available_channels,
+                )
+            except ProviderAdapterError as exc:
+                trace.record(
+                    "run_finished",
+                    status=exc.status,
+                    details={"error": str(exc)},
+                )
+                return self._provider_failure(
+                    logfile_path=context.logfile_path,
+                    authoring=authoring,
+                    mode="revise",
+                    status=exc.status,
+                    trace=trace,
+                )
+            except Exception as exc:
+                trace.record("run_finished", status="failed", details={"error": str(exc)})
+                raise
+            final_result = self._finalize(
+                logfile_path=context.logfile_path,
+                authoring=authoring,
+                before=before,
+                mode="revise",
+                success=result.success,
+                rolled_back=result.rolled_back,
+                plan_summary=result.revision.plan.summary,
+                errors=result.errors,
+                trace=trace,
+            )
+            trace.record(
+                "run_finished",
+                status="succeeded" if final_result.success else "failed",
+                details={
+                    "changed": final_result.changed,
+                    "rolled_back": final_result.rolled_back,
+                    "errors": final_result.errors,
+                },
+            )
+            return self._result_with_trace(final_result, trace)
 
     def _finalize(
         self,
@@ -135,6 +209,7 @@ class GraphAuthoringMcpOperations:
         rolled_back: bool,
         plan_summary: str,
         errors: tuple[str, ...],
+        trace: AgentRunTrace,
     ) -> GraphAuthoringToolResult:
         """Persist only a semantically verified canonical document."""
         document = authoring.document
@@ -155,6 +230,43 @@ class GraphAuthoringMcpOperations:
             plan_summary=plan_summary,
             section_ids=[section.id for section in document.sections],
             errors=list(errors),
+            trace_path=str(trace.path),
+            trace_event_count=trace.event_count,
+        )
+
+    @staticmethod
+    def _provider_failure(
+        *,
+        logfile_path: Path,
+        authoring: AuthoringService,
+        mode: Literal["reconstruct", "revise"],
+        status: str,
+        trace: AgentRunTrace,
+    ) -> GraphAuthoringToolResult:
+        """Return a safe graph result when the configured provider is unavailable."""
+        return GraphAuthoringToolResult(
+            logfile_path=str(logfile_path),
+            mode=mode,
+            success=False,
+            changed=False,
+            rolled_back=False,
+            section_ids=[section.id for section in authoring.document.sections],
+            errors=[f"Provider request failed before graph compilation completed ({status})."],
+            trace_path=str(trace.path),
+            trace_event_count=trace.event_count,
+        )
+
+    @staticmethod
+    def _result_with_trace(
+        result: GraphAuthoringToolResult,
+        trace: AgentRunTrace,
+    ) -> GraphAuthoringToolResult:
+        """Refresh trace metadata after the terminal event has been flushed."""
+        return result.model_copy(
+            update={
+                "trace_path": str(trace.path),
+                "trace_event_count": trace.event_count,
+            }
         )
 
 

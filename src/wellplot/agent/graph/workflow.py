@@ -27,6 +27,7 @@ from langgraph.types import Send
 
 from ...capabilities import CapabilityRegistry
 from ...model.intent import AuthoringDocumentIntent
+from ..execution_trace import current_agent_trace
 from .merge import merge_compiled_artifacts
 from .models import CompilationMode, CompiledArtifact, ReconstructionPlan, SectionPlan
 from .planner import ReconstructionPlanner
@@ -122,11 +123,29 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
 
     async def merge_node(state: ReconstructionState) -> dict[str, object]:
         """Merge compiled artifacts after every dynamic worker has completed."""
-        artifacts = [CompiledArtifact.model_validate(item) for item in state["compiled_artifacts"]]
-        merged: AuthoringDocumentIntent = merge_compiled_artifacts(
-            artifacts,
-            registry=dependencies.registry,
-        )
+        trace = current_agent_trace()
+        if trace is None:
+            artifacts = [
+                CompiledArtifact.model_validate(item) for item in state["compiled_artifacts"]
+            ]
+            merged: AuthoringDocumentIntent = merge_compiled_artifacts(
+                artifacts,
+                registry=dependencies.registry,
+            )
+        else:
+            with trace.stage("merge"):
+                artifacts = [
+                    CompiledArtifact.model_validate(item) for item in state["compiled_artifacts"]
+                ]
+                merged = merge_compiled_artifacts(
+                    artifacts,
+                    registry=dependencies.registry,
+                )
+                trace.record(
+                    "merged_intent",
+                    status="accepted",
+                    payload=merged.model_dump(mode="json", exclude_unset=True),
+                )
         return {"merged_intent": merged.model_dump(mode="json", exclude_unset=True)}
 
     builder = StateGraph(ReconstructionState)
