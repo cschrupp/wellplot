@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 from jsonschema import Draft202012Validator
 
@@ -38,6 +39,50 @@ from ._openai_responses import (
     _required_tool_submission_outcome,
     _tool_argument_schema_error,
 )
+
+_MAX_TRANSPORT_ERROR_CHARACTERS = 500
+
+
+@dataclass(frozen=True)
+class _PartialChatResponse:
+    """Provider response fragments received before a stream interruption."""
+
+    text: str
+    function_calls: list[dict[str, str]]
+    finish_reason: str | None
+
+
+class _ChatStreamInterrupted(RuntimeError):
+    """Carry partial streamed output when a provider closes the response early."""
+
+    def __init__(self, cause: BaseException, partial_response: _PartialChatResponse) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.partial_response = partial_response
+
+
+def _transport_exception_details(exc: BaseException) -> dict[str, str]:
+    """Return bounded transport evidence suitable for a trace report fact."""
+    message = str(exc).strip()
+    if len(message) > _MAX_TRANSPORT_ERROR_CHARACTERS:
+        message = message[: _MAX_TRANSPORT_ERROR_CHARACTERS - 3].rstrip() + "..."
+    return {
+        "exception_type": type(exc).__name__,
+        "exception_message": message,
+    }
+
+
+def _partial_response_trace_payload(
+    partial_response: _PartialChatResponse | None,
+) -> dict[str, object] | None:
+    """Project incomplete streamed output into the durable response trace shape."""
+    if partial_response is None:
+        return None
+    return {
+        "assistant_response": assistant_response_trace_payload(partial_response.text),
+        "tool_calls": partial_response.function_calls,
+        "finish_reason": partial_response.finish_reason,
+    }
 
 
 def _message_text(message: object) -> str:
@@ -75,36 +120,46 @@ def _chat_response_parts(
     content_parts: list[str] = []
     calls_by_index: dict[int, dict[str, str]] = {}
     finish_reason: str | None = None
-    for chunk in response:
-        chunk_choices = getattr(chunk, "choices", [])
-        for choice in chunk_choices:
-            current_finish_reason = getattr(choice, "finish_reason", None)
-            if current_finish_reason:
-                finish_reason = str(current_finish_reason)
-            delta = getattr(choice, "delta", None)
-            if delta is None:
-                continue
-            content = getattr(delta, "content", None)
-            if isinstance(content, str):
-                content_parts.append(content)
-            for call in list(getattr(delta, "tool_calls", None) or []):
-                index = int(getattr(call, "index", 0) or 0)
-                current = calls_by_index.setdefault(
-                    index,
-                    {"id": "", "name": "", "arguments": ""},
-                )
-                call_id = getattr(call, "id", None)
-                if call_id:
-                    current["id"] = str(call_id)
-                function = getattr(call, "function", None)
-                if function is None:
+    try:
+        for chunk in response:
+            chunk_choices = getattr(chunk, "choices", [])
+            for choice in chunk_choices:
+                current_finish_reason = getattr(choice, "finish_reason", None)
+                if current_finish_reason:
+                    finish_reason = str(current_finish_reason)
+                delta = getattr(choice, "delta", None)
+                if delta is None:
                     continue
-                name = getattr(function, "name", None)
-                if name:
-                    current["name"] += str(name)
-                arguments = getattr(function, "arguments", None)
-                if arguments:
-                    current["arguments"] += str(arguments)
+                content = getattr(delta, "content", None)
+                if isinstance(content, str):
+                    content_parts.append(content)
+                for call in list(getattr(delta, "tool_calls", None) or []):
+                    index = int(getattr(call, "index", 0) or 0)
+                    current = calls_by_index.setdefault(
+                        index,
+                        {"id": "", "name": "", "arguments": ""},
+                    )
+                    call_id = getattr(call, "id", None)
+                    if call_id:
+                        current["id"] = str(call_id)
+                    function = getattr(call, "function", None)
+                    if function is None:
+                        continue
+                    name = getattr(function, "name", None)
+                    if name:
+                        current["name"] += str(name)
+                    arguments = getattr(function, "arguments", None)
+                    if arguments:
+                        current["arguments"] += str(arguments)
+    except Exception as exc:
+        raise _ChatStreamInterrupted(
+            exc,
+            _PartialChatResponse(
+                text="".join(content_parts),
+                function_calls=[calls_by_index[index] for index in sorted(calls_by_index)],
+                finish_reason=finish_reason,
+            ),
+        ) from exc
 
     return (
         "".join(content_parts),
@@ -125,10 +180,22 @@ def _request_chat_response(
         return _chat_response_parts(response)
     except ProviderAdapterError:
         raise
+    except _ChatStreamInterrupted as exc:
+        cause = exc.cause
+        raise ProviderAdapterError(
+            "transport_failure",
+            f"The {provider_label} chat request failed while receiving a response.",
+            final_text=exc.partial_response.text,
+            report_facts={
+                "transport": _transport_exception_details(cause),
+                "partial_response": _partial_response_trace_payload(exc.partial_response),
+            },
+        ) from cause
     except Exception as exc:
         raise ProviderAdapterError(
             "transport_failure",
             f"The {provider_label} chat request failed while receiving a response.",
+            report_facts={"transport": _transport_exception_details(exc)},
         ) from exc
 
 
@@ -210,12 +277,36 @@ async def run_chat_completions_authoring_loop(
             )
         except ProviderAdapterError as exc:
             if trace is not None:
+                transport = exc.report_facts.get("transport")
+                partial_response = exc.report_facts.get("partial_response")
+                details: dict[str, object] = {"round": round_index, "error": str(exc)}
+                if isinstance(transport, dict):
+                    details["transport"] = transport
+                failure_payload: dict[str, object] = {}
+                if isinstance(partial_response, dict):
+                    failure_payload["partial_response"] = partial_response
+                if tool_trace:
+                    failure_payload["prior_tool_calls"] = [
+                        {
+                            "round": call.round,
+                            "name": call.name,
+                            "arguments": call.arguments,
+                        }
+                        for call in tool_trace
+                    ]
                 trace.record(
                     "provider_round_finished",
                     status=exc.status,
-                    details={"round": round_index, "error": str(exc)},
+                    details=details,
+                    payload=failure_payload or None,
                 )
-            raise
+            raise ProviderAdapterError(
+                exc.status,
+                str(exc),
+                tool_trace=(*tool_trace, *exc.tool_trace),
+                final_text=exc.final_text or final_text,
+                report_facts=exc.report_facts,
+            ) from exc
         if trace is not None:
             trace.record(
                 "provider_round_finished",
@@ -226,7 +317,10 @@ async def run_chat_completions_authoring_loop(
                     "tool_names": [call["name"] for call in function_calls],
                     "text_characters": len(response_text),
                 },
-                payload={"assistant_response": assistant_response_trace_payload(response_text)},
+                payload={
+                    "assistant_response": assistant_response_trace_payload(response_text),
+                    "tool_calls": function_calls,
+                },
             )
         if finish_reason is not None:
             finish_reasons.append(finish_reason)

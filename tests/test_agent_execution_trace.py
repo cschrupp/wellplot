@@ -152,6 +152,45 @@ class _CorrectingProviderBackend:
         )
 
 
+@dataclass
+class _ResponseModelCorrectingProviderBackend:
+    """Resubmit after the response model rejects the first provider payload."""
+
+    async def run_authoring(
+        self,
+        *,
+        instructions: str,
+        initial_user_message: str,
+        tool_definitions: list[object],
+        tool_caller: object,
+        max_rounds: int,
+        required_tool_name: str | None = None,
+    ) -> ProviderRunResult:
+        """Model the correction conversation after a Pydantic rejection."""
+        del instructions, initial_user_message, tool_definitions, max_rounds
+        assert required_tool_name == "submit_trace"
+        rejected = await tool_caller("submit_trace", {"unexpected": "Rejected"})  # type: ignore[misc]
+        assert rejected["is_error"] is True
+        accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]
+        assert accepted == {"accepted": True}
+        return ProviderRunResult(
+            final_text="Submitted corrected typed output.",
+            tool_trace=(
+                AuthoringToolCall(
+                    round=1,
+                    name="submit_trace",
+                    arguments={"unexpected": "Rejected"},
+                ),
+                AuthoringToolCall(
+                    round=2,
+                    name="submit_trace",
+                    arguments={"title": "Accepted"},
+                ),
+            ),
+            report_facts={"provider_response": {"rounds": 2}},
+        )
+
+
 def test_agent_run_trace_redacts_sensitive_values_and_flushes_events(tmp_path: Path) -> None:
     """Trace files remain readable and never persist credential-shaped values."""
     trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
@@ -259,9 +298,25 @@ def test_provider_adapter_trace_records_validated_agent_submission(tmp_path: Pat
         for event in events
         if event.event == "structured_request_finished" and event.status == "succeeded"
     )
+    started = next(
+        event
+        for event in events
+        if event.event == "structured_request_started" and event.status == "started"
+    )
 
     assert result.title == "Agent output"
     assert completed.payload == {"title": "Agent output"}
+    assert started.details["instructions_characters"] == len("Submit the response.")
+    assert started.details["user_message_characters"] == len("Set the title.")
+    assert started.details["response_schema_characters"] > 0
+    assert started.details["prompt_and_schema_characters"] == sum(
+        started.details[key]
+        for key in (
+            "instructions_characters",
+            "user_message_characters",
+            "response_schema_characters",
+        )
+    )
 
 
 def test_provider_adapter_returns_semantic_rejections_to_the_same_provider(tmp_path: Path) -> None:
@@ -292,3 +347,33 @@ def test_provider_adapter_returns_semantic_rejections_to_the_same_provider(tmp_p
     assert rejection.status == "invalid_semantics"
     assert rejection.payload == {"title": "Rejected"}
     assert "title must be 'Accepted'" in rejection.details["error"]
+
+
+def test_provider_adapter_traces_response_model_rejections(tmp_path: Path) -> None:
+    """Keep invalid typed provider submissions available for later trace review."""
+    trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
+    adapter = ExistingProviderStructuredAdapter(backend=_ResponseModelCorrectingProviderBackend())
+
+    async def generate() -> _Submission:
+        with bind_agent_trace(trace), trace.stage("report", target_id="report"):
+            return await adapter.generate(
+                instructions="Submit the response.",
+                user_message="Set the title.",
+                response_model=_Submission,
+                tool_name="submit_trace",
+                tool_description="Submit one trace response.",
+            )
+
+    result = asyncio.run(generate())
+    events = read_agent_trace(trace.path)
+    rejection = next(
+        event
+        for event in events
+        if event.event == "structured_submission_rejected"
+        and event.status == "invalid_response_model"
+    )
+
+    assert result.title == "Accepted"
+    assert rejection.payload == {"unexpected": "Rejected"}
+    assert rejection.details["response_model"] == "_Submission"
+    assert "title" in rejection.details["error"]

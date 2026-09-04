@@ -9,13 +9,13 @@
 
 from __future__ import annotations
 
-import json
 from contextlib import nullcontext
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
 from ..execution_trace import current_agent_trace
 from .models import CompilationMode, CompiledArtifact, ReconstructionPlan
+from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -67,7 +67,7 @@ class ReportCompiler:
                 ),
                 user_message=(
                     "Compile the report-wide portion of the reconstruction.\n\nContext:\n"
-                    + json.dumps(context, indent=2, default=str)
+                    + compact_prompt_json(context)
                 ),
                 response_model=spec.artifact_model,
                 tool_name="submit_report_artifact",

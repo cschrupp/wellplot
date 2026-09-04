@@ -9,13 +9,13 @@
 
 from __future__ import annotations
 
-import json
 from contextlib import nullcontext
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
 from ..execution_trace import current_agent_trace
 from .models import CompilationMode, ReconstructionPlan
+from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -76,7 +76,7 @@ class ReconstructionPlanner:
                 user_message=(
                     "Create the ReconstructionPlan for this request. The response schema is "
                     "supplied as the required function schema.\n\nContext:\n"
-                    + json.dumps(context, indent=2, default=str)
+                    + compact_prompt_json(context)
                 ),
                 response_model=ReconstructionPlan,
                 tool_name="submit_reconstruction_plan",

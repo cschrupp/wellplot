@@ -15,6 +15,7 @@ start without replacing the provider layer at the same time.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
@@ -70,6 +71,10 @@ class ExistingProviderStructuredAdapter:
 
         accepted: TModel | None = None
         trace = current_agent_trace()
+        response_schema = response_model.model_json_schema()
+        response_schema_characters = len(
+            json.dumps(response_schema, separators=(",", ":"), default=str)
+        )
 
         async def capture(name: str, arguments: dict[str, object]) -> dict[str, object]:
             nonlocal accepted
@@ -81,6 +86,17 @@ class ExistingProviderStructuredAdapter:
             try:
                 candidate = response_model.model_validate(arguments)
             except Exception as exc:
+                if trace is not None:
+                    trace.record(
+                        "structured_submission_rejected",
+                        status="invalid_response_model",
+                        details={
+                            "tool_name": tool_name,
+                            "response_model": response_model.__name__,
+                            "error": str(exc),
+                        },
+                        payload=arguments,
+                    )
                 return {
                     "is_error": True,
                     "error": f"Invalid {response_model.__name__}: {exc}",
@@ -115,6 +131,12 @@ class ExistingProviderStructuredAdapter:
                     "tool_name": tool_name,
                     "response_model": response_model.__name__,
                     "max_rounds": max_rounds,
+                    "instructions_characters": len(instructions),
+                    "user_message_characters": len(user_message),
+                    "response_schema_characters": response_schema_characters,
+                    "prompt_and_schema_characters": (
+                        len(instructions) + len(user_message) + response_schema_characters
+                    ),
                 },
             )
         try:
@@ -125,7 +147,7 @@ class ExistingProviderStructuredAdapter:
                     FunctionToolDefinition(
                         name=tool_name,
                         description=tool_description,
-                        parameters=response_model.model_json_schema(),
+                        parameters=response_schema,
                     )
                 ],
                 tool_caller=capture,
@@ -134,14 +156,18 @@ class ExistingProviderStructuredAdapter:
             )
         except ProviderAdapterError as exc:
             if trace is not None:
+                details: dict[str, object] = {
+                    "tool_name": tool_name,
+                    "error": str(exc),
+                    "provider_response": exc.report_facts.get("provider_response", {}),
+                }
+                transport = exc.report_facts.get("transport")
+                if isinstance(transport, dict):
+                    details["transport"] = transport
                 trace.record(
                     "structured_request_finished",
                     status=exc.status,
-                    details={
-                        "tool_name": tool_name,
-                        "error": str(exc),
-                        "provider_response": exc.report_facts.get("provider_response", {}),
-                    },
+                    details=details,
                     payload={
                         "tool_trace": [
                             {

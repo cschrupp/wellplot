@@ -67,6 +67,32 @@ class _BrokenStream:
         raise RuntimeError("peer closed connection without sending complete message body")
 
 
+class _PartiallyBrokenStream:
+    """Yield text and a partial tool call before a gateway interruption."""
+
+    def __iter__(self) -> Iterator[object]:
+        yield SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    delta=SimpleNamespace(
+                        content="I will submit ",
+                        tool_calls=[
+                            SimpleNamespace(
+                                index=0,
+                                id="call-partial",
+                                function=SimpleNamespace(
+                                    name="submit_reconstruction_plan",
+                                    arguments='{"summary":"CBL',
+                                ),
+                            )
+                        ],
+                    )
+                )
+            ]
+        )
+        raise RuntimeError("peer closed connection without sending complete message body")
+
+
 def _chat_response(
     *,
     content: str | None,
@@ -223,6 +249,171 @@ def test_chat_adapter_normalizes_stream_transport_failure() -> None:
         )
 
     assert exc_info.value.status == "transport_failure"
+
+
+def test_chat_adapter_traces_partial_stream_transport_failure(tmp_path: Path) -> None:
+    """Retain bounded provider fragments and transport evidence after a stream breaks."""
+    completions = _FakeCompletions([_PartiallyBrokenStream()])
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
+
+    async def call_tool(_: str, __: dict[str, object]) -> dict[str, object]:
+        raise AssertionError("the provider must fail before calling a tool")
+
+    async def run_with_trace() -> None:
+        with bind_agent_trace(trace):
+            await run_chat_completions_authoring_loop(
+                client=client,
+                model="local-model",
+                provider_label="OpenAI-compatible",
+                instructions="Use the available tools.",
+                initial_user_message="Inspect the draft.",
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name="submit_reconstruction_plan",
+                        description="Submit a reconstruction plan.",
+                        parameters={"type": "object"},
+                    )
+                ],
+                tool_caller=call_tool,
+                max_rounds=1,
+                required_tool_name="submit_reconstruction_plan",
+            )
+
+    with pytest.raises(ProviderAdapterError) as exc_info:
+        anyio.run(run_with_trace)
+
+    assert exc_info.value.status == "transport_failure"
+    assert exc_info.value.final_text == "I will submit "
+    assert exc_info.value.report_facts["transport"] == {
+        "exception_type": "RuntimeError",
+        "exception_message": "peer closed connection without sending complete message body",
+    }
+
+    interrupted = next(
+        event
+        for event in read_agent_trace(trace.path)
+        if event.event == "provider_round_finished" and event.status == "transport_failure"
+    )
+
+    assert interrupted.details["transport"] == exc_info.value.report_facts["transport"]
+    assert isinstance(interrupted.payload, dict)
+    partial_response = interrupted.payload["partial_response"]
+    assert isinstance(partial_response, dict)
+    assistant_response = partial_response["assistant_response"]
+    assert assistant_response == {
+        "original_characters": 14,
+        "sha256": "e1ba5c1e854bd28aa9e5e81840c63a1298c6657d8f0dfb295b8db3fd1c743d5c",
+        "truncated": False,
+        "excerpt": "I will submit ",
+    }
+    assert partial_response["tool_calls"] == [
+        {
+            "id": "call-partial",
+            "name": "submit_reconstruction_plan",
+            "arguments": '{"summary":"CBL',
+        }
+    ]
+    assert partial_response["finish_reason"] is None
+
+
+def test_chat_adapter_preserves_prior_tool_calls_after_transport_failure(tmp_path: Path) -> None:
+    """Keep completed calls inspectable when a corrective round loses its stream."""
+    completions = _FakeCompletions(
+        [
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(
+                            name="submit_report_artifact",
+                            arguments='{"title":"First report attempt"}',
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            ),
+            _BrokenStream(),
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    trace = AgentRunTrace.create(logfile_path=tmp_path / "draft.log.yaml", mode="reconstruct")
+
+    async def reject_submission(_: str, __: dict[str, object]) -> dict[str, object]:
+        return {"is_error": True, "error": "correct the report artifact"}
+
+    async def run_with_trace() -> None:
+        with bind_agent_trace(trace):
+            await run_chat_completions_authoring_loop(
+                client=client,
+                model="local-model",
+                provider_label="OpenAI-compatible",
+                instructions="Submit one report artifact.",
+                initial_user_message="Compile the report.",
+                tool_definitions=[
+                    FunctionToolDefinition(
+                        name="submit_report_artifact",
+                        description="Submit one report artifact.",
+                        parameters={"type": "object"},
+                    )
+                ],
+                tool_caller=reject_submission,
+                max_rounds=2,
+                required_tool_name="submit_report_artifact",
+            )
+
+    with pytest.raises(ProviderAdapterError) as exc_info:
+        anyio.run(run_with_trace)
+
+    assert [(call.name, call.arguments) for call in exc_info.value.tool_trace] == [
+        ("submit_report_artifact", {"title": "First report attempt"})
+    ]
+    events = read_agent_trace(trace.path)
+    received = next(
+        event
+        for event in events
+        if event.event == "provider_round_finished" and event.status == "received"
+    )
+    failed = next(
+        event
+        for event in events
+        if event.event == "provider_round_finished" and event.status == "transport_failure"
+    )
+
+    assert received.payload == {
+        "assistant_response": {
+            "original_characters": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": False,
+            "excerpt": "",
+        },
+        "tool_calls": [
+            {
+                "id": "call-1",
+                "name": "submit_report_artifact",
+                "arguments": '{"title":"First report attempt"}',
+            }
+        ],
+    }
+    assert isinstance(failed.payload, dict)
+    assert failed.payload["prior_tool_calls"] == [
+        {
+            "round": 1,
+            "name": "submit_report_artifact",
+            "arguments": {"title": "First report attempt"},
+        }
+    ]
+    assert failed.payload["partial_response"] == {
+        "assistant_response": {
+            "original_characters": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "truncated": False,
+            "excerpt": "",
+        },
+        "tool_calls": [],
+        "finish_reason": None,
+    }
 
 
 def test_chat_adapter_records_provider_response_excerpt(tmp_path: Path) -> None:

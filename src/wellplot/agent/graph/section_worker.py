@@ -9,7 +9,6 @@
 
 from __future__ import annotations
 
-import json
 from contextlib import nullcontext
 from dataclasses import dataclass
 
@@ -18,6 +17,7 @@ from pydantic import BaseModel
 from ...capabilities import CapabilityRegistry
 from ..execution_trace import current_agent_trace
 from .models import CompilationMode, CompiledArtifact, SectionPlan
+from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
 
 
@@ -77,8 +77,7 @@ class SectionCompiler:
                 instructions=instructions,
                 user_message=(
                     f"Compile section {plan.section_id!r}. The artifact schema is supplied as "
-                    "the required function schema.\n\nContext:\n"
-                    + json.dumps(context, indent=2, default=str)
+                    "the required function schema.\n\nContext:\n" + compact_prompt_json(context)
                 ),
                 response_model=section_spec.artifact_model,
                 tool_name="submit_section_artifact",
