@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +35,10 @@ from wellplot.capabilities import create_builtin_registry
 class _TraceStructuredModel:
     """Return deterministic graph artifacts for trace coverage."""
 
+    def __init__(self) -> None:
+        """Record graph prompts while returning deterministic artifacts."""
+        self.user_messages: list[str] = []
+
     async def generate(
         self,
         *,
@@ -47,6 +52,7 @@ class _TraceStructuredModel:
     ) -> BaseModel:
         """Produce each typed planner or compiler output without a provider."""
         del instructions, tool_description, max_rounds, response_validator
+        self.user_messages.append(user_message)
         if response_model is ReconstructionPlan:
             return ReconstructionPlan.model_validate(
                 {
@@ -274,6 +280,24 @@ def test_compile_graph_trace_records_stage_outputs(tmp_path: Path) -> None:
     }
     assert len(outputs) == 4
     assert any(event.event == "merged_intent" for event in events)
+
+    report_context = next(
+        json.loads(message.partition("Context:\n")[2])
+        for message in model.user_messages
+        if message.startswith("Compile the report-wide portion")
+    )
+    section_contexts = [
+        json.loads(message.partition("Context:\n")[2])
+        for message in model.user_messages
+        if message.startswith("Compile section")
+    ]
+
+    assert report_context["capability"] == registry.get("report.standard").planning_descriptor()
+    assert all(
+        context["capabilities"] == [registry.get("section.log_plot").planning_descriptor()]
+        for context in section_contexts
+    )
+    assert all("artifact_schema" not in message for message in model.user_messages)
 
 
 def test_provider_adapter_trace_records_validated_agent_submission(tmp_path: Path) -> None:

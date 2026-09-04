@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
 from wellplot.model import (
@@ -97,3 +98,23 @@ def test_intent_models_are_strict_and_schema_is_generated() -> None:
     serialized = str(schema)
     assert "AuthoringClearIntent" in serialized
     assert "AuthoringRemoveIntent" in serialized
+
+
+def test_intent_schema_advertises_omission_or_explicit_clear_not_raw_null() -> None:
+    """Provider schemas must agree with runtime intent-null validation."""
+    schema = authoring_intent_json_schema()
+    title = schema["properties"]["title"]
+
+    assert {"type": "null"} not in title["anyOf"]
+    assert "default" not in title
+    assert {"$ref": "#/$defs/AuthoringClearIntent"} in title["anyOf"]
+
+    remove = schema["$defs"]["AuthoringRemoveIntent"]
+    section_id = remove["properties"]["section_id"]
+    assert {"type": "null"} not in section_id["anyOf"]
+    assert "default" not in section_id
+
+    validator = Draft202012Validator(schema)
+    assert list(validator.iter_errors({"title": None}))
+    assert not list(validator.iter_errors({}))
+    assert not list(validator.iter_errors({"title": {"operation": "clear"}}))

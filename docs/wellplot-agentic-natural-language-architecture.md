@@ -1774,8 +1774,13 @@ MCP results without persistence; programming faults still propagate.
 instruction, prompt, and response-schema sizes in the execution trace. It
 preserves every supplied fact and adds no provider retry or controller behavior.
 
-`LG-R4B` scopes current-document and source context to each worker and records
-artifact sizes. This begins only after the hierarchy contract is green.
+`LG-R4B` removes artifact-schema duplication from worker prompt context, then
+scopes current-document and source context to each worker and records artifact
+sizes. The function schema remains the sole typed output contract.
+
+`LG-R4C` aligns provider-facing intent schemas with canonical omit/set/clear
+semantics: raw `null` is not advertised where deterministic intent validation
+rejects it.
 
 `LG-R5` reruns the unchanged CBL prompt with two providers and requires valid
 hierarchy, verified canonical state, and a final render. The target remains one

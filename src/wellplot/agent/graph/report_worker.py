@@ -53,7 +53,8 @@ class ReportCompiler:
             "mode": mode,
             "current_document": current_document,
             "source_manifest": source_manifest,
-            "capability": spec.worker_descriptor(),
+            # The required function schema is sent separately; do not duplicate it here.
+            "capability": spec.planning_descriptor(),
         }
         trace = current_agent_trace()
         stage = trace.stage("report", target_id="report") if trace is not None else nullcontext()

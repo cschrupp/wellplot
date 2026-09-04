@@ -42,8 +42,11 @@ class SectionCompiler:
         if section_spec.category != "section":
             raise ValueError(f"{plan.capability_id!r} is not a section capability.")
 
-        selected_ids = [plan.capability_id, *(item.capability_id for item in plan.components)]
-        worker_catalog = self.registry.worker_catalog(selected_ids)
+        selected_ids = {plan.capability_id, *(item.capability_id for item in plan.components)}
+        worker_catalog = tuple(
+            self.registry.get(capability_id).planning_descriptor()
+            for capability_id in sorted(selected_ids)
+        )
         revision_instruction = (
             " In revision mode, this selected section is the only section you may compile; omit "
             "unchanged fields so deterministic reconciliation preserves them."
@@ -64,6 +67,7 @@ class SectionCompiler:
             "section_plan": plan.model_dump(mode="json"),
             "current_document": current_document,
             "source_manifest": source_manifest,
+            # The section artifact schema is already the required function schema.
             "capabilities": worker_catalog,
         }
         trace = current_agent_trace()

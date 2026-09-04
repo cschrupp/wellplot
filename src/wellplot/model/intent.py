@@ -31,6 +31,8 @@ from __future__ import annotations
 from typing import Any, Literal, Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic.json_schema import GetJsonSchemaHandler, JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from .authoring import (
     AnnotationSpec,
@@ -56,6 +58,36 @@ from .authoring import (
 )
 
 
+def _omit_rejected_nulls_from_schema(value: object) -> object:
+    """Remove schema variants that intent validation rejects at runtime."""
+    if isinstance(value, list):
+        return [_omit_rejected_nulls_from_schema(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    schema = {key: _omit_rejected_nulls_from_schema(item) for key, item in value.items()}
+    removed_null = False
+
+    any_of = schema.get("anyOf")
+    if isinstance(any_of, list):
+        non_null_variants = [
+            item for item in any_of if not (isinstance(item, dict) and item.get("type") == "null")
+        ]
+        if len(non_null_variants) != len(any_of):
+            schema["anyOf"] = non_null_variants
+            removed_null = True
+
+    schema_type = schema.get("type")
+    if isinstance(schema_type, list) and "null" in schema_type:
+        non_null_types = [item for item in schema_type if item != "null"]
+        schema["type"] = non_null_types[0] if len(non_null_types) == 1 else non_null_types
+        removed_null = True
+
+    if removed_null and schema.get("default") is None:
+        schema.pop("default", None)
+    return schema
+
+
 class _IntentModel(BaseModel):
     """Strict base model shared by desired-state intent objects."""
 
@@ -65,6 +97,15 @@ class _IntentModel(BaseModel):
         validate_assignment=True,
     )
 
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls,
+        core_schema: CoreSchema,
+        handler: GetJsonSchemaHandler,
+    ) -> JsonSchemaValue:
+        """Advertise omission-or-clear semantics rather than rejected raw nulls."""
+        return _omit_rejected_nulls_from_schema(handler(core_schema))
+
     @model_validator(mode="after")
     def reject_explicit_nulls(self) -> Self:
         """Require callers to use the clear marker instead of raw ``null``."""
@@ -72,7 +113,7 @@ class _IntentModel(BaseModel):
             if getattr(self, field_name) is None:
                 raise ValueError(
                     f"Intent field '{field_name}' cannot be null; use "
-                    "{\"operation\": \"clear\"} to clear it explicitly."
+                    '{"operation": "clear"} to clear it explicitly.'
                 )
         return self
 
