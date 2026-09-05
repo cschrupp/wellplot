@@ -108,6 +108,37 @@ class _FrozenCblModel:
         return response_model.model_validate(payload)
 
 
+@dataclass
+class _FrozenFailureModel:
+    """Return one reduced live failure artifact without provider access."""
+
+    contract: dict[str, object]
+
+    async def generate(
+        self,
+        *,
+        instructions: str,
+        user_message: str,
+        response_model: type[BaseModel],
+        tool_name: str,
+        tool_description: str,
+        max_rounds: int = 3,
+        response_validator: object | None = None,
+    ) -> BaseModel:
+        """Return the captured plan and artifact for the requested graph target."""
+        del instructions, user_message, tool_description, max_rounds, response_validator
+        artifacts = self.contract["artifacts"]
+        if tool_name == "submit_reconstruction_plan":
+            payload = self.contract["reconstruction_plan"]
+        elif tool_name == "submit_report_artifact":
+            payload = artifacts["report"]
+        elif tool_name == "submit_section_artifact":
+            payload = artifacts["sections"]["repeat_pass"]
+        else:
+            raise AssertionError(f"Unexpected structured model request: {tool_name}")
+        return response_model.model_validate(payload)
+
+
 def _graph() -> CompiledStateGraph:
     """Build the generic graph with deterministic reconstruction responses."""
     registry = create_builtin_registry()
@@ -150,6 +181,20 @@ def _frozen_cbl_graph(contract: dict[str, object]) -> CompiledStateGraph:
     """Build the generic graph with frozen CBL compiler responses."""
     registry = create_builtin_registry()
     model = _FrozenCblModel(contract=contract)
+    return build_compile_graph(
+        ReconstructionGraphDependencies(
+            planner=ReconstructionPlanner(model=model, registry=registry),
+            report_compiler=ReportCompiler(model=model, registry=registry),
+            section_compiler=SectionCompiler(model=model, registry=registry),
+            registry=registry,
+        )
+    )
+
+
+def _frozen_failure_graph(contract: dict[str, object]) -> CompiledStateGraph:
+    """Build the graph against one reduced invalid live artifact."""
+    registry = create_builtin_registry()
+    model = _FrozenFailureModel(contract=contract)
     return build_compile_graph(
         ReconstructionGraphDependencies(
             planner=ReconstructionPlanner(model=model, registry=registry),
@@ -255,3 +300,26 @@ def test_reconstruction_execution_applies_frozen_cbl_transaction(tmp_path: Path)
     assert [section.id for section in service.document.sections] == ["main_pass", "repeat_pass"]
     for section in service.document.sections:
         assert [track.id for track in section.tracks] == ["combo", "depth", "cbl", "vdl"]
+
+
+def test_reconstruction_rejects_live_clear_on_create_without_persisting(tmp_path: Path) -> None:
+    """Reject the captured clear-on-create artifact before mutating the draft."""
+    contract = json.loads(
+        (_FIXTURE_DIR / "live_clear_on_create_contract.json").read_text(encoding="utf-8")
+    )
+    service = _cased_hole_service(tmp_path)
+    before = service.document.model_dump(mode="json")
+
+    result = asyncio.run(
+        execute_document_reconstruction(
+            _frozen_failure_graph(contract),
+            service,
+            request="Create the repeat logging pass.",
+        )
+    )
+
+    assert result.success is False
+    assert result.execution.success is False
+    assert result.execution.reconciliation_plan is not None
+    assert set(contract["expected_errors"]).issubset(result.errors)
+    assert service.document.model_dump(mode="json") == before

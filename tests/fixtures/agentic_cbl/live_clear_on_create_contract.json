@@ -1,0 +1,76 @@
+{
+  "evidence": {
+    "trace_run_id": "3a0a2c27d9b747a8b4527cbf3f4ef031",
+    "trace_status": "failed",
+    "description": "Reduced live reconstruction artifact: a new repeat section used explicit clear markers and scoped component ids as local track ids."
+  },
+  "reconstruction_plan": {
+    "summary": "Create the repeat logging pass.",
+    "sections": [
+      {
+        "section_id": "repeat_pass",
+        "capability_id": "section.log_plot",
+        "goal": "Create the repeat logging pass.",
+        "components": [
+          {
+            "component_id": "repeat_pass.combo",
+            "capability_id": "track.normal",
+            "goal": "Create the combo track.",
+            "values": {
+              "track_id": "combo",
+              "width_mm": 50
+            },
+            "parent_component_id": null
+          }
+        ]
+      }
+    ]
+  },
+  "artifacts": {
+    "report": {
+      "intent": {}
+    },
+    "sections": {
+      "repeat_pass": {
+        "section": {
+          "section_id": "repeat_pass",
+          "title": {
+            "operation": "clear"
+          },
+          "subtitle": {
+            "operation": "clear"
+          },
+          "depth_range": {
+            "operation": "clear"
+          },
+          "tracks": [
+            {
+              "section_id": "repeat_pass",
+              "track_id": "repeat_pass.combo",
+              "title": {
+                "operation": "clear"
+              },
+              "kind": "normal",
+              "width_mm": 50,
+              "x_scale": {
+                "operation": "clear"
+              },
+              "grid": {
+                "operation": "clear"
+              },
+              "track_header": {
+                "operation": "clear"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expected_errors": [
+    "Cannot clear section field 'title' while creating a section.",
+    "Cannot clear required track field 'title' while creating a track.",
+    "Cannot create track 'repeat_pass.combo': missing display title. These values could not be resolved from the request, existing draft, or generic form defaults.",
+    "Creating a section requires title and at least one track."
+  ]
+}
