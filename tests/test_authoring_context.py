@@ -431,6 +431,63 @@ def test_compatibility_and_duplicate_identity_are_blocking() -> None:
     assert "content_track_incompatible" in {issue.code for issue in result.issues}
 
 
+def test_empty_track_content_collections_are_compatible() -> None:
+    """Treat empty fill and annotation collections as no requested content."""
+    empty_collections = ["normal", "reference", "array", "annotation"]
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": f"{kind}-track",
+                        "kind": kind,
+                        "fills": [],
+                        "annotations": [],
+                    }
+                    for kind in empty_collections
+                ],
+            }
+        ]
+    )
+
+    result = resolve_authoring_context(intent)
+
+    assert result.ready is True
+    assert "content_track_incompatible" not in {issue.code for issue in result.issues}
+
+
+def test_nonempty_track_content_remains_kind_compatible() -> None:
+    """Reject fills and annotations when their track kinds cannot own them."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "array-track",
+                        "kind": "array",
+                        "fills": [{"fill_id": "fill-1"}],
+                    },
+                    {
+                        "track_id": "normal-track",
+                        "kind": "normal",
+                        "annotations": [{"annotation_id": "annotation-1"}],
+                    },
+                ],
+            }
+        ]
+    )
+
+    result = resolve_authoring_context(intent)
+
+    assert result.ready is False
+    assert [issue.message for issue in result.issues] == [
+        "Curve fills currently require a normal track.",
+        "Annotation objects require an annotation track.",
+    ]
+
+
 def test_defaulted_track_kind_is_used_for_compatibility() -> None:
     """Use a selected default track kind before validating raster ownership."""
     intent = AuthoringDocumentIntent(

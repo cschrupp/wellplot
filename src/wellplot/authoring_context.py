@@ -1228,13 +1228,13 @@ def _validate_track_content_compatibility(
                             path=f"sections[{section.section_id}].tracks[{track.track_id}].bindings[{index}]",
                             message="Curve bindings require a normal, reference, or array track.",
                         )
-            if isinstance(track.fills, list) and kind != "normal":
+            if track.fills and kind != "normal":
                 _add_compatibility_issue(
                     issues,
                     path=f"sections[{section.section_id}].tracks[{track.track_id}].fills",
                     message="Curve fills currently require a normal track.",
                 )
-            if isinstance(track.annotations, list) and kind != "annotation":
+            if track.annotations and kind != "annotation":
                 _add_compatibility_issue(
                     issues,
                     path=f"sections[{section.section_id}].tracks[{track.track_id}].annotations",
