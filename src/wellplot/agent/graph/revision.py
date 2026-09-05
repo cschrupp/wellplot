@@ -32,6 +32,7 @@ class RevisionCompilationResult:
     existing_document: AuthoringDocumentSpec
     plan: ReconstructionPlan
     intent: AuthoringDocumentIntent
+    source_manifest: dict[str, Any]
     affected_section_ids: tuple[str, ...]
     preserved_section_ids: tuple[str, ...]
 
@@ -42,6 +43,7 @@ async def compile_document_revision(
     request: str,
     current_document: AuthoringDocumentSpec,
     source_manifest: Mapping[str, Any] | None = None,
+    logfile_path: str | None = None,
 ) -> RevisionCompilationResult:
     """Compile a scoped revision without mutating ``current_document``.
 
@@ -58,6 +60,7 @@ async def compile_document_revision(
         {
             "request": request,
             "mode": "revise",
+            "logfile_path": logfile_path,
             "current_document": existing_snapshot.model_dump(mode="json"),
             "source_manifest": dict(source_manifest or {}),
             "compiled_artifacts": [],
@@ -67,6 +70,9 @@ async def compile_document_revision(
     )
     plan = ReconstructionPlan.model_validate(result["plan"])
     intent = AuthoringDocumentIntent.model_validate(result["merged_intent"])
+    resolved_source_manifest = result.get("source_manifest", dict(source_manifest or {}))
+    if not isinstance(resolved_source_manifest, Mapping):
+        raise ValueError("Graph revision returned an invalid source_manifest.")
     affected_section_ids = tuple(section.section_id for section in plan.sections)
     intent_section_ids = (
         tuple(section.section_id for section in intent.sections)
@@ -89,6 +95,7 @@ async def compile_document_revision(
         existing_document=existing_snapshot,
         plan=plan,
         intent=intent,
+        source_manifest=dict(resolved_source_manifest),
         affected_section_ids=affected_section_ids,
         preserved_section_ids=preserved_section_ids,
     )

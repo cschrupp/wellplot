@@ -14,6 +14,7 @@ from .finalization import (
 from .models import (
     CompilationMode,
     CompiledArtifact,
+    PlannedSectionDataSource,
     ReconstructionDiagnostic,
     ReconstructionPlan,
     SectionPlan,
@@ -31,7 +32,12 @@ from .report_worker import ReportCompiler
 from .revision import RevisionCompilationResult, compile_document_revision
 from .revision_execution import RevisionExecutionResult, execute_document_revision
 from .section_worker import SectionCompiler
-from .source_context import GraphAuthoringContext, build_graph_authoring_context
+from .source_context import (
+    GraphAuthoringContext,
+    PlannedSourceContextResolver,
+    available_channels_from_source_manifest,
+    build_graph_authoring_context,
+)
 from .verifier import (
     DocumentIntentVerificationResult,
     IntentVerificationIssue,
@@ -49,6 +55,8 @@ __all__ = [
     "ExistingProviderStructuredAdapter",
     "FinalRenderArtifact",
     "GraphAuthoringContext",
+    "PlannedSectionDataSource",
+    "PlannedSourceContextResolver",
     "IntentVerificationIssue",
     "MAX_VISUAL_REPAIR_CYCLES",
     "ReconstructionDiagnostic",
@@ -70,6 +78,7 @@ __all__ = [
     "VisualReviewResult",
     "build_compile_graph",
     "build_graph_authoring_context",
+    "available_channels_from_source_manifest",
     "compile_document_revision",
     "compile_document_reconstruction",
     "execute_document_intent",

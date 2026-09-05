@@ -62,6 +62,15 @@ class _ReconstructionModel:
                             "section_id": "main_pass",
                             "capability_id": "section.log_plot",
                             "goal": "Build the main pass.",
+                            "components": [
+                                {
+                                    "component_id": "main_pass.depth",
+                                    "target_id": "depth",
+                                    "capability_id": "track.reference",
+                                    "goal": "Keep the depth reference track.",
+                                    "parent_component_id": None,
+                                }
+                            ],
                         }
                     ],
                 }
@@ -70,7 +79,13 @@ class _ReconstructionModel:
             return response_model.model_validate({"intent": {"title": "Reconstructed"}})
         if tool_name == "submit_section_artifact":
             return response_model.model_validate(
-                {"section": {"section_id": "main_pass", "title": "Main pass"}}
+                {
+                    "section": {
+                        "section_id": "main_pass",
+                        "title": "Main pass",
+                        "tracks": [{"track_id": "depth"}],
+                    }
+                }
             )
         raise AssertionError(f"Unexpected structured model request: {tool_name}")
 
@@ -93,7 +108,7 @@ class _FrozenCblModel:
         response_validator: object | None = None,
     ) -> BaseModel:
         """Return the fixture response for the planned compiler target."""
-        del instructions, tool_description, max_rounds, response_validator
+        del instructions, tool_description, max_rounds
         artifacts = self.contract["artifacts"]
         if tool_name == "submit_reconstruction_plan":
             payload = self.contract["reconstruction_plan"]
@@ -105,7 +120,10 @@ class _FrozenCblModel:
             payload = artifacts["sections"]["repeat_pass"]
         else:
             raise AssertionError(f"Unexpected compiler target: {tool_name!r}")
-        return response_model.model_validate(payload)
+        result = response_model.model_validate(payload)
+        if response_validator is not None:
+            response_validator(result)
+        return result
 
 
 @dataclass
@@ -288,7 +306,7 @@ def test_reconstruction_execution_applies_frozen_cbl_transaction(tmp_path: Path)
             request=prompt,
             source_manifest=source_manifest,
             available_channels={
-                section_id: source["channels"] for section_id, source in source_manifest.items()
+                "main_pass": source_manifest["main_pass"]["channels"],
             },
             header_aliases=contract["execution_context"]["header_aliases"],
         )
@@ -310,16 +328,14 @@ def test_reconstruction_rejects_live_clear_on_create_without_persisting(tmp_path
     service = _cased_hole_service(tmp_path)
     before = service.document.model_dump(mode="json")
 
-    result = asyncio.run(
-        execute_document_reconstruction(
-            _frozen_failure_graph(contract),
-            service,
-            request="Create the repeat logging pass.",
+    with pytest.raises(ValueError, match="ScopedSectionArtifact") as error:
+        asyncio.run(
+            execute_document_reconstruction(
+                _frozen_failure_graph(contract),
+                service,
+                request="Create the repeat logging pass.",
+            )
         )
-    )
-
-    assert result.success is False
-    assert result.execution.success is False
-    assert result.execution.reconciliation_plan is not None
-    assert set(contract["expected_errors"]).issubset(result.errors)
+    assert "section.title" in str(error.value)
+    assert "track_id" in str(error.value)
     assert service.document.model_dump(mode="json") == before

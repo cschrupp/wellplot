@@ -15,10 +15,13 @@ from dataclasses import dataclass
 from pydantic import BaseModel
 
 from ...capabilities import CapabilityRegistry
+from ...capabilities.builtins import LogPlotSectionArtifact
 from ..execution_trace import current_agent_trace
+from .context_projection import section_document_context, section_source_context
 from .models import CompilationMode, CompiledArtifact, SectionPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
+from .worker_contracts import section_contract
 
 
 @dataclass(slots=True)
@@ -59,14 +62,19 @@ class SectionCompiler:
             "capabilities and source information. Return the typed artifact required by the "
             "section capability. Do not emit MCP calls or an operation sequence. The result is "
             "desired state; Wellplot's deterministic compiler/executor will decide how to "
-            "reach it." + revision_instruction
+            "reach it. Use component target_id as the canonical object ID and "
+            "parent_component_id for ownership. Include every planned target. For new "
+            "objects supply a display title, kind and width; omit unrequested optional "
+            "settings to keep defaults. When section_plan declares data_source, return that "
+            "exact source_path and source_format. Do not clear fields during construction."
+            + revision_instruction
         )
         context = {
             "original_request": request,
             "mode": mode,
             "section_plan": plan.model_dump(mode="json"),
-            "current_document": current_document,
-            "source_manifest": source_manifest,
+            "current_document": section_document_context(current_document, plan.section_id),
+            "source_manifest": section_source_context(source_manifest, plan.section_id),
             # The section artifact schema is already the required function schema.
             "capabilities": worker_catalog,
         }
@@ -77,16 +85,28 @@ class SectionCompiler:
             else nullcontext()
         )
         with stage:
+            response_model = section_spec.artifact_model
+            if response_model is LogPlotSectionArtifact:
+                response_model = section_contract(
+                    plan, current_document, self.registry, reconstruct=mode == "reconstruct"
+                )
             artifact: BaseModel = await self.model.generate(
                 instructions=instructions,
                 user_message=(
                     f"Compile section {plan.section_id!r}. The artifact schema is supplied as "
                     "the required function schema.\n\nContext:\n" + compact_prompt_json(context)
                 ),
-                response_model=section_spec.artifact_model,
+                response_model=response_model,
                 tool_name="submit_section_artifact",
                 tool_description=f"Submit the typed artifact for section {plan.section_id!r}.",
                 max_rounds=3,
+                response_validator=(
+                    lambda artifact: (
+                        self._validate_targets(artifact, plan)
+                        if section_spec.artifact_model is LogPlotSectionArtifact
+                        else None
+                    )
+                ),
             )
             if trace is not None:
                 trace.record(
@@ -101,3 +121,48 @@ class SectionCompiler:
             payload=artifact.model_dump(mode="json", exclude_unset=True),
             covered_component_ids=[item.component_id for item in plan.components],
         )
+
+    def _validate_targets(self, artifact: BaseModel, plan: SectionPlan) -> None:
+        """Require every planned target at its explicit parent before acceptance."""
+        if not plan.components:
+            return
+        tracks = artifact.section.tracks
+        if not isinstance(tracks, list):
+            raise ValueError("Planned component edits require explicit tracks in the artifact.")
+        tracks_by_id = {track.track_id: track for track in tracks or []}
+        if len(tracks_by_id) != len(tracks or []):
+            raise ValueError("A section artifact must not repeat track IDs.")
+        components = {item.component_id: item for item in plan.components}
+        planned_track_ids = [
+            item.target_id
+            for item in plan.components
+            if self.registry.get(item.capability_id).category == "track"
+        ]
+        if [track.track_id for track in tracks] != planned_track_ids:
+            raise ValueError(
+                f"Section {plan.section_id!r} tracks must preserve planned target order "
+                f"{planned_track_ids!r}."
+            )
+        for component in plan.components:
+            category = self.registry.get(component.capability_id).category
+            if category == "track":
+                found = component.target_id in tracks_by_id
+            else:
+                parent = components[component.parent_component_id]
+                track = tracks_by_id.get(parent.target_id)
+                collection, identity = {
+                    "binding": ("bindings", "binding_id"),
+                    "fill": ("fills", "fill_id"),
+                    "annotation": ("annotations", "annotation_id"),
+                }[category]
+                children = getattr(track, collection, None)
+                found = (
+                    isinstance(children, list)
+                    and sum(getattr(child, identity) == component.target_id for child in children)
+                    == 1
+                )
+            if not found:
+                raise ValueError(
+                    f"Section {plan.section_id!r} omitted planned {category} target "
+                    f"{component.target_id!r} at its declared parent."
+                )

@@ -11,10 +11,14 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
+from typing import Literal
+
+from pydantic import Field, create_model
 
 from ...capabilities import CapabilityRegistry
 from ..execution_trace import current_agent_trace
-from .models import CompilationMode, ReconstructionPlan
+from .context_projection import planner_document_summary, planner_source_manifest_summary
+from .models import CompilationMode, ReconstructionPlan, SectionPlan, SemanticComponentPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
 
@@ -59,18 +63,49 @@ class ReconstructionPlanner:
             "parent_component_id: use null only for a direct child of its section; otherwise "
             "reference a parent component_id in that same section. This field expresses "
             "structural ownership, not execution order. In revision mode, include an unchanged "
-            "parent component as context when a changed child needs it. " + mode_instruction
+            "parent component as context when a changed child needs it. When a planned section "
+            "uses a staged source that is not already present in source_manifest, set the typed "
+            "section data_source field with a path relative to the target logfile and a lowercase "
+            "source_format of auto, las, or dlis. Never place data_source inside section values. "
+            "Each component must declare target_id independently of component_id. Track "
+            "target IDs are local to their section; binding target IDs are globally unique. "
+            "List every requested child object in components, including existing targets that "
+            "need updates; constraints do not substitute for component declarations. "
+            + mode_instruction
         )
         context = {
             "request": request,
             "mode": mode,
-            "current_document": current_document,
-            "source_manifest": source_manifest,
+            "current_document": planner_document_summary(current_document),
+            "source_manifest": planner_source_manifest_summary(source_manifest),
             "available_capabilities": catalog,
         }
         trace = current_agent_trace()
+        reconstruction_section = create_model(
+            "ReconstructionSectionPlan",
+            __base__=SectionPlan,
+            components=(list[SemanticComponentPlan], Field(min_length=1)),
+        )
+        existing_ids = tuple(item["id"] for item in current_document.get("sections", []))
+        section_type = reconstruction_section if mode == "reconstruct" else SectionPlan
+        if existing_ids:
+            existing_section = create_model(
+                "ExistingSectionPlan",
+                __base__=section_type,
+                section_id=(Literal[existing_ids], ...),
+            )
+            section_type = existing_section | section_type
+        response_model = create_model(
+            "ScopedReconstructionPlan",
+            __base__=ReconstructionPlan,
+            sections=(list[section_type], Field(min_length=1)),
+        )
         stage = trace.stage("planner") if trace is not None else nullcontext()
         with stage:
+
+            def validate_plan(plan: ReconstructionPlan) -> None:
+                self._validate_capabilities(plan)
+
             plan = await self.model.generate(
                 instructions=instructions,
                 user_message=(
@@ -78,11 +113,11 @@ class ReconstructionPlanner:
                     "supplied as the required function schema.\n\nContext:\n"
                     + compact_prompt_json(context)
                 ),
-                response_model=ReconstructionPlan,
+                response_model=response_model,
                 tool_name="submit_reconstruction_plan",
                 tool_description="Submit the semantic reconstruction plan.",
                 max_rounds=3,
-                response_validator=self._validate_capabilities,
+                response_validator=validate_plan,
             )
             if trace is not None:
                 trace.record(
@@ -103,8 +138,13 @@ class ReconstructionPlanner:
                 )
 
             components_by_id = {}
+            targets = set()
             for component in section.components:
-                self.registry.get(component.capability_id)
+                spec = self.registry.get(component.capability_id)
+                identity = (spec.category, component.parent_component_id, component.target_id)
+                if identity in targets:
+                    raise ValueError(f"Duplicate component target {component.target_id!r}.")
+                targets.add(identity)
                 components_by_id[component.component_id] = component
 
             for component in section.components:

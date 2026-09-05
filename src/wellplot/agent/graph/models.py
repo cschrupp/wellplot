@@ -27,6 +27,14 @@ class SemanticComponentPlan(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     component_id: str = Field(min_length=1)
+    target_id: str = Field(
+        min_length=1,
+        description=(
+            "Canonical object ID, distinct from component_id. For a track use its local "
+            "ID within the section (e.g. combo), not a section-prefixed planning ID. "
+            "For a binding use its unique binding_id. Reuse existing IDs when revising."
+        ),
+    )
     capability_id: str = Field(min_length=1)
     goal: str = Field(min_length=1)
     values: dict[str, Any] = Field(default_factory=dict)
@@ -40,6 +48,21 @@ class SemanticComponentPlan(BaseModel):
     )
 
 
+class PlannedSectionDataSource(BaseModel):
+    """One explicit source selected for a planned section."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    source_path: str = Field(
+        min_length=1,
+        description=("Path to the staged source file, resolved relative to the target logfile."),
+    )
+    source_format: Literal["auto", "las", "dlis"] = Field(
+        default="auto",
+        description="Lowercase source format. Use auto only when the file suffix is reliable.",
+    )
+
+
 class SectionPlan(BaseModel):
     """Semantic plan for one independently compilable plot section."""
 
@@ -48,13 +71,36 @@ class SectionPlan(BaseModel):
     section_id: str = Field(min_length=1)
     capability_id: str = Field(min_length=1)
     goal: str = Field(min_length=1)
+    data_source: PlannedSectionDataSource | None = Field(
+        default=None,
+        description=(
+            "Explicit source routing for this section. Required for a newly planned section "
+            "that is not already represented in the inspected source manifest."
+        ),
+    )
     values: dict[str, Any] = Field(default_factory=dict)
-    components: list[SemanticComponentPlan] = Field(default_factory=list)
+    components: list[SemanticComponentPlan] = Field(
+        default_factory=list,
+        description=(
+            "Ordered explicit component targets for every requested track, binding, fill "
+            "and annotation. Empty only for section settings with no child edits. "
+            "Do not encode child objects solely as prose constraints."
+        ),
+    )
     constraints: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_component_hierarchy(self) -> SectionPlan:
         """Require an acyclic local ownership tree for section components."""
+        hidden_source_keys = sorted(
+            {"data_source", "source_format", "source_path"}.intersection(self.values)
+        )
+        if hidden_source_keys:
+            raise ValueError(
+                "Section source routing must be declared through the typed data_source field, "
+                "not SectionPlan.values. "
+                f"Unsupported values keys: {hidden_source_keys!r}."
+            )
         components_by_id: dict[str, SemanticComponentPlan] = {}
         for component in self.components:
             if component.component_id in components_by_id:

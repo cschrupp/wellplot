@@ -20,6 +20,7 @@ from ...authoring_service import AuthoringService
 from ...model.authoring import AuthoringDocumentSpec
 from .executor import DirectIntentExecutionResult, execute_document_intent
 from .revision import RevisionCompilationResult, compile_document_revision
+from .source_context import available_channels_from_source_manifest
 from .verifier import DocumentIntentVerificationResult, verify_document_intent
 
 
@@ -57,6 +58,7 @@ async def execute_document_revision(
     *,
     request: str,
     source_manifest: Mapping[str, Any] | None = None,
+    logfile_path: str | None = None,
     scaffold: AuthoringDocumentSpec | None = None,
     defaults: Mapping[str, Any] | None = None,
     available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
@@ -76,13 +78,16 @@ async def execute_document_revision(
         request=request,
         current_document=before,
         source_manifest=source_manifest,
+        logfile_path=logfile_path,
     )
+    effective_channels = dict(available_channels or {})
+    effective_channels.update(available_channels_from_source_manifest(revision.source_manifest))
     execution = execute_document_intent(
         service,
         revision.intent,
         scaffold=scaffold,
         defaults=defaults,
-        available_channels=available_channels,
+        available_channels=effective_channels,
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
     )
@@ -99,7 +104,7 @@ async def execute_document_revision(
         revision.intent,
         scaffold=scaffold,
         defaults=defaults,
-        available_channels=available_channels,
+        available_channels=effective_channels,
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
     )

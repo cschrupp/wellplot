@@ -96,6 +96,7 @@ class GraphAuthoringMcpOperations:
                     request=request,
                     source_manifest=context.source_manifest,
                     available_channels=context.available_channels,
+                    logfile_path=str(context.logfile_path),
                 )
             except ProviderAdapterError as exc:
                 trace.record(
@@ -159,6 +160,7 @@ class GraphAuthoringMcpOperations:
                     request=request,
                     source_manifest=context.source_manifest,
                     available_channels=context.available_channels,
+                    logfile_path=str(context.logfile_path),
                 )
             except ProviderAdapterError as exc:
                 trace.record(

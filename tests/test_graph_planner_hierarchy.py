@@ -20,6 +20,7 @@ def _component(
     """Build one minimal semantic component for hierarchy tests."""
     return {
         "component_id": component_id,
+        "target_id": component_id,
         "capability_id": capability_id,
         "goal": component_id,
         "parent_component_id": parent_component_id,
@@ -98,6 +99,53 @@ def test_component_parent_is_required_by_the_advertised_schema() -> None:
     assert "parent_component_id" in component["properties"]
     assert "parent_component_id" in component["required"]
     assert "depends_on" not in component["properties"]
+
+
+def test_section_source_routing_is_typed_and_not_hidden_in_values() -> None:
+    """Planner source routing has one explicit schema location."""
+    schema = ReconstructionPlan.model_json_schema()
+    section = schema["$defs"]["SectionPlan"]
+
+    assert "data_source" in section["properties"]
+    assert (
+        ReconstructionPlan.model_validate(
+            {
+                "summary": "Build the repeat section from its staged source.",
+                "sections": [
+                    {
+                        "section_id": "repeat_pass",
+                        "capability_id": "section.log_plot",
+                        "goal": "Build the repeat section.",
+                        "data_source": {
+                            "source_path": "CBL_Repeat.dlis",
+                            "source_format": "dlis",
+                        },
+                    }
+                ],
+            }
+        )
+        .sections[0]
+        .data_source
+        is not None
+    )
+
+    with pytest.raises(ValueError, match="typed data_source field"):
+        ReconstructionPlan.model_validate(
+            {
+                "summary": "Build the repeat section from its staged source.",
+                "sections": [
+                    {
+                        "section_id": "repeat_pass",
+                        "capability_id": "section.log_plot",
+                        "goal": "Build the repeat section.",
+                        "values": {
+                            "source_path": "CBL_Repeat.dlis",
+                            "source_format": "dlis",
+                        },
+                    }
+                ],
+            }
+        )
 
 
 def test_registry_accepts_all_builtin_component_parent_relationships() -> None:

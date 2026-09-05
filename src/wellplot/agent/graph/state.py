@@ -27,6 +27,7 @@ class ReconstructionState(TypedDict, total=False):
 
     request: str
     mode: CompilationMode
+    logfile_path: str | None
     current_document: dict[str, Any]
     source_manifest: dict[str, Any]
     plan: dict[str, Any]

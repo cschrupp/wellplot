@@ -1335,6 +1335,48 @@ def _load_dataset_from_source(
     raise TemplateValidationError(f"Unsupported data source format {resolved_format!r}.")
 
 
+def resolve_data_source(
+    source_path: str,
+    source_format: str,
+    *,
+    base_dir: Path | None = None,
+    allowed_root: Path | None = None,
+) -> tuple[Path, str]:
+    """Resolve one explicit source path and canonical source format safely."""
+    resolved_path = _resolve_data_source_path(
+        source_path,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
+    resolved_format = _normalized_source_format(source_format, context="source_format")
+    if resolved_format == "auto":
+        resolved_format = resolved_path.suffix.lower().lstrip(".")
+    return resolved_path, resolved_format
+
+
+def load_dataset_from_source(
+    source_path: str,
+    source_format: str,
+    *,
+    base_dir: Path | None = None,
+    allowed_root: Path | None = None,
+) -> tuple[WellDataset, Path, str]:
+    """Load one explicit LAS or DLIS source within an optional application root."""
+    resolved_path, resolved_format = resolve_data_source(
+        source_path,
+        source_format,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
+    dataset, loaded_path = _load_dataset_from_source(
+        str(resolved_path),
+        resolved_format,
+        base_dir=base_dir,
+        allowed_root=allowed_root,
+    )
+    return dataset, loaded_path, resolved_format
+
+
 def _section_data_sources_for_logfile(
     spec: LogFileSpec,
 ) -> dict[str, tuple[str, str]]:

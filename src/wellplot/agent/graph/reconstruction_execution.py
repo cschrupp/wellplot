@@ -23,6 +23,7 @@ from .reconstruction import (
     ReconstructionCompilationResult,
     compile_document_reconstruction,
 )
+from .source_context import available_channels_from_source_manifest
 from .verifier import DocumentIntentVerificationResult, verify_document_intent
 
 
@@ -60,6 +61,7 @@ async def execute_document_reconstruction(
     *,
     request: str,
     source_manifest: Mapping[str, Any] | None = None,
+    logfile_path: str | None = None,
     scaffold: AuthoringDocumentSpec | None = None,
     defaults: Mapping[str, Any] | None = None,
     available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
@@ -79,13 +81,18 @@ async def execute_document_reconstruction(
         request=request,
         current_document=before,
         source_manifest=source_manifest,
+        logfile_path=logfile_path,
+    )
+    effective_channels = dict(available_channels or {})
+    effective_channels.update(
+        available_channels_from_source_manifest(reconstruction.source_manifest)
     )
     execution = execute_document_intent(
         service,
         reconstruction.intent,
         scaffold=scaffold,
         defaults=defaults,
-        available_channels=available_channels,
+        available_channels=effective_channels,
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
     )
@@ -102,7 +109,7 @@ async def execute_document_reconstruction(
         reconstruction.intent,
         scaffold=scaffold,
         defaults=defaults,
-        available_channels=available_channels,
+        available_channels=effective_channels,
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
     )

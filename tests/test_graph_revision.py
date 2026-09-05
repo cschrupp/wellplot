@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 
 import pytest
@@ -60,6 +61,15 @@ class _RevisionModel:
                             "section_id": "main_pass",
                             "capability_id": "section.log_plot",
                             "goal": "Update the main pass only.",
+                            "components": [
+                                {
+                                    "component_id": "main_pass.depth",
+                                    "target_id": "depth",
+                                    "capability_id": "track.reference",
+                                    "goal": "Keep the depth reference track.",
+                                    "parent_component_id": None,
+                                }
+                            ],
                         }
                     ],
                 }
@@ -73,6 +83,7 @@ class _RevisionModel:
                     "section": {
                         "section_id": self.compiled_section_id,
                         "title": "Main pass revised",
+                        "tracks": [{"track_id": "depth"}],
                     }
                 }
             )
@@ -140,7 +151,8 @@ def test_revision_compiles_only_affected_section_and_preserves_unrelated_state()
     )
 
     assert "This is a revision" in model.planner_instructions
-    assert '"mode": "revise"' in model.planner_message
+    planner_context = json.loads(model.planner_message.split("Context:\n", maxsplit=1)[1])
+    assert planner_context["mode"] == "revise"
     assert model.tool_calls == [
         "submit_reconstruction_plan",
         "submit_report_artifact",
@@ -163,7 +175,7 @@ def test_revision_rejects_compiled_sections_outside_its_plan() -> None:
     """A worker cannot extend a revision beyond the planner's selected scope."""
     model = _RevisionModel(compiled_section_id="repeat_pass")
 
-    with pytest.raises(ValueError, match="not selected by the revision plan"):
+    with pytest.raises(ValueError, match="section_id"):
         asyncio.run(
             compile_document_revision(
                 _graph(model),
@@ -181,7 +193,7 @@ def test_compile_graph_defaults_to_reconstruction_mode() -> None:
         _graph(model).ainvoke(
             {
                 "request": "Build a main pass.",
-                "current_document": {},
+                "current_document": _document().model_dump(mode="json"),
                 "source_manifest": {},
                 "compiled_artifacts": [],
                 "diagnostics": [],

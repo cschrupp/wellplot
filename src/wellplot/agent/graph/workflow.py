@@ -33,6 +33,7 @@ from .models import CompilationMode, CompiledArtifact, ReconstructionPlan, Secti
 from .planner import ReconstructionPlanner
 from .report_worker import ReportCompiler
 from .section_worker import SectionCompiler
+from .source_context import PlannedSourceContextResolver
 from .state import CompilationWorkerState, ReconstructionState
 
 
@@ -44,6 +45,7 @@ class ReconstructionGraphDependencies:
     report_compiler: ReportCompiler
     section_compiler: SectionCompiler
     registry: CapabilityRegistry
+    source_context_resolver: PlannedSourceContextResolver | None = None
 
 
 def _compilation_mode(value: object) -> CompilationMode:
@@ -65,6 +67,37 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
             mode=mode,
         )
         return {"plan": plan.model_dump(mode="json")}
+
+    async def resolve_planned_sources_node(state: ReconstructionState) -> dict[str, object]:
+        """Load only explicit planner-selected sources before worker fan-out."""
+        resolver = dependencies.source_context_resolver
+        if resolver is None:
+            return {}
+        plan = ReconstructionPlan.model_validate(state["plan"])
+        trace = current_agent_trace()
+        source_manifest = state.get("source_manifest", {})
+        if trace is None:
+            enriched = resolver.enrich(
+                plan=plan,
+                source_manifest=source_manifest,
+                logfile_path=state.get("logfile_path"),
+            )
+        else:
+            with trace.stage("source_context"):
+                enriched = resolver.enrich(
+                    plan=plan,
+                    source_manifest=source_manifest,
+                    logfile_path=state.get("logfile_path"),
+                )
+                trace.record(
+                    "planned_source_context_ready",
+                    status="ready",
+                    details={
+                        "planned_section_ids": [section.section_id for section in plan.sections],
+                        "source_section_ids": sorted(enriched),
+                    },
+                )
+        return {"source_manifest": enriched}
 
     async def dispatch_workers(state: ReconstructionState) -> list[Send]:
         """Fan out independent report and section compiler work units."""
@@ -150,12 +183,14 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
 
     builder = StateGraph(ReconstructionState)
     builder.add_node("plan", plan_node)
+    builder.add_node("resolve_planned_sources", resolve_planned_sources_node)
     builder.add_node("compile_artifact", compile_artifact_node)
     builder.add_node("merge", merge_node)
 
     builder.add_edge(START, "plan")
+    builder.add_edge("plan", "resolve_planned_sources")
     builder.add_conditional_edges(
-        "plan",
+        "resolve_planned_sources",
         dispatch_workers,
         ["compile_artifact"],
     )

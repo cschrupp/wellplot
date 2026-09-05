@@ -13,10 +13,13 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 
 from ...capabilities import CapabilityRegistry
+from ...capabilities.builtins import ReportArtifact
 from ..execution_trace import current_agent_trace
+from .context_projection import report_document_context, report_source_context
 from .models import CompilationMode, CompiledArtifact, ReconstructionPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
+from .worker_contracts import report_contract
 
 
 @dataclass(slots=True)
@@ -51,26 +54,33 @@ class ReportCompiler:
             "report_values": plan.report_values,
             "postconditions": plan.postconditions,
             "mode": mode,
-            "current_document": current_document,
-            "source_manifest": source_manifest,
+            "current_document": report_document_context(current_document),
+            "source_manifest": report_source_context(source_manifest),
             # The required function schema is sent separately; do not duplicate it here.
             "capability": spec.planning_descriptor(),
         }
         trace = current_agent_trace()
         stage = trace.stage("report", target_id="report") if trace is not None else nullcontext()
         with stage:
+            response_model = spec.artifact_model
+            if response_model is ReportArtifact:
+                response_model = report_contract(
+                    current_document, reconstruct=mode == "reconstruct"
+                )
             artifact = await self.model.generate(
                 instructions=(
                     "You are the report-wide compiler. Compile only report/header/page/depth/"
                     "output/remarks/tail requirements. Do not author section-local tracks, "
                     "bindings, fills, or annotations. Return desired state, not an operation "
-                    "sequence or MCP calls. " + revision_instruction
+                    "sequence or MCP calls. Omit unrequested fields to preserve scaffold "
+                    "values and defaults. Use only listed header slot IDs; their labels and "
+                    "aliases describe their meaning. Never invent slots. " + revision_instruction
                 ),
                 user_message=(
                     "Compile the report-wide portion of the reconstruction.\n\nContext:\n"
                     + compact_prompt_json(context)
                 ),
-                response_model=spec.artifact_model,
+                response_model=response_model,
                 tool_name="submit_report_artifact",
                 tool_description="Submit typed report-wide desired state.",
                 max_rounds=3,

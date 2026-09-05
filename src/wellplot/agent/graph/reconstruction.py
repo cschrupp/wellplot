@@ -27,6 +27,7 @@ class ReconstructionCompilationResult:
     starting_document: AuthoringDocumentSpec
     plan: ReconstructionPlan
     intent: AuthoringDocumentIntent
+    source_manifest: dict[str, Any]
 
 
 async def compile_document_reconstruction(
@@ -35,6 +36,7 @@ async def compile_document_reconstruction(
     request: str,
     current_document: AuthoringDocumentSpec,
     source_manifest: Mapping[str, Any] | None = None,
+    logfile_path: str | None = None,
 ) -> ReconstructionCompilationResult:
     """Compile one reconstruction request without mutating ``current_document``.
 
@@ -50,6 +52,7 @@ async def compile_document_reconstruction(
         {
             "request": request,
             "mode": "reconstruct",
+            "logfile_path": logfile_path,
             "current_document": starting_snapshot.model_dump(mode="json"),
             "source_manifest": dict(source_manifest or {}),
             "compiled_artifacts": [],
@@ -59,6 +62,9 @@ async def compile_document_reconstruction(
     )
     plan = ReconstructionPlan.model_validate(result["plan"])
     intent = AuthoringDocumentIntent.model_validate(result["merged_intent"])
+    resolved_source_manifest = result.get("source_manifest", dict(source_manifest or {}))
+    if not isinstance(resolved_source_manifest, Mapping):
+        raise ValueError("Graph reconstruction returned an invalid source_manifest.")
     planned_section_ids = {section.section_id for section in plan.sections}
     intent_section_ids = (
         {section.section_id for section in intent.sections}
@@ -76,6 +82,7 @@ async def compile_document_reconstruction(
         starting_document=starting_snapshot,
         plan=plan,
         intent=intent,
+        source_manifest=dict(resolved_source_manifest),
     )
 
 

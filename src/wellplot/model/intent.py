@@ -423,8 +423,8 @@ class AuthoringSectionIntent(_IntentModel):
     extensions: dict[str, Any] | AuthoringClearIntent | None = None
 
 
-class AuthoringDocumentIntent(_IntentModel):
-    """Root provider-neutral desired state for one report revision."""
+class AuthoringReportIntent(_IntentModel):
+    """Report-wide values, without section-local authoring permissions."""
 
     title: ClearableText = None
     subtitle: ClearableText = None
@@ -433,8 +433,13 @@ class AuthoringDocumentIntent(_IntentModel):
     depth: AuthoringDepthIntent | AuthoringClearIntent | None = None
     header: AuthoringHeaderIntent | AuthoringClearIntent | None = None
     tail: AuthoringTailIntent | AuthoringClearIntent | None = None
-    sections: list[AuthoringSectionIntent] | AuthoringClearIntent | None = None
     remarks: list[AuthoringRemarkIntent] | AuthoringClearIntent | None = None
+
+
+class AuthoringDocumentIntent(AuthoringReportIntent):
+    """Root provider-neutral desired state for one report revision."""
+
+    sections: list[AuthoringSectionIntent] | AuthoringClearIntent | None = None
     curve_bindings: list[AuthoringCurveBindingIntent] | AuthoringClearIntent | None = None
     raster_bindings: list[AuthoringRasterBindingIntent] | AuthoringClearIntent | None = None
     fills: list[AuthoringFillIntent] | AuthoringClearIntent | None = None
@@ -463,6 +468,7 @@ __all__ = [
     "AuthoringRasterBindingIntent",
     "AuthoringRemoveIntent",
     "AuthoringRemarkIntent",
+    "AuthoringReportIntent",
     "AuthoringReportValueIntent",
     "AuthoringSectionIntent",
     "AuthoringServiceTitleIntent",

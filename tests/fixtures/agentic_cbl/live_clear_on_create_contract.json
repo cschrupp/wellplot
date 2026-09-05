@@ -14,6 +14,7 @@
         "components": [
           {
             "component_id": "repeat_pass.combo",
+            "target_id": "combo",
             "capability_id": "track.normal",
             "goal": "Create the combo track.",
             "values": {

@@ -15,7 +15,9 @@ and registered without changing the LangGraph workflow.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..model.intent import (
     AuthoringAnnotationIntent,
@@ -24,11 +26,25 @@ from ..model.intent import (
     AuthoringFillIntent,
     AuthoringRasterBindingIntent,
     AuthoringRemarkIntent,
+    AuthoringRemoveIntent,
+    AuthoringReportIntent,
     AuthoringSectionIntent,
     AuthoringTrackIntent,
 )
 from .base import CapabilitySpec
 from .registry import CapabilityRegistry
+
+
+class ReportRemoval(AuthoringRemoveIntent):
+    """Only report-owned objects may be removed by the report worker."""
+
+    object_kind: Literal["report", "page", "depth", "output", "header", "tail", "remark"]
+
+
+class ReportIntent(AuthoringReportIntent):
+    """Report mutation contract, including explicitly requested removals."""
+
+    removals: list[ReportRemoval] = Field(default_factory=list)
 
 
 class LogPlotSectionArtifact(BaseModel):
@@ -45,25 +61,7 @@ class ReportArtifact(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    intent: AuthoringDocumentIntent
-
-    @model_validator(mode="after")
-    def reject_section_content(self) -> ReportArtifact:
-        """Keep report artifacts separate from independently compiled sections."""
-        forbidden = (
-            "sections",
-            "curve_bindings",
-            "raster_bindings",
-            "fills",
-            "annotations",
-        )
-        supplied = self.intent.supplied_fields()
-        invalid = sorted(field for field in forbidden if field in supplied)
-        if invalid:
-            raise ValueError(
-                "Report worker cannot author section-local content: " + ", ".join(invalid)
-            )
-        return self
+    intent: ReportIntent
 
 
 def _compile_log_plot_section(artifact: BaseModel) -> AuthoringDocumentIntent:
@@ -75,7 +73,10 @@ def _compile_log_plot_section(artifact: BaseModel) -> AuthoringDocumentIntent:
 
 
 def _compile_report(artifact: BaseModel) -> AuthoringDocumentIntent:
-    return ReportArtifact.model_validate(artifact).intent
+    typed = ReportArtifact.model_validate(artifact)
+    return AuthoringDocumentIntent.model_validate(
+        typed.intent.model_dump(mode="python", exclude_unset=True)
+    )
 
 
 def _no_document_compiler(artifact: BaseModel) -> AuthoringDocumentIntent:
@@ -125,6 +126,7 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringTrackIntent,
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
+            metadata={"track_kind": "normal"},
         ),
         CapabilitySpec(
             capability_id="track.reference",
@@ -134,6 +136,7 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringTrackIntent,
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
+            metadata={"track_kind": "reference"},
         ),
         CapabilitySpec(
             capability_id="track.array",
@@ -143,6 +146,7 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringTrackIntent,
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
+            metadata={"track_kind": "array"},
         ),
         CapabilitySpec(
             capability_id="track.annotation",
@@ -152,6 +156,7 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringTrackIntent,
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
+            metadata={"track_kind": "annotation"},
         ),
         CapabilitySpec(
             capability_id="binding.curve",

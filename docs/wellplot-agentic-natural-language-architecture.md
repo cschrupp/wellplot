@@ -1774,17 +1774,79 @@ MCP results without persistence; programming faults still propagate.
 instruction, prompt, and response-schema sizes in the execution trace. It
 preserves every supplied fact and adds no provider retry or controller behavior.
 
-`LG-R4B` removes artifact-schema duplication from worker prompt context, then
-scopes current-document and source context to each worker and records artifact
-sizes. The function schema remains the sole typed output contract.
+`LG-R4B` removes artifact-schema duplication from worker prompt context and
+projects the planner's full canonical document and source manifest into a
+deterministic semantic inventory. The planner receives report/section identity,
+existing track and binding structure, source routing, and channel
+mnemonic/kind/unit/description facts; it does not receive extensions, renderer
+settings, header values, source metadata, provenance, array shapes, or repeated
+per-channel source paths. A pure projection contract test guards that boundary.
+The next `LG-R4B` slice scopes current-document and source context to each
+worker and records artifact sizes. The function schema remains the sole typed
+output contract.
 
 `LG-R4C` aligns provider-facing intent schemas with canonical omit/set/clear
 semantics: raw `null` is not advertised where deterministic intent validation
 rejects it.
 
+`LG-R4D` closes the source-context data-flow gap for planner-created sections.
+`SectionPlan.data_source` is the sole typed location for a section's staged
+source routing; `SectionPlan.values.data_source` is rejected at the required
+structured-output boundary. After planning and before report/section workers
+fan out, the graph resolves only sources declared through that field relative
+to the target logfile and within the server root. It neither scans directories
+nor infers source files or channels from request prose. Existing inspected
+sources are reused, each newly declared file is loaded once per run, and the
+enriched manifest is propagated to every worker, deterministic execution, and
+final verification. The trace records the planned and resolved section ids in
+the `source_context` stage.
+
+The acceptance tests cover a newly planned second section, source reuse and
+single-load behavior, rejection of hidden source routing, worker visibility of
+the enriched manifest, and channel resolution during the frozen two-section
+CBL transaction. A declared source that cannot be loaded remains a deterministic
+error; no fallback source discovery is permitted.
+
 `LG-R5` reruns the unchanged CBL prompt with two providers and requires valid
 hierarchy, verified canonical state, and a final render. The target remains one
 planner, one report worker, and one worker per planned section.
+
+`LG-R6` makes the graph's worker contracts authoritative about construction
+scope. Reconstruction plans must enumerate at least one component for every
+compiled section; prose constraints cannot stand in for track, binding, fill,
+or annotation targets. Every component carries a stable `target_id`, and the
+section worker advertises only the planned track IDs, their declared order, and
+their direct nested child IDs. A new track requires its title, kind, and width;
+a new binding also requires its source channel. A section with an explicit
+`data_source` must return that exact source route. The report worker receives a
+separate report-only intent model, a bounded header-slot inventory, and no
+section-local fields. Construction schemas advertise set-or-omit only; clear
+operations remain available only in scoped revision schemas.
+
+This is enforced twice at the same contract boundary: JSON Schema and Pydantic
+reject invalid submissions before execution, then the section worker validates
+complete ordered coverage of every planned target. The deterministic executor
+still owns canonical reconciliation and final verification; it must not infer
+missing targets from prose or recover an under-specified worker artifact.
+
+The `test_graph_worker_contracts.py` regression suite covers report ownership,
+known header slots, construction clear rejection, exact track, binding, fill,
+and annotation identities, source-route identity, and planned track ordering.
+The frozen two-pass CBL transaction remains the end-to-end non-provider
+acceptance test.
+
+Current deterministic evidence: the CBL report contract serializes to 12,813
+characters and each CBL section contract remains below 45,000 characters while
+retaining exact target validation. The required gate is:
+
+```bash
+UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run --extra graph pytest -q \
+  tests/test_graph_*.py tests/test_mcp_agentic.py
+```
+
+This gate must pass before attempting a provider-backed notebook run. A provider
+transport failure is recorded as external evidence; it does not authorize a
+fallback compiler or a relaxation of the typed contracts.
 
 ### Gates
 

@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,13 +20,16 @@ from ...authoring_context import AuthoringChannelCandidate
 from ...authoring_service import AuthoringService
 from ...errors import PathAccessError
 from ...logfile import (
+    load_dataset_from_source,
     load_datasets_for_logfile,
     load_logfile,
+    resolve_data_source,
     resolve_section_data_sources_for_logfile,
 )
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.channels import ArrayChannel, BaseChannel
 from ...model.dataset import WellDataset
+from .models import ReconstructionPlan
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,111 @@ class GraphAuthoringContext:
     document: AuthoringDocumentSpec
     source_manifest: dict[str, dict[str, Any]]
     available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]]
+
+
+@dataclass(frozen=True)
+class PlannedSourceContextResolver:
+    """Resolve only sources explicitly selected by a validated section plan."""
+
+    root: Path
+
+    def enrich(
+        self,
+        *,
+        plan: ReconstructionPlan,
+        source_manifest: Mapping[str, object],
+        logfile_path: str | Path | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Return source facts for existing and explicitly planned sections.
+
+        No source is inferred from request text or discovered from directories. A
+        newly planned section must carry ``SectionPlan.data_source`` and the
+        declared file is resolved through the same root boundary as logfile
+        loading.
+        """
+        enriched = {
+            str(section_id): deepcopy(dict(source))
+            for section_id, source in source_manifest.items()
+            if isinstance(source, Mapping)
+        }
+        sections_with_sources = [section for section in plan.sections if section.data_source]
+        if not sections_with_sources:
+            return enriched
+        if logfile_path is None:
+            raise ValueError(
+                "A logfile_path is required to resolve explicitly planned section sources."
+            )
+
+        resolved_logfile = _resolve_logfile_path(logfile_path, root=self.root)
+        loaded_sources: dict[tuple[Path, str], tuple[WellDataset, Path, str]] = {}
+        for section in sections_with_sources:
+            assert section.data_source is not None
+            source = section.data_source
+            source_path, source_format = resolve_data_source(
+                source.source_path,
+                source.source_format,
+                base_dir=resolved_logfile.parent,
+                allowed_root=self.root,
+            )
+            existing = enriched.get(section.section_id)
+            if _manifest_uses_source(
+                existing,
+                source_path=source_path,
+                source_format=source_format,
+            ):
+                continue
+            cache_key = (source_path, source_format)
+            if cache_key not in loaded_sources:
+                loaded_sources[cache_key] = load_dataset_from_source(
+                    str(source_path),
+                    source_format,
+                    base_dir=resolved_logfile.parent,
+                    allowed_root=self.root,
+                )
+            cached_dataset, cached_path, cached_format = loaded_sources[cache_key]
+            channels = tuple(
+                _channel_candidate(channel, source_path=cached_path)
+                for channel in cached_dataset.channels.values()
+            )
+            enriched[section.section_id] = _source_manifest_entry(
+                cached_dataset,
+                source_path=cached_path,
+                source_format=cached_format,
+                channels=channels,
+            )
+        return enriched
+
+
+def available_channels_from_source_manifest(
+    source_manifest: Mapping[str, object],
+) -> dict[str, tuple[AuthoringChannelCandidate, ...]]:
+    """Project graph-state source facts back to typed channel candidates."""
+    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
+    for section_id, source in source_manifest.items():
+        if not isinstance(source, Mapping):
+            continue
+        raw_channels = source.get("channels")
+        if not isinstance(raw_channels, list):
+            continue
+        available_channels[str(section_id)] = tuple(
+            AuthoringChannelCandidate.model_validate(channel) for channel in raw_channels
+        )
+    return available_channels
+
+
+def _manifest_uses_source(
+    manifest: Mapping[str, object] | None,
+    *,
+    source_path: Path,
+    source_format: str,
+) -> bool:
+    """Return whether an inspected manifest already represents one source."""
+    if manifest is None:
+        return False
+    return (
+        manifest.get("source_path") == str(source_path)
+        and manifest.get("source_format") == source_format
+    )
 
 
 def _resolve_logfile_path(logfile_path: str | Path, *, root: Path) -> Path:
@@ -171,4 +280,9 @@ def build_graph_authoring_context(
     )
 
 
-__all__ = ["GraphAuthoringContext", "build_graph_authoring_context"]
+__all__ = [
+    "GraphAuthoringContext",
+    "PlannedSourceContextResolver",
+    "available_channels_from_source_manifest",
+    "build_graph_authoring_context",
+]

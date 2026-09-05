@@ -93,6 +93,7 @@ def create_agentic_mcp_server(
     try:
         from ..agent.graph import (
             ExistingProviderStructuredAdapter,
+            PlannedSourceContextResolver,
             ReconstructionGraphDependencies,
             ReconstructionPlanner,
             ReportCompiler,
@@ -117,6 +118,7 @@ def create_agentic_mcp_server(
             report_compiler=ReportCompiler(model=structured_model, registry=registry),
             section_compiler=SectionCompiler(model=structured_model, registry=registry),
             registry=registry,
+            source_context_resolver=PlannedSourceContextResolver(root=server_root),
         )
     )
     operations = GraphAuthoringMcpOperations.create(graph=graph, root=server_root)
