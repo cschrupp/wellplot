@@ -683,8 +683,14 @@ class ProviderBackendProtocol(Protocol):
         tool_caller: ToolCaller,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
-        """Run one authoring loop and replay provider tool calls."""
+        """Run one authoring loop and replay provider tool calls.
+
+        ``stream_response`` preserves incremental transport for interactive
+        authoring by default. One-shot structured graph submissions can opt
+        out when no incremental output is consumed.
+        """
 
 
 @dataclass(frozen=True)

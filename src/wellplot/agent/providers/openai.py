@@ -88,8 +88,11 @@ class OpenAIAuthoringBackend:
         tool_caller: ToolCaller,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
         """Run one OpenAI Responses API loop and replay tool calls through MCP."""
+        # The Responses adapter already uses non-streamed response objects.
+        del stream_response
         return await run_responses_authoring_loop(
             client=self.client,
             model=self.model,

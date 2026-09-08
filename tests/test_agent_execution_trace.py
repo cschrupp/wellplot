@@ -100,10 +100,12 @@ class _ProviderBackend:
         tool_caller: object,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
         """Call the required structured tool with a representative agent output."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
+        assert stream_response is False
         response = await tool_caller("submit_trace", {"title": "Agent output"})  # type: ignore[misc]
         assert response == {"accepted": True}
         return ProviderRunResult(
@@ -132,10 +134,12 @@ class _CorrectingProviderBackend:
         tool_caller: object,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
         """Model the existing provider loop receiving one rejected submission."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
+        assert stream_response is False
         rejected = await tool_caller("submit_trace", {"title": "Rejected"})  # type: ignore[misc]
         assert rejected["is_error"] is True
         accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]
@@ -171,10 +175,12 @@ class _ResponseModelCorrectingProviderBackend:
         tool_caller: object,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
         """Model the correction conversation after a Pydantic rejection."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
+        assert stream_response is False
         rejected = await tool_caller("submit_trace", {"unexpected": "Rejected"})  # type: ignore[misc]
         assert rejected["is_error"] is True
         accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]

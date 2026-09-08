@@ -219,6 +219,67 @@ def test_chat_adapter_replays_function_tool_calls() -> None:
     assert "tool_choice" not in completions.requests[1]
 
 
+def test_chat_adapter_accepts_non_streamed_required_tool_calls() -> None:
+    """One-shot structured submissions can avoid an SSE response stream."""
+    completions = _FakeCompletions(
+        [
+            _chat_response(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(
+                            name="submit_section_artifact",
+                            arguments='{"section_id":"main_pass"}',
+                        ),
+                    )
+                ],
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=completions))
+    received: list[dict[str, object]] = []
+
+    async def call_tool(_: str, arguments: dict[str, object]) -> dict[str, object]:
+        received.append(arguments)
+        return {"accepted": True}
+
+    result = anyio.run(
+        partial(
+            run_chat_completions_authoring_loop,
+            client=client,
+            model="local-model",
+            provider_label="OpenAI-compatible",
+            instructions="Submit the section artifact.",
+            initial_user_message="Compile main_pass.",
+            tool_definitions=[
+                FunctionToolDefinition(
+                    name="submit_section_artifact",
+                    description="Submit one section artifact.",
+                    parameters={
+                        "type": "object",
+                        "properties": {"section_id": {"type": "string"}},
+                        "required": ["section_id"],
+                    },
+                )
+            ],
+            tool_caller=call_tool,
+            max_rounds=1,
+            required_tool_name="submit_section_artifact",
+            stream_response=False,
+        )
+    )
+
+    assert received == [{"section_id": "main_pass"}]
+    assert result.report_facts["provider_response"]["required_submission_accepted"] is True
+    assert completions.requests[0]["stream"] is False
+    assert completions.requests[0]["tool_choice"] == {
+        "type": "function",
+        "function": {"name": "submit_section_artifact"},
+    }
+
+
 def test_chat_adapter_normalizes_stream_transport_failure() -> None:
     """Expose interrupted streamed responses through a stable provider status."""
     completions = _FakeCompletions([_BrokenStream()])

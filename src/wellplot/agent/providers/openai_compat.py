@@ -139,6 +139,7 @@ class OpenAICompatibleAuthoringBackend:
         tool_caller: ToolCaller,
         max_rounds: int,
         required_tool_name: str | None = None,
+        stream_response: bool = True,
     ) -> ProviderRunResult:
         """Run one OpenAI-compatible Chat Completions loop through the adapter."""
         return await run_chat_completions_authoring_loop(
@@ -151,4 +152,5 @@ class OpenAICompatibleAuthoringBackend:
             tool_caller=tool_caller,
             max_rounds=max_rounds,
             required_tool_name=required_tool_name,
+            stream_response=stream_response,
         )

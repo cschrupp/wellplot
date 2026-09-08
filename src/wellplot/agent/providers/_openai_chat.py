@@ -174,7 +174,7 @@ def _request_chat_response(
     request_kwargs: dict[str, object],
     provider_label: str,
 ) -> tuple[str, list[dict[str, str]], str | None]:
-    """Send one streamed request and normalize provider transport failures."""
+    """Send one Chat Completions request and normalize provider failures."""
     try:
         response = client.chat.completions.create(**request_kwargs)
         return _chat_response_parts(response)
@@ -210,8 +210,14 @@ async def run_chat_completions_authoring_loop(
     tool_caller: ToolCaller,
     max_rounds: int,
     required_tool_name: str | None = None,
+    stream_response: bool = True,
 ) -> ProviderRunResult:
-    """Run one Chat Completions loop and replay tool calls through MCP."""
+    """Run one Chat Completions loop and replay tool calls through MCP.
+
+    Streaming remains the default for interactive authoring. Structured graph
+    submissions may request a complete response object because they do not
+    consume incremental output and should avoid an unnecessary SSE transport.
+    """
     if not tool_definitions:
         raise RuntimeError(f"No function tools were provided to the {provider_label} backend.")
 
@@ -256,13 +262,14 @@ async def run_chat_completions_authoring_loop(
                     "model": model,
                     "round": round_index,
                     "required_tool_name": required_name,
+                    "stream_response": stream_response,
                 },
             )
         request_kwargs: dict[str, object] = {
             "model": model,
             "messages": messages,
             "tools": function_tools,
-            "stream": True,
+            "stream": stream_response,
         }
         if required_name is not None and not required_tool_called:
             request_kwargs["tool_choice"] = {
@@ -486,7 +493,7 @@ async def run_chat_completions_authoring_loop(
             request_kwargs={
                 "model": model,
                 "messages": messages,
-                "stream": True,
+                "stream": stream_response,
             },
             provider_label=provider_label,
         )
