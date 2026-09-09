@@ -59,8 +59,11 @@ class SectionCompiler:
         instructions = (
             "You are one isolated Wellplot section compiler. Compile only the supplied section "
             "plan. Do not modify other sections or report-wide settings. Use only the supplied "
-            "capabilities and source information. Return the typed artifact required by the "
-            "section capability. Do not emit MCP calls or an operation sequence. The result is "
+            "capabilities and source information. Call submit_section_artifact with the typed "
+            "artifact as its function arguments, matching the supplied function schema. "
+            "A JSON object in assistant text or a Markdown code block is not a submission. "
+            "This submission function returns desired state; do not request editing tools or "
+            "describe an operation sequence. The result is "
             "desired state; Wellplot's deterministic compiler/executor will decide how to "
             "reach it. Use component target_id as the canonical object ID and "
             "parent_component_id for ownership. Include every planned target. For new "
