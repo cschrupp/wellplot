@@ -706,22 +706,28 @@ def _resolve_header_aliases(
                 continue
             item_path = f"header.{collection_name}[{index}]"
             requested_slot = _normalize_token(item.slot_id)
-            explicit_slot_aliases = {
-                token
-                for token in aliases_by_key.get(requested_slot, set())
-                if token != requested_slot
-            }
-            lookup_tokens = (
-                set(explicit_slot_aliases) if explicit_slot_aliases else {requested_slot}
-            )
-            if not explicit_slot_aliases:
-                for field_name in ("key", "label"):
-                    value = getattr(item, field_name, None)
-                    if isinstance(value, str):
-                        normalized = _normalize_token(value)
-                        lookup_tokens.add(normalized)
-                        lookup_tokens.update(aliases_by_key.get(normalized, set()))
-            matches = [slot_id for slot_id, tokens in slots if lookup_tokens.intersection(tokens)]
+            # A literal identity must not become ambiguous through a shared row label.
+            matches = [slot_id for slot_id, _tokens in slots if slot_id == item.slot_id]
+            explicit_slot_aliases: set[str] = set()
+            if not matches:
+                explicit_slot_aliases = {
+                    token
+                    for token in aliases_by_key.get(requested_slot, set())
+                    if token != requested_slot
+                }
+                lookup_tokens = (
+                    set(explicit_slot_aliases) if explicit_slot_aliases else {requested_slot}
+                )
+                if not explicit_slot_aliases:
+                    for field_name in ("key", "label"):
+                        value = getattr(item, field_name, None)
+                        if isinstance(value, str):
+                            normalized = _normalize_token(value)
+                            lookup_tokens.add(normalized)
+                            lookup_tokens.update(aliases_by_key.get(normalized, set()))
+                matches = [
+                    slot_id for slot_id, tokens in slots if lookup_tokens.intersection(tokens)
+                ]
             if len(matches) != 1:
                 code = "header_slot_missing" if not matches else "header_slot_ambiguous"
                 status = (

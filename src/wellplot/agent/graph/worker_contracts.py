@@ -5,7 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 from functools import cache
 from types import UnionType
-from typing import Literal, Union, get_args, get_origin
+from typing import ClassVar, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel, Field, create_model
 
@@ -157,6 +157,9 @@ def section_contract(
             kind = registry.get(component.capability_id).metadata.get("track_kind")
             if kind is not None:
                 fields["kind"] = (Literal[kind], ... if creating else None)
+            if kind in {"reference", "annotation"}:
+                # Remove the inherited field from both wire schema and accepted input.
+                fields["x_scale"] = (ClassVar[None], None)
         if creating:
             fields["title"] = (str, Field(min_length=1))
             fields["width_mm"] = (float, Field(gt=0))

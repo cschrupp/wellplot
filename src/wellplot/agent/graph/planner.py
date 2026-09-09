@@ -66,7 +66,9 @@ class ReconstructionPlanner:
             "parent component as context when a changed child needs it. When a planned section "
             "uses a staged source that is not already present in source_manifest, set the typed "
             "section data_source field with a path relative to the target logfile and a lowercase "
-            "source_format of auto, las, or dlis. Never place data_source inside section values. "
+            "source_format of auto, las, or dlis. The graph also recognizes an explicit path "
+            "relative to the application root, but prefer the logfile-relative form. Never place "
+            "data_source inside section values. "
             "Each component must declare target_id independently of component_id. Track "
             "target IDs are local to their section; binding target IDs are globally unique. "
             "List every requested child object in components, including existing targets that "
@@ -129,6 +131,7 @@ class ReconstructionPlanner:
 
     def _validate_capabilities(self, plan: ReconstructionPlan) -> None:
         self.registry.get(plan.report_capability_id)
+        binding_owners: dict[str, tuple[str, str | None]] = {}
         for section in plan.sections:
             section_spec = self.registry.get(section.capability_id)
             if section_spec.category != "section":
@@ -141,6 +144,19 @@ class ReconstructionPlanner:
             targets = set()
             for component in section.components:
                 spec = self.registry.get(component.capability_id)
+                if spec.category == "binding":
+                    owner = (section.section_id, component.parent_component_id)
+                    previous = binding_owners.get(component.target_id)
+                    if previous is not None:
+                        raise ValueError(
+                            f"Binding target ID {component.target_id!r} is used in section "
+                            f"{previous[0]!r} under component {previous[1]!r} and section "
+                            f"{owner[0]!r} under component {owner[1]!r}. Binding target IDs "
+                            "must be globally unique across the document. Assign distinct "
+                            "IDs to separate instances (for example, section.track.channel.1); "
+                            "the source channel may be repeated."
+                        )
+                    binding_owners[component.target_id] = owner
                 identity = (spec.category, component.parent_component_id, component.target_id)
                 if identity in targets:
                     raise ValueError(f"Duplicate component target {component.target_id!r}.")

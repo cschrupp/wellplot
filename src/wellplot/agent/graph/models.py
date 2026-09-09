@@ -32,7 +32,9 @@ class SemanticComponentPlan(BaseModel):
         description=(
             "Canonical object ID, distinct from component_id. For a track use its local "
             "ID within the section (e.g. combo), not a section-prefixed planning ID. "
-            "For a binding use its unique binding_id. Reuse existing IDs when revising."
+            "For a binding use a binding_id globally unique across all sections and tracks "
+            "(e.g. main.combo.GR.1). Repeated source channels need distinct instance IDs. "
+            "Reuse existing IDs when revising the same instance."
         ),
     )
     capability_id: str = Field(min_length=1)
@@ -55,7 +57,10 @@ class PlannedSectionDataSource(BaseModel):
 
     source_path: str = Field(
         min_length=1,
-        description=("Path to the staged source file, resolved relative to the target logfile."),
+        description=(
+            "Path to the staged source file. Prefer a path relative to the target logfile; "
+            "an existing path relative to the application root is canonicalized before workers run."
+        ),
     )
     source_format: Literal["auto", "las", "dlis"] = Field(
         default="auto",
