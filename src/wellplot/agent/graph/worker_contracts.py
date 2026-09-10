@@ -41,6 +41,11 @@ def construction_model(model: type[BaseModel]) -> type[BaseModel]:
     model.model_rebuild()
     fields = {}
     for name, original in model.model_fields.items():
+        if name == "extensions":
+            # Extensions preserve opaque compatibility data. Worker context
+            # deliberately excludes them, so a provider cannot replace them.
+            fields[name] = (ClassVar[None], None)
+            continue
         field = deepcopy(original)
         annotation = _construction_type(field.annotation)
         field.annotation = annotation
