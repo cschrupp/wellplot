@@ -28,7 +28,7 @@ execution are intentionally outside this module.
 
 from __future__ import annotations
 
-from typing import Any, Literal, Self, TypeAlias
+from typing import Annotated, Any, Literal, Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.json_schema import GetJsonSchemaHandler, JsonSchemaValue
@@ -104,7 +104,13 @@ class _IntentModel(BaseModel):
         handler: GetJsonSchemaHandler,
     ) -> JsonSchemaValue:
         """Advertise omission-or-clear semantics rather than rejected raw nulls."""
-        return _omit_rejected_nulls_from_schema(handler(core_schema))
+        schema = _omit_rejected_nulls_from_schema(handler(core_schema))
+        # Construction subclasses have already removed None from annotations,
+        # but retain it as the internal sentinel for an omitted field.
+        for field in schema.get("properties", {}).values():
+            if field.get("default") is None:
+                field.pop("default", None)
+        return schema
 
     @model_validator(mode="after")
     def reject_explicit_nulls(self) -> Self:
@@ -162,18 +168,25 @@ class AuthoringRemoveIntent(_IntentModel):
 
 
 ClearableText: TypeAlias = str | AuthoringClearIntent | None
+NonEmptyClearableText: TypeAlias = Annotated[str, Field(min_length=1)] | AuthoringClearIntent | None
 ClearableFloat: TypeAlias = float | AuthoringClearIntent | None
 ClearableInteger: TypeAlias = int | AuthoringClearIntent | None
 ClearableBoolean: TypeAlias = bool | AuthoringClearIntent | None
+PositiveClearableFloat: TypeAlias = Annotated[float, Field(gt=0)] | AuthoringClearIntent | None
+NonNegativeClearableFloat: TypeAlias = Annotated[float, Field(ge=0)] | AuthoringClearIntent | None
+UnitIntervalClearableFloat: TypeAlias = (
+    Annotated[float, Field(ge=0, le=1)] | AuthoringClearIntent | None
+)
+PositiveClearableInteger: TypeAlias = Annotated[int, Field(gt=0)] | AuthoringClearIntent | None
 
 
 class AuthoringReportValueIntent(_IntentModel):
     """Partial update for a source-backed report value slot."""
 
     value: ClearableText = None
-    source_key: ClearableText = None
+    source_key: NonEmptyClearableText = None
     default: ClearableText = None
-    unit: ClearableText = None
+    unit: NonEmptyClearableText = None
     provenance: Literal["unknown", "source", "user", "default", "preserved"] | None = None
     availability: Literal["unknown", "available", "missing", "not_applicable"] | None = None
 
@@ -182,11 +195,11 @@ class AuthoringHeaderFieldIntent(_IntentModel):
     """Partial update for one stable general-header field."""
 
     slot_id: str = Field(min_length=1)
-    key: ClearableText = None
-    label: ClearableText = None
+    key: NonEmptyClearableText = None
+    label: NonEmptyClearableText = None
     value: AuthoringReportValueIntent | AuthoringClearIntent | None = None
     aliases: list[str] | AuthoringClearIntent | None = None
-    layout_path: ClearableText = None
+    layout_path: NonEmptyClearableText = None
 
 
 class AuthoringServiceTitleIntent(_IntentModel):
@@ -194,7 +207,7 @@ class AuthoringServiceTitleIntent(_IntentModel):
 
     slot_id: str = Field(min_length=1)
     value: AuthoringReportValueIntent | AuthoringClearIntent | None = None
-    font_size: ClearableFloat = None
+    font_size: PositiveClearableFloat = None
     auto_adjust: ClearableBoolean = None
     bold: ClearableBoolean = None
     italic: ClearableBoolean = None
@@ -205,9 +218,9 @@ class AuthoringHeaderIntent(_IntentModel):
     """Partial desired state for the first-class report header."""
 
     enabled: ClearableBoolean = None
-    provider_name: ClearableText = None
-    title: ClearableText = None
-    subtitle: ClearableText = None
+    provider_name: NonEmptyClearableText = None
+    title: NonEmptyClearableText = None
+    subtitle: NonEmptyClearableText = None
     general_fields: list[AuthoringHeaderFieldIntent] | AuthoringClearIntent | None = None
     service_titles: list[AuthoringServiceTitleIntent] | AuthoringClearIntent | None = None
     detail_fields: list[AuthoringHeaderFieldIntent] | AuthoringClearIntent | None = None
@@ -230,19 +243,19 @@ class AuthoringPageIntent(_IntentModel):
     """Partial desired state for physical page and layout settings."""
 
     size: ClearableText = None
-    width_mm: ClearableFloat = None
-    height_mm: ClearableFloat = None
+    width_mm: PositiveClearableFloat = None
+    height_mm: PositiveClearableFloat = None
     orientation: Literal["portrait", "landscape"] | AuthoringClearIntent | None = None
     continuous: ClearableBoolean = None
     bottom_track_header_enabled: ClearableBoolean = None
-    margin_left_mm: ClearableFloat = None
-    margin_right_mm: ClearableFloat = None
-    margin_top_mm: ClearableFloat = None
-    margin_bottom_mm: ClearableFloat = None
-    header_height_mm: ClearableFloat = None
-    track_header_height_mm: ClearableFloat = None
-    footer_height_mm: ClearableFloat = None
-    track_gap_mm: ClearableFloat = None
+    margin_left_mm: NonNegativeClearableFloat = None
+    margin_right_mm: NonNegativeClearableFloat = None
+    margin_top_mm: NonNegativeClearableFloat = None
+    margin_bottom_mm: NonNegativeClearableFloat = None
+    header_height_mm: NonNegativeClearableFloat = None
+    track_header_height_mm: NonNegativeClearableFloat = None
+    footer_height_mm: NonNegativeClearableFloat = None
+    track_gap_mm: NonNegativeClearableFloat = None
 
 
 class AuthoringDepthIntent(_IntentModel):
@@ -250,8 +263,8 @@ class AuthoringDepthIntent(_IntentModel):
 
     unit: ClearableText = None
     scale: str | float | AuthoringClearIntent | None = None
-    major_step: ClearableFloat = None
-    minor_step: ClearableFloat = None
+    major_step: PositiveClearableFloat = None
+    minor_step: PositiveClearableFloat = None
 
 
 class AuthoringStyleIntent(_IntentModel):
@@ -259,10 +272,10 @@ class AuthoringStyleIntent(_IntentModel):
 
     color: ClearableText = None
     line_style: ClearableText = None
-    line_width: ClearableFloat = None
-    alpha: ClearableFloat = None
+    line_width: PositiveClearableFloat = None
+    alpha: UnitIntervalClearableFloat = None
     fill_color: ClearableText = None
-    fill_alpha: ClearableFloat = None
+    fill_alpha: UnitIntervalClearableFloat = None
     colormap: ClearableText = None
 
 
@@ -272,30 +285,30 @@ class AuthoringGridIntent(_IntentModel):
     display: AuthoringGridDisplayMode | AuthoringClearIntent | None = None
     major: ClearableBoolean = None
     minor: ClearableBoolean = None
-    major_alpha: ClearableFloat = None
-    minor_alpha: ClearableFloat = None
+    major_alpha: UnitIntervalClearableFloat = None
+    minor_alpha: UnitIntervalClearableFloat = None
     horizontal_display: AuthoringGridDisplayMode | AuthoringClearIntent | None = None
     horizontal_major_visible: ClearableBoolean = None
     horizontal_minor_visible: ClearableBoolean = None
-    horizontal_major_color: ClearableText = None
-    horizontal_minor_color: ClearableText = None
-    horizontal_major_thickness: ClearableFloat = None
-    horizontal_minor_thickness: ClearableFloat = None
-    horizontal_major_alpha: ClearableFloat = None
-    horizontal_minor_alpha: ClearableFloat = None
+    horizontal_major_color: NonEmptyClearableText = None
+    horizontal_minor_color: NonEmptyClearableText = None
+    horizontal_major_thickness: PositiveClearableFloat = None
+    horizontal_minor_thickness: PositiveClearableFloat = None
+    horizontal_major_alpha: UnitIntervalClearableFloat = None
+    horizontal_minor_alpha: UnitIntervalClearableFloat = None
     vertical_display: AuthoringGridDisplayMode | AuthoringClearIntent | None = None
     vertical_main_visible: ClearableBoolean = None
-    vertical_main_line_count: ClearableInteger = None
-    vertical_main_thickness: ClearableFloat = None
-    vertical_main_color: ClearableText = None
-    vertical_main_alpha: ClearableFloat = None
+    vertical_main_line_count: PositiveClearableInteger = None
+    vertical_main_thickness: PositiveClearableFloat = None
+    vertical_main_color: NonEmptyClearableText = None
+    vertical_main_alpha: UnitIntervalClearableFloat = None
     vertical_main_scale: AuthoringGridScaleKind | AuthoringClearIntent | None = None
     vertical_main_spacing_mode: AuthoringGridSpacingMode | AuthoringClearIntent | None = None
     vertical_secondary_visible: ClearableBoolean = None
-    vertical_secondary_line_count: ClearableInteger = None
-    vertical_secondary_thickness: ClearableFloat = None
-    vertical_secondary_color: ClearableText = None
-    vertical_secondary_alpha: ClearableFloat = None
+    vertical_secondary_line_count: PositiveClearableInteger = None
+    vertical_secondary_thickness: PositiveClearableFloat = None
+    vertical_secondary_color: NonEmptyClearableText = None
+    vertical_secondary_alpha: UnitIntervalClearableFloat = None
     vertical_secondary_scale: AuthoringGridScaleKind | AuthoringClearIntent | None = None
     vertical_secondary_spacing_mode: AuthoringGridSpacingMode | AuthoringClearIntent | None = None
 
@@ -307,7 +320,7 @@ class AuthoringTrackIntent(_IntentModel):
     section_id: str | None = Field(default=None, min_length=1)
     title: ClearableText = None
     kind: Literal["normal", "reference", "array", "annotation"] | AuthoringClearIntent | None = None
-    width_mm: ClearableFloat = None
+    width_mm: PositiveClearableFloat = None
     x_scale: AuthoringScale | AuthoringClearIntent | None = None
     grid: AuthoringGridIntent | AuthoringClearIntent | None = None
     track_header: AuthoringTrackHeaderSpec | AuthoringClearIntent | None = None
@@ -357,7 +370,7 @@ class AuthoringRasterBindingIntent(_IntentModel):
     clip_percentiles: tuple[float, float] | AuthoringClearIntent | None = None
     interpolation: ClearableText = None
     show_raster: ClearableBoolean = None
-    alpha: ClearableFloat = None
+    alpha: UnitIntervalClearableFloat = None
     color_limits: tuple[float, float] | AuthoringClearIntent | None = None
     colorbar: AuthoringRasterColorbarSpec | AuthoringClearIntent | None = None
     sample_axis: AuthoringRasterSampleAxisSpec | AuthoringClearIntent | None = None
@@ -377,7 +390,7 @@ class AuthoringFillIntent(_IntentModel):
     baseline: AuthoringCurveFillBaselineSpec | AuthoringClearIntent | None = None
     label: ClearableText = None
     color: ClearableText = None
-    alpha: ClearableFloat = None
+    alpha: UnitIntervalClearableFloat = None
     crossover: AuthoringCurveFillCrossoverSpec | AuthoringClearIntent | None = None
     extensions: dict[str, Any] | AuthoringClearIntent | None = None
 
@@ -399,8 +412,8 @@ class AuthoringRemarkIntent(_IntentModel):
     text: ClearableText = None
     lines: list[str] | AuthoringClearIntent | None = None
     alignment: Literal["left", "center", "right"] | AuthoringClearIntent | None = None
-    font_size: ClearableFloat = None
-    title_font_size: ClearableFloat = None
+    font_size: PositiveClearableFloat = None
+    title_font_size: PositiveClearableFloat = None
     border: ClearableBoolean = None
 
 

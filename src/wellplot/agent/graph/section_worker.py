@@ -11,16 +11,21 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
+from functools import partial
 
 from pydantic import BaseModel
 
+from ...authoring_service import AuthoringService
 from ...capabilities import CapabilityRegistry
 from ...capabilities.builtins import LogPlotSectionArtifact
+from ...model.authoring import AuthoringDocumentSpec
 from ..execution_trace import current_agent_trace
 from .context_projection import section_document_context, section_source_context
+from .executor import execute_document_intent
 from .models import CompilationMode, CompiledArtifact, SectionPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
+from .source_context import available_channels_from_source_manifest
 from .worker_contracts import section_contract
 
 
@@ -104,11 +109,14 @@ class SectionCompiler:
                 tool_description=f"Submit the typed artifact for section {plan.section_id!r}.",
                 max_rounds=3,
                 response_validator=(
-                    lambda artifact: (
-                        self._validate_targets(artifact, plan)
-                        if section_spec.artifact_model is LogPlotSectionArtifact
-                        else None
+                    partial(
+                        self._validate_section,
+                        plan=plan,
+                        current_document=current_document,
+                        source_manifest=source_manifest,
                     )
+                    if section_spec.artifact_model is LogPlotSectionArtifact
+                    else None
                 ),
             )
             if trace is not None:
@@ -124,6 +132,34 @@ class SectionCompiler:
             payload=artifact.model_dump(mode="json", exclude_unset=True),
             covered_component_ids=[item.component_id for item in plan.components],
         )
+
+    def _validate_section(
+        self,
+        artifact: BaseModel,
+        *,
+        plan: SectionPlan,
+        current_document: dict[str, object],
+        source_manifest: dict[str, object],
+    ) -> None:
+        """Check applicability on a private snapshot before accepting a submission."""
+        self._validate_targets(artifact, plan)
+        document = AuthoringDocumentSpec.model_validate(current_document).model_copy(deep=True)
+        # Use the same canonical conversion as the merge boundary, preserving
+        # omitted fields from the provider's scoped construction model.
+        spec = self.registry.get(plan.capability_id)
+        canonical = spec.artifact_model.model_validate(
+            artifact.model_dump(mode="json", exclude_unset=True)
+        )
+        intent = spec.compiler(canonical)
+        result = execute_document_intent(
+            AuthoringService(document),
+            intent,
+            available_channels=available_channels_from_source_manifest(source_manifest),
+        )
+        if not result.success:
+            raise ValueError(
+                "Section cannot be applied to the current scaffold:\n" + "\n".join(result.errors)
+            )
 
     def _validate_targets(self, artifact: BaseModel, plan: SectionPlan) -> None:
         """Require every planned target at its explicit parent before acceptance."""

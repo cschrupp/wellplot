@@ -577,12 +577,14 @@ def _add_header_slot_operations(
                 continue
             base_path = f"header.{collection_name}[{item.slot_id}]"
             current = _current_header_slot(current_header, item.slot_id)
+            # These fields identify scaffold slots; value updates do not rename
+            # labels or replace their layout. Alias resolution has already run.
             patch = _patch_for_model(
                 item,
                 current,
                 base_path=base_path,
                 decisions=decisions,
-                ignored={"slot_id"},
+                ignored={"slot_id", "key", "label", "aliases", "layout_path"},
             )
             if not patch:
                 unchanged.append(base_path)
@@ -1524,6 +1526,14 @@ def reconcile_authoring(
             for remark in (existing.remarks if existing is not None else ())
             if _value(_mapping(remark), "remark_id") is not _MISSING
         ]
+        # Remark creates append during the report phase. Include those planned
+        # IDs in the simulated collection so final ordering also covers new
+        # remarks relative to remarks already in the document.
+        planned_remark_ids = current_remark_ids + [
+            remark.remark_id
+            for remark in intent.remarks
+            if remark.remark_id not in current_remark_ids
+        ]
         for remark in intent.remarks:
             _process_remark(
                 builder,
@@ -1537,7 +1547,7 @@ def reconcile_authoring(
             builder,
             object_kind="remark",
             desired_ids=[remark.remark_id for remark in intent.remarks],
-            current_ids=current_remark_ids,
+            current_ids=planned_remark_ids,
             section_id=None,
             parent_dependencies={},
             unchanged=unchanged,

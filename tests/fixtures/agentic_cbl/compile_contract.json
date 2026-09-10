@@ -566,8 +566,6 @@
             },
             {
               "slot_id": "general.country",
-              "key": "country",
-              "label": "Country",
               "value": {
                 "value": "Utah"
               }
@@ -1305,8 +1303,6 @@
         },
         {
           "slot_id": "general.country",
-          "key": "country",
-          "label": "Country",
           "value": {
             "value": "Utah"
           }

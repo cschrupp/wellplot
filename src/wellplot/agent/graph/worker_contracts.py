@@ -79,6 +79,14 @@ def report_contract(document: dict[str, object], *, reconstruct: bool) -> type[B
         if reconstruct
         else AuthoringHeaderFieldIntent
     )
+    field_base = create_model(
+        "HeaderSlotValueIntent",
+        __base__=field_base,
+        key=(ClassVar[None], None),
+        label=(ClassVar[None], None),
+        aliases=(ClassVar[None], None),
+        layout_path=(ClassVar[None], None),
+    )
     title_base = (
         construction_model(AuthoringServiceTitleIntent)
         if reconstruct

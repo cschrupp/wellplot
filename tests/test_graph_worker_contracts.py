@@ -115,6 +115,46 @@ def test_report_schema_rejects_section_content_before_submission(field: str) -> 
             model.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    "page",
+    [
+        {"width_mm": 0},
+        {"height_mm": 0},
+        {"width_mm": -1},
+        {"height_mm": -1},
+    ],
+)
+def test_report_schema_rejects_non_positive_page_dimensions(page: dict[str, object]) -> None:
+    """Page dimensions fail at the provider contract, not during execution."""
+    payload = {"intent": {"page": page}}
+    for model in (ReportArtifact, report_contract(_document(), reconstruct=True)):
+        schema = model.model_json_schema()
+        assert list(Draft202012Validator(schema).iter_errors(payload))
+        with pytest.raises(ValidationError):
+            model.model_validate(payload)
+
+
+def test_report_schema_permits_zero_sized_page_layout_settings() -> None:
+    """Page layout fields retain the zero values allowed by ``PagePatch``."""
+    payload = {
+        "intent": {
+            "page": {
+                "margin_left_mm": 0,
+                "margin_right_mm": 0,
+                "margin_top_mm": 0,
+                "margin_bottom_mm": 0,
+                "header_height_mm": 0,
+                "track_header_height_mm": 0,
+                "footer_height_mm": 0,
+                "track_gap_mm": 0,
+            }
+        }
+    }
+    for model in (ReportArtifact, report_contract(_document(), reconstruct=True)):
+        assert not list(Draft202012Validator(model.model_json_schema()).iter_errors(payload))
+        model.model_validate(payload)
+
+
 @pytest.mark.parametrize("reconstruct", [True, False])
 def test_report_requires_existing_header_slot_ids(reconstruct: bool) -> None:
     """Reject invented targets in both modes while accepting an inspected slot."""

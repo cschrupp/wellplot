@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from wellplot.authoring_reconciler import (
-    AuthoringOperationPhase,
-    reconcile_authoring,
-)
+from wellplot.authoring_executor import AuthoringExecutor
+from wellplot.authoring_reconciler import AuthoringOperationPhase, reconcile_authoring
+from wellplot.authoring_service import AuthoringService
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 
 
@@ -142,6 +141,55 @@ def test_reconciler_is_idempotent_for_matching_values() -> None:
     assert plan.operations == []
     assert "sections[main].tracks[curves].structure" in plan.unchanged_paths
     assert "sections[main].tracks[curves].bindings[gr-1]" in plan.unchanged_paths
+
+
+def test_reconciler_orders_new_remarks_with_existing_remarks() -> None:
+    """Move newly created remarks when the request places them before existing ones."""
+    existing = _document()
+    existing.remarks = [
+        {
+            "remark_id": "notice",
+            "title": "Notice",
+            "lines": ["Existing notice."],
+        }
+    ]
+    intent = AuthoringDocumentIntent(
+        remarks=[
+            {
+                "remark_id": "scope",
+                "title": "Supported Reconstruction Scope",
+                "lines": ["Supported scope."],
+            },
+            {
+                "remark_id": "sources",
+                "title": "Data Sources",
+                "lines": ["Staged sources."],
+            },
+            {"remark_id": "notice"},
+        ]
+    )
+
+    plan = reconcile_authoring(intent, existing=existing)
+
+    assert plan.ready is True
+    moves = [
+        operation
+        for operation in plan.operations
+        if operation.action == "move" and operation.object_kind == "remark"
+    ]
+    assert [(operation.object_id, operation.payload["new_index"]) for operation in moves] == [
+        ("scope", 0),
+        ("sources", 1),
+    ]
+
+    result = AuthoringExecutor(AuthoringService(existing)).execute(plan)
+
+    assert result.success is True, result.errors
+    assert [remark.remark_id for remark in result.document.remarks] == [
+        "scope",
+        "sources",
+        "notice",
+    ]
 
 
 def test_reconciler_reports_exact_missing_track_form_fields() -> None:
