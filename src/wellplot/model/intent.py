@@ -270,13 +270,13 @@ class AuthoringDepthIntent(_IntentModel):
 class AuthoringStyleIntent(_IntentModel):
     """Partial style desired state used by curve and raster bindings."""
 
-    color: ClearableText = None
-    line_style: ClearableText = None
+    color: NonEmptyClearableText = None
+    line_style: NonEmptyClearableText = None
     line_width: PositiveClearableFloat = None
     alpha: UnitIntervalClearableFloat = None
-    fill_color: ClearableText = None
+    fill_color: NonEmptyClearableText = None
     fill_alpha: UnitIntervalClearableFloat = None
-    colormap: ClearableText = None
+    colormap: NonEmptyClearableText = None
 
 
 class AuthoringGridIntent(_IntentModel):
@@ -428,8 +428,8 @@ class AuthoringSectionIntent(_IntentModel):
     """Partial desired state for one section and its ordered children."""
 
     section_id: str = Field(min_length=1)
-    title: ClearableText = None
-    subtitle: ClearableText = None
+    title: NonEmptyClearableText = None
+    subtitle: NonEmptyClearableText = None
     depth_range: tuple[float, float] | AuthoringClearIntent | None = None
     data_source: AuthoringDataSource | AuthoringClearIntent | None = None
     tracks: list[AuthoringTrackIntent] | AuthoringClearIntent | None = None
