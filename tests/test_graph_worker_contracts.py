@@ -175,6 +175,54 @@ def test_report_requires_existing_header_slot_ids(reconstruct: bool) -> None:
     model.model_validate(payload)
 
 
+def test_planner_requires_inspected_header_slot_ids() -> None:
+    """A semantic State request is directed to the inspected State/Country slot."""
+
+    class Model:
+        async def generate(self, **kwargs: object) -> BaseModel:
+            response_model = kwargs["response_model"]
+            assert isinstance(response_model, type)
+            invalid = {
+                "summary": "Set the state.",
+                "report_values": {
+                    "header": {
+                        "general_fields": [{"slot_id": "general.state", "value": "Utah"}],
+                    }
+                },
+                "sections": [
+                    {
+                        "section_id": "main",
+                        "capability_id": "section.log_plot",
+                        "goal": "Keep main.",
+                        "components": [
+                            {
+                                "component_id": "main.existing",
+                                "target_id": "existing",
+                                "capability_id": "track.normal",
+                                "goal": "Keep existing.",
+                                "parent_component_id": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+            with pytest.raises(ValidationError, match="general.country"):
+                response_model.model_validate(invalid)
+            invalid["report_values"]["header"]["general_fields"][0]["slot_id"] = "general.country"
+            return response_model.model_validate(invalid)
+
+    plan = asyncio.run(
+        ReconstructionPlanner(model=Model(), registry=create_builtin_registry()).plan(
+            request="Set the state to Utah.",
+            current_document=_document(),
+            source_manifest={},
+        )
+    )
+    assert plan.report_values["header"]["general_fields"] == [
+        {"slot_id": "general.country", "value": "Utah"}
+    ]
+
+
 def test_construction_rejects_clear_and_preserves_omitted_values() -> None:
     """An omitted construction field stays omitted through model serialization."""
     model = section_contract(_plan(), _document(), create_builtin_registry(), reconstruct=True)

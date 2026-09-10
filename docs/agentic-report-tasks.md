@@ -6,6 +6,13 @@ partitions that plan into report settings, groups of at most eight header slots,
 and individual remarks. Tasks run sequentially; each has its own three-round
 structured-response budget and a schema limited to its fields and target IDs.
 
+The planner's header collections are also scoped to the stable slot IDs exposed
+by the inspected starter document. A request for a semantic field such as a
+state must select the matching existing slot, such as `general.country` when
+that is the starter's State/Country field. It cannot create `general.state`.
+Invalid planner submissions receive the provider's normal schema correction
+before report tasks begin.
+
 Each candidate is combined with accepted artifacts in memory and checked through
 the existing canonical authoring executor on a copy of the scaffold. Rejected
 candidates do not replace accepted work. The combined artifact must still cover

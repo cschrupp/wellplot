@@ -11,9 +11,9 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from ...capabilities import CapabilityRegistry
 from ..execution_trace import current_agent_trace
@@ -21,6 +21,28 @@ from .context_projection import planner_document_summary, planner_source_manifes
 from .models import CompilationMode, ReconstructionPlan, SectionPlan, SemanticComponentPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
+from .worker_contracts import header_slot_ids
+
+
+class _PlannerReportValues(BaseModel):
+    """Open report planning values with typed header-slot collections."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class _PlannerHeaderValues(BaseModel):
+    """Open scalar header planning values with scoped slot collections."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class _PlannerHeaderSlotValue(BaseModel):
+    """One semantic plan value directed at a stable existing header slot."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    slot_id: str = Field(min_length=1)
+    value: Any = None
 
 
 @dataclass(slots=True)
@@ -73,7 +95,10 @@ class ReconstructionPlanner:
             "target IDs are local to their section; binding target IDs are globally unique. "
             "List every requested child object in components, including existing targets that "
             "need updates; constraints do not substitute for component declarations. "
-            + mode_instruction
+            "For report header values, use only the stable slot_id values shown in the "
+            "current_document header inventory. Match a requested semantic field to the "
+            "listed key, label, or aliases; never invent a slot ID from natural-language "
+            "wording. " + mode_instruction
         )
         context = {
             "request": request,
@@ -97,10 +122,15 @@ class ReconstructionPlanner:
                 section_id=(Literal[existing_ids], ...),
             )
             section_type = existing_section | section_type
+        report_values_model = _planner_report_values_contract(current_document)
         response_model = create_model(
             "ScopedReconstructionPlan",
             __base__=ReconstructionPlan,
             sections=(list[section_type], Field(min_length=1)),
+            report_values=(
+                report_values_model,
+                Field(default_factory=report_values_model),
+            ),
         )
         stage = trace.stage("planner") if trace is not None else nullcontext()
         with stage:
@@ -121,6 +151,9 @@ class ReconstructionPlanner:
                 max_rounds=3,
                 response_validator=validate_plan,
             )
+            # The scoped response model constrains provider output. Downstream graph
+            # nodes consume the stable, JSON-like ReconstructionPlan representation.
+            plan = ReconstructionPlan.model_validate(plan.model_dump(mode="json"))
             if trace is not None:
                 trace.record(
                     "structured_output",
@@ -175,3 +208,34 @@ class ReconstructionPlanner:
                         f"{parent_capability_id!r} in section {section.section_id!r}. "
                         f"Allowed parents: {list(spec.allowed_parents)!r}."
                     )
+
+
+def _planner_report_values_contract(document: dict[str, object]) -> type[BaseModel]:
+    """Restrict planner header values to inspected stable slot identities."""
+    header = document.get("header")
+    header_mapping = header if isinstance(header, dict) else {}
+    fields: dict[str, tuple[object, object]] = {}
+    for collection in ("general_fields", "detail_fields", "service_titles"):
+        slots = header_slot_ids(header_mapping, collection)
+        if slots:
+            slot_value = create_model(
+                f"Planned{collection.title().replace('_', '')}Value",
+                __base__=_PlannerHeaderSlotValue,
+                slot_id=(Literal[tuple(slots)], Field(description="Inspected stable slot ID.")),
+            )
+            fields[collection] = (list[slot_value], Field(default_factory=list))
+        else:
+            fields[collection] = (
+                list[_PlannerHeaderSlotValue],
+                Field(default_factory=list, max_length=0),
+            )
+    scoped_header = create_model(
+        "PlannedHeaderValues",
+        __base__=_PlannerHeaderValues,
+        **fields,
+    )
+    return create_model(
+        "PlannerReportValues",
+        __base__=_PlannerReportValues,
+        header=(scoped_header | None, None),
+    )

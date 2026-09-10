@@ -26,7 +26,9 @@ def report_tasks(base: type[BaseModel], values: dict[str, Any]) -> list[ReportTa
     intent = base.model_fields["intent"].annotation
     header = intent.model_fields["header"].annotation
     settings = deepcopy(values)
-    planned_header = settings.get("header", {})
+    planned_header = settings.get("header")
+    if not isinstance(planned_header, dict):
+        planned_header = {}
     tasks = []
     for collection in HEADER_COLLECTIONS:
         entries = planned_header.pop(collection, [])
