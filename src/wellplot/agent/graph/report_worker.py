@@ -26,6 +26,7 @@ from .executor import execute_document_intent
 from .models import CompilationMode, CompiledArtifact, ReconstructionPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
+from .report_tasks import ReportTask, merge_report_parts, report_tasks
 from .worker_contracts import report_contract
 
 
@@ -70,58 +71,97 @@ class ReportCompiler:
         stage = trace.stage("report", target_id="report") if trace is not None else nullcontext()
         with stage:
             response_model = spec.artifact_model
-            response_validator = None
             if response_model is ReportArtifact:
                 response_model = report_contract(
                     current_document, reconstruct=mode == "reconstruct"
                 )
-                response_validator = partial(
-                    _validate_report,
-                    current_document=current_document,
-                    report_values=plan.report_values,
+            tasks = [ReportTask("report", plan.report_values, response_model)]
+            if spec.artifact_model is ReportArtifact and mode == "reconstruct":
+                tasks = report_tasks(response_model, plan.report_values)
+            accepted: dict[str, Any] = {}
+            for task in tasks:
+                task_context = dict(context)
+                task_context["report_values"] = task.values
+                task_context["task_id"] = task.target_id
+                response_validator = None
+                if spec.artifact_model is ReportArtifact:
+                    response_validator = partial(
+                        _validate_report_part,
+                        accepted=accepted,
+                        current_document=current_document,
+                        report_values=task.values,
+                    )
+                task_stage = (
+                    trace.stage("report_task", target_id=task.target_id)
+                    if trace is not None and len(tasks) > 1
+                    else nullcontext()
                 )
-            artifact = await self.model.generate(
-                instructions=(
-                    "You are the report-wide compiler. Compile only report/header/page/depth/"
-                    "output/remarks/tail requirements. Do not author section-local tracks, "
-                    "bindings, fills, or annotations. Return desired state, not an operation "
-                    "sequence or MCP calls. Omit unrequested fields to preserve scaffold "
-                    "values and defaults. Use only listed header slot IDs; their labels and "
-                    "aliases describe their meaning. Never invent slots. "
-                    "Submit sparse updates, not a copy of current_document. Absent optional "
-                    "settings mean preserve automatic sizing; do not substitute empty strings, "
-                    "zeroes, or tiny numbers for them. Only set geometry or typography when "
-                    "requested. Populate every requested header value and remark body. For "
-                    "example, a header value update contains only intent.header.general_fields "
-                    "or detail_fields entries shaped as "
-                    '{"slot_id": "<listed slot ID>", "value": {"value": "<requested value>"}}. '
-                    "Header detail context is an inventory, not a replacement layout. Keep "
-                    "header.detail omitted unless replacing the layout is requested. A new "
-                    "remark needs its requested text or lines, not just a title. "
-                    + revision_instruction
-                ),
-                user_message=(
-                    "Compile the report-wide portion of the reconstruction.\n\nContext:\n"
-                    + compact_prompt_json(context)
-                ),
-                response_model=response_model,
-                tool_name="submit_report_artifact",
-                tool_description="Submit typed report-wide desired state.",
-                max_rounds=3,
-                response_validator=response_validator,
-            )
-            if trace is not None:
-                trace.record(
-                    "structured_output",
-                    status="accepted",
-                    payload=artifact.model_dump(mode="json", exclude_unset=True),
+                with task_stage:
+                    artifact = await self.model.generate(
+                        instructions=(
+                            "Complete only the fields permitted by this task's schema. Other tasks "
+                            "own the other report fields. Include every value in report_values. "
+                            "A null plan value is unspecified: omit that setting. Never use "
+                            "the literal string 'null' as a placeholder. "
+                            "You are the report compiler. Compile report/header/page/depth/"
+                            "output/remarks/tail requirements. Do not author section tracks, "
+                            "bindings, fills, or annotations. Return desired state. "
+                            "Omit unrequested fields to preserve scaffold values and defaults. "
+                            "Use only listed header slot IDs; labels and aliases describe "
+                            "their meaning. Never invent slots. "
+                            "Submit sparse updates, not a copy of current_document. "
+                            "Absent settings preserve automatic sizing. Do not substitute "
+                            "empty strings, zeroes, or tiny numbers for them. Only set geometry "
+                            "or typography when requested. Populate each requested header "
+                            "value and remark body. Header general_fields and detail_fields "
+                            "entries have this shape: "
+                            '{"slot_id": "<listed ID>", "value": {"value": "<value>"}}. '
+                            "Header detail context is an inventory, not a replacement layout. Keep "
+                            "header.detail omitted unless replacing the layout is requested. A new "
+                            "remark needs its requested text or lines, not just a title. "
+                            + revision_instruction
+                        ),
+                        user_message=(
+                            "Compile the report-wide portion of the reconstruction.\n\nContext:\n"
+                            + compact_prompt_json(task_context)
+                        ),
+                        response_model=task.response_model,
+                        tool_name="submit_report_artifact",
+                        tool_description="Submit typed report-wide desired state.",
+                        max_rounds=3,
+                        response_validator=response_validator,
+                    )
+                    if trace is not None:
+                        trace.record(
+                            "structured_output",
+                            status="accepted",
+                            payload=artifact.model_dump(mode="json", exclude_unset=True),
+                        )
+                accepted = merge_report_parts(
+                    accepted, artifact.model_dump(mode="json", exclude_unset=True)
+                )
+            if spec.artifact_model is ReportArtifact and len(tasks) > 1:
+                _validate_report(
+                    ReportArtifact.model_validate(accepted), current_document, plan.report_values
                 )
         return CompiledArtifact(
             worker_id="report",
             capability_id=spec.capability_id,
             target_id="report",
-            payload=artifact.model_dump(mode="json", exclude_unset=True),
+            payload=accepted,
         )
+
+
+def _validate_report_part(
+    artifact: ReportArtifact,
+    *,
+    accepted: dict[str, Any],
+    current_document: dict[str, object],
+    report_values: Mapping[str, Any],
+) -> None:
+    """Validate the current task against all accepted in-memory report work."""
+    combined = merge_report_parts(accepted, artifact.model_dump(mode="json", exclude_unset=True))
+    _validate_report(ReportArtifact.model_validate(combined), current_document, report_values)
 
 
 def _validate_report(
