@@ -246,6 +246,43 @@ def test_construction_rejects_clear_and_preserves_omitted_values() -> None:
             model.model_validate(invalid)
 
 
+@pytest.mark.parametrize("reconstruct", [True, False])
+@pytest.mark.parametrize("collection", ["bindings", "fills", "annotations"])
+def test_unplanned_child_collections_advertise_no_item_models(
+    reconstruct: bool, collection: str
+) -> None:
+    """Empty collections preserve omission without inviting unplanned objects."""
+    model = section_contract(
+        _plan(), _document(), create_builtin_registry(), reconstruct=reconstruct
+    )
+    schema = model.model_json_schema()
+    assert not any(
+        name.endswith(("BindingIntent", "FillIntent", "AnnotationIntent"))
+        for name in schema.get("$defs", {})
+    )
+    payload = {
+        "section": {
+            "section_id": "repeat",
+            "title": "Repeat",
+            "tracks": [
+                {
+                    "track_id": "combo",
+                    "title": "Combo",
+                    "kind": "normal",
+                    "width_mm": 50,
+                    collection: [],
+                }
+            ],
+        }
+    }
+    assert not list(Draft202012Validator(schema).iter_errors(payload))
+    assert model.model_validate(payload).model_dump(exclude_unset=True) == payload
+    payload["section"]["tracks"][0][collection] = [{}]
+    assert list(Draft202012Validator(schema).iter_errors(payload))
+    with pytest.raises(ValidationError):
+        model.model_validate(payload)
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -503,4 +540,7 @@ def test_cbl_report_schema_is_smaller_and_contains_only_owned_fields() -> None:
         schema = section_contract(
             section, current_document, registry, reconstruct=True
         ).model_json_schema()
-        assert len(json.dumps(schema, separators=(",", ":"))) < 45000
+        assert len(json.dumps(schema, separators=(",", ":"))) < 35000
+        assert not any(
+            name.endswith(("FillIntent", "AnnotationIntent")) for name in schema.get("$defs", {})
+        )

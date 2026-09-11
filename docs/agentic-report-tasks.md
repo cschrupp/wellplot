@@ -36,3 +36,23 @@ The same run also experienced section transport failures; task decomposition doe
 not resolve provider disconnects or overload. More, smaller calls can increase
 latency and input-token cost. Live evaluation is still needed to measure that
 tradeoff. Section task decomposition is outside this change.
+
+## Section Schema Follow-up
+
+Run `3c8350994f9f47e3b952925b2ac0a6a5` completed report compilation, then
+submitted an expanded main-pass artifact with invalid VDL limits `[0, 1]`.
+The correction request and the repeat-pass request both disconnected.
+
+Section artifacts already use partial intents and preserve omitted fields.
+Collections with no planned children now advertise only an empty array, without
+pulling the unused child models into the function schema. This retains rejection
+of unplanned children and the existing revision clear semantics. Planned fills
+and annotations still receive their full typed schemas.
+
+Section guidance asks for requested properties and required identities rather
+than expanded defaults. The raster limit field explains that VDL limits must
+straddle zero even with amplitude normalization disabled: its rendered color
+map remains centered on zero. Omitted limits retain existing settings or use
+automatic limits for new bindings. Explicit overrides remain subject to canonical
+validation. This reduces schema overhead and clarifies the observed validation
+failure; it does not guarantee provider transport reliability or add retries.

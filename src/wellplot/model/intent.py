@@ -371,7 +371,16 @@ class AuthoringRasterBindingIntent(_IntentModel):
     interpolation: ClearableText = None
     show_raster: ClearableBoolean = None
     alpha: UnitIntervalClearableFloat = None
-    color_limits: tuple[float, float] | AuthoringClearIntent | None = None
+    color_limits: tuple[float, float] | AuthoringClearIntent | None = Field(
+        default=None,
+        description=(
+            "Explicit raster amplitude limits, strictly increasing. For profile='vdl', "
+            "the lower limit must be negative and the upper limit positive because VDL "
+            "color mapping is centered on zero, including when normalization='none'. "
+            "Omit unless explicit amplitude limits were requested; omission keeps the "
+            "existing limits or uses automatic limits for a new binding."
+        ),
+    )
     colorbar: AuthoringRasterColorbarSpec | AuthoringClearIntent | None = None
     sample_axis: AuthoringRasterSampleAxisSpec | AuthoringClearIntent | None = None
     waveform: AuthoringRasterWaveformSpec | AuthoringClearIntent | None = None

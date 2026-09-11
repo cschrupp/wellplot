@@ -75,7 +75,10 @@ class SectionCompiler:
             "objects supply a display title, kind and width; omit unrequested optional "
             "settings to keep defaults. When section_plan declares data_source, return that "
             "exact source_path and source_format. Do not clear fields during construction."
-            + revision_instruction
+            " Submit only requested changes and required identities, not a copy of the "
+            "current document with all defaults expanded. For raster bindings, omit "
+            "unrequested color_limits and normalization settings. The string 'null' is "
+            "not an omitted value." + revision_instruction
         )
         context = {
             "original_request": request,

@@ -195,7 +195,6 @@ def section_contract(
                 existing_ids=existing_binding_ids,
                 reconstruct=reconstruct or creating,
             ),
-            canonical_model=AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
             reconstruct=reconstruct or creating,
         )
         fields["fills"] = _child_collection_field(
@@ -207,7 +206,6 @@ def section_contract(
                 track_id=target_id,
                 reconstruct=reconstruct or creating,
             ),
-            canonical_model=AuthoringFillIntent,
             reconstruct=reconstruct or creating,
         )
         fields["annotations"] = _child_collection_field(
@@ -219,7 +217,6 @@ def section_contract(
                 track_id=target_id,
                 reconstruct=reconstruct or creating,
             ),
-            canonical_model=AuthoringAnnotationIntent,
             reconstruct=reconstruct or creating,
         )
         variants.append(create_model(f"{target_id}TrackIntent", __base__=track_base, **fields))
@@ -265,7 +262,6 @@ def _child_collection_field(
     children: list[SemanticComponentPlan],
     category: str,
     item_models: list[type[BaseModel]],
-    canonical_model: object,
     reconstruct: bool,
 ) -> tuple[object, Field]:
     """Restrict one nested collection to the planned child targets.
@@ -277,8 +273,9 @@ def _child_collection_field(
     """
     count = sum(1 for item in children if item.capability_id.split(".", maxsplit=1)[0] == category)
     if not item_models:
-        item_type = _construction_type(canonical_model) if reconstruct else canonical_model
-        annotation = list[item_type] if reconstruct else list[item_type] | AuthoringClearIntent
+        # No item is legal here. Advertising its full model suggests unsupported
+        # work and pulls unrelated capability definitions into the tool schema.
+        annotation = list[object] if reconstruct else list[object] | AuthoringClearIntent
         return annotation, Field(default=None, max_length=0)
     item_type = Union[tuple(item_models)]  # noqa: UP007
     annotation = list[item_type] if reconstruct else list[item_type] | AuthoringClearIntent
