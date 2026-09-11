@@ -4,13 +4,21 @@ from __future__ import annotations
 
 import pytest
 from jsonschema import Draft202012Validator
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from wellplot.model import (
     AuthoringClearIntent,
     AuthoringCurveBindingIntent,
+    AuthoringDepthIntent,
     AuthoringDocumentIntent,
+    AuthoringFillIntent,
+    AuthoringGridIntent,
+    AuthoringPageIntent,
+    AuthoringRasterBindingIntent,
+    AuthoringRemarkIntent,
     AuthoringRemoveIntent,
+    AuthoringServiceTitleIntent,
+    AuthoringStyleIntent,
     AuthoringTrackIntent,
     authoring_intent_json_schema,
 )
@@ -45,6 +53,34 @@ def test_raw_null_is_not_an_implicit_clear() -> None:
 
     with pytest.raises(ValidationError, match="cannot be null"):
         AuthoringCurveBindingIntent(kind="curve", binding_id="cbl-1", label=None)
+
+
+@pytest.mark.parametrize(
+    ("model", "values"),
+    [
+        (AuthoringPageIntent, {"width_mm": 0}),
+        (AuthoringPageIntent, {"height_mm": -1}),
+        (AuthoringDepthIntent, {"major_step": 0}),
+        (AuthoringStyleIntent, {"line_width": 0}),
+        (AuthoringStyleIntent, {"alpha": 1.1}),
+        (AuthoringStyleIntent, {"fill_alpha": -0.1}),
+        (AuthoringGridIntent, {"horizontal_major_thickness": 0}),
+        (AuthoringGridIntent, {"vertical_main_line_count": 0}),
+        (AuthoringGridIntent, {"vertical_secondary_alpha": 1.1}),
+        (AuthoringTrackIntent, {"track_id": "curve", "width_mm": 0}),
+        (AuthoringRasterBindingIntent, {"kind": "raster", "binding_id": "vdl", "alpha": -0.1}),
+        (AuthoringFillIntent, {"fill_id": "gas", "alpha": 1.1}),
+        (AuthoringRemarkIntent, {"remark_id": "scope", "font_size": 0}),
+        (AuthoringServiceTitleIntent, {"slot_id": "service_title.1", "font_size": 0}),
+    ],
+)
+def test_intent_numeric_constraints_match_canonical_patch_invariants(
+    model: type[BaseModel],
+    values: dict[str, object],
+) -> None:
+    """Reject values that the canonical mutation patches cannot persist."""
+    with pytest.raises(ValidationError):
+        model(**values)
 
 
 def test_binding_intent_requires_kind_when_nested_under_a_track() -> None:

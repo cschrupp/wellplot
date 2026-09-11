@@ -83,10 +83,9 @@ class _FakeStructuredModel:
         if tool_name == "submit_report_artifact":
             return response_model.model_validate({"intent": {"title": "Compiled report"}})
         if tool_name == "submit_section_artifact":
-            section_id = (
-                "repeat_pass" if "Compile section 'repeat_pass'." in user_message else "main_pass"
-            )
             context = json.loads(user_message.rsplit("Context:\n", maxsplit=1)[1])
+            section_plan = context["section_plan"]
+            section_id = section_plan["section_id"]
             self.section_source_manifests[section_id] = context["source_manifest"]
             section: dict[str, object] = {
                 "section_id": section_id,
@@ -101,10 +100,7 @@ class _FakeStructuredModel:
                 ],
             }
             if section_id == "repeat_pass":
-                section["data_source"] = {
-                    "source_path": "repeat.las",
-                    "source_format": "las",
-                }
+                section["data_source"] = section_plan["data_source"]
             return response_model.model_validate(
                 {
                     "section": section,
@@ -127,11 +123,49 @@ def test_compile_graph_fans_out_sections_and_merges_intent() -> None:
     ]
 
 
+def test_compile_graph_dispatches_canonicalized_source_routes_to_workers() -> None:
+    """The source boundary updates graph state before worker contracts are derived."""
+    result, _model = asyncio.run(_compile_two_sections(normalized_source_path="sources/repeat.las"))
+
+    repeat = result["merged_intent"]["sections"][1]
+    assert repeat["data_source"] == {
+        "source_path": "sources/repeat.las",
+        "source_format": "las",
+    }
+
+
 @dataclass
 class _PlannedSourceResolver:
     """Test double for deterministic source enrichment before worker dispatch."""
 
     calls: list[tuple[list[str], list[str]]] = field(default_factory=list)
+    normalized_source_path: str | None = None
+
+    def normalize_plan_sources(
+        self,
+        *,
+        plan: ReconstructionPlan,
+        logfile_path: str | None,
+    ) -> ReconstructionPlan:
+        """Optionally canonicalize a route before workers receive the plan."""
+        del logfile_path
+        if self.normalized_source_path is None:
+            return plan
+        normalized_sections = []
+        for section in plan.sections:
+            if section.data_source is None:
+                normalized_sections.append(section)
+                continue
+            normalized_sections.append(
+                section.model_copy(
+                    update={
+                        "data_source": section.data_source.model_copy(
+                            update={"source_path": self.normalized_source_path}
+                        )
+                    }
+                )
+            )
+        return plan.model_copy(update={"sections": normalized_sections})
 
     def enrich(
         self,
@@ -153,11 +187,14 @@ class _PlannedSourceResolver:
         }
 
 
-async def _compile_two_sections() -> tuple[dict[str, object], _FakeStructuredModel]:
+async def _compile_two_sections(
+    *,
+    normalized_source_path: str | None = None,
+) -> tuple[dict[str, object], _FakeStructuredModel]:
     """Compile the synthetic two-section request through the generic graph."""
     registry = create_builtin_registry()
     model = _FakeStructuredModel()
-    source_resolver = _PlannedSourceResolver()
+    source_resolver = _PlannedSourceResolver(normalized_source_path=normalized_source_path)
     graph = build_compile_graph(
         ReconstructionGraphDependencies(
             planner=ReconstructionPlanner(model=model, registry=registry),

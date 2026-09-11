@@ -1,4 +1,4 @@
-"""Transport selection for one-shot graph structured submissions."""
+"""Transport defaults for one-shot graph structured submissions."""
 
 from __future__ import annotations
 
@@ -45,8 +45,8 @@ class _Backend:
         return ProviderRunResult(final_text="", tool_trace=())
 
 
-def test_graph_adapter_disables_streaming_for_structured_submission() -> None:
-    """Graph compilation avoids SSE when no incremental output is consumed."""
+def test_graph_adapter_preserves_backend_streaming_default() -> None:
+    """Graph compilation does not override the backend transport default."""
     backend = _Backend()
     adapter = ExistingProviderStructuredAdapter(backend=backend)
 
@@ -61,4 +61,4 @@ def test_graph_adapter_disables_streaming_for_structured_submission() -> None:
     )
 
     assert result == _Submission(title="Compiled")
-    assert backend.stream_response is False
+    assert backend.stream_response is True

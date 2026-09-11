@@ -70,6 +70,8 @@ _EXPECTED_SERVICE_TITLES = (
     "Gamma Ray - CCL",
 )
 _LINE_STYLE_ALIASES = {
+    "-": "-",
+    "solid": "-",
     "--": "--",
     "dashed": "--",
     ":": ":",
@@ -181,10 +183,18 @@ def _check_scale(
         return
     if scale.get("kind") != "linear":
         errors.append(f"{requirement}: scale kind is not linear")
-    if not _close(scale.get("minimum"), minimum) or not _close(scale.get("maximum"), maximum):
-        errors.append(f"{requirement}: scale bounds are {scale!r}")
-    if scale.get("reverse") is not reverse:
-        errors.append(f"{requirement}: reverse is {scale.get('reverse')!r}")
+    actual_minimum = scale.get("minimum")
+    actual_maximum = scale.get("maximum")
+    actual_reverse = bool(scale.get("reverse"))
+    expected_left = maximum if reverse else minimum
+    expected_right = minimum if reverse else maximum
+    actual_left = actual_maximum if actual_reverse else actual_minimum
+    actual_right = actual_minimum if actual_reverse else actual_maximum
+    if not _close(actual_left, expected_left) or not _close(actual_right, expected_right):
+        errors.append(
+            f"{requirement}: scale endpoints are "
+            f"{actual_left!r} to {actual_right!r}, expected {expected_left!r} to {expected_right!r}"
+        )
 
 
 def _check_curve(
@@ -349,11 +359,31 @@ def _check_report_settings(payload: Mapping[str, Any], errors: list[str]) -> Non
         for key, expected in {"size": "A4", "orientation": "portrait", "continuous": False}.items():
             if page.get(key) != expected:
                 errors.append(f"page {key} is {page.get(key)!r}, expected {expected!r}")
+        for key, expected in {"width_mm": 210.0, "height_mm": 297.0}.items():
+            if page.get(key) is not None and not _close(page[key], expected):
+                errors.append(f"page {key} overrides the requested A4 geometry: {page[key]!r}")
+    # This packet requests readable typography. This is an evaluation criterion,
+    # not a new minimum imposed on the general authoring API; None keeps auto sizing.
+    header = payload.get("header") or {}
+    for title in header.get("service_titles", []):
+        _check_readable_font(title, "font_size", title.get("slot_id"), errors)
+    for remark in payload.get("remarks", []):
+        for key in ("font_size", "title_font_size"):
+            _check_readable_font(remark, key, remark.get("title"), errors)
     output = payload.get("output")
     if not isinstance(output, Mapping) or output.get("backend") != "matplotlib":
         errors.append("output backend must be matplotlib")
     if not isinstance(payload.get("tail"), Mapping) or payload["tail"].get("enabled") is not True:
         errors.append("tail must be enabled")
+
+
+def _check_readable_font(
+    item: Mapping[str, Any], key: str, target: object, errors: list[str]
+) -> None:
+    """Reject unreadable explicit sizes in the CBL acceptance packet."""
+    value = item.get(key)
+    if value is not None and float(value) < 6.0:
+        errors.append(f"{target}: {key} must be automatic or at least 6 pt, got {value!r}")
 
 
 def verify_cbl_packet(logfile_path: str | Path) -> dict[str, Any]:

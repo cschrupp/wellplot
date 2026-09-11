@@ -74,18 +74,22 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
         if resolver is None:
             return {}
         plan = ReconstructionPlan.model_validate(state["plan"])
+        normalized_plan = resolver.normalize_plan_sources(
+            plan=plan,
+            logfile_path=state.get("logfile_path"),
+        )
         trace = current_agent_trace()
         source_manifest = state.get("source_manifest", {})
         if trace is None:
             enriched = resolver.enrich(
-                plan=plan,
+                plan=normalized_plan,
                 source_manifest=source_manifest,
                 logfile_path=state.get("logfile_path"),
             )
         else:
             with trace.stage("source_context"):
                 enriched = resolver.enrich(
-                    plan=plan,
+                    plan=normalized_plan,
                     source_manifest=source_manifest,
                     logfile_path=state.get("logfile_path"),
                 )
@@ -93,11 +97,16 @@ def build_compile_graph(dependencies: ReconstructionGraphDependencies) -> Compil
                     "planned_source_context_ready",
                     status="ready",
                     details={
-                        "planned_section_ids": [section.section_id for section in plan.sections],
+                        "planned_section_ids": [
+                            section.section_id for section in normalized_plan.sections
+                        ],
                         "source_section_ids": sorted(enriched),
                     },
                 )
-        return {"source_manifest": enriched}
+        return {
+            "plan": normalized_plan.model_dump(mode="json"),
+            "source_manifest": enriched,
+        }
 
     async def dispatch_workers(state: ReconstructionState) -> list[Send]:
         """Fan out independent report and section compiler work units."""

@@ -78,7 +78,10 @@ class SectionCompiler:
             " Submit only requested changes and required identities, not a copy of the "
             "current document with all defaults expanded. For raster bindings, omit "
             "unrequested color_limits and normalization settings. The string 'null' is "
-            "not an omitted value." + revision_instruction
+            "not an omitted value. A requested scale written as 'A to B' has left endpoint "
+            "A and right endpoint B: encode it as minimum=A, maximum=B, reverse=false. "
+            "Use reverse=true only when the request separately requires reversing an "
+            "ascending scale; never reverse both the bounds and the flag." + revision_instruction
         )
         context = {
             "original_request": request,

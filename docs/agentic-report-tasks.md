@@ -56,3 +56,18 @@ map remains centered on zero. Omitted limits retain existing settings or use
 automatic limits for new bindings. Explicit overrides remain subject to canonical
 validation. This reduces schema overhead and clarifies the observed validation
 failure; it does not guarantee provider transport reliability or add retries.
+
+## Planner Report Coverage
+
+Planner context now includes the stable detail slot IDs together with each
+row's semantic key and label. The planner response contract also carries typed
+remarks. Every explicit report header value, including detail-row values, and
+every explicit remark must appear in `report_values`; the report tasks then
+compile and verify those values independently.
+
+Header plan values are display text. The planner preserves requested units and
+fixed precision instead of converting values such as `5445.50 ft` to a numeric
+value. Packet acceptance compares rendered scale endpoints, so equivalent
+canonical forms such as ascending bounds plus `reverse: true` are accepted.
+Descending bounds combined with `reverse: true` invert a scale twice and are
+rejected.

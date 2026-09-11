@@ -27,6 +27,7 @@ from wellplot.agent.graph import (
     SectionCompiler,
     build_compile_graph,
 )
+from wellplot.authoring import load_authoring_document
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.intent import AuthoringDocumentIntent
 
@@ -54,7 +55,7 @@ class _FixtureStructuredModel:
         response_validator: object | None = None,
     ) -> BaseModel:
         """Return the frozen planner or compiler output for its exact target."""
-        del instructions, tool_description, max_rounds, response_validator
+        del instructions, tool_description, max_rounds
         self.tool_calls.append(tool_name)
         artifacts = self.contract["artifacts"]
         if tool_name == "submit_reconstruction_plan":
@@ -67,7 +68,10 @@ class _FixtureStructuredModel:
             payload = artifacts["sections"]["repeat_pass"]
         else:
             raise AssertionError(f"Unexpected compiler target: {tool_name!r}")
-        return response_model.model_validate(payload)
+        result = response_model.model_validate(payload)
+        if response_validator is not None:
+            response_validator(result)
+        return result
 
 
 def test_cbl_compile_graph_matches_frozen_semantic_contract() -> None:
@@ -138,7 +142,9 @@ async def _compile_frozen_cbl(
     result = await graph.ainvoke(
         {
             "request": prompt,
-            "current_document": {},
+            "current_document": load_authoring_document(
+                _FIXTURE_DIR / "cased_hole_starter.log.yaml"
+            ).model_dump(mode="json"),
             "source_manifest": contract["source_manifest"],
             "compiled_artifacts": [],
             "diagnostics": [],

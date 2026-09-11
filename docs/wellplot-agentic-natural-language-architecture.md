@@ -1793,19 +1793,23 @@ rejects it.
 `SectionPlan.data_source` is the sole typed location for a section's staged
 source routing; `SectionPlan.values.data_source` is rejected at the required
 structured-output boundary. After planning and before report/section workers
-fan out, the graph resolves only sources declared through that field relative
-to the target logfile and within the server root. It neither scans directories
-nor infers source files or channels from request prose. Existing inspected
+fan out, the graph accepts a declared staged source relative to either the
+target logfile or the server root, only when exactly one existing regular file
+within the server root matches. It then canonicalizes the route relative to the
+target logfile before worker schemas or persisted YAML can observe it. It
+neither scans directories nor infers source files or channels from request prose.
+Existing inspected
 sources are reused, each newly declared file is loaded once per run, and the
 enriched manifest is propagated to every worker, deterministic execution, and
 final verification. The trace records the planned and resolved section ids in
 the `source_context` stage.
 
 The acceptance tests cover a newly planned second section, source reuse and
-single-load behavior, rejection of hidden source routing, worker visibility of
-the enriched manifest, and channel resolution during the frozen two-section
-CBL transaction. A declared source that cannot be loaded remains a deterministic
-error; no fallback source discovery is permitted.
+single-load behavior, canonicalization of an explicit server-root-relative
+route, rejection of ambiguous or out-of-root routes, rejection of hidden source
+routing, worker visibility of the enriched manifest, and channel resolution
+during the frozen two-section CBL transaction. A declared source that cannot be
+loaded remains a deterministic error; no fallback source discovery is permitted.
 
 `LG-R5` reruns the unchanged CBL prompt with two providers and requires valid
 hierarchy, verified canonical state, and a final render. The target remains one
@@ -1835,7 +1839,7 @@ and annotation identities, source-route identity, and planned track ordering.
 The frozen two-pass CBL transaction remains the end-to-end non-provider
 acceptance test.
 
-Current deterministic evidence: the CBL report contract serializes to 12,813
+Current deterministic evidence: the CBL report contract serializes to 12,130
 characters and each CBL section contract remains below 45,000 characters while
 retaining exact target validation. The required gate is:
 
@@ -1847,6 +1851,57 @@ UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run --extra graph pytest -q \
 This gate must pass before attempting a provider-backed notebook run. A provider
 transport failure is recorded as external evidence; it does not authorize a
 fallback compiler or a relaxation of the typed contracts.
+
+### LG-R7: Sparse Report Compilation
+
+Live run `e0ca7511c300484ea4d9b03c6573415c` completed provider compilation but
+failed canonical header validation. Its report copied the scaffold, replacing
+unset header strings with `""` and automatic page/font settings with `0.0001`.
+It also supplied remark titles without their requested bodies. The reduced
+response is frozen in `tests/fixtures/agentic_cbl/report_placeholders_failure.json`.
+
+This slice corrects the report contract and its existing validation boundary:
+
+- Intent properties no longer advertise `default: null` when explicit null is
+  rejected, including dynamically derived construction schemas. Omitted fields
+  remain optional; this does not make every field required.
+- Header titles, identifiers, labels, source keys, and units match canonical
+  nonempty-string constraints. Literal header values and blank defaults remain
+  valid, and revision clear markers retain their existing semantics.
+- Report context exposes editable slots, labels, aliases, values, and detail
+  row/column identities rather than the complete header layout tree. Unset
+  optional properties are omitted, while explicit current sizes remain visible.
+  Sparse-update guidance explains preservation and requires actual remark text.
+- Before accepting a built-in report artifact, the existing response validator
+  applies it through canonical reconciliation to an isolated document copy.
+  Failures return to the same provider conversation within the existing three
+  rounds. No files change during this check; no new graph node, fallback,
+  provider-specific rule, or retry budget is introduced.
+
+Canonical validity is not proof that all natural-language requirements were
+fulfilled. The independent CBL verifier now checks physical A4 dimensions and
+rejects explicit service-title/remark fonts below 6 pt, in addition to its
+existing metadata, remark-content, section, and binding checks. The font floor
+is a readability criterion for this evaluation packet, not a restriction on
+the general authoring API. Automatic sizes and equivalent explicit A4 dimensions
+remain accepted. Tests also assert that sparse report edits preserve scaffold
+geometry, automatic typography, and all sections. Verifier fixtures use the
+checked-in CBL contract, not the notebook's mutable draft.
+
+Run the report/graph regression gate before another live notebook attempt:
+
+```bash
+UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run --extra graph pytest -q \
+  tests/test_graph_*.py tests/test_mcp_agentic.py \
+  tests/test_cbl_packet_verifier.py tests/test_cbl_compile_only_graph.py \
+  tests/test_direct_graph_executor.py tests/test_authoring_intent.py
+```
+
+The live acceptance requirement is unchanged: the original CBL prompt must pass
+the independent packet verifier and produce a final render. Replaying a frozen
+provider response proves the correction path, not live model reliability.
+Transport failures remain a separate issue, and this slice does not claim to
+eliminate them.
 
 ### Gates
 

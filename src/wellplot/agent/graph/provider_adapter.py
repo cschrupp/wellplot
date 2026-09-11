@@ -153,9 +153,6 @@ class ExistingProviderStructuredAdapter:
                 tool_caller=capture,
                 max_rounds=max_rounds,
                 required_tool_name=tool_name,
-                # Graph stages consume exactly one typed submission; they do
-                # not display incremental tokens, so avoid fragile SSE streams.
-                stream_response=False,
             )
         except ProviderAdapterError as exc:
             if trace is not None:

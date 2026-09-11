@@ -9,6 +9,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ValidationError
 
+from wellplot.agent.graph.context_projection import planner_document_summary
 from wellplot.agent.graph.models import ReconstructionPlan, SectionPlan
 from wellplot.agent.graph.planner import ReconstructionPlanner
 from wellplot.agent.graph.section_worker import SectionCompiler
@@ -22,7 +23,19 @@ from wellplot.model.intent import AuthoringDocumentIntent
 
 def _document() -> dict[str, object]:
     return {
-        "header": {"general_fields": [{"slot_id": "general.country", "label": "State / Country"}]},
+        "header": {
+            "general_fields": [{"slot_id": "general.country", "label": "State / Country"}],
+            "detail": {
+                "rows": [
+                    {
+                        "row_id": "detail.row_1",
+                        "key": "driller_depth",
+                        "label": "Driller Depth",
+                        "values": [{"slot_id": "detail.row_1.value_1"}],
+                    }
+                ]
+            },
+        },
         "sections": [
             {
                 "id": "main",
@@ -220,6 +233,82 @@ def test_planner_requires_inspected_header_slot_ids() -> None:
     )
     assert plan.report_values["header"]["general_fields"] == [
         {"slot_id": "general.country", "value": "Utah"}
+    ]
+
+
+def test_planner_contract_carries_detail_slots_and_remarks() -> None:
+    """The planner can map requested detail values and report remarks structurally."""
+
+    class Model:
+        async def generate(self, **kwargs: object) -> BaseModel:
+            response_model = kwargs["response_model"]
+            assert isinstance(response_model, type)
+            payload = {
+                "summary": "Set the requested report values.",
+                "report_values": {
+                    "header": {
+                        "detail_fields": [
+                            {"slot_id": "detail.row_1.value_1", "value": "4980.00 ft"}
+                        ]
+                    },
+                    "remarks": [
+                        {
+                            "title": "Data Sources",
+                            "text": "Use the staged DLIS files for both passes.",
+                        }
+                    ],
+                },
+                "sections": [
+                    {
+                        "section_id": "main",
+                        "capability_id": "section.log_plot",
+                        "goal": "Keep the main section.",
+                        "components": [
+                            {
+                                "component_id": "main.track",
+                                "target_id": "existing",
+                                "capability_id": "track.normal",
+                                "goal": "Keep the existing track.",
+                                "parent_component_id": None,
+                            }
+                        ],
+                    }
+                ],
+            }
+            return response_model.model_validate(payload)
+
+    plan = asyncio.run(
+        ReconstructionPlanner(model=Model(), registry=create_builtin_registry()).plan(
+            request="Set driller depth and add a data-sources remark.",
+            current_document=_document(),
+            source_manifest={},
+        )
+    )
+
+    assert plan.report_values["header"]["detail_fields"] == [
+        {"slot_id": "detail.row_1.value_1", "value": "4980.00 ft"}
+    ]
+    assert plan.report_values["remarks"] == [
+        {
+            "remark_id": None,
+            "title": "Data Sources",
+            "text": "Use the staged DLIS files for both passes.",
+        }
+    ]
+
+
+def test_planner_context_describes_detail_slot_semantics() -> None:
+    """Detail slot IDs retain their labels and keys in the planner context."""
+    summary = planner_document_summary(_document())
+
+    assert summary["header"]["detail"]["fields"] == [
+        {
+            "row_id": "detail.row_1",
+            "key": "driller_depth",
+            "label": "Driller Depth",
+            "slot_id": "detail.row_1.value_1",
+            "cell_index": 0,
+        }
     ]
 
 

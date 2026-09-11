@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
@@ -53,6 +54,57 @@ class PlannedSourceContextResolver:
 
     root: Path
 
+    def normalize_plan_sources(
+        self,
+        *,
+        plan: ReconstructionPlan,
+        logfile_path: str | Path | None,
+    ) -> ReconstructionPlan:
+        """Canonicalize explicit source routes for persistence in a logfile.
+
+        A request may name a staged file relative to either the target logfile
+        or the application root. Both forms are accepted only when they resolve
+        to one unambiguous regular file inside ``root``. The returned plan uses
+        the canonical logfile-relative form required by persisted YAML.
+        """
+        sections_with_sources = [section for section in plan.sections if section.data_source]
+        if not sections_with_sources:
+            return plan
+        if logfile_path is None:
+            raise ValueError(
+                "A logfile_path is required to normalize explicitly planned section sources."
+            )
+
+        resolved_logfile = _resolve_logfile_path(logfile_path, root=self.root)
+        normalized_sections = []
+        for section in plan.sections:
+            source = section.data_source
+            if source is None:
+                normalized_sections.append(section)
+                continue
+            source_path, source_format = _resolve_planned_source_path(
+                source.source_path,
+                source.source_format,
+                logfile_path=resolved_logfile,
+                root=self.root,
+            )
+            relative_path = Path(
+                os.path.relpath(source_path, start=resolved_logfile.parent)
+            ).as_posix()
+            normalized_sections.append(
+                section.model_copy(
+                    update={
+                        "data_source": source.model_copy(
+                            update={
+                                "source_path": relative_path,
+                                "source_format": source_format,
+                            }
+                        )
+                    }
+                )
+            )
+        return plan.model_copy(update={"sections": normalized_sections})
+
     def enrich(
         self,
         *,
@@ -85,11 +137,11 @@ class PlannedSourceContextResolver:
         for section in sections_with_sources:
             assert section.data_source is not None
             source = section.data_source
-            source_path, source_format = resolve_data_source(
+            source_path, source_format = _resolve_planned_source_path(
                 source.source_path,
                 source.source_format,
-                base_dir=resolved_logfile.parent,
-                allowed_root=self.root,
+                logfile_path=resolved_logfile,
+                root=self.root,
             )
             existing = enriched.get(section.section_id)
             if _manifest_uses_source(
@@ -167,6 +219,59 @@ def _resolve_logfile_path(logfile_path: str | Path, *, root: Path) -> Path:
             f"logfile_path must resolve inside the application root {root}."
         ) from exc
     return resolved_path
+
+
+def _resolve_planned_source_path(
+    source_path: str,
+    source_format: str,
+    *,
+    logfile_path: Path,
+    root: Path,
+) -> tuple[Path, str]:
+    """Resolve one explicit source against the supported graph route bases.
+
+    Persisted Wellplot sources are relative to their logfile, while request
+    authors commonly identify staged assets relative to the server root. This
+    boundary resolves either explicit form without searching directories or
+    guessing filenames. It rejects paths outside the server root, ambiguous
+    relative routes, and nonexistent targets before any provider worker runs.
+    """
+    requested_path = Path(source_path).expanduser()
+    if requested_path.is_absolute():
+        candidates = [requested_path.resolve()]
+    else:
+        candidates = [
+            (logfile_path.parent / requested_path).resolve(),
+            (root / requested_path).resolve(),
+        ]
+
+    permitted_candidates = []
+    for candidate in candidates:
+        try:
+            candidate.relative_to(root)
+        except ValueError:
+            continue
+        if candidate not in permitted_candidates:
+            permitted_candidates.append(candidate)
+    if not permitted_candidates:
+        raise PathAccessError(f"data.source_path must resolve inside the application root {root}.")
+
+    existing_candidates = [candidate for candidate in permitted_candidates if candidate.is_file()]
+    if not existing_candidates:
+        raise FileNotFoundError(
+            f"{source_path!r} is not an existing regular file relative to either "
+            f"the target logfile {logfile_path.parent} or application root {root}."
+        )
+    if len(existing_candidates) > 1:
+        raise ValueError(
+            f"data.source_path {source_path!r} is ambiguous relative to the target "
+            "logfile and application root. Use an unambiguous path."
+        )
+    return resolve_data_source(
+        str(existing_candidates[0]),
+        source_format,
+        allowed_root=root,
+    )
 
 
 def _json_safe(value: object) -> object:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
@@ -42,7 +42,23 @@ class _PlannerHeaderSlotValue(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     slot_id: str = Field(min_length=1)
-    value: Any = None
+    value: str = Field(
+        min_length=1,
+        description=(
+            "Exact requested display text. Preserve spelling, fixed precision, and units; "
+            "do not convert display values to numbers."
+        ),
+    )
+
+
+class _PlannerRemarkValue(BaseModel):
+    """One report remark explicitly requested by the user."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    remark_id: str | None = Field(default=None, min_length=1)
+    title: str = Field(min_length=1)
+    text: str = Field(min_length=1)
 
 
 @dataclass(slots=True)
@@ -98,7 +114,10 @@ class ReconstructionPlanner:
             "For report header values, use only the stable slot_id values shown in the "
             "current_document header inventory. Match a requested semantic field to the "
             "listed key, label, or aliases; never invent a slot ID from natural-language "
-            "wording. " + mode_instruction
+            "wording. Put every explicitly requested report header value in report_values, "
+            "including values that belong to detail rows. Preserve requested display text "
+            "exactly, including units and fixed decimals. Put every explicitly requested "
+            "remark in report_values.remarks with its title and non-empty body. " + mode_instruction
         )
         context = {
             "request": request,
@@ -238,4 +257,5 @@ def _planner_report_values_contract(document: dict[str, object]) -> type[BaseMod
         "PlannerReportValues",
         __base__=_PlannerReportValues,
         header=(scoped_header | None, None),
+        remarks=(list[_PlannerRemarkValue], Field(default_factory=list)),
     )

@@ -24,12 +24,48 @@ def _without_extensions(value: object) -> object:
 
 
 def report_document_context(document: Mapping[str, object]) -> dict[str, object]:
-    """Expose report state, including exact header slot IDs, labels and values."""
-    return {
-        key: _without_extensions(document[key])
+    """Expose editable report values without a full header-layout template.
+
+    Absent optional settings retain canonical automatic sizing. Detail slots
+    are flattened into the same collection used for partial value updates;
+    row/column identity remains available as read-only targeting context.
+    """
+    context = {
+        key: _report_values(document[key])
         for key in ("title", "subtitle", "header", "remarks", "tail", "page", "depth", "output")
-        if key in document
+        if document.get(key) is not None
     }
+    header = context.get("header")
+    if isinstance(header, dict) and isinstance(header.get("detail"), dict):
+        detail = header["detail"]
+        slots = []
+        for row in detail.get("rows", []):
+            identity = _selected_values(
+                row, ("row_id", "key", "keys", "label", "label_cells", "aliases")
+            )
+            for index, cell in enumerate(row.get("values", [])):
+                slots.append({**identity, **cell, "cell_index": index})
+            for column_index, column in enumerate(row.get("columns", [])):
+                for index, cell in enumerate(column.get("cells", [])):
+                    slots.append(
+                        {**identity, **cell, "column_index": column_index, "cell_index": index}
+                    )
+        header["detail_fields"] = slots
+        header["detail"] = _selected_values(detail, ("kind", "title", "column_titles"))
+    return context
+
+
+def _report_values(value: object) -> object:
+    """Exclude automatic/unset properties and opaque renderer extensions."""
+    if isinstance(value, Mapping):
+        return {
+            key: _report_values(item)
+            for key, item in value.items()
+            if key != "extensions" and item is not None
+        }
+    if isinstance(value, list):
+        return [_report_values(item) for item in value]
+    return value
 
 
 def report_source_context(manifest: Mapping[str, object]) -> dict[str, object]:
@@ -131,7 +167,7 @@ def planner_source_manifest_summary(
 
 
 def _header_summary(header: Mapping[str, object]) -> dict[str, object]:
-    """Keep header archetype identifiers and omit individual field values."""
+    """Keep header identities and semantic slot inventory without field values."""
     summary = _selected_values(
         header,
         ("enabled", "provider_name", "title", "subtitle", "tail_enabled"),
@@ -157,8 +193,35 @@ def _header_summary(header: Mapping[str, object]) -> dict[str, object]:
         rows = _mapping_sequence(detail.get("rows"))
         if rows:
             detail_summary["row_count"] = len(rows)
+            detail_summary["fields"] = _planner_detail_slot_inventory(rows)
         summary["detail"] = detail_summary
     return summary
+
+
+def _planner_detail_slot_inventory(rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+    """Expose stable detail slots with the row labels needed for semantic matching."""
+    slots: list[dict[str, object]] = []
+    for row in rows:
+        identity = _selected_values(
+            row, ("row_id", "key", "keys", "label", "label_cells", "aliases")
+        )
+        for index, value in enumerate(_mapping_sequence(row.get("values"))):
+            slot = _selected_values(value, ("slot_id",))
+            if slot:
+                slots.append({**identity, **slot, "cell_index": index})
+        for column_index, column in enumerate(_mapping_sequence(row.get("columns"))):
+            for index, cell in enumerate(_mapping_sequence(column.get("cells"))):
+                slot = _selected_values(cell, ("slot_id",))
+                if slot:
+                    slots.append(
+                        {
+                            **identity,
+                            **slot,
+                            "column_index": column_index,
+                            "cell_index": index,
+                        }
+                    )
+    return slots
 
 
 def _section_summary(section: Mapping[str, object]) -> dict[str, object]:

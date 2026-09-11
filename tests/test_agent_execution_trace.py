@@ -28,7 +28,6 @@ from wellplot.agent.graph import (
     SectionCompiler,
     build_compile_graph,
 )
-from wellplot.agent.graph.models import ReconstructionPlan
 from wellplot.capabilities import create_builtin_registry
 
 
@@ -53,8 +52,8 @@ class _TraceStructuredModel:
         """Produce each typed planner or compiler output without a provider."""
         del instructions, tool_description, max_rounds, response_validator
         self.user_messages.append(user_message)
-        if response_model is ReconstructionPlan:
-            return ReconstructionPlan.model_validate(
+        if tool_name == "submit_reconstruction_plan":
+            return response_model.model_validate(
                 {
                     "summary": "Compile the main and repeat passes.",
                     "sections": [
@@ -62,11 +61,29 @@ class _TraceStructuredModel:
                             "section_id": "main_pass",
                             "capability_id": "section.log_plot",
                             "goal": "Compile the main pass.",
+                            "components": [
+                                {
+                                    "component_id": "main_pass.depth",
+                                    "target_id": "depth",
+                                    "capability_id": "track.reference",
+                                    "goal": "Add depth.",
+                                    "parent_component_id": None,
+                                }
+                            ],
                         },
                         {
                             "section_id": "repeat_pass",
                             "capability_id": "section.log_plot",
                             "goal": "Compile the repeat pass.",
+                            "components": [
+                                {
+                                    "component_id": "repeat_pass.depth",
+                                    "target_id": "depth",
+                                    "capability_id": "track.reference",
+                                    "goal": "Add depth.",
+                                    "parent_component_id": None,
+                                }
+                            ],
                         },
                     ],
                 }
@@ -76,7 +93,20 @@ class _TraceStructuredModel:
         if tool_name == "submit_section_artifact":
             section_id = "repeat_pass" if "repeat_pass" in user_message else "main_pass"
             return response_model.model_validate(
-                {"section": {"section_id": section_id, "title": section_id}}
+                {
+                    "section": {
+                        "section_id": section_id,
+                        "title": section_id,
+                        "tracks": [
+                            {
+                                "track_id": "depth",
+                                "title": "Depth",
+                                "kind": "reference",
+                                "width_mm": 10,
+                            },
+                        ],
+                    }
+                }
             )
         raise AssertionError(f"Unexpected structured request {tool_name!r}")
 
@@ -105,7 +135,7 @@ class _ProviderBackend:
         """Call the required structured tool with a representative agent output."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
-        assert stream_response is False
+        assert stream_response is True
         response = await tool_caller("submit_trace", {"title": "Agent output"})  # type: ignore[misc]
         assert response == {"accepted": True}
         return ProviderRunResult(
@@ -139,7 +169,7 @@ class _CorrectingProviderBackend:
         """Model the existing provider loop receiving one rejected submission."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
-        assert stream_response is False
+        assert stream_response is True
         rejected = await tool_caller("submit_trace", {"title": "Rejected"})  # type: ignore[misc]
         assert rejected["is_error"] is True
         accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]
@@ -180,7 +210,7 @@ class _ResponseModelCorrectingProviderBackend:
         """Model the correction conversation after a Pydantic rejection."""
         del instructions, initial_user_message, tool_definitions, max_rounds
         assert required_tool_name == "submit_trace"
-        assert stream_response is False
+        assert stream_response is True
         rejected = await tool_caller("submit_trace", {"unexpected": "Rejected"})  # type: ignore[misc]
         assert rejected["is_error"] is True
         accepted = await tool_caller("submit_trace", {"title": "Accepted"})  # type: ignore[misc]
@@ -299,9 +329,12 @@ def test_compile_graph_trace_records_stage_outputs(tmp_path: Path) -> None:
     ]
 
     assert report_context["capability"] == registry.get("report.standard").planning_descriptor()
+    expected_section_capabilities = [
+        registry.get("section.log_plot").planning_descriptor(),
+        registry.get("track.reference").planning_descriptor(),
+    ]
     assert all(
-        context["capabilities"] == [registry.get("section.log_plot").planning_descriptor()]
-        for context in section_contexts
+        context["capabilities"] == expected_section_capabilities for context in section_contexts
     )
     assert all("artifact_schema" not in message for message in model.user_messages)
 

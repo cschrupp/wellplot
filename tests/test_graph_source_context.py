@@ -114,6 +114,80 @@ def test_planned_source_context_loads_new_sections_once(
     }
 
 
+def test_planned_source_context_canonicalizes_application_root_relative_routes() -> None:
+    """A request may name a staged source from the application-root boundary."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+        fixture_paths = create_mcp_fixture_paths(Path(temporary_directory))
+        context = build_graph_authoring_context(
+            fixture_paths.single_logfile,
+            root=REPO_ROOT,
+        )
+        root_relative_source = fixture_paths.las_path.relative_to(REPO_ROOT).as_posix()
+        plan = ReconstructionPlan.model_validate(
+            {
+                "summary": "Add the repeat pass from the explicitly staged source.",
+                "sections": [
+                    {
+                        "section_id": "repeat_pass",
+                        "capability_id": "section.log_plot",
+                        "goal": "Build the repeat pass.",
+                        "data_source": {
+                            "source_path": root_relative_source,
+                            "source_format": "las",
+                        },
+                    }
+                ],
+            }
+        )
+
+        resolver = PlannedSourceContextResolver(root=REPO_ROOT)
+        normalized = resolver.normalize_plan_sources(
+            plan=plan,
+            logfile_path=context.logfile_path,
+        )
+        enriched = resolver.enrich(
+            plan=normalized,
+            source_manifest=context.source_manifest,
+            logfile_path=context.logfile_path,
+        )
+
+    source = normalized.sections[0].data_source
+    assert source is not None
+    assert source.source_path == "fixture.las"
+    assert source.source_format == "las"
+    assert enriched["repeat_pass"]["source_path"] == str(fixture_paths.las_path)
+
+
+def test_planned_source_context_rejects_ambiguous_relative_source_routes(tmp_path: Path) -> None:
+    """Two existing relative routes require the request to disambiguate explicitly."""
+    logfile_path = tmp_path / "project" / "draft.log.yaml"
+    logfile_path.parent.mkdir()
+    logfile_path.write_text("name: fixture\n", encoding="utf-8")
+    root_source = tmp_path / "fixture.las"
+    logfile_source = logfile_path.parent / "fixture.las"
+    root_source.write_text("root\n", encoding="utf-8")
+    logfile_source.write_text("logfile\n", encoding="utf-8")
+    plan = ReconstructionPlan.model_validate(
+        {
+            "summary": "Use an ambiguous staged source.",
+            "sections": [
+                {
+                    "section_id": "repeat_pass",
+                    "capability_id": "section.log_plot",
+                    "goal": "Build the repeat pass.",
+                    "data_source": {"source_path": "fixture.las", "source_format": "las"},
+                }
+            ],
+        }
+    )
+
+    with pytest.raises(ValueError, match="ambiguous"):
+        PlannedSourceContextResolver(root=tmp_path).normalize_plan_sources(
+            plan=plan,
+            logfile_path=logfile_path,
+        )
+
+
 def test_planned_source_context_rejects_source_outside_application_root() -> None:
     """Explicit graph routing retains the canonical source-root boundary."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
