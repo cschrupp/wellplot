@@ -15,6 +15,7 @@ openai_api_key.txt
 UNSLOTH_API_KEY.txt
 NVIDIA_API_KEY.txt
 OPENROUTER_API_KEY.txt
+LLAMA_CPP_API_KEY.txt
 
 # Generated outputs
 workspace/
