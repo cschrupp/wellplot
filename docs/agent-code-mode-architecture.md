@@ -110,7 +110,7 @@ fragment through the SDK runtime.
 |---|---|---|
 | CM-00 Freeze and evidence | Complete (`cf51935`) | Baseline record, evidence format, and historical v1 labels prepared with no runtime changes |
 | CM-01 Architecture guards | Complete pending commit | AST import-invariant tests protect empty v2 package boundaries |
-| CM-02 Reachability inventory | Not started | Legacy reachability/deletion inventory committed |
+| CM-02 Reachability inventory | Complete pending commit | Legacy reachability/deletion inventory committed |
 | CM-03 Dual-engine evaluation | Not started | Comparable v1/v2 result records supported |
 | CM-10 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
@@ -148,3 +148,17 @@ not prohibit a future Code Mode orchestration layer from importing LangGraph.
 The guard also protects the existing domain and authoring roots from importing
 the agent package. It does not decide deletion eligibility; CM-02 owns the
 reachability graph and legacy deletion inventory.
+
+## CM-02 Inventory Boundary
+
+CM-02 uses a static AST import graph rooted at public package, MCP, notebook,
+and project-script entry points. The machine-readable inventory preserves a
+deterministic shortest path for each seed that reaches a module. Current
+reachability and migration classification are separate facts: a currently
+reachable module can still be marked `replace` or `delete-after-cutover`, and
+an unreachable module is not thereby authorized for deletion.
+
+The inventory excludes direct `TYPE_CHECKING` and `typing.TYPE_CHECKING` bodies
+from runtime reachability. It does not claim to resolve dynamic imports, plugin
+entry points, or string-based module loading. No CM-02 result authorizes
+caller refactoring or deletion; CM-03 and later slices consume this evidence.

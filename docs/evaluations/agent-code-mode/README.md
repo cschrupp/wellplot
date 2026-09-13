@@ -26,6 +26,8 @@ Every result must identify exactly one category:
   commands.
 - `CM-00-development-memory.md` records the decisions, evidence, and explicit
   deferrals made while completing CM-00.
+- `CM-02-reachability.json` is the deterministic static import inventory used
+  to distinguish current reachability from planned migration disposition.
 - `SCORECARD_TEMPLATE.md` defines the required fields for each later slice.
 
 Evidence names use the migration slice identifier. A record is immutable once
