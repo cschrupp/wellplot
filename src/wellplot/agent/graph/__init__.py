@@ -23,6 +23,7 @@ from .models import (
 )
 from .planner import ReconstructionPlanner
 from .provider_adapter import ExistingProviderStructuredAdapter, StructuredModelProtocol
+from .report_requirements import ReportRequirementPlanner
 from .reconstruction import ReconstructionCompilationResult, compile_document_reconstruction
 from .reconstruction_execution import (
     ReconstructionExecutionResult,
@@ -68,6 +69,7 @@ __all__ = [
     "RevisionCompilationResult",
     "RevisionExecutionResult",
     "ReportCompiler",
+    "ReportRequirementPlanner",
     "SectionCompiler",
     "SectionPlan",
     "SemanticComponentPlan",

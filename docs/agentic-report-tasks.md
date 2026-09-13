@@ -1,17 +1,32 @@
 # Incremental Report Construction
 
 Report reconstruction compiles small typed artifacts before persisting the packet.
-The planner still identifies the requested report values. The report compiler
-partitions that plan into report settings, groups of at most eight header slots,
-and individual remarks. Tasks run sequentially; each has its own three-round
-structured-response budget and a schema limited to its fields and target IDs.
+The topology planner supplies initial report values, then a focused
+report-requirements planner audits the original request against the report form
+inventory. That stage is isolated from section planning and returns only typed
+report values. The topology plan supplies preliminary report values, but the
+focused stage owns report extraction: its explicitly supplied stable slots and
+remarks replace preliminary values for the same identity. Every replacement is
+recorded in the run trace as `report_requirements_reconciled`, so this precedence
+is deterministic and observable rather than an implicit last-writer-wins rule.
+The report compiler then partitions the merged values into report
+settings, groups of at most eight header slots, and individual remarks. Tasks
+run sequentially; each has its own three-round structured-response budget and a
+schema limited to its fields and target IDs.
 
-The planner's header collections are also scoped to the stable slot IDs exposed
-by the inspected starter document. A request for a semantic field such as a
-state must select the matching existing slot, such as `general.country` when
-that is the starter's State/Country field. It cannot create `general.state`.
-Invalid planner submissions receive the provider's normal schema correction
-before report tasks begin.
+The planners' header collections are scoped to the stable slot IDs exposed by
+the inspected starter document. A request for a semantic field such as a state
+must select the matching existing slot, such as `general.country` when that
+field advertises `State` or `State / Country` as aliases. It cannot create
+`general.state`. Invalid submissions receive the provider's normal schema
+correction before report tasks begin.
+
+Before report-task schemas are created, every planned remark receives one
+stable ID. A title matching an existing remark reuses that ID; a new title gets
+the next unused canonical `remark-N` ID. Each one-remark task schema then
+requires exactly that ID. This is deterministic task targeting, not provider
+identity inference, and prevents a later remark task from overwriting an
+earlier remark.
 
 Each candidate is combined with accepted artifacts in memory and checked through
 the existing canonical authoring executor on a copy of the scaffold. Rejected
@@ -26,8 +41,10 @@ submission was rejected. A failed task stops report compilation. Accepted work
 is retained during that invocation, not checkpointed for a later notebook retry.
 
 Revision compilation retains its existing sparse report contract. Custom report
-capabilities retain their own artifact models. Reconstruction plans without
-explicit header collections or remarks use the existing single report task.
+capabilities retain their own artifact models. The focused planner also runs in
+production when a reconstruction plan has no explicit header collections or
+remarks; if it confirms there is no report work, the compiler uses the existing
+single report task.
 
 This change addresses report omissions seen in run
 `326fa1d854a1442b8fa127668780c0c7`: the report worker omitted eleven planned fields

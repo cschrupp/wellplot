@@ -181,7 +181,8 @@ def _header_summary(header: Mapping[str, object]) -> dict[str, object]:
     general_fields = _mapping_sequence(header.get("general_fields"))
     if general_fields:
         summary["general_fields"] = [
-            _selected_values(field, ("slot_id", "key", "label")) for field in general_fields
+            _selected_values(field, ("slot_id", "key", "label", "aliases"))
+            for field in general_fields
         ]
 
     detail = _mapping(header.get("detail"))

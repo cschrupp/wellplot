@@ -3314,6 +3314,12 @@ class AgentTests(unittest.TestCase):
                 template_payload["document"]["layout"]["heading"]["service_titles"][0]["value"],
                 "Cased Hole Quicklook",
             )
+            general_fields = {
+                field["key"]: field
+                for field in template_payload["document"]["layout"]["heading"]["general_fields"]
+            }
+            country = general_fields["country"]
+            self.assertEqual(country["aliases"], ["State", "State / Country"])
 
     def test_project_session_create_starter_supports_combo_seed_track(self) -> None:
         """Allow minimal cased-hole starters to seed one valid combo/depth layout."""

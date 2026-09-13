@@ -15,7 +15,11 @@ from wellplot.agent.core import FunctionToolDefinition, ProviderRunResult
 from wellplot.agent.execution_trace import AgentRunTrace, bind_agent_trace
 from wellplot.agent.graph.models import CompiledArtifact, ReconstructionPlan
 from wellplot.agent.graph.provider_adapter import ExistingProviderStructuredAdapter
-from wellplot.agent.graph.report_tasks import HEADER_BATCH_SIZE, report_tasks
+from wellplot.agent.graph.report_tasks import (
+    HEADER_BATCH_SIZE,
+    materialize_report_remark_ids,
+    report_tasks,
+)
 from wellplot.agent.graph.report_worker import ReportCompiler
 from wellplot.agent.graph.worker_contracts import report_contract
 from wellplot.capabilities import create_builtin_registry
@@ -267,3 +271,49 @@ def test_report_remarks_are_individual_ordered_and_traced(tmp_path: Path) -> Non
         if event["event"] == "stage_finished" and event["stage"] == "report_task"
     ]
     assert targets == ["report.settings", "report.remark.1", "report.remark.2", "report.remark.3"]
+
+
+def test_report_remark_tasks_pin_materialized_stable_ids() -> None:
+    """Independent remark tasks cannot overwrite a prior remark target."""
+    document = _document()
+    document["remarks"] = [
+        {
+            "remark_id": "remark-1",
+            "title": "Public Data and IP Notice",
+            "text": "Keep the reproduction boundary explicit.",
+        }
+    ]
+    values = materialize_report_remark_ids(
+        {
+            "remarks": [
+                {"title": "Supported Reconstruction Scope", "text": "Keep the scope bounded."},
+                {"title": "Data Sources", "text": "Use staged DLIS files."},
+                {
+                    "title": "Public Data and IP Notice",
+                    "text": "Keep the reproduction boundary explicit.",
+                },
+            ]
+        },
+        document,
+    )
+
+    assert [remark["remark_id"] for remark in values["remarks"]] == [
+        "remark-2",
+        "remark-3",
+        "remark-1",
+    ]
+    tasks = report_tasks(report_contract(document, reconstruct=True), values)
+    with pytest.raises(ValueError, match="remark-2"):
+        tasks[2].response_model.model_validate(
+            {
+                "intent": {
+                    "remarks": [
+                        {
+                            "remark_id": "remark-2",
+                            "title": "Data Sources",
+                            "text": "Use staged DLIS files.",
+                        }
+                    ]
+                }
+            }
+        )

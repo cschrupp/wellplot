@@ -1074,10 +1074,14 @@ def _header_field_to_legacy(
         {},
     )
     item = dict(existing) if isinstance(existing, Mapping) else {}
-    for key in ("aliases", "layout_path", "slot_id"):
+    for key in ("layout_path", "slot_id"):
         item.pop(key, None)
     item["key"] = field.key
     item["label"] = field.label
+    if field.aliases:
+        item["aliases"] = list(field.aliases)
+    else:
+        item.pop("aliases", None)
     item.pop("value", None)
     item.pop("source_key", None)
     if field.value.value is not None:

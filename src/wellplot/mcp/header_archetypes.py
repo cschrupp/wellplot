@@ -89,6 +89,13 @@ def _validate_general_fields(
         if key in seen_keys:
             raise ValueError(f"{context} heading.general_fields contains duplicate key {key!r}.")
         seen_keys.add(key)
+        aliases = item.get("aliases")
+        if aliases is not None:
+            item["aliases"] = _require_string_list(
+                aliases,
+                field_name="aliases",
+                context=f"{context} heading.general_fields[{index}]",
+            )
 
 
 def _validate_service_titles(

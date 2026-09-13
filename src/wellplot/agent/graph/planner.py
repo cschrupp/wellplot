@@ -141,7 +141,7 @@ class ReconstructionPlanner:
                 section_id=(Literal[existing_ids], ...),
             )
             section_type = existing_section | section_type
-        report_values_model = _planner_report_values_contract(current_document)
+        report_values_model = report_values_contract(current_document)
         response_model = create_model(
             "ScopedReconstructionPlan",
             __base__=ReconstructionPlan,
@@ -172,7 +172,9 @@ class ReconstructionPlanner:
             )
             # The scoped response model constrains provider output. Downstream graph
             # nodes consume the stable, JSON-like ReconstructionPlan representation.
-            plan = ReconstructionPlan.model_validate(plan.model_dump(mode="json"))
+            plan = ReconstructionPlan.model_validate(
+                plan.model_dump(mode="json", exclude_unset=True)
+            )
             if trace is not None:
                 trace.record(
                     "structured_output",
@@ -229,7 +231,7 @@ class ReconstructionPlanner:
                     )
 
 
-def _planner_report_values_contract(document: dict[str, object]) -> type[BaseModel]:
+def report_values_contract(document: dict[str, object]) -> type[BaseModel]:
     """Restrict planner header values to inspected stable slot identities."""
     header = document.get("header")
     header_mapping = header if isinstance(header, dict) else {}

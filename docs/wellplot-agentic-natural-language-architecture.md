@@ -1813,7 +1813,9 @@ loaded remains a deterministic error; no fallback source discovery is permitted.
 
 `LG-R5` reruns the unchanged CBL prompt with two providers and requires valid
 hierarchy, verified canonical state, and a final render. The target remains one
-planner, one report worker, and one worker per planned section.
+topology planner, one focused report-requirements worker, one report compiler,
+and one worker per planned section. The report-requirements worker is isolated
+from section topology and returns only stable report slots and remarks.
 
 `LG-R6` makes the graph's worker contracts authoritative about construction
 scope. Reconstruction plans must enumerate at least one component for every

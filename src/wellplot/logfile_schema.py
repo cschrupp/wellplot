@@ -264,6 +264,10 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
             "properties": {
                 "key": {"type": "string", "minLength": 1},
                 "label": {"type": "string", "minLength": 1},
+                "aliases": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                },
                 "value": {"$ref": "#/$defs/reportValue"},
                 "source_key": {"type": "string", "minLength": 1},
                 "default": {"type": "string"},

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, ClassVar, Literal, get_args
@@ -19,6 +20,52 @@ class ReportTask:
     target_id: str
     values: dict[str, Any]
     response_model: type[BaseModel]
+
+
+def materialize_report_remark_ids(
+    values: Mapping[str, Any], current_document: Mapping[str, object]
+) -> dict[str, Any]:
+    """Assign every planned report remark a deterministic stable identity.
+
+    The report planner describes a remark by its requested title and content.
+    Report tasks, however, must target one concrete authoring object. Reuse an
+    existing remark ID when its title matches; otherwise allocate the next
+    canonical ``remark-N`` ID without consulting the provider.
+    """
+    result = deepcopy(dict(values))
+    remarks = result.get("remarks")
+    if not isinstance(remarks, list):
+        return result
+
+    existing_by_title: dict[str, str] = {}
+    used_ids: set[str] = set()
+    for item in _mapping_sequence(current_document.get("remarks")):
+        remark_id = item.get("remark_id")
+        title = item.get("title")
+        if not isinstance(remark_id, str) or not remark_id:
+            continue
+        used_ids.add(remark_id)
+        if isinstance(title, str) and title:
+            existing_by_title.setdefault(title, remark_id)
+
+    assigned_ids: set[str] = set()
+    for index, remark in enumerate(remarks):
+        if not isinstance(remark, dict):
+            raise ValueError(f"Planned remarks[{index}] must be an object.")
+        remark_id = remark.get("remark_id")
+        if isinstance(remark_id, str) and remark_id:
+            if remark_id in assigned_ids:
+                raise ValueError(f"Planned remarks contain duplicate id {remark_id!r}.")
+        else:
+            title = remark.get("title")
+            existing_id = existing_by_title.get(title) if isinstance(title, str) else None
+            if existing_id is not None and existing_id not in assigned_ids:
+                remark_id = existing_id
+            else:
+                remark_id = _next_remark_id(used_ids | assigned_ids)
+            remark["remark_id"] = remark_id
+        assigned_ids.add(remark_id)
+    return result
 
 
 def report_tasks(base: type[BaseModel], values: dict[str, Any]) -> list[ReportTask]:
@@ -67,10 +114,14 @@ def report_tasks(base: type[BaseModel], values: dict[str, Any]) -> list[ReportTa
             )
     remarks = settings.pop("remarks", [])
     for index, remark in enumerate(remarks):
+        remark_id = remark.get("remark_id")
+        if not isinstance(remark_id, str) or not remark_id:
+            raise ValueError(
+                "Report remark tasks require preallocated stable remark IDs. "
+                "Call materialize_report_remark_ids before creating report tasks."
+            )
         item_base = get_args(intent.model_fields["remarks"].annotation)[0]
-        fields = {}
-        if remark.get("remark_id"):
-            fields["remark_id"] = (Literal[remark["remark_id"]], ...)
+        fields = {"remark_id": (Literal[remark_id], ...)}
         item = create_model("ReportTaskRemark", __base__=item_base, **fields)
         task_intent = create_model(
             "ReportTaskIntent",
@@ -123,3 +174,18 @@ def _only_fields(base: type[BaseModel], allowed: set[str]) -> type[BaseModel]:
     """Remove other task fields from both validation and advertised schema."""
     excluded = {name: (ClassVar[None], None) for name in base.model_fields if name not in allowed}
     return create_model(f"Task{base.__name__}", __base__=base, **excluded)
+
+
+def _mapping_sequence(value: object) -> list[Mapping[str, Any]]:
+    """Return mapping items from one optional report collection."""
+    if not isinstance(value, Sequence) or isinstance(value, (bytes, str)):
+        return []
+    return [item for item in value if isinstance(item, Mapping)]
+
+
+def _next_remark_id(used_ids: set[str]) -> str:
+    """Allocate the next canonical remark identity without collisions."""
+    index = 1
+    while f"remark-{index}" in used_ids:
+        index += 1
+    return f"remark-{index}"

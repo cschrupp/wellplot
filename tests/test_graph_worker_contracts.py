@@ -24,7 +24,14 @@ from wellplot.model.intent import AuthoringDocumentIntent
 def _document() -> dict[str, object]:
     return {
         "header": {
-            "general_fields": [{"slot_id": "general.country", "label": "State / Country"}],
+            "general_fields": [
+                {
+                    "slot_id": "general.country",
+                    "key": "country",
+                    "label": "Country",
+                    "aliases": ["State", "State / Country"],
+                }
+            ],
             "detail": {
                 "rows": [
                     {
@@ -290,7 +297,6 @@ def test_planner_contract_carries_detail_slots_and_remarks() -> None:
     ]
     assert plan.report_values["remarks"] == [
         {
-            "remark_id": None,
             "title": "Data Sources",
             "text": "Use the staged DLIS files for both passes.",
         }
@@ -308,6 +314,20 @@ def test_planner_context_describes_detail_slot_semantics() -> None:
             "label": "Driller Depth",
             "slot_id": "detail.row_1.value_1",
             "cell_index": 0,
+        }
+    ]
+
+
+def test_planner_context_describes_general_field_aliases() -> None:
+    """General header aliases remain available for semantic slot selection."""
+    summary = planner_document_summary(_document())
+
+    assert summary["header"]["general_fields"] == [
+        {
+            "slot_id": "general.country",
+            "key": "country",
+            "label": "Country",
+            "aliases": ["State", "State / Country"],
         }
     ]
 
@@ -548,6 +568,138 @@ def test_section_schema_binds_nested_content_to_planned_identity() -> None:
         model.model_validate(invalid)
 
 
+def test_section_schema_requires_explicit_planned_presentation_values() -> None:
+    """Requested curve styles and raster sampling survive the worker boundary."""
+    plan = SectionPlan.model_validate(
+        {
+            "section_id": "repeat",
+            "capability_id": "section.log_plot",
+            "goal": "Build the repeat pass.",
+            "components": [
+                {
+                    "component_id": "repeat.combo",
+                    "target_id": "combo",
+                    "capability_id": "track.normal",
+                    "goal": "Add the combo track.",
+                    "parent_component_id": None,
+                },
+                {
+                    "component_id": "repeat.combo.tension",
+                    "target_id": "repeat.combo.TENS.1",
+                    "capability_id": "binding.curve",
+                    "goal": "Add the dashed cable-tension curve.",
+                    "values": {
+                        "channel": "TENS",
+                        "label": "Cable Tension (TENS)",
+                        "scale_min": 5000.0,
+                        "scale_max": 0.0,
+                        "scale_reversed": False,
+                        "style_color": "#111111",
+                        "style_width": 0.65,
+                        "style_dash": "dashed",
+                    },
+                    "parent_component_id": "repeat.combo",
+                },
+                {
+                    "component_id": "repeat.vdl",
+                    "target_id": "vdl",
+                    "capability_id": "track.array",
+                    "goal": "Add the VDL track.",
+                    "parent_component_id": None,
+                },
+                {
+                    "component_id": "repeat.vdl.raster",
+                    "target_id": "repeat.vdl.VDL.1",
+                    "capability_id": "binding.raster",
+                    "goal": "Add the sampled VDL raster.",
+                    "values": {
+                        "channel": "VDL",
+                        "profile": "vdl",
+                        "track_x_scale_min": 200.0,
+                        "track_x_scale_max": 1200.0,
+                        "sample_axis_enabled": True,
+                        "sample_axis_unit": "us",
+                        "sample_axis_source_origin": 40.0,
+                        "sample_axis_source_step": 10.0,
+                        "sample_axis_min": 200.0,
+                        "sample_axis_max": 1200.0,
+                        "sample_axis_ticks": 7,
+                    },
+                    "parent_component_id": "repeat.vdl",
+                },
+            ],
+        }
+    )
+    model = section_contract(plan, _document(), create_builtin_registry(), reconstruct=True)
+    payload = {
+        "section": {
+            "section_id": "repeat",
+            "title": "Repeat",
+            "tracks": [
+                {
+                    "track_id": "combo",
+                    "title": "Combo",
+                    "kind": "normal",
+                    "width_mm": 50,
+                    "bindings": [
+                        {
+                            "kind": "curve",
+                            "binding_id": "repeat.combo.TENS.1",
+                            "channel": "TENS",
+                            "label": "Cable Tension (TENS)",
+                            "scale": {
+                                "minimum": 5000.0,
+                                "maximum": 0.0,
+                                "reverse": False,
+                            },
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 0.65,
+                                "line_style": "dashed",
+                            },
+                        }
+                    ],
+                },
+                {
+                    "track_id": "vdl",
+                    "title": "VDL",
+                    "kind": "array",
+                    "width_mm": 48,
+                    "x_scale": {"minimum": 200.0, "maximum": 1200.0},
+                    "bindings": [
+                        {
+                            "kind": "raster",
+                            "binding_id": "repeat.vdl.VDL.1",
+                            "channel": "VDL",
+                            "profile": "vdl",
+                            "sample_axis": {
+                                "enabled": True,
+                                "unit": "us",
+                                "source_origin": 40.0,
+                                "source_step": 10.0,
+                                "minimum": 200.0,
+                                "maximum": 1200.0,
+                                "tick_count": 7,
+                            },
+                        }
+                    ],
+                },
+            ],
+        }
+    }
+    model.model_validate(payload)
+
+    missing_style = deepcopy(payload)
+    del missing_style["section"]["tracks"][0]["bindings"][0]["style"]["line_style"]
+    with pytest.raises(ValidationError, match="line_style"):
+        model.model_validate(missing_style)
+
+    missing_origin = deepcopy(payload)
+    del missing_origin["section"]["tracks"][1]["bindings"][0]["sample_axis"]["source_origin"]
+    with pytest.raises(ValidationError, match="source_origin"):
+        model.model_validate(missing_origin)
+
+
 def test_section_schema_requires_the_declared_source_route() -> None:
     """A planned staged source cannot be omitted or changed by a section worker."""
     plan = SectionPlan.model_validate(
@@ -616,6 +768,8 @@ def test_cbl_report_schema_is_smaller_and_contains_only_owned_fields() -> None:
         Path("tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml")
     )
     current_document = document.model_dump(mode="json")
+    country = next(field for field in document.header.general_fields if field.key == "country")
+    assert country.aliases == ["State", "State / Country"]
     report_schema = report_contract(current_document, reconstruct=True).model_json_schema()
     assert len(json.dumps(report_schema, separators=(",", ":"))) < 15000
     assert "AuthoringTrackIntent" not in report_schema.get("$defs", {})

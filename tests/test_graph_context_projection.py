@@ -178,6 +178,7 @@ def test_planner_projections_keep_semantic_inventory_and_drop_heavy_payloads() -
                 "slot_id": "general.company",
                 "key": "company",
                 "label": "Company",
+                "aliases": ["Company"],
             }
         ],
         "detail": {
@@ -185,6 +186,7 @@ def test_planner_projections_keep_semantic_inventory_and_drop_heavy_payloads() -
             "title": "Open Hole Metadata",
             "column_titles": ["Field", "Value"],
             "row_count": 1,
+            "fields": [],
         },
     }
     assert document_summary["remarks"] == [{"remark_id": "notice", "title": "Public Data Notice"}]

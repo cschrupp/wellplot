@@ -11,12 +11,18 @@ from pydantic import BaseModel, Field, create_model
 
 from ...capabilities import CapabilityRegistry
 from ...capabilities.builtins import LogPlotSectionArtifact, ReportArtifact
-from ...model.authoring import AuthoringDataSource
+from ...model.authoring import (
+    AuthoringDataSource,
+    AuthoringRasterColorbarSpec,
+    AuthoringRasterSampleAxisSpec,
+    AuthoringScale,
+)
 from ...model.intent import (
     AuthoringAnnotationIntent,
     AuthoringClearIntent,
     AuthoringCurveBindingIntent,
     AuthoringFillIntent,
+    AuthoringGridIntent,
     AuthoringHeaderFieldIntent,
     AuthoringHeaderIntent,
     AuthoringRasterBindingIntent,
@@ -24,6 +30,7 @@ from ...model.intent import (
     AuthoringReportIntent,
     AuthoringSectionIntent,
     AuthoringServiceTitleIntent,
+    AuthoringStyleIntent,
     AuthoringTrackIntent,
     _IntentModel,
 )
@@ -161,6 +168,13 @@ def section_contract(
             if reconstruct or creating
             else AuthoringTrackIntent
         )
+        component = targets[target_id]
+        component_id = component.component_id if component is not None else None
+        children = (
+            [item for item in plan.components if item.parent_component_id == component_id]
+            if component_id is not None
+            else []
+        )
         fields = {
             "track_id": (Literal[target_id], ...),
             "section_id": (Literal[plan.section_id], None),
@@ -176,12 +190,7 @@ def section_contract(
         if creating:
             fields["title"] = (str, Field(min_length=1))
             fields["width_mm"] = (float, Field(gt=0))
-        component_id = component.component_id if component is not None else None
-        children = (
-            [item for item in plan.components if item.parent_component_id == component_id]
-            if component_id is not None
-            else []
-        )
+        fields.update(_planned_track_value_fields(children))
         existing_binding_ids = {
             item["binding_id"] for item in existing_tracks.get(target_id, {}).get("bindings", [])
         }
@@ -290,40 +299,222 @@ def _binding_models(
     existing_ids: set[str],
     reconstruct: bool,
 ) -> list[type[BaseModel]]:
-    """Build exact curve/raster binding variants for one planned track."""
-    grouped: dict[tuple[str, bool], list[SemanticComponentPlan]] = {}
-    for item in children:
+    """Build binding contracts that preserve every explicit semantic value.
+
+    A planner's component values are the hand-off between semantic planning and
+    typed authoring. Constraining them here prevents a section compiler from
+    silently replacing a requested style or raster-axis value with a default.
+    """
+    models = []
+    for index, item in enumerate(children):
         if item.capability_id not in {"binding.curve", "binding.raster"}:
             continue
-        identity = (item.capability_id, item.target_id not in existing_ids)
-        grouped.setdefault(identity, []).append(item)
-
-    models = []
-    for (capability_id, requires_channel), items in grouped.items():
-        base: type[BaseModel]
-        base = (
+        base: type[BaseModel] = (
             AuthoringCurveBindingIntent
-            if capability_id == "binding.curve"
+            if item.capability_id == "binding.curve"
             else AuthoringRasterBindingIntent
         )
         if reconstruct:
             base = construction_model(base)
         fields: dict[str, object] = {
-            "binding_id": (Literal[tuple(item.target_id for item in items)], ...),
+            "binding_id": (Literal[item.target_id], ...),
             "section_id": (Literal[section_id], None),
             "track_id": (Literal[track_id], None),
         }
-        if requires_channel:
+        channel = _planned_text(item, "channel")
+        if channel is not None:
+            fields["channel"] = (Literal[channel], ...)
+        elif item.target_id not in existing_ids:
             fields["channel"] = (str, Field(min_length=1))
-        suffix = "New" if requires_channel else "Existing"
+        fields.update(_planned_binding_value_fields(item))
         models.append(
             create_model(
-                f"{track_id}{capability_id.replace('.', '_')}{suffix}BindingIntent",
+                f"{track_id}{index}{item.capability_id.replace('.', '_')}BindingIntent",
                 __base__=base,
                 **fields,
             )
         )
     return models
+
+
+def _planned_track_value_fields(
+    children: list[SemanticComponentPlan],
+) -> dict[str, tuple[object, object]]:
+    """Require track settings explicitly carried by child semantic components."""
+    values = _planned_values(children)
+    fields: dict[str, tuple[object, object]] = {}
+    scale_fields = _scale_value_fields(values, prefix="track_x_scale_")
+    if scale_fields:
+        fields["x_scale"] = (
+            _constrained_model("PlannedTrackScale", AuthoringScale, scale_fields),
+            ...,
+        )
+    if "hide_vertical_grid_lines" in values:
+        visible = not bool(values["hide_vertical_grid_lines"])
+        grid = create_model(
+            "PlannedTrackGrid",
+            __base__=construction_model(AuthoringGridIntent),
+            vertical_main_visible=(Literal[visible], ...),
+            vertical_secondary_visible=(Literal[visible], ...),
+        )
+        fields["grid"] = (grid, ...)
+    return fields
+
+
+def _planned_binding_value_fields(
+    item: SemanticComponentPlan,
+) -> dict[str, tuple[object, object]]:
+    """Translate explicit semantic binding values into exact nested constraints."""
+    values = item.values
+    fields: dict[str, tuple[object, object]] = {}
+    label = _planned_text(item, "label")
+    if label is not None:
+        fields["label"] = (Literal[label], ...)
+    scale_fields = _scale_value_fields(values, prefix="scale_")
+    if scale_fields:
+        fields["scale"] = (
+            _constrained_model("PlannedCurveScale", AuthoringScale, scale_fields),
+            ...,
+        )
+    style_fields = _style_value_fields(values)
+    if style_fields:
+        fields["style"] = (
+            _constrained_model(
+                "PlannedBindingStyle",
+                construction_model(AuthoringStyleIntent),
+                style_fields,
+            ),
+            ...,
+        )
+    if item.capability_id == "binding.raster":
+        fields.update(_planned_raster_value_fields(values))
+    return fields
+
+
+def _planned_raster_value_fields(
+    values: dict[str, object],
+) -> dict[str, tuple[object, object]]:
+    """Require the raster presentation values explicitly declared by the planner."""
+    fields: dict[str, tuple[object, object]] = {}
+    profile = _text_value(values.get("profile"))
+    if profile is not None:
+        fields["profile"] = (Literal[profile], ...)
+    colorbar_fields = _prefixed_value_fields(
+        values,
+        "colorbar_",
+        {
+            "enabled": "enabled",
+            "label": "label",
+            "position": "position",
+        },
+    )
+    if colorbar_fields:
+        fields["colorbar"] = (
+            _constrained_model(
+                "PlannedRasterColorbar",
+                AuthoringRasterColorbarSpec,
+                colorbar_fields,
+            ),
+            ...,
+        )
+    sample_axis_fields = _prefixed_value_fields(
+        values,
+        "sample_axis_",
+        {
+            "enabled": "enabled",
+            "unit": "unit",
+            "source_origin": "source_origin",
+            "source_step": "source_step",
+            "min": "minimum",
+            "max": "maximum",
+            "ticks": "tick_count",
+        },
+    )
+    if sample_axis_fields:
+        fields["sample_axis"] = (
+            _constrained_model(
+                "PlannedRasterSampleAxis",
+                AuthoringRasterSampleAxisSpec,
+                sample_axis_fields,
+            ),
+            ...,
+        )
+    return fields
+
+
+def _scale_value_fields(
+    values: dict[str, object], *, prefix: str
+) -> dict[str, tuple[object, object]]:
+    """Build exact scale fields from the planner's semantic scale vocabulary."""
+    return _prefixed_value_fields(
+        values,
+        prefix,
+        {"min": "minimum", "max": "maximum", "reversed": "reverse"},
+    )
+
+
+def _style_value_fields(values: dict[str, object]) -> dict[str, tuple[object, object]]:
+    """Build exact style fields when the planner specified them explicitly."""
+    fields = _prefixed_value_fields(
+        values,
+        "style_",
+        {"color": "color", "width": "line_width", "colormap": "colormap"},
+    )
+    dash = _text_value(values.get("style_dash"))
+    if dash is not None:
+        fields["line_style"] = (Literal[dash], ...)
+    return fields
+
+
+def _prefixed_value_fields(
+    values: dict[str, object],
+    prefix: str,
+    mapping: dict[str, str],
+) -> dict[str, tuple[object, object]]:
+    """Return literal constraints for scalar values declared under one prefix."""
+    fields: dict[str, tuple[object, object]] = {}
+    for source_name, target_name in mapping.items():
+        key = prefix + source_name
+        if key in values and _is_literal_value(values[key]):
+            fields[target_name] = (Literal[values[key]], ...)
+    return fields
+
+
+def _planned_values(children: list[SemanticComponentPlan]) -> dict[str, object]:
+    """Combine only child values that describe their shared parent track."""
+    values: dict[str, object] = {}
+    for child in children:
+        for key, value in child.values.items():
+            if not (key.startswith("track_x_scale_") or key == "hide_vertical_grid_lines"):
+                continue
+            if key in values and values[key] != value:
+                raise ValueError(f"Planned track children disagree on {key!r}.")
+            values[key] = value
+    return values
+
+
+def _planned_text(item: SemanticComponentPlan, key: str) -> str | None:
+    """Read a non-empty textual component value when present."""
+    return _text_value(item.values.get(key))
+
+
+def _text_value(value: object) -> str | None:
+    """Return a non-empty string suitable for an exact construction constraint."""
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _is_literal_value(value: object) -> bool:
+    """Allow only scalar semantic values in dynamic literal constraints."""
+    return isinstance(value, (str, int, float, bool)) and not isinstance(value, complex)
+
+
+def _constrained_model(
+    name: str,
+    base: type[BaseModel],
+    fields: dict[str, tuple[object, object]],
+) -> type[BaseModel]:
+    """Create one sparse nested model with exact values required by the plan."""
+    return create_model(name, __base__=base, **fields)
 
 
 def _fill_models(

@@ -33,6 +33,9 @@ heading:
       source_key: CNTY
     - key: country
       label: Country
+      aliases:
+        - State
+        - State / Country
       source_key: CTRY
     - key: location
       label: Location

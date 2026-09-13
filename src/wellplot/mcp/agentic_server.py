@@ -97,6 +97,7 @@ def create_agentic_mcp_server(
             ReconstructionGraphDependencies,
             ReconstructionPlanner,
             ReportCompiler,
+            ReportRequirementPlanner,
             SectionCompiler,
             build_compile_graph,
         )
@@ -115,7 +116,11 @@ def create_agentic_mcp_server(
     graph = build_compile_graph(
         ReconstructionGraphDependencies(
             planner=ReconstructionPlanner(model=structured_model, registry=registry),
-            report_compiler=ReportCompiler(model=structured_model, registry=registry),
+            report_compiler=ReportCompiler(
+                model=structured_model,
+                registry=registry,
+                requirements_planner=ReportRequirementPlanner(model=structured_model),
+            ),
             section_compiler=SectionCompiler(model=structured_model, registry=registry),
             registry=registry,
             source_context_resolver=PlannedSourceContextResolver(root=server_root),

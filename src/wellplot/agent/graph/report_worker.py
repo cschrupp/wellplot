@@ -26,7 +26,13 @@ from .executor import execute_document_intent
 from .models import CompilationMode, CompiledArtifact, ReconstructionPlan
 from .prompt_context import compact_prompt_json
 from .provider_adapter import StructuredModelProtocol
-from .report_tasks import ReportTask, merge_report_parts, report_tasks
+from .report_requirements import ReportRequirementPlanner
+from .report_tasks import (
+    ReportTask,
+    materialize_report_remark_ids,
+    merge_report_parts,
+    report_tasks,
+)
 from .worker_contracts import report_contract
 
 
@@ -36,6 +42,7 @@ class ReportCompiler:
 
     model: StructuredModelProtocol
     registry: CapabilityRegistry
+    requirements_planner: ReportRequirementPlanner | None = None
 
     async def compile(
         self,
@@ -50,6 +57,16 @@ class ReportCompiler:
         spec = self.registry.get(plan.report_capability_id)
         if spec.category != "report":
             raise ValueError(f"{plan.report_capability_id!r} is not a report capability.")
+        report_values = plan.report_values
+        if self.requirements_planner is not None:
+            report_values = await self.requirements_planner.resolve(
+                request=request,
+                current_document=current_document,
+                source_manifest=source_manifest,
+                prior_values=plan.report_values,
+                mode=mode,
+            )
+        report_values = materialize_report_remark_ids(report_values, current_document)
         revision_instruction = (
             " In revision mode, omit unchanged report-wide values so their current state is "
             "preserved."
@@ -59,7 +76,7 @@ class ReportCompiler:
         context = {
             "original_request": request,
             "report_goal": plan.report_goal,
-            "report_values": plan.report_values,
+            "report_values": report_values,
             "postconditions": plan.postconditions,
             "mode": mode,
             "current_document": report_document_context(current_document),
@@ -75,9 +92,9 @@ class ReportCompiler:
                 response_model = report_contract(
                     current_document, reconstruct=mode == "reconstruct"
                 )
-            tasks = [ReportTask("report", plan.report_values, response_model)]
+            tasks = [ReportTask("report", report_values, response_model)]
             if spec.artifact_model is ReportArtifact and mode == "reconstruct":
-                tasks = report_tasks(response_model, plan.report_values)
+                tasks = report_tasks(response_model, report_values)
             accepted: dict[str, Any] = {}
             for task in tasks:
                 task_context = dict(context)
@@ -142,7 +159,7 @@ class ReportCompiler:
                 )
             if spec.artifact_model is ReportArtifact and len(tasks) > 1:
                 _validate_report(
-                    ReportArtifact.model_validate(accepted), current_document, plan.report_values
+                    ReportArtifact.model_validate(accepted), current_document, report_values
                 )
         return CompiledArtifact(
             worker_id="report",
