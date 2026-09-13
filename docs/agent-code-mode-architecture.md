@@ -108,8 +108,8 @@ fragment through the SDK runtime.
 
 | Phase | Status | Exit condition |
 |---|---|---|
-| CM-00 Freeze and evidence | Complete pending commit | Baseline record, evidence format, and historical v1 labels prepared with no runtime changes |
-| CM-01 Architecture guards | Not started | AST import-invariant tests protect empty v2 package boundaries |
+| CM-00 Freeze and evidence | Complete (`cf51935`) | Baseline record, evidence format, and historical v1 labels prepared with no runtime changes |
+| CM-01 Architecture guards | Complete pending commit | AST import-invariant tests protect empty v2 package boundaries |
 | CM-02 Reachability inventory | Not started | Legacy reachability/deletion inventory committed |
 | CM-03 Dual-engine evaluation | Not started | Comparable v1/v2 result records supported |
 | CM-10 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
@@ -130,3 +130,21 @@ production imports, dependencies, prompts, or agent behavior changes.
 
 The CM-00 evidence record and scorecard format live in
 [`docs/evaluations/agent-code-mode/`](evaluations/agent-code-mode/).
+
+## CM-01 Guard Scope
+
+CM-01 establishes two inert package boundaries:
+
+- `wellplot.authoring_program` for the future restricted program parser,
+  validator, interpreter, and SDK;
+- `wellplot.agent.code_mode` for future v2 orchestration.
+
+Both packages are docstring-only markers in CM-01 and are not public API. The
+AST guard forbids `authoring_program` and `capabilities` from importing the
+agent package, LangGraph, or MCP. It forbids `agent.code_mode` from importing
+MCP or the identified legacy agent compiler and tool-loop modules, but it does
+not prohibit a future Code Mode orchestration layer from importing LangGraph.
+
+The guard also protects the existing domain and authoring roots from importing
+the agent package. It does not decide deletion eligibility; CM-02 owns the
+reachability graph and legacy deletion inventory.
