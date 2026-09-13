@@ -1,0 +1,150 @@
+{
+  "record_version": 1,
+  "slice": "CM-00",
+  "recorded_on": "2026-09-13",
+  "frozen_reference": {
+    "branch": "mcp-stabilization",
+    "commit": "f03f76bda097bf93e4c640e0fc1a6b82b372bd0c",
+    "short_commit": "f03f76b",
+    "commit_message": "Strengthen graph report requirement compilation"
+  },
+  "scope": {
+    "runtime_behavior_changed": false,
+    "dependencies_changed": false,
+    "production_imports_changed": false,
+    "legacy_deletions": false,
+    "purpose": "Freeze v1 evidence and document the approved Code Mode v2 target."
+  },
+  "structural_baseline": {
+    "measurement_source": "frozen Git tree at f03f76b",
+    "agent_python_module_count": 37,
+    "agent_python_loc": 20602,
+    "agent_python_bytes": 820344,
+    "graph_python_module_count": 22,
+    "graph_python_loc": 4338,
+    "graph_python_bytes": 169443,
+    "core_py_loc": 8772,
+    "core_py_bytes": 370983,
+    "worker_contracts_py_loc": 565,
+    "worker_contracts_py_bytes": 20933,
+    "legacy_agent_module_count": 7,
+    "legacy_agent_modules": [
+      "src/wellplot/agent/core.py",
+      "src/wellplot/agent/branch_compiler.py",
+      "src/wellplot/agent/compilation.py",
+      "src/wellplot/agent/operation_executor.py",
+      "src/wellplot/agent/reconciliation_bridge.py",
+      "src/wellplot/agent/stable_fallback.py",
+      "src/wellplot/agent/tool_contract.py"
+    ],
+    "builtin_capability_count": 10,
+    "builtin_capability_ids": [
+      "annotation.typed",
+      "binding.curve",
+      "binding.raster",
+      "fill.curve",
+      "report.standard",
+      "section.log_plot",
+      "track.annotation",
+      "track.array",
+      "track.normal",
+      "track.reference"
+    ],
+    "stable_mcp_tool_count": 17,
+    "stable_mcp_tool_source": "tests/fixtures/mcp_contract_baseline_v20.json",
+    "agentic_mcp_high_level_tool_count": 2,
+    "agentic_mcp_high_level_tool_ids": [
+      "build_plot_from_request",
+      "revise_plot_from_request"
+    ],
+    "test_module_count": 71,
+    "test_function_count": 407,
+    "public_agent_exports_source": "src/wellplot/agent/__init__.py",
+    "public_agent_exports": [
+      "AuthoringRequest",
+      "AuthoringPlanPhase",
+      "AuthoringPlanResult",
+      "AuthoringResult",
+      "AuthoringRunState",
+      "AuthoringSession",
+      "AuthoringToolCall",
+      "AuthoringUserReport",
+      "AgentTraceEvent",
+      "AgenticMcpClient",
+      "BranchOperationGroup",
+      "DirectBranchCompilationResult",
+      "ExecutedAuthoringPhase",
+      "ProjectPaths",
+      "ProjectSession",
+      "ProjectStarter",
+      "RevisionRequest",
+      "create_agentic_mcp_client",
+      "create_project_session",
+      "build_branch_operation_groups",
+      "compile_direct_branch_operations",
+      "display_authoring_result",
+      "display_agentic_result",
+      "display_phase_previews",
+      "relative_path",
+      "read_agent_trace",
+      "revise_authoring_request",
+      "run_authoring_request",
+      "StableToolProfile",
+      "stable_tool_budget",
+      "stable_tool_profile"
+    ]
+  },
+  "model_facing_baseline": {
+    "v1_dynamic_request_specific_worker_schemas": "present",
+    "schema_size_metrics": "not_available_at_CM-00",
+    "provider_round_metrics": "not_available_at_CM-00",
+    "generated_program_metrics": "not_applicable_before_v2"
+  },
+  "evaluation_evidence": {
+    "repository_ruff_format": {
+      "status": "failed_preexisting",
+      "classification": "deterministic_baseline_condition",
+      "command": "UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run ruff format --check src tests",
+      "result": "17 files would be reformatted; no CM-00 source formatting changes were made."
+    },
+    "deterministic_full_suite": {
+      "status": "failed_before_completion",
+      "classification": "deterministic_baseline_failure",
+      "attempted_command": "UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run pytest -q",
+      "focused_command": "UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run pytest -q --maxfail=1",
+      "focused_result": "1 failed, 66 passed in 6.33s",
+      "first_failure": "tests/test_agent.py::AgentTests::test_server_command_prefers_sibling_entry_point: TypeError: _server_command() missing 1 required positional argument: 'server_module'"
+    },
+    "architecture_checks": {
+      "status": "not_applicable_at_CM-00",
+      "classification": "not_available",
+      "reason": "The existing architecture script requires a legacy remediation baseline. Code Mode AST import-invariant checks begin in CM-01."
+    },
+    "frozen_cbl_compile_only": {
+      "status": "not_run",
+      "classification": "not_available"
+    },
+    "full_cbl_reconstruction": {
+      "status": "not_reproducible_at_CM-00",
+      "classification": "historical_observational",
+      "trace": "not_available"
+    },
+    "simple_section": {
+      "status": "not_run",
+      "classification": "not_available"
+    },
+    "report": {
+      "status": "not_run",
+      "classification": "not_available"
+    },
+    "revision": {
+      "status": "not_run",
+      "classification": "not_available"
+    }
+  },
+  "decision": {
+    "status": "proceed",
+    "next_authorized_slice": "CM-01",
+    "rationale": "The v1 reference, Code Mode target, evidence categories, and CM-00 no-runtime-change boundary are unambiguous."
+  }
+}

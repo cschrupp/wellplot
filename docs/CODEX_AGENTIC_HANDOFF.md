@@ -1,8 +1,18 @@
-# Codex Handoff - Wellplot Agentic Natural-Language Compiler
+# Codex Handoff - Historical v1 LangGraph Migration Record
+
+> **Historical v1 guidance.** This document records the LG-1 through LG-4
+> structured-graph migration that produced the current operational/reference
+> implementation. It is not active implementation guidance for new agent
+> architecture work. Code Mode v2 is the approved target; read
+> [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md) and the
+> [Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md)
+> before changing agent architecture. During CM-00 through early CM slices, v1
+> remains frozen except for critical correctness fixes and v2 is not
+> production-routed.
 
 Read `docs/wellplot-agentic-natural-language-architecture.md` completely before changing code.
 
-## Immediate objective
+## Historical Immediate Objective
 
 Integrate **LG-1 through LG-4 only**:
 

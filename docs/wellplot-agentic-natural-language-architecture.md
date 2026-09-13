@@ -1,9 +1,19 @@
 # Wellplot Agentic Natural-Language Architecture
 
-**Status:** Proposed target architecture and staged migration plan
+**Status:** Historical v1 architecture and implementation record
 **Date:** 2026-08-27
 **Audience:** Wellplot maintainers, Codex coding agents, reviewers, future plugin authors
 **Primary objective:** Replace fragile long-horizon MCP tool inference with a modular natural-language compiler that can grow as Wellplot gains new scientific visualization capabilities.
+
+> **Supersession notice (2026-09-13):** This document remains the historical
+> record of the v1 typed structured-graph architecture and its LG migration
+> slices. New agent-architecture work is governed by
+> [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md) and
+> [`wellplot_agentic_code_mode_migration_plan.md`](wellplot_agentic_code_mode_migration_plan.md).
+> v1 remains the operational/reference implementation and is frozen except for
+> critical correctness fixes. Code Mode v2 is approved as the target
+> architecture but does not yet exist as a production route. This notice does
+> not rewrite or invalidate the historical implementation record below.
 
 ---
 
