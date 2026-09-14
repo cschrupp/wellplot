@@ -35,10 +35,17 @@ from ..model.authoring import AnnotationTextSpec, AuthoringScale
 from ..model.intent import (
     AuthoringAnnotationIntent,
     AuthoringCurveBindingIntent,
+    AuthoringDepthIntent,
     AuthoringDocumentIntent,
     AuthoringFillIntent,
+    AuthoringHeaderFieldIntent,
+    AuthoringOutputIntent,
+    AuthoringPageIntent,
     AuthoringRasterBindingIntent,
+    AuthoringRemarkIntent,
+    AuthoringReportValueIntent,
     AuthoringSectionIntent,
+    AuthoringServiceTitleIntent,
     AuthoringStyleIntent,
     AuthoringTrackIntent,
 )
@@ -87,6 +94,13 @@ class IntentBuilder:
         self._handles = handles or HandleBuilder()
         self._report: ReportHandle | None = None
         self._report_fields: dict[str, str] = {}
+        self._header_fields: dict[str, AuthoringHeaderFieldIntent] = {}
+        self._service_titles: dict[str, AuthoringServiceTitleIntent] = {}
+        self._detail_fields: dict[str, AuthoringHeaderFieldIntent] = {}
+        self._remarks: dict[str, AuthoringRemarkIntent] = {}
+        self._page: AuthoringPageIntent | None = None
+        self._depth: AuthoringDepthIntent | None = None
+        self._output: AuthoringOutputIntent | None = None
         self._sections: dict[str, AuthoringSectionIntent] = {}
         self._section_order: list[str] = []
         self._tracks: dict[str, TrackHandle] = {}
@@ -106,8 +120,8 @@ class IntentBuilder:
     ) -> ReportHandle:
         """Start one report-wide desired-state fragment.
 
-        CM-14 supports the narrow title/subtitle report surface only.  Header,
-        output, page, remarks, and tail capability semantics remain deferred.
+        Report-wide settings are added through explicit builder methods below;
+        fluent report-receiver syntax remains intentionally deferred.
         """
         if self._report is not None:
             raise ProgramPolicyError("A program may create only one report intent.")
@@ -117,6 +131,117 @@ class IntentBuilder:
         self._report = self._handles.create_report()
         self._report_fields = fields
         return self._report
+
+    def set_header_field(
+        self,
+        report: ReportHandle,
+        *,
+        key: str,
+        value: AuthoringReportValueIntent,
+        label: str | None = None,
+    ) -> None:
+        """Set one semantic general-header field for the owned report."""
+        self._require_report(report)
+        field = _validated(
+            AuthoringHeaderFieldIntent,
+            _non_null_fields(slot_id=key, key=key, value=value, label=label),
+            "Header field desired state",
+        )
+        self._header_fields[key] = field
+
+    def set_service_title(
+        self,
+        report: ReportHandle,
+        *,
+        slot_id: str,
+        value: AuthoringReportValueIntent,
+        font_size: float | None = None,
+        auto_adjust: bool | None = None,
+        bold: bool | None = None,
+        italic: bool | None = None,
+        alignment: str | None = None,
+    ) -> None:
+        """Set one stable service-title slot for the owned report."""
+        self._require_report(report)
+        title = _validated(
+            AuthoringServiceTitleIntent,
+            _non_null_fields(
+                slot_id=slot_id,
+                value=value,
+                font_size=font_size,
+                auto_adjust=auto_adjust,
+                bold=bold,
+                italic=italic,
+                alignment=alignment,
+            ),
+            "Service title desired state",
+        )
+        self._service_titles[slot_id] = title
+
+    def set_detail_field(
+        self,
+        report: ReportHandle,
+        *,
+        key: str,
+        value: AuthoringReportValueIntent,
+        label: str | None = None,
+    ) -> None:
+        """Set one semantic detail-header field for the owned report."""
+        self._require_report(report)
+        field = _validated(
+            AuthoringHeaderFieldIntent,
+            _non_null_fields(slot_id=key, key=key, value=value, label=label),
+            "Detail field desired state",
+        )
+        self._detail_fields[key] = field
+
+    def add_remark(
+        self,
+        report: ReportHandle,
+        *,
+        remark_id: str,
+        title: str | None = None,
+        text: str | None = None,
+        lines: list[str] | None = None,
+        alignment: str | None = None,
+        font_size: float | None = None,
+        title_font_size: float | None = None,
+        border: bool | None = None,
+    ) -> None:
+        """Add one identified report remark without replacing another remark."""
+        self._require_report(report)
+        if remark_id in self._remarks:
+            raise ProgramNameError(f"Remark id '{remark_id}' is already owned by this builder.")
+        remark = _validated(
+            AuthoringRemarkIntent,
+            _non_null_fields(
+                remark_id=remark_id,
+                title=title,
+                text=text,
+                lines=lines,
+                alignment=alignment,
+                font_size=font_size,
+                title_font_size=title_font_size,
+                border=border,
+            ),
+            "Remark desired state",
+        )
+        self._remarks[remark_id] = remark
+
+    def update_page(self, report: ReportHandle, *, page: AuthoringPageIntent) -> None:
+        """Set one explicit canonical page patch for the owned report."""
+        self._require_report(report)
+        self._page = _copy_intent(page, AuthoringPageIntent, "Page desired state")
+
+    def update_depth(self, report: ReportHandle, *, depth: AuthoringDepthIntent) -> None:
+        """Set one explicit canonical depth patch for the owned report."""
+        self._require_report(report)
+        self._depth = _copy_intent(depth, AuthoringDepthIntent, "Depth desired state")
+
+    def update_output(self, report: ReportHandle, *, output: AuthoringOutputIntent) -> None:
+        """Set one explicit canonical output patch for the owned report."""
+        self._require_report(report)
+        self._output = _copy_intent(output, AuthoringOutputIntent, "Output desired state")
 
     def add_section(
         self,
@@ -376,6 +501,21 @@ class IntentBuilder:
     def intent(self) -> AuthoringDocumentIntent:
         """Return a fresh validated canonical intent in deterministic call order."""
         fields: dict[str, object] = dict(self._report_fields)
+        header_fields = _report_header_fields(
+            self._header_fields,
+            self._service_titles,
+            self._detail_fields,
+        )
+        if header_fields:
+            fields["header"] = header_fields
+        if self._remarks:
+            fields["remarks"] = list(self._remarks.values())
+        if self._page is not None:
+            fields["page"] = self._page
+        if self._depth is not None:
+            fields["depth"] = self._depth
+        if self._output is not None:
+            fields["output"] = self._output
         if self._section_order:
             fields["sections"] = [
                 self._sections[token].model_dump(exclude_unset=True)
@@ -666,6 +806,30 @@ class IntentBuilder:
 def _non_null_fields(**values: object) -> dict[str, object]:
     """Return explicit SDK values while treating ``None`` as omitted input."""
     return {name: value for name, value in values.items() if value is not None}
+
+
+def _copy_intent(
+    value: BaseModel,
+    model_type: type[_Model],
+    label: str,
+) -> _Model:
+    """Copy one canonical partial intent while preserving omitted fields."""
+    if not isinstance(value, model_type):
+        raise ProgramTypeError(f"{label} is invalid.")
+    return _validated(model_type, value.model_dump(exclude_unset=True), label)
+
+
+def _report_header_fields(
+    general_fields: Mapping[str, AuthoringHeaderFieldIntent],
+    service_titles: Mapping[str, AuthoringServiceTitleIntent],
+    detail_fields: Mapping[str, AuthoringHeaderFieldIntent],
+) -> dict[str, object]:
+    """Return only the explicitly accumulated header collections."""
+    return _non_null_fields(
+        general_fields=list(general_fields.values()) or None,
+        service_titles=list(service_titles.values()) or None,
+        detail_fields=list(detail_fields.values()) or None,
+    )
 
 
 def _validated(

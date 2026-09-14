@@ -119,8 +119,9 @@ fragment through the SDK runtime.
 | CM-14 Canonical intent builder | Complete (`66f06ef`) | Explicit SDK calls compile to canonical intent without execution |
 | CM-15 Private semantic dry run | Complete (`ea2d115`) | Canonical intent reconciles, executes, and validates against an isolated document copy |
 | CM-16 Bounded inspection facade | Complete (`f37284d`) | Fixed immutable projections provide scoped worker context without document discovery |
-| CM-20 CapabilitySpec v2 bridge | Complete pending commit | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
-| CM-21 through CM-24 Capability migrations | Not started | v2 capabilities compile through plugin-owned handlers |
+| CM-20 CapabilitySpec v2 bridge | Complete (`873fd14`) | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
+| CM-21 Report capability migration | Complete pending commit | `report.standard` v2 arguments compile through explicit host SDK methods |
+| CM-22 through CM-24 Capability migrations | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -417,3 +418,27 @@ duplicates, and redundant capability-ID aliases. It does not execute handlers,
 register them with the interpreter, migrate built-ins, or alter registry
 lookup, planner, graph, provider, MCP, routing, persistence, rendering, or
 legacy-deletion behavior. CM-21 owns the first real capability migration.
+
+## CM-21 Report Capability Boundary
+
+CM-21 migrates only `report.standard` to the additive v2 capability contract.
+Its static `ReportStandardArgs` model contains sparse, explicit fields for
+report title/subtitle, semantic general-header fields, service titles, detail
+fields, remarks, page, depth, and output settings. Omitted collections and
+settings mean no update; unknown fields and empty supplied collections are
+rejected before compilation.
+
+The host handler validates those arguments and routes them through explicit
+`IntentBuilder` methods (`set_header_field`, `set_service_title`,
+`set_detail_field`, `add_remark`, `update_page`, `update_depth`, and
+`update_output`). It returns the existing `AuthoringDocumentIntent` directly.
+Header semantic keys remain subject to the existing deterministic header-slot
+reconciliation and alias context. No fuzzy path lookup or generic arbitrary
+field setter is introduced.
+
+Fluent receiver syntax such as `report.set(...)` and `report.add_remark(...)`
+is explicitly deferred. `ReportHandle` remains an identity-only host token;
+CM-21 does not add handle-method registration, interpreter changes, provider
+guidance, planner routing, LangGraph, MCP, persistence, rendering, or legacy
+deletion. The v1 report artifact/compiler and existing descriptor shapes remain
+unchanged. CM-22 owns the next capability migration.

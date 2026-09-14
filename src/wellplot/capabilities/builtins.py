@@ -33,6 +33,7 @@ from ..model.intent import (
 )
 from .base import CapabilitySpec
 from .registry import CapabilityRegistry
+from .report_standard import ReportStandardArgs, compile_report_standard
 
 
 class ReportRemoval(AuthoringRemoveIntent):
@@ -100,6 +101,13 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             aliases=("report", "header", "page settings"),
             artifact_model=ReportArtifact,
             compiler=_compile_report,
+            arguments_model=ReportStandardArgs,
+            handler=compile_report_standard,
+            worker_hints=(
+                "Use semantic header keys and explicit report settings only.",
+                "Omit report collections that do not need changes.",
+            ),
+            examples=("report.standard(header_fields=[{key: 'well', value: {value: 'Demo'}}])",),
         ),
         CapabilitySpec(
             capability_id="section.log_plot",
