@@ -127,7 +127,8 @@ fragment through the SDK runtime.
 | CM-25 Plugin extensibility proof | Complete (`5646c60`) | External test-only capability registers and executes through generic contracts |
 | CM-30 Provider v2 protocol | Complete (`e207550`) | Async typed provider contract works without `agent.core` |
 | CM-31 OpenAI structured transport | Complete (`1dbf49d`) | One native Responses parse call validates a static plan fixture |
-| CM-32 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
+| CM-32 OpenAI program transport | In progress | One native Responses text call returns bounded program source |
+| CM-33 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
@@ -581,3 +582,24 @@ concrete adapters. The OpenAI optional dependency floor is `>=1.66.0`, the
 first verified release used for the async Responses `parse` contract in this
 slice. Existing OpenAI and OpenAI-compatible authoring adapters remain
 unchanged; CM-32 owns plain program transport.
+
+## CM-32 Native OpenAI Program Transport
+
+CM-32 adds `agent.providers.openai_program_v2.OpenAIProgramBackend` for one
+ordinary async OpenAI Responses `responses.create` call. The transport passes
+only the model, prompts, explicit optional generation settings, and per-request
+timeout; it does not use `text_format`, function tools, tool replay, retries,
+repair calls, or execution. `OpenAIBackendV2` composes the unchanged CM-31
+structured backend and the CM-32 program backend to provide the full
+`ModelBackendProtocol` surface without making either leaf transport claim the
+other operation.
+
+The program boundary performs envelope checks only: raw source or exactly one
+strict Python fenced block, empty/prose/ambiguous envelope rejection, negative
+JSON object/array classification, Python syntax parseability, completion and
+tool-call checks, and the shared CM-11 16,000-character source limit. It does
+not inspect AST node policy, receivers, calls, loops, budgets, or semantic
+validity. The existing restricted parser and validator remain authoritative
+downstream. Refusals remain `provider_rejected`; malformed, truncated,
+tool-call, JSON, syntax-invalid, and oversized output remain
+`invalid_response`. Existing provider error and usage semantics are preserved.

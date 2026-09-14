@@ -14,6 +14,7 @@ CAPABILITIES_ROOT = WELLPLOT_ROOT / "capabilities"
 CODE_MODE_ROOT = WELLPLOT_ROOT / "agent" / "code_mode"
 PROVIDER_BASE = WELLPLOT_ROOT / "agent" / "providers" / "base.py"
 PROVIDER_OPENAI_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_v2.py"
+PROVIDER_OPENAI_PROGRAM_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_program_v2.py"
 
 AUTHORING_DOMAIN_ROOTS = (
     WELLPLOT_ROOT / "model",
@@ -209,7 +210,7 @@ def test_openai_v2_adapter_stays_outside_legacy_orchestration() -> None:
     violations = [
         reference
         for reference in _collect_import_references(
-            (PROVIDER_OPENAI_V2,),
+            (PROVIDER_OPENAI_V2, PROVIDER_OPENAI_PROGRAM_V2),
             source_root=SOURCE_ROOT,
         )
         if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)

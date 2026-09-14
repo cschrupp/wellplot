@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from time import perf_counter
 from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
 from .base import (
+    ProgramGenerationRequest,
+    ProgramGenerationResult,
     ProviderFailureCategory,
     ProviderMetrics,
     ProviderRequestError,
@@ -174,6 +176,8 @@ def _contains_refusal(response: object) -> bool:
         return True
     output = _field(response, "output") or ()
     for item in output:
+        if _field(item, "type") == "refusal" or _field(item, "refusal"):
+            return True
         for content in _field(item, "content") or ():
             if _field(content, "type") == "refusal" or _field(content, "refusal"):
                 return True
@@ -187,4 +191,37 @@ def _field(value: object, field_name: str) -> object:
     return getattr(value, field_name, None)
 
 
-__all__ = ["OpenAIStructuredBackend"]
+@dataclass(frozen=True, slots=True)
+class OpenAIBackendV2:
+    """Compose the CM-31 and CM-32 transports into the v2 backend surface."""
+
+    model: str
+    client: object
+    _structured: OpenAIStructuredBackend = field(init=False, repr=False)
+    _program: object = field(init=False, repr=False)
+
+    def __post_init__(self) -> None:
+        """Construct delegates that share the injected model and client."""
+        from .openai_program_v2 import OpenAIProgramBackend
+
+        object.__setattr__(self, "_structured", OpenAIStructuredBackend(self.model, self.client))
+        object.__setattr__(self, "_program", OpenAIProgramBackend(self.model, self.client))
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[TModel],
+    ) -> StructuredGenerationResult[TModel]:
+        """Delegate structured generation to the unchanged CM-31 transport."""
+        return await self._structured.generate_structured(request, response_model=response_model)
+
+    async def generate_program(
+        self,
+        request: ProgramGenerationRequest,
+    ) -> ProgramGenerationResult:
+        """Delegate plain program generation to the CM-32 transport."""
+        return await self._program.generate_program(request)
+
+
+__all__ = ["OpenAIBackendV2", "OpenAIStructuredBackend"]
