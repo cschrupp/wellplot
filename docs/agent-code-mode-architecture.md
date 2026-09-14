@@ -111,8 +111,9 @@ fragment through the SDK runtime.
 | CM-00 Freeze and evidence | Complete (`cf51935`) | Baseline record, evidence format, and historical v1 labels prepared with no runtime changes |
 | CM-01 Architecture guards | Complete (`d928261`) | AST import-invariant tests protect empty v2 package boundaries |
 | CM-02 Reachability inventory | Complete (`7ab6780`) | Legacy reachability/deletion inventory committed |
-| CM-03 Dual-engine evaluation | Complete pending commit | Comparable v1/v2 result records supported without a v2 runtime route |
-| CM-10 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
+| CM-03 Dual-engine evaluation | Complete (`5182d9c`) | Comparable v1/v2 result records supported without a v2 runtime route |
+| CM-10 Program contracts and errors | Complete pending commit | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
+| CM-11 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -181,3 +182,24 @@ label. The provider matrix retains provider summaries, adds engine summaries,
 and pairs v1/v2 evidence by task ID, fixture, provider, and model. Missing
 counterparts are represented as `null`, and `not_implemented` is excluded from
 the pass-at-one denominator.
+
+## CM-10 Program Contract Boundary
+
+CM-10 introduces only pure, strict Authoring Program contracts and the
+semantic error taxonomy in `wellplot.authoring_program`. Program source remains
+verbatim until the parser exists. A compiled `ProgramArtifact` carries the
+existing canonical `AuthoringDocumentIntent` directly, rather than a new
+operation, statement, SDK-call, or desired-state representation.
+
+The execution-result model requires explicit evidence: success requires an
+artifact and cannot include error diagnostics; failure requires diagnostics and
+cannot include an artifact. The seven program error categories convert
+deterministically to concise diagnostics with stable `program.*` codes, an
+optional source span, and an optional remediation hint. No raw Python
+exception, traceback, provider object, persistence result, or MCP response is
+part of the public contracts.
+
+CM-10 adds no grammar, AST validation, interpreter, SDK, capability handler,
+provider, LangGraph, MCP, route, feature flag, or legacy deletion. CM-11 owns
+syntax and policy validation; CM-12 owns interpretation; CM-14 owns intent
+compilation; CM-15 owns dry-run semantics.
