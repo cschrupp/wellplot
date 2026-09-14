@@ -124,6 +124,7 @@ fragment through the SDK runtime.
 | CM-22 Structural capability migration | Complete (`9ae45b3`) | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
 | CM-23 Curve/raster binding migration | Complete (`4966b60`) | Curve and raster v2 arguments compile through host-owned binding methods |
 | CM-24 Fills and annotations | Complete (`0423f7e`) | v2 leaf capabilities compile through plugin-owned handlers |
+| CM-25 Plugin extensibility proof | In progress | External test-only capability registers and executes through generic contracts |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -514,3 +515,25 @@ annotation tracks. The result remains the existing
 CM-24 adds no interpreter registration, fluent syntax, provider, planner,
 LangGraph, MCP, routing, persistence, rendering, or legacy deletion behavior.
 CM-25 owns the next separately authorized migration slice.
+
+## CM-25 Plugin Extensibility Boundary
+
+CM-25 proves the capability registry is an execution plugin boundary without
+changing production code. A test-only external-looking capability declares its
+own v1 artifact/compiler and v2 argument model/handler, registers in a fresh
+`CapabilityRegistry`, resolves by canonical ID and alias, exposes planning,
+worker, and Code Mode descriptors, and executes through the registry-held
+validate-then-handler contract to produce an exact
+`AuthoringDocumentIntent`.
+
+The synthetic capability is not included in `create_builtin_registry()` and
+does not import graph, MCP, provider, LangGraph, or interpreter modules. The
+protected workflow, planner, section worker, and interpreter files have no
+dependency on the fixture. CM-25 therefore proves extensibility over the
+existing canonical authoring domain; it does not claim that a new canonical
+document object kind can be introduced without domain-model changes.
+
+CM-25 adds no production capability registration, registry execution API,
+workflow or planner branch, program-worker branch, interpreter change,
+provider, LangGraph, MCP, routing, persistence, rendering, or legacy deletion.
+CM-30 owns the next separately authorized provider/planner migration.
