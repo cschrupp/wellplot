@@ -125,7 +125,7 @@ fragment through the SDK runtime.
 | CM-23 Curve/raster binding migration | Complete (`4966b60`) | Curve and raster v2 arguments compile through host-owned binding methods |
 | CM-24 Fills and annotations | Complete (`0423f7e`) | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-25 Plugin extensibility proof | Complete (`5646c60`) | External test-only capability registers and executes through generic contracts |
-| CM-30 Provider v2 protocol | In progress | Async typed provider contract works without `agent.core` |
+| CM-30 Provider v2 protocol | Complete (`e207550`) | Async typed provider contract works without `agent.core` |
 | CM-31 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |

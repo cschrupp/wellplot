@@ -7,7 +7,7 @@ Code Mode planner and program-generation slices. It intentionally does not
 migrate a live provider.
 
 - **Slice base SHA:** `68124fe`
-- **Implementation commit:** pending
+- **Implementation commit:** `e207550`
 - **Scope:** typed generation requests/results, per-call metrics, redacted
   provider errors, fake/recorded backend tests, and the provider-boundary
   architecture guard.
@@ -59,5 +59,5 @@ are excluded.
 
 ## Decision
 
-**PROCEED / STOP:** PROCEED to review and commit CM-30. STOP before CM-31
-implementation until separately authorized.
+**PROCEED / STOP:** PROCEED to CM-31 planning; CM-30 committed and pushed.
+STOP before CM-31 implementation until separately authorized.
