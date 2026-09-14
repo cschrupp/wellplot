@@ -7,6 +7,7 @@ program. It returns candidate source to the caller and does not own semantic
 revalidation or document mutation.
 
 - **Slice base SHA:** `4ba854a`
+- **Implementation commit:** `ad03bce`
 - **Implementation scope:** compact repair prompts, one normal repair attempt,
   one explicit format-only second attempt, stable result evidence, and repair
   metrics.
@@ -35,6 +36,9 @@ worker context.
 ## Validation
 
 - Focused CM-34/CM-33/CM-32/CM-31/provider-contract/architecture tests: `80 passed`.
+- Tracked Code Mode regression selection: `346 passed, 2 failed`. The two
+  failures are the pre-existing `reconstruct` and `revise` assertions in
+  `tests/test_graph_section_submission.py`; neither file is part of CM-34.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
@@ -50,5 +54,5 @@ worker context.
 
 ## Decision
 
-**PROCEED / STOP:** Implementation is ready for the isolated CM-34 commit.
-After evidence finalization, stop before CM-40 implementation.
+**PROCEED / STOP:** CM-34 is committed and pushed as `ad03bce`. Stop before
+CM-40 implementation until separately authorized.
