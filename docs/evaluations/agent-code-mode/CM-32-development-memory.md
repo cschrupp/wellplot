@@ -6,6 +6,7 @@ CM-32 completes the OpenAI provider-v2 surface for plain Code Mode program
 generation without integrating a planner or worker.
 
 - **Slice base SHA:** `fdbde64`
+- **Implementation commit:** `1329c62`
 - **Implementation scope:** one async Responses text call, strict program
   envelope extraction, shared source-length limit, metrics, stable failures,
   and a composed full-protocol backend.
@@ -42,6 +43,9 @@ second configurable policy.
 ## Validation
 
 - Focused CM-32/CM-31/provider-contract/architecture tests: `53 passed`.
+- Tracked Code Mode regression selection: `288 passed, 2 failed`. The two
+  failures are the pre-existing `reconstruct` and `revise` assertions in
+  `tests/test_graph_section_submission.py`; neither file is part of CM-32.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
@@ -57,5 +61,5 @@ second configurable policy.
 
 ## Decision
 
-**PROCEED / STOP:** Implementation is ready for the isolated CM-32 commit.
-After evidence finalization, stop before CM-33 implementation.
+**PROCEED / STOP:** CM-32 is committed and pushed as `1329c62`. Stop before
+CM-33 implementation until separately authorized.

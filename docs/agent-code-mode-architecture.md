@@ -127,7 +127,7 @@ fragment through the SDK runtime.
 | CM-25 Plugin extensibility proof | Complete (`5646c60`) | External test-only capability registers and executes through generic contracts |
 | CM-30 Provider v2 protocol | Complete (`e207550`) | Async typed provider contract works without `agent.core` |
 | CM-31 OpenAI structured transport | Complete (`1dbf49d`) | One native Responses parse call validates a static plan fixture |
-| CM-32 OpenAI program transport | In progress | One native Responses text call returns bounded program source |
+| CM-32 OpenAI program transport | Complete (`1329c62`) | One native Responses text call returns bounded program source |
 | CM-33 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
