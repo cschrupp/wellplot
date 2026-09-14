@@ -121,8 +121,9 @@ fragment through the SDK runtime.
 | CM-16 Bounded inspection facade | Complete (`f37284d`) | Fixed immutable projections provide scoped worker context without document discovery |
 | CM-20 CapabilitySpec v2 bridge | Complete (`873fd14`) | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
 | CM-21 Report capability migration | Complete (`3bebd28`) | `report.standard` v2 arguments compile through explicit host SDK methods |
-| CM-22 Structural capability migration | Complete pending commit | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
-| CM-23 through CM-24 Capability migrations | Not started | v2 leaf capabilities compile through plugin-owned handlers |
+| CM-22 Structural capability migration | Complete (`9ae45b3`) | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
+| CM-23 Curve/raster binding migration | In progress | Curve and raster v2 arguments compile through host-owned binding methods |
+| CM-24 Fills and annotations | Not started | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -466,3 +467,24 @@ reconciliation concern. No bindings, fills, annotation objects, interpreter
 registration, fluent syntax, provider, planner, LangGraph, MCP, routing,
 persistence, rendering, or legacy deletion is included. CM-23 owns curve and
 raster bindings.
+
+## CM-23 Binding Capability Boundary
+
+CM-23 migrates `binding.curve` and `binding.raster` to additive v2 contracts.
+Both capabilities use explicit `create`, `select`, and `update` operations.
+Create allocates a binding identity from the CM-13 allocator; select and update
+adopt an exact host-resolved binding identity without searching the current
+document or resolving aliases.
+
+Curve bindings own channel, label, independent scalar scale, and line style.
+Raster bindings own channel, label, raster profile, normalization and explicit
+color limits, colorbar, and sample-axis settings. Parent capability and source
+kind restrictions remain declarative registry metadata: curve bindings require
+normal or reference tracks and LAS/DLIS sources, while raster bindings require
+array tracks and DLIS sources.
+
+Handlers compile directly to the existing `AuthoringDocumentIntent` through
+`IntentBuilder`. They do not add a binding IR, inspect source data, validate
+current-document existence, register interpreter methods, or change provider,
+planner, LangGraph, MCP, routing, persistence, rendering, or legacy deletion
+behavior. CM-24 owns fills and annotations.

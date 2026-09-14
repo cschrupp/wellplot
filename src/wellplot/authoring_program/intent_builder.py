@@ -31,7 +31,12 @@ from typing import TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
 
-from ..model.authoring import AnnotationTextSpec, AuthoringScale
+from ..model.authoring import (
+    AnnotationTextSpec,
+    AuthoringRasterColorbarSpec,
+    AuthoringRasterSampleAxisSpec,
+    AuthoringScale,
+)
 from ..model.intent import (
     AuthoringAnnotationIntent,
     AuthoringCurveBindingIntent,
@@ -446,6 +451,7 @@ class IntentBuilder:
         scale_maximum: float | None = None,
         scale_kind: str = "linear",
         reverse: bool = False,
+        scale_unit: str | None = None,
         color: str | None = None,
         line_style: str | None = None,
         line_width: float | None = None,
@@ -468,6 +474,7 @@ class IntentBuilder:
                     scale_maximum,
                     kind=scale_kind,
                     reverse=reverse,
+                    unit=scale_unit,
                     label="Curve scale",
                 ),
                 style=_optional_style(
@@ -495,6 +502,8 @@ class IntentBuilder:
         color_maximum: float | None = None,
         colormap: str | None = None,
         alpha: float | None = None,
+        colorbar: AuthoringRasterColorbarSpec | None = None,
+        sample_axis: AuthoringRasterSampleAxisSpec | None = None,
     ) -> BindingHandle:
         """Add one raster binding with explicit display and amplitude options."""
         owned_track = self._require_track(track)
@@ -517,6 +526,8 @@ class IntentBuilder:
                 profile=profile,
                 normalization=normalization,
                 color_limits=color_limits,
+                colorbar=colorbar,
+                sample_axis=sample_axis,
                 style=_optional_style(colormap=colormap, alpha=alpha),
             ),
             "Raster binding desired state",
@@ -524,6 +535,103 @@ class IntentBuilder:
         self._append_track_binding(owned_track, fragment)
         self._bindings[binding.token] = binding
         return binding
+
+    def select_curve(self, track: TrackHandle, *, binding_id: str) -> BindingHandle:
+        """Adopt one host-resolved scalar binding identity under a track."""
+        return self._select_binding(track, binding_id=binding_id, kind="curve")
+
+    def select_raster(self, track: TrackHandle, *, binding_id: str) -> BindingHandle:
+        """Adopt one host-resolved raster binding identity under a track."""
+        return self._select_binding(track, binding_id=binding_id, kind="raster")
+
+    def update_curve(
+        self,
+        track: TrackHandle,
+        binding: BindingHandle,
+        *,
+        channel: str | None = None,
+        label: str | None = None,
+        scale_minimum: float | None = None,
+        scale_maximum: float | None = None,
+        scale_kind: str = "linear",
+        reverse: bool = False,
+        scale_unit: str | None = None,
+        color: str | None = None,
+        line_style: str | None = None,
+        line_width: float | None = None,
+    ) -> None:
+        """Apply a sparse update to one adopted curve binding."""
+        owned_track = self._require_track(track)
+        owned_binding = self._require_binding(owned_track, binding)
+        patch = _validated(
+            AuthoringCurveBindingIntent,
+            _non_null_fields(
+                kind="curve",
+                binding_id=owned_binding.binding_id,
+                section_id=owned_track.section_id,
+                track_id=owned_track.track_id,
+                channel=channel,
+                label=label,
+                scale=_optional_scale(
+                    scale_minimum,
+                    scale_maximum,
+                    kind=scale_kind,
+                    reverse=reverse,
+                    unit=scale_unit,
+                    label="Curve scale",
+                ),
+                style=_optional_style(
+                    color=color,
+                    line_style=line_style,
+                    line_width=line_width,
+                ),
+            ),
+            "Curve binding desired state",
+        )
+        self._merge_track_binding(owned_track, patch)
+
+    def update_raster(
+        self,
+        track: TrackHandle,
+        binding: BindingHandle,
+        *,
+        channel: str | None = None,
+        label: str | None = None,
+        profile: str | None = None,
+        normalization: str | None = None,
+        color_minimum: float | None = None,
+        color_maximum: float | None = None,
+        colormap: str | None = None,
+        alpha: float | None = None,
+        colorbar: AuthoringRasterColorbarSpec | None = None,
+        sample_axis: AuthoringRasterSampleAxisSpec | None = None,
+    ) -> None:
+        """Apply a sparse update to one adopted raster binding."""
+        owned_track = self._require_track(track)
+        owned_binding = self._require_binding(owned_track, binding)
+        patch = _validated(
+            AuthoringRasterBindingIntent,
+            _non_null_fields(
+                kind="raster",
+                binding_id=owned_binding.binding_id,
+                section_id=owned_track.section_id,
+                track_id=owned_track.track_id,
+                channel=channel,
+                label=label,
+                profile=profile,
+                normalization=normalization,
+                color_limits=_optional_pair(
+                    color_minimum,
+                    color_maximum,
+                    label="Raster color limits",
+                ),
+                colorbar=colorbar,
+                sample_axis=sample_axis,
+                style=_optional_style(colormap=colormap, alpha=alpha),
+            ),
+            "Raster binding desired state",
+        )
+        self._merge_track_binding(owned_track, patch)
 
     def add_fill(
         self,
@@ -694,6 +802,62 @@ class IntentBuilder:
         bindings.append(binding)
         tracks[index] = _replace_track_field(current, "bindings", bindings)
         self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
+
+    def _select_binding(
+        self,
+        track: TrackHandle,
+        *,
+        binding_id: str,
+        kind: str,
+    ) -> BindingHandle:
+        """Adopt one exact binding identity with a typed partial fragment."""
+        owned_track = self._require_track(track)
+        binding = self._handles.adopt_binding(owned_track, binding_id)
+        self._handles.validate_leaf_parent(owned_track, binding)
+        if binding.token not in self._bindings:
+            model_type = (
+                AuthoringCurveBindingIntent if kind == "curve" else AuthoringRasterBindingIntent
+            )
+            fragment = _validated(
+                model_type,
+                _non_null_fields(
+                    kind=kind,
+                    binding_id=binding.binding_id,
+                    section_id=owned_track.section_id,
+                    track_id=owned_track.track_id,
+                ),
+                "Binding desired state",
+            )
+            self._append_track_binding(owned_track, fragment)
+            self._bindings[binding.token] = binding
+        return binding
+
+    def _merge_track_binding(
+        self,
+        track: TrackHandle,
+        patch: AuthoringCurveBindingIntent | AuthoringRasterBindingIntent,
+    ) -> None:
+        """Merge one binding patch into the exact binding identity on a track."""
+        section, tracks, index = self._track_state(track)
+        current = tracks[index]
+        bindings = list(current.bindings or [])
+        for binding_index, existing in enumerate(bindings):
+            if existing.binding_id != patch.binding_id:
+                continue
+            if existing.kind != patch.kind:
+                raise ProgramPolicyError(
+                    f"Binding '{patch.binding_id}' kind does not match the selected capability."
+                )
+            bindings[binding_index] = _merge_intent(
+                existing,
+                patch,
+                type(existing),
+                "Binding desired state",
+            )
+            tracks[index] = _replace_track_field(current, "bindings", bindings)
+            self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
+            return
+        raise ProgramNameError(f"Binding '{patch.binding_id}' is not owned by the selected track.")
 
     def _append_track_fill(self, track: TrackHandle, fill: AuthoringFillIntent) -> None:
         """Append one canonical fill fragment without applying it to a report."""
@@ -989,6 +1153,7 @@ def _optional_scale(
     *,
     kind: str,
     reverse: bool,
+    unit: str | None = None,
     label: str,
 ) -> AuthoringScale | None:
     """Return one canonical scale only when both explicit bounds were supplied."""
@@ -1002,6 +1167,7 @@ def _optional_scale(
             "minimum": bounds[0],
             "maximum": bounds[1],
             "reverse": reverse,
+            "unit": unit,
         },
         label,
     )

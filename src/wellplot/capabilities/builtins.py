@@ -32,6 +32,12 @@ from ..model.intent import (
     AuthoringTrackIntent,
 )
 from .base import CapabilitySpec
+from .bindings import (
+    CurveBindingArgs,
+    RasterBindingArgs,
+    compile_binding_curve,
+    compile_binding_raster,
+)
 from .registry import CapabilityRegistry
 from .report_standard import ReportStandardArgs, compile_report_standard
 from .structural import (
@@ -220,6 +226,16 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("track.normal", "track.reference"),
             source_kinds=("LAS", "DLIS"),
+            arguments_model=CurveBindingArgs,
+            handler=compile_binding_curve,
+            worker_hints=(
+                "Use create, select, or update explicitly; selection adopts a host-resolved id.",
+                "Curve scale and line style are binding-local and do not change the parent track.",
+            ),
+            examples=(
+                "binding.curve(operation='create', section_id='main', track_id='combo', "
+                "channel='GR', label='Gamma Ray')",
+            ),
         ),
         CapabilitySpec(
             capability_id="binding.raster",
@@ -230,6 +246,17 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("track.array",),
             source_kinds=("DLIS",),
+            arguments_model=RasterBindingArgs,
+            handler=compile_binding_raster,
+            worker_hints=(
+                "Use create, select, or update explicitly; selection adopts a host-resolved id.",
+                "Use profile, colorbar, sample_axis, and explicit color limits "
+                "only when requested.",
+            ),
+            examples=(
+                "binding.raster(operation='create', section_id='main', track_id='vdl', "
+                "channel='VDL', profile='vdl')",
+            ),
         ),
         CapabilitySpec(
             capability_id="fill.curve",

@@ -88,4 +88,4 @@ CM-23 owns curve and raster bindings.
 **STOP after CM-22. Proceed to CM-23 only after this slice is committed and
 pushed.**
 
-**PROCEED / STOP:** PROCEED to review and commit CM-22; STOP before CM-23.
+**PROCEED / STOP:** PROCEED to CM-23; CM-22 committed and pushed.
