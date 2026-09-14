@@ -116,7 +116,8 @@ fragment through the SDK runtime.
 | CM-11 AST policy validator | Complete (`5883a0a`) | Static grammar and adversarial allowlist tests pass without execution |
 | CM-12 Restricted interpreter | Complete (`a9f2d3a`) | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
 | CM-13 Deterministic identities | Complete (`1708905`) | Reservation-based IDs and typed ownership-handle tests pass |
-| CM-14 Canonical intent builder | Complete pending commit | Explicit SDK calls compile to canonical intent without execution |
+| CM-14 Canonical intent builder | Complete (`66f06ef`) | Explicit SDK calls compile to canonical intent without execution |
+| CM-15 Private semantic dry run | Complete pending commit | Canonical intent reconciles, executes, and validates against an isolated document copy |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -329,3 +330,33 @@ persistence, rendering, source inspection, provider, LangGraph, MCP, routing,
 feature flag, or legacy deletion. CM-15 owns private semantic dry-run
 execution; CM-20 and later capability slices own broader SDK vocabulary and
 capability handlers.
+
+## CM-15 Private Semantic Dry-Run Boundary
+
+CM-15 adds `ProgramRuntime`, the Wellplot-specific execution boundary beneath
+CM-14. It accepts already compiled canonical intent and does not reparse,
+reinterpret, or reconstruct program source. For every run it creates an
+`AuthoringService` from a deep canonical clone of the caller's current
+`AuthoringDocumentSpec`, then calls `reconcile_authoring`,
+`execute_authoring_plan`, and `AuthoringService.validate` in that order.
+
+All authoring context is supplied explicitly by the caller: current document,
+optional scaffold and defaults, available channels, channel aliases, and header
+aliases. CM-15 does not inspect files or sources, acquire project state, or
+infer missing context. The input document remains unchanged whether execution
+succeeds or fails, and the private post-execution document never leaves the
+runtime.
+
+Success returns a `ProgramArtifact` containing the exact CM-14 intent. Failure
+returns no artifact and one or more compact `ProgramDryRunError` diagnostics.
+Canonical reconciliation issue codes and messages remain available when the
+plan is not ready; unexpected implementation exceptions and execution details
+are reduced to stable program-facing messages without tracebacks or host
+objects.
+
+CM-15 intentionally depends only on canonical domain/authoring modules:
+`wellplot.model`, `wellplot.authoring_context`, `wellplot.authoring_reconciler`,
+`wellplot.authoring_executor`, and `wellplot.authoring_service`. It adds no
+agent, MCP, provider, LangGraph, source inspection, persistence, renderer,
+notebook, routing, feature-flag, or legacy-deletion dependency. CM-16 owns
+the next execution integration work.
