@@ -15,6 +15,7 @@ CODE_MODE_ROOT = WELLPLOT_ROOT / "agent" / "code_mode"
 PROVIDER_BASE = WELLPLOT_ROOT / "agent" / "providers" / "base.py"
 PROVIDER_OPENAI_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_v2.py"
 PROVIDER_OPENAI_PROGRAM_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_program_v2.py"
+PROVIDER_OPENAI_COMPAT_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_compat_v2.py"
 
 AUTHORING_DOMAIN_ROOTS = (
     WELLPLOT_ROOT / "model",
@@ -197,8 +198,8 @@ def test_provider_v2_contract_stays_provider_neutral() -> None:
     )
 
 
-def test_openai_v2_adapter_stays_outside_legacy_orchestration() -> None:
-    """The CM-31 adapter may depend on the v2 contract, not legacy loops."""
+def test_provider_v2_adapters_stay_outside_legacy_orchestration() -> None:
+    """Provider-v2 adapters may depend on the v2 contract, not legacy loops."""
     forbidden = (
         "wellplot.agent.core",
         "wellplot.agent.graph",
@@ -210,7 +211,7 @@ def test_openai_v2_adapter_stays_outside_legacy_orchestration() -> None:
     violations = [
         reference
         for reference in _collect_import_references(
-            (PROVIDER_OPENAI_V2, PROVIDER_OPENAI_PROGRAM_V2),
+            (PROVIDER_OPENAI_V2, PROVIDER_OPENAI_PROGRAM_V2, PROVIDER_OPENAI_COMPAT_V2),
             source_root=SOURCE_ROOT,
         )
         if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)

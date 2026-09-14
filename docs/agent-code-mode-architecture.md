@@ -128,7 +128,8 @@ fragment through the SDK runtime.
 | CM-30 Provider v2 protocol | Complete (`e207550`) | Async typed provider contract works without `agent.core` |
 | CM-31 OpenAI structured transport | Complete (`1dbf49d`) | One native Responses parse call validates a static plan fixture |
 | CM-32 OpenAI program transport | Complete (`1329c62`) | One native Responses text call returns bounded program source |
-| CM-33 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
+| CM-33 OpenAI-compatible provider transport | In progress | Explicit-capability Chat Completions adapter implements the v2 protocol |
+| CM-34 Bounded program repair | Not started | One bounded correction remains observable in traces/evals |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
@@ -603,3 +604,26 @@ validity. The existing restricted parser and validator remain authoritative
 downstream. Refusals remain `provider_rejected`; malformed, truncated,
 tool-call, JSON, syntax-invalid, and oversized output remain
 `invalid_response`. Existing provider error and usage semantics are preserved.
+
+## CM-33 OpenAI-Compatible Provider Transport
+
+CM-33 adds `agent.providers.openai_compat_v2.OpenAICompatibleBackendV2` as a
+parallel v2 adapter over one injected Chat Completions client. Structured
+generation is available only when the adapter is explicitly configured with
+`structured_output="json_schema"`; otherwise it raises a configuration error
+before making a provider call. The supported path sends one strict JSON Schema
+response format derived from the supplied Pydantic model, validates the returned
+JSON locally, and never downgrades to JSON mode or plain output.
+
+Plain program generation uses one sparse Chat Completions request with no tools
+or functions and shares CM-32's program-envelope validator and CM-11 source
+limit. The max-token parameter spelling is also explicit at construction time:
+`max_completion_tokens` or `max_tokens`; the adapter never probes or retries
+with another spelling. Completion status, refusal, tool-call, malformed choice,
+JSON, syntax, and length failures map to the CM-30 stable categories with
+redacted adapter-authored messages and normalized Chat usage metrics.
+
+The adapter does not import the legacy compatible-provider loop, `agent.core`,
+MCP, LangGraph, planner, or worker modules. It implements both provider-v2
+operations directly; no OpenAI fallback, retry policy, routing, or repair is
+introduced. CM-34 owns bounded program repair.
