@@ -113,8 +113,9 @@ fragment through the SDK runtime.
 | CM-02 Reachability inventory | Complete (`7ab6780`) | Legacy reachability/deletion inventory committed |
 | CM-03 Dual-engine evaluation | Complete (`5182d9c`) | Comparable v1/v2 result records supported without a v2 runtime route |
 | CM-10 Program contracts and errors | Complete (`a5aec78`) | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
-| CM-11 AST policy validator | Complete pending commit | Static grammar and adversarial allowlist tests pass without execution |
-| CM-12 through CM-14 Program kernel | Not started | Restricted interpreter, SDK, and compile-only intent tests pass |
+| CM-11 AST policy validator | Complete (`5883a0a`) | Static grammar and adversarial allowlist tests pass without execution |
+| CM-12 Restricted interpreter | Complete pending commit | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
+| CM-13 through CM-14 Program kernel | Not started | SDK and compile-only intent tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -232,3 +233,31 @@ centralized in `grammar.py`; it maps Python AST offsets into the existing
 CM-11 adds no interpreter, SDK handles, capability semantics, intent
 generation, dry-run, provider, LangGraph, MCP, route, feature flag, or legacy
 deletion. CM-12 owns all source-to-behavior interpretation.
+
+## CM-12 Restricted Interpreter Boundary
+
+CM-12 interprets only `AuthoringProgram` source after it has passed the CM-11
+parser and static validator. The public entry point does not accept raw ASTs.
+It executes the existing closed grammar directly by AST node type and never
+uses `exec`, `eval`, source imports, Python builtins lookup, or dynamic
+attribute dispatch.
+
+The execution substrate is capability-neutral. A `RuntimeHandle` is only an
+opaque `(token, kind)` identity. Root and handle methods resolve through
+immutable explicit registries, not through a Python object carried by a handle.
+Callbacks receive isolated recursively validated runtime values and must return
+the same restricted value universe: scalar values, list/tuple values,
+string-keyed dictionaries, and runtime handles. Unexpected callback failures
+and unsupported returns become typed compact program diagnostics.
+
+CM-12 applies independent actual-work budgets for dispatched calls, leaf loop
+iterations, materialized runtime value items, and journal entries. Nested
+loops count leaf iterations globally: a three-by-three nested loop records nine
+iterations rather than two independent loop lengths. The generic journal is
+deterministic trace evidence only; it is not an authoring operation IR or
+canonical application state. Loop target bindings are lexical and temporary.
+
+CM-12 adds no Wellplot SDK handles, IDs, capabilities, intent construction,
+AuthoringService integration, transactions, persistence, provider, LangGraph,
+MCP, routing, feature flags, or legacy deletion. CM-13 owns real deterministic
+handles and IDs; CM-14 owns `AuthoringDocumentIntent` construction.

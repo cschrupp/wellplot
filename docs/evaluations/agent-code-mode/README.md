@@ -35,6 +35,8 @@ Every result must identify exactly one category:
   diagnostic, artifact, result, metric, and semantic-error contracts.
 - `CM-11-development-memory.md` records the AST parser/validator allowlist,
   static budgets, adversarial security tests, and execution boundary.
+- `CM-12-development-memory.md` records the generic interpreter, explicit
+  runtime registries, safe dynamic values, budgets, and execution journal.
 - `SCORECARD_TEMPLATE.md` defines the required fields for each later slice.
 
 Evidence names use the migration slice identifier. A record is immutable once
