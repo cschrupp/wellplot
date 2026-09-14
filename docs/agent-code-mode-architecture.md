@@ -117,7 +117,8 @@ fragment through the SDK runtime.
 | CM-12 Restricted interpreter | Complete (`a9f2d3a`) | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
 | CM-13 Deterministic identities | Complete (`1708905`) | Reservation-based IDs and typed ownership-handle tests pass |
 | CM-14 Canonical intent builder | Complete (`66f06ef`) | Explicit SDK calls compile to canonical intent without execution |
-| CM-15 Private semantic dry run | Complete pending commit | Canonical intent reconciles, executes, and validates against an isolated document copy |
+| CM-15 Private semantic dry run | Complete (`ea2d115`) | Canonical intent reconciles, executes, and validates against an isolated document copy |
+| CM-16 Bounded inspection facade | Complete pending commit | Fixed immutable projections provide scoped worker context without document discovery |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -360,3 +361,36 @@ CM-15 intentionally depends only on canonical domain/authoring modules:
 agent, MCP, provider, LangGraph, source inspection, persistence, renderer,
 notebook, routing, feature-flag, or legacy-deletion dependency. CM-16 owns
 the next execution integration work.
+
+## CM-16 Bounded Read-Only Inspection Boundary
+
+CM-16 adds `AuthoringInspectionFacade` as a host-side context preparation API.
+It accepts a caller-owned canonical document and explicit section-keyed channel
+facts, then returns fixed immutable projections. It is not registered in the
+restricted interpreter and cannot be invoked by generated programs.
+
+The public surface is intentionally fixed:
+
+- `document_summary()` returns report name, title, subtitle, and ordered section
+  IDs.
+- `sections()` returns ordered section ID, title, subtitle, depth range, track
+  IDs, and track kinds without nested tracks.
+- `tracks(section_id)` returns ordered track ID, title, kind, width, and binding
+  IDs for one selected section.
+- `bindings(section_id, track_id)` returns ordered binding ID, binding kind, and
+  source channel for one section-scoped track.
+- `header_slots()` returns ordered slot ID, semantic key, and label only; it
+  does not expose current values or nested header layout.
+- `channels(section_id)` returns only explicit caller-supplied mnemonic, kind,
+  unit, and compact shape metadata for one existing section.
+
+Document-derived projections preserve canonical order. External channels are
+sorted by `(mnemonic, kind, unit)` using case-insensitive lexical comparison.
+The facade never infers section-to-source relationships, accepts global
+channel context, reads files, exposes paths or sample values, or provides
+arbitrary query, field-selection, dump, or document access methods. Unknown
+sections and section-local tracks produce the existing typed `ProgramNameError`.
+
+CM-16 adds no capability knowledge, program-time inspection calls, provider,
+planner, LangGraph, MCP, routing, persistence, rendering, source discovery,
+or legacy deletion. CM-20 owns the next capability-plugin contract.
