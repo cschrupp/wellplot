@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 from uuid import uuid4
 
 from .errors import ProgramNameError, ProgramPolicyError, ProgramTypeError
@@ -284,6 +285,30 @@ class HandleBuilder:
         owned_section = self._require_handle(section, SectionHandle)
         if owned_section.report_token != owned_report.token:
             raise ProgramPolicyError("Section handle does not belong to the supplied report.")
+
+    def validate_report(self, report: ReportHandle) -> ReportHandle:
+        """Return one issued report handle after provenance validation."""
+        return cast(ReportHandle, self._require_handle(report, ReportHandle))
+
+    def validate_section(self, section: SectionHandle) -> SectionHandle:
+        """Return one issued section handle after provenance validation."""
+        return cast(SectionHandle, self._require_handle(section, SectionHandle))
+
+    def validate_track(self, track: TrackHandle) -> TrackHandle:
+        """Return one issued track handle after provenance validation."""
+        return cast(TrackHandle, self._require_handle(track, TrackHandle))
+
+    def validate_binding(self, binding: BindingHandle) -> BindingHandle:
+        """Return one issued binding handle after provenance validation."""
+        return cast(BindingHandle, self._require_handle(binding, BindingHandle))
+
+    def validate_fill(self, fill: FillHandle) -> FillHandle:
+        """Return one issued fill handle after provenance validation."""
+        return cast(FillHandle, self._require_handle(fill, FillHandle))
+
+    def validate_annotation(self, annotation: AnnotationHandle) -> AnnotationHandle:
+        """Return one issued annotation handle after provenance validation."""
+        return cast(AnnotationHandle, self._require_handle(annotation, AnnotationHandle))
 
     def validate_track_parent(self, section: SectionHandle, track: TrackHandle) -> None:
         """Require that one issued track belongs to the supplied section handle."""

@@ -77,7 +77,12 @@ class IdAllocator:
 
     def allocate_section(self, id_hint: str | None = None) -> str:
         """Allocate one document-scoped section identity from a slugged hint."""
-        return self._reserve_next(self._section_ids, slugify_id_hint(id_hint, fallback="section"))
+        section_id = self._reserve_next(
+            self._section_ids,
+            slugify_id_hint(id_hint, fallback="section"),
+        )
+        self._track_ids_by_section.setdefault(section_id, set())
+        return section_id
 
     def adopt_section(self, section_id: str) -> str:
         """Reserve one existing section identity without allocating a replacement."""

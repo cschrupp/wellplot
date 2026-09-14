@@ -90,6 +90,15 @@ def test_reservation_sets_choose_first_free_suffix_without_hidden_counters() -> 
     assert allocator.allocate_binding("main", "combo", channel="GR") == "main.combo.GR.2"
 
 
+def test_newly_allocated_sections_immediately_accept_section_scoped_tracks() -> None:
+    """Allocation initializes the local track namespace just like section adoption."""
+    allocator = IdAllocator()
+
+    section_id = allocator.allocate_section("main")
+
+    assert allocator.allocate_track(section_id, "combo") == "combo"
+
+
 def test_track_scope_is_local_to_sections_and_binding_scope_is_document_wide() -> None:
     """Identical local track IDs are legal while binding IDs remain global."""
     allocator = IdAllocator(section_ids=("main", "repeat"))

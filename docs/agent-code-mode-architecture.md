@@ -115,8 +115,8 @@ fragment through the SDK runtime.
 | CM-10 Program contracts and errors | Complete (`a5aec78`) | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
 | CM-11 AST policy validator | Complete (`5883a0a`) | Static grammar and adversarial allowlist tests pass without execution |
 | CM-12 Restricted interpreter | Complete (`a9f2d3a`) | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
-| CM-13 Deterministic identities | Complete pending commit | Reservation-based IDs and typed ownership-handle tests pass |
-| CM-14 Program kernel | Not started | SDK and compile-only intent tests pass |
+| CM-13 Deterministic identities | Complete (`1708905`) | Reservation-based IDs and typed ownership-handle tests pass |
+| CM-14 Canonical intent builder | Complete pending commit | Explicit SDK calls compile to canonical intent without execution |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -295,3 +295,37 @@ CM-13 adds no Wellplot authoring methods, capability dispatch, document state,
 intent construction, AuthoringService integration, persistence, reconciliation,
 provider, LangGraph, MCP, routing, feature flags, or legacy deletion. CM-14
 owns canonical `AuthoringDocumentIntent` construction.
+
+## CM-14 Canonical Intent Builder Boundary
+
+CM-14 connects the restricted program kernel to the existing canonical
+`AuthoringDocumentIntent`. `IntentBuilder` accumulates only immutable,
+revalidated desired-state fragments; it does not hold an `AuthoringDocumentSpec`
+or simulate reconciliation, mutations, persistence, rendering, or an
+application service.
+
+The initial explicit SDK surface covers report title/subtitle, sections,
+tracks, scalar curves, rasters, curve fills, and narrow text annotations.
+It accepts typed CM-13 handles and delegates every identity, provenance, and
+parent ownership check to `HandleBuilder`. CM-14 consumes canonical IDs from
+those handles; it never allocates, rewrites, or infers an identity itself.
+
+CM-12's callback contract intentionally remains receiver-independent in this
+slice. The SDK therefore uses explicit root calls such as
+`wp.track(section, ...)` and `wp.curve(track, ...)`, passing typed handles as
+ordinary restricted-program values. This keeps the ownership operand visible
+to the callback without changing the generic interpreter registry solely for
+fluent syntax.
+
+Each accepted SDK value is first constructed with the existing canonical intent
+models. Repeated `intent()` calls return fresh equivalent
+`AuthoringDocumentIntent` values and preserve section, track, and child call
+order where the canonical model represents order. There is no Code Mode
+operation IR, shadow desired-state model, generic payload passthrough, or
+capability-specific execution in this slice.
+
+CM-14 adds no `AuthoringService` execution, dry-run, reconciliation,
+persistence, rendering, source inspection, provider, LangGraph, MCP, routing,
+feature flag, or legacy deletion. CM-15 owns private semantic dry-run
+execution; CM-20 and later capability slices own broader SDK vocabulary and
+capability handlers.
