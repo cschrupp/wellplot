@@ -112,8 +112,9 @@ fragment through the SDK runtime.
 | CM-01 Architecture guards | Complete (`d928261`) | AST import-invariant tests protect empty v2 package boundaries |
 | CM-02 Reachability inventory | Complete (`7ab6780`) | Legacy reachability/deletion inventory committed |
 | CM-03 Dual-engine evaluation | Complete (`5182d9c`) | Comparable v1/v2 result records supported without a v2 runtime route |
-| CM-10 Program contracts and errors | Complete pending commit | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
-| CM-11 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
+| CM-10 Program contracts and errors | Complete (`a5aec78`) | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
+| CM-11 AST policy validator | Complete pending commit | Static grammar and adversarial allowlist tests pass without execution |
+| CM-12 through CM-14 Program kernel | Not started | Restricted interpreter, SDK, and compile-only intent tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -203,3 +204,31 @@ CM-10 adds no grammar, AST validation, interpreter, SDK, capability handler,
 provider, LangGraph, MCP, route, feature flag, or legacy deletion. CM-11 owns
 syntax and policy validation; CM-12 owns interpretation; CM-14 owns intent
 compilation; CM-15 owns dry-run semantics.
+
+## CM-11 Static Grammar Boundary
+
+CM-11 parses source only with `ast.parse` and validates a closed AST allowlist.
+It never executes, evaluates, imports from generated source, resolves runtime
+attributes, calls callbacks, or generates bytecode. Its only output is the
+validated `ast.Module` consumed by the future CM-12 interpreter.
+
+The initial language permits expression method calls, one-name assignments,
+literals and literal containers, keyword arguments, public one-attribute
+access on `wp` or a previously introduced handle, bounded literal/local-literal
+`for` loops, and boolean or literal-equality `if` conditions. A flat tuple loop
+target remains allowed for the resistivity example in the migration plan. Calls
+cannot chain and source cannot introduce arbitrary bare functions, imports,
+private names, dynamic iteration, mutation, operators, comprehensions, async
+syntax, or any AST node outside the allowlist.
+
+One immutable `ProgramPolicyLimits` object carries the initial static budgets:
+source characters, AST nodes, statements, calls, loop iterations, and nesting.
+Oversize inputs yield `ProgramLimitError`; parsing errors yield
+`ProgramSyntaxError`; unsupported syntax yields `ProgramPolicyError`; and
+unknown or private names yield `ProgramNameError`. AST location conversion is
+centralized in `grammar.py`; it maps Python AST offsets into the existing
+1-based source-span model without attempting Unicode grapheme normalization.
+
+CM-11 adds no interpreter, SDK handles, capability semantics, intent
+generation, dry-run, provider, LangGraph, MCP, route, feature flag, or legacy
+deletion. CM-12 owns all source-to-behavior interpretation.

@@ -33,6 +33,8 @@ Every result must identify exactly one category:
   `not_implemented` evidence path, and incremental v1/v2 comparisons.
 - `CM-10-development-memory.md` records the pure Authoring Program source,
   diagnostic, artifact, result, metric, and semantic-error contracts.
+- `CM-11-development-memory.md` records the AST parser/validator allowlist,
+  static budgets, adversarial security tests, and execution boundary.
 - `SCORECARD_TEMPLATE.md` defines the required fields for each later slice.
 
 Evidence names use the migration slice identifier. A record is immutable once
