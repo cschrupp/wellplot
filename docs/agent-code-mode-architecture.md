@@ -129,7 +129,7 @@ fragment through the SDK runtime.
 | CM-31 OpenAI structured transport | Complete (`1dbf49d`) | One native Responses parse call validates a static plan fixture |
 | CM-32 OpenAI program transport | Complete (`1329c62`) | One native Responses text call returns bounded program source |
 | CM-33 OpenAI-compatible provider transport | Complete (`a2ed81e`) | Explicit-capability Chat Completions adapter implements the v2 protocol |
-| CM-34 Bounded program repair | Not started | One bounded correction remains observable in traces/evals |
+| CM-34 Bounded program repair | In progress | One bounded correction remains observable in traces/evals |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
@@ -627,3 +627,24 @@ The adapter does not import the legacy compatible-provider loop, `agent.core`,
 MCP, LangGraph, planner, or worker modules. It implements both provider-v2
 operations directly; no OpenAI fallback, retry policy, routing, or repair is
 introduced. CM-34 owns bounded program repair.
+
+## CM-34 Bounded Program Repair
+
+CM-34 adds `agent.code_mode.repair.ProgramRepairCoordinator` for one known
+failed program. Its compact request contains only the semantic task, relevant
+SDK documentation, previous source, and one stable `ProgramDiagnostic`. It
+returns candidate source and bounded orchestration evidence; it does not parse,
+validate, interpret, dry-run, mutate, persist, or reconcile the candidate.
+
+The normal path makes one `ModelBackendProtocol.generate_program` call. An
+explicit `ProgramRepairFormatFailure` signal may authorize one second call for
+format-only failure; provider timeout, transport, authentication, rate-limit,
+configuration, refusal, and generic invalid-response failures stop immediately.
+There is no third call and no provider-specific retry policy. The immutable
+result records `repair_count`, `generation_call_count`, a stable stop reason,
+diagnostics, and `ProgramMetrics.program_repairs`.
+
+CM-34 does not add planner, program-worker, LangGraph, MCP, routing, visual-QA,
+persistence, or legacy-deletion behavior. Later workers remain responsible for
+normal CM-11+ validation and deterministic dry-run checks. CM-40 owns the
+semantic planner migration.
