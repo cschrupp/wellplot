@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -31,10 +32,12 @@ try:
         load_fixture_catalog,
     )
     from scripts.agent_eval_support import (
+        SUPPORTED_ENGINES,
         EvalTask,
         collect_architecture_metrics,
         grade_document,
         load_task_suite,
+        normalize_engine_metrics,
         redact,
     )
 except ModuleNotFoundError:
@@ -44,10 +47,12 @@ except ModuleNotFoundError:
         load_fixture_catalog,
     )
     from agent_eval_support import (  # type: ignore[no-redef]
+        SUPPORTED_ENGINES,
         EvalTask,
         collect_architecture_metrics,
         grade_document,
         load_task_suite,
+        normalize_engine_metrics,
         redact,
     )
 
@@ -55,6 +60,7 @@ except ModuleNotFoundError:
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = REPO_ROOT / "tests" / "evals" / "agent_tasks.json"
 DEFAULT_FIXTURE_CATALOG = REPO_ROOT / "tests" / "evals" / "agent_fixture_catalog.json"
+_V2_NOT_IMPLEMENTED_REASON = "Code Mode execution is introduced in CM-10+."
 
 
 def _control_document(*, correct: bool) -> dict[str, Any]:
@@ -121,6 +127,7 @@ def _write_control(path: Path, *, correct: bool) -> None:
 def run_deterministic_suite(
     tasks: tuple[EvalTask, ...],
     *,
+    engine: str = "v1",
     document: Path | None = None,
     baseline: Path | None = None,
 ) -> dict[str, Any]:
@@ -161,9 +168,17 @@ def run_deterministic_suite(
                     "result": wrong_result,
                 }
             )
-        task_results = [grade_document(document, task, baseline_path=baseline) for task in tasks]
+        task_results = [
+            _with_engine_contract(
+                grade_document(document, task, baseline_path=baseline),
+                engine=engine,
+                fixture=_task_fixture_name(task),
+            )
+            for task in tasks
+        ]
     return {
         "mode": "deterministic",
+        "engine": engine,
         "controls": controls,
         "tasks": task_results,
         "live_execution": False,
@@ -185,15 +200,18 @@ def _result_metrics(result: object, elapsed_seconds: float) -> dict[str, Any]:
     report_facts_value = getattr(result, "report_facts", {})
     report_facts = report_facts_value if isinstance(report_facts_value, dict) else {}
     tool_trace = getattr(result, "tool_trace", ())
-    return {
-        "latency_ms": round(elapsed_seconds * 1000, 2),
-        "tool_trace_count": len(tool_trace),
-        "tool_trace": [item.name for item in tool_trace],
-        "rounds": report_facts.get("rounds", report_facts.get("provider_rounds")),
-        "context_chars": report_facts.get("context_chars"),
-        "prompt_chars": report_facts.get("prompt_chars"),
-        "token_usage": redact(report_facts.get("token_usage")),
-    }
+    return normalize_engine_metrics(
+        {
+            "latency_ms": round(elapsed_seconds * 1000, 2),
+            "tool_trace_count": len(tool_trace),
+            "tool_trace": [item.name for item in tool_trace],
+            "rounds": report_facts.get("rounds", report_facts.get("provider_rounds")),
+            "context_chars": report_facts.get("context_chars"),
+            "prompt_chars": report_facts.get("prompt_chars"),
+            "token_usage": redact(report_facts.get("token_usage")),
+            "legacy_core_reached": True,
+        }
+    )
 
 
 def _result_outcome(result: object, *, has_persisted_mutation: bool) -> dict[str, Any]:
@@ -207,6 +225,53 @@ def _result_outcome(result: object, *, has_persisted_mutation: bool) -> dict[str
 def _task_fixture_name(task: EvalTask) -> str:
     """Return the fixture declared by one already-validated task."""
     return str(task.initial_state["fixture"])
+
+
+def _with_engine_contract(
+    record: dict[str, Any],
+    *,
+    engine: str,
+    fixture: str | None = None,
+) -> dict[str, Any]:
+    """Add the stable, engine-neutral evidence fields to one task result."""
+    if engine not in SUPPORTED_ENGINES:
+        raise ValueError(f"Unsupported evaluation engine: {engine!r}")
+    normalized = dict(record)
+    normalized["engine"] = engine
+    if fixture is not None:
+        normalized.setdefault("fixture", fixture)
+    metrics = normalized.get("metrics")
+    existing_metrics = metrics if isinstance(metrics, Mapping) else None
+    normalized["metrics"] = normalize_engine_metrics(existing_metrics)
+    return normalized
+
+
+def _not_implemented_v2_results(tasks: tuple[EvalTask, ...]) -> list[dict[str, Any]]:
+    """Describe unimplemented v2 cases without constructing a legacy session."""
+    results: list[dict[str, Any]] = []
+    for task in tasks:
+        if task.status == "active":
+            record = {
+                "task_id": task.task_id,
+                "kind": task.kind,
+                "status": "not_implemented",
+                "reason": _V2_NOT_IMPLEMENTED_REASON,
+            }
+        else:
+            record = {
+                "task_id": task.task_id,
+                "kind": task.kind,
+                "status": "not_run",
+                "reason": f"task is marked {task.status}",
+            }
+        results.append(
+            _with_engine_contract(
+                record,
+                engine="v2",
+                fixture=_task_fixture_name(task),
+            )
+        )
+    return results
 
 
 def _live_task_inputs(
@@ -244,7 +309,12 @@ async def _run_live(
     fixture_catalog: Path | None = None,
     project_dir: Path,
     max_rounds: int,
+    engine: str = "v1",
 ) -> list[dict[str, Any]]:
+    if engine == "v2":
+        return _not_implemented_v2_results(tasks)
+    if engine != "v1":
+        raise ValueError(f"Unsupported evaluation engine: {engine!r}")
     if os.getenv("WELLPLOT_RUN_LIVE_AGENT_EVALS") != "1":
         raise RuntimeError(
             "Live evaluation is disabled. Set WELLPLOT_RUN_LIVE_AGENT_EVALS=1 explicitly."
@@ -264,12 +334,15 @@ async def _run_live(
             raise RuntimeError(f"No fixture catalog entry for {next(iter(fixture_names))!r}.")
         if not fixture.root.is_dir() and source_logfile is None and initial_document is None:
             return [
-                {
-                    "task_id": task.task_id,
-                    "status": "not_run",
-                    "fixture": _task_fixture_name(task),
-                    "reason": f"fixture directory is missing: {fixture.root}",
-                }
+                _with_engine_contract(
+                    {
+                        "task_id": task.task_id,
+                        "status": "not_run",
+                        "fixture": _task_fixture_name(task),
+                        "reason": f"fixture directory is missing: {fixture.root}",
+                    },
+                    engine="v1",
+                )
                 for task in tasks
                 if task.status == "active"
             ]
@@ -314,7 +387,11 @@ async def _run_live(
     if preflight_not_run and len(preflight_not_run) == sum(
         task.status == "active" for task in tasks
     ):
-        return [preflight_not_run[task.task_id] for task in tasks if task.status == "active"]
+        return [
+            _with_engine_contract(preflight_not_run[task.task_id], engine="v1")
+            for task in tasks
+            if task.status == "active"
+        ]
     from wellplot.agent.notebook import create_project_session
 
     api_key = _credential_from_file(api_key_file)
@@ -465,7 +542,14 @@ async def _run_live(
             graded["provider"] = provider
             graded["model"] = model
             results.append(redact(graded))
-    return results
+    return [
+        _with_engine_contract(
+            result,
+            engine="v1",
+            fixture=_task_fixture_name(task),
+        )
+        for task, result in zip(tasks, results, strict=True)
+    ]
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -476,6 +560,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         choices=("deterministic", "adapter", "live", "matrix"),
         default="deterministic",
         help="Evaluation mode; only live can contact a provider; matrix aggregates evidence.",
+    )
+    parser.add_argument(
+        "--engine",
+        choices=tuple(sorted(SUPPORTED_ENGINES)),
+        default="v1",
+        help="Authoring engine represented by this evidence run.",
     )
     parser.add_argument("--provider", default="openai", help="Provider name for live mode.")
     parser.add_argument("--model", default=None, help="Optional provider model override.")
@@ -552,7 +642,12 @@ def main(argv: list[str] | None = None) -> int:
         ]
         report = aggregate_matrix(evidence)
     elif args.mode in {"deterministic", "adapter"}:
-        report = run_deterministic_suite(tasks, document=document, baseline=baseline)
+        report = run_deterministic_suite(
+            tasks,
+            engine=args.engine,
+            document=document,
+            baseline=baseline,
+        )
         report["mode"] = args.mode
     else:
         project_dir = (
@@ -560,33 +655,42 @@ def main(argv: list[str] | None = None) -> int:
             if args.project_dir
             else repo_root / "workspace" / "evaluations" / "agent_l0"
         )
-        live_results = asyncio.run(
-            _run_live(
-                tasks,
-                repo_root=repo_root,
-                provider=args.provider,
-                model=args.model,
-                base_url=args.base_url,
-                api_key_file=Path(args.api_key_file) if args.api_key_file else None,
-                source_logfile=Path(args.source_logfile).resolve() if args.source_logfile else None,
-                initial_document=(
-                    Path(args.initial_document).resolve() if args.initial_document else None
-                ),
-                baseline_document=(
-                    Path(args.baseline_document).resolve() if args.baseline_document else None
-                ),
-                fixture_catalog=Path(args.fixture_catalog).resolve(),
-                project_dir=project_dir,
-                max_rounds=args.max_rounds,
+        if args.engine == "v2":
+            live_results = _not_implemented_v2_results(tasks)
+        else:
+            live_results = asyncio.run(
+                _run_live(
+                    tasks,
+                    repo_root=repo_root,
+                    provider=args.provider,
+                    model=args.model,
+                    base_url=args.base_url,
+                    api_key_file=Path(args.api_key_file) if args.api_key_file else None,
+                    source_logfile=(
+                        Path(args.source_logfile).resolve() if args.source_logfile else None
+                    ),
+                    initial_document=(
+                        Path(args.initial_document).resolve() if args.initial_document else None
+                    ),
+                    baseline_document=(
+                        Path(args.baseline_document).resolve() if args.baseline_document else None
+                    ),
+                    fixture_catalog=Path(args.fixture_catalog).resolve(),
+                    project_dir=project_dir,
+                    max_rounds=args.max_rounds,
+                    engine=args.engine,
+                )
             )
-        )
         report = {
             "mode": "live",
-            "live_execution": True,
+            "live_execution": args.engine == "v1",
+            "engine": args.engine,
             "provider": args.provider,
             "model": args.model,
             "tasks": live_results,
         }
+    if args.mode != "matrix":
+        report["engine"] = args.engine
     report.update(
         {
             "suite": suite_name,

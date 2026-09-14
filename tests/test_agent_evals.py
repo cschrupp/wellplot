@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 import sys
 from pathlib import Path
 
@@ -13,13 +14,23 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 
 from scripts.agent_eval_matrix import aggregate_matrix, load_fixture_catalog
 from scripts.agent_eval_support import (
+    ENGINE_METRIC_FIELDS,
+    NOT_AVAILABLE,
     canonical_diff,
     collect_architecture_metrics,
     grade_document,
     load_task_suite,
+    normalize_engine_metrics,
     redact,
 )
-from scripts.run_agent_evals import _control_document, _run_live, _write_control
+from scripts.run_agent_evals import (
+    _control_document,
+    _parse_args,
+    _run_live,
+    _write_control,
+    main,
+    run_deterministic_suite,
+)
 
 from wellplot.authoring import authoring_document_from_mapping, authoring_document_to_yaml
 
@@ -221,6 +232,120 @@ def test_architecture_metrics_have_required_l0_measurements() -> None:
     assert metrics["authoring_operation_schema_chars"] > 0
 
 
+def test_engine_argument_defaults_to_v1_and_rejects_unknown_values() -> None:
+    """The command line exposes only the two migration engines."""
+    assert _parse_args([]).engine == "v1"
+    assert _parse_args(["--engine", "v2"]).engine == "v2"
+
+    with pytest.raises(SystemExit):
+        _parse_args(["--engine", "v3"])
+
+
+def test_engine_metrics_preserve_measured_zero_and_none() -> None:
+    """Unavailable metrics remain distinct from a measured zero or recorded null."""
+    metrics = normalize_engine_metrics({"program_calls": 0, "program_repairs": None})
+
+    assert metrics["program_calls"] == 0
+    assert metrics["program_repairs"] is None
+    assert metrics["program_chars"] == NOT_AVAILABLE
+
+
+def test_deterministic_engine_records_share_the_v1_v2_evidence_shape() -> None:
+    """Engine-neutral grading emits every case with stable task-level metrics."""
+    _, tasks = load_task_suite(TASK_SUITE)
+
+    v1_report = run_deterministic_suite(tasks, engine="v1")
+    v2_report = run_deterministic_suite(tasks, engine="v2")
+
+    assert v1_report["engine"] == "v1"
+    assert v2_report["engine"] == "v2"
+    assert [task["task_id"] for task in v1_report["tasks"]] == [
+        task["task_id"] for task in v2_report["tasks"]
+    ]
+    assert [task["fixture"] for task in v1_report["tasks"]] == [
+        task["fixture"] for task in v2_report["tasks"]
+    ]
+    for report in (v1_report, v2_report):
+        for task in report["tasks"]:
+            assert task["engine"] == report["engine"]
+            assert all(field_name in task["metrics"] for field_name in ENGINE_METRIC_FIELDS)
+            assert all(
+                task["metrics"][field_name] == NOT_AVAILABLE for field_name in ENGINE_METRIC_FIELDS
+            )
+
+
+def test_v2_live_stub_never_imports_or_constructs_the_legacy_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CM-03 v2 evidence cannot be legacy execution with a renamed label."""
+    _, tasks = load_task_suite(TASK_SUITE)
+    monkeypatch.delenv("WELLPLOT_RUN_LIVE_AGENT_EVALS", raising=False)
+    monkeypatch.setitem(sys.modules, "wellplot.agent.notebook", object())
+
+    results = asyncio.run(
+        _run_live(
+            tasks,
+            repo_root=REPOSITORY_ROOT,
+            provider="openai",
+            model="unused-model",
+            base_url="https://example.test/v1",
+            api_key_file=None,
+            source_logfile=None,
+            initial_document=None,
+            project_dir=REPOSITORY_ROOT / "tmp-agent-eval-test",
+            max_rounds=1,
+            engine="v2",
+        )
+    )
+
+    assert len(results) == len(tasks)
+    assert {result["status"] for result in results} == {"not_implemented"}
+    assert {result["reason"] for result in results} == {
+        "Code Mode execution is introduced in CM-10+."
+    }
+    assert [result["task_id"] for result in results] == [task.task_id for task in tasks]
+    assert [result["fixture"] for result in results] == [
+        task.initial_state["fixture"] for task in tasks
+    ]
+    for result in results:
+        assert result["engine"] == "v2"
+        assert all(
+            result["metrics"][field_name] == NOT_AVAILABLE for field_name in ENGINE_METRIC_FIELDS
+        )
+
+
+def test_v2_live_cli_does_not_enter_the_legacy_live_adapter(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The CLI bypasses _run_live entirely until a v2 execution path exists."""
+    output_path = tmp_path / "v2-evidence.json"
+
+    def legacy_live_adapter(*args: object, **kwargs: object) -> None:
+        raise AssertionError("v2 evidence must not enter the legacy live adapter")
+
+    monkeypatch.setattr("scripts.run_agent_evals._run_live", legacy_live_adapter)
+
+    assert (
+        main(
+            [
+                "--mode",
+                "live",
+                "--engine",
+                "v2",
+                "--task",
+                "initial_open_hole",
+                "--output",
+                str(output_path),
+            ]
+        )
+        == 0
+    )
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    assert report["engine"] == "v2"
+    assert report["tasks"][0]["status"] == "not_implemented"
+
+
 def test_live_mode_requires_explicit_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
     """The live runner cannot contact a provider by accident."""
     monkeypatch.delenv("WELLPLOT_RUN_LIVE_AGENT_EVALS", raising=False)
@@ -333,6 +458,10 @@ def test_missing_live_fixture_is_not_reported_as_a_pass(
 
     assert results[0]["status"] == "not_run"
     assert "fixture directory is missing" in results[0]["reason"]
+    assert results[0]["engine"] == "v1"
+    assert all(
+        results[0]["metrics"][field_name] == NOT_AVAILABLE for field_name in ENGINE_METRIC_FIELDS
+    )
 
 
 def test_matrix_aggregation_reports_pass_at_one_and_failure_category() -> None:
@@ -363,3 +492,80 @@ def test_matrix_aggregation_reports_pass_at_one_and_failure_category() -> None:
     assert report["providers"]["unsloth"]["pass_at_1"] is None
     assert report["failure_categories"] == {"contract/schema": 1}
     assert report["not_run_cases"] == 1
+
+
+def test_matrix_pairs_v1_and_v2_without_counting_not_implemented_as_failure() -> None:
+    """Historical v1 evidence can pair with a CM-03 v2 placeholder incrementally."""
+    report = aggregate_matrix(
+        [
+            {
+                "provider": "openai",
+                "model": "model-a",
+                "tasks": [
+                    {
+                        "task_id": "initial_open_hole",
+                        "fixture": "open_hole_clean_starter",
+                        "status": "passed",
+                        "metrics": {"program_calls": 0},
+                    }
+                ],
+            },
+            {
+                "engine": "v2",
+                "provider": "openai",
+                "model": "model-a",
+                "tasks": [
+                    {
+                        "task_id": "initial_open_hole",
+                        "fixture": "open_hole_clean_starter",
+                        "engine": "v2",
+                        "status": "not_implemented",
+                        "reason": "Code Mode execution is introduced in CM-10+.",
+                        "metrics": dict.fromkeys(ENGINE_METRIC_FIELDS, NOT_AVAILABLE),
+                    }
+                ],
+            },
+        ]
+    )
+
+    assert report["providers"]["openai"] == {
+        "passed": 1,
+        "failed": 0,
+        "not_run": 0,
+        "not_implemented": 1,
+        "eligible_cases": 1,
+        "pass_at_1": 1.0,
+    }
+    assert report["engines"]["v1"]["pass_at_1"] == 1.0
+    assert report["engines"]["v2"] == {
+        "passed": 0,
+        "failed": 0,
+        "not_run": 0,
+        "not_implemented": 1,
+        "eligible_cases": 0,
+        "pass_at_1": None,
+    }
+    comparison = report["comparisons"]
+    assert len(comparison) == 1
+    assert comparison[0]["v1"]["status"] == "passed"
+    assert comparison[0]["v1"]["metrics"]["program_calls"] == 0
+    assert comparison[0]["v2"]["status"] == "not_implemented"
+    assert comparison[0]["v2"]["metrics"]["program_chars"] == NOT_AVAILABLE
+
+    one_sided = aggregate_matrix(
+        [
+            {
+                "provider": "openai",
+                "model": "model-a",
+                "tasks": [
+                    {
+                        "task_id": "initial_open_hole",
+                        "fixture": "open_hole_clean_starter",
+                        "status": "passed",
+                    }
+                ],
+            }
+        ]
+    )
+    assert one_sided["comparisons"][0]["v1"]["status"] == "passed"
+    assert one_sided["comparisons"][0]["v2"] is None

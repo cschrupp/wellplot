@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from scripts.agent_eval_support import redact
+    from scripts.agent_eval_support import normalize_engine_metrics, redact
 except ModuleNotFoundError:
-    from agent_eval_support import redact  # type: ignore[no-redef]
+    from agent_eval_support import normalize_engine_metrics, redact  # type: ignore[no-redef]
 
 
 @dataclass(frozen=True)
@@ -142,47 +142,110 @@ def aggregate_matrix(reports: list[dict[str, Any]]) -> dict[str, Any]:
     """Aggregate one or more redacted provider reports without false greens."""
     cases: list[dict[str, Any]] = []
     provider_totals: dict[str, Counter[str]] = {}
+    engine_totals: dict[str, Counter[str]] = {}
     failure_categories: Counter[str] = Counter()
     for report in reports:
         provider = str(report.get("provider") or "unknown")
         model = report.get("model")
+        report_engine = str(report.get("engine") or "v1")
         for task in report.get("tasks", []):
             if not isinstance(task, dict):
                 continue
             status = str(task.get("status", "not_run"))
+            engine = str(task.get("engine") or report_engine)
             provider_totals.setdefault(provider, Counter())[status] += 1
+            engine_totals.setdefault(engine, Counter())[status] += 1
             case = {
                 "provider": provider,
                 "model": model,
                 "task_id": task.get("task_id"),
                 "fixture": task.get("fixture"),
+                "engine": engine,
                 "status": status,
+                "metrics": normalize_engine_metrics(
+                    task.get("metrics") if isinstance(task.get("metrics"), dict) else None
+                ),
             }
             if status == "failed":
                 category = classify_failure(task)
                 failure_categories[category] += 1
                 case["failure_category"] = category
-            if status == "not_run":
+            if status in {"not_run", "not_implemented"}:
                 case["reason"] = task.get("reason", "not run")
             cases.append(case)
 
-    providers: dict[str, dict[str, Any]] = {}
-    for provider, counts in sorted(provider_totals.items()):
+    def summarize(counts: Counter[str]) -> dict[str, Any]:
         eligible = counts.get("passed", 0) + counts.get("failed", 0)
-        providers[provider] = {
+        return {
             "passed": counts.get("passed", 0),
             "failed": counts.get("failed", 0),
             "not_run": counts.get("not_run", 0),
+            "not_implemented": counts.get("not_implemented", 0),
             "eligible_cases": eligible,
             "pass_at_1": (counts.get("passed", 0) / eligible) if eligible else None,
         }
+
+    providers = {
+        provider: summarize(counts) for provider, counts in sorted(provider_totals.items())
+    }
+    engines = {engine: summarize(counts) for engine, counts in sorted(engine_totals.items())}
+    comparisons_by_key: dict[tuple[str, str | None, str, str | None], dict[str, Any]] = {}
+    for case in cases:
+        task_id = str(case.get("task_id") or "")
+        fixture_value = case.get("fixture")
+        fixture = fixture_value if isinstance(fixture_value, str) else None
+        model_value = case.get("model")
+        model = model_value if isinstance(model_value, str) else None
+        key = (task_id, fixture, str(case["provider"]), model)
+        comparison = comparisons_by_key.setdefault(
+            key,
+            {
+                "task_id": case.get("task_id"),
+                "fixture": fixture,
+                "provider": case["provider"],
+                "model": model,
+                "v1": None,
+                "v2": None,
+            },
+        )
+        engine = str(case["engine"])
+        if engine not in {"v1", "v2"}:
+            continue
+        entry = {
+            "status": case["status"],
+            "metrics": case["metrics"],
+        }
+        if "reason" in case:
+            entry["reason"] = case["reason"]
+        if "failure_category" in case:
+            entry["failure_category"] = case["failure_category"]
+        if comparison[engine] is None:
+            comparison[engine] = entry
+        else:
+            comparison.setdefault("duplicate_engine_records", {}).setdefault(engine, []).append(
+                entry
+            )
+    comparisons = sorted(
+        comparisons_by_key.values(),
+        key=lambda comparison: (
+            str(comparison["task_id"]),
+            str(comparison["fixture"]),
+            str(comparison["provider"]),
+            str(comparison["model"]),
+        ),
+    )
     return redact(
         {
             "mode": "matrix",
             "live_execution": False,
             "providers": providers,
+            "engines": engines,
             "cases": cases,
+            "comparisons": comparisons,
             "failure_categories": dict(sorted(failure_categories.items())),
             "not_run_cases": sum(1 for case in cases if case["status"] == "not_run"),
+            "not_implemented_cases": sum(
+                1 for case in cases if case["status"] == "not_implemented"
+            ),
         }
     )

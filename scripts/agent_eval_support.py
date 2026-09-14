@@ -29,6 +29,16 @@ _SECRET_QUERY = re.compile(
 )
 _SUPPORTED_TASK_KINDS = frozenset({"run", "revise"})
 _SUPPORTED_TASK_STATUSES = frozenset({"active", "deferred"})
+SUPPORTED_ENGINES = frozenset({"v1", "v2"})
+NOT_AVAILABLE = "not_available"
+ENGINE_METRIC_FIELDS = (
+    "program_chars",
+    "program_ast_nodes",
+    "program_calls",
+    "program_repairs",
+    "dynamic_schema_chars",
+    "legacy_core_reached",
+)
 _SUPPORTED_ASSERTION_OPERATORS = frozenset(
     {
         "contains",
@@ -41,6 +51,14 @@ _SUPPORTED_ASSERTION_OPERATORS = frozenset(
         "not_contains_object",
     }
 )
+
+
+def normalize_engine_metrics(metrics: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Return one stable metric object without inventing unavailable values."""
+    normalized = dict(metrics or {})
+    for field_name in ENGINE_METRIC_FIELDS:
+        normalized.setdefault(field_name, NOT_AVAILABLE)
+    return normalized
 
 
 @dataclass(frozen=True)

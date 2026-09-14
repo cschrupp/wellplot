@@ -28,6 +28,9 @@ Every result must identify exactly one category:
   deferrals made while completing CM-00.
 - `CM-02-reachability.json` is the deterministic static import inventory used
   to distinguish current reachability from planned migration disposition.
+- `CM-03-development-memory.md` records the dual-engine evaluation contract:
+  task-level engine labels, explicit unavailable metrics, the v2
+  `not_implemented` evidence path, and incremental v1/v2 comparisons.
 - `SCORECARD_TEMPLATE.md` defines the required fields for each later slice.
 
 Evidence names use the migration slice identifier. A record is immutable once

@@ -205,12 +205,25 @@ def test_required_migration_modules_are_classified_in_current_inventory() -> Non
     assert classifications["wellplot.agent.graph.worker_contracts"]["classification"] == "replace"
 
 
-def test_committed_manifest_matches_current_static_inventory() -> None:
-    """CM-02 evidence remains reproducible from the committed static analyzer."""
-    inventory = build_inventory(
-        REPO_ROOT,
-        migration_baseline_sha=MIGRATION_BASELINE_SHA,
-        reachability_analysis_sha=ANALYSIS_SHA,
-    )
+def test_committed_manifest_remains_a_valid_frozen_cm02_record() -> None:
+    """Later slices do not rewrite CM-02's static snapshot of its own worktree."""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
 
-    assert json.loads(MANIFEST_PATH.read_text(encoding="utf-8")) == inventory
+    assert manifest["migration_baseline_sha"] == MIGRATION_BASELINE_SHA
+    assert manifest["reachability_analysis_sha"] == ANALYSIS_SHA
+    assert manifest["summary"]["unresolved_count"] == 0
+    assert manifest["unresolved"] == []
+    assert manifest["classifications"]["wellplot.agent.core"] == {
+        "classification": "delete-after-cutover",
+        "rationale": (
+            "Legacy provider, tool-loop, branch, or operation architecture may be deleted "
+            "only after v2 reachability and acceptance gates pass."
+        ),
+    }
+    assert manifest["classifications"]["wellplot.agent.graph.worker_contracts"] == {
+        "classification": "replace",
+        "rationale": (
+            "Current structured-output graph worker is replaced by Code Mode program generation "
+            "while preserving its semantic responsibility."
+        ),
+    }

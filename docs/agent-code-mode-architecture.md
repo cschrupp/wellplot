@@ -109,9 +109,9 @@ fragment through the SDK runtime.
 | Phase | Status | Exit condition |
 |---|---|---|
 | CM-00 Freeze and evidence | Complete (`cf51935`) | Baseline record, evidence format, and historical v1 labels prepared with no runtime changes |
-| CM-01 Architecture guards | Complete pending commit | AST import-invariant tests protect empty v2 package boundaries |
-| CM-02 Reachability inventory | Complete pending commit | Legacy reachability/deletion inventory committed |
-| CM-03 Dual-engine evaluation | Not started | Comparable v1/v2 result records supported |
+| CM-01 Architecture guards | Complete (`d928261`) | AST import-invariant tests protect empty v2 package boundaries |
+| CM-02 Reachability inventory | Complete (`7ab6780`) | Legacy reachability/deletion inventory committed |
+| CM-03 Dual-engine evaluation | Complete pending commit | Comparable v1/v2 result records supported without a v2 runtime route |
 | CM-10 through CM-14 Program kernel | Not started | Restricted parser, validator, interpreter, SDK, and dry-run tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
@@ -162,3 +162,22 @@ The inventory excludes direct `TYPE_CHECKING` and `typing.TYPE_CHECKING` bodies
 from runtime reachability. It does not claim to resolve dynamic imports, plugin
 entry points, or string-based module loading. No CM-02 result authorizes
 caller refactoring or deletion; CM-03 and later slices consume this evidence.
+
+## CM-03 Dual-Engine Evidence Boundary
+
+The existing evaluation harness accepts `--engine v1` and `--engine v2`, with
+`v1` as the compatibility default. Every task result records its engine and a
+stable metrics object containing `program_chars`, `program_ast_nodes`,
+`program_calls`, `program_repairs`, `dynamic_schema_chars`, and
+`legacy_core_reached`. An unavailable measurement is the explicit string
+`not_available`; it is distinct from an absent field, `null`, or a measured
+zero.
+
+CM-03 does not implement Code Mode execution. A live `v2` request returns one
+`not_implemented` record per active task with the same task and fixture IDs as
+the v1 suite. This happens before fixture preflight, provider creation, or an
+import of `wellplot.agent.notebook`; it cannot run the legacy engine with a v2
+label. The provider matrix retains provider summaries, adds engine summaries,
+and pairs v1/v2 evidence by task ID, fixture, provider, and model. Missing
+counterparts are represented as `null`, and `not_implemented` is excluded from
+the pass-at-one denominator.
