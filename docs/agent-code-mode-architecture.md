@@ -118,8 +118,9 @@ fragment through the SDK runtime.
 | CM-13 Deterministic identities | Complete (`1708905`) | Reservation-based IDs and typed ownership-handle tests pass |
 | CM-14 Canonical intent builder | Complete (`66f06ef`) | Explicit SDK calls compile to canonical intent without execution |
 | CM-15 Private semantic dry run | Complete (`ea2d115`) | Canonical intent reconciles, executes, and validates against an isolated document copy |
-| CM-16 Bounded inspection facade | Complete pending commit | Fixed immutable projections provide scoped worker context without document discovery |
-| CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
+| CM-16 Bounded inspection facade | Complete (`f37284d`) | Fixed immutable projections provide scoped worker context without document discovery |
+| CM-20 CapabilitySpec v2 bridge | Complete pending commit | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
+| CM-21 through CM-24 Capability migrations | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -394,3 +395,25 @@ sections and section-local tracks produce the existing typed `ProgramNameError`.
 CM-16 adds no capability knowledge, program-time inspection calls, provider,
 planner, LangGraph, MCP, routing, persistence, rendering, source discovery,
 or legacy deletion. CM-20 owns the next capability-plugin contract.
+
+## CM-20 CapabilitySpec v2 Boundary
+
+CM-20 extends the existing capability declaration with an optional Code Mode
+contract while preserving the v1 artifact/compiler contract and all existing
+planning and worker descriptor methods. A declaration is v1-only when neither
+`arguments_model` nor `handler` is supplied. It supports v2 only when both are
+supplied; partial pairs fail at construction.
+
+The separate `code_mode_worker_descriptor()` contains only deterministic
+declarative data: capability identity, category, description, aliases,
+allowed parents, source constraints, worker hints, examples, and the JSON
+schema generated directly by the declared Pydantic `arguments_model`. It never
+contains the host handler, compiler, callable representation, signature,
+module path, or memory address. Existing `planning_descriptor()` and
+`worker_descriptor()` shapes remain unchanged for the current graph.
+
+CM-20 validates capability aliases for non-empty values, case-insensitive
+duplicates, and redundant capability-ID aliases. It does not execute handlers,
+register them with the interpreter, migrate built-ins, or alter registry
+lookup, planner, graph, provider, MCP, routing, persistence, rendering, or
+legacy-deletion behavior. CM-21 owns the first real capability migration.
