@@ -8,6 +8,7 @@ CM-22 identity boundary and compiles directly to the existing
 `AuthoringDocumentIntent`.
 
 - **Slice base SHA:** `9ae45b3`
+- **Implementation commit:** `4966b60`
 - **Scope:** typed binding arguments, builder creation/adoption/update methods,
   v2 capability handlers, pure CBL/VDL tests, and architecture evidence.
 
@@ -58,4 +59,5 @@ handler boundary has no document or source-inspection context.
 
 ## Decision
 
-**PROCEED / STOP:** PROCEED to review and commit CM-23; STOP before CM-24.
+**PROCEED / STOP:** PROCEED to CM-24; CM-23 committed and pushed. STOP before
+CM-24 implementation until separately authorized.

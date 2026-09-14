@@ -122,7 +122,7 @@ fragment through the SDK runtime.
 | CM-20 CapabilitySpec v2 bridge | Complete (`873fd14`) | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
 | CM-21 Report capability migration | Complete (`3bebd28`) | `report.standard` v2 arguments compile through explicit host SDK methods |
 | CM-22 Structural capability migration | Complete (`9ae45b3`) | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
-| CM-23 Curve/raster binding migration | In progress | Curve and raster v2 arguments compile through host-owned binding methods |
+| CM-23 Curve/raster binding migration | Complete (`4966b60`) | Curve and raster v2 arguments compile through host-owned binding methods |
 | CM-24 Fills and annotations | Not started | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
