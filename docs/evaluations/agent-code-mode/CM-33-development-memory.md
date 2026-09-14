@@ -6,6 +6,7 @@ CM-33 adds an isolated OpenAI-compatible Chat Completions provider-v2 adapter
 without changing the legacy provider or introducing routing.
 
 - **Slice base SHA:** `97e7b19`
+- **Implementation commit:** `a2ed81e`
 - **Implementation scope:** one compatible v2 adapter, explicit structured
   capability configuration, explicit max-token parameter selection, shared
   program-envelope validation, metrics, and stable redacted failures.
@@ -32,6 +33,9 @@ CM-30 error and metrics contracts.
 ## Validation
 
 - Focused CM-33/CM-32/CM-31/provider-contract/architecture tests: `63 passed`.
+- Tracked Code Mode regression selection: `329 passed, 2 failed`. The two
+  failures are the pre-existing `reconstruct` and `revise` assertions in
+  `tests/test_graph_section_submission.py`; neither file is part of CM-33.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
@@ -47,5 +51,5 @@ CM-30 error and metrics contracts.
 
 ## Decision
 
-**PROCEED / STOP:** Implementation is ready for the isolated CM-33 commit.
-After evidence finalization, stop before CM-34 implementation.
+**PROCEED / STOP:** CM-33 is committed and pushed as `a2ed81e`. Stop before
+CM-34 implementation until separately authorized.
