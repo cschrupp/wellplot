@@ -32,7 +32,10 @@ from typing import TypeVar, cast
 from pydantic import BaseModel, ValidationError
 
 from ..model.authoring import (
+    AnnotationSpec,
     AnnotationTextSpec,
+    AuthoringCurveFillBaselineSpec,
+    AuthoringCurveFillCrossoverSpec,
     AuthoringRasterColorbarSpec,
     AuthoringRasterSampleAxisSpec,
     AuthoringScale,
@@ -81,6 +84,7 @@ _FILL_KINDS = frozenset(
         "between_instances",
         "to_lower_limit",
         "to_upper_limit",
+        "baseline_split",
     }
 )
 _BETWEEN_FILL_KINDS = frozenset({"between_curves", "between_instances"})
@@ -111,6 +115,8 @@ class IntentBuilder:
         self._tracks: dict[str, TrackHandle] = {}
         self._track_locations: dict[str, tuple[str, int]] = {}
         self._bindings: dict[str, BindingHandle] = {}
+        self._fills: dict[str, FillHandle] = {}
+        self._annotations: dict[str, AnnotationHandle] = {}
 
     @property
     def handles(self) -> HandleBuilder:
@@ -644,6 +650,8 @@ class IntentBuilder:
         label: str | None = None,
         color: str | None = None,
         alpha: float | None = None,
+        baseline: AuthoringCurveFillBaselineSpec | None = None,
+        crossover: AuthoringCurveFillCrossoverSpec | None = None,
     ) -> FillHandle:
         """Add one explicit curve-fill relation between bindings on one track."""
         owned_track = self._require_track(track)
@@ -674,11 +682,81 @@ class IntentBuilder:
                 label=label,
                 color=color,
                 alpha=alpha,
+                baseline=baseline,
+                crossover=crossover,
             ),
             "Fill desired state",
         )
         self._append_track_fill(owned_track, fragment)
+        self._fills[fill.token] = fill
         return fill
+
+    def reference_binding(self, track: TrackHandle, *, binding_id: str) -> BindingHandle:
+        """Adopt a binding identity for a relation without emitting a binding patch."""
+        owned_track = self._require_track(track)
+        binding = self._handles.adopt_binding(owned_track, binding_id)
+        self._handles.validate_leaf_parent(owned_track, binding)
+        self._bindings[binding.token] = binding
+        return binding
+
+    def select_fill(self, track: TrackHandle, *, fill_id: str) -> FillHandle:
+        """Adopt one host-resolved fill identity under a normal track."""
+        owned_track = self._require_track(track)
+        fill = self._handles.adopt_fill(owned_track, fill_id)
+        self._handles.validate_leaf_parent(owned_track, fill)
+        if fill.token not in self._fills:
+            self._append_track_fill(
+                owned_track,
+                AuthoringFillIntent(
+                    fill_id=fill.fill_id,
+                    section_id=owned_track.section_id,
+                    track_id=owned_track.track_id,
+                ),
+            )
+            self._fills[fill.token] = fill
+        return fill
+
+    def update_fill(
+        self,
+        track: TrackHandle,
+        fill: FillHandle,
+        *,
+        kind: str | None = None,
+        binding: BindingHandle | None = None,
+        other_binding: BindingHandle | None = None,
+        label: str | None = None,
+        color: str | None = None,
+        alpha: float | None = None,
+        baseline: AuthoringCurveFillBaselineSpec | None = None,
+        crossover: AuthoringCurveFillCrossoverSpec | None = None,
+    ) -> None:
+        """Apply an outer sparse fill update with atomic nested replacements."""
+        owned_track = self._require_track(track)
+        owned_fill = self._require_fill(owned_track, fill)
+        owned_binding = self._require_binding(owned_track, binding) if binding is not None else None
+        owned_other_binding = (
+            self._require_binding(owned_track, other_binding) if other_binding is not None else None
+        )
+        patch = _validated(
+            AuthoringFillIntent,
+            _non_null_fields(
+                fill_id=owned_fill.fill_id,
+                section_id=owned_track.section_id,
+                track_id=owned_track.track_id,
+                kind=kind,
+                binding_id=(owned_binding.binding_id if owned_binding is not None else None),
+                other_binding_id=(
+                    owned_other_binding.binding_id if owned_other_binding is not None else None
+                ),
+                label=label,
+                color=color,
+                alpha=alpha,
+                baseline=baseline,
+                crossover=crossover,
+            ),
+            "Fill desired state",
+        )
+        self._merge_track_fill(owned_track, patch)
 
     def add_annotation(
         self,
@@ -691,14 +769,11 @@ class IntentBuilder:
         font_size: float | None = None,
     ) -> AnnotationHandle:
         """Add one narrow text annotation anchored at a depth value."""
-        owned_track = self._require_track(track)
-        annotation = self._handles.create_annotation(owned_track, id_hint)
-        self._handles.validate_leaf_parent(owned_track, annotation)
         annotation_spec = _validated(
             AnnotationTextSpec,
             _non_null_fields(
                 kind="text",
-                annotation_id=annotation.annotation_id,
+                annotation_id=id_hint or "annotation",
                 text=text,
                 depth=depth,
                 color=color,
@@ -706,18 +781,74 @@ class IntentBuilder:
             ),
             "Text annotation desired state",
         )
+        return self.add_typed_annotation(track, annotation=annotation_spec, id_hint=id_hint)
+
+    def add_typed_annotation(
+        self,
+        track: TrackHandle,
+        *,
+        annotation: AnnotationSpec,
+        id_hint: str | None = None,
+    ) -> AnnotationHandle:
+        """Add one complete typed annotation with a host-owned identity."""
+        owned_track = self._require_track(track)
+        typed_annotation = _replace_annotation_id(annotation, "pending")
+        created = self._handles.create_annotation(owned_track, id_hint)
+        self._handles.validate_leaf_parent(owned_track, created)
+        typed_annotation = _replace_annotation_id(typed_annotation, created.annotation_id)
         fragment = _validated(
             AuthoringAnnotationIntent,
             {
-                "annotation_id": annotation.annotation_id,
+                "annotation_id": created.annotation_id,
                 "section_id": owned_track.section_id,
                 "track_id": owned_track.track_id,
-                "annotation": annotation_spec,
+                "annotation": typed_annotation,
             },
             "Annotation desired state",
         )
         self._append_track_annotation(owned_track, fragment)
+        self._annotations[created.token] = created
+        return created
+
+    def select_annotation(self, track: TrackHandle, *, annotation_id: str) -> AnnotationHandle:
+        """Adopt one host-resolved annotation identity under an annotation track."""
+        owned_track = self._require_track(track)
+        annotation = self._handles.adopt_annotation(owned_track, annotation_id)
+        self._handles.validate_leaf_parent(owned_track, annotation)
+        if annotation.token not in self._annotations:
+            self._append_track_annotation(
+                owned_track,
+                AuthoringAnnotationIntent(
+                    annotation_id=annotation.annotation_id,
+                    section_id=owned_track.section_id,
+                    track_id=owned_track.track_id,
+                ),
+            )
+            self._annotations[annotation.token] = annotation
         return annotation
+
+    def update_typed_annotation(
+        self,
+        track: TrackHandle,
+        annotation: AnnotationHandle,
+        *,
+        payload: AnnotationSpec,
+    ) -> None:
+        """Replace one adopted annotation payload without changing its identity."""
+        owned_track = self._require_track(track)
+        owned_annotation = self._require_annotation(owned_track, annotation)
+        typed_payload = _replace_annotation_id(payload, owned_annotation.annotation_id)
+        patch = _validated(
+            AuthoringAnnotationIntent,
+            {
+                "annotation_id": owned_annotation.annotation_id,
+                "section_id": owned_track.section_id,
+                "track_id": owned_track.track_id,
+                "annotation": typed_payload,
+            },
+            "Annotation desired state",
+        )
+        self._merge_track_annotation(owned_track, patch)
 
     def intent(self) -> AuthoringDocumentIntent:
         """Return a fresh validated canonical intent in deterministic call order."""
@@ -789,6 +920,26 @@ class IntentBuilder:
         if owned_binding.token not in self._bindings:
             raise ProgramNameError("Binding handle is not owned by this intent builder.")
         return owned_binding
+
+    def _require_fill(self, track: TrackHandle, fill: FillHandle) -> FillHandle:
+        """Require one accumulated fill under the exact supplied parent track."""
+        owned_fill = self._handles.validate_fill(fill)
+        self._handles.validate_leaf_parent(track, owned_fill)
+        if owned_fill.token not in self._fills:
+            raise ProgramNameError("Fill handle is not owned by this intent builder.")
+        return owned_fill
+
+    def _require_annotation(
+        self,
+        track: TrackHandle,
+        annotation: AnnotationHandle,
+    ) -> AnnotationHandle:
+        """Require one accumulated annotation under the exact supplied parent track."""
+        owned_annotation = self._handles.validate_annotation(annotation)
+        self._handles.validate_leaf_parent(track, owned_annotation)
+        if owned_annotation.token not in self._annotations:
+            raise ProgramNameError("Annotation handle is not owned by this intent builder.")
+        return owned_annotation
 
     def _append_track_binding(
         self,
@@ -868,6 +1019,25 @@ class IntentBuilder:
         tracks[index] = _replace_track_field(current, "fills", fills)
         self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
 
+    def _merge_track_fill(self, track: TrackHandle, patch: AuthoringFillIntent) -> None:
+        """Merge one sparse outer fill patch with atomic nested field replacement."""
+        section, tracks, index = self._track_state(track)
+        current = tracks[index]
+        fills = list(current.fills or [])
+        for fill_index, existing in enumerate(fills):
+            if existing.fill_id != patch.fill_id:
+                continue
+            fills[fill_index] = _merge_intent(
+                existing,
+                patch,
+                AuthoringFillIntent,
+                "Fill desired state",
+            )
+            tracks[index] = _replace_track_field(current, "fills", fills)
+            self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
+            return
+        raise ProgramNameError(f"Fill '{patch.fill_id}' is not owned by the selected track.")
+
     def _append_track_annotation(
         self,
         track: TrackHandle,
@@ -880,6 +1050,26 @@ class IntentBuilder:
         annotations.append(annotation)
         tracks[index] = _replace_track_field(current, "annotations", annotations)
         self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
+
+    def _merge_track_annotation(
+        self,
+        track: TrackHandle,
+        patch: AuthoringAnnotationIntent,
+    ) -> None:
+        """Replace one complete typed annotation payload at a stable identity."""
+        section, tracks, index = self._track_state(track)
+        current = tracks[index]
+        annotations = list(current.annotations or [])
+        for annotation_index, existing in enumerate(annotations):
+            if existing.annotation_id != patch.annotation_id:
+                continue
+            annotations[annotation_index] = patch
+            tracks[index] = _replace_track_field(current, "annotations", annotations)
+            self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
+            return
+        raise ProgramNameError(
+            f"Annotation '{patch.annotation_id}' is not owned by the selected track."
+        )
 
     def _track_state(
         self,
@@ -1192,6 +1382,13 @@ def _optional_style(
     if not fields:
         return None
     return _validated(AuthoringStyleIntent, fields, "Style desired state")
+
+
+def _replace_annotation_id(annotation: AnnotationSpec, annotation_id: str) -> AnnotationSpec:
+    """Return a revalidated typed annotation with the host-owned identity."""
+    fields = annotation.model_dump(mode="python")
+    fields["annotation_id"] = annotation_id
+    return cast(AnnotationSpec, _validated(type(annotation), fields, "Annotation desired state"))
 
 
 def _replace_section_tracks(

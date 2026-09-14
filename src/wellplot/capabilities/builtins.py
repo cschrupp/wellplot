@@ -38,6 +38,12 @@ from .bindings import (
     compile_binding_curve,
     compile_binding_raster,
 )
+from .fills_annotations import (
+    CurveFillArgs,
+    TypedAnnotationArgs,
+    compile_annotation_typed,
+    compile_fill_curve,
+)
 from .registry import CapabilityRegistry
 from .report_standard import ReportStandardArgs, compile_report_standard
 from .structural import (
@@ -266,6 +272,17 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringFillIntent,
             compiler=_no_document_compiler,
             allowed_parents=("track.normal",),
+            arguments_model=CurveFillArgs,
+            handler=compile_fill_curve,
+            worker_hints=(
+                "Use create, select, or update explicitly; fill identity is host-owned.",
+                "Supply complete baseline or crossover objects when those nested fields are used.",
+            ),
+            examples=(
+                "fill.curve(operation='create', section_id='main', track_id='combo', "
+                "kind='between_instances', binding_id='main.combo.GR', "
+                "other_binding_id='main.combo.SP')",
+            ),
         ),
         CapabilitySpec(
             capability_id="annotation.typed",
@@ -275,6 +292,17 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             artifact_model=AuthoringAnnotationIntent,
             compiler=_no_document_compiler,
             allowed_parents=("track.annotation",),
+            arguments_model=TypedAnnotationArgs,
+            handler=compile_annotation_typed,
+            worker_hints=(
+                "Use create, select, or update explicitly; annotation identity is host-owned.",
+                "Create and update require a complete typed annotation payload.",
+            ),
+            examples=(
+                "annotation.typed(operation='create', section_id='main', track_id='notes', "
+                "annotation={kind: 'text', annotation_id: 'requested', depth: 2500, "
+                "text: 'Bond'})",
+            ),
         ),
     )
 

@@ -123,7 +123,7 @@ fragment through the SDK runtime.
 | CM-21 Report capability migration | Complete (`3bebd28`) | `report.standard` v2 arguments compile through explicit host SDK methods |
 | CM-22 Structural capability migration | Complete (`9ae45b3`) | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
 | CM-23 Curve/raster binding migration | Complete (`4966b60`) | Curve and raster v2 arguments compile through host-owned binding methods |
-| CM-24 Fills and annotations | Not started | v2 leaf capabilities compile through plugin-owned handlers |
+| CM-24 Fills and annotations | In progress | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -488,3 +488,29 @@ Handlers compile directly to the existing `AuthoringDocumentIntent` through
 current-document existence, register interpreter methods, or change provider,
 planner, LangGraph, MCP, routing, persistence, rendering, or legacy deletion
 behavior. CM-24 owns fills and annotations.
+
+## CM-24 Fill And Annotation Capability Boundary
+
+CM-24 migrates `fill.curve` and `annotation.typed` to additive v2
+capabilities. Curve fills support the five canonical kinds:
+`between_curves`, `between_instances`, `to_lower_limit`, `to_upper_limit`, and
+`baseline_split`. The handler validates the kind-specific binding targets and
+the required baseline or crossover configuration before compiling through
+`IntentBuilder`.
+
+Typed annotations support all five canonical variants: `interval`, `text`,
+`marker`, `arrow`, and `glyph`. Both capabilities use explicit `create`,
+`select`, and `update` operations. Creation allocates a host-owned identity;
+selection adopts an exact identity; updates preserve that identity. Fill outer
+fields are sparse, while baseline and crossover nested objects are complete
+replacement values. Annotation updates replace the complete typed payload.
+
+The handlers use identity adoption only and do not inspect documents, resolve
+source channels, or infer parent compatibility. Declarative registry metadata
+continues to require curve fills under normal tracks and typed annotations under
+annotation tracks. The result remains the existing
+`AuthoringDocumentIntent`; no fill/annotation operation IR is introduced.
+
+CM-24 adds no interpreter registration, fluent syntax, provider, planner,
+LangGraph, MCP, routing, persistence, rendering, or legacy deletion behavior.
+CM-25 owns the next separately authorized migration slice.
