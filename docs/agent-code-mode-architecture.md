@@ -130,7 +130,8 @@ fragment through the SDK runtime.
 | CM-32 OpenAI program transport | Complete (`1329c62`) | One native Responses text call returns bounded program source |
 | CM-33 OpenAI-compatible provider transport | Complete (`a2ed81e`) | Explicit-capability Chat Completions adapter implements the v2 protocol |
 | CM-34 Bounded program repair | Complete (`ad03bce`) | One bounded correction remains observable in traces/evals |
-| CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
+| CM-40 Semantic planner v2 | Complete (`a9f4a21`) | Static semantic plan and one-call provider boundary pass |
+| CM-41 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
@@ -648,3 +649,25 @@ CM-34 does not add planner, program-worker, LangGraph, MCP, routing, visual-QA,
 persistence, or legacy-deletion behavior. Later workers remain responsible for
 normal CM-11+ validation and deterministic dry-run checks. CM-40 owns the
 semantic planner migration.
+
+## CM-40 Semantic Planner v2
+
+CM-40 adds the isolated `agent.code_mode.planner` boundary. `ReportTask`,
+`SectionTask`, and `SemanticPlan` are static, frozen Pydantic contracts with
+forbidden extras. They describe semantic goals, requirements, constraints,
+capability selections, source hints, and advisory existing-section hints; they
+do not contain canonical object identities, component trees, source resolution,
+header slot identities, or operation order.
+
+`SemanticPlanner` makes exactly one provider-v2 structured-generation call with
+the static `SemanticPlan` response model. It sends a compact current-document
+summary and a filtered static capability catalogue. Host-side validation checks
+canonical capability IDs and task-level categories without dynamic `Literal`
+schemas, registry-derived response models, parent legality, or document
+mutation. Unknown or invalid capability selections fail observably without a
+planner retry or fallback.
+
+The existing `graph.planner.ReconstructionPlanner` and all v1 graph workers
+remain unchanged. Source normalization, source discovery, canonical section
+resolution, and worker projections are deferred to CM-41; program workers,
+LangGraph routing, MCP, persistence, and legacy deletion remain out of scope.
