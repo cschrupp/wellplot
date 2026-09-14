@@ -126,7 +126,8 @@ fragment through the SDK runtime.
 | CM-24 Fills and annotations | Complete (`0423f7e`) | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-25 Plugin extensibility proof | Complete (`5646c60`) | External test-only capability registers and executes through generic contracts |
 | CM-30 Provider v2 protocol | Complete (`e207550`) | Async typed provider contract works without `agent.core` |
-| CM-31 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
+| CM-31 OpenAI structured transport | In progress | One native Responses parse call validates a static plan fixture |
+| CM-32 through CM-34 Provider/planner transports | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
@@ -561,3 +562,22 @@ validates a recorded response through the supplied model, returns per-call
 metrics, preserves program text, and reports typed validation and timeout
 failures. Current OpenAI, OpenAI-compatible, local, and other provider
 adapters remain unchanged. CM-31 owns the first live provider transport.
+
+## CM-31 Native OpenAI Structured Transport
+
+CM-31 adds `agent.providers.openai_v2.OpenAIStructuredBackend` as a separate,
+structured-only transport. It delegates one request to the injected async
+OpenAI Responses `responses.parse` method, passes the requested Pydantic model
+as `text_format`, and passes the provider-neutral per-call timeout at the SDK
+call boundary. It returns only the parsed model and normalized reported usage
+metrics; it does not replay tools, stream, retry, repair JSON, or implement
+plain program generation.
+
+The adapter maps refusal, missing or invalid parsed output, timeout, transport,
+rate-limit, authentication, provider rejection, and configuration failures to
+the CM-30 stable categories with adapter-authored redacted messages. It has no
+dependency on `agent.core`, legacy provider loops, MCP, LangGraph, or existing
+concrete adapters. The OpenAI optional dependency floor is `>=1.66.0`, the
+first verified release used for the async Responses `parse` contract in this
+slice. Existing OpenAI and OpenAI-compatible authoring adapters remain
+unchanged; CM-32 owns plain program transport.
