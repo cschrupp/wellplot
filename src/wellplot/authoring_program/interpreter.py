@@ -41,8 +41,8 @@ from .runtime import (
     RuntimeBudget,
     RuntimeCounters,
     RuntimeEnvironment,
-    RuntimeHandle,
     RuntimeValue,
+    is_runtime_handle,
     runtime_value_item_count,
 )
 from .validator import validate_authoring_program
@@ -272,7 +272,7 @@ class _RestrictedInterpreter:
                 result = self._runtime.dispatch_root(method, args, kwargs)
             else:
                 handle = self._resolve_local_name(call.func.value)
-                if type(handle) is not RuntimeHandle:
+                if not is_runtime_handle(handle):
                     self._type_error("Call receivers must be runtime handles.", call.func.value)
                 receiver = handle.token
                 result = self._runtime.dispatch_handle(handle, method, args, kwargs)
@@ -287,7 +287,7 @@ class _RestrictedInterpreter:
             kwargs=kwargs,
             result=result,
         )
-        if type(result) is RuntimeHandle:
+        if is_runtime_handle(result):
             self._created_objects += 1
         return result
 

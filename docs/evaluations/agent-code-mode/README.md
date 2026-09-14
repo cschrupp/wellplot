@@ -37,6 +37,8 @@ Every result must identify exactly one category:
   static budgets, adversarial security tests, and execution boundary.
 - `CM-12-development-memory.md` records the generic interpreter, explicit
   runtime registries, safe dynamic values, budgets, and execution journal.
+- `CM-13-development-memory.md` records reservation-based identity allocation,
+  typed ownership handles, and CM-12 typed-handle compatibility.
 - `SCORECARD_TEMPLATE.md` defines the required fields for each later slice.
 
 Evidence names use the migration slice identifier. A record is immutable once

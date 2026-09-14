@@ -30,7 +30,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TypeAlias
+from typing import TypeAlias, TypeGuard
 
 from .errors import (
     AuthoringProgramError,
@@ -39,7 +39,7 @@ from .errors import (
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RuntimeHandle:
     """Opaque, registry-routable identity returned by a registered method."""
 
@@ -70,6 +70,8 @@ RuntimeValue: TypeAlias = (
 RuntimeMethod: TypeAlias = Callable[
     [tuple[RuntimeValue, ...], Mapping[str, RuntimeValue]], RuntimeValue
 ]
+
+_TRUSTED_RUNTIME_HANDLE_TYPES: set[type[RuntimeHandle]] = {RuntimeHandle}
 
 
 @dataclass(frozen=True)
@@ -160,7 +162,7 @@ class CommandJournal:
             kwargs=MappingProxyType(
                 {key: clone_runtime_value(value) for key, value in kwargs.items()}
             ),
-            result_handle=result.token if type(result) is RuntimeHandle else None,
+            result_handle=result.token if is_runtime_handle(result) else None,
         )
         self._entries.append(entry)
         return entry
@@ -261,6 +263,11 @@ def runtime_value_item_count(value: RuntimeValue) -> int:
     return _runtime_value_item_count(value, active_container_ids=set())
 
 
+def is_runtime_handle(value: object) -> TypeGuard[RuntimeHandle]:
+    """Return whether a value is one of the runtime's trusted handle classes."""
+    return isinstance(value, RuntimeHandle) and type(value) in _TRUSTED_RUNTIME_HANDLE_TYPES
+
+
 def clone_runtime_value(value: RuntimeValue) -> RuntimeValue:
     """Return an isolated validated copy suitable for registry boundaries."""
     runtime_value_item_count(value)
@@ -279,6 +286,13 @@ def _freeze_method_mapping(
             raise ValueError(f"{label.capitalize()} registry values must be callable.")
         frozen_methods[name] = callback
     return MappingProxyType(frozen_methods)
+
+
+def _register_runtime_handle_type(handle_type: type[RuntimeHandle]) -> None:
+    """Register one internal immutable handle subtype for safe runtime values."""
+    if not isinstance(handle_type, type) or not issubclass(handle_type, RuntimeHandle):
+        raise TypeError("Trusted runtime handle types must inherit RuntimeHandle.")
+    _TRUSTED_RUNTIME_HANDLE_TYPES.add(handle_type)
 
 
 def _validate_registry_name(name: object, label: str) -> None:
@@ -312,7 +326,7 @@ def _invoke_registered_method(
 
 def _runtime_value_item_count(value: object, *, active_container_ids: set[int]) -> int:
     """Validate the recursive runtime value universe without host object access."""
-    if type(value) in (type(None), bool, int, float, str, RuntimeHandle):
+    if type(value) in (type(None), bool, int, float, str) or is_runtime_handle(value):
         return 1
 
     if type(value) is list or type(value) is tuple:
@@ -361,7 +375,7 @@ def _container_item_count(
 
 def _clone_runtime_value(value: RuntimeValue) -> RuntimeValue:
     """Copy a previously validated safe value without using generic deepcopy."""
-    if type(value) in (type(None), bool, int, float, str, RuntimeHandle):
+    if type(value) in (type(None), bool, int, float, str) or is_runtime_handle(value):
         return value
     if type(value) is list:
         return [_clone_runtime_value(item) for item in value]
@@ -385,5 +399,6 @@ __all__ = [
     "RuntimeMethod",
     "RuntimeValue",
     "clone_runtime_value",
+    "is_runtime_handle",
     "runtime_value_item_count",
 ]

@@ -114,8 +114,9 @@ fragment through the SDK runtime.
 | CM-03 Dual-engine evaluation | Complete (`5182d9c`) | Comparable v1/v2 result records supported without a v2 runtime route |
 | CM-10 Program contracts and errors | Complete (`a5aec78`) | Pure source, diagnostic, artifact, result, and typed-error contracts pass |
 | CM-11 AST policy validator | Complete (`5883a0a`) | Static grammar and adversarial allowlist tests pass without execution |
-| CM-12 Restricted interpreter | Complete pending commit | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
-| CM-13 through CM-14 Program kernel | Not started | SDK and compile-only intent tests pass |
+| CM-12 Restricted interpreter | Complete (`a9f2d3a`) | Generic registry dispatch, dynamic budgets, and execution journal tests pass |
+| CM-13 Deterministic identities | Complete pending commit | Reservation-based IDs and typed ownership-handle tests pass |
+| CM-14 Program kernel | Not started | SDK and compile-only intent tests pass |
 | CM-20 through CM-24 Capability plugins | Not started | v2 capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
@@ -261,3 +262,36 @@ CM-12 adds no Wellplot SDK handles, IDs, capabilities, intent construction,
 AuthoringService integration, transactions, persistence, provider, LangGraph,
 MCP, routing, feature flags, or legacy deletion. CM-13 owns real deterministic
 handles and IDs; CM-14 owns `AuthoringDocumentIntent` construction.
+
+## CM-13 Identity And Handle Boundary
+
+CM-13 allocates canonical identity through explicit reservation sets, never a
+hidden counter. Document sections are in one document-wide namespace; tracks
+are local to each section; bindings are document-wide. Allocation selects a
+requested normalized base when it is free, otherwise the first available
+numeric suffix (`base`, `base.2`, `base.3`). Reserving an existing high suffix
+does not consume lower free suffixes. Identical reservation and creation order
+therefore produces identical canonical identities.
+
+New binding bases derive from normalized section, track, and source channel
+when available; an `id_hint` is only an advisory fallback seed. Adoption keeps
+the exact supplied canonical identity and reserves it idempotently without
+allocating a replacement. Fill and annotation IDs are generic structural leaf
+identities only; CM-14 owns their domain-specific naming semantics.
+
+`ReportHandle`, `SectionHandle`, `TrackHandle`, `BindingHandle`, `FillHandle`,
+and `AnnotationHandle` are frozen identity values. They carry provenance and
+parent path metadata, not mutable document fragments, callbacks, capabilities,
+or Python host objects. The identity builder rejects wrong types, foreign
+builders, unknown issued identities, and incorrect parent relationships using
+existing typed program errors.
+
+CM-12 accepts these explicitly registered immutable `RuntimeHandle`
+subclasses through the unchanged registry dispatcher. It still does not use
+dynamic attribute lookup, and arbitrary handle subclasses or lookalike objects
+remain invalid runtime values.
+
+CM-13 adds no Wellplot authoring methods, capability dispatch, document state,
+intent construction, AuthoringService integration, persistence, reconciliation,
+provider, LangGraph, MCP, routing, feature flags, or legacy deletion. CM-14
+owns canonical `AuthoringDocumentIntent` construction.
