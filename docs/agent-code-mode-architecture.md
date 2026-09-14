@@ -120,8 +120,9 @@ fragment through the SDK runtime.
 | CM-15 Private semantic dry run | Complete (`ea2d115`) | Canonical intent reconciles, executes, and validates against an isolated document copy |
 | CM-16 Bounded inspection facade | Complete (`f37284d`) | Fixed immutable projections provide scoped worker context without document discovery |
 | CM-20 CapabilitySpec v2 bridge | Complete (`873fd14`) | Additive v2 arguments/handler contracts coexist with unchanged v1 declarations |
-| CM-21 Report capability migration | Complete pending commit | `report.standard` v2 arguments compile through explicit host SDK methods |
-| CM-22 through CM-24 Capability migrations | Not started | v2 capabilities compile through plugin-owned handlers |
+| CM-21 Report capability migration | Complete (`3bebd28`) | `report.standard` v2 arguments compile through explicit host SDK methods |
+| CM-22 Structural capability migration | Complete pending commit | Section and fixed-kind track v2 arguments compile through host-owned structural methods |
+| CM-23 through CM-24 Capability migrations | Not started | v2 leaf capabilities compile through plugin-owned handlers |
 | CM-30 through CM-34 Provider and planner | Not started | Provider-neutral small semantic planner path works |
 | CM-40 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
@@ -442,3 +443,26 @@ CM-21 does not add handle-method registration, interpreter changes, provider
 guidance, planner routing, LangGraph, MCP, persistence, rendering, or legacy
 deletion. The v1 report artifact/compiler and existing descriptor shapes remain
 unchanged. CM-22 owns the next capability migration.
+
+## CM-22 Structural Capability Boundary
+
+CM-22 migrates `section.log_plot` and the four fixed-kind track capabilities:
+`track.normal`, `track.reference`, `track.array`, and `track.annotation`. Their
+static v2 contracts make `create`, `select`, and `update` explicit operations.
+Create uses an advisory hint with the CM-13 allocator; select and update adopt
+host-resolved canonical IDs. No handler searches the current document or
+performs fuzzy identity resolution.
+
+`IntentBuilder.select_section` and `select_track` adopt exact identities into
+typed CM-13 handles. `update_section` and `update_track` merge only supplied
+mutable fields, preserving omitted state and rejecting identity/parent moves.
+Track capability handlers fix the canonical kind by capability function rather
+than accepting a free-form kind argument. The result remains the existing
+`AuthoringDocumentIntent` with no structural operation IR.
+
+CM-22 validates structural ownership and argument shape only. Whether an
+adopted target exists in a supplied current document remains a later dry-run or
+reconciliation concern. No bindings, fills, annotation objects, interpreter
+registration, fluent syntax, provider, planner, LangGraph, MCP, routing,
+persistence, rendering, or legacy deletion is included. CM-23 owns curve and
+raster bindings.

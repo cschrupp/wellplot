@@ -276,6 +276,51 @@ class IntentBuilder:
         self._section_order.append(section.token)
         return section
 
+    def select_section(self, report: ReportHandle, *, section_id: str) -> SectionHandle:
+        """Adopt one host-resolved section identity without searching a document."""
+        owned_report = self._require_report(report)
+        section = self._handles.adopt_section(owned_report, section_id)
+        self._handles.validate_section_parent(owned_report, section)
+        if section.token not in self._sections:
+            self._sections[section.token] = AuthoringSectionIntent(section_id=section.section_id)
+            self._section_order.append(section.token)
+        return section
+
+    def update_section(
+        self,
+        section: SectionHandle,
+        *,
+        title: str | None = None,
+        subtitle: str | None = None,
+        depth_minimum: float | None = None,
+        depth_maximum: float | None = None,
+    ) -> None:
+        """Apply one sparse update to an adopted section without changing identity."""
+        owned_section = self._require_section(section)
+        depth_range = _optional_pair(
+            depth_minimum,
+            depth_maximum,
+            label="Section depth range",
+        )
+        patch = _validated(
+            AuthoringSectionIntent,
+            _non_null_fields(
+                section_id=owned_section.section_id,
+                title=title,
+                subtitle=subtitle,
+                depth_range=depth_range,
+            ),
+            "Section desired state",
+        )
+        if not patch.supplied_fields().difference({"section_id"}):
+            raise ProgramPolicyError("Section update requires at least one mutable field.")
+        self._sections[owned_section.token] = _merge_intent(
+            self._sections[owned_section.token],
+            patch,
+            AuthoringSectionIntent,
+            "Section desired state",
+        )
+
     def add_track(
         self,
         section: SectionHandle,
@@ -321,6 +366,74 @@ class IntentBuilder:
         self._tracks[track.token] = track
         self._track_locations[track.token] = (owned_section.token, len(tracks) - 1)
         return track
+
+    def select_track(self, section: SectionHandle, *, track_id: str) -> TrackHandle:
+        """Adopt one host-resolved track identity under one selected section."""
+        owned_section = self._require_section(section)
+        track = self._handles.adopt_track(owned_section, track_id)
+        self._handles.validate_track_parent(owned_section, track)
+        if track.token not in self._tracks:
+            section_fragment = self._sections[owned_section.token]
+            tracks = list(section_fragment.tracks or [])
+            tracks.append(
+                AuthoringTrackIntent(
+                    track_id=track.track_id,
+                    section_id=track.section_id,
+                )
+            )
+            self._sections[owned_section.token] = _replace_section_tracks(
+                section_fragment,
+                tracks,
+            )
+            self._tracks[track.token] = track
+            self._track_locations[track.token] = (owned_section.token, len(tracks) - 1)
+        return track
+
+    def update_track(
+        self,
+        track: TrackHandle,
+        *,
+        kind: str | None = None,
+        title: str | None = None,
+        width_mm: float | None = None,
+        scale_minimum: float | None = None,
+        scale_maximum: float | None = None,
+        scale_kind: str = "linear",
+        reverse: bool = False,
+    ) -> None:
+        """Apply one sparse update without moving or renaming an adopted track."""
+        owned_track = self._require_track(track)
+        if kind is not None and kind not in _TRACK_KINDS:
+            raise ProgramTypeError(f"Unsupported track kind '{kind}'.")
+        scale = _optional_scale(
+            scale_minimum,
+            scale_maximum,
+            kind=scale_kind,
+            reverse=reverse,
+            label="Track scale",
+        )
+        patch = _validated(
+            AuthoringTrackIntent,
+            _non_null_fields(
+                track_id=owned_track.track_id,
+                section_id=owned_track.section_id,
+                kind=kind,
+                title=title,
+                width_mm=width_mm,
+                x_scale=scale,
+            ),
+            "Track desired state",
+        )
+        if not patch.supplied_fields().difference({"track_id", "section_id"}):
+            raise ProgramPolicyError("Track update requires at least one mutable field.")
+        section, tracks, index = self._track_state(owned_track)
+        tracks[index] = _merge_intent(
+            tracks[index],
+            patch,
+            AuthoringTrackIntent,
+            "Track desired state",
+        )
+        self._sections[section] = _replace_section_tracks(self._sections[section], tracks)
 
     def add_curve(
         self,
@@ -817,6 +930,18 @@ def _copy_intent(
     if not isinstance(value, model_type):
         raise ProgramTypeError(f"{label} is invalid.")
     return _validated(model_type, value.model_dump(exclude_unset=True), label)
+
+
+def _merge_intent(
+    current: BaseModel,
+    patch: BaseModel,
+    model_type: type[_Model],
+    label: str,
+) -> _Model:
+    """Merge supplied patch fields while preserving omitted canonical state."""
+    fields = current.model_dump(exclude_unset=True)
+    fields.update(patch.model_dump(exclude_unset=True))
+    return _validated(model_type, fields, label)
 
 
 def _report_header_fields(

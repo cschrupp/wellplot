@@ -34,6 +34,18 @@ from ..model.intent import (
 from .base import CapabilitySpec
 from .registry import CapabilityRegistry
 from .report_standard import ReportStandardArgs, compile_report_standard
+from .structural import (
+    SectionLogPlotArgs,
+    TrackAnnotationArgs,
+    TrackArrayArgs,
+    TrackNormalArgs,
+    TrackReferenceArgs,
+    compile_section_log_plot,
+    compile_track_annotation,
+    compile_track_array,
+    compile_track_normal,
+    compile_track_reference,
+)
 
 
 class ReportRemoval(AuthoringRemoveIntent):
@@ -125,6 +137,13 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
                 "panel.",
                 "Prefer explicit section ids that are stable across revisions.",
             ),
+            arguments_model=SectionLogPlotArgs,
+            handler=compile_section_log_plot,
+            worker_hints=(
+                "Use create, select, or update explicitly; selection adopts a host-resolved id.",
+                "Omit section fields that should be preserved during an update.",
+            ),
+            examples=("section.log_plot(operation='create', id_hint='main', title='Main Pass')",),
         ),
         CapabilitySpec(
             capability_id="track.normal",
@@ -135,6 +154,12 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
             metadata={"track_kind": "normal"},
+            arguments_model=TrackNormalArgs,
+            handler=compile_track_normal,
+            worker_hints=("This capability always creates or updates a normal track kind.",),
+            examples=(
+                "track.normal(operation='create', section_id='main', title='GR', width_mm=30)",
+            ),
         ),
         CapabilitySpec(
             capability_id="track.reference",
@@ -145,6 +170,13 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
             metadata={"track_kind": "reference"},
+            arguments_model=TrackReferenceArgs,
+            handler=compile_track_reference,
+            worker_hints=("This capability always creates or updates a reference track kind.",),
+            examples=(
+                "track.reference(operation='create', section_id='main', "
+                "title='Depth', width_mm=12)",
+            ),
         ),
         CapabilitySpec(
             capability_id="track.array",
@@ -155,6 +187,12 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
             metadata={"track_kind": "array"},
+            arguments_model=TrackArrayArgs,
+            handler=compile_track_array,
+            worker_hints=("This capability always creates or updates an array track kind.",),
+            examples=(
+                "track.array(operation='create', section_id='main', title='VDL', width_mm=40)",
+            ),
         ),
         CapabilitySpec(
             capability_id="track.annotation",
@@ -165,6 +203,13 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
             compiler=_no_document_compiler,
             allowed_parents=("section.log_plot",),
             metadata={"track_kind": "annotation"},
+            arguments_model=TrackAnnotationArgs,
+            handler=compile_track_annotation,
+            worker_hints=("This capability always creates or updates an annotation track kind.",),
+            examples=(
+                "track.annotation(operation='create', section_id='main', "
+                "title='Notes', width_mm=20)",
+            ),
         ),
         CapabilitySpec(
             capability_id="binding.curve",

@@ -97,4 +97,4 @@ migration.
 **STOP after CM-21. Proceed to CM-22 only after this slice is committed and
 pushed.**
 
-**PROCEED / STOP:** PROCEED to review and commit CM-21; STOP before CM-22.
+**PROCEED / STOP:** PROCEED to CM-22; CM-21 committed and pushed.
