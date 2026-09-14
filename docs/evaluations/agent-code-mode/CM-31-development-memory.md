@@ -6,6 +6,7 @@ CM-31 adds the first concrete Code Mode provider transport without routing the
 planner or changing the legacy authoring adapters.
 
 - **Slice base SHA:** `9533a34`
+- **Implementation commit:** `1dbf49d`
 - **Implementation scope:** one async OpenAI Responses structured parse call,
   typed result handling, per-call timeout, usage normalization, and redacted
   stable provider failures.
@@ -35,6 +36,9 @@ planner or changing the legacy authoring adapters.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
 - `uv lock`: passed; lockfile contains only the intended OpenAI floor update.
+- Broader tracked Code Mode selection: `273 passed, 2 failed`; both failures
+  are pre-existing `tests/test_graph_section_submission.py` assertions outside
+  CM-31 and no files in those failures were changed.
 
 ## Boundaries and Risks
 
@@ -48,5 +52,5 @@ planner or changing the legacy authoring adapters.
 
 ## Decision
 
-**PROCEED / STOP:** Implementation is ready for the isolated CM-31 commit.
-After evidence finalization, stop before CM-32 implementation.
+**PROCEED / STOP:** CM-31 is committed and pushed as `1dbf49d`.
+STOP before CM-32 implementation until separately authorized.
