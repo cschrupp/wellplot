@@ -8,7 +8,7 @@ interpreter. The fixture is deliberately test-only and is not registered in
 the built-in catalog.
 
 - **Slice base SHA:** `83384f7`
-- **Implementation commit:** pending
+- **Implementation commit:** `5646c60`
 - **Scope:** external-looking fixture capability, generic registry-held v1/v2
   execution tests, descriptor tests, architecture assertions, and evidence.
 
@@ -63,5 +63,5 @@ domain-model changes.
 
 ## Decision
 
-**PROCEED / STOP:** PROCEED to review and commit CM-25. STOP before CM-30
-implementation until separately authorized.
+**PROCEED / STOP:** PROCEED to CM-30 planning; CM-25 committed and pushed.
+STOP before CM-30 implementation until separately authorized.
