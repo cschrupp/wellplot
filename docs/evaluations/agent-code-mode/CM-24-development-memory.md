@@ -7,7 +7,7 @@ The slice preserves the CM-23 identity boundary and compiles directly to the
 existing `AuthoringDocumentIntent`.
 
 - **Slice base SHA:** `f062f82`
-- **Implementation commit:** pending
+- **Implementation commit:** `0423f7e`
 - **Scope:** five fill kinds, five typed annotation variants, builder
   create/select/update methods, capability handlers, pure unit tests, and
   architecture evidence.
@@ -65,5 +65,5 @@ Validation evidence:
 
 ## Decision
 
-**PROCEED / STOP:** PROCEED to review and commit CM-24. STOP before CM-25
-implementation until separately authorized.
+**PROCEED / STOP:** PROCEED to CM-25; CM-24 committed and pushed. STOP before
+CM-25 implementation until separately authorized.
