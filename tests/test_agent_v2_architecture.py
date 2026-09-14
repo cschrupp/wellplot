@@ -12,6 +12,7 @@ WELLPLOT_ROOT = SOURCE_ROOT / "wellplot"
 AUTHORING_PROGRAM_ROOT = WELLPLOT_ROOT / "authoring_program"
 CAPABILITIES_ROOT = WELLPLOT_ROOT / "capabilities"
 CODE_MODE_ROOT = WELLPLOT_ROOT / "agent" / "code_mode"
+PROVIDER_BASE = WELLPLOT_ROOT / "agent" / "providers" / "base.py"
 
 AUTHORING_DOMAIN_ROOTS = (
     WELLPLOT_ROOT / "model",
@@ -164,6 +165,33 @@ def test_code_mode_does_not_depend_on_legacy_agent_or_mcp_modules() -> None:
     _assert_no_dependencies(
         (CODE_MODE_ROOT,),
         forbidden=LEGACY_CODE_MODE_DEPENDENCIES,
+    )
+
+
+def test_provider_v2_contract_stays_provider_neutral() -> None:
+    """The new provider contract cannot depend on legacy or concrete adapters."""
+    forbidden = (
+        "wellplot.agent.core",
+        "wellplot.agent.graph",
+        "wellplot.mcp",
+        "langgraph",
+        "openai",
+        "anthropic",
+        "nvidia",
+        "wellplot.authoring_program.interpreter",
+    )
+    violations = [
+        reference
+        for reference in _collect_import_references(
+            (PROVIDER_BASE,),
+            source_root=SOURCE_ROOT,
+        )
+        if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)
+    ]
+    assert not violations, "\n".join(
+        f"{reference.path.relative_to(REPO_ROOT)}:{reference.line}: "
+        f"forbidden dependency {reference.module!r}"
+        for reference in violations
     )
 
 
