@@ -52,6 +52,17 @@ from .notebook import (
     display_phase_previews,
     relative_path,
 )
+from .session import (
+    AgentDiagnostic,
+    AgentDiagnosticSeverity,
+    AgentMetrics,
+    AgentSession,
+    AgentSessionConfig,
+    AgentSessionResult,
+    AgentSourceConfig,
+    AgentWorkerEvidence,
+    AgentWorkerMetrics,
+)
 from .tool_contract import (
     StableToolProfile,
     stable_tool_budget,
@@ -69,6 +80,15 @@ __all__ = [
     "AuthoringUserReport",
     "AgentTraceEvent",
     "AgenticMcpClient",
+    "AgentDiagnostic",
+    "AgentDiagnosticSeverity",
+    "AgentMetrics",
+    "AgentSession",
+    "AgentSessionConfig",
+    "AgentSessionResult",
+    "AgentSourceConfig",
+    "AgentWorkerMetrics",
+    "AgentWorkerEvidence",
     "BranchOperationGroup",
     "DirectBranchCompilationResult",
     "ExecutedAuthoringPhase",

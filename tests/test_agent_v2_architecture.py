@@ -12,6 +12,7 @@ WELLPLOT_ROOT = SOURCE_ROOT / "wellplot"
 AUTHORING_PROGRAM_ROOT = WELLPLOT_ROOT / "authoring_program"
 CAPABILITIES_ROOT = WELLPLOT_ROOT / "capabilities"
 CODE_MODE_ROOT = WELLPLOT_ROOT / "agent" / "code_mode"
+AGENT_SESSION_MODULE = WELLPLOT_ROOT / "agent" / "session.py"
 PROVIDER_BASE = WELLPLOT_ROOT / "agent" / "providers" / "base.py"
 PROVIDER_OPENAI_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_v2.py"
 PROVIDER_OPENAI_PROGRAM_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_program_v2.py"
@@ -169,6 +170,31 @@ def test_code_mode_does_not_depend_on_legacy_agent_or_mcp_modules() -> None:
     _assert_no_dependencies(
         (CODE_MODE_ROOT,),
         forbidden=LEGACY_CODE_MODE_DEPENDENCIES,
+    )
+
+
+def test_direct_agent_session_does_not_depend_on_mcp_or_legacy_orchestration() -> None:
+    """The public v2 session must remain a direct Python boundary."""
+    references = _collect_import_references(
+        (AGENT_SESSION_MODULE,),
+        source_root=SOURCE_ROOT,
+    )
+    forbidden = (
+        "wellplot.agent.mcp",
+        "wellplot.agent.notebook",
+        "wellplot.mcp",
+        "wellplot.agent.core",
+        "wellplot.agent.graph",
+    )
+    violations = [
+        reference
+        for reference in references
+        if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)
+    ]
+    assert not violations, "\\n".join(
+        f"{reference.path.relative_to(REPO_ROOT)}:{reference.line}: "
+        f"forbidden dependency {reference.module!r}"
+        for reference in violations
     )
 
 
