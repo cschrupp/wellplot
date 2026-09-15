@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ...authoring_context import (
     AuthoringChannelAlias,
@@ -239,6 +239,13 @@ class VisualSectionCorrectionCoordinator:
             return _failure(
                 VisualCorrectionStopReason.REVIEW_FAILED,
                 str(error),
+                artifact=artifact,
+                metrics=VisualCorrectionMetrics(render_count=1, review_count=1),
+            )
+        except ValidationError:
+            return _failure(
+                VisualCorrectionStopReason.REVIEW_FAILED,
+                "The visual evaluator returned an invalid structured decision.",
                 artifact=artifact,
                 metrics=VisualCorrectionMetrics(render_count=1, review_count=1),
             )
@@ -524,7 +531,7 @@ def _validate_root_section_intent(
         for field_name in ("curve_bindings", "raster_bindings", "fills", "annotations")
     ):
         return "Visual section corrections may not emit global children or removals."
-    if intent.sections is None or len(intent.sections) != 1:
+    if not isinstance(intent.sections, list) or len(intent.sections) != 1:
         return "Visual section corrections must emit exactly one section fragment."
     section = intent.sections[0]
     if section.section_id != section_id:

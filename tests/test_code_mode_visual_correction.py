@@ -28,7 +28,11 @@ from wellplot.authoring_program.models import (
 )
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDataSource, AuthoringDocumentSpec
-from wellplot.model.intent import AuthoringDocumentIntent, AuthoringSectionIntent
+from wellplot.model.intent import (
+    AuthoringClearIntent,
+    AuthoringDocumentIntent,
+    AuthoringSectionIntent,
+)
 
 
 def _document() -> AuthoringDocumentSpec:
@@ -279,6 +283,7 @@ def test_semantic_failure_prevents_render_and_review() -> None:
                 )
             ]
         ),
+        AuthoringDocumentIntent(sections=AuthoringClearIntent()),
     ],
 )
 def test_visual_worker_output_cannot_escape_root_only_boundary(
@@ -366,4 +371,33 @@ def test_visual_reviewer_cannot_select_an_unregistered_capability() -> None:
     assert result.success is False
     assert result.stop_reason is VisualCorrectionStopReason.CORRECTION_REJECTED
     assert result.metrics.correction_count == 1
+    assert compiler.calls == []
+
+
+def test_invalid_visual_reviewer_payload_is_a_bounded_failure() -> None:
+    """Evaluator schema violations cannot escape the visual boundary."""
+    renderer = _Renderer()
+    evaluator = _Evaluator(
+        decision={
+            "correction": {
+                "target_scope": "selected_section",
+                "section_id": "main",
+                "capability_id": "section.log_plot",
+                "issue": "Invalid target field.",
+                "requested_adjustment": "Change the root.",
+            }
+        }  # type: ignore[arg-type]
+    )
+    compiler = _SectionCompiler(_execution_result(AuthoringDocumentIntent()))
+
+    result = _run(
+        _coordinator(renderer, evaluator, compiler),
+        **_kwargs(),
+    )
+
+    assert result.success is False
+    assert result.stop_reason is VisualCorrectionStopReason.REVIEW_FAILED
+    assert result.corrected_document is None
+    assert result.metrics.render_count == 1
+    assert result.metrics.review_count == 1
     assert compiler.calls == []
