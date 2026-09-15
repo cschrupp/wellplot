@@ -448,6 +448,33 @@ def test_new_section_has_no_allocated_id_and_existing_channels_use_facade(tmp_pa
     assert result.sections[1].section_id is None
 
 
+def test_duplicate_existing_section_targets_fail_before_source_loading(tmp_path: Path) -> None:
+    """Two semantic tasks cannot independently mutate one host section target."""
+    enricher, loader = _enricher(tmp_path)
+    plan = SemanticPlan(
+        summary="Duplicate revision targets.",
+        section_tasks=(
+            SectionTask(
+                goal="Revise the main pass title.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Main Pass",
+            ),
+            SectionTask(
+                goal="Revise the main pass depth.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Main Pass",
+            ),
+        ),
+    )
+
+    with pytest.raises(SemanticEnrichmentError) as duplicate:
+        enricher.enrich(plan=plan, document=_document(), source_candidates=())
+
+    assert duplicate.value.code is EnrichmentErrorCode.SECTION_TARGET_DUPLICATE
+    assert duplicate.value.task_index == 1
+    assert loader.calls == []
+
+
 def test_enrichment_models_reject_extras_and_are_immutable() -> None:
     """Transient context contracts remain strict and frozen."""
     with pytest.raises(ValidationError):

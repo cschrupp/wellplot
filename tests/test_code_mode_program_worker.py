@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
+import wellplot.authoring_program.program_runtime as runtime_module
 from wellplot.agent.code_mode.enrichment import (
     ChannelContext,
     EnrichedSemanticContext,
@@ -24,6 +25,8 @@ from wellplot.agent.providers.base import (
     ProviderMetrics,
     ProviderRequestError,
 )
+from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_service import AuthoringService
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDocumentSpec
 
@@ -47,7 +50,11 @@ class _Backend:
         )
 
 
-def _document(*, collision_binding: bool = True) -> AuthoringDocumentSpec:
+def _document(
+    *,
+    collision_binding: bool = True,
+    section_id: str = "existing",
+) -> AuthoringDocumentSpec:
     """Build a document with identities that must seed every worker attempt."""
     binding_id = "pilot.scalar.GR" if collision_binding else "existing.GR"
     return AuthoringDocumentSpec(
@@ -55,7 +62,7 @@ def _document(*, collision_binding: bool = True) -> AuthoringDocumentSpec:
         title="Current report",
         sections=[
             {
-                "id": "existing",
+                "id": section_id,
                 "title": "Existing section",
                 "tracks": [
                     {
@@ -156,6 +163,15 @@ def _source_program() -> str:
         "track = wp.track(section, id_hint='normal', kind='normal', "
         "title='Gamma Ray', width_mm=30)\n"
         "wp.curve(track, channel='GR', label='GR')\n"
+    )
+
+
+def _revision_program(*, title: str = "Revised section") -> str:
+    """Return a program that uses only the opaque host-selected target."""
+    return (
+        "report = wp.report()\n"
+        "section = wp.target_section(report)\n"
+        f"wp.update_section(section, title='{title}')\n"
     )
 
 
@@ -357,21 +373,155 @@ def test_each_worker_attempt_gets_fresh_source_handle_provenance() -> None:
     assert not hasattr(first_source, "canonical_path")
 
 
-def test_existing_section_task_is_rejected_without_provider_call() -> None:
-    """CM-42 does not turn a resolved section into accidental duplicate creation."""
-    backend = _Backend(responses=[_program()])
-
-    with pytest.raises(ValueError, match="new section reconstruction only"):
-        _run(
-            _compiler(backend).compile(
-                task_index=0,
-                context=_context(section_id="existing"),
-                document=_document(),
-                timeout_seconds=10,
-            )
+def test_existing_section_revision_uses_opaque_host_target() -> None:
+    """An existing revision carries the host identity without exposing it to the provider."""
+    secret_id = "canonical-secret-section-17"
+    backend = _Backend(responses=[_revision_program()])
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(section_id=secret_id),
+            document=_document(section_id=secret_id),
+            timeout_seconds=10,
         )
+    )
 
-    assert backend.requests == []
+    assert result.success is True
+    assert result.artifact is not None
+    section = result.artifact.intent_fragment.sections[0]
+    assert section.model_dump(exclude_unset=True) == {
+        "section_id": secret_id,
+        "title": "Revised section",
+    }
+    assert secret_id not in backend.requests[0].user_prompt
+
+
+def test_existing_revision_private_application_preserves_omissions_and_siblings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Private reconciliation changes only the host target and requested field."""
+    secret_id = "canonical-secret-section-17"
+    document = AuthoringDocumentSpec(
+        name="cm-47",
+        title="Current report",
+        sections=[
+            {
+                "id": secret_id,
+                "title": "Original section",
+                "subtitle": "Keep this subtitle",
+                "tracks": [
+                    {
+                        "id": "existing-track",
+                        "title": "Existing track",
+                        "kind": "normal",
+                        "width_mm": 20,
+                    }
+                ],
+            },
+            {
+                "id": "sibling",
+                "title": "Sibling section",
+                "tracks": [
+                    {
+                        "id": "sibling-track",
+                        "title": "Sibling track",
+                        "kind": "normal",
+                        "width_mm": 18,
+                    }
+                ],
+            },
+        ],
+    )
+    captured: dict[str, AuthoringDocumentSpec] = {}
+
+    def capture_private_execution(service: AuthoringService, plan: object) -> object:
+        """Capture the isolated post-state while preserving normal execution."""
+        result = execute_authoring_plan(service, plan)  # type: ignore[arg-type]
+        captured["document"] = result.document
+        return result
+
+    monkeypatch.setattr(runtime_module, "execute_authoring_plan", capture_private_execution)
+    backend = _Backend(responses=[_revision_program()])
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(section_id=secret_id),
+            document=document,
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    private = captured["document"]
+    target, sibling = private.sections
+    assert target.title == "Revised section"
+    assert target.subtitle == "Keep this subtitle"
+    assert target.tracks[0].id == "existing-track"
+    assert sibling.id == "sibling"
+    assert sibling.tracks[0].id == "sibling-track"
+    assert document.sections[0].title == "Original section"
+
+
+def test_existing_target_id_is_not_an_executable_argument() -> None:
+    """Generated code cannot provide a canonical ID to the target selector."""
+    backend = _Backend(
+        responses=[
+            "report = wp.report()\nsection = wp.target_section(report, section_id='invented')\n",
+            _revision_program(),
+        ]
+    )
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(section_id="canonical-secret-section-17"),
+            document=_document(section_id="canonical-secret-section-17"),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    assert len(backend.requests) == 2
+    assert "canonical-secret-section-17" not in backend.requests[0].user_prompt
+    assert "canonical-secret-section-17" not in backend.requests[1].user_prompt
+
+
+def test_existing_target_requires_a_sparse_mutation() -> None:
+    """Selecting the host target without changing it is not a successful revision."""
+    backend = _Backend(
+        responses=[
+            "report = wp.report()\nsection = wp.target_section(report)\n",
+            "report = wp.report()\nsection = wp.target_section(report)\n",
+        ]
+    )
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(section_id="existing"),
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert len(backend.requests) == 2
+    assert any(diagnostic.code == "program.dry_run_error" for diagnostic in result.diagnostics)
+
+
+def test_existing_target_cannot_create_a_sibling_section() -> None:
+    """A revision candidate that creates another section is rejected before dry-run."""
+    sibling_program = _program(section_id="sibling")
+    backend = _Backend(responses=[sibling_program, sibling_program])
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(section_id="existing"),
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert len(backend.requests) == 2
 
 
 def test_repair_uses_fresh_identity_state_and_counts_one_repair() -> None:

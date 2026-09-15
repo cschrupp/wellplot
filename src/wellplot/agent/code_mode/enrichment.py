@@ -122,6 +122,7 @@ class EnrichmentErrorCode(StrEnum):
     SOURCE_LOAD_FAILED = "source_load_failed"
     SECTION_HINT_UNRESOLVED = "section_hint_unresolved"
     SECTION_HINT_AMBIGUOUS = "section_hint_ambiguous"
+    SECTION_TARGET_DUPLICATE = "section_target_duplicate"
 
 
 class SemanticEnrichmentError(ValueError):
@@ -166,6 +167,11 @@ class SemanticEnricher:
         source_candidates: Sequence[SourceCandidate],
     ) -> EnrichedSemanticContext:
         """Enrich one plan without changing it or mutating the document."""
+        resolved_section_ids = tuple(
+            _resolved_section_id(task, document, task_index=task_index)
+            for task_index, task in enumerate(plan.section_tasks)
+        )
+        _validate_unique_section_targets(resolved_section_ids)
         roots = _normalize_roots(self.allowed_roots)
         candidates = _normalize_candidates(source_candidates, roots)
         loaded_cache: dict[tuple[Path, SourceFormat], LoadedSource] = {}
@@ -184,7 +190,7 @@ class SemanticEnricher:
 
         available_channels: dict[str, list[AuthoringChannelCandidate]] = {}
         for task_index, sources in resolved_sources.items():
-            section_id = _resolved_section_id(plan.section_tasks[task_index], document)
+            section_id = resolved_section_ids[task_index]
             if section_id is None:
                 continue
             available_channels[section_id] = [
@@ -200,7 +206,7 @@ class SemanticEnricher:
             self._section_context(
                 task,
                 task_index=task_index,
-                document=document,
+                section_id=resolved_section_ids[task_index],
                 inspection=inspection,
                 sources=resolved_sources[task_index],
             )
@@ -249,12 +255,11 @@ class SemanticEnricher:
         task: SectionTask,
         *,
         task_index: int,
-        document: AuthoringDocumentSpec,
+        section_id: str | None,
         inspection: AuthoringInspectionFacade,
         sources: tuple[SourceContext, ...],
     ) -> ResolvedSectionContext:
         """Project canonical section and channels through the inspection facade."""
-        section_id = _resolved_section_id(task, document, task_index=task_index)
         if section_id is None:
             channels = tuple(
                 ChannelInspectionSummary(
@@ -517,6 +522,23 @@ def _unique_section_id(
             candidates=section_ids,
         )
     return section_ids[0]
+
+
+def _validate_unique_section_targets(section_ids: Sequence[str | None]) -> None:
+    """Reject multiple semantic tasks targeting one canonical section."""
+    first_by_id: dict[str, int] = {}
+    for task_index, section_id in enumerate(section_ids):
+        if section_id is None:
+            continue
+        first_index = first_by_id.get(section_id)
+        if first_index is not None:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SECTION_TARGET_DUPLICATE,
+                "Multiple section tasks resolve to the same existing section target.",
+                task_index=task_index,
+                candidates=(str(first_index), str(task_index)),
+            )
+        first_by_id[section_id] = task_index
 
 
 def _channel_candidate(channel: ChannelContext, *, source_path: str) -> AuthoringChannelCandidate:

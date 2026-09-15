@@ -47,6 +47,8 @@ section = wp.section(
     title='Section title',
     source=source,
 )
+target = wp.target_section(report)
+wp.update_section(target, title='Updated title')
 normal = wp.track(
     section,
     id_hint='normal',
@@ -72,13 +74,17 @@ wp.curve(normal, channel='CHANNEL', label='Curve label')
 wp.curve(reference, channel='REFERENCE_CHANNEL', label='Reference label')
 wp.raster(array, channel='ARRAY_CHANNEL', label='Array label')
 
-Only the root calls and keyword arguments shown above are executable. Create a
-new section only. Use only source candidate IDs supplied in the task context.
+Only the root calls and keyword arguments shown above are executable. For a
+new target, use wp.section(); for an existing target, use
+wp.target_section(report) and then wp.update_section(). The target-section call
+accepts no section ID; the host supplies the opaque target. Use only source
+candidate IDs supplied in the task context.
 Use only exact supplied channel mnemonics or explicitly supplied aliases. Never
 invent, derive, suffix, expand, or rename channel names. Multiple bindings may
 reference the same source channel.
-Do not use existing document identifiers, selection/update operations,
-report-wide settings, or filesystem operations.
+Do not select or update existing tracks, bindings, fills, or annotations. Do
+not use report-wide settings or filesystem operations. Never create a second
+section in an existing-target task.
 Return only the program source, with no markdown fences or explanation."""
 
 _CHANNEL_GROUNDING_RULE = (
@@ -90,7 +96,7 @@ _CHANNEL_GROUNDING_RULE = (
 
 @dataclass(frozen=True, slots=True)
 class ProgramSectionCompiler:
-    """Compile one new section program without mutating a document."""
+    """Compile one host-scoped section program without mutating a document."""
 
     backend: ModelBackendProtocol
     registry: CapabilityRegistry
@@ -108,11 +114,6 @@ class ProgramSectionCompiler:
     ) -> ProgramExecutionResult:
         """Generate, interpret, and privately dry-run one section program."""
         task, section_context = _task_context(context, task_index)
-        if section_context.section_id is not None:
-            raise ValueError(
-                "Code Mode new section reconstruction only; existing-section "
-                "revision is not available in the restricted SDK."
-            )
 
         capabilities = _worker_capabilities(task, self.registry)
         request = ProgramGenerationRequest(
@@ -192,7 +193,10 @@ class ProgramSectionCompiler:
                 builder.runtime_environment(),
             )
             intent = builder.intent()
-            section_id = _validate_section_intent(intent)
+            section_id = _validate_section_intent(
+                intent,
+                expected_section_id=section_context.section_id,
+            )
             runtime = ProgramRuntime(
                 document,
                 available_channels={
@@ -215,7 +219,10 @@ class ProgramSectionCompiler:
                 program,
                 ProgramDryRunError(
                     "Section program could not be compiled deterministically.",
-                    remediation_hint="Return one new section using only the selected capabilities.",
+                    remediation_hint=(
+                        "Use the host-selected target for revision or return one new "
+                        "section using only the selected capabilities."
+                    ),
                 ).to_diagnostic(),
                 metrics=ProgramMetrics(program_chars=len(source)),
             )
@@ -275,10 +282,20 @@ def _worker_prompt(
         "section_context": _bounded_section_context(section_context),
         "sdk_reference": _SDK_REFERENCE,
     }
+    if section_context.section_id is None:
+        instruction = (
+            "Create one new section from this scoped context. When a source candidate "
+            "is needed, resolve its exact candidate_id with wp.source() and pass the "
+            "handle to wp.section(). "
+        )
+    else:
+        instruction = (
+            "Revise the one host-selected existing section from this scoped context. "
+            "Use wp.target_section(report) without an ID, then apply a sparse section "
+            "update or add requested new child tracks. Do not create a second section. "
+        )
     return (
-        "Create one new section from this scoped context. When a source candidate "
-        "is needed, resolve its exact candidate_id with wp.source() and pass the "
-        "handle to wp.section(). "
+        instruction
         + _CHANNEL_GROUNDING_RULE
         + " Do not add report-wide settings or use context outside this task.\n\n"
         + json.dumps(payload, sort_keys=True, separators=(",", ":"))
@@ -298,6 +315,7 @@ def _semantic_task_payload(task: SectionTask) -> dict[str, object]:
 def _bounded_section_context(section_context: ResolvedSectionContext) -> dict[str, object]:
     """Project only source candidates and exact channel facts into a worker prompt."""
     return {
+        "target": {"kind": "existing" if section_context.section_id else "new"},
         "sources": [
             {
                 "candidate_id": source.candidate_id,
@@ -312,7 +330,7 @@ def _bounded_section_context(section_context: ResolvedSectionContext) -> dict[st
                 ],
             }
             for source in section_context.sources
-        ]
+        ],
     }
 
 
@@ -324,6 +342,7 @@ def _repair_context_text(
     return json.dumps(
         {
             "task": _semantic_task_payload(task),
+            "target": {"kind": "existing" if section_context.section_id else "new"},
             "section_context": _bounded_section_context(section_context),
             "channel_grounding_rule": _CHANNEL_GROUNDING_RULE,
         },
@@ -358,6 +377,8 @@ def _fresh_builder(
     )
     handles = HandleBuilder(allocator=allocator)
     builder = IntentBuilder(handles=handles)
+    if section_context.section_id is not None:
+        builder.register_section_target(section_context.section_id)
     for source in section_context.sources:
         builder.register_source(
             source.candidate_id,
@@ -401,8 +422,12 @@ def _available_channels(
     ]
 
 
-def _validate_section_intent(intent: AuthoringDocumentIntent) -> str:
-    """Reject report-wide or multi-section output from a section worker."""
+def _validate_section_intent(
+    intent: AuthoringDocumentIntent,
+    *,
+    expected_section_id: str | None,
+) -> str:
+    """Reject leakage and enforce the host-selected section target."""
     report_fields = (
         "title",
         "subtitle",
@@ -433,7 +458,25 @@ def _validate_section_intent(intent: AuthoringDocumentIntent) -> str:
                 "Create exactly one new section with section-local tracks and bindings."
             ),
         )
-    return intent.sections[0].section_id
+    section = intent.sections[0]
+    if expected_section_id is None:
+        return section.section_id
+    if section.section_id != expected_section_id:
+        raise ProgramDryRunError(
+            "Existing-section programs must use the host-selected target.",
+            remediation_hint=(
+                "Use wp.target_section(report) and do not create or identify a section."
+            ),
+        )
+    if not section.supplied_fields().difference({"section_id"}):
+        raise ProgramDryRunError(
+            "Existing-section programs must contain a sparse section mutation.",
+            remediation_hint=(
+                "Apply a section title, subtitle, depth range, or create a new child "
+                "track beneath wp.target_section(report)."
+            ),
+        )
+    return section.section_id
 
 
 def _failed_result(

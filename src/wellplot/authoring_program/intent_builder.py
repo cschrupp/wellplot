@@ -105,6 +105,7 @@ class IntentBuilder:
         """Create one isolated compiler with a CM-13 identity context."""
         self._handles = handles or HandleBuilder()
         self._sources: dict[str, tuple[SourceHandle, AuthoringDataSource]] = {}
+        self._section_target_id: str | None = None
         self._report: ReportHandle | None = None
         self._report_fields: dict[str, str] = {}
         self._header_fields: dict[str, AuthoringHeaderFieldIntent] = {}
@@ -174,6 +175,14 @@ class IntentBuilder:
         if handle_and_source is None:
             raise ProgramNameError(f"Unknown source candidate '{candidate_id}'.")
         return handle_and_source[0]
+
+    def register_section_target(self, section_id: str) -> None:
+        """Bind one host-resolved section identity for target-section calls."""
+        if self._section_target_id is not None:
+            raise ProgramPolicyError("An intent builder can own only one section target.")
+        if not isinstance(section_id, str) or not section_id.strip():
+            raise ProgramTypeError("A section target requires a non-empty section ID.")
+        self._section_target_id = section_id.strip()
 
     def set_header_field(
         self,
@@ -937,6 +946,8 @@ class IntentBuilder:
                     "output": self._runtime_output,
                     "tail": self._runtime_tail,
                     "section": self._runtime_section,
+                    "target_section": self._runtime_target_section,
+                    "update_section": self._runtime_update_section,
                     "track": self._runtime_track,
                     "curve": self._runtime_curve,
                     "raster": self._runtime_raster,
@@ -1408,6 +1419,39 @@ class IntentBuilder:
             depth_maximum=_optional_runtime_number(values, "depth_maximum"),
             source=source,
         )
+
+    def _runtime_target_section(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Adopt the one opaque section identity registered by the host."""
+        report = _runtime_handle_arg(args, "wp.target_section", ReportHandle)
+        _runtime_kwargs(kwargs, "wp.target_section", set())
+        if self._section_target_id is None:
+            raise ProgramPolicyError("No host-selected section target is available.")
+        return self.select_section(report, section_id=self._section_target_id)
+
+    def _runtime_update_section(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Apply a sparse update to one section handle selected by the host."""
+        section = _runtime_handle_arg(args, "wp.update_section", SectionHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.update_section",
+            {"title", "subtitle", "depth_minimum", "depth_maximum"},
+        )
+        self.update_section(
+            section,
+            title=_optional_runtime_text(values, "title"),
+            subtitle=_optional_runtime_text(values, "subtitle"),
+            depth_minimum=_optional_runtime_number(values, "depth_minimum"),
+            depth_maximum=_optional_runtime_number(values, "depth_maximum"),
+        )
+        return None
 
     def _runtime_track(
         self,
