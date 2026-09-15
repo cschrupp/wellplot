@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -35,18 +36,20 @@ class AgentSessionConfig(_SessionModel):
 
     @field_validator("timeout_seconds", "temperature", mode="before")
     @classmethod
-    def reject_boolean_numbers(cls, value: object) -> object:
-        """Keep booleans from being accepted as numeric execution settings."""
-        if isinstance(value, bool):
-            raise TypeError("Execution settings must use numeric values, not booleans.")
+    def validate_finite_numbers(cls, value: object) -> object:
+        """Match provider validation for finite numeric execution settings."""
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise TypeError("Execution settings must use numeric values.")
+        if not math.isfinite(value):
+            raise ValueError("Execution settings must be finite numbers.")
         return value
 
     @field_validator("max_output_tokens", mode="before")
     @classmethod
-    def reject_boolean_token_limit(cls, value: object) -> object:
-        """Keep booleans from being accepted as token limits."""
-        if isinstance(value, bool):
-            raise TypeError("max_output_tokens must be an integer, not a boolean.")
+    def validate_integer_token_limit(cls, value: object) -> object:
+        """Match provider validation for a real positive integer token limit."""
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise TypeError("max_output_tokens must be an integer.")
         return value
 
 

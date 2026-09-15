@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from dataclasses import dataclass, field
 from typing import NoReturn
 
@@ -184,10 +185,17 @@ def test_build_uses_reconstruct_mode_and_preserves_host_inputs(
     assert source.trusted_format == "las"
 
 
-def test_revise_uses_revise_mode_and_projects_bounded_inspection() -> None:
+def test_revise_uses_revise_mode_and_projects_bounded_inspection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Revision maps only to revise mode and exposes no raw execution material."""
     compiler = _Compiler(_success_result())
     session = AgentSession(compiler=compiler)
+
+    def fail_if_mcp_is_used(*_args: object, **_kwargs: object) -> NoReturn:
+        raise AssertionError("direct AgentSession must not open an MCP session")
+
+    monkeypatch.setattr(LocalStdioMcpRuntime, "open_session", fail_if_mcp_is_used)
     result = _run(session.revise(request="Change the title.", document=_document()))
 
     assert result.mode == "revise"
@@ -224,6 +232,29 @@ def test_session_configuration_rejects_invalid_limits() -> None:
         AgentSessionConfig(max_output_tokens=0)
     with pytest.raises((TypeError, ValueError)):
         AgentSessionConfig(timeout_seconds=True)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"timeout_seconds": math.inf},
+        {"timeout_seconds": -math.inf},
+        {"timeout_seconds": math.nan},
+        {"temperature": math.inf},
+        {"temperature": -math.inf},
+        {"temperature": math.nan},
+        {"timeout_seconds": "15"},
+        {"temperature": "0.2"},
+        {"max_output_tokens": "800"},
+        {"max_output_tokens": 800.0},
+    ],
+)
+def test_session_configuration_rejects_nonfinite_and_coercible_values(
+    kwargs: dict[str, object],
+) -> None:
+    """Session settings must match the provider contract without coercion."""
+    with pytest.raises((TypeError, ValueError)):
+        AgentSessionConfig(**kwargs)
 
 
 def test_empty_request_is_rejected_before_compiler_call() -> None:
