@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[1]))
 
@@ -17,6 +20,10 @@ from scripts.cbl_section_ab import (
     evaluate_gate,
     evaluate_section_intent,
     run_ab,
+)
+from scripts.run_cbl_section_ab import (
+    _factory_pair,
+    _GenerationSettings,
 )
 
 from wellplot.agent.code_mode.program_worker import _SDK_REFERENCE
@@ -300,6 +307,73 @@ def test_gate_stops_for_published_sdk_context_gap() -> None:
     )
     assert gate["ready"] is True
     assert gate["decision"] == "STOP_SDK_CONTEXT_GAP"
+
+
+def test_gate_rejects_an_engine_with_only_provider_configuration_failures() -> None:
+    """Configuration failures cannot be counted as live architecture evidence."""
+    case = _case()
+    rows = _live_gate_rows(
+        case,
+        v1_acceptance=(True, True, True),
+        v2_acceptance=(True, True, True),
+        v2_gap=True,
+    )
+    for row in rows:
+        if row["engine"] == "v2":
+            row["failure_stage"] = "provider"
+            row["failure_code"] = "configuration"
+
+    gate = evaluate_gate(rows)
+
+    assert gate == {
+        "ready": False,
+        "decision": None,
+        "reason": "CM-43 v2 runs never reached a valid provider transaction.",
+    }
+
+
+def test_v2_factory_exposes_awaitable_chat_creation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The live v2 factory must supply an async Chat Completions client."""
+
+    class AsyncCompletions:
+        async def create(self, **arguments: object) -> dict[str, object]:
+            return arguments
+
+    class AsyncChat:
+        completions = AsyncCompletions()
+
+    class AsyncClient:
+        chat = AsyncChat()
+
+    raw_client = AsyncClient()
+    monkeypatch.setattr(
+        "scripts.run_cbl_section_ab._load_async_openai_client",
+        lambda _settings: raw_client,
+    )
+    settings = _GenerationSettings(
+        base_url="https://provider.example/v1",
+        api_key="redacted",
+        temperature=1.0,
+        top_p=0.95,
+        max_output_tokens=16384,
+        max_tokens_parameter="max_tokens",
+        timeout_seconds=300.0,
+    )
+    _v1_factory, v2_factory = _factory_pair(
+        root=Path.cwd(),
+        settings=settings,
+        model="fake-model",
+    )
+
+    backend = v2_factory(_case())
+    configured = backend.client
+    request = configured.chat.completions.create(model="fake-model")
+
+    assert inspect.isawaitable(request)
+    arguments = asyncio.run(request)
+    assert arguments["temperature"] == 1.0
+    assert arguments["top_p"] == 0.95
+    assert arguments["max_tokens"] == 16384
 
 
 def test_gate_rejects_mixed_experiment_fingerprints() -> None:

@@ -549,6 +549,16 @@ def evaluate_gate(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
             "decision": None,
             "reason": "CM-43 evidence rows must share one experiment fingerprint.",
         }
+    for engine in ("v1", "v2"):
+        if grouped[engine] and all(
+            row.get("failure_stage") == "provider" and row.get("failure_code") == "configuration"
+            for row in grouped[engine]
+        ):
+            return {
+                "ready": False,
+                "decision": None,
+                "reason": (f"CM-43 {engine} runs never reached a valid provider transaction."),
+            }
     v2_gap = any(
         row.get("representability_status") == "sdk_prompt_contract_insufficient"
         for row in grouped["v2"]

@@ -57,15 +57,7 @@ class _ConfiguredCompletions:
     def create(self, **arguments: object) -> object:
         """Forward a request while filling only explicitly configured settings."""
         self.calls += 1
-        if self._settings.temperature is not None:
-            arguments.setdefault("temperature", self._settings.temperature)
-        if self._settings.top_p is not None:
-            arguments.setdefault("top_p", self._settings.top_p)
-        if self._settings.max_output_tokens is not None:
-            arguments.setdefault(
-                self._settings.max_tokens_parameter,
-                self._settings.max_output_tokens,
-            )
+        _apply_generation_settings(arguments, self._settings)
         return self._delegate.create(**arguments)  # type: ignore[attr-defined]
 
 
@@ -89,6 +81,67 @@ class _ConfiguredClient:
     def provider_generation_calls(self) -> int:
         """Expose the Chat request count to the v1 recorder."""
         return self.chat.completions.calls
+
+
+class _ConfiguredAsyncCompletions:
+    """Inject settings into an async Chat Completions namespace."""
+
+    def __init__(self, delegate: object, settings: _GenerationSettings) -> None:
+        self._delegate = delegate
+        self._settings = settings
+        self.calls = 0
+
+    async def create(self, **arguments: object) -> object:
+        """Forward one request through the async provider client."""
+        self.calls += 1
+        _apply_generation_settings(arguments, self._settings)
+        return await self._delegate.create(**arguments)  # type: ignore[attr-defined]
+
+
+class _ConfiguredAsyncChat:
+    """Proxy the async Chat Completions namespace used by v2."""
+
+    def __init__(self, delegate: object, settings: _GenerationSettings) -> None:
+        self.completions = _ConfiguredAsyncCompletions(
+            delegate.__getattribute__("completions"),
+            settings,
+        )
+
+
+class _ConfiguredAsyncClient:
+    """Proxy an async provider client without retaining credentials."""
+
+    def __init__(self, delegate: object, settings: _GenerationSettings) -> None:
+        self.chat = _ConfiguredAsyncChat(delegate.__getattribute__("chat"), settings)
+
+
+def _apply_generation_settings(
+    arguments: dict[str, object],
+    settings: _GenerationSettings,
+) -> None:
+    """Apply the frozen experiment settings to one Chat request."""
+    if settings.temperature is not None:
+        arguments.setdefault("temperature", settings.temperature)
+    if settings.top_p is not None:
+        arguments.setdefault("top_p", settings.top_p)
+    if settings.max_output_tokens is not None:
+        arguments.setdefault(settings.max_tokens_parameter, settings.max_output_tokens)
+
+
+def _load_async_openai_client(settings: _GenerationSettings) -> object:
+    """Construct the async client required by the v2 backend contract."""
+    try:
+        from openai import AsyncOpenAI
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Install `wellplot[agent]` or add the `openai` package to run CM-43."
+        ) from exc
+
+    return AsyncOpenAI(
+        api_key=settings.api_key,
+        base_url=settings.base_url,
+        timeout=settings.timeout_seconds,
+    )
 
 
 def _load_api_key(root: Path, *, key_file: str | None, key_env: str) -> str:
@@ -135,14 +188,10 @@ def _factory_pair(
     def v2_factory(case: CBLExperimentCase) -> OpenAICompatibleBackendV2:
         """Create a fresh v2 program adapter for one frozen case."""
         del case
-        raw_client = load_openai_client(
-            api_key=settings.api_key,
-            base_url=settings.base_url,
-            timeout=settings.timeout_seconds,
-        )
+        raw_client = _load_async_openai_client(settings)
         return OpenAICompatibleBackendV2(
             model=model,
-            client=_ConfiguredClient(raw_client, settings),
+            client=_ConfiguredAsyncClient(raw_client, settings),
             max_tokens_parameter=settings.max_tokens_parameter,  # type: ignore[arg-type]
         )
 
