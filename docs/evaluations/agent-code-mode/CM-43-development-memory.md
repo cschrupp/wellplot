@@ -16,6 +16,7 @@ document mutation path.
 - **Live runner commit:** `3864df2` (`Add CM-43 live experiment runner`).
 - **NVIDIA sampling correction:** `4d23704` (`Add top-p to CM-43 live settings`).
 - **NVIDIA settings evidence:** `b7a9f0c` (`Document CM-43 NVIDIA sampling settings`).
+- **Live evidence commit:** `4af7210` (`Record CM-43 live gate evidence`).
 
 ## Harness Corrections
 

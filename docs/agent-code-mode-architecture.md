@@ -133,7 +133,7 @@ fragment through the SDK runtime.
 | CM-40 Semantic planner v2 | Complete (`a9f4a21`) | Static semantic plan and one-call provider boundary pass |
 | CM-41 Deterministic enrichment | Complete (`58b9d01`) | Host-bounded source/target enrichment and immutable worker context pass |
 | CM-42 Scalar section program worker | Complete (`392778c`) | New scalar section compiles, interprets, and privately dry-runs |
-| CM-43 CBL section A/B experiment | Complete pending evidence commit | Six live runs return `STOP_SDK_CONTEXT_GAP`; generic SDK/context expansion required before CM-44 |
+| CM-43 CBL section A/B experiment | Complete (`4af7210`) | Six live runs return `STOP_SDK_CONTEXT_GAP`; generic SDK/context expansion required before CM-44 |
 | CM-44 Report program worker | Not started | Full report development set passes |
 | CM-45 through CM-48 Graph parity | Not started | Full report/revision graph parity and cutover gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
