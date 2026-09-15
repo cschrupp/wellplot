@@ -16,7 +16,9 @@ document mutation path.
 - **Live runner commit:** `3864df2` (`Add CM-43 live experiment runner`).
 - **NVIDIA sampling correction:** `4d23704` (`Add top-p to CM-43 live settings`).
 - **NVIDIA settings evidence:** `b7a9f0c` (`Document CM-43 NVIDIA sampling settings`).
-- **Live evidence commit:** `4af7210` (`Record CM-43 live gate evidence`).
+- **Initial live evidence commit:** `4af7210` (`Record CM-43 live gate evidence`);
+  superseded because the v2 factory used a synchronous client.
+- **Async v2 runner correction:** `ca8e80d` (`Fix CM-43 async v2 live client`).
 
 ## Harness Corrections
 
@@ -116,10 +118,16 @@ UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run --extra agent \
   --timeout 300
 ```
 
-The required three live runs per engine were collected with the NVIDIA
-configuration above. All six rows share fingerprint
-`52deb03472c4939efa00cfda95c429850cdb0dd90735c910ca04ba9ad3910cc1` and are
-stored in `CM-43-live-runs.jsonl`. The file contains redacted metrics only;
+The first six-run batch was not valid final evidence: every v2 row stopped at
+provider configuration because the runner supplied a synchronous client to the
+async v2 backend. The runner correction was committed without changing the
+frozen case or settings, then the complete three-plus-three experiment was
+rerun. The corrected six rows now replace the initial rows in
+`CM-43-live-runs.jsonl`.
+
+All corrected rows share fingerprint
+`52deb03472c4939efa00cfda95c429850cdb0dd90735c910ca04ba9ad3910cc1` and use
+the NVIDIA configuration above. The file contains redacted metrics only;
 provider responses, source text, and credentials are not retained.
 
 The aggregate evidence is:
@@ -127,11 +135,14 @@ The aggregate evidence is:
 | Engine | Engine success | Common acceptance | Representability | Provider calls |
 | --- | ---: | ---: | --- | --- |
 | v1 | 2/3 | 2/3 | complete on successful runs | 1 when exposed; otherwise unavailable |
-| v2 | 0/3 | 0/3 | `sdk_prompt_contract_insufficient` in all runs | 1/3 |
+| v2 | 2/3 | 0/3 | `sdk_prompt_contract_insufficient` in all runs | 1, 2, 2 |
 
-The v1 worker latencies were `2417.71`, `94600.14`, and `82023.29` ms. The
-v2 worker latencies were `14732.63`, `14869.41`, and `17230.55` ms. Token
-counts and unavailable provider metrics remain redacted or marked
+The corrected v1 worker latencies were `2401.35`, `131266.71`, and
+`61629.33` ms. The corrected v2 worker latencies were `21621.82`, `26836.71`,
+and `55465.70` ms. The v2 generated-program lengths were `992`, `1041`, and
+`1014` characters, with `203`, `215`, and `215` AST nodes. The third v2 run
+reached the provider and then failed during worker execution; it was not a
+configuration failure. Token counts remain redacted or marked
 `not_available` by the evidence contract.
 
 The live runner must use the same provider family, model, temperature, output
@@ -140,7 +151,7 @@ JSONL rows containing engine success, common acceptance, omissions, repairs,
 provider calls/tokens, worker/provider latency, prompt/schema/source metrics,
 legacy-core reachability, the shared experiment fingerprint, and failure codes.
 
-The live decision is `STOP_SDK_CONTEXT_GAP`; do not modify
+The corrected live decision is `STOP_SDK_CONTEXT_GAP`; do not modify
 `ProgramSectionCompiler` retroactively or weaken the CBL acceptance contract.
 The next engineering slice should be a generic SDK/context expansion exposing
 normal, reference, and array tracks plus curve/raster bindings, with no CBL- or
@@ -156,7 +167,8 @@ VDL-specific branch.
 
 ## Decision
 
-**STOP:** CM-43 is complete with decision `STOP_SDK_CONTEXT_GAP`. Do not
-proceed to CM-44. The next authorized slice is the generic SDK/context
-expansion described above; rerun this unchanged six-run case before revisiting
-the report worker.
+**STOP:** The corrected CM-43 evidence still yields `STOP_SDK_CONTEXT_GAP`.
+Do not proceed to CM-44. Finalize this evidence batch before declaring CM-43
+closed. The next authorized slice is the generic SDK/context expansion
+described above; rerun this unchanged six-run case before revisiting the
+report worker.
