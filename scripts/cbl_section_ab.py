@@ -85,6 +85,7 @@ class CBLExperimentCase:
     provider: str
     model: str
     temperature: float | None
+    top_p: float | None
     max_output_tokens: int | None
     timeout_seconds: float
     run_count: int
@@ -98,6 +99,7 @@ class CBLExperimentCase:
         provider: str = "unspecified",
         model: str = "unspecified",
         temperature: float | None = None,
+        top_p: float | None = None,
         max_output_tokens: int | None = None,
         timeout_seconds: float = 1800.0,
         run_count: int = 3,
@@ -143,6 +145,7 @@ class CBLExperimentCase:
             provider=provider,
             model=model,
             temperature=temperature,
+            top_p=top_p,
             max_output_tokens=max_output_tokens,
             timeout_seconds=timeout_seconds,
             run_count=run_count,
@@ -161,6 +164,7 @@ class CBLExperimentCase:
             "section_id": self.section_plan.section_id,
             "starter_sha256": FROZEN_STARTER_SHA256,
             "temperature": self.temperature,
+            "top_p": self.top_p,
             "timeout_seconds": self.timeout_seconds,
         }
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -216,6 +220,7 @@ class CBLRunEvidence:
     model: str
     experiment_fingerprint: str
     temperature: float | None
+    top_p: float | None
     max_output_tokens: int | None
     timeout_seconds: float
     engine_success: bool
@@ -871,6 +876,7 @@ def _evidence(
         model=case.model,
         experiment_fingerprint=case.experiment_fingerprint,
         temperature=case.temperature,
+        top_p=case.top_p,
         max_output_tokens=case.max_output_tokens,
         timeout_seconds=case.timeout_seconds,
         engine_success=engine_success,

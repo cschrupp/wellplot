@@ -40,6 +40,7 @@ class _GenerationSettings:
     base_url: str
     api_key: str
     temperature: float | None
+    top_p: float | None
     max_output_tokens: int | None
     max_tokens_parameter: str
     timeout_seconds: float
@@ -58,6 +59,8 @@ class _ConfiguredCompletions:
         self.calls += 1
         if self._settings.temperature is not None:
             arguments.setdefault("temperature", self._settings.temperature)
+        if self._settings.top_p is not None:
+            arguments.setdefault("top_p", self._settings.top_p)
         if self._settings.max_output_tokens is not None:
             arguments.setdefault(
                 self._settings.max_tokens_parameter,
@@ -156,6 +159,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key-file")
     parser.add_argument("--api-key-env", default="OPENAI_COMPAT_API_KEY")
     parser.add_argument("--temperature", type=float, default=None)
+    parser.add_argument("--top-p", type=float, default=None)
     parser.add_argument("--max-output-tokens", type=int, default=None)
     parser.add_argument(
         "--max-tokens-parameter",
@@ -186,6 +190,7 @@ async def _run(arguments: argparse.Namespace) -> dict[str, object]:
         provider=arguments.provider,
         model=arguments.model,
         temperature=arguments.temperature,
+        top_p=arguments.top_p,
         max_output_tokens=arguments.max_output_tokens,
         timeout_seconds=arguments.timeout,
         run_count=3,
@@ -194,6 +199,7 @@ async def _run(arguments: argparse.Namespace) -> dict[str, object]:
         base_url=arguments.base_url,
         api_key=api_key,
         temperature=arguments.temperature,
+        top_p=arguments.top_p,
         max_output_tokens=arguments.max_output_tokens,
         max_tokens_parameter=arguments.max_tokens_parameter,
         timeout_seconds=arguments.timeout,

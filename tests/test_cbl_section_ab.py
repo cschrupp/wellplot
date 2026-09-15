@@ -63,6 +63,7 @@ def _case(*, run_count: int = 3) -> CBLExperimentCase:
     return CBLExperimentCase.load(
         provider="fake",
         model="fake-model",
+        top_p=0.95,
         run_count=run_count,
     )
 
@@ -90,6 +91,7 @@ def test_case_freezes_prompt_starter_contract_and_derives_both_inputs() -> None:
     case = _case()
 
     assert case.section_plan.section_id == "main_pass"
+    assert case.top_p == 0.95
     assert case.section_task.capability_ids == (
         "binding.curve",
         "binding.raster",
