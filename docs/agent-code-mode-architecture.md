@@ -135,7 +135,8 @@ fragment through the SDK runtime.
 | CM-42 Scalar section program worker | Complete (`392778c`) | New scalar section compiles, interprets, and privately dry-runs |
 | CM-43 CBL section A/B experiment | Complete (`37bc02c`) | Corrected six-run evidence reaches v2 generation and returns `STOP_SDK_CONTEXT_GAP`; generic SDK/context expansion required before CM-44 |
 | CM-43R Generic section SDK/context expansion | Complete (`c4fecb4`) | Opaque host-owned sources and generic normal/reference/array plus curve/raster section primitives; unchanged live gate returns `STOP_V2_REGRESSION` |
-| CM-44 Report program worker | Blocked (`STOP_V2_REGRESSION`) | Full report development set passes after the frozen CBL gate is competitive |
+| CM-43R2 Grounded section repair and A/B parity | Complete (`b95b58b`) | Generic exact-channel semantic projection and bounded repair context; unchanged live gate returns `PROCEED` |
+| CM-44 Report program worker | Not started (unblocked) | Full report development set passes after the frozen CBL gate is competitive |
 | CM-45 through CM-48 Graph parity | Not started | Full report/revision graph parity and cutover gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
