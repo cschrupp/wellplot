@@ -19,6 +19,7 @@ document mutation path.
 - **Initial live evidence commit:** `4af7210` (`Record CM-43 live gate evidence`);
   superseded because the v2 factory used a synchronous client.
 - **Async v2 runner correction:** `ca8e80d` (`Fix CM-43 async v2 live client`).
+- **Corrected live evidence commit:** `37bc02c` (`Record corrected CM-43 live evidence`).
 
 ## Harness Corrections
 
@@ -82,8 +83,8 @@ valid.
 
 ## Validation
 
-- CM-43-focused tests: `10 passed`.
-- Adjacent Code Mode/CBL regression selection: `65 passed`.
+- CM-43-focused tests: `12 passed`.
+- Adjacent Code Mode/CBL regression selection: `67 passed`.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
