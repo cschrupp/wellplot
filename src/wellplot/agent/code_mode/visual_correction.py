@@ -22,6 +22,7 @@ from ...authoring_service import AuthoringService
 from ...capabilities import CapabilityRegistry
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
+from ..providers.base import ProviderRequestError
 from .enrichment import EnrichedSemanticContext, ReportContext, ResolvedSectionContext
 from .planner import SectionTask, SemanticPlan
 from .program_worker import ProgramSectionCompiler
@@ -270,14 +271,23 @@ class VisualSectionCorrectionCoordinator:
             )
 
         correction_context = _correction_context(correction, section_context)
-        worker_result = await self.section_compiler.compile(
-            task_index=0,
-            context=correction_context,
-            document=document,
-            timeout_seconds=timeout_seconds,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
-        )
+        try:
+            worker_result = await self.section_compiler.compile(
+                task_index=0,
+                context=correction_context,
+                document=document,
+                timeout_seconds=timeout_seconds,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+            )
+        except ProviderRequestError as error:
+            return _failure(
+                VisualCorrectionStopReason.CORRECTION_WORKER_FAILED,
+                error.safe_message,
+                artifact=artifact,
+                correction=correction,
+                metrics=base_metrics.model_copy(update={"correction_count": 1}),
+            )
         metrics = base_metrics.model_copy(
             update={
                 "correction_count": 1,

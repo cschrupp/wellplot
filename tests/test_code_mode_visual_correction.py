@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import anyio
 import pytest
 
-from wellplot.agent.code_mode.enrichment import ResolvedSectionContext
+from wellplot.agent.code_mode.enrichment import ResolvedSectionContext, SourceContext
 from wellplot.agent.code_mode.visual_correction import (
     SectionRenderArtifact,
     SectionRenderImage,
@@ -15,10 +15,12 @@ from wellplot.agent.code_mode.visual_correction import (
     VisualEvaluator,
     VisualRenderError,
     VisualReviewDecision,
+    VisualReviewError,
     VisualReviewRequest,
     VisualSectionCorrection,
     VisualSectionCorrectionCoordinator,
 )
+from wellplot.agent.providers.base import ProviderFailureCategory, ProviderRequestError
 from wellplot.authoring_program.models import (
     AuthoringProgram,
     ProgramArtifact,
@@ -77,9 +79,18 @@ def _original_intent() -> AuthoringDocumentIntent:
     )
 
 
-def _context() -> ResolvedSectionContext:
+def _context(*, include_source: bool = False) -> ResolvedSectionContext:
     """Return the host-selected opaque section context."""
-    return ResolvedSectionContext(task_index=0, section_id="main")
+    sources = ()
+    if include_source:
+        sources = (
+            SourceContext(
+                candidate_id="source",
+                canonical_path="/secret/source/CBL.dlis",
+                source_format="dlis",
+            ),
+        )
+    return ResolvedSectionContext(task_index=0, section_id="main", sources=sources)
 
 
 def _execution_result(
@@ -119,10 +130,13 @@ class _Evaluator:
     """Return one deterministic review decision while recording its safe request."""
 
     decision: VisualReviewDecision
+    error: VisualReviewError | None = None
     requests: list[VisualReviewRequest] = field(default_factory=list)
 
     async def review(self, request: VisualReviewRequest) -> VisualReviewDecision:
         self.requests.append(request)
+        if self.error is not None:
+            raise self.error
         return self.decision
 
 
@@ -131,10 +145,13 @@ class _SectionCompiler:
     """Return one deterministic correction-worker result."""
 
     result: ProgramExecutionResult
+    error: ProviderRequestError | None = None
     calls: list[dict[str, object]] = field(default_factory=list)
 
     async def compile(self, **kwargs: object) -> ProgramExecutionResult:
         self.calls.append(kwargs)
+        if self.error is not None:
+            raise self.error
         return self.result
 
 
@@ -220,6 +237,100 @@ def test_visual_correction_applies_one_root_change_and_preserves_everything_else
     assert "main" not in review_payload
     assert "document" not in review_payload
     assert "output_path" not in review_payload
+
+
+def test_visual_correction_normalizes_provider_failure_at_worker_boundary() -> None:
+    """A provider failure becomes stable worker evidence without a partial result."""
+    renderer = _Renderer()
+    evaluator = _Evaluator(
+        VisualReviewDecision(
+            correction=VisualSectionCorrection(
+                capability_id="section.log_plot",
+                issue="The section subtitle is missing.",
+                requested_adjustment="Set the subtitle to 'Corrected'.",
+            )
+        )
+    )
+    compiler = _SectionCompiler(
+        _execution_result(AuthoringDocumentIntent()),
+        error=ProviderRequestError(
+            ProviderFailureCategory.TIMEOUT,
+            "Section correction provider timed out.",
+        ),
+    )
+
+    result = _run(
+        _coordinator(renderer, evaluator, compiler),
+        **_kwargs(),
+    )
+
+    assert result.success is False
+    assert result.stop_reason is VisualCorrectionStopReason.CORRECTION_WORKER_FAILED
+    assert result.corrected_document is None
+    assert result.metrics.render_count == 1
+    assert result.metrics.review_count == 1
+    assert result.metrics.correction_count == 1
+    assert result.metrics.repair_count == 0
+    assert result.diagnostics[0].message == "Section correction provider timed out."
+
+
+def test_initial_render_failure_is_a_bounded_terminal_result() -> None:
+    """An initial render failure prevents visual review and correction."""
+    renderer = _Renderer(fail_on_call=1)
+    evaluator = _Evaluator(VisualReviewDecision())
+    compiler = _SectionCompiler(_execution_result(AuthoringDocumentIntent()))
+
+    result = _run(
+        _coordinator(renderer, evaluator, compiler),
+        **_kwargs(),
+    )
+
+    assert result.success is False
+    assert result.stop_reason is VisualCorrectionStopReason.INITIAL_RENDER_FAILED
+    assert result.metrics.render_count == 1
+    assert result.metrics.review_count == 0
+    assert evaluator.requests == []
+    assert compiler.calls == []
+
+
+def test_visual_review_failure_is_a_bounded_terminal_result() -> None:
+    """An explicit evaluator failure does not enter the correction worker."""
+    renderer = _Renderer()
+    evaluator = _Evaluator(
+        VisualReviewDecision(),
+        error=VisualReviewError("fixture reviewer failed"),
+    )
+    compiler = _SectionCompiler(_execution_result(AuthoringDocumentIntent()))
+
+    result = _run(
+        _coordinator(renderer, evaluator, compiler),
+        **_kwargs(),
+    )
+
+    assert result.success is False
+    assert result.stop_reason is VisualCorrectionStopReason.REVIEW_FAILED
+    assert result.metrics.render_count == 1
+    assert result.metrics.review_count == 1
+    assert compiler.calls == []
+
+
+def test_visual_review_context_redacts_canonical_source_paths() -> None:
+    """Host source paths remain in section context but not review payloads."""
+    renderer = _Renderer()
+    evaluator = _Evaluator(VisualReviewDecision())
+    compiler = _SectionCompiler(_execution_result(AuthoringDocumentIntent()))
+    kwargs = _kwargs()
+    kwargs["section_context"] = _context(include_source=True)
+
+    result = _run(
+        _coordinator(renderer, evaluator, compiler),
+        **kwargs,
+    )
+
+    assert result.success is True
+    review_payload = evaluator.requests[0].model_dump_json()
+    assert "/secret/source/CBL.dlis" not in review_payload
+    assert "source" not in review_payload
 
 
 def test_visual_correction_stops_successfully_without_a_second_render() -> None:

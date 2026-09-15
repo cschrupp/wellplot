@@ -31,6 +31,7 @@ PROGRAM_AND_CAPABILITY_DEPENDENCIES = (
     *MCP_DEPENDENCIES,
 )
 LEGACY_CODE_MODE_DEPENDENCIES = (
+    "wellplot.agent.graph",
     "wellplot.agent.core",
     "wellplot.agent.branch_compiler",
     "wellplot.agent.compilation",
