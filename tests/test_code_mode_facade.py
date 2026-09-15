@@ -21,10 +21,19 @@ from wellplot.agent.code_mode.facade import (
     CodeModeCompileFacade,
     CodeModeCompileResult,
 )
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import (
+    CompilationMode,
+    ReportTask,
+    SectionTask,
+    SemanticPlan,
+)
 from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
 from wellplot.agent.graph import (
     ReconstructionGraphDependencies,
+    ReconstructionPlanner,
+    ReportCompiler,
+    SectionCompiler,
+    compile_document_revision,
 )
 from wellplot.agent.graph import (
     build_compile_graph as build_legacy_graph,
@@ -134,8 +143,11 @@ class _Enricher:
         return EnrichedSemanticContext(
             plan=plan,
             sections=tuple(
-                ResolvedSectionContext(task_index=index)
-                for index, _task in enumerate(plan.section_tasks)
+                ResolvedSectionContext(
+                    task_index=index,
+                    section_id=("existing" if task.existing_section_hint else None),
+                )
+                for index, task in enumerate(plan.section_tasks)
             ),
             report=ReportContext(),
         )
@@ -182,12 +194,14 @@ class _Workers:
             )
         if self.fail_kind == "section":
             return _failed_result()
+        task = context.plan.section_tasks[0]
+        target_id = context.sections[0].section_id
         return _success_result(
             AuthoringDocumentIntent(
                 sections=[
                     {
-                        "section_id": f"section-{index}",
-                        "title": f"Section {index}",
+                        "section_id": target_id or f"section-{index}",
+                        "title": task.goal if target_id else f"Section {index}",
                     }
                 ]
             ),
@@ -232,12 +246,14 @@ async def _compile(
     facade: CodeModeCompileFacade,
     *,
     request: str = "compile the fixture",
+    mode: CompilationMode = "reconstruct",
+    document: AuthoringDocumentSpec | None = None,
 ) -> CodeModeCompileResult:
     """Invoke the facade with its stable host inputs."""
     return await facade.compile(
         request=request,
-        mode="reconstruct",
-        document=_document(),
+        mode=mode,
+        document=document or _document(),
         source_candidates=(),
         timeout_seconds=5.0,
     )
@@ -254,6 +270,22 @@ def _plan(*, report: bool, sections: int) -> SemanticPlan:
                 capability_ids=("section.log_plot",),
             )
             for index in range(sections)
+        ),
+    )
+
+
+def _revision_plan(*, report: bool, sections: int) -> SemanticPlan:
+    """Build deterministic report, existing-section, and mixed revision plans."""
+    return SemanticPlan(
+        summary="revision fixture",
+        report_task=ReportTask(goal="Updated report") if report else None,
+        section_tasks=tuple(
+            SectionTask(
+                goal="Existing section revised",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Existing section",
+            )
+            for _index in range(sections)
         ),
     )
 
@@ -403,6 +435,153 @@ def test_v2_parity_matches_deterministic_legacy_graph_for_sections() -> None:
     assert legacy_result["merged_intent"] == v2_result.merged_intent.model_dump(
         mode="json", exclude_unset=True
     )
+
+
+@dataclass
+class _LegacyRevisionModel:
+    """Deterministic structured model for legacy revision parity fixtures."""
+
+    include_report: bool
+
+    async def generate(
+        self,
+        *,
+        response_model: type[object],
+        tool_name: str,
+        **_kwargs: object,
+    ) -> object:
+        """Return one fixed report-plus-existing-section revision shape."""
+        if tool_name == "submit_reconstruction_plan":
+            return response_model.model_validate(
+                {
+                    "summary": "Revision fixture",
+                    "sections": [
+                        {
+                            "section_id": "existing",
+                            "capability_id": "section.log_plot",
+                            "goal": "Existing section revised",
+                        }
+                    ],
+                }
+            )
+        if tool_name == "submit_report_artifact":
+            intent = {"title": "Updated report"} if self.include_report else {}
+            return response_model.model_validate({"intent": intent})
+        if tool_name == "submit_section_artifact":
+            return response_model.model_validate(
+                {
+                    "section": {
+                        "section_id": "existing",
+                        "title": "Existing section revised",
+                    }
+                }
+            )
+        raise AssertionError(f"Unexpected legacy revision tool: {tool_name}")
+
+
+class _LegacyReportBoundary:
+    """Represent the unchanged legacy report-worker boundary for parity."""
+
+    async def compile(self, **_kwargs: object) -> CompiledArtifact:
+        """Return the exact report intent used by the revision fixture."""
+        return CompiledArtifact(
+            worker_id="report",
+            capability_id="report.standard",
+            target_id="report",
+            payload={"intent": {"title": "Updated report"}},
+        )
+
+
+def _legacy_revision_intent(*, include_report: bool) -> AuthoringDocumentIntent:
+    """Compile one comparable existing-section revision through the legacy graph."""
+    registry = create_builtin_registry()
+    model = _LegacyRevisionModel(include_report=include_report)
+    graph = build_legacy_graph(
+        ReconstructionGraphDependencies(
+            planner=ReconstructionPlanner(model=model, registry=registry),
+            report_compiler=ReportCompiler(model=model, registry=registry),
+            section_compiler=SectionCompiler(model=model, registry=registry),
+            registry=registry,
+        )
+    )
+    result = asyncio.run(
+        compile_document_revision(
+            graph,
+            request="Revise the existing section fixture.",
+            current_document=_document(),
+        )
+    )
+    return result.intent
+
+
+def test_v2_report_only_revision_matches_legacy_report_boundary() -> None:
+    """Report-only revision compares exactly at the legacy report-worker boundary."""
+    document = _document()
+    before = document.model_dump(mode="json")
+    result = asyncio.run(
+        _compile(
+            _facade(_revision_plan(report=True, sections=0), _Workers()),
+            mode="revise",
+            document=document,
+        )
+    )
+    legacy_artifact = asyncio.run(_LegacyReportBoundary().compile())
+    legacy_intent = AuthoringDocumentIntent.model_validate(legacy_artifact.payload["intent"])
+
+    assert result.success is True
+    assert result.merged_intent is not None
+    assert result.merged_intent.model_dump(exclude_unset=True) == legacy_intent.model_dump(
+        exclude_unset=True
+    )
+    assert document.model_dump(mode="json") == before
+    assert result.merged_intent.sections is None
+
+
+@pytest.mark.parametrize("include_report", [False, True])
+def test_v2_revision_matches_legacy_graph_for_existing_and_mixed_shapes(
+    include_report: bool,
+) -> None:
+    """Existing-section and mixed revision shapes have exact canonical parity."""
+    document = _document()
+    before = document.model_dump(mode="json")
+    result = asyncio.run(
+        _compile(
+            _facade(_revision_plan(report=include_report, sections=1), _Workers()),
+            mode="revise",
+            document=document,
+        )
+    )
+    legacy_intent = _legacy_revision_intent(include_report=include_report)
+
+    assert result.success is True
+    assert result.merged_intent is not None
+    assert result.merged_intent.model_dump(exclude_unset=True) == legacy_intent.model_dump(
+        exclude_unset=True
+    )
+    assert document.model_dump(mode="json") == before
+    section = result.merged_intent.sections[0]
+    assert section.subtitle is None
+    assert section.tracks is None
+
+
+def test_mixed_revision_failure_is_atomic_without_partial_intent() -> None:
+    """A failed existing-section worker cannot publish a successful report fragment."""
+    document = _document()
+    before = document.model_dump(mode="json")
+    result = asyncio.run(
+        _compile(
+            _facade(
+                _revision_plan(report=True, sections=1),
+                _Workers(fail_kind="section"),
+            ),
+            mode="revise",
+            document=document,
+        )
+    )
+
+    assert result.success is False
+    assert result.merged_intent is None
+    assert document.model_dump(mode="json") == before
 
 
 def test_worker_failure_is_normalized_without_partial_intent() -> None:
