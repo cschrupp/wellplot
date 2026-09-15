@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).parents[1]))
 from scripts.cbl_section_ab import (
     CBLExperimentCase,
     LegacyBackendRecorder,
+    _section_task,
     evaluate_gate,
     evaluate_section_intent,
     run_ab,
@@ -109,6 +110,16 @@ def test_case_freezes_prompt_starter_contract_and_derives_both_inputs() -> None:
     )
     assert case.section_context.sections[0].section_id is None
     assert "wp.section" in _SDK_REFERENCE
+
+
+def test_section_task_preserves_exact_channel_facts_without_legacy_ids() -> None:
+    """The A/B adapter retains semantic channels without copying component identity."""
+    task = _section_task(_case().section_plan)
+
+    assert any("exact scalar source channel 'CBL'" in item for item in task.requirements)
+    assert any("exact array source channel 'VDL'" in item for item in task.requirements)
+    assert all("binding_id" not in item for item in task.requirements)
+    assert all("main_pass.cbl" not in item for item in task.requirements)
 
 
 def test_common_acceptance_requires_all_cbl_track_roles() -> None:

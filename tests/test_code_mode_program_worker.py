@@ -87,10 +87,14 @@ def _context(
     extra_task: SectionTask | None = None,
     section_id: str | None = None,
     channel: str = "GR",
+    channel_specs: tuple[ChannelContext, ...] | None = None,
 ) -> EnrichedSemanticContext:
     """Build indexed enrichment with only the selected source projection."""
     selected_task = task or _task()
     tasks = [selected_task]
+    selected_channels = channel_specs or (
+        ChannelContext(mnemonic=channel, kind="scalar", unit="gAPI"),
+    )
     sections = [
         ResolvedSectionContext(
             task_index=0,
@@ -101,15 +105,17 @@ def _context(
                     canonical_path="/approved/pilot.las",
                     source_format="las",
                     dataset_name="pilot",
-                    channels=(ChannelContext(mnemonic=channel, kind="scalar", unit="gAPI"),),
+                    channels=selected_channels,
                 ),
             ),
             channels=(
                 {
-                    "mnemonic": channel,
-                    "kind": "scalar",
-                    "unit": "gAPI",
-                },
+                    "mnemonic": item.mnemonic,
+                    "kind": item.kind,
+                    "unit": item.unit,
+                    "shape": item.shape,
+                }
+                for item in selected_channels
             ),
         )
     ]
@@ -150,6 +156,43 @@ def _source_program() -> str:
         "track = wp.track(section, id_hint='normal', kind='normal', "
         "title='Gamma Ray', width_mm=30)\n"
         "wp.curve(track, channel='GR', label='GR')\n"
+    )
+
+
+def _generic_binding_task() -> SectionTask:
+    """Build a generic section task requiring scalar and array bindings."""
+    return SectionTask(
+        goal="Create a generic section with scalar and array displays.",
+        capability_ids=(
+            "binding.curve",
+            "binding.raster",
+            "section.log_plot",
+            "track.array",
+            "track.normal",
+        ),
+        requirements=(
+            "Bind exact scalar source channel 'CBL' twice for two presentations.",
+            "Bind exact array source channel 'VDL' as a raster.",
+        ),
+        constraints=(),
+    )
+
+
+def _generic_binding_program(*, invented_channels: bool) -> str:
+    """Return a generic two-track program with optionally invented channel names."""
+    cbl_channel = "CBL_0_100" if invented_channels else "CBL"
+    vdl_channel = "VDL_WAVEFORM" if invented_channels else "VDL"
+    return (
+        "report = wp.report()\n"
+        "source = wp.source('pilot.las')\n"
+        "section = wp.section(report, id_hint='pilot', title='Pilot', source=source)\n"
+        "cbl = wp.track(section, id_hint='cbl', kind='normal', "
+        "title='CBL', width_mm=44)\n"
+        "vdl = wp.track(section, id_hint='vdl', kind='array', "
+        "title='VDL', width_mm=48)\n"
+        f"wp.curve(cbl, channel='{cbl_channel}', id_hint='broad')\n"
+        f"wp.curve(cbl, channel='{cbl_channel}', id_hint='tight')\n"
+        f"wp.raster(vdl, channel='{vdl_channel}')\n"
     )
 
 
@@ -257,6 +300,47 @@ def test_source_candidate_is_associated_without_exposing_canonical_path() -> Non
     assert section.data_source is not None
     assert section.data_source.source_path == "/approved/pilot.las"
     assert "/approved/pilot.las" not in backend.requests[0].user_prompt
+
+
+def test_repair_prompt_reuses_bounded_exact_channel_facts() -> None:
+    """A repair can correct invented channels from the same bounded facts as generation."""
+    backend = _Backend(
+        responses=[
+            _generic_binding_program(invented_channels=True),
+            _generic_binding_program(invented_channels=False),
+        ]
+    )
+    context = _context(
+        task=_generic_binding_task(),
+        channel_specs=(
+            ChannelContext(mnemonic="CBL", kind="scalar", unit="mV"),
+            ChannelContext(mnemonic="VDL", kind="array", shape=(128, 64)),
+        ),
+    )
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    assert len(backend.requests) == 2
+    repair_prompt = backend.requests[1].user_prompt
+    assert '"mnemonic":"CBL"' in repair_prompt
+    assert '"kind":"scalar"' in repair_prompt
+    assert '"mnemonic":"VDL"' in repair_prompt
+    assert '"kind":"array"' in repair_prompt
+    assert "Multiple bindings may reference the same source channel." in repair_prompt
+    assert "/approved/" not in repair_prompt
+    repair_context = repair_prompt.split(
+        "\n\nRelevant SDK documentation:",
+        maxsplit=1,
+    )[0]
+    assert "CBL_0_100" not in repair_context
+    assert "VDL_WAVEFORM" not in repair_context
 
 
 def test_each_worker_attempt_gets_fresh_source_handle_provenance() -> None:

@@ -28,7 +28,7 @@ from wellplot.agent.code_mode.program_worker import (
 )
 from wellplot.agent.graph.executor import execute_document_intent
 from wellplot.agent.graph.merge import merge_compiled_artifacts
-from wellplot.agent.graph.models import SectionPlan
+from wellplot.agent.graph.models import SectionPlan, SemanticComponentPlan
 from wellplot.agent.graph.provider_adapter import StructuredModelProtocol
 from wellplot.agent.graph.section_worker import SectionCompiler
 from wellplot.agent.providers.base import (
@@ -747,7 +747,7 @@ def _available_channels(case: CBLExperimentCase) -> list[AuthoringChannelCandida
 def _section_task(plan: SectionPlan) -> SectionTask:
     """Derive a static v2 task from the frozen v1 section plan."""
     capability_ids = {plan.capability_id, *(item.capability_id for item in plan.components)}
-    requirements = tuple(item.goal for item in plan.components)
+    requirements = tuple(_semantic_requirement(item) for item in plan.components)
     source_hints = (plan.data_source.source_path,) if plan.data_source is not None else ()
     return SectionTask(
         goal=plan.goal,
@@ -756,6 +756,25 @@ def _section_task(plan: SectionPlan) -> SectionTask:
         requirements=requirements,
         constraints=tuple(plan.constraints),
     )
+
+
+def _semantic_requirement(component: SemanticComponentPlan) -> str:
+    """Project one legacy component into a semantic, identity-free requirement."""
+    capability_id = component.capability_id
+    details = [component.goal]
+    parent_component_id = component.parent_component_id
+    if parent_component_id:
+        details.append(f"Parent role: {parent_component_id.rsplit('.', 1)[-1]}.")
+
+    if capability_id.startswith("track."):
+        details.append(f"Track kind: {capability_id.removeprefix('track.')}.")
+    elif capability_id.startswith("binding."):
+        binding_kind = "array" if capability_id == "binding.raster" else "scalar"
+        channel = component.values.get("channel")
+        if isinstance(channel, str) and channel:
+            details.append(f"Use exact {binding_kind} source channel '{channel}'.")
+        details.append("Multiple bindings may reference the same source channel.")
+    return " ".join(details)
 
 
 def _section_context(

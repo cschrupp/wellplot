@@ -74,9 +74,18 @@ wp.raster(array, channel='ARRAY_CHANNEL', label='Array label')
 
 Only the root calls and keyword arguments shown above are executable. Create a
 new section only. Use only source candidate IDs supplied in the task context.
+Use only exact supplied channel mnemonics or explicitly supplied aliases. Never
+invent, derive, suffix, expand, or rename channel names. Multiple bindings may
+reference the same source channel.
 Do not use existing document identifiers, selection/update operations,
 report-wide settings, or filesystem operations.
 Return only the program source, with no markdown fences or explanation."""
+
+_CHANNEL_GROUNDING_RULE = (
+    "Use only exact supplied channel mnemonics or explicitly supplied aliases. "
+    "Never invent, derive, suffix, expand, or rename channel names. Multiple "
+    "bindings may reference the same source channel."
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -134,7 +143,7 @@ class ProgramSectionCompiler:
         diagnostic = initial.diagnostics[0]
         coordinator = self.repair_coordinator or ProgramRepairCoordinator(self.backend)
         repair = await coordinator.repair(
-            semantic_task=_semantic_task_text(task),
+            semantic_task=_repair_context_text(task, section_context),
             sdk_docs=_SDK_REFERENCE,
             previous_program=generated.text,
             diagnostic=diagnostic,
@@ -261,48 +270,62 @@ def _worker_prompt(
 ) -> str:
     """Serialize only the selected section's bounded worker context."""
     payload = {
-        "section_task": {
-            "goal": task.goal,
-            "capability_ids": list(task.capability_ids),
-            "requirements": list(task.requirements),
-            "constraints": list(task.constraints),
-        },
+        "section_task": _semantic_task_payload(task),
         "capabilities": capabilities,
-        "section_context": {
-            "task_index": section_context.task_index,
-            "section_id": section_context.section_id,
-            "channels": [channel.model_dump(mode="json") for channel in section_context.channels],
-            "sources": [
-                {
-                    "candidate_id": source.candidate_id,
-                    "source_format": source.source_format,
-                    "dataset_name": source.dataset_name,
-                    "well_metadata": [
-                        item.model_dump(mode="json") for item in source.well_metadata
-                    ],
-                    "channels": [channel.model_dump(mode="json") for channel in source.channels],
-                }
-                for source in section_context.sources
-            ],
-        },
+        "section_context": _bounded_section_context(section_context),
         "sdk_reference": _SDK_REFERENCE,
     }
     return (
         "Create one new section from this scoped context. When a source candidate "
         "is needed, resolve its exact candidate_id with wp.source() and pass the "
-        "handle to wp.section(). Do not add report-wide settings or use context "
-        "outside this task.\n\n" + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        "handle to wp.section(). "
+        + _CHANNEL_GROUNDING_RULE
+        + " Do not add report-wide settings or use context outside this task.\n\n"
+        + json.dumps(payload, sort_keys=True, separators=(",", ":"))
     )
 
 
-def _semantic_task_text(task: SectionTask) -> str:
-    """Format the selected task for the bounded repair prompt."""
+def _semantic_task_payload(task: SectionTask) -> dict[str, object]:
+    """Return the planner-approved semantic task without document mechanics."""
+    return {
+        "goal": task.goal,
+        "capability_ids": list(task.capability_ids),
+        "requirements": list(task.requirements),
+        "constraints": list(task.constraints),
+    }
+
+
+def _bounded_section_context(section_context: ResolvedSectionContext) -> dict[str, object]:
+    """Project only source candidates and exact channel facts into a worker prompt."""
+    return {
+        "sources": [
+            {
+                "candidate_id": source.candidate_id,
+                "channels": [
+                    {
+                        "mnemonic": channel.mnemonic,
+                        "kind": channel.kind,
+                        "aliases": list(channel.aliases),
+                        "unit": channel.unit,
+                    }
+                    for channel in source.channels
+                ],
+            }
+            for source in section_context.sources
+        ]
+    }
+
+
+def _repair_context_text(
+    task: SectionTask,
+    section_context: ResolvedSectionContext,
+) -> str:
+    """Build bounded repair context with the same channel facts as initial generation."""
     return json.dumps(
         {
-            "goal": task.goal,
-            "capability_ids": list(task.capability_ids),
-            "requirements": list(task.requirements),
-            "constraints": list(task.constraints),
+            "task": _semantic_task_payload(task),
+            "section_context": _bounded_section_context(section_context),
+            "channel_grounding_rule": _CHANNEL_GROUNDING_RULE,
         },
         sort_keys=True,
         separators=(",", ":"),
