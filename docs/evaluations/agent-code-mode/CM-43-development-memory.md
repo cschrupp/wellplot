@@ -105,6 +105,7 @@ uv run --extra agent python scripts/run_cbl_section_ab.py \
   --base-url https://provider.example/v1 \
   --api-key-file PROVIDER_API_KEY.txt \
   --temperature 0 \
+  --top-p 0.95 \
   --max-output-tokens 16000 \
   --timeout 1800
 ```
