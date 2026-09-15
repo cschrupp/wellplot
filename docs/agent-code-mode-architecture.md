@@ -140,7 +140,7 @@ fragment through the SDK runtime.
 | CM-45 v2 compile graph | Complete (`23fdba4`) | Planner, enrichment, dynamic report/section fan-out, compact outcomes, deterministic merge, and atomic failure gate pass |
 | CM-46 Async graph integration and parity | Complete (`dba0635`) | Native async v2 facade, stable compile result, safe failure projection, metrics, and deterministic parity fixtures pass |
 | CM-47 Host-bound revision mode | Complete (`21cf21b`) | Existing-section target resolution, opaque sparse revision, duplicate-target rejection, private preservation, and exact revision parity gates pass |
-| CM-48 Bounded visual correction | Complete (`a0c0a25`) | Root-only section visual review, one scoped correction, private preservation, and bounded render/review gates pass |
+| CM-48 Bounded visual correction | Complete (`2e8fe54`) | Root-only section visual review, bounded failure evidence, source redaction, private preservation, and render/review gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |

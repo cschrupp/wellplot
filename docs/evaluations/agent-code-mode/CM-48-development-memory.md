@@ -9,7 +9,7 @@ Existing track, binding, fill, annotation, source, report, and cross-section
 selectors remain outside this slice.
 
 - **Evidence base SHA:** `9997c02`
-- **Implementation commits:** `e6f725c` and `a0c0a25`
+- **Implementation commits:** `e6f725c`, `a0c0a25`, and `2e8fe54`
 - **Production LOC delta:** `633`
 - **Test LOC delta:** `403`
 - **Runtime behavior delta:** one new private v2 visual-correction boundary;
@@ -56,6 +56,13 @@ correction rejection, worker, private-apply, preservation, postcondition, and
 final-render failures. `no_correction` and `corrected` are the only successful
 terminal states.
 
+CM-48R hardens the correction-worker boundary by catching only the provider's
+typed `ProviderRequestError` and returning `CORRECTION_WORKER_FAILED` with its
+redacted safe message. Unexpected programming exceptions still propagate.
+Initial-render and reviewer failures likewise produce stable terminal results,
+and reviewer context redacts canonical source paths even when the host context
+contains one.
+
 ```text
 render_count       0..2
 review_count       0..1
@@ -71,8 +78,8 @@ must remain identical.
 
 ## Validation
 
-- CM-48 visual-correction and architecture tests: `16 passed`.
-- Full Code Mode and architecture regression selection: `79 passed`.
+- CM-48 visual-correction and architecture tests: `20 passed`.
+- Full Code Mode and architecture regression selection: `85 passed`.
 - Ruff check: passed.
 - Ruff format check: passed.
 - `git diff --check`: passed.
@@ -80,12 +87,14 @@ must remain identical.
 
 ## Boundaries And Deferrals
 
-CM-48 does not import or modify `wellplot.agent.graph.finalization`,
+CM-48 does not import or modify `wellplot.agent.graph`,
+`wellplot.agent.graph.finalization`,
 `wellplot.agent.graph.verifier`, or `wellplot.agent.graph.models`. It adds no
 vision-provider adapter, semantic planner call, public Python/notebook route,
 MCP tool, persistence, rendering backend, graph cutover, child-object target
 selection, or legacy deletion. The existing legacy finalization layer remains
 outside the v2 boundary.
 
-**PROCEED / STOP:** CM-48 is implemented and evidenced. Stop before CM-50
-public cutover planning/implementation until separately authorized.
+**PROCEED / STOP:** CM-48R is implemented and evidenced. CM-48 is closed.
+Stop before CM-50 public cutover planning/implementation until separately
+authorized.
