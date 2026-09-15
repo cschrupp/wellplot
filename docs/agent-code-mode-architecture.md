@@ -131,7 +131,8 @@ fragment through the SDK runtime.
 | CM-33 OpenAI-compatible provider transport | Complete (`a2ed81e`) | Explicit-capability Chat Completions adapter implements the v2 protocol |
 | CM-34 Bounded program repair | Complete (`ad03bce`) | One bounded correction remains observable in traces/evals |
 | CM-40 Semantic planner v2 | Complete (`a9f4a21`) | Static semantic plan and one-call provider boundary pass |
-| CM-41 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
+| CM-41 Deterministic enrichment | Complete (`58b9d01`) | Host-bounded source/target enrichment and immutable worker context pass |
+| CM-42 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
