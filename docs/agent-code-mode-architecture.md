@@ -139,7 +139,7 @@ fragment through the SDK runtime.
 | CM-44 Report program worker | Complete (`9de218f`) | Report-only program worker compiles the full report development set through private dry-run gates |
 | CM-45 v2 compile graph | Complete (`23fdba4`) | Planner, enrichment, dynamic report/section fan-out, compact outcomes, deterministic merge, and atomic failure gate pass |
 | CM-46 Async graph integration and parity | Complete (`dba0635`) | Native async v2 facade, stable compile result, safe failure projection, metrics, and deterministic parity fixtures pass |
-| CM-47 Host-bound revision mode | Complete (`21cf21b`) | Existing-section target resolution, opaque sparse revision, duplicate-target rejection, and private preservation gates pass |
+| CM-47 Host-bound revision mode | Complete (`21cf21b`) | Existing-section target resolution, opaque sparse revision, duplicate-target rejection, private preservation, and exact revision parity gates pass |
 | CM-48 Bounded visual correction | Not started | Visual correction and bounded retry gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
