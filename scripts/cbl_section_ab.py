@@ -6,7 +6,8 @@ import hashlib
 import json
 import sys
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, Protocol
@@ -52,20 +53,21 @@ FROZEN_STARTER_SHA256 = "5dbbdb82dc5cc2616797dddaea8625def73db94a5798e0bf479ee48
 FROZEN_CONTRACT_SHA256 = "e9ca3c12d38c04ccae84d912523ab63491653b85c225501e780ad54844b4150b"
 
 ExperimentDecision = Literal["PROCEED", "STOP_SDK_CONTEXT_GAP", "STOP_V2_REGRESSION"]
+PUBLISHED_V2_WORKER_CAPABILITIES = frozenset({"section.log_plot", "track.normal", "binding.curve"})
 
 
 class SectionModelFactory(Protocol):
     """Create one fresh legacy structured model for an isolated run."""
 
-    def __call__(self) -> StructuredModelProtocol:
-        """Return a provider-backed structured model."""
+    def __call__(self, case: CBLExperimentCase) -> StructuredModelProtocol:
+        """Return a provider-backed structured model for the frozen case."""
 
 
 class BackendFactory(Protocol):
     """Create one fresh v2 backend for an isolated run."""
 
-    def __call__(self) -> ModelBackendProtocol:
-        """Return a provider-backed v2 backend."""
+    def __call__(self, case: CBLExperimentCase) -> ModelBackendProtocol:
+        """Return a provider-backed v2 backend for the frozen case."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +148,24 @@ class CBLExperimentCase:
             run_count=run_count,
         )
 
+    @property
+    def experiment_fingerprint(self) -> str:
+        """Return the stable identity of the frozen experiment configuration."""
+        payload = {
+            "contract_sha256": FROZEN_CONTRACT_SHA256,
+            "max_output_tokens": self.max_output_tokens,
+            "model": self.model,
+            "prompt_sha256": FROZEN_PROMPT_SHA256,
+            "provider": self.provider,
+            "run_count": self.run_count,
+            "section_id": self.section_plan.section_id,
+            "starter_sha256": FROZEN_STARTER_SHA256,
+            "temperature": self.temperature,
+            "timeout_seconds": self.timeout_seconds,
+        }
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return _sha256(encoded)
+
 
 @dataclass(frozen=True, slots=True)
 class CBLAcceptance:
@@ -194,11 +214,16 @@ class CBLRunEvidence:
     live: bool
     provider: str
     model: str
+    experiment_fingerprint: str
+    temperature: float | None
+    max_output_tokens: int | None
+    timeout_seconds: float
     engine_success: bool
     acceptance_success: bool
     semantic_omissions: tuple[str, ...]
     unrequested_mutations: tuple[str, ...]
     representability_status: str
+    sdk_gap_capabilities: tuple[str, ...]
     worker_invocations: int
     provider_generation_calls: int | str
     repair_count: int | str
@@ -253,6 +278,53 @@ class _StructuredRecorder:
         return result
 
 
+@dataclass(slots=True)
+class LegacyBackendRecorder:
+    """Record legacy backend calls without retaining provider response content."""
+
+    delegate: object
+    provider_generation_calls: int = 0
+    repair_count: int | str = NOT_AVAILABLE
+    input_tokens: int | str = NOT_AVAILABLE
+    output_tokens: int | str = NOT_AVAILABLE
+    total_tokens: int | str = NOT_AVAILABLE
+    provider_latency_ms: float | str = NOT_AVAILABLE
+
+    async def run_authoring(self, **kwargs: object) -> object:
+        """Delegate one legacy request and record safe aggregate measurements."""
+        self.provider_generation_calls += 1
+        started = time.perf_counter()
+        try:
+            result = await self.delegate.run_authoring(**kwargs)  # type: ignore[attr-defined]
+        finally:
+            elapsed_ms = (time.perf_counter() - started) * 1000
+            if self.provider_latency_ms is NOT_AVAILABLE:
+                self.provider_latency_ms = elapsed_ms
+        report_facts = getattr(result, "report_facts", {})
+        if isinstance(report_facts, Mapping):
+            self._record_facts(report_facts)
+        return result
+
+    def _record_facts(self, facts: Mapping[str, object]) -> None:
+        """Copy only numeric aggregate metrics from provider report facts."""
+        for field_name in ("input_tokens", "output_tokens", "total_tokens"):
+            value = _nonnegative_integer(facts.get(field_name))
+            if value is not None:
+                setattr(self, field_name, value)
+        repair_value = _nonnegative_integer(
+            facts.get("repair_count", facts.get("correction_count"))
+        )
+        if repair_value is not None:
+            self.repair_count = repair_value
+        latency = _nonnegative_number(facts.get("provider_latency_ms", facts.get("latency_ms")))
+        if latency is not None:
+            self.provider_latency_ms = latency
+
+    def __getattr__(self, name: str) -> object:
+        """Preserve backend configuration access for the existing adapter."""
+        return getattr(self.delegate, name)
+
+
 @dataclass
 class _ProgramRecorder:
     """Measure every v2 program generation and sum provider-reported metrics."""
@@ -305,36 +377,36 @@ async def run_v1_once(
 ) -> CBLRunEvidence:
     """Run the unchanged v1 section worker against the frozen main-pass case."""
     registry = registry or create_builtin_registry()
-    before_modules = set(sys.modules)
-    recorder = _StructuredRecorder(model_factory())
+    recorder = _StructuredRecorder(model_factory(case))
     compiler = SectionCompiler(model=recorder, registry=registry)
     started = time.perf_counter()
-    try:
-        artifact = await compiler.compile(
-            request=case.frozen_prompt,
-            plan=case.section_plan,
-            current_document=case.starter_document.model_dump(mode="json"),
-            source_manifest=case.source_manifest,
-            mode="reconstruct",
-        )
-        intent = merge_compiled_artifacts([artifact], registry=registry)
-        acceptance = _evaluate_intent(intent, case)
-        measurements = _v1_measurements(recorder)
-        failure_stage = None
-        failure_code = None
-        engine_success = True
-    except ProviderRequestError as error:
-        acceptance = CBLAcceptance(False, semantic_omissions=("provider failure",))
-        measurements = _v1_measurements(recorder)
-        failure_stage = "provider"
-        failure_code = error.category.value
-        engine_success = False
-    except Exception:
-        acceptance = CBLAcceptance(False, semantic_omissions=("engine failure",))
-        measurements = _v1_measurements(recorder)
-        failure_stage = "worker"
-        failure_code = "worker_failure"
-        engine_success = False
+    with _legacy_core_execution_probe() as probe:
+        try:
+            artifact = await compiler.compile(
+                request=case.frozen_prompt,
+                plan=case.section_plan,
+                current_document=case.starter_document.model_dump(mode="json"),
+                source_manifest=case.source_manifest,
+                mode="reconstruct",
+            )
+            intent = merge_compiled_artifacts([artifact], registry=registry)
+            acceptance = _evaluate_intent(intent, case)
+            measurements = _v1_measurements(recorder)
+            failure_stage = None
+            failure_code = None
+            engine_success = True
+        except ProviderRequestError as error:
+            acceptance = CBLAcceptance(False, semantic_omissions=("provider failure",))
+            measurements = _v1_measurements(recorder)
+            failure_stage = "provider"
+            failure_code = error.category.value
+            engine_success = False
+        except Exception:
+            acceptance = CBLAcceptance(False, semantic_omissions=("engine failure",))
+            measurements = _v1_measurements(recorder)
+            failure_stage = "worker"
+            failure_code = "worker_failure"
+            engine_success = False
     return _evidence(
         case,
         engine="v1",
@@ -344,7 +416,7 @@ async def run_v1_once(
         acceptance=acceptance,
         measurements=measurements,
         worker_latency_ms=(time.perf_counter() - started) * 1000,
-        legacy_core_reached=_new_legacy_core_import(before_modules),
+        legacy_core_reached=probe["reached"],
         failure_stage=failure_stage,
         failure_code=failure_code,
     )
@@ -360,46 +432,46 @@ async def run_v2_once(
 ) -> CBLRunEvidence:
     """Run the unchanged v2 section worker against the same semantic case."""
     registry = registry or create_builtin_registry()
-    before_modules = set(sys.modules)
-    recorder = _ProgramRecorder(backend_factory())
+    recorder = _ProgramRecorder(backend_factory(case))
     compiler = ProgramSectionCompiler(backend=recorder, registry=registry)
     started = time.perf_counter()
     source_text: str | None = None
-    try:
-        result = await compiler.compile(
-            task_index=0,
-            context=case.section_context,
-            document=case.starter_document,
-            timeout_seconds=case.timeout_seconds,
-            temperature=case.temperature,
-            max_output_tokens=case.max_output_tokens,
-        )
-        engine_success = result.success
-        intent = result.artifact.intent_fragment if result.artifact is not None else None
-        acceptance = (
-            _evaluate_intent(intent, case)
-            if intent is not None
-            else CBLAcceptance(
-                False,
-                semantic_omissions=_diagnostics(result),
+    with _legacy_core_execution_probe() as probe:
+        try:
+            result = await compiler.compile(
+                task_index=0,
+                context=case.section_context,
+                document=case.starter_document,
+                timeout_seconds=case.timeout_seconds,
+                temperature=case.temperature,
+                max_output_tokens=case.max_output_tokens,
             )
-        )
-        source_text = result.program.source.text
-        measurements = _v2_measurements(recorder, result.metrics.model_dump(mode="json"))
-        failure_stage = None if result.success else "worker"
-        failure_code = None if result.success else "program_execution_failed"
-    except ProviderRequestError as error:
-        acceptance = CBLAcceptance(False, semantic_omissions=("provider failure",))
-        measurements = _v2_measurements(recorder, {})
-        failure_stage = "provider"
-        failure_code = error.category.value
-        engine_success = False
-    except Exception:
-        acceptance = CBLAcceptance(False, semantic_omissions=("engine failure",))
-        measurements = _v2_measurements(recorder, {})
-        failure_stage = "worker"
-        failure_code = "worker_failure"
-        engine_success = False
+            engine_success = result.success
+            intent = result.artifact.intent_fragment if result.artifact is not None else None
+            acceptance = (
+                _evaluate_intent(intent, case)
+                if intent is not None
+                else CBLAcceptance(
+                    False,
+                    semantic_omissions=_diagnostics(result),
+                )
+            )
+            source_text = result.program.source.text
+            measurements = _v2_measurements(recorder, result.metrics.model_dump(mode="json"))
+            failure_stage = None if result.success else "worker"
+            failure_code = None if result.success else "program_execution_failed"
+        except ProviderRequestError as error:
+            acceptance = CBLAcceptance(False, semantic_omissions=("provider failure",))
+            measurements = _v2_measurements(recorder, {})
+            failure_stage = "provider"
+            failure_code = error.category.value
+            engine_success = False
+        except Exception:
+            acceptance = CBLAcceptance(False, semantic_omissions=("engine failure",))
+            measurements = _v2_measurements(recorder, {})
+            failure_stage = "worker"
+            failure_code = "worker_failure"
+            engine_success = False
     return _evidence(
         case,
         engine="v2",
@@ -409,7 +481,7 @@ async def run_v2_once(
         acceptance=acceptance,
         measurements=_with_program_hash(measurements, source_text),
         worker_latency_ms=(time.perf_counter() - started) * 1000,
-        legacy_core_reached=_new_legacy_core_import(before_modules),
+        legacy_core_reached=probe["reached"],
         failure_stage=failure_stage,
         failure_code=failure_code,
     )
@@ -456,6 +528,13 @@ def evaluate_gate(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
             "decision": None,
             "reason": "CM-43 requires at least three live runs for each engine.",
         }
+    fingerprints = {row.get("experiment_fingerprint") for row in (*grouped["v1"], *grouped["v2"])}
+    if len(fingerprints) != 1 or None in fingerprints:
+        return {
+            "ready": False,
+            "decision": None,
+            "reason": "CM-43 evidence rows must share one experiment fingerprint.",
+        }
     v2_gap = any(
         row.get("representability_status") == "sdk_prompt_contract_insufficient"
         for row in grouped["v2"]
@@ -467,9 +546,12 @@ def evaluate_gate(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
         v1_acceptance = sum(row.get("acceptance_success") is True for row in grouped["v1"])
         v2_acceptance = sum(row.get("acceptance_success") is True for row in grouped["v2"])
         v2_simpler = _v2_complexity_advantage(grouped["v1"], grouped["v2"])
-        if v2_acceptance < v1_acceptance and not v2_simpler:
+        if v2_acceptance < v1_acceptance:
             decision = "STOP_V2_REGRESSION"
-            reason = "v2 is less reliable without a measured complexity advantage."
+            reason = "v2 acceptance is lower than v1; complexity cannot override the regression."
+        elif not v2_simpler:
+            decision = "STOP_V2_REGRESSION"
+            reason = "v2 is not materially simpler at competitive acceptance."
         else:
             decision = "PROCEED"
             reason = "v2 is competitive on acceptance and materially simpler."
@@ -519,6 +601,12 @@ def _evaluate_intent(
 
     tracks = section.tracks if isinstance(section.tracks, list) else []
     role_tracks: dict[str, object] = {}
+    expected_bindings = {
+        "combo": ("normal", "curve", frozenset({"ECGR_STGC", "TT", "TENS", "MTEM"}), 4),
+        "depth": ("reference", "curve", frozenset({"STIT", "TDSP", "VSEC"}), 3),
+        "cbl": ("normal", "curve", frozenset({"CBL"}), 2),
+        "vdl": ("array", "raster", frozenset({"VDL"}), 1),
+    }
     for track in tracks:
         curve_channels = {
             binding.channel
@@ -530,7 +618,16 @@ def _evaluate_intent(
             for binding in track.bindings or []
             if getattr(binding, "kind", None) == "raster" and binding.channel
         }
-        if track.kind == "normal" and {"ECGR_STGC", "TT", "TENS", "MTEM"} <= curve_channels:
+        if (
+            track.kind == "normal"
+            and {
+                "ECGR_STGC",
+                "TT",
+                "TENS",
+                "MTEM",
+            }
+            <= curve_channels
+        ):
             role_tracks.setdefault("combo", track)
         if track.kind == "reference" and {"STIT", "TDSP", "VSEC"} <= curve_channels:
             role_tracks.setdefault("depth", track)
@@ -548,8 +645,30 @@ def _evaluate_intent(
         if role not in role_tracks:
             semantic.append(f"missing {kind}")
 
-    if len(tracks) > 4:
+    if len(tracks) != 4:
+        mutations.append("section must contain exactly four requested tracks")
+    recognized_tracks = {id(track) for track in role_tracks.values()}
+    if len(recognized_tracks) != len(role_tracks):
+        mutations.append("multiple tracks claim the same semantic role")
+    if any(id(track) not in recognized_tracks for track in tracks):
         mutations.append("unrequested track")
+    for role, (expected_kind, expected_binding_kind, channels, count) in expected_bindings.items():
+        track = role_tracks.get(role)
+        if track is None:
+            continue
+        bindings = list(track.bindings or [])
+        actual_channels = {
+            binding.channel
+            for binding in bindings
+            if getattr(binding, "kind", None) == expected_binding_kind and binding.channel
+        }
+        if (
+            track.kind != expected_kind
+            or len(bindings) != count
+            or actual_channels != channels
+            or any(getattr(binding, "kind", None) != expected_binding_kind for binding in bindings)
+        ):
+            mutations.append(f"{role} track contains unrequested or incomplete bindings")
     canonical = True
     private = _private_application(case, intent)
     legacy_ids = _legacy_target_ids(case)
@@ -656,12 +775,18 @@ def _section_context(
 
 def _v1_measurements(recorder: _StructuredRecorder) -> _RunMeasurements:
     """Map measured legacy request/schema sizes into common evidence fields."""
+    backend = getattr(recorder.delegate, "backend", None)
     return _RunMeasurements(
         worker_invocations=recorder.invocations,
         provider_generation_calls=recorder.provider_generation_calls,
+        repair_count=getattr(backend, "repair_count", NOT_AVAILABLE),
+        input_tokens=getattr(backend, "input_tokens", NOT_AVAILABLE),
+        output_tokens=getattr(backend, "output_tokens", NOT_AVAILABLE),
+        total_tokens=getattr(backend, "total_tokens", NOT_AVAILABLE),
         prompt_chars=recorder.prompt_chars,
         schema_chars=recorder.schema_chars,
         dynamic_schema_chars=recorder.schema_chars,
+        provider_latency_ms=getattr(backend, "provider_latency_ms", NOT_AVAILABLE),
     )
 
 
@@ -719,10 +844,12 @@ def _evidence(
 ) -> CBLRunEvidence:
     """Build the stable evidence row shared by both engine adapters."""
     representability = "complete"
-    if engine == "v2" and any(
-        item in {"missing array VDL track", "missing normal CBL track"}
-        for item in acceptance.semantic_omissions
-    ):
+    sdk_gap_capabilities = ()
+    if engine == "v2":
+        sdk_gap_capabilities = tuple(
+            sorted(set(case.section_task.capability_ids) - PUBLISHED_V2_WORKER_CAPABILITIES)
+        )
+    if engine == "v2" and sdk_gap_capabilities:
         representability = "sdk_prompt_contract_insufficient"
     elif not acceptance.success:
         representability = "incomplete"
@@ -733,11 +860,16 @@ def _evidence(
         live=live,
         provider=case.provider,
         model=case.model,
+        experiment_fingerprint=case.experiment_fingerprint,
+        temperature=case.temperature,
+        max_output_tokens=case.max_output_tokens,
+        timeout_seconds=case.timeout_seconds,
         engine_success=engine_success,
         acceptance_success=acceptance.success,
         semantic_omissions=acceptance.semantic_omissions,
         unrequested_mutations=acceptance.unrequested_mutations,
         representability_status=representability,
+        sdk_gap_capabilities=sdk_gap_capabilities,
         worker_invocations=measurements.worker_invocations,
         provider_generation_calls=measurements.provider_generation_calls,
         repair_count=measurements.repair_count,
@@ -778,12 +910,26 @@ def _legacy_target_ids(case: CBLExperimentCase) -> set[str]:
     }
 
 
-def _new_legacy_core_import(before_modules: set[str]) -> bool:
-    """Measure whether this adapter newly loaded the legacy core module."""
-    return any(
-        name == "wellplot.agent.core" or name.startswith("wellplot.agent.core.")
-        for name in set(sys.modules) - before_modules
-    )
+@contextmanager
+def _legacy_core_execution_probe() -> Iterator[dict[str, bool]]:
+    """Detect legacy-core execution without depending on import history."""
+    state = {"reached": False}
+    previous = sys.getprofile()
+
+    def profile(frame: object, event: str, _argument: object) -> None:
+        globals_dict = getattr(frame, "f_globals", {})
+        module_name = globals_dict.get("__name__") if isinstance(globals_dict, dict) else None
+        if event == "call" and (
+            module_name == "wellplot.agent.core"
+            or (isinstance(module_name, str) and module_name.startswith("wellplot.agent.core."))
+        ):
+            state["reached"] = True
+
+    sys.setprofile(profile)
+    try:
+        yield state
+    finally:
+        sys.setprofile(previous)
 
 
 def _v2_complexity_advantage(
@@ -804,6 +950,22 @@ def _numeric_average(rows: Sequence[Mapping[str, object]], field: str) -> float 
     return sum(values) / len(values) if values else None
 
 
+def _nonnegative_integer(value: object) -> int | None:
+    """Return a safe integer metric or ``None`` when it was not reported."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    integer = int(value)
+    return integer if integer >= 0 and integer == value else None
+
+
+def _nonnegative_number(value: object) -> float | None:
+    """Return a safe nonnegative numeric metric or ``None``."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    number = float(value)
+    return number if number >= 0 else None
+
+
 def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
@@ -812,6 +974,7 @@ __all__ = [
     "CBLAcceptance",
     "CBLExperimentCase",
     "CBLRunEvidence",
+    "LegacyBackendRecorder",
     "evaluate_gate",
     "evaluate_section_intent",
     "run_ab",
