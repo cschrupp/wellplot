@@ -36,6 +36,7 @@ from ..model.authoring import (
     AnnotationTextSpec,
     AuthoringCurveFillBaselineSpec,
     AuthoringCurveFillCrossoverSpec,
+    AuthoringDataSource,
     AuthoringRasterColorbarSpec,
     AuthoringRasterSampleAxisSpec,
     AuthoringScale,
@@ -64,6 +65,7 @@ from .builders import (
     HandleBuilder,
     ReportHandle,
     SectionHandle,
+    SourceHandle,
     TrackHandle,
 )
 from .errors import ProgramNameError, ProgramPolicyError, ProgramTypeError
@@ -101,6 +103,7 @@ class IntentBuilder:
     def __init__(self, *, handles: HandleBuilder | None = None) -> None:
         """Create one isolated compiler with a CM-13 identity context."""
         self._handles = handles or HandleBuilder()
+        self._sources: dict[str, tuple[SourceHandle, AuthoringDataSource]] = {}
         self._report: ReportHandle | None = None
         self._report_fields: dict[str, str] = {}
         self._header_fields: dict[str, AuthoringHeaderFieldIntent] = {}
@@ -142,6 +145,33 @@ class IntentBuilder:
         self._report = self._handles.create_report()
         self._report_fields = fields
         return self._report
+
+    def register_source(
+        self,
+        candidate_id: str,
+        data_source: AuthoringDataSource,
+    ) -> SourceHandle:
+        """Register one host-bounded source without exposing its path to programs."""
+        source = _validated(
+            AuthoringDataSource,
+            data_source.model_dump(mode="python"),
+            "Source association",
+        )
+        handle = self._handles.create_source(candidate_id)
+        existing = self._sources.get(handle.candidate_id)
+        if existing is not None and existing[1] != source:
+            raise ProgramPolicyError(
+                f"Source candidate '{handle.candidate_id}' has conflicting metadata."
+            )
+        self._sources[handle.candidate_id] = (handle, source)
+        return handle
+
+    def source(self, candidate_id: str) -> SourceHandle:
+        """Return one exact host-registered source candidate handle."""
+        handle_and_source = self._sources.get(candidate_id)
+        if handle_and_source is None:
+            raise ProgramNameError(f"Unknown source candidate '{candidate_id}'.")
+        return handle_and_source[0]
 
     def set_header_field(
         self,
@@ -263,6 +293,7 @@ class IntentBuilder:
         subtitle: str | None = None,
         depth_minimum: float | None = None,
         depth_maximum: float | None = None,
+        source: SourceHandle | None = None,
     ) -> SectionHandle:
         """Create one titled section with an optional explicit depth range."""
         owned_report = self._require_report(report)
@@ -271,6 +302,7 @@ class IntentBuilder:
             depth_maximum,
             label="Section depth range",
         )
+        data_source = self._source_data(source) if source is not None else None
         section = self._handles.create_section(owned_report, id_hint)
         self._handles.validate_section_parent(owned_report, section)
         fragment = _validated(
@@ -280,6 +312,7 @@ class IntentBuilder:
                 title=title,
                 subtitle=subtitle,
                 depth_range=depth_range,
+                data_source=data_source,
             ),
             "Section desired state",
         )
@@ -881,6 +914,7 @@ class IntentBuilder:
             root_methods=RootMethodRegistry(
                 methods={
                     "report": self._runtime_report,
+                    "source": self._runtime_source,
                     "section": self._runtime_section,
                     "track": self._runtime_track,
                     "curve": self._runtime_curve,
@@ -898,6 +932,20 @@ class IntentBuilder:
         if owned_report != self._report:
             raise ProgramNameError("Report handle is not owned by this intent builder.")
         return owned_report
+
+    def _require_source(self, source: SourceHandle) -> SourceHandle:
+        """Require one source handle issued by this builder."""
+        owned_source = self._handles.validate_source(source)
+        if owned_source.candidate_id not in self._sources:
+            raise ProgramNameError(
+                f"Source candidate '{owned_source.candidate_id}' is not registered."
+            )
+        return owned_source
+
+    def _source_data(self, source: SourceHandle) -> AuthoringDataSource:
+        """Resolve an owned opaque source handle to private canonical metadata."""
+        owned_source = self._require_source(source)
+        return self._sources[owned_source.candidate_id][1]
 
     def _require_section(self, section: SectionHandle) -> SectionHandle:
         """Require an issued section that already has an accumulated fragment."""
@@ -1093,6 +1141,25 @@ class IntentBuilder:
             subtitle=_optional_runtime_text(values, "subtitle"),
         )
 
+    def _runtime_source(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Resolve one exact host-registered source candidate."""
+        if len(args) > 1:
+            raise ProgramTypeError("wp.source accepts at most one positional candidate ID.")
+        if args and "candidate_id" in kwargs:
+            raise ProgramTypeError("wp.source cannot mix positional and keyword candidate IDs.")
+        values = _runtime_kwargs(kwargs, "wp.source", {"candidate_id"})
+        if args:
+            candidate_id = args[0]
+            if not isinstance(candidate_id, str) or not candidate_id:
+                raise ProgramTypeError("wp.source candidate ID must be a non-empty string.")
+        else:
+            candidate_id = _required_runtime_text(values, "candidate_id", "wp.source")
+        return self.source(candidate_id)
+
     def _runtime_section(
         self,
         args: tuple[RuntimeValue, ...],
@@ -1103,8 +1170,18 @@ class IntentBuilder:
         values = _runtime_kwargs(
             kwargs,
             "wp.section",
-            {"id_hint", "title", "subtitle", "depth_minimum", "depth_maximum"},
+            {
+                "id_hint",
+                "title",
+                "subtitle",
+                "depth_minimum",
+                "depth_maximum",
+                "source",
+            },
         )
+        source = None
+        if "source" in values:
+            source = _runtime_handle(values["source"], "wp.section", SourceHandle)
         return self.add_section(
             report,
             id_hint=_optional_runtime_text(values, "id_hint"),
@@ -1112,6 +1189,7 @@ class IntentBuilder:
             subtitle=_optional_runtime_text(values, "subtitle"),
             depth_minimum=_optional_runtime_number(values, "depth_minimum"),
             depth_maximum=_optional_runtime_number(values, "depth_maximum"),
+            source=source,
         )
 
     def _runtime_track(

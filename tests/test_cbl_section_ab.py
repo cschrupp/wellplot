@@ -189,8 +189,8 @@ def test_three_fake_pairs_do_not_satisfy_live_gate() -> None:
     assert all(row["legacy_core_reached"] is False for row in rows)
     assert all(row["schema_chars"] == 0 for row in rows if row["engine"] == "v2")
     assert all(row["dynamic_schema_chars"] != 0 for row in rows if row["engine"] == "v1")
-    assert any(
-        row["representability_status"] == "sdk_prompt_contract_insufficient"
+    assert all(
+        row["representability_status"] != "sdk_prompt_contract_insufficient"
         for row in rows
         if row["engine"] == "v2"
     )

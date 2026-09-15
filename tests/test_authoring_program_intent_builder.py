@@ -12,7 +12,7 @@ from wellplot.authoring_program.errors import ProgramNameError, ProgramPolicyErr
 from wellplot.authoring_program.intent_builder import IntentBuilder
 from wellplot.authoring_program.interpreter import interpret_authoring_program
 from wellplot.authoring_program.models import AuthoringProgram, ProgramSource
-from wellplot.model.authoring import AnnotationTextSpec, AuthoringScale
+from wellplot.model.authoring import AnnotationTextSpec, AuthoringDataSource, AuthoringScale
 from wellplot.model.intent import (
     AuthoringAnnotationIntent,
     AuthoringCurveBindingIntent,
@@ -33,6 +33,106 @@ def _builder(builder_id: str = "builder-a") -> IntentBuilder:
 def _program(source: str) -> AuthoringProgram:
     """Wrap one source string in the immutable CM-10 program contract."""
     return AuthoringProgram(source=ProgramSource(text=source, logical_name="intent-builder.wpa"))
+
+
+def test_source_handles_are_opaque_and_attach_host_owned_data_source() -> None:
+    """Programs select opaque candidates while intent retains canonical source metadata."""
+    builder = _builder()
+    source = builder.register_source(
+        "main-pass-dlis",
+        AuthoringDataSource(source_path="/approved/main-pass.dlis", source_format="dlis"),
+    )
+
+    assert source.kind == "source"
+    assert source.candidate_id == "main-pass-dlis"
+    assert not hasattr(source, "source_path")
+    assert not hasattr(source, "source_format")
+
+    report = builder.report()
+    builder.add_section(report, id_hint="main", title="Main Pass", source=source)
+
+    section = builder.intent().sections[0]
+    assert section.data_source == AuthoringDataSource(
+        source_path="/approved/main-pass.dlis",
+        source_format="dlis",
+    )
+
+
+def test_source_lookup_is_exact_and_rejects_foreign_handles() -> None:
+    """Source selection accepts only registered IDs and this builder's handles."""
+    builder = _builder()
+    builder.register_source(
+        "main-pass-las",
+        AuthoringDataSource(source_path="/approved/main-pass.las", source_format="las"),
+    )
+    with pytest.raises(ProgramNameError, match="Unknown source candidate"):
+        builder.source("/approved/main-pass.las")
+
+    foreign = _builder("foreign")
+    foreign_source = foreign.register_source(
+        "foreign-las",
+        AuthoringDataSource(source_path="/approved/foreign.las", source_format="las"),
+    )
+    report = builder.report()
+    with pytest.raises(ProgramNameError, match="different identity builder"):
+        builder.add_section(report, id_hint="main", title="Main Pass", source=foreign_source)
+
+
+def test_interpreter_selects_one_of_two_registered_sources() -> None:
+    """Exact source selection remains deterministic when two candidates are available."""
+    builder = _builder()
+    builder.register_source(
+        "first",
+        AuthoringDataSource(source_path="/approved/first.las", source_format="las"),
+    )
+    builder.register_source(
+        "second",
+        AuthoringDataSource(source_path="/approved/second.dlis", source_format="dlis"),
+    )
+    source = (
+        "report = wp.report()\n"
+        "selected = wp.source('second')\n"
+        "section = wp.section(report, id_hint='main', title='Main', source=selected)\n"
+        "track = wp.track(section, id_hint='normal', kind='normal', "
+        "title='Normal', width_mm=30)\n"
+        "wp.curve(track, channel='GR')\n"
+    )
+
+    interpret_authoring_program(_program(source), builder.runtime_environment())
+
+    assert builder.intent().sections[0].data_source == AuthoringDataSource(
+        source_path="/approved/second.dlis",
+        source_format="dlis",
+    )
+
+
+def test_generic_track_and_binding_kinds_are_available_to_programs() -> None:
+    """Reference, array, curve, and raster construction remain generic primitives."""
+    builder = _builder()
+    report = builder.report()
+    section = builder.add_section(report, id_hint="main", title="Main")
+    reference = builder.add_track(
+        section,
+        id_hint="reference",
+        kind="reference",
+        title="Reference",
+        width_mm=20,
+    )
+    array = builder.add_track(
+        section,
+        id_hint="array",
+        kind="array",
+        title="Array",
+        width_mm=20,
+    )
+    builder.add_curve(reference, channel="TT")
+    builder.add_raster(array, channel="VDL")
+
+    tracks = builder.intent().sections[0].tracks
+    assert [(track.kind, track.bindings[0].kind) for track in tracks] == [
+        ("reference", "curve"),
+        ("array", "raster"),
+    ]
 
 
 def _expected_intent(*, include_raster_limits: bool = True) -> AuthoringDocumentIntent:

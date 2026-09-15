@@ -22,7 +22,10 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
-from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
+from wellplot.agent.code_mode.program_worker import (
+    SECTION_PROGRAM_CAPABILITIES,
+    ProgramSectionCompiler,
+)
 from wellplot.agent.graph.executor import execute_document_intent
 from wellplot.agent.graph.merge import merge_compiled_artifacts
 from wellplot.agent.graph.models import SectionPlan
@@ -53,7 +56,7 @@ FROZEN_STARTER_SHA256 = "5dbbdb82dc5cc2616797dddaea8625def73db94a5798e0bf479ee48
 FROZEN_CONTRACT_SHA256 = "e9ca3c12d38c04ccae84d912523ab63491653b85c225501e780ad54844b4150b"
 
 ExperimentDecision = Literal["PROCEED", "STOP_SDK_CONTEXT_GAP", "STOP_V2_REGRESSION"]
-PUBLISHED_V2_WORKER_CAPABILITIES = frozenset({"section.log_plot", "track.normal", "binding.curve"})
+PUBLISHED_V2_WORKER_CAPABILITIES = SECTION_PROGRAM_CAPABILITIES
 
 
 class SectionModelFactory(Protocol):

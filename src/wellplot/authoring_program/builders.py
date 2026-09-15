@@ -46,6 +46,21 @@ class ReportHandle(RuntimeHandle):
 
 
 @dataclass(frozen=True, slots=True)
+class SourceHandle(RuntimeHandle):
+    """Opaque host-registered source candidate handle."""
+
+    builder_id: str
+    candidate_id: str
+
+    def __post_init__(self) -> None:
+        """Validate source identity without carrying filesystem metadata."""
+        RuntimeHandle.__post_init__(self)
+        _validate_handle_fields(self.builder_id, self.candidate_id)
+        if self.kind != "source":
+            raise ValueError("Source handles must use kind 'source'.")
+
+
+@dataclass(frozen=True, slots=True)
 class SectionHandle(RuntimeHandle):
     """Identity-only section handle with its report parent token."""
 
@@ -152,6 +167,7 @@ class AnnotationHandle(RuntimeHandle):
 
 for _handle_type in (
     ReportHandle,
+    SourceHandle,
     SectionHandle,
     TrackHandle,
     BindingHandle,
@@ -193,6 +209,19 @@ class HandleBuilder:
     def adopt_report(self, report_id: str = "report") -> ReportHandle:
         """Return the equivalent report identity without allocating a replacement."""
         return self.create_report(report_id)
+
+    def create_source(self, candidate_id: str) -> SourceHandle:
+        """Issue one opaque handle for a host-registered source candidate."""
+        canonical_candidate_id = _identity_text(candidate_id, "source candidate id")
+        token = self._token("source", canonical_candidate_id)
+        return self._issue(
+            SourceHandle(
+                token=token,
+                kind="source",
+                builder_id=self._builder_id,
+                candidate_id=canonical_candidate_id,
+            )
+        )
 
     def create_section(self, report: ReportHandle, id_hint: str | None = None) -> SectionHandle:
         """Allocate and issue one document-scoped section identity."""
@@ -289,6 +318,10 @@ class HandleBuilder:
     def validate_report(self, report: ReportHandle) -> ReportHandle:
         """Return one issued report handle after provenance validation."""
         return cast(ReportHandle, self._require_handle(report, ReportHandle))
+
+    def validate_source(self, source: SourceHandle) -> SourceHandle:
+        """Return one issued source handle after provenance validation."""
+        return cast(SourceHandle, self._require_handle(source, SourceHandle))
 
     def validate_section(self, section: SectionHandle) -> SectionHandle:
         """Return one issued section handle after provenance validation."""
@@ -434,6 +467,7 @@ class HandleBuilder:
             raise ProgramTypeError("Handle has an incompatible typed identity.")
         issued_handle_types = (
             ReportHandle,
+            SourceHandle,
             SectionHandle,
             TrackHandle,
             BindingHandle,
@@ -483,6 +517,7 @@ __all__ = [
     "FillHandle",
     "HandleBuilder",
     "ReportHandle",
+    "SourceHandle",
     "SectionHandle",
     "TrackHandle",
 ]

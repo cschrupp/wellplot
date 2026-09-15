@@ -1,4 +1,4 @@
-"""Bounded scalar-section program compilation for Code Mode v2."""
+"""Bounded section program compilation for Code Mode v2."""
 
 from __future__ import annotations
 
@@ -20,34 +20,68 @@ from ...authoring_program.models import (
 )
 from ...authoring_program.program_runtime import ProgramRuntime
 from ...capabilities import CapabilityRegistry
-from ...model.authoring import AuthoringDocumentSpec
+from ...model.authoring import AuthoringDataSource, AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ModelBackendProtocol, ProgramGenerationRequest
 from .enrichment import EnrichedSemanticContext, ResolvedSectionContext
 from .planner import SectionTask
 from .repair import ProgramRepairCoordinator
 
+SECTION_PROGRAM_CAPABILITIES = frozenset(
+    {
+        "section.log_plot",
+        "track.normal",
+        "track.reference",
+        "track.array",
+        "binding.curve",
+        "binding.raster",
+    }
+)
+
 _SDK_REFERENCE = """Executable Wellplot SDK reference:
 report = wp.report()
-section = wp.section(report, id_hint='new-section', title='Section title')
-track = wp.track(
+source = wp.source('candidate-id')
+section = wp.section(
+    report,
+    id_hint='new-section',
+    title='Section title',
+    source=source,
+)
+normal = wp.track(
     section,
-    id_hint='scalar',
+    id_hint='normal',
     kind='normal',
-    title='Scalar track',
+    title='Normal track',
     width_mm=30,
 )
-wp.curve(track, channel='CHANNEL', label='Curve label')
+reference = wp.track(
+    section,
+    id_hint='reference',
+    kind='reference',
+    title='Reference track',
+    width_mm=30,
+)
+array = wp.track(
+    section,
+    id_hint='array',
+    kind='array',
+    title='Array track',
+    width_mm=30,
+)
+wp.curve(normal, channel='CHANNEL', label='Curve label')
+wp.curve(reference, channel='REFERENCE_CHANNEL', label='Reference label')
+wp.raster(array, channel='ARRAY_CHANNEL', label='Array label')
 
-Only the root calls and keyword arguments shown above are executable in this
-pilot. Create a new section only. Do not use existing document identifiers,
-selection/update operations, report-wide settings, or filesystem operations.
+Only the root calls and keyword arguments shown above are executable. Create a
+new section only. Use only source candidate IDs supplied in the task context.
+Do not use existing document identifiers, selection/update operations,
+report-wide settings, or filesystem operations.
 Return only the program source, with no markdown fences or explanation."""
 
 
 @dataclass(frozen=True, slots=True)
 class ProgramSectionCompiler:
-    """Compile one new scalar-section program without mutating a document."""
+    """Compile one new section program without mutating a document."""
 
     backend: ModelBackendProtocol
     registry: CapabilityRegistry
@@ -67,14 +101,14 @@ class ProgramSectionCompiler:
         task, section_context = _task_context(context, task_index)
         if section_context.section_id is not None:
             raise ValueError(
-                "CM-42 supports new section reconstruction only; existing-section "
+                "Code Mode new section reconstruction only; existing-section "
                 "revision is not available in the restricted SDK."
             )
 
         capabilities = _worker_capabilities(task, self.registry)
         request = ProgramGenerationRequest(
             system_prompt=(
-                "You are the Wellplot scalar-section Code Mode worker. "
+                "You are the Wellplot section Code Mode worker. "
                 "Write one short restricted authoring program using only the "
                 "executable SDK reference and scoped task context."
             ),
@@ -137,9 +171,12 @@ class ProgramSectionCompiler:
     ) -> ProgramExecutionResult:
         """Run one candidate with a fresh identity builder and private runtime."""
         program = AuthoringProgram(
-            source=ProgramSource(text=source, logical_name=f"cm42-section-{task_index}.wpa")
+            source=ProgramSource(text=source, logical_name=f"cm43r-section-{task_index}.wpa")
         )
-        builder = _fresh_builder(document, task_index=task_index)
+        builder = _fresh_builder(
+            document,
+            section_context=section_context,
+        )
         try:
             interpretation = interpret_authoring_program(
                 program,
@@ -169,7 +206,7 @@ class ProgramSectionCompiler:
                 program,
                 ProgramDryRunError(
                     "Section program could not be compiled deterministically.",
-                    remediation_hint="Return a new section with one normal scalar track.",
+                    remediation_hint="Return one new section using only the selected capabilities.",
                 ).to_diagnostic(),
                 metrics=ProgramMetrics(program_chars=len(source)),
             )
@@ -251,9 +288,10 @@ def _worker_prompt(
         "sdk_reference": _SDK_REFERENCE,
     }
     return (
-        "Create one new scalar section from this scoped context. Do not add "
-        "report-wide settings or use context outside this task.\n\n"
-        + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        "Create one new section from this scoped context. When a source candidate "
+        "is needed, resolve its exact candidate_id with wp.source() and pass the "
+        "handle to wp.section(). Do not add report-wide settings or use context "
+        "outside this task.\n\n" + json.dumps(payload, sort_keys=True, separators=(",", ":"))
     )
 
 
@@ -271,8 +309,12 @@ def _semantic_task_text(task: SectionTask) -> str:
     )
 
 
-def _fresh_builder(document: AuthoringDocumentSpec, *, task_index: int) -> IntentBuilder:
-    """Create a fresh builder with every canonical document identity reserved."""
+def _fresh_builder(
+    document: AuthoringDocumentSpec,
+    *,
+    section_context: ResolvedSectionContext,
+) -> IntentBuilder:
+    """Create a fresh builder with identities and source candidates reserved."""
     allocator = IdAllocator(
         section_ids=[section.id for section in document.sections],
         track_ids_by_section={
@@ -291,8 +333,17 @@ def _fresh_builder(document: AuthoringDocumentSpec, *, task_index: int) -> Inten
             for leaf_id in _track_leaf_ids(track)
         ],
     )
-    handles = HandleBuilder(allocator=allocator, builder_id=f"cm42-{task_index}")
-    return IntentBuilder(handles=handles)
+    handles = HandleBuilder(allocator=allocator)
+    builder = IntentBuilder(handles=handles)
+    for source in section_context.sources:
+        builder.register_source(
+            source.candidate_id,
+            AuthoringDataSource(
+                source_path=source.canonical_path,
+                source_format=source.source_format,
+            ),
+        )
+    return builder
 
 
 def _track_leaf_ids(track: object) -> tuple[str, ...]:
@@ -355,7 +406,9 @@ def _validate_section_intent(intent: AuthoringDocumentIntent) -> str:
     if intent.sections is None or len(intent.sections) != 1:
         raise ProgramDryRunError(
             "Section programs must emit exactly one section fragment.",
-            remediation_hint="Create one new section with one normal scalar track.",
+            remediation_hint=(
+                "Create exactly one new section with section-local tracks and bindings."
+            ),
         )
     return intent.sections[0].section_id
 
@@ -391,4 +444,4 @@ def _with_repair_evidence(
     )
 
 
-__all__ = ["ProgramSectionCompiler"]
+__all__ = ["ProgramSectionCompiler", "SECTION_PROGRAM_CAPABILITIES"]

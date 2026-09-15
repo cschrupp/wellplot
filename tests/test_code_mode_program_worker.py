@@ -1,4 +1,4 @@
-"""CM-42 tests for the bounded scalar-section program worker."""
+"""Tests for the bounded generic section program worker."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
-from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
+from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler, _fresh_builder
 from wellplot.agent.providers.base import (
     ProgramGenerationRequest,
     ProgramGenerationResult,
@@ -141,6 +141,18 @@ def _program(*, section_id: str = "pilot", channel: str = "GR") -> str:
     )
 
 
+def _source_program() -> str:
+    """Return a program that selects the host-registered candidate explicitly."""
+    return (
+        "report = wp.report()\n"
+        "source = wp.source('pilot.las')\n"
+        "section = wp.section(report, id_hint='pilot', title='Pilot', source=source)\n"
+        "track = wp.track(section, id_hint='normal', kind='normal', "
+        "title='Gamma Ray', width_mm=30)\n"
+        "wp.curve(track, channel='GR', label='GR')\n"
+    )
+
+
 def _compiler(backend: _Backend) -> ProgramSectionCompiler:
     """Build the worker with the built-in v2 capability registry."""
     return ProgramSectionCompiler(backend=backend, registry=create_builtin_registry())
@@ -225,6 +237,40 @@ def test_worker_prompt_is_scoped_to_the_indexed_section() -> None:
     assert "header_slots" not in prompt
     assert "/approved/pilot.las" not in prompt
     assert "Executable Wellplot SDK reference" in prompt
+
+
+def test_source_candidate_is_associated_without_exposing_canonical_path() -> None:
+    """The worker can attach a host source while its prompt remains path-free."""
+    backend = _Backend(responses=[_source_program()])
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_context(),
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    assert result.artifact is not None
+    section = result.artifact.intent_fragment.sections[0]
+    assert section.data_source is not None
+    assert section.data_source.source_path == "/approved/pilot.las"
+    assert "/approved/pilot.las" not in backend.requests[0].user_prompt
+
+
+def test_each_worker_attempt_gets_fresh_source_handle_provenance() -> None:
+    """Repair attempts cannot reuse source handles issued by a prior builder."""
+    context = _context()
+    document = _document()
+    first = _fresh_builder(document, section_context=context.sections[0])
+    second = _fresh_builder(document, section_context=context.sections[0])
+
+    first_source = first.source("pilot.las")
+    second_source = second.source("pilot.las")
+    assert first_source != second_source
+    assert first_source.builder_id != second_source.builder_id
+    assert not hasattr(first_source, "canonical_path")
 
 
 def test_existing_section_task_is_rejected_without_provider_call() -> None:
