@@ -8,9 +8,10 @@ canonical inputs, maps `build()` to reconstruction and `revise()` to revision,
 and returns a stable public projection without applying or retaining the result.
 
 - **Slice base SHA:** `3475434`
-- **Implementation commit:** `dd2bb6e` (`Add direct Code Mode Python session`)
-- **Production LOC delta:** `+445`
-- **Test LOC delta:** `+272`
+- **Implementation commits:** `dd2bb6e` (`Add direct Code Mode Python session`)
+  and `7496553` (`Harden CM-50 session validation`)
+- **Production LOC delta:** `+448`
+- **Test LOC delta:** `+303`
 - **Runtime behavior delta:** direct v2 Python compilation is available;
   MCP, notebook routing, persistence, rendering, defaults, and legacy behavior
   are unchanged.
@@ -34,6 +35,11 @@ how providers, planners, workers, source loaders, or allowed roots are built.
 `AgentSourceConfig` converts explicitly supplied host references into the
 internal enrichment contract without resolving paths, opening files, or
 discovering candidates.
+
+CM-50R aligns those execution limits with the provider request contract:
+timeouts and temperatures must be finite numeric values, and
+`max_output_tokens` must be a real positive integer. Build and revise both
+retain the direct-Python MCP tripwire.
 
 The public flow is:
 
@@ -69,7 +75,7 @@ and no `AgentSession` export is added to top-level `wellplot`.
 
 ## Validation
 
-- CM-50 focused session and architecture tests: `15 passed`.
+- CM-50/CM-50R focused session and architecture tests: `25 passed`.
 - Full Code Mode and architecture regression selection: `86 passed`.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
@@ -78,7 +84,8 @@ and no `AgentSession` export is added to top-level `wellplot`.
 Coverage includes build/revise mode mapping, host-injected compiler calls,
 source conversion, safe result projection, failure-without-intent invariants,
 input immutability, no session-owned document state, bounded inspection,
-configuration validation, public imports, and MCP isolation.
+finite and strict configuration validation, public imports, and symmetric MCP
+isolation.
 
 ## Boundaries And Deferrals
 
@@ -88,6 +95,7 @@ exposure, notebook migration, MCP migration, default-engine switching, or
 legacy deletion. Existing `wellplot.agent` legacy exports remain unchanged
 apart from additive CM-50 names.
 
-**PROCEED / STOP:** CM-50 is implemented and evidenced. Stop before CM-51
+**PROCEED / STOP:** CM-50R is implemented and evidenced. CM-50 is closed.
+Stop before CM-51
 MCP cutover, CM-52 notebook migration, or CM-53 default-engine selection until
 each is separately authorized.

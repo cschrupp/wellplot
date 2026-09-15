@@ -141,7 +141,7 @@ fragment through the SDK runtime.
 | CM-46 Async graph integration and parity | Complete (`dba0635`) | Native async v2 facade, stable compile result, safe failure projection, metrics, and deterministic parity fixtures pass |
 | CM-47 Host-bound revision mode | Complete (`21cf21b`) | Existing-section target resolution, opaque sparse revision, duplicate-target rejection, private preservation, and exact revision parity gates pass |
 | CM-48 Bounded visual correction | Complete (`2e8fe54`) | Root-only section visual review, bounded failure evidence, source redaction, private preservation, and render/review gates pass |
-| CM-50 Direct Python v2 API | Complete (`dd2bb6e`) | Injected async AgentSession projects build/revise results without MCP, mutation, or persistence |
+| CM-50 Direct Python v2 API | Complete (`7496553`) | Injected async AgentSession projects build/revise results with provider-aligned limits, without MCP, mutation, or persistence |
 | CM-51 MCP cutover | Not started | Agentic MCP tools delegate to the v2 session/graph service |
 | CM-52 Notebook cutover | Not started | ProjectSession uses the direct v2 Python path for local authoring |
 | CM-53 Default v2 engine | Not started | v2 becomes default only after final transition acceptance |
