@@ -14,6 +14,8 @@ document mutation path.
   of the CM-43 decision gate.
 - **Harness correction commit:** `bfada44` (`Correct CM-43 A/B evidence gate`).
 - **Live runner commit:** `3864df2` (`Add CM-43 live experiment runner`).
+- **NVIDIA sampling correction:** `4d23704` (`Add top-p to CM-43 live settings`).
+- **NVIDIA settings evidence:** `b7a9f0c` (`Document CM-43 NVIDIA sampling settings`).
 
 ## Harness Corrections
 
@@ -99,21 +101,37 @@ writes only redacted rows plus the gate summary. A live run is invoked with
 explicit provider settings, for example:
 
 ```bash
-uv run --extra agent python scripts/run_cbl_section_ab.py \
-  --provider openai_compat \
-  --model MODEL \
-  --base-url https://provider.example/v1 \
-  --api-key-file PROVIDER_API_KEY.txt \
-  --temperature 0 \
+UV_CACHE_DIR=/tmp/wellplot-uv-cache uv run --extra agent \
+  python scripts/run_cbl_section_ab.py \
+  --provider nvidia_cloud \
+  --model nvidia/nemotron-3-super-120b-a12b \
+  --base-url https://integrate.api.nvidia.com/v1 \
+  --api-key-file NVIDIA_API_KEY.txt \
+  --api-key-env NVIDIA_API_KEY \
+  --temperature 1.0 \
   --top-p 0.95 \
-  --max-output-tokens 16000 \
-  --timeout 1800
+  --max-output-tokens 16384 \
+  --max-tokens-parameter max_tokens \
+  --timeout 300
 ```
 
-The required three live runs per engine have not yet been collected in this
-environment. No provider credentials, endpoint, model, or generation settings
-were selected for execution, so no live claim is made and no
-`CM-43-live-runs.jsonl` is created.
+The required three live runs per engine were collected with the NVIDIA
+configuration above. All six rows share fingerprint
+`52deb03472c4939efa00cfda95c429850cdb0dd90735c910ca04ba9ad3910cc1` and are
+stored in `CM-43-live-runs.jsonl`. The file contains redacted metrics only;
+provider responses, source text, and credentials are not retained.
+
+The aggregate evidence is:
+
+| Engine | Engine success | Common acceptance | Representability | Provider calls |
+| --- | ---: | ---: | --- | --- |
+| v1 | 2/3 | 2/3 | complete on successful runs | 1 when exposed; otherwise unavailable |
+| v2 | 0/3 | 0/3 | `sdk_prompt_contract_insufficient` in all runs | 1/3 |
+
+The v1 worker latencies were `2417.71`, `94600.14`, and `82023.29` ms. The
+v2 worker latencies were `14732.63`, `14869.41`, and `17230.55` ms. Token
+counts and unavailable provider metrics remain redacted or marked
+`not_available` by the evidence contract.
 
 The live runner must use the same provider family, model, temperature, output
 budget, timeout, and semantic case for both engines. It must record redacted
@@ -121,10 +139,11 @@ JSONL rows containing engine success, common acceptance, omissions, repairs,
 provider calls/tokens, worker/provider latency, prompt/schema/source metrics,
 legacy-core reachability, the shared experiment fingerprint, and failure codes.
 
-If v2 omits the array/raster roles because the current scalar-only SDK
-reference cannot express them, the decision is `STOP_SDK_CONTEXT_GAP`; do not
-modify `ProgramSectionCompiler` during this slice. Otherwise the gate may
-produce `PROCEED` or `STOP_V2_REGRESSION` according to the measured evidence.
+The live decision is `STOP_SDK_CONTEXT_GAP`; do not modify
+`ProgramSectionCompiler` retroactively or weaken the CBL acceptance contract.
+The next engineering slice should be a generic SDK/context expansion exposing
+normal, reference, and array tracks plus curve/raster bindings, with no CBL- or
+VDL-specific branch.
 
 ## Boundaries
 
@@ -136,6 +155,7 @@ produce `PROCEED` or `STOP_V2_REGRESSION` according to the measured evidence.
 
 ## Decision
 
-**PROCEED / STOP:** The deterministic A/B harness is implemented and tested,
-but CM-43 remains open pending three live runs for each engine. Do not proceed
-to CM-44 until the live evidence is collected and the A/B decision is recorded.
+**STOP:** CM-43 is complete with decision `STOP_SDK_CONTEXT_GAP`. Do not
+proceed to CM-44. The next authorized slice is the generic SDK/context
+expansion described above; rerun this unchanged six-run case before revisiting
+the report worker.
