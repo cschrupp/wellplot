@@ -111,6 +111,22 @@ def test_semantic_models_are_strict_and_frozen() -> None:
         task.goal = "Mutate the plan"  # type: ignore[misc]
 
 
+def test_semantic_plan_allows_report_only_work() -> None:
+    """Report workers can be planned without inventing a section task."""
+    plan = SemanticPlan(
+        summary="Update the report heading.",
+        report_task=ReportTask(goal="Update the report heading."),
+    )
+
+    assert plan.section_tasks == ()
+
+
+def test_semantic_plan_rejects_empty_work() -> None:
+    """A plan without report or section work is not executable."""
+    with pytest.raises(ValidationError, match="report task or section tasks"):
+        SemanticPlan(summary="No work")
+
+
 def test_planner_makes_one_static_structured_call() -> None:
     """Normal planning uses one fixed response model and no source discovery."""
     backend = _RecordedBackend(_plan_payload())

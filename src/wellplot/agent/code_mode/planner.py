@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ...capabilities import CapabilityRegistry
 from ..providers.base import (
@@ -67,8 +67,15 @@ class SemanticPlan(_SemanticModel):
 
     summary: str = Field(min_length=1)
     report_task: ReportTask | None = None
-    section_tasks: tuple[SectionTask, ...] = Field(min_length=1)
+    section_tasks: tuple[SectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_work_units(self) -> SemanticPlan:
+        """Require at least one report or section work unit."""
+        if self.report_task is None and not self.section_tasks:
+            raise ValueError("SemanticPlan must contain a report task or section tasks.")
+        return self
 
     @field_validator("unresolved_requirements")
     @classmethod
@@ -204,6 +211,9 @@ Select capability IDs exactly as listed in the static capability catalogue. A
 SectionTask describes what one logical section should accomplish; its list order
 does not specify document order or execution order. Existing-section hints are
 advisory natural-language clues only and are resolved later by host code.
+
+Report-only requests must use report_task with an empty section_tasks collection;
+do not invent a dummy section task.
 
 In revise mode, include only materially changed or newly requested semantic
 work. Omitted report or section areas are preserved by later deterministic
