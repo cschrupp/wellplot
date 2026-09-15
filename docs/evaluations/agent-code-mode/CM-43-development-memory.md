@@ -13,6 +13,7 @@ document mutation path.
 - **Primary case:** `main_pass` only. `repeat_pass` is intentionally not part
   of the CM-43 decision gate.
 - **Harness correction commit:** `bfada44` (`Correct CM-43 A/B evidence gate`).
+- **Live runner commit:** `3864df2` (`Add CM-43 live experiment runner`).
 
 ## Harness Corrections
 
@@ -91,9 +92,27 @@ only as a length and SHA-256 hash in evidence rows.
 
 ## Live Gate Status
 
-The required three live runs per engine have not been collected in this
-environment. No provider credentials or provider factories were supplied, so
-no live claim is made and no `CM-43-live-runs.jsonl` is created.
+The six-run entry point is `scripts/run_cbl_section_ab.py`. It builds both
+case-aware factories over one OpenAI-compatible client configuration, injects
+the same temperature/token/timeout settings into the legacy Chat path, and
+writes only redacted rows plus the gate summary. A live run is invoked with
+explicit provider settings, for example:
+
+```bash
+uv run --extra agent python scripts/run_cbl_section_ab.py \
+  --provider openai_compat \
+  --model MODEL \
+  --base-url https://provider.example/v1 \
+  --api-key-file PROVIDER_API_KEY.txt \
+  --temperature 0 \
+  --max-output-tokens 16000 \
+  --timeout 1800
+```
+
+The required three live runs per engine have not yet been collected in this
+environment. No provider credentials, endpoint, model, or generation settings
+were selected for execution, so no live claim is made and no
+`CM-43-live-runs.jsonl` is created.
 
 The live runner must use the same provider family, model, temperature, output
 budget, timeout, and semantic case for both engines. It must record redacted
