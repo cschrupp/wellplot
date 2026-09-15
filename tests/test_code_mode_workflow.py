@@ -204,6 +204,11 @@ def _state(plan: SemanticPlan) -> dict[str, object]:
     }
 
 
+def _invoke(plan: SemanticPlan, workers: _Workers) -> dict[str, object]:
+    """Invoke the async graph through its native ainvoke entry point."""
+    return asyncio.run(_graph(plan, workers).ainvoke(_state(plan)))
+
+
 def test_graph_merges_report_and_sections_in_plan_order() -> None:
     """Reversed asynchronous completion does not change canonical merge order."""
     plan = SemanticPlan(
@@ -215,7 +220,7 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
         ),
     )
     workers = _Workers()
-    result = _graph(plan, workers).invoke(_state(plan))
+    result = _invoke(plan, workers)
 
     assert workers.completion_order == ["section-1", "report", "section-0"]
     assert [section["section_id"] for section in result["merged_intent"]["sections"]] == [
@@ -232,14 +237,14 @@ def test_graph_supports_report_only_and_section_only_plans() -> None:
         summary="report only",
         report_task=ReportTask(goal="Report title"),
     )
-    report_result = _graph(report_plan, _Workers()).invoke(_state(report_plan))
+    report_result = _invoke(report_plan, _Workers())
     assert report_result["merged_intent"]["title"] == "Report title"
 
     section_plan = SemanticPlan(
         summary="section only",
         section_tasks=(SectionTask(goal="first section", capability_ids=("section.log_plot",)),),
     )
-    section_result = _graph(section_plan, _Workers()).invoke(_state(section_plan))
+    section_result = _invoke(section_plan, _Workers())
     assert section_result["merged_intent"]["sections"][0]["section_id"] == "section-0"
 
 
@@ -252,7 +257,7 @@ def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:
             SectionTask(goal="second section", capability_ids=("section.log_plot",)),
         ),
     )
-    result = _graph(plan, _Workers(fail_section=1)).invoke(_state(plan))
+    result = _invoke(plan, _Workers(fail_section=1))
 
     assert result["merged_intent"] == {}
     assert json.loads(result["diagnostics"][0])["code"] == "program.dry_run_error"
@@ -269,7 +274,7 @@ def test_graph_rejects_duplicate_section_id_at_merge() -> None:
     )
 
     with pytest.raises(ValueError, match="Duplicate v2 section identity"):
-        _graph(plan, _Workers(duplicate_sections=True)).invoke(_state(plan))
+        _invoke(plan, _Workers(duplicate_sections=True))
 
 
 def test_worker_outcome_does_not_accept_generated_source() -> None:

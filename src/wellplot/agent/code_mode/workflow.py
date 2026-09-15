@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -48,11 +47,7 @@ class CodeModeGraphDependencies:
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
     """Build plan -> enrich -> fan-out -> deterministic merge workflow."""
 
-    def plan_node(state: CodeModeGraphState) -> dict[str, object]:
-        """Run the async planner from the synchronous compile graph."""
-        return asyncio.run(_plan_node(state))
-
-    async def _plan_node(state: CodeModeGraphState) -> dict[str, object]:
+    async def plan_node(state: CodeModeGraphState) -> dict[str, object]:
         """Plan from a bounded document summary, never the full document."""
         document = _document(state)
         summary = AuthoringInspectionFacade(document).document_summary()
@@ -66,7 +61,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         )
         return {"plan": plan.model_dump(mode="json")}
 
-    def enrich_node(state: CodeModeGraphState) -> dict[str, object]:
+    async def enrich_node(state: CodeModeGraphState) -> dict[str, object]:
         """Resolve host-provided source candidates into bounded context."""
         plan = SemanticPlan.model_validate(state["plan"])
         context = dependencies.enricher.enrich(
@@ -79,7 +74,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         )
         return {"enriched_context": context.model_dump(mode="json")}
 
-    def dispatch_workers(state: CodeModeGraphState) -> list[Send]:
+    async def dispatch_workers(state: CodeModeGraphState) -> list[Send]:
         """Dispatch only the task-local context required by each worker."""
         plan = SemanticPlan.model_validate(state["plan"])
         context = EnrichedSemanticContext.model_validate(state["enriched_context"])
@@ -117,11 +112,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             raise ValueError("Semantic plan did not produce any graph work units.")
         return sends
 
-    def compile_worker_node(state: dict[str, Any]) -> dict[str, object]:
-        """Run one async compiler from a synchronous LangGraph Send node."""
-        return asyncio.run(_compile_worker_node(state))
-
-    async def _compile_worker_node(state: dict[str, Any]) -> dict[str, object]:
+    async def compile_worker_node(state: dict[str, Any]) -> dict[str, object]:
         """Run one isolated worker and project only compact safe evidence."""
         worker_state = cast(CodeModeWorkerState, state)
         kind = worker_state["kind"]
@@ -177,7 +168,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         )
         return _outcome_state(outcome)
 
-    def merge_node(state: CodeModeGraphState) -> dict[str, object]:
+    async def merge_node(state: CodeModeGraphState) -> dict[str, object]:
         """Reject incomplete/failed fan-out and merge successful intents in plan order."""
         plan = SemanticPlan.model_validate(state["plan"])
         outcomes = tuple(
