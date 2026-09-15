@@ -300,6 +300,12 @@ class LegacyBackendRecorder:
             elapsed_ms = (time.perf_counter() - started) * 1000
             if self.provider_latency_ms is NOT_AVAILABLE:
                 self.provider_latency_ms = elapsed_ms
+        client = getattr(self.delegate, "client", None)
+        reported_calls = _nonnegative_integer(
+            getattr(client, "provider_generation_calls", NOT_AVAILABLE)
+        )
+        if reported_calls is not None:
+            self.provider_generation_calls = reported_calls
         report_facts = getattr(result, "report_facts", {})
         if isinstance(report_facts, Mapping):
             self._record_facts(report_facts)
@@ -316,6 +322,9 @@ class LegacyBackendRecorder:
         )
         if repair_value is not None:
             self.repair_count = repair_value
+        provider_calls = _nonnegative_integer(facts.get("provider_generation_calls"))
+        if provider_calls is not None:
+            self.provider_generation_calls = provider_calls
         latency = _nonnegative_number(facts.get("provider_latency_ms", facts.get("latency_ms")))
         if latency is not None:
             self.provider_latency_ms = latency
