@@ -137,7 +137,8 @@ fragment through the SDK runtime.
 | CM-43R Generic section SDK/context expansion | Complete (`c4fecb4`) | Opaque host-owned sources and generic normal/reference/array plus curve/raster section primitives; unchanged live gate returns `STOP_V2_REGRESSION` |
 | CM-43R2 Grounded section repair and A/B parity | Complete (`b95b58b`) | Generic exact-channel semantic projection and bounded repair context; unchanged live gate returns `PROCEED` |
 | CM-44 Report program worker | Complete (`9de218f`) | Report-only program worker compiles the full report development set through private dry-run gates |
-| CM-45 through CM-48 Graph parity | Not started | Full report/revision graph parity and cutover gates pass |
+| CM-45 v2 compile graph | Complete (`23fdba4`) | Planner, enrichment, dynamic report/section fan-out, compact outcomes, deterministic merge, and atomic failure gate pass |
+| CM-46 through CM-48 Graph integration and parity | Not started | Full report/revision graph parity and cutover gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
