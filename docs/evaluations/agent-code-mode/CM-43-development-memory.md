@@ -12,6 +12,29 @@ document mutation path.
   evaluation.
 - **Primary case:** `main_pass` only. `repeat_pass` is intentionally not part
   of the CM-43 decision gate.
+- **Harness correction commit:** `bfada44` (`Correct CM-43 A/B evidence gate`).
+
+## Harness Corrections
+
+The deterministic harness now enforces the fairness conditions required before
+live runs:
+
+- `evaluate_gate()` requires v2 acceptance to be at least competitive with v1
+  and also requires a material v2 complexity advantage. Simplicity cannot
+  override a lower v2 acceptance count.
+- Every row carries an experiment fingerprint derived from the frozen corpus
+  hashes, section, provider/model, generation settings, timeout, and run count.
+  Mixed fingerprints are not eligible for a decision.
+- Legacy-core reachability is measured by an execution-frame probe, not by a
+  `sys.modules` import delta, so the result is independent of prior imports.
+- v2 SDK representability is classified from the published worker capability
+  set (`section.log_plot`, `track.normal`, and `binding.curve`), not from a
+  particular model's omitted tracks.
+- The common acceptance contract requires exactly four tracks and exact
+  binding shapes: four combo curves, three depth curves, two CBL curves, and
+  one VDL raster. Extra tracks or bindings are rejected.
+- The v1 evaluation boundary includes a redaction-safe legacy backend recorder
+  for provider-call, repair, token, and latency aggregates when available.
 
 ## Fairness Contract
 
@@ -53,15 +76,17 @@ valid.
 
 ## Validation
 
-- CM-43-focused tests: `4 passed`.
-- Adjacent Code Mode/CBL regression selection: `59 passed`.
+- CM-43-focused tests: `10 passed`.
+- Adjacent Code Mode/CBL regression selection: `65 passed`.
 - Ruff check over changed Python files: passed.
 - Ruff format check over changed Python files: passed.
 - `git diff --check`: passed.
 
 The deterministic tests prove that three fake A/B pairs remain ineligible for
-the live gate, that missing array/raster output is reported as
-`sdk_prompt_contract_insufficient`, and that generated program text is retained
+the live gate, all gate outcomes are bounded and explicit, mixed experiment
+fingerprints are rejected, lower v2 acceptance stops even when v2 is simpler,
+published SDK gaps are reported as `sdk_prompt_contract_insufficient`, exact
+extra-binding mutations are rejected, and generated program text is retained
 only as a length and SHA-256 hash in evidence rows.
 
 ## Live Gate Status
@@ -74,7 +99,7 @@ The live runner must use the same provider family, model, temperature, output
 budget, timeout, and semantic case for both engines. It must record redacted
 JSONL rows containing engine success, common acceptance, omissions, repairs,
 provider calls/tokens, worker/provider latency, prompt/schema/source metrics,
-legacy-core reachability, and failure codes.
+legacy-core reachability, the shared experiment fingerprint, and failure codes.
 
 If v2 omits the array/raster roles because the current scalar-only SDK
 reference cannot express them, the decision is `STOP_SDK_CONTEXT_GAP`; do not
