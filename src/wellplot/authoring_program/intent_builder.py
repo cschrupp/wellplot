@@ -56,6 +56,7 @@ from ..model.intent import (
     AuthoringSectionIntent,
     AuthoringServiceTitleIntent,
     AuthoringStyleIntent,
+    AuthoringTailIntent,
     AuthoringTrackIntent,
 )
 from .builders import (
@@ -113,6 +114,7 @@ class IntentBuilder:
         self._page: AuthoringPageIntent | None = None
         self._depth: AuthoringDepthIntent | None = None
         self._output: AuthoringOutputIntent | None = None
+        self._tail: AuthoringTailIntent | None = None
         self._sections: dict[str, AuthoringSectionIntent] = {}
         self._section_order: list[str] = []
         self._tracks: dict[str, TrackHandle] = {}
@@ -283,6 +285,15 @@ class IntentBuilder:
         """Set one explicit canonical output patch for the owned report."""
         self._require_report(report)
         self._output = _copy_intent(output, AuthoringOutputIntent, "Output desired state")
+
+    def update_tail(self, report: ReportHandle, *, enabled: bool | None = None) -> None:
+        """Set minimal report-tail enablement for the owned report."""
+        self._require_report(report)
+        self._tail = _validated(
+            AuthoringTailIntent,
+            _non_null_fields(enabled=enabled),
+            "Tail desired state",
+        )
 
     def add_section(
         self,
@@ -901,6 +912,8 @@ class IntentBuilder:
             fields["depth"] = self._depth
         if self._output is not None:
             fields["output"] = self._output
+        if self._tail is not None:
+            fields["tail"] = self._tail
         if self._section_order:
             fields["sections"] = [
                 self._sections[token].model_dump(exclude_unset=True)
@@ -915,6 +928,14 @@ class IntentBuilder:
                 methods={
                     "report": self._runtime_report,
                     "source": self._runtime_source,
+                    "header_field": self._runtime_header_field,
+                    "service_title": self._runtime_service_title,
+                    "detail_field": self._runtime_detail_field,
+                    "remark": self._runtime_remark,
+                    "page": self._runtime_page,
+                    "depth": self._runtime_depth,
+                    "output": self._runtime_output,
+                    "tail": self._runtime_tail,
                     "section": self._runtime_section,
                     "track": self._runtime_track,
                     "curve": self._runtime_curve,
@@ -1140,6 +1161,202 @@ class IntentBuilder:
             title=_optional_runtime_text(values, "title"),
             subtitle=_optional_runtime_text(values, "subtitle"),
         )
+
+    def _runtime_header_field(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch one primitive-valued semantic header field."""
+        report = _runtime_handle_arg(args, "wp.header_field", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.header_field",
+            {"key", "value", "unit", "label"},
+        )
+        return self._set_runtime_header_field(report, values, detail=False)
+
+    def _runtime_service_title(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch one primitive-valued service-title slot."""
+        report = _runtime_handle_arg(args, "wp.service_title", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.service_title",
+            {
+                "slot_id",
+                "value",
+                "unit",
+                "font_size",
+                "auto_adjust",
+                "bold",
+                "italic",
+                "alignment",
+            },
+        )
+        self.set_service_title(
+            report,
+            slot_id=_required_runtime_text(values, "slot_id", "wp.service_title"),
+            value=_runtime_report_value(values, "wp.service_title"),
+            font_size=_optional_runtime_number(values, "font_size"),
+            auto_adjust=_optional_runtime_bool_or_none(values, "auto_adjust"),
+            bold=_optional_runtime_bool_or_none(values, "bold"),
+            italic=_optional_runtime_bool_or_none(values, "italic"),
+            alignment=_optional_runtime_text(values, "alignment"),
+        )
+        return None
+
+    def _runtime_detail_field(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch one primitive-valued detail-header field."""
+        report = _runtime_handle_arg(args, "wp.detail_field", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.detail_field",
+            {"key", "value", "unit", "label"},
+        )
+        return self._set_runtime_header_field(report, values, detail=True)
+
+    def _set_runtime_header_field(
+        self,
+        report: ReportHandle,
+        values: Mapping[str, RuntimeValue],
+        *,
+        detail: bool,
+    ) -> RuntimeValue:
+        """Set one header/detail field after converting primitive values."""
+        name = "wp.detail_field" if detail else "wp.header_field"
+        key = _required_runtime_text(values, "key", name)
+        value = _runtime_report_value(values, name)
+        setter = self.set_detail_field if detail else self.set_header_field
+        setter(
+            report,
+            key=key,
+            value=value,
+            label=_optional_runtime_text(values, "label"),
+        )
+        return None
+
+    def _runtime_remark(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch one primitive-valued report remark."""
+        report = _runtime_handle_arg(args, "wp.remark", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.remark",
+            {
+                "remark_id",
+                "title",
+                "text",
+                "alignment",
+                "font_size",
+                "title_font_size",
+                "border",
+            },
+        )
+        self.add_remark(
+            report,
+            remark_id=_required_runtime_text(values, "remark_id", "wp.remark"),
+            title=_optional_runtime_text(values, "title"),
+            text=_required_runtime_text(values, "text", "wp.remark"),
+            alignment=_optional_runtime_text(values, "alignment"),
+            font_size=_optional_runtime_number(values, "font_size"),
+            title_font_size=_optional_runtime_number(values, "title_font_size"),
+            border=_optional_runtime_bool_or_none(values, "border"),
+        )
+        return None
+
+    def _runtime_page(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch primitive page settings into one canonical page patch."""
+        report = _runtime_handle_arg(args, "wp.page", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.page",
+            {"size", "width_mm", "height_mm", "orientation", "continuous"},
+        )
+        page = _validated(
+            AuthoringPageIntent,
+            _non_null_fields(
+                size=_optional_runtime_text(values, "size"),
+                width_mm=_optional_runtime_number(values, "width_mm"),
+                height_mm=_optional_runtime_number(values, "height_mm"),
+                orientation=_optional_runtime_text(values, "orientation"),
+                continuous=_optional_runtime_bool_or_none(values, "continuous"),
+            ),
+            "Page desired state",
+        )
+        self.update_page(report, page=page)
+        return None
+
+    def _runtime_depth(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch primitive depth settings into one canonical depth patch."""
+        report = _runtime_handle_arg(args, "wp.depth", ReportHandle)
+        values = _runtime_kwargs(kwargs, "wp.depth", {"unit", "scale"})
+        depth = _validated(
+            AuthoringDepthIntent,
+            _non_null_fields(
+                unit=_optional_runtime_text(values, "unit"),
+                scale=_optional_runtime_scalar(values, "scale", "wp.depth"),
+            ),
+            "Depth desired state",
+        )
+        self.update_depth(report, depth=depth)
+        return None
+
+    def _runtime_output(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch primitive output settings without filesystem access."""
+        report = _runtime_handle_arg(args, "wp.output", ReportHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.output",
+            {"backend", "output_path", "dpi"},
+        )
+        output = _validated(
+            AuthoringOutputIntent,
+            _non_null_fields(
+                backend=_optional_runtime_text(values, "backend"),
+                output_path=_optional_runtime_text(values, "output_path"),
+                dpi=_optional_runtime_integer(values, "dpi", "wp.output"),
+            ),
+            "Output desired state",
+        )
+        self.update_output(report, output=output)
+        return None
+
+    def _runtime_tail(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Dispatch minimal report-tail enablement."""
+        report = _runtime_handle_arg(args, "wp.tail", ReportHandle)
+        values = _runtime_kwargs(kwargs, "wp.tail", {"enabled"})
+        self.update_tail(
+            report,
+            enabled=_required_runtime_bool(values, "enabled", "wp.tail"),
+        )
+        return None
 
     def _runtime_source(
         self,
@@ -1552,6 +1769,21 @@ def _optional_runtime_text(values: Mapping[str, RuntimeValue], key: str) -> str 
     return value
 
 
+def _runtime_report_value(
+    values: Mapping[str, RuntimeValue],
+    name: str,
+) -> AuthoringReportValueIntent:
+    """Build one report value from primitive program keywords."""
+    return _validated(
+        AuthoringReportValueIntent,
+        _non_null_fields(
+            value=_required_runtime_text(values, "value", name),
+            unit=_optional_runtime_text(values, "unit"),
+        ),
+        f"{name} value",
+    )
+
+
 def _required_runtime_number(
     values: Mapping[str, RuntimeValue],
     key: str,
@@ -1574,6 +1806,34 @@ def _optional_runtime_number(values: Mapping[str, RuntimeValue], key: str) -> fl
     return float(value)
 
 
+def _optional_runtime_scalar(
+    values: Mapping[str, RuntimeValue],
+    key: str,
+    name: str,
+) -> str | float | None:
+    """Return a depth scale string or number without coercion."""
+    if key not in values:
+        return None
+    value = values[key]
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        raise ProgramTypeError(f"{name} keyword '{key}' must be a string or number.")
+    return float(value) if isinstance(value, (int, float)) else value
+
+
+def _optional_runtime_integer(
+    values: Mapping[str, RuntimeValue],
+    key: str,
+    name: str,
+) -> int | None:
+    """Return one integer SDK value without accepting booleans or coercion."""
+    if key not in values:
+        return None
+    value = values[key]
+    if type(value) is not int:
+        raise ProgramTypeError(f"{name} keyword '{key}' must be an integer.")
+    return value
+
+
 def _optional_runtime_bool(
     values: Mapping[str, RuntimeValue],
     key: str,
@@ -1587,6 +1847,31 @@ def _optional_runtime_bool(
     if type(value) is not bool:
         raise ProgramTypeError(f"Keyword '{key}' must be a boolean.")
     return cast(bool, value)
+
+
+def _optional_runtime_bool_or_none(
+    values: Mapping[str, RuntimeValue],
+    key: str,
+) -> bool | None:
+    """Return an omitted-or-explicit boolean without coercion."""
+    if key not in values:
+        return None
+    value = values[key]
+    if type(value) is not bool:
+        raise ProgramTypeError(f"Keyword '{key}' must be a boolean.")
+    return cast(bool, value)
+
+
+def _required_runtime_bool(
+    values: Mapping[str, RuntimeValue],
+    key: str,
+    name: str,
+) -> bool:
+    """Return one required boolean SDK value without coercion."""
+    value = _optional_runtime_bool_or_none(values, key)
+    if value is None:
+        raise ProgramTypeError(f"{name} requires keyword '{key}'.")
+    return value
 
 
 __all__ = ["IntentBuilder"]
