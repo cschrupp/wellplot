@@ -132,7 +132,10 @@ fragment through the SDK runtime.
 | CM-34 Bounded program repair | Complete (`ad03bce`) | One bounded correction remains observable in traces/evals |
 | CM-40 Semantic planner v2 | Complete (`a9f4a21`) | Static semantic plan and one-call provider boundary pass |
 | CM-41 Deterministic enrichment | Complete (`58b9d01`) | Host-bounded source/target enrichment and immutable worker context pass |
-| CM-42 through CM-44 Graph cutover | Not started | Program workers pass A/B and CBL acceptance gates |
+| CM-42 Scalar section program worker | Complete (`392778c`) | New scalar section compiles, interprets, and privately dry-runs |
+| CM-43 CBL section A/B experiment | Not started | Program worker is compared with the unchanged v1 section worker |
+| CM-44 Report program worker | Not started | Full report development set passes |
+| CM-45 through CM-48 Graph parity | Not started | Full report/revision graph parity and cutover gates pass |
 | CM-50 through CM-52 Public cutover | Not started | Python/notebook/MCP opt-in v2 path is verified |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
@@ -672,3 +675,33 @@ The existing `graph.planner.ReconstructionPlanner` and all v1 graph workers
 remain unchanged. Source normalization, source discovery, canonical section
 resolution, and worker projections are deferred to CM-41; program workers,
 LangGraph routing, MCP, persistence, and legacy deletion remain out of scope.
+
+## CM-42 Scalar Section Program Worker
+
+CM-42 adds `agent.code_mode.program_worker.ProgramSectionCompiler` as a
+new-section scalar reconstruction pilot. It accepts an indexed
+`EnrichedSemanticContext`, a `SectionTask`, and an explicit canonical document;
+the indexed task/context pairing prevents one section from receiving another
+section's source facts. The worker prompt contains only that task's semantic
+requirements, selected v2 capability descriptors, bounded source/channel
+metadata, and a small executable SDK reference. It does not send the full
+semantic plan, report inventory, current document, unrelated source paths, or
+graph state to the provider.
+
+Each candidate uses a fresh `IdAllocator`, seeded from all existing section,
+section-local track, global binding, fill, and annotation identities. The worker
+then constructs an `AuthoringProgram` and calls
+`interpret_authoring_program()` as the single parse, policy, and execution
+entry point. The resulting builder intent must contain exactly one section and
+no report-wide fields, global child lists, or removals. `ProgramRuntime` then
+reconciles and validates that intent against a private document copy with the
+selected bounded channels.
+
+CM-42 supports only new-section reconstruction. Resolved existing-section
+tasks are rejected before provider generation because the restricted SDK's
+runtime surface is create-oriented; CM-42 does not claim revision support.
+One failed candidate invokes `ProgramRepairCoordinator` once. A repaired
+candidate receives a fresh builder and allocator and is run through the full
+kernel and private dry run once. The worker never adds recursive repair,
+provider-specific error matching, MCP calls, persistence, rendering, graph
+routing, or changes to the v1 section worker.
