@@ -95,6 +95,18 @@ class _ProviderFailureSession:
         return _session_failure("revise")
 
 
+class _UnexpectedSession:
+    """Raise an unexpected error to verify MCP trace preservation."""
+
+    async def build(self, **_: object) -> object:
+        """Raise a programming-style failure without exposing its text."""
+        raise RuntimeError("private failure detail")
+
+    async def revise(self, **_: object) -> object:
+        """Raise a programming-style revision failure without conversion."""
+        raise RuntimeError("private revision failure detail")
+
+
 class _FacadeBackend:
     """Fake provider proving the real session/facade/graph integration path."""
 
@@ -301,6 +313,29 @@ def test_agentic_tool_contract_and_declared_source_candidates_are_stable() -> No
     }
 
 
+def test_agentic_relative_logfile_path_resolves_against_server_root(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Relative MCP paths are independent of the process working directory."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+        fixture_paths = create_mcp_fixture_paths(Path(temporary_directory))
+        monkeypatch.chdir(Path("/tmp"))
+        operations = GraphAuthoringMcpOperations.create(
+            session=_Session(intent={"title": "Root-relative"}, mode="reconstruct"),
+            root=REPO_ROOT,  # type: ignore[arg-type]
+        )
+
+        result = asyncio.run(
+            operations.build(
+                logfile_path=fixture_paths.single_logfile_relative,
+                request="Set the title.",
+            )
+        )
+
+    assert result.success is True, result.errors
+    assert result.logfile_path == str(fixture_paths.single_logfile.resolve())
+
+
 def test_agentic_operations_use_real_v2_facade_with_fake_provider() -> None:
     """The MCP edge reaches AgentSession, facade, graph, and canonical apply."""
     with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
@@ -353,7 +388,12 @@ def test_agentic_execution_failure_discards_private_mutation(
     """A failed neutral executor cannot persist a partial private document."""
     from wellplot.mcp import agentic as agentic_module
 
-    def fail_execution(*_args: object, **_kwargs: object) -> object:
+    def fail_execution(
+        private_service: AuthoringService, *_args: object, **_kwargs: object
+    ) -> object:
+        mutated = private_service.document
+        mutated.title = "Private mutation must not persist"
+        private_service.replace_document(mutated)
         return SimpleNamespace(success=False, errors=("executor failed",))
 
     monkeypatch.setattr(agentic_module, "execute_authoring_plan", fail_execution)
@@ -376,6 +416,39 @@ def test_agentic_execution_failure_discards_private_mutation(
     assert result.changed is False
     assert result.rolled_back is True
     assert result.errors == ["executor failed"]
+    assert before == after
+
+
+def test_agentic_unexpected_session_exception_is_traced_and_reraised() -> None:
+    """Unexpected session errors remain exceptions with a safe terminal trace."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
+        fixture_paths = create_mcp_fixture_paths(Path(temporary_directory))
+        before = fixture_paths.single_logfile.read_text(encoding="utf-8")
+        operations = GraphAuthoringMcpOperations.create(
+            session=_UnexpectedSession(),  # type: ignore[arg-type]
+            root=REPO_ROOT,
+        )
+
+        with pytest.raises(RuntimeError, match="private failure detail"):
+            asyncio.run(
+                operations.build(
+                    logfile_path=str(fixture_paths.single_logfile),
+                    request="Set the title.",
+                )
+            )
+
+        after = fixture_paths.single_logfile.read_text(encoding="utf-8")
+        trace_paths = list(
+            (fixture_paths.fixture_dir / ".wellplot" / "agentic-runs").glob("*.jsonl")
+        )
+        events = read_agent_trace(trace_paths[0])
+
+    terminal_events = [event for event in events if event.event == "run_finished"]
+    serialized = json.dumps([event.model_dump(mode="json") for event in events])
+    assert len(terminal_events) == 1
+    assert terminal_events[0].status == "failed"
+    assert terminal_events[0].details == {"error_type": "RuntimeError"}
+    assert "private failure detail" not in serialized
     assert before == after
 
 

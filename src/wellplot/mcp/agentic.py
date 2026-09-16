@@ -54,7 +54,10 @@ class _McpDocumentContext:
 
 def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
     """Load one logfile and expose only its declared sources to Code Mode."""
-    resolved_logfile = Path(logfile_path).expanduser().resolve()
+    requested_logfile = Path(logfile_path).expanduser()
+    resolved_logfile = (
+        requested_logfile if requested_logfile.is_absolute() else root / requested_logfile
+    ).resolve()
     spec = load_logfile(resolved_logfile, allowed_root=root)
     document = AuthoringService.from_mapping(report_to_dict(spec)).document
     declared = resolve_section_data_sources_for_logfile(
@@ -252,18 +255,26 @@ class GraphAuthoringMcpOperations:
                 status="ready",
                 details={"section_ids": [section.id for section in context.document.sections]},
             )
-            if mode == "reconstruct":
-                result = await self.session.build(
-                    request=request,
-                    document=context.document,
-                    sources=context.source_candidates,
+            try:
+                if mode == "reconstruct":
+                    result = await self.session.build(
+                        request=request,
+                        document=context.document,
+                        sources=context.source_candidates,
+                    )
+                else:
+                    result = await self.session.revise(
+                        request=request,
+                        document=context.document,
+                        sources=context.source_candidates,
+                    )
+            except Exception as exc:
+                trace.record(
+                    "run_finished",
+                    status="failed",
+                    details={"error_type": type(exc).__name__},
                 )
-            else:
-                result = await self.session.revise(
-                    request=request,
-                    document=context.document,
-                    sources=context.source_candidates,
-                )
+                raise
             trace.record(
                 "compile_finished",
                 status="succeeded" if result.success else "failed",
