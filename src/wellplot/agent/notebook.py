@@ -36,7 +36,8 @@ from ..mcp.header_archetypes import (
     header_archetype_heading,
 )
 from ..mcp.service import create_logfile_draft
-from .core import AuthoringResult, AuthoringSession
+from .core import AuthoringResult
+from .direct_notebook import DirectNotebookSession, create_direct_notebook_session
 from .mcp import AGENTIC_MCP_SERVER_MODULE, LocalStdioMcpRuntime
 
 if TYPE_CHECKING:
@@ -124,7 +125,7 @@ class ProjectStarter:
 class ProjectSession:
     """Notebook-facing project wrapper around one public authoring session."""
 
-    authoring_session: AuthoringSession
+    authoring_session: DirectNotebookSession
     paths: ProjectPaths
     run_max_rounds: int = 12
     revise_max_rounds: int = 12
@@ -962,7 +963,7 @@ def create_project_session(
         model=model,
         base_url=base_url,
     )
-    authoring_session = AuthoringSession.from_local_mcp(
+    authoring_session = create_direct_notebook_session(
         provider=resolved_provider,
         model=resolved_model,
         server_root=project_paths.server_root,

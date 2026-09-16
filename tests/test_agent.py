@@ -35,6 +35,7 @@ from unittest import mock
 import anyio
 import yaml
 
+import wellplot.agent.notebook as notebook_module
 from wellplot.agent import (
     AuthoringRequest,
     AuthoringResult,
@@ -2848,10 +2849,10 @@ class AgentTests(unittest.TestCase):
         """Create one generic project session rooted under the configured server root."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
-            fake_session = mock.Mock(spec=AuthoringSession)
+            fake_session = mock.Mock()
             with mock.patch.object(
-                AuthoringSession,
-                "from_local_mcp",
+                notebook_module,
+                "create_direct_notebook_session",
                 return_value=fake_session,
             ) as factory:
                 session, paths = create_project_session(
@@ -2881,7 +2882,7 @@ class AgentTests(unittest.TestCase):
         """Resolve OpenAI-compatible model and base URL defaults from env vars."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
-            fake_session = mock.Mock(spec=AuthoringSession)
+            fake_session = mock.Mock()
             with (
                 mock.patch.dict(
                     os.environ,
@@ -2892,8 +2893,8 @@ class AgentTests(unittest.TestCase):
                     clear=False,
                 ),
                 mock.patch.object(
-                    AuthoringSession,
-                    "from_local_mcp",
+                    notebook_module,
+                    "create_direct_notebook_session",
                     return_value=fake_session,
                 ) as factory,
             ):
@@ -2916,10 +2917,10 @@ class AgentTests(unittest.TestCase):
         """Forward a larger request timeout to local OpenAI-compatible sessions."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
-            fake_session = mock.Mock(spec=AuthoringSession)
+            fake_session = mock.Mock()
             with mock.patch.object(
-                AuthoringSession,
-                "from_local_mcp",
+                notebook_module,
+                "create_direct_notebook_session",
                 return_value=fake_session,
             ) as factory:
                 session, _ = create_project_session(
@@ -2946,10 +2947,10 @@ class AgentTests(unittest.TestCase):
         """Provide a notebook-facing Ollama alias over the OpenAI-compatible backend."""
         with tempfile.TemporaryDirectory() as tmpdir:
             repo_root = Path(tmpdir)
-            fake_session = mock.Mock(spec=AuthoringSession)
+            fake_session = mock.Mock()
             with mock.patch.object(
-                AuthoringSession,
-                "from_local_mcp",
+                notebook_module,
+                "create_direct_notebook_session",
                 return_value=fake_session,
             ) as factory:
                 session, _ = create_project_session(
@@ -2976,9 +2977,9 @@ class AgentTests(unittest.TestCase):
             replacement_path.write_text("replacement", encoding="utf-8")
 
             with mock.patch.object(
-                AuthoringSession,
-                "from_local_mcp",
-                return_value=mock.Mock(spec=AuthoringSession),
+                notebook_module,
+                "create_direct_notebook_session",
+                return_value=mock.Mock(),
             ):
                 session, paths = create_project_session(
                     server_root=repo_root,
@@ -3002,9 +3003,9 @@ class AgentTests(unittest.TestCase):
             replacement_path.write_text("replacement", encoding="utf-8")
 
             with mock.patch.object(
-                AuthoringSession,
-                "from_local_mcp",
-                return_value=mock.Mock(spec=AuthoringSession),
+                notebook_module,
+                "create_direct_notebook_session",
+                return_value=mock.Mock(),
             ):
                 session, paths = create_project_session(
                     server_root=repo_root,
