@@ -74,9 +74,19 @@ source discovery, capabilities, and legacy code are unchanged.
 - `git diff --check`: passed.
 - CM-43 deterministic acceptance tests remain included and passing.
 
-The earlier three default-route live retries remain invalid transition
-evidence: they reached v2 with the required NVIDIA fingerprint but failed
-before common CBL acceptance. No live evidence rows were written.
+The post-implementation default-route retry also remains invalid transition
+evidence. All three calls omitted `engine`, used the required NVIDIA
+fingerprint, and reached the v2 public route:
+
+```text
+run 1    enrichment.section_hint_unresolved
+run 2    provider.invalid_response during structured planning
+run 3    provider.invalid_response during structured planning
+```
+
+None reached common CBL acceptance, so no live evidence rows were written and
+CM-53 remains transition-open. The failures are downstream of routing and are
+not evidence for v1 fallback or a routing regression.
 
 ## Decision
 
