@@ -28,7 +28,7 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 from uuid import uuid4
 
 from ..authoring import (
@@ -8725,9 +8725,13 @@ async def run_authoring_request(
     base_url: str | None = None,
     timeout: float | None = None,
     max_rounds: int = 12,
+    engine: Literal["v1", "v2"] = "v2",
 ) -> AuthoringResult:
-    """Run one high-level authoring request against local stdio MCP."""
-    session = AuthoringSession.from_local_mcp(
+    """Run one high-level request through the selected authoring engine."""
+    from .routing import create_authoring_session, tag_authoring_result
+
+    session = create_authoring_session(
+        engine=engine,
         provider=provider,
         model=model,
         server_root=server_root,
@@ -8735,13 +8739,14 @@ async def run_authoring_request(
         base_url=base_url,
         timeout=timeout,
     )
-    return await session.run(
+    result = await session.run(
         goal=goal,
         output_logfile=output_logfile,
         example_id=example_id,
         source_logfile_path=source_logfile_path,
         max_rounds=max_rounds,
     )
+    return tag_authoring_result(result, engine=engine)
 
 
 async def revise_authoring_request(
@@ -8755,9 +8760,13 @@ async def revise_authoring_request(
     base_url: str | None = None,
     timeout: float | None = None,
     max_rounds: int = 12,
+    engine: Literal["v1", "v2"] = "v2",
 ) -> AuthoringResult:
-    """Revise one existing draft logfile against local stdio MCP."""
-    session = AuthoringSession.from_local_mcp(
+    """Revise one draft through the selected authoring engine."""
+    from .routing import create_authoring_session, tag_authoring_result
+
+    session = create_authoring_session(
+        engine=engine,
         provider=provider,
         model=model,
         server_root=server_root,
@@ -8765,8 +8774,9 @@ async def revise_authoring_request(
         base_url=base_url,
         timeout=timeout,
     )
-    return await session.revise(
+    result = await session.revise(
         feedback=feedback,
         logfile_path=logfile_path,
         max_rounds=max_rounds,
     )
+    return tag_authoring_result(result, engine=engine)

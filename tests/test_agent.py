@@ -3479,6 +3479,7 @@ class AgentTests(unittest.TestCase):
                     source_logfile_path="examples/starter.log.yaml",
                     provider="openai",
                     model="demo-model",
+                    engine="v1",
                 )
             )
 
@@ -3503,6 +3504,7 @@ class AgentTests(unittest.TestCase):
                     logfile_path="workspace/demo.log.yaml",
                     provider="openai",
                     model="demo-model",
+                    engine="v1",
                 )
             )
 
@@ -3692,7 +3694,8 @@ class AgentTests(unittest.TestCase):
         ) as factory:
             returned = anyio.run(self._run_authoring_request_helper)
 
-        self.assertIs(returned, result)
+        self.assertIsNot(returned, result)
+        self.assertEqual(returned.report_facts["engine"], "v1")
         factory.assert_called_once_with(
             provider="openai",
             model="gpt-5.4-mini",
@@ -3718,4 +3721,5 @@ class AgentTests(unittest.TestCase):
             output_logfile="workspace/demo.log.yaml",
             provider="openai",
             model="gpt-5.4-mini",
+            engine="v1",
         )

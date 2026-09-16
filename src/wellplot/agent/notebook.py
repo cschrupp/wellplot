@@ -37,8 +37,16 @@ from ..mcp.header_archetypes import (
 )
 from ..mcp.service import create_logfile_draft
 from .core import AuthoringResult
-from .direct_notebook import DirectNotebookSession, create_direct_notebook_session
+from .direct_notebook import create_direct_notebook_session
 from .mcp import AGENTIC_MCP_SERVER_MODULE, LocalStdioMcpRuntime
+from .routing import (
+    DEFAULT_AUTHORING_ENGINE,
+    AuthoringEngine,
+    AuthoringSessionProtocol,
+    create_authoring_session,
+    normalize_authoring_engine,
+    tag_authoring_result,
+)
 
 if TYPE_CHECKING:
     from ..mcp.agentic import GraphAuthoringToolResult
@@ -125,8 +133,9 @@ class ProjectStarter:
 class ProjectSession:
     """Notebook-facing project wrapper around one public authoring session."""
 
-    authoring_session: DirectNotebookSession
+    authoring_session: AuthoringSessionProtocol
     paths: ProjectPaths
+    engine: AuthoringEngine = DEFAULT_AUTHORING_ENGINE
     run_max_rounds: int = 12
     revise_max_rounds: int = 12
     draft_logfile: str | Path | None = None
@@ -482,13 +491,14 @@ class ProjectSession:
             self.draft_logfile if output_logfile is None else output_logfile,
             field_name="draft_logfile",
         )
-        return await self.authoring_session.run(
+        result = await self.authoring_session.run(
             goal=self._normalize_text(goal),
             output_logfile=resolved_output,
             example_id=example_id,
             source_logfile_path=source_logfile_path,
             max_rounds=self.run_max_rounds if max_rounds is None else max_rounds,
         )
+        return tag_authoring_result(result, engine=self.engine)
 
     async def revise(
         self,
@@ -502,11 +512,12 @@ class ProjectSession:
             self.draft_logfile if logfile_path is None else logfile_path,
             field_name="draft_logfile",
         )
-        return await self.authoring_session.revise(
+        result = await self.authoring_session.revise(
             feedback=self._normalize_text(feedback),
             logfile_path=resolved_logfile,
             max_rounds=self.revise_max_rounds if max_rounds is None else max_rounds,
         )
+        return tag_authoring_result(result, engine=self.engine)
 
     async def render_logfile_to_file(
         self,
@@ -954,6 +965,7 @@ def create_project_session(
     timeout: float | None = None,
     run_max_rounds: int = 12,
     revise_max_rounds: int = 12,
+    engine: AuthoringEngine = DEFAULT_AUTHORING_ENGINE,
 ) -> tuple[ProjectSession, ProjectPaths]:
     """Create one notebook-ready authoring session scoped to a project directory."""
     project_paths = ProjectPaths.under_root(server_root=server_root, project_dir=project_dir)
@@ -963,18 +975,22 @@ def create_project_session(
         model=model,
         base_url=base_url,
     )
-    authoring_session = create_direct_notebook_session(
+    normalized_engine = normalize_authoring_engine(engine)
+    authoring_session = create_authoring_session(
+        engine=normalized_engine,
         provider=resolved_provider,
         model=resolved_model,
         server_root=project_paths.server_root,
         api_key=api_key,
         base_url=resolved_base_url,
         timeout=timeout,
+        v2_factory=create_direct_notebook_session,
     )
     return (
         ProjectSession(
             authoring_session=authoring_session,
             paths=project_paths,
+            engine=normalized_engine,
             run_max_rounds=run_max_rounds,
             revise_max_rounds=revise_max_rounds,
         ),
