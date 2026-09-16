@@ -62,6 +62,26 @@ class SectionTask(_SemanticModel):
         return values
 
 
+class PlannerSemanticError(ValueError):
+    """One expected semantic error in provider-produced planner output."""
+
+    def __init__(self, code: str, safe_message: str) -> None:
+        """Initialize a stable, provider-safe correction diagnostic."""
+        self.code = code
+        self.safe_message = safe_message
+        super().__init__(safe_message)
+
+
+class PlannerSemanticFailure(RuntimeError):
+    """Final bounded planner failure after one semantic correction attempt."""
+
+    def __init__(self, code: str, safe_message: str) -> None:
+        """Initialize a stable terminal planner diagnostic."""
+        self.code = code
+        self.safe_message = safe_message
+        super().__init__(safe_message)
+
+
 class SemanticPlan(_SemanticModel):
     """Small planner result that describes work without document mechanics."""
 
@@ -102,7 +122,7 @@ class SemanticPlanner:
         temperature: float | None = None,
         max_output_tokens: int | None = None,
     ) -> SemanticPlan:
-        """Make exactly one structured provider call for a semantic plan."""
+        """Make one or two bounded structured calls for a semantic plan."""
         if not isinstance(request, str) or not request.strip():
             raise ValueError("Planning request must be a non-empty string.")
 
@@ -112,23 +132,39 @@ class SemanticPlanner:
             "current_document_summary": dict(current_document_summary or {}),
             "capabilities": _planning_catalog(self.registry),
         }
-        provider_request = StructuredGenerationRequest(
-            system_prompt=_PLANNER_SYSTEM_PROMPT,
-            user_prompt=(
-                "Create one SemanticPlan for this request. Return only the supplied "
-                "structured response model.\n\nContext:\n"
-                + json.dumps(context, sort_keys=True, separators=(",", ":"))
-            ),
-            timeout_seconds=timeout_seconds,
-            temperature=temperature,
-            max_output_tokens=max_output_tokens,
-        )
         generated = await self.backend.generate_structured(
-            provider_request,
+            _planning_request(
+                context=context,
+                timeout_seconds=timeout_seconds,
+                temperature=temperature,
+                max_output_tokens=max_output_tokens,
+            ),
             response_model=SemanticPlan,
         )
         plan = SemanticPlan.model_validate(generated.value)
-        return validate_semantic_plan(plan, self.registry)
+        try:
+            return validate_semantic_plan(plan, self.registry)
+        except PlannerSemanticError as first_error:
+            corrected = await self.backend.generate_structured(
+                _correction_request(
+                    mode=mode,
+                    previous_plan=plan,
+                    diagnostic=first_error,
+                    registry=self.registry,
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+                response_model=SemanticPlan,
+            )
+            corrected_plan = SemanticPlan.model_validate(corrected.value)
+            try:
+                return validate_semantic_plan(corrected_plan, self.registry)
+            except PlannerSemanticError as second_error:
+                raise PlannerSemanticFailure(
+                    second_error.code,
+                    "Planner returned a semantically invalid plan after one correction.",
+                ) from second_error
 
 
 def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> SemanticPlan:
@@ -144,11 +180,15 @@ def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> 
         specs = _validate_capabilities(task.capability_ids, registry, task_kind="section")
         categories = {spec.category for spec in specs}
         if "section" not in categories:
-            raise ValueError(
-                "Each SectionTask must select at least one registered section capability."
+            raise PlannerSemanticError(
+                "missing_section_capability",
+                "Each SectionTask must select at least one registered section capability.",
             )
         if "report" in categories:
-            raise ValueError("A SectionTask cannot select a report capability.")
+            raise PlannerSemanticError(
+                "wrong_task_category",
+                "SectionTask selected a report capability.",
+            )
     return plan
 
 
@@ -164,16 +204,22 @@ def _validate_capabilities(
         try:
             spec = registry.get(capability_id)
         except KeyError as exc:
-            raise ValueError(f"Unknown capability id {capability_id!r}.") from exc
+            raise PlannerSemanticError(
+                "unknown_capability",
+                "Unknown capability id selected by planner.",
+            ) from exc
         if spec.capability_id != capability_id:
-            raise ValueError(
-                f"Capability selection must use canonical id {spec.capability_id!r}, "
-                f"not alias {capability_id!r}."
+            raise PlannerSemanticError(
+                "noncanonical_capability",
+                "Planner selected a non-canonical capability identifier.",
             )
         if task_kind == "report" and spec.category != "report":
-            raise ValueError(
-                f"ReportTask capability {capability_id!r} has category {spec.category!r}; "
-                "only report capabilities are allowed."
+            raise PlannerSemanticError(
+                "wrong_task_category",
+                (
+                    "ReportTask selected a non-report capability; only report capabilities "
+                    "are allowed."
+                ),
             )
         specs.append(spec)
     return tuple(specs)
@@ -193,6 +239,76 @@ def _planning_catalog(registry: CapabilityRegistry) -> tuple[dict[str, object], 
             }
         )
     return tuple(catalog)
+
+
+def _planning_request(
+    *,
+    context: Mapping[str, object],
+    timeout_seconds: float,
+    temperature: float | None,
+    max_output_tokens: int | None,
+) -> StructuredGenerationRequest:
+    """Build the single initial structured planner request."""
+    return StructuredGenerationRequest(
+        system_prompt=_PLANNER_SYSTEM_PROMPT,
+        user_prompt=(
+            "Create one SemanticPlan for this request. Return only the supplied "
+            "structured response model.\n\nContext:\n"
+            + json.dumps(context, sort_keys=True, separators=(",", ":"))
+        ),
+        timeout_seconds=timeout_seconds,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
+
+
+def _correction_request(
+    *,
+    mode: CompilationMode,
+    previous_plan: SemanticPlan,
+    diagnostic: PlannerSemanticError,
+    registry: CapabilityRegistry,
+    timeout_seconds: float,
+    temperature: float | None,
+    max_output_tokens: int | None,
+) -> StructuredGenerationRequest:
+    """Build one bounded correction request without host identities."""
+    context = {
+        "mode": mode,
+        "capabilities": _planning_catalog(registry),
+        "previous_plan": _safe_plan_for_correction(previous_plan),
+        "diagnostic": {
+            "code": diagnostic.code,
+            "message": diagnostic.safe_message,
+        },
+    }
+    return StructuredGenerationRequest(
+        system_prompt=_PLANNER_SYSTEM_PROMPT,
+        user_prompt=(
+            "Correct the previous SemanticPlan using only the capability catalogue. "
+            "Return the corrected structured response model and preserve the intended "
+            "semantic work.\n\nCorrection context:\n"
+            + json.dumps(context, sort_keys=True, separators=(",", ":"))
+        ),
+        timeout_seconds=timeout_seconds,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
+
+
+def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
+    """Project only capability selections into the correction context."""
+    report_task = (
+        None
+        if plan.report_task is None
+        else {"capability_ids": list(plan.report_task.capability_ids)}
+    )
+    return {
+        "report_task": report_task,
+        "section_tasks": [
+            {"capability_ids": list(task.capability_ids)} for task in plan.section_tasks
+        ],
+    }
 
 
 def _require_nonempty_items(values: tuple[str, ...]) -> None:
@@ -225,6 +341,8 @@ inventing capabilities or identities.
 
 __all__ = [
     "CompilationMode",
+    "PlannerSemanticError",
+    "PlannerSemanticFailure",
     "ReportTask",
     "SectionTask",
     "SemanticPlan",

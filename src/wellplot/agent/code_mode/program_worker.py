@@ -40,12 +40,10 @@ SECTION_PROGRAM_CAPABILITIES = frozenset(
 
 _SDK_REFERENCE = """Executable Wellplot SDK reference:
 report = wp.report()
-source = wp.source('candidate-id')
 section = wp.section(
     report,
     id_hint='new-section',
     title='Section title',
-    source=source,
 )
 target = wp.target_section(report)
 wp.update_section(target, title='Updated title')
@@ -145,7 +143,7 @@ class ProgramSectionCompiler:
         coordinator = self.repair_coordinator or ProgramRepairCoordinator(self.backend)
         repair = await coordinator.repair(
             semantic_task=_repair_context_text(task, section_context),
-            sdk_docs=_SDK_REFERENCE,
+            sdk_docs=_sdk_reference(section_context),
             previous_program=generated.text,
             diagnostic=diagnostic,
             timeout_seconds=timeout_seconds,
@@ -280,14 +278,20 @@ def _worker_prompt(
         "section_task": _semantic_task_payload(task),
         "capabilities": capabilities,
         "section_context": _bounded_section_context(section_context),
-        "sdk_reference": _SDK_REFERENCE,
+        "sdk_reference": _sdk_reference(section_context),
     }
     if section_context.section_id is None:
-        instruction = (
-            "Create one new section from this scoped context. When a source candidate "
-            "is needed, resolve its exact candidate_id with wp.source() and pass the "
-            "handle to wp.section(). "
-        )
+        if section_context.sources:
+            instruction = (
+                "Create one new section from this scoped context. When a source "
+                "candidate is needed, resolve its exact candidate_id with the supplied "
+                "source handle examples and pass the handle to wp.section(). "
+            )
+        else:
+            instruction = (
+                "Create one new section from this scoped context. No host source "
+                "candidate is available for this task, so do not associate a source. "
+            )
     else:
         instruction = (
             "Revise the one host-selected existing section from this scoped context. "
@@ -299,6 +303,40 @@ def _worker_prompt(
         + _CHANNEL_GROUNDING_RULE
         + " Do not add report-wide settings or use context outside this task.\n\n"
         + json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    )
+
+
+def _sdk_reference(section_context: ResolvedSectionContext) -> str:
+    """Build executable SDK documentation from host-approved source handles."""
+    source_ids = tuple(source.candidate_id for source in section_context.sources)
+    if not source_ids:
+        return _SDK_REFERENCE
+
+    source_lines = [
+        f"source_{index} = wp.source({json.dumps(candidate_id)})"
+        for index, candidate_id in enumerate(source_ids, start=1)
+    ]
+    source_argument = "    source=source_1,\n"
+    section_template = (
+        "section = wp.section(\n"
+        "    report,\n"
+        "    id_hint='new-section',\n"
+        "    title='Section title',\n"
+        ")"
+    )
+    return _SDK_REFERENCE.replace(
+        section_template,
+        "\n".join(
+            [
+                *source_lines,
+                "section = wp.section(",
+                "    report,",
+                "    id_hint='new-section',",
+                "    title='Section title',",
+                source_argument.rstrip("\n"),
+                ")",
+            ]
+        ),
     )
 
 

@@ -17,7 +17,11 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
-from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler, _fresh_builder
+from wellplot.agent.code_mode.program_worker import (
+    ProgramSectionCompiler,
+    _fresh_builder,
+    _sdk_reference,
+)
 from wellplot.agent.providers.base import (
     ProgramGenerationRequest,
     ProgramGenerationResult,
@@ -95,6 +99,7 @@ def _context(
     section_id: str | None = None,
     channel: str = "GR",
     channel_specs: tuple[ChannelContext, ...] | None = None,
+    candidate_ids: tuple[str, ...] = ("pilot.las",),
 ) -> EnrichedSemanticContext:
     """Build indexed enrichment with only the selected source projection."""
     selected_task = task or _task()
@@ -102,19 +107,21 @@ def _context(
     selected_channels = channel_specs or (
         ChannelContext(mnemonic=channel, kind="scalar", unit="gAPI"),
     )
+    sources = tuple(
+        SourceContext(
+            candidate_id=candidate_id,
+            canonical_path=f"/approved/{candidate_id}",
+            source_format="las",
+            dataset_name="pilot",
+            channels=selected_channels,
+        )
+        for candidate_id in candidate_ids
+    )
     sections = [
         ResolvedSectionContext(
             task_index=0,
             section_id=section_id,
-            sources=(
-                SourceContext(
-                    candidate_id="pilot.las",
-                    canonical_path="/approved/pilot.las",
-                    source_format="las",
-                    dataset_name="pilot",
-                    channels=selected_channels,
-                ),
-            ),
+            sources=sources,
             channels=(
                 {
                     "mnemonic": item.mnemonic,
@@ -296,6 +303,98 @@ def test_worker_prompt_is_scoped_to_the_indexed_section() -> None:
     assert "header_slots" not in prompt
     assert "/approved/pilot.las" not in prompt
     assert "Executable Wellplot SDK reference" in prompt
+
+
+def test_worker_sdk_reference_uses_exact_single_candidate_without_fake_ids() -> None:
+    """A single source example uses only the host-issued opaque candidate ID."""
+    backend = _Backend(responses=[_program()])
+    context = _context(candidate_ids=("source-1",))
+
+    _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    prompt = backend.requests[0].user_prompt
+    assert "candidate-id" not in prompt
+    assert "source-1" in prompt
+    assert "/approved/source-1" not in prompt
+
+
+def test_worker_sdk_reference_enumerates_multiple_candidates_without_paths() -> None:
+    """Multiple source examples remain limited to the exact host-issued IDs."""
+    backend = _Backend(responses=[_program()])
+    context = _context(candidate_ids=("pilot.las", "source-2"))
+
+    _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    prompt = backend.requests[0].user_prompt
+    assert "candidate-id" not in prompt
+    assert "pilot.las" in prompt
+    assert "source-2" in prompt
+    assert "/approved/" not in prompt
+
+
+def test_worker_sdk_reference_omits_source_example_without_candidates() -> None:
+    """No source candidate means no executable source call or source argument."""
+    backend = _Backend(responses=[_program()])
+    context = _context(candidate_ids=())
+
+    _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    prompt = backend.requests[0].user_prompt
+    assert "wp.source(" not in prompt
+    assert "source=" not in prompt
+
+
+def test_worker_repair_reuses_the_same_grounded_sdk_reference() -> None:
+    """Initial and repair prompts share the same source-handle documentation."""
+    backend = _Backend(
+        responses=[
+            _generic_binding_program(invented_channels=True),
+            _generic_binding_program(invented_channels=False),
+        ]
+    )
+    context = _context(
+        channel_specs=(
+            ChannelContext(mnemonic="CBL", kind="scalar", unit="mV"),
+            ChannelContext(mnemonic="VDL", kind="array", shape=(128, 64)),
+        )
+    )
+
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    assert "candidate-id" not in backend.requests[0].user_prompt
+    assert "candidate-id" not in backend.requests[1].user_prompt
+    assert _sdk_reference(context.sections[0]) in backend.requests[1].user_prompt
+    assert "pilot.las" in backend.requests[0].user_prompt
+    assert "/approved/" not in backend.requests[1].user_prompt
 
 
 def test_source_candidate_is_associated_without_exposing_canonical_path() -> None:

@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from wellplot.agent.code_mode.planner import (
+    PlannerSemanticFailure,
     ReportTask,
     SectionTask,
     SemanticPlan,
@@ -17,7 +18,9 @@ from wellplot.agent.code_mode.planner import (
     validate_semantic_plan,
 )
 from wellplot.agent.providers.base import (
+    ProviderFailureCategory,
     ProviderMetrics,
+    ProviderRequestError,
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
@@ -48,6 +51,34 @@ class _RecordedBackend:
 
     async def generate_program(self, request: object) -> object:
         """Keep the fake explicit if the planner accidentally uses program generation."""
+        raise AssertionError(f"Unexpected program generation request: {request!r}")
+
+
+@dataclass
+class _SequenceBackend:
+    """Fake structured backend returning one configured response per call."""
+
+    responses: list[object]
+    requests: list[StructuredGenerationRequest] = field(default_factory=list)
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[BaseModel],
+    ) -> StructuredGenerationResult[BaseModel]:
+        """Return the next response or raise its configured exception."""
+        self.requests.append(request)
+        response = self.responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return StructuredGenerationResult(
+            value=response_model.model_validate(response),
+            metrics=ProviderMetrics(),
+        )
+
+    async def generate_program(self, request: object) -> object:
+        """Keep the fake explicit if the planner accidentally uses programs."""
         raise AssertionError(f"Unexpected program generation request: {request!r}")
 
 
@@ -168,6 +199,133 @@ def test_planner_preserves_revise_mode_as_semantic_context() -> None:
     )
 
     assert '"mode":"revise"' in backend.requests[0].user_prompt
+
+
+def _invalid_plan_payload(kind: str) -> dict[str, object]:
+    """Return one structurally valid plan with one semantic error."""
+    payload = _plan_payload()
+    if kind == "unknown_capability":
+        payload["section_tasks"] = (
+            {
+                **payload["section_tasks"][0],
+                "capability_ids": ("missing",),
+            },
+        )
+    elif kind == "noncanonical_capability":
+        payload["section_tasks"] = (
+            {
+                **payload["section_tasks"][0],
+                "capability_ids": ("normal track",),
+            },
+        )
+    elif kind == "wrong_task_category":
+        payload["section_tasks"] = (
+            {
+                **payload["section_tasks"][0],
+                "capability_ids": ("track.normal", "report.standard"),
+            },
+        )
+    elif kind == "missing_section_capability":
+        payload["section_tasks"] = (
+            {
+                **payload["section_tasks"][0],
+                "capability_ids": ("track.normal",),
+            },
+        )
+    else:
+        raise AssertionError(f"Unknown fixture kind: {kind}")
+    return payload
+
+
+@pytest.mark.parametrize(
+    "kind",
+    (
+        "unknown_capability",
+        "noncanonical_capability",
+        "wrong_task_category",
+        "missing_section_capability",
+    ),
+)
+def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
+    """Each expected provider semantic error gets exactly one correction call."""
+    backend = _SequenceBackend(responses=[_invalid_plan_payload(kind), _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert len(backend.requests) == 2
+    correction_prompt = backend.requests[1].user_prompt
+    assert "capabilities" in correction_prompt
+    assert "source_hints" not in correction_prompt
+    assert "existing_section_hint" not in correction_prompt
+
+
+def test_planner_returns_bounded_failure_after_invalid_correction() -> None:
+    """A second semantic failure stops planning without a third generation."""
+    backend = _SequenceBackend(
+        responses=[
+            _invalid_plan_payload("unknown_capability"),
+            _invalid_plan_payload("unknown_capability"),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "unknown_capability"
+    assert len(backend.requests) == 2
+
+
+def test_planner_provider_failure_does_not_trigger_correction() -> None:
+    """Provider failures remain single-call failures without semantic retry."""
+    failure = ProviderRequestError(
+        ProviderFailureCategory.TIMEOUT,
+        "Planner request timed out.",
+    )
+    backend = _SequenceBackend(responses=[failure])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(ProviderRequestError):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert len(backend.requests) == 1
+
+
+def test_planner_unexpected_backend_failure_propagates() -> None:
+    """Unexpected backend defects are not classified as semantic corrections."""
+    backend = _SequenceBackend(responses=[RuntimeError("programming defect")])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(RuntimeError, match="programming defect"):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert len(backend.requests) == 1
 
 
 def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None:

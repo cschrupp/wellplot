@@ -19,7 +19,7 @@ from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ProviderRequestError
 from .enrichment import SemanticEnrichmentError, SourceCandidate
-from .planner import CompilationMode, SemanticPlan
+from .planner import CompilationMode, PlannerSemanticFailure, SemanticPlan
 from .state import CodeModeGraphState, WorkerOutcome
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
@@ -146,6 +146,8 @@ class CodeModeCompileFacade:
             result = await self._graph.ainvoke(state)
         except ProviderRequestError as error:
             return _failure_result((_provider_diagnostic(error),))
+        except PlannerSemanticFailure as error:
+            return _failure_result((_planner_diagnostic(error),))
         except SemanticEnrichmentError as error:
             return _failure_result((_enrichment_diagnostic(error),))
         return _project_graph_result(result)
@@ -244,6 +246,16 @@ def _enrichment_diagnostic(error: SemanticEnrichmentError) -> CompileDiagnostic:
         stage="enrichment",
         code=f"enrichment.{error.code.value}",
         message=str(error),
+    )
+
+
+def _planner_diagnostic(error: PlannerSemanticFailure) -> CompileDiagnostic:
+    """Project the bounded final semantic planner failure."""
+    return CompileDiagnostic(
+        stage="planner",
+        code=f"planner.{error.code}",
+        message=error.safe_message,
+        retryable=False,
     )
 
 

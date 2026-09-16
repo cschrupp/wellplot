@@ -23,6 +23,7 @@ from wellplot.agent.code_mode.facade import (
 )
 from wellplot.agent.code_mode.planner import (
     CompilationMode,
+    PlannerSemanticFailure,
     ReportTask,
     SectionTask,
     SemanticPlan,
@@ -122,7 +123,7 @@ def _failed_result() -> ProgramExecutionResult:
 @dataclass
 class _Planner:
     plan_value: SemanticPlan | None = None
-    failure: ProviderRequestError | None = None
+    failure: Exception | None = None
 
     async def plan(self, **_kwargs: object) -> SemanticPlan:
         """Return the fixture plan or its configured provider failure."""
@@ -627,6 +628,29 @@ def test_planner_provider_failure_has_no_worker_evidence() -> None:
     assert result.workers == ()
     assert result.diagnostics[0].stage == "planner"
     assert result.diagnostics[0].retryable is True
+
+
+def test_planner_semantic_failure_is_projected_without_partial_intent() -> None:
+    """Final bounded planner correction failure is safe and worker-free."""
+    dependencies = CodeModeGraphDependencies(
+        planner=_Planner(
+            failure=PlannerSemanticFailure(
+                "unknown_capability",
+                "Planner returned a semantically invalid plan after one correction.",
+            )
+        ),  # type: ignore[arg-type]
+        enricher=_Enricher(),  # type: ignore[arg-type]
+        report_compiler=_ReportAdapter(_Workers()),  # type: ignore[arg-type]
+        section_compiler=_SectionAdapter(_Workers()),  # type: ignore[arg-type]
+    )
+    result = asyncio.run(_compile(CodeModeCompileFacade(dependencies)))
+
+    assert result.success is False
+    assert result.merged_intent is None
+    assert result.workers == ()
+    assert result.diagnostics[0].stage == "planner"
+    assert result.diagnostics[0].code == "planner.unknown_capability"
+    assert result.diagnostics[0].retryable is False
 
 
 def test_enrichment_failure_has_no_worker_evidence() -> None:
