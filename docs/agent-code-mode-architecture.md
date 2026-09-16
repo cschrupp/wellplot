@@ -21,7 +21,7 @@ normative slice-by-slice specification and evidence record.
 | Engine | Status during CM-00 through early CM slices | Routing |
 |---|---|---|
 | v1 structured graph | Operational production/reference implementation; frozen except critical correctness fixes | Current route |
-| v2 Code Mode | Approved target under construction | Not production-routed |
+| v2 Code Mode | Approved target; opt-in agentic MCP route migrated in CM-51 | Default route remains v1 |
 
 v1 is not deprecated during CM-00. Deprecation requires the later A/B gate;
 deletion requires the reachability and removal gates defined by the plan.
@@ -142,7 +142,7 @@ fragment through the SDK runtime.
 | CM-47 Host-bound revision mode | Complete (`21cf21b`) | Existing-section target resolution, opaque sparse revision, duplicate-target rejection, private preservation, and exact revision parity gates pass |
 | CM-48 Bounded visual correction | Complete (`2e8fe54`) | Root-only section visual review, bounded failure evidence, source redaction, private preservation, and render/review gates pass |
 | CM-50 Direct Python v2 API | Complete (`7496553`) | Injected async AgentSession projects build/revise results with provider-aligned limits, without MCP, mutation, or persistence |
-| CM-51 MCP cutover | Not started | Agentic MCP tools delegate to the v2 session/graph service |
+| CM-51 MCP cutover | Complete (`e6643d0`) | Opt-in agentic MCP tools delegate to the v2 session/graph service and privately apply verified intents; stable MCP/default routing unchanged |
 | CM-52 Notebook cutover | Not started | ProjectSession uses the direct v2 Python path for local authoring |
 | CM-53 Default v2 engine | Not started | v2 becomes default only after final transition acceptance |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
