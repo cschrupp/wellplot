@@ -254,6 +254,7 @@ def test_agentic_tools_persist_successful_build_and_revision() -> None:
     assert revision_graph.states[0]["mode"] == "revise"
     assert persisted["title"] == "Graph reconstruction"
     assert persisted["sections"][0]["subtitle"] == "Graph revision"
+    assert persisted["sections"][0]["data_source"]["source_path"] == "./fixture.las"
     assert any(event.event == "run_finished" for event in build_events)
 
 
