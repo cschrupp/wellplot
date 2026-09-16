@@ -89,6 +89,19 @@ it enters the correction prompt.
 - CM-43 deterministic tests remain included in the broader evaluation suite.
 - No live CM-53 transition rows were written by this slice.
 
+## Default-Route Probe
+
+After deterministic validation, three exploratory calls used the frozen CBL
+request with `engine` omitted and the required NVIDIA settings. All three
+reached the v2 public route; none failed in planner structured-output recovery
+or unresolved-hint handling. They nevertheless ended before common acceptance
+with bounded worker/provider/dry-run failures, so this probe is not CM-43R2
+acceptance evidence and the existing JSONL was intentionally left unchanged.
+
+The result is useful boundary evidence: CM-53R2 removed the earlier planner
+and enrichment stop points, but it did not claim to solve provider-generated
+section correctness or broaden the acceptance contract.
+
 ## Decision
 
 ```text
