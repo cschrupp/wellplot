@@ -1,6 +1,6 @@
 # Wellplot Code Mode Architecture Contract
 
-- **Status:** Approved target architecture; v2 is available on opt-in MCP and notebook paths but is not the default engine.
+- **Status:** Approved architecture; v2 is the default host engine, with v1 retained only through explicit compatibility selection.
 - **Migration authority:** [Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md)
 - **Frozen v1 reference:** `f03f76bda097bf93e4c640e0fc1a6b82b372bd0c` (`f03f76b`) on `mcp-stabilization`
 
@@ -20,11 +20,12 @@ normative slice-by-slice specification and evidence record.
 
 | Engine | Status during CM-00 through early CM slices | Routing |
 |---|---|---|
-| v1 structured graph | Operational production/reference implementation; frozen except critical correctness fixes | Current route |
-| v2 Code Mode | Opt-in agentic MCP and notebook routes migrated in CM-51/CM-52 | Default route remains v1 |
+| v1 structured graph | Explicit compatibility implementation; frozen except critical correctness fixes | `engine="v1"` only |
+| v2 Code Mode | Default host engine for ambiguous public helpers; explicit agentic MCP route | Default route |
 
-v1 is not deprecated during CM-00. Deprecation requires the later A/B gate;
-deletion requires the reachability and removal gates defined by the plan.
+v1 remains available for the transition window through explicit compatibility
+selection. It is not deleted or behaviorally rewritten by CM-53; deprecation
+and removal require the reachability and deletion gates defined by the plan.
 
 ## Dependency Direction
 
@@ -144,7 +145,7 @@ fragment through the SDK runtime.
 | CM-50 Direct Python v2 API | Complete (`7496553`) | Injected async AgentSession projects build/revise results with provider-aligned limits, without MCP, mutation, or persistence |
 | CM-51 MCP cutover | Complete (`7b27529`) | Opt-in agentic MCP tools delegate to the v2 session/graph service and privately apply verified intents; root-relative paths, safe terminal tracing, and rollback evidence hardened |
 | CM-52 Notebook cutover | Complete (`07534a1`) | ProjectSession uses the direct v2 Python path for local authoring with timeout-contract hardening; AgenticMcpClient remains MCP-backed and the default engine remains v1 |
-| CM-53 Default v2 engine | Not started | v2 becomes default only after final transition acceptance |
+| CM-53 Default v2 engine | In progress | Ambiguous host helpers default to v2; explicit `engine="v1"` preserves the legacy transition path; live acceptance remains open |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
 
