@@ -17,6 +17,8 @@ PROVIDER_BASE = WELLPLOT_ROOT / "agent" / "providers" / "base.py"
 PROVIDER_OPENAI_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_v2.py"
 PROVIDER_OPENAI_PROGRAM_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_program_v2.py"
 PROVIDER_OPENAI_COMPAT_V2 = WELLPLOT_ROOT / "agent" / "providers" / "openai_compat_v2.py"
+AGENTIC_MCP_MODULE = WELLPLOT_ROOT / "mcp" / "agentic.py"
+AGENTIC_MCP_SERVER_MODULE = WELLPLOT_ROOT / "mcp" / "agentic_server.py"
 
 AUTHORING_DOMAIN_ROOTS = (
     WELLPLOT_ROOT / "model",
@@ -239,6 +241,55 @@ def test_provider_v2_adapters_stay_outside_legacy_orchestration() -> None:
         reference
         for reference in _collect_import_references(
             (PROVIDER_OPENAI_V2, PROVIDER_OPENAI_PROGRAM_V2, PROVIDER_OPENAI_COMPAT_V2),
+            source_root=SOURCE_ROOT,
+        )
+        if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)
+    ]
+    assert not violations, "\n".join(
+        f"{reference.path.relative_to(REPO_ROOT)}:{reference.line}: "
+        f"forbidden dependency {reference.module!r}"
+        for reference in violations
+    )
+
+
+def test_agentic_mcp_edge_stays_off_legacy_graph_and_execution() -> None:
+    """The agentic MCP edge delegates to the direct v2 session only."""
+    forbidden = (
+        "wellplot.agent.core",
+        "wellplot.agent.graph",
+        "wellplot.agent.operation_executor",
+        "wellplot.agent.reconciliation_bridge",
+        "wellplot.agent.providers.openai",
+        "wellplot.agent.providers.openai_compat",
+        "ProviderAdapterError",
+    )
+    violations = [
+        reference
+        for reference in _collect_import_references(
+            (AGENTIC_MCP_MODULE,),
+            source_root=SOURCE_ROOT,
+        )
+        if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)
+    ]
+    assert not violations, "\n".join(
+        f"{reference.path.relative_to(REPO_ROOT)}:{reference.line}: "
+        f"forbidden dependency {reference.module!r}"
+        for reference in violations
+    )
+
+
+def test_agentic_mcp_server_constructs_only_provider_v2() -> None:
+    """The opt-in host cannot compose legacy providers or the legacy graph."""
+    forbidden = (
+        "wellplot.agent.graph",
+        "wellplot.agent.providers.openai",
+        "wellplot.agent.providers.openai_compat",
+        "wellplot.agent.core",
+    )
+    violations = [
+        reference
+        for reference in _collect_import_references(
+            (AGENTIC_MCP_SERVER_MODULE,),
             source_root=SOURCE_ROOT,
         )
         if any(_matches_dependency(reference.module, dependency) for dependency in forbidden)

@@ -133,7 +133,7 @@ def test_real_stdio_agentic_surface_persists_and_rolls_back() -> None:
         assert provider_failure.structuredContent["success"] is False
         assert provider_failure.structuredContent["changed"] is False
         assert provider_failure.structuredContent["errors"] == [
-            "Provider request failed before graph compilation completed (transport_failure)."
+            "provider.transport: The configured provider request failed."
         ]
         assert persisted["title"] == "Graph stdio reconstruction"
         assert persisted["sections"][0]["subtitle"] == "Revised"
