@@ -187,6 +187,9 @@ def _build_agent_session(
     timeout: float | None,
 ) -> tuple[AgentSession, str | None]:
     """Compose the direct notebook v2 graph without an MCP edge."""
+    session_config = AgentSessionConfig(
+        timeout_seconds=120.0 if timeout is None else timeout,
+    )
     backend, credential_source = _provider_backend(
         provider=provider,
         model=model,
@@ -210,7 +213,7 @@ def _build_agent_session(
     return (
         AgentSession(
             compiler=CodeModeCompileFacade(dependencies),
-            config=AgentSessionConfig(timeout_seconds=timeout or 120.0),
+            config=session_config,
         ),
         credential_source,
     )
