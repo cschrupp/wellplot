@@ -67,6 +67,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         context = dependencies.enricher.enrich(
             plan=plan,
             document=_document(state),
+            mode=state.get("mode", "reconstruct"),
             source_candidates=tuple(
                 SourceCandidate.model_validate(candidate)
                 for candidate in state.get("source_candidates", [])

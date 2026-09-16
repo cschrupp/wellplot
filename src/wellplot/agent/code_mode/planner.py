@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
@@ -12,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from ...capabilities import CapabilityRegistry
 from ..providers.base import (
     ModelBackendProtocol,
+    ProviderFailureCategory,
+    ProviderRequestError,
     StructuredGenerationRequest,
 )
 
@@ -122,7 +125,7 @@ class SemanticPlanner:
         temperature: float | None = None,
         max_output_tokens: int | None = None,
     ) -> SemanticPlan:
-        """Make one or two bounded structured calls for a semantic plan."""
+        """Make at most two bounded structured calls for a semantic plan."""
         if not isinstance(request, str) or not request.strip():
             raise ValueError("Planning request must be a non-empty string.")
 
@@ -132,19 +135,39 @@ class SemanticPlanner:
             "current_document_summary": dict(current_document_summary or {}),
             "capabilities": _planning_catalog(self.registry),
         }
-        generated = await self.backend.generate_structured(
-            _planning_request(
-                context=context,
-                timeout_seconds=timeout_seconds,
-                temperature=temperature,
-                max_output_tokens=max_output_tokens,
-            ),
-            response_model=SemanticPlan,
-        )
+        invalid_response_retry_used = False
+        try:
+            generated = await self.backend.generate_structured(
+                _planning_request(
+                    context=context,
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+                response_model=SemanticPlan,
+            )
+        except ProviderRequestError as error:
+            if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
+                raise
+            invalid_response_retry_used = True
+            generated = await self.backend.generate_structured(
+                _planning_request(
+                    context=context,
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+                response_model=SemanticPlan,
+            )
         plan = SemanticPlan.model_validate(generated.value)
         try:
             return validate_semantic_plan(plan, self.registry)
         except PlannerSemanticError as first_error:
+            if invalid_response_retry_used:
+                raise PlannerSemanticFailure(
+                    first_error.code,
+                    "Planner returned a semantically invalid plan after one correction.",
+                ) from first_error
             corrected = await self.backend.generate_structured(
                 _correction_request(
                     mode=mode,
@@ -297,18 +320,28 @@ def _correction_request(
 
 
 def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
-    """Project only capability selections into the correction context."""
-    report_task = (
-        None
-        if plan.report_task is None
-        else {"capability_ids": list(plan.report_task.capability_ids)}
-    )
+    """Project semantic intent without identities or source-selection hints."""
+    report_task = None if plan.report_task is None else _safe_task_for_correction(plan.report_task)
     return {
+        "summary": _safe_correction_text(plan.summary),
         "report_task": report_task,
-        "section_tasks": [
-            {"capability_ids": list(task.capability_ids)} for task in plan.section_tasks
-        ],
+        "section_tasks": [_safe_task_for_correction(task) for task in plan.section_tasks],
     }
+
+
+def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, object]:
+    """Preserve semantic task text while excluding host-owned selection fields."""
+    return {
+        "goal": _safe_correction_text(task.goal),
+        "capability_ids": list(task.capability_ids),
+        "requirements": [_safe_correction_text(value) for value in task.requirements],
+        "constraints": [_safe_correction_text(value) for value in task.constraints],
+    }
+
+
+def _safe_correction_text(value: str) -> str:
+    """Redact path-shaped text from provider-controlled semantic prose."""
+    return re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s,;]+", "[redacted-path]", value)
 
 
 def _require_nonempty_items(values: tuple[str, ...]) -> None:

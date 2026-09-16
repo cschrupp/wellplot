@@ -316,7 +316,6 @@ def _sdk_reference(section_context: ResolvedSectionContext) -> str:
         f"source_{index} = wp.source({json.dumps(candidate_id)})"
         for index, candidate_id in enumerate(source_ids, start=1)
     ]
-    source_argument = "    source=source_1,\n"
     section_template = (
         "section = wp.section(\n"
         "    report,\n"
@@ -324,20 +323,16 @@ def _sdk_reference(section_context: ResolvedSectionContext) -> str:
         "    title='Section title',\n"
         ")"
     )
-    return _SDK_REFERENCE.replace(
-        section_template,
-        "\n".join(
-            [
-                *source_lines,
-                "section = wp.section(",
-                "    report,",
-                "    id_hint='new-section',",
-                "    title='Section title',",
-                source_argument.rstrip("\n"),
-                ")",
-            ]
-        ),
-    )
+    section_lines = [
+        "section = wp.section(",
+        "    report,",
+        "    id_hint='new-section',",
+        "    title='Section title',",
+    ]
+    if len(source_ids) == 1:
+        section_lines.append("    source=source_1,")
+    section_lines.append(")")
+    return _SDK_REFERENCE.replace(section_template, "\n".join([*source_lines, *section_lines]))
 
 
 def _semantic_task_payload(task: SectionTask) -> dict[str, object]:

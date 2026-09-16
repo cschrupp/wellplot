@@ -18,7 +18,12 @@ from ...authoring_program.models import (
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ProviderRequestError
-from .enrichment import SemanticEnrichmentError, SourceCandidate
+from .enrichment import (
+    EnrichedSemanticContext,
+    EnrichmentWarning,
+    SemanticEnrichmentError,
+    SourceCandidate,
+)
 from .planner import CompilationMode, PlannerSemanticFailure, SemanticPlan
 from .state import CodeModeGraphState, WorkerOutcome
 from .workflow import CodeModeGraphDependencies, build_compile_graph
@@ -156,6 +161,7 @@ class CodeModeCompileFacade:
 def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
     """Project validated graph state into the stable host-facing result."""
     plan = SemanticPlan.model_validate(state["plan"])
+    enriched_context = EnrichedSemanticContext.model_validate(state["enriched_context"])
     outcomes = tuple(
         WorkerOutcome.model_validate(json.loads(payload))
         for payload in state.get("worker_outcomes", [])
@@ -165,7 +171,10 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
         _worker_evidence(outcome) for outcome in sorted(outcomes, key=lambda item: item.plan_order)
     )
     metrics = _aggregate_metrics(workers)
-    diagnostics = tuple(diagnostic for worker in workers for diagnostic in worker.diagnostics)
+    diagnostics = tuple(
+        _enrichment_warning_diagnostic(warning) for warning in enriched_context.warnings
+    )
+    diagnostics += tuple(diagnostic for worker in workers for diagnostic in worker.diagnostics)
     if any(not worker.success for worker in workers):
         return CodeModeCompileResult(
             success=False,
@@ -246,6 +255,17 @@ def _enrichment_diagnostic(error: SemanticEnrichmentError) -> CompileDiagnostic:
         stage="enrichment",
         code=f"enrichment.{error.code.value}",
         message=str(error),
+    )
+
+
+def _enrichment_warning_diagnostic(warning: EnrichmentWarning) -> CompileDiagnostic:
+    """Project safe non-fatal enrichment evidence into the compile result."""
+    return CompileDiagnostic(
+        stage="enrichment",
+        code=f"enrichment.{warning.code}",
+        message=warning.message,
+        severity=CompileDiagnosticSeverity.WARNING,
+        retryable=False,
     )
 
 

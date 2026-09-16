@@ -386,7 +386,7 @@ def test_section_hint_resolution_is_exact_then_lexical_and_preserves_plan(tmp_pa
 
 
 def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:
-    """Containment is allowed only when it produces one deterministic match."""
+    """Containment resolves, while an unresolved reconstruction hint downgrades."""
     enricher, _ = _enricher(tmp_path)
     (tmp_path / "main.las").write_text("source", encoding="utf-8")
 
@@ -397,13 +397,24 @@ def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:
     )
     assert contained.sections[0].section_id == "main"
 
-    with pytest.raises(SemanticEnrichmentError) as unresolved:
+    unresolved = enricher.enrich(
+        plan=_plan(hint="Gamma ray only"),
+        document=_document(),
+        source_candidates=(),
+        mode="reconstruct",
+    )
+    assert unresolved.sections[0].section_id is None
+    assert unresolved.warnings[0].code == "section_hint_unresolved_downgraded"
+    assert "Gamma ray only" not in unresolved.warnings[0].message
+
+    with pytest.raises(SemanticEnrichmentError) as revise_unresolved:
         enricher.enrich(
             plan=_plan(hint="Gamma ray only"),
             document=_document(),
             source_candidates=(),
+            mode="revise",
         )
-    assert unresolved.value.code is EnrichmentErrorCode.SECTION_HINT_UNRESOLVED
+    assert revise_unresolved.value.code is EnrichmentErrorCode.SECTION_HINT_UNRESOLVED
 
     with pytest.raises(SemanticEnrichmentError) as ambiguous:
         enricher.enrich(
@@ -413,6 +424,16 @@ def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:
         )
     assert ambiguous.value.code is EnrichmentErrorCode.SECTION_HINT_AMBIGUOUS
     assert ambiguous.value.candidates == ("main", "repeat")
+
+    for mode in ("reconstruct", "revise"):
+        with pytest.raises(SemanticEnrichmentError) as ambiguous_mode:
+            enricher.enrich(
+                plan=_plan(hint="Main Pass", duplicate_titles=True),
+                document=_document(duplicate_titles=True),
+                source_candidates=(),
+                mode=mode,
+            )
+        assert ambiguous_mode.value.code is EnrichmentErrorCode.SECTION_HINT_AMBIGUOUS
 
 
 def test_new_section_has_no_allocated_id_and_existing_channels_use_facade(tmp_path: Path) -> None:

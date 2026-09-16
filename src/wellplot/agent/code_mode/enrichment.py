@@ -18,7 +18,7 @@ from ...authoring_program.inspection import (
     HeaderSlotInspectionSummary,
 )
 from ...model.authoring import AuthoringDocumentSpec
-from .planner import SectionTask, SemanticPlan
+from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
 
@@ -103,12 +103,20 @@ class ReportContext(_EnrichmentModel):
     header_slots: tuple[HeaderSlotInspectionSummary, ...] = ()
 
 
+class EnrichmentWarning(_EnrichmentModel):
+    """Safe non-fatal evidence produced during deterministic enrichment."""
+
+    code: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+
 class EnrichedSemanticContext(_EnrichmentModel):
     """Transient worker context preserving the original semantic plan."""
 
     plan: SemanticPlan
     sections: tuple[ResolvedSectionContext, ...]
     report: ReportContext
+    warnings: tuple[EnrichmentWarning, ...] = ()
 
 
 class EnrichmentErrorCode(StrEnum):
@@ -165,12 +173,33 @@ class SemanticEnricher:
         plan: SemanticPlan,
         document: AuthoringDocumentSpec,
         source_candidates: Sequence[SourceCandidate],
+        mode: CompilationMode = "reconstruct",
     ) -> EnrichedSemanticContext:
         """Enrich one plan without changing it or mutating the document."""
-        resolved_section_ids = tuple(
-            _resolved_section_id(task, document, task_index=task_index)
-            for task_index, task in enumerate(plan.section_tasks)
-        )
+        resolved_section_ids: list[str | None] = []
+        warnings: list[EnrichmentWarning] = []
+        for task_index, task in enumerate(plan.section_tasks):
+            try:
+                resolved_section_ids.append(
+                    _resolved_section_id(task, document, task_index=task_index)
+                )
+            except SemanticEnrichmentError as error:
+                if (
+                    mode == "reconstruct"
+                    and error.code is EnrichmentErrorCode.SECTION_HINT_UNRESOLVED
+                ):
+                    resolved_section_ids.append(None)
+                    warnings.append(
+                        EnrichmentWarning(
+                            code="section_hint_unresolved_downgraded",
+                            message=(
+                                "An advisory existing-section hint was not resolved; "
+                                "compiling as a new section."
+                            ),
+                        )
+                    )
+                    continue
+                raise
         _validate_unique_section_targets(resolved_section_ids)
         roots = _normalize_roots(self.allowed_roots)
         candidates = _normalize_candidates(source_candidates, roots)
@@ -216,6 +245,7 @@ class SemanticEnricher:
             plan=plan,
             sections=sections,
             report=ReportContext(header_slots=inspection.header_slots()),
+            warnings=tuple(warnings),
         )
 
     def _load_source(
@@ -557,6 +587,7 @@ def _channel_candidate(channel: ChannelContext, *, source_path: str) -> Authorin
 __all__ = [
     "ChannelContext",
     "EnrichedSemanticContext",
+    "EnrichmentWarning",
     "EnrichmentErrorCode",
     "HeaderSlotInspectionSummary",
     "LoadedSource",

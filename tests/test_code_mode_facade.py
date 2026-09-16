@@ -13,6 +13,7 @@ pytest.importorskip("langgraph")
 from wellplot.agent.code_mode.enrichment import (
     EnrichedSemanticContext,
     EnrichmentErrorCode,
+    EnrichmentWarning,
     ReportContext,
     ResolvedSectionContext,
     SemanticEnrichmentError,
@@ -136,6 +137,7 @@ class _Planner:
 @dataclass
 class _Enricher:
     failure: SemanticEnrichmentError | None = None
+    warnings: tuple[EnrichmentWarning, ...] = ()
 
     def enrich(self, *, plan: SemanticPlan, **_kwargs: object) -> EnrichedSemanticContext:
         """Return one bounded context per planned section."""
@@ -151,6 +153,7 @@ class _Enricher:
                 for index, task in enumerate(plan.section_tasks)
             ),
             report=ReportContext(),
+            warnings=self.warnings,
         )
 
 
@@ -313,6 +316,29 @@ def test_facade_compiles_inside_an_already_running_event_loop() -> None:
         assert "report = wp.report" not in str(outward)
 
     asyncio.run(scenario())
+
+
+def test_facade_projects_reconstruction_enrichment_warning_on_success() -> None:
+    """A downgraded advisory hint remains visible as bounded warning evidence."""
+    plan = _plan(report=False, sections=1)
+    warning = EnrichmentWarning(
+        code="section_hint_unresolved_downgraded",
+        message="An advisory existing-section hint was not resolved; compiling as a new section.",
+    )
+    dependencies = CodeModeGraphDependencies(
+        planner=_Planner(plan_value=plan),  # type: ignore[arg-type]
+        enricher=_Enricher(warnings=(warning,)),  # type: ignore[arg-type]
+        report_compiler=_ReportAdapter(_Workers()),  # type: ignore[arg-type]
+        section_compiler=_SectionAdapter(_Workers()),  # type: ignore[arg-type]
+    )
+
+    result = asyncio.run(_compile(CodeModeCompileFacade(dependencies)))
+
+    assert result.success is True
+    assert result.diagnostics[0].stage == "enrichment"
+    assert result.diagnostics[0].code == "enrichment.section_hint_unresolved_downgraded"
+    assert result.diagnostics[0].severity.value == "warning"
+    assert result.diagnostics[0].retryable is False
 
 
 def test_workflow_contains_no_nested_event_loop_bridge() -> None:

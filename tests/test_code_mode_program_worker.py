@@ -344,6 +344,8 @@ def test_worker_sdk_reference_enumerates_multiple_candidates_without_paths() -> 
     assert "pilot.las" in prompt
     assert "source-2" in prompt
     assert "/approved/" not in prompt
+    assert "source=source_1" not in prompt
+    assert "source=source_2" not in prompt
 
 
 def test_worker_sdk_reference_omits_source_example_without_candidates() -> None:

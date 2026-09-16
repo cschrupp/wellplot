@@ -263,6 +263,10 @@ def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
     assert len(backend.requests) == 2
     correction_prompt = backend.requests[1].user_prompt
     assert "capabilities" in correction_prompt
+    assert "Add a CBL presentation section." in correction_prompt
+    assert "Show the main CBL and VDL interpretation." in correction_prompt
+    assert "Include depth and cement-bond measurements." in correction_prompt
+    assert "Keep the section readable." in correction_prompt
     assert "source_hints" not in correction_prompt
     assert "existing_section_hint" not in correction_prompt
 
@@ -305,6 +309,115 @@ def test_planner_provider_failure_does_not_trigger_correction() -> None:
                 request="Build the CBL quicklook.",
                 mode="reconstruct",
                 timeout_seconds=5.0,
+            )
+        )
+
+    assert len(backend.requests) == 1
+
+
+def test_planner_retries_one_invalid_structured_response() -> None:
+    """One provider invalid-response failure gets one normal planning retry."""
+    backend = _SequenceBackend(
+        responses=[
+            ProviderRequestError(
+                ProviderFailureCategory.INVALID_RESPONSE,
+                "Planner returned invalid structured output.",
+            ),
+            _plan_payload(),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0)
+    )
+
+    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert len(backend.requests) == 2
+    assert backend.requests[0].user_prompt == backend.requests[1].user_prompt
+
+
+def test_planner_stops_after_two_invalid_structured_responses() -> None:
+    """Two invalid structured responses stop without a third provider call."""
+    failure = ProviderRequestError(
+        ProviderFailureCategory.INVALID_RESPONSE,
+        "Planner returned invalid structured output.",
+    )
+    backend = _SequenceBackend(responses=[failure, failure])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(ProviderRequestError):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0
+            )
+        )
+
+    assert len(backend.requests) == 2
+
+
+def test_planner_invalid_response_then_semantic_failure_stays_bounded() -> None:
+    """A retried plan with semantic errors cannot open a third correction call."""
+    failure = ProviderRequestError(
+        ProviderFailureCategory.INVALID_RESPONSE,
+        "Planner returned invalid structured output.",
+    )
+    backend = _SequenceBackend(responses=[failure, _invalid_plan_payload("unknown_capability")])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0
+            )
+        )
+
+    assert len(backend.requests) == 2
+
+
+def test_planner_semantic_failure_then_invalid_response_stays_bounded() -> None:
+    """A semantic correction that fails provider validation remains provider-owned."""
+    failure = ProviderRequestError(
+        ProviderFailureCategory.INVALID_RESPONSE,
+        "Planner returned invalid structured output.",
+    )
+    backend = _SequenceBackend(responses=[_invalid_plan_payload("unknown_capability"), failure])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(ProviderRequestError):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0
+            )
+        )
+
+    assert len(backend.requests) == 2
+
+
+@pytest.mark.parametrize(
+    "category",
+    (
+        ProviderFailureCategory.AUTHENTICATION,
+        ProviderFailureCategory.TIMEOUT,
+        ProviderFailureCategory.RATE_LIMIT,
+        ProviderFailureCategory.TRANSPORT,
+        ProviderFailureCategory.CONFIGURATION,
+        ProviderFailureCategory.PROVIDER_REJECTED,
+    ),
+)
+def test_planner_does_not_retry_non_invalid_provider_failures(
+    category: ProviderFailureCategory,
+) -> None:
+    """Only invalid structured output receives planner-level recovery."""
+    backend = _SequenceBackend(
+        responses=[ProviderRequestError(category, "Planner provider failure.")]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(ProviderRequestError):
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0
             )
         )
 
