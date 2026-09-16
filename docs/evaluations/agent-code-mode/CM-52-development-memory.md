@@ -8,6 +8,7 @@ authoring loop to the proven direct Code Mode v2 session. The explicit
 
 - **Slice base SHA:** `16d3896`
 - **Implementation commit:** `3ad6a80` (`Route notebook sessions through Code Mode v2`)
+- **Hardening commit:** `07534a1` (`Harden CM-52 notebook cutover`)
 - **Production LOC delta:** `+564 / -3`
 - **Test LOC delta:** `+295 / -18`
 - **Runtime behavior delta:** notebook build/revise now composes the v2
@@ -42,7 +43,7 @@ and bounded repair coordinator retain their fixed call limits.
 
 ## Validation
 
-- Direct notebook and agentic-notebook tests: `8 passed`.
+- Direct notebook and agentic-notebook tests: `15 passed`.
 - Combined notebook/agent tests: `80 passed, 2 failed`; the failures are the
   pre-existing legacy `_server_command()` and `_server_env()` test calls in
   `tests/test_agent.py`, outside the CM-52 path.
@@ -75,5 +76,5 @@ CM-52 notebook cutover   complete
 CM-53 default v2 engine  blocked pending separate authorization
 ```
 
-**PROCEED / STOP:** CM-52 is implemented, committed, and ready to push. Stop
-before CM-53 planning or default-engine changes.
+**PROCEED / STOP:** CM-52 and CM-52R are implemented, committed, and ready to
+push. Stop before CM-53 planning or default-engine changes.

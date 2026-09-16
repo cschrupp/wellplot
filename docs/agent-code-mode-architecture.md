@@ -143,7 +143,7 @@ fragment through the SDK runtime.
 | CM-48 Bounded visual correction | Complete (`2e8fe54`) | Root-only section visual review, bounded failure evidence, source redaction, private preservation, and render/review gates pass |
 | CM-50 Direct Python v2 API | Complete (`7496553`) | Injected async AgentSession projects build/revise results with provider-aligned limits, without MCP, mutation, or persistence |
 | CM-51 MCP cutover | Complete (`7b27529`) | Opt-in agentic MCP tools delegate to the v2 session/graph service and privately apply verified intents; root-relative paths, safe terminal tracing, and rollback evidence hardened |
-| CM-52 Notebook cutover | Complete (`3ad6a80`) | ProjectSession uses the direct v2 Python path for local authoring; AgenticMcpClient remains MCP-backed and the default engine remains v1 |
+| CM-52 Notebook cutover | Complete (`07534a1`) | ProjectSession uses the direct v2 Python path for local authoring with timeout-contract hardening; AgenticMcpClient remains MCP-backed and the default engine remains v1 |
 | CM-53 Default v2 engine | Not started | v2 becomes default only after final transition acceptance |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
