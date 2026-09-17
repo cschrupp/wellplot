@@ -38,51 +38,31 @@ SECTION_PROGRAM_CAPABILITIES = frozenset(
     }
 )
 
-_SDK_REFERENCE = """Executable Wellplot SDK reference:
-report = wp.report()
-section = wp.section(
-    report,
-    id_hint='new-section',
-    title='Section title',
-)
-target = wp.target_section(report)
-wp.update_section(target, title='Updated title')
-normal = wp.track(
-    section,
-    id_hint='normal',
-    kind='normal',
-    title='Normal track',
-    width_mm=30,
-)
-reference = wp.track(
-    section,
-    id_hint='reference',
-    kind='reference',
-    title='Reference track',
-    width_mm=30,
-)
-array = wp.track(
-    section,
-    id_hint='array',
-    kind='array',
-    title='Array track',
-    width_mm=30,
-)
-wp.curve(normal, channel='CHANNEL', label='Curve label')
-wp.curve(reference, channel='REFERENCE_CHANNEL', label='Reference label')
-wp.raster(array, channel='ARRAY_CHANNEL', label='Array label')
+_SDK_REFERENCE = """Exact executable Wellplot SDK contract:
+Use only the keyword arguments listed for each call. Do not infer aliases or
+additional keywords from the semantic task.
 
-Only the root calls and keyword arguments shown above are executable. For a
-new target, use wp.section(); for an existing target, use
-wp.target_section(report) and then wp.update_section(). The target-section call
-accepts no section ID; the host supplies the opaque target. Use only source
-candidate IDs supplied in the task context.
-Use only exact supplied channel mnemonics or explicitly supplied aliases. Never
-invent, derive, suffix, expand, or rename channel names. Multiple bindings may
-reference the same source channel.
-Do not select or update existing tracks, bindings, fills, or annotations. Do
-not use report-wide settings or filesystem operations. Never create a second
-section in an existing-target task.
+wp.report(): title, subtitle
+wp.source(candidate_id): candidate_id (positional or keyword)
+wp.section(report): id_hint, title, subtitle, depth_minimum, depth_maximum, source
+wp.target_section(report): no keyword arguments; the host supplies the target
+wp.update_section(target): title, subtitle, depth_minimum, depth_maximum
+wp.track(section): id_hint, kind, title, width_mm, scale_minimum, scale_maximum,
+    scale_kind, reverse
+wp.curve(track): channel, id_hint, label, scale_minimum, scale_maximum, scale_kind,
+    reverse, color, line_style, line_width
+wp.raster(track): channel, id_hint, label, profile, normalization, color_minimum,
+    color_maximum, colormap, alpha
+
+Use wp.section(report) only for a new section. Use
+wp.target_section(report) followed by wp.update_section() for an existing
+target. The target-section call accepts no section ID; the host supplies the
+opaque target. Use only source candidate IDs and channel mnemonics supplied in
+the task context. Do not invent, derive, suffix, expand, or rename them.
+Multiple bindings may reference the same source channel. Do not select or
+update existing tracks, bindings, fills, or annotations. Do not use report-wide
+settings or filesystem operations. Never create a second section in an
+existing-target task.
 Return only the program source, with no markdown fences or explanation."""
 
 _CHANNEL_GROUNDING_RULE = (
@@ -309,30 +289,52 @@ def _worker_prompt(
 def _sdk_reference(section_context: ResolvedSectionContext) -> str:
     """Build executable SDK documentation from host-approved source handles."""
     source_ids = tuple(source.candidate_id for source in section_context.sources)
-    if not source_ids:
-        return _SDK_REFERENCE
+    lines = [_SDK_REFERENCE]
+    if source_ids:
+        lines.extend(
+            [
+                "Host-approved source handles for this task:",
+                *(
+                    f"source_{index} = wp.source({json.dumps(candidate_id)})"
+                    for index, candidate_id in enumerate(source_ids, start=1)
+                ),
+            ]
+        )
+        if len(source_ids) == 1:
+            lines.append("For this task, the new-section source argument may use source_1.")
+        else:
+            lines.append(
+                "Multiple source handles are available; pass only the handle selected "
+                "by the task and do not prefer one by position."
+            )
+    else:
+        lines.append("No host-approved source handle is available; omit source association.")
 
-    source_lines = [
-        f"source_{index} = wp.source({json.dumps(candidate_id)})"
-        for index, candidate_id in enumerate(source_ids, start=1)
-    ]
-    section_template = (
-        "section = wp.section(\n"
-        "    report,\n"
-        "    id_hint='new-section',\n"
-        "    title='Section title',\n"
-        ")"
-    )
-    section_lines = [
-        "section = wp.section(",
-        "    report,",
-        "    id_hint='new-section',",
-        "    title='Section title',",
-    ]
-    if len(source_ids) == 1:
-        section_lines.append("    source=source_1,")
-    section_lines.append(")")
-    return _SDK_REFERENCE.replace(section_template, "\n".join([*source_lines, *section_lines]))
+    channel_examples: list[str] = []
+    seen_channels: set[tuple[str, str]] = set()
+    for source in section_context.sources:
+        for channel in source.channels:
+            identity = (channel.mnemonic, channel.kind)
+            if identity in seen_channels:
+                continue
+            seen_channels.add(identity)
+            channel_literal = json.dumps(channel.mnemonic)
+            if channel.kind == "array":
+                channel_examples.append(f"wp.raster(array, channel={channel_literal})")
+            else:
+                channel_examples.append(f"wp.curve(normal, channel={channel_literal})")
+    if channel_examples:
+        lines.extend(
+            [
+                "Context-valid executable channel examples; use only these exact literals:",
+                *channel_examples,
+            ]
+        )
+    else:
+        lines.append(
+            "No host-approved channel is available; omit wp.curve and wp.raster binding examples."
+        )
+    return "\n".join(lines)
 
 
 def _semantic_task_payload(task: SectionTask) -> dict[str, object]:

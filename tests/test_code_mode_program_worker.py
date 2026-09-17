@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 
 import pytest
@@ -30,6 +31,11 @@ from wellplot.agent.providers.base import (
     ProviderRequestError,
 )
 from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_program.builders import HandleBuilder
+from wellplot.authoring_program.errors import ProgramTypeError
+from wellplot.authoring_program.intent_builder import IntentBuilder
+from wellplot.authoring_program.interpreter import interpret_authoring_program
+from wellplot.authoring_program.models import AuthoringProgram, ProgramSource
 from wellplot.authoring_service import AuthoringService
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDocumentSpec
@@ -302,7 +308,34 @@ def test_worker_prompt_is_scoped_to_the_indexed_section() -> None:
     assert "Current report" not in prompt
     assert "header_slots" not in prompt
     assert "/approved/pilot.las" not in prompt
-    assert "Executable Wellplot SDK reference" in prompt
+    assert "Exact executable Wellplot SDK contract" in prompt
+
+
+def test_worker_sdk_reference_exposes_only_exact_context_grounded_contract() -> None:
+    """Section docs contain legal keywords and only host-approved channels."""
+    context = _context(
+        channel_specs=(
+            ChannelContext(mnemonic="CBL", kind="scalar", unit="mV"),
+            ChannelContext(mnemonic="VDL", kind="array", shape=(128, 64)),
+        )
+    )
+
+    reference = _sdk_reference(context.sections[0])
+
+    assert "scale_minimum" in reference
+    assert "scale_maximum" in reference
+    assert "scale_kind" in reference
+    assert "wp.track(section):" in reference
+    assert "wp.curve(track):" in reference
+    assert "wp.raster(track):" in reference
+    assert "scale_linear" not in reference
+    assert "x_scale" not in reference
+    assert "high" not in reference
+    assert "'CHANNEL'" not in reference
+    assert "'REFERENCE_CHANNEL'" not in reference
+    assert "'ARRAY_CHANNEL'" not in reference
+    assert 'wp.curve(normal, channel="CBL")' in reference
+    assert 'wp.raster(array, channel="VDL")' in reference
 
 
 def test_worker_sdk_reference_uses_exact_single_candidate_without_fake_ids() -> None:
@@ -363,8 +396,8 @@ def test_worker_sdk_reference_omits_source_example_without_candidates() -> None:
     )
 
     prompt = backend.requests[0].user_prompt
-    assert "wp.source(" not in prompt
-    assert "source=" not in prompt
+    assert "source_1 = wp.source(" not in prompt
+    assert "source=source_1" not in prompt
 
 
 def test_worker_repair_reuses_the_same_grounded_sdk_reference() -> None:
@@ -445,7 +478,11 @@ def test_repair_prompt_reuses_bounded_exact_channel_facts() -> None:
 
     assert result.success is True
     assert len(backend.requests) == 2
+    reference = _sdk_reference(context.sections[0])
+    initial_payload = json.loads(backend.requests[0].user_prompt.split("\n\n", 1)[1])
+    assert initial_payload["sdk_reference"] == reference
     repair_prompt = backend.requests[1].user_prompt
+    assert reference in repair_prompt
     assert '"mnemonic":"CBL"' in repair_prompt
     assert '"kind":"scalar"' in repair_prompt
     assert '"mnemonic":"VDL"' in repair_prompt
@@ -458,6 +495,23 @@ def test_repair_prompt_reuses_bounded_exact_channel_facts() -> None:
     )[0]
     assert "CBL_0_100" not in repair_context
     assert "VDL_WAVEFORM" not in repair_context
+
+
+def test_interpreter_still_rejects_unsupported_worker_keyword() -> None:
+    """The kernel remains strict when a program invents a curve keyword."""
+    source = (
+        "report = wp.report()\n"
+        "section = wp.section(report, title='Pilot')\n"
+        "track = wp.track(section, kind='normal', title='GR', width_mm=30)\n"
+        "wp.curve(track, channel='GR', scale_linear=0)\n"
+    )
+    builder = IntentBuilder(handles=HandleBuilder(builder_id="cm53r3-contract"))
+
+    with pytest.raises(ProgramTypeError, match="scale_linear"):
+        interpret_authoring_program(
+            AuthoringProgram(source=ProgramSource(text=source, logical_name="invalid.wpa")),
+            builder.runtime_environment(),
+        )
 
 
 def test_each_worker_attempt_gets_fresh_source_handle_provenance() -> None:

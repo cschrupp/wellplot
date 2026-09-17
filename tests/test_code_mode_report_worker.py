@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 
 import pytest
@@ -11,6 +12,7 @@ from wellplot.agent.code_mode.enrichment import HeaderSlotInspectionSummary, Rep
 from wellplot.agent.code_mode.planner import ReportTask
 from wellplot.agent.code_mode.report_worker import (
     ReportProgramCompiler,
+    _sdk_reference,
     _validate_report_intent,
     _worker_capabilities,
 )
@@ -87,6 +89,17 @@ def _context() -> ReportContext:
     return ReportContext(
         header_slots=(
             HeaderSlotInspectionSummary(slot_id="well", key="well", label="Well"),
+            HeaderSlotInspectionSummary(slot_id="service_title_1"),
+        )
+    )
+
+
+def _grounded_context() -> ReportContext:
+    """Build report slots with explicit general/detail/service namespaces."""
+    return ReportContext(
+        header_slots=(
+            HeaderSlotInspectionSummary(slot_id="general.well", key="well"),
+            HeaderSlotInspectionSummary(slot_id="detail.row_2.value_1", key="run_number"),
             HeaderSlotInspectionSummary(slot_id="service_title_1"),
         )
     )
@@ -192,6 +205,21 @@ def test_report_worker_prompt_contains_only_bounded_report_context() -> None:
     assert "/" not in prompt.split("sdk_reference", maxsplit=1)[0]
 
 
+def test_report_sdk_reference_uses_only_context_grounded_identifiers() -> None:
+    """Report docs omit invented slot/key examples and unsupported detail kwargs."""
+    reference = _sdk_reference(_grounded_context())
+
+    assert 'Host-approved wp.header_field key: "well"' in reference
+    assert 'Host-approved wp.detail_field key: "run_number"' in reference
+    assert 'Host-approved wp.service_title slot_id: "service_title_1"' in reference
+    assert "detail.run_number" not in reference
+    assert "wp.detail_field(report, key=" not in reference
+    assert "wp.header_field(report):" in reference
+    assert "wp.detail_field(report):" in reference
+    assert "wp.detail_field(report): key, value, unit, label" in reference
+    assert "wp.service_title(report): slot_id" in reference
+
+
 def test_report_worker_rejects_noop_and_section_programs() -> None:
     """The report boundary rejects empty programs and mixed section output."""
     noop_backend = _Backend(responses=["report = wp.report()\n", "report = wp.report()\n"])
@@ -249,6 +277,10 @@ def test_report_worker_repairs_once_with_same_bounded_context() -> None:
     assert result.success is True
     assert result.metrics.program_repairs == 1
     assert len(backend.requests) == 2
+    reference = _sdk_reference(_context())
+    initial_payload = json.loads(backend.requests[0].user_prompt.split("\n\n", 1)[1])
+    assert initial_payload["sdk_reference"] == reference
+    assert reference in backend.requests[1].user_prompt
     repair_prompt = backend.requests[1].user_prompt
     assert '"slot_id":"well"' in repair_prompt
     assert "Current report" not in repair_prompt

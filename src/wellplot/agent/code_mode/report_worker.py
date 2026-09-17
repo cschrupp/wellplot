@@ -24,23 +24,26 @@ from .enrichment import ReportContext
 from .planner import ReportTask
 from .repair import ProgramRepairCoordinator
 
-_SDK_REFERENCE = """Executable Wellplot report SDK reference:
-report = wp.report(title='Report title', subtitle='Report subtitle')
-wp.header_field(report, key='well', value='Well name', unit='name')
-wp.service_title(report, slot_id='service_title_1', value='Quicklook')
-wp.detail_field(report, key='detail.run_number', value='ONE', unit='run')
-wp.remark(report, remark_id='scope', title='Scope', text='Short note')
-wp.page(report, size='letter', orientation='portrait', continuous=False)
-wp.depth(report, unit='ft', scale='1:240')
-wp.output(report, backend='matplotlib', output_path='wellplot.pdf', dpi=180)
-wp.tail(report, enabled=True)
+_SDK_REFERENCE = """Exact executable Wellplot report SDK contract:
+Use only the keyword arguments listed for each call. Do not infer aliases or
+additional keywords from the semantic task.
 
-Only the root calls and keyword arguments shown above are executable. Use only
-header slot IDs, keys, and labels supplied in the task context. Values must be
-literal primitive strings or numbers from the request. Do not inspect, select,
-create, or revise sections or child plot objects. Do not use filesystem
-operations. Return only the program source, with no markdown fences or
-explanation."""
+wp.report(): title, subtitle
+wp.header_field(report): key, value, unit, label
+wp.service_title(report): slot_id, value, unit, font_size, auto_adjust, bold, italic,
+    alignment
+wp.detail_field(report): key, value, unit, label
+wp.remark(report): remark_id, title, text, alignment, font_size, title_font_size, border
+wp.page(report): size, width_mm, height_mm, orientation, continuous
+wp.depth(report): unit, scale
+wp.output(report): backend, output_path, dpi
+wp.tail(report): enabled
+
+Use only header keys and service-title slot IDs supplied in the task context.
+Values must be literal primitive strings or numbers from the request. Do not
+inspect, select, create, or revise sections or child plot objects. Do not use
+filesystem operations. Return only the program source, with no markdown fences
+or explanation."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +90,7 @@ class ReportProgramCompiler:
         coordinator = self.repair_coordinator or ProgramRepairCoordinator(self.backend)
         repair = await coordinator.repair(
             semantic_task=_repair_context_text(task, report_context),
-            sdk_docs=_SDK_REFERENCE,
+            sdk_docs=_sdk_reference(report_context),
             previous_program=generated.text,
             diagnostic=diagnostic,
             timeout_seconds=timeout_seconds,
@@ -193,7 +196,7 @@ def _worker_prompt(
         "report_context": {
             "header_slots": [slot.model_dump(mode="json") for slot in report_context.header_slots],
         },
-        "sdk_reference": _SDK_REFERENCE,
+        "sdk_reference": _sdk_reference(report_context),
     }
     return (
         "Create one report-only authoring program from this scoped context. "
@@ -201,6 +204,41 @@ def _worker_prompt(
         "Do not create sections or child plot objects.\n\n"
         + json.dumps(payload, sort_keys=True, separators=(",", ":"))
     )
+
+
+def _sdk_reference(report_context: ReportContext) -> str:
+    """Build report SDK documentation from host-approved slot identities."""
+    lines = [_SDK_REFERENCE]
+    examples: list[str] = []
+    for slot in report_context.header_slots:
+        if slot.slot_id.startswith("general.") and slot.key:
+            examples.append(
+                "Host-approved wp.header_field key: "
+                f"{json.dumps(slot.key)}. Use it only with a requested primitive value."
+            )
+        elif slot.slot_id.startswith("detail.") and slot.key:
+            examples.append(
+                "Host-approved wp.detail_field key: "
+                f"{json.dumps(slot.key)}. Use it only with a requested primitive value."
+            )
+        elif slot.slot_id.startswith("service_title"):
+            examples.append(
+                "Host-approved wp.service_title slot_id: "
+                f"{json.dumps(slot.slot_id)}. Use it only with a requested primitive value."
+            )
+    if examples:
+        lines.extend(
+            [
+                "Context-valid executable header examples; use only these exact identifiers:",
+                *examples,
+            ]
+        )
+    else:
+        lines.append(
+            "No context-valid header or service-title example is available; omit "
+            "header_field, detail_field, and service_title calls."
+        )
+    return "\n".join(lines)
 
 
 def _semantic_task_payload(task: ReportTask) -> dict[str, object]:
