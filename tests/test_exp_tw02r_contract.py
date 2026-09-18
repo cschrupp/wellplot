@@ -14,6 +14,7 @@ from scripts.exp_tw02r_contract import (
     execute_compiled_section,
     load_golden_drafts,
     provider_section_input,
+    selected_execution_channels,
     validate_gate_a,
 )
 
@@ -219,9 +220,35 @@ def test_review_projection_is_path_free_and_contains_no_provider_concepts() -> N
     assert projection["source_candidate"] == "source-2"
 
 
-def test_valid_corrected_contract_is_total_for_canonical_intent() -> None:
-    """Every Gate-A-valid corrected value has an explicit host completion path."""
-    for result in compile_golden_drafts().values():
+def test_private_execution_channels_are_scoped_to_compiled_source() -> None:
+    """Private reconciliation sees only the compiled source candidate."""
+    corpus = load_corpus()
+    selected_source = corpus.sections[0].sources[0]
+    other_source = selected_source.model_copy(
+        update={
+            "candidate_id": "source-other",
+            "canonical_path": "workspace/data/other.dlis",
+            "channels": (
+                selected_source.channels[0].model_copy(update={"mnemonic": "ONLY_OTHER"}),
+            ),
+        }
+    )
+    context = corpus.sections[0].model_copy(update={"sources": (selected_source, other_source)})
+    compiled = compile_golden_drafts()["main_pass"]
+
+    channels = selected_execution_channels(compiled, context)
+
+    assert [channel.mnemonic for channel in channels] == [
+        channel.mnemonic for channel in selected_source.channels
+    ]
+    assert "ONLY_OTHER" not in {channel.mnemonic for channel in channels}
+
+
+def test_frozen_golden_drafts_have_explicit_canonical_completion() -> None:
+    """Both frozen corrected goldens have all host-owned fields needed downstream."""
+    compiled = compile_golden_drafts()
+    assert set(compiled) == {"main_pass", "repeat_pass"}
+    for result in compiled.values():
         assert result.intent.sections is not None
         section = result.intent.sections[0]
         assert section.tracks is not None

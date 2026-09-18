@@ -71,11 +71,17 @@ The two-source regression keeps a valid channel in source A while selecting a
 source B that lacks it; Gate A rejects the draft rather than unioning channels
 across candidates.
 
-For valid corrected drafts, the mapping to `AuthoringDocumentIntent` is total:
-the explicit host completion policy supplies the required new-track widths and
-presentation fields. Both golden sections then pass deterministic
-reconciliation and private `AuthoringService` execution. The canonical intent
-contains host-resolved source metadata only at this host-side boundary.
+For the two frozen Gate-A-valid corrected golden drafts, deterministic host
+completion supplies every required new-track width and presentation field.
+Both golden sections then pass deterministic reconciliation and private
+`AuthoringService` execution. This is completion evidence for the frozen CBL
+contract, not an exhaustive proof over every structurally possible
+`SectionDraft` value. The canonical intent contains host-resolved source
+metadata only at this host-side boundary.
+
+The private reconciliation harness scopes its available-channel inventory to
+the source candidate selected by the compiled draft; unrelated candidates in
+the host context cannot contribute channels during execution evidence.
 
 ## Hard stop
 

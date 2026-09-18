@@ -503,11 +503,7 @@ def execute_compiled_section(
 ) -> AuthoringExecutionResult:
     """Reconcile and privately execute one completed new-section intent."""
     section_id = compiled.intent.sections[0].section_id
-    channels = [
-        AuthoringChannelCandidate(mnemonic=channel.mnemonic, kind=channel.kind)
-        for source in context.sources
-        for channel in source.channels
-    ]
+    channels = selected_execution_channels(compiled, context)
     document = AuthoringDocumentSpec(
         name="exp-tw02r",
         title="EXP-TW-02R",
@@ -540,6 +536,37 @@ def execute_compiled_section(
     if not result.success:
         raise DraftCompilationError("execution_failed", "Private execution rejected the intent.")
     return result
+
+
+def selected_execution_channels(
+    compiled: CompiledSectionDraft,
+    context: ResolvedSectionContext,
+) -> list[AuthoringChannelCandidate]:
+    """Return channels from only the source selected by the compiled draft."""
+    candidate_id = compiled.normalized_projection.get("source_candidate")
+    if not isinstance(candidate_id, str) or not candidate_id:
+        raise DraftCompilationError(
+            "execution_source_missing",
+            "Compiled review projection does not contain a valid source candidate.",
+        )
+
+    selected_source = next(
+        (source for source in context.sources if source.candidate_id == candidate_id),
+        None,
+    )
+    if selected_source is None:
+        raise DraftCompilationError(
+            "execution_source_missing",
+            "Private execution context does not contain the compiled source candidate.",
+        )
+
+    return [
+        AuthoringChannelCandidate(
+            mnemonic=channel.mnemonic,
+            kind=channel.kind,
+        )
+        for channel in selected_source.channels
+    ]
 
 
 def _base_track_requirements(section_key: str) -> list[dict[str, object]]:
@@ -602,5 +629,6 @@ __all__ = [
     "execute_compiled_section",
     "load_golden_drafts",
     "provider_section_input",
+    "selected_execution_channels",
     "validate_gate_a",
 ]
