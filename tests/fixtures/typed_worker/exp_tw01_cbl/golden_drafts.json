@@ -1,0 +1,82 @@
+{
+  "main_pass": {
+    "title": "Main Pass CBL/VDL",
+    "source_candidate": "source-1",
+    "tracks": [
+      {
+        "kind": "normal",
+        "title": "Combo",
+        "bindings": [
+          {"kind": "curve", "channel": "ECGR_STGC"},
+          {"kind": "curve", "channel": "TT"},
+          {"kind": "curve", "channel": "TENS"},
+          {"kind": "curve", "channel": "MTEM"}
+        ]
+      },
+      {
+        "kind": "reference",
+        "title": "Depth",
+        "bindings": [
+          {"kind": "curve", "channel": "STIT"},
+          {"kind": "curve", "channel": "TDSP"},
+          {"kind": "curve", "channel": "VSEC"}
+        ]
+      },
+      {
+        "kind": "normal",
+        "title": "CBL",
+        "bindings": [
+          {"kind": "curve", "channel": "CBL"},
+          {"kind": "curve", "channel": "CBL"}
+        ]
+      },
+      {
+        "kind": "array",
+        "title": "VDL",
+        "bindings": [
+          {"kind": "raster", "channel": "VDL"}
+        ]
+      }
+    ]
+  },
+  "repeat_pass": {
+    "title": "Repeat Pass CBL/VDL",
+    "source_candidate": "source-2",
+    "tracks": [
+      {
+        "kind": "normal",
+        "title": "Combo",
+        "bindings": [
+          {"kind": "curve", "channel": "ECGR_STGC"},
+          {"kind": "curve", "channel": "TT"},
+          {"kind": "curve", "channel": "TENS"},
+          {"kind": "curve", "channel": "MTEM"}
+        ]
+      },
+      {
+        "kind": "reference",
+        "title": "Depth",
+        "bindings": [
+          {"kind": "curve", "channel": "STIT"},
+          {"kind": "curve", "channel": "TDSP"},
+          {"kind": "curve", "channel": "VSEC"}
+        ]
+      },
+      {
+        "kind": "normal",
+        "title": "CBL",
+        "bindings": [
+          {"kind": "curve", "channel": "CBL"},
+          {"kind": "curve", "channel": "CBL"}
+        ]
+      },
+      {
+        "kind": "array",
+        "title": "VDL",
+        "bindings": [
+          {"kind": "raster", "channel": "VDL"}
+        ]
+      }
+    ]
+  }
+}
