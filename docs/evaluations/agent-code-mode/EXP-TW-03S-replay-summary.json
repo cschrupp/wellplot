@@ -1,0 +1,162 @@
+{
+  "baseline_sha": "151efd0",
+  "experiment_version": "exp-tw-03s.structural-schema.v1",
+  "summaries": [
+    {
+      "baseline_sha": "151efd0",
+      "experiment_version": "exp-tw-03s.structural-schema.v1",
+      "gate_a_valid_count_after_strengthening": 1,
+      "historical_attempts": 10,
+      "historical_gate_a_valid_count": 1,
+      "historical_structural_failure_count": 0,
+      "historical_structurally_valid_count": 10,
+      "model_id": "qwen3.6-35b-a3b",
+      "prior_gate_a_failures_rejected_structurally": 9,
+      "prior_gate_a_failures_remaining_structurally_valid": 0,
+      "provider_id": "llama_cpp",
+      "section_role": "main_pass",
+      "strengthened_structurally_valid_count": 1,
+      "structural_error_path_counts": [
+        {
+          "count": 8,
+          "key": "extra_forbidden@tracks.3.array.bindings.0.scale"
+        },
+        {
+          "count": 8,
+          "key": "literal_error@tracks.3.array.bindings.0.kind"
+        },
+        {
+          "count": 8,
+          "key": "missing@tracks.3.array.bindings.0.sample_axis"
+        },
+        {
+          "count": 4,
+          "key": "model_type@tracks.3.array.x_scale"
+        },
+        {
+          "count": 8,
+          "key": "too_short@tracks.3.array.bindings"
+        }
+      ],
+      "structural_rejection_count": 9
+    },
+    {
+      "baseline_sha": "151efd0",
+      "experiment_version": "exp-tw-03s.structural-schema.v1",
+      "gate_a_valid_count_after_strengthening": 3,
+      "historical_attempts": 10,
+      "historical_gate_a_valid_count": 3,
+      "historical_structural_failure_count": 0,
+      "historical_structurally_valid_count": 10,
+      "model_id": "qwen3.6-35b-a3b",
+      "prior_gate_a_failures_rejected_structurally": 7,
+      "prior_gate_a_failures_remaining_structurally_valid": 0,
+      "provider_id": "llama_cpp",
+      "section_role": "repeat_pass",
+      "strengthened_structurally_valid_count": 3,
+      "structural_error_path_counts": [
+        {
+          "count": 5,
+          "key": "extra_forbidden@tracks.3.array.bindings.0.scale"
+        },
+        {
+          "count": 5,
+          "key": "literal_error@tracks.3.array.bindings.0.kind"
+        },
+        {
+          "count": 5,
+          "key": "missing@tracks.3.array.bindings.0.sample_axis"
+        },
+        {
+          "count": 4,
+          "key": "model_type@tracks.3.array.x_scale"
+        },
+        {
+          "count": 5,
+          "key": "too_short@tracks.3.array.bindings"
+        }
+      ],
+      "structural_rejection_count": 7
+    },
+    {
+      "baseline_sha": "151efd0",
+      "experiment_version": "exp-tw-03s.structural-schema.v1",
+      "gate_a_valid_count_after_strengthening": 6,
+      "historical_attempts": 10,
+      "historical_gate_a_valid_count": 6,
+      "historical_structural_failure_count": 0,
+      "historical_structurally_valid_count": 10,
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "prior_gate_a_failures_rejected_structurally": 3,
+      "prior_gate_a_failures_remaining_structurally_valid": 1,
+      "provider_id": "openrouter",
+      "section_role": "main_pass",
+      "strengthened_structurally_valid_count": 7,
+      "structural_error_path_counts": [
+        {
+          "count": 2,
+          "key": "extra_forbidden@tracks.3.array.bindings.0.scale"
+        },
+        {
+          "count": 2,
+          "key": "literal_error@tracks.3.array.bindings.0.kind"
+        },
+        {
+          "count": 2,
+          "key": "missing@tracks.3.array.bindings.0.sample_axis"
+        },
+        {
+          "count": 2,
+          "key": "model_type@tracks.3.array.x_scale"
+        },
+        {
+          "count": 2,
+          "key": "too_short@tracks.3.array.bindings"
+        }
+      ],
+      "structural_rejection_count": 3
+    },
+    {
+      "baseline_sha": "151efd0",
+      "experiment_version": "exp-tw-03s.structural-schema.v1",
+      "gate_a_valid_count_after_strengthening": 4,
+      "historical_attempts": 10,
+      "historical_gate_a_valid_count": 4,
+      "historical_structural_failure_count": 1,
+      "historical_structurally_valid_count": 9,
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "prior_gate_a_failures_rejected_structurally": 3,
+      "prior_gate_a_failures_remaining_structurally_valid": 2,
+      "provider_id": "openrouter",
+      "section_role": "repeat_pass",
+      "strengthened_structurally_valid_count": 6,
+      "structural_error_path_counts": [
+        {
+          "count": 1,
+          "key": "extra_forbidden@tracks.3.array.bindings.0.scale"
+        },
+        {
+          "count": 1,
+          "key": "literal_error@tracks.3.array.bindings.0.kind"
+        },
+        {
+          "count": 1,
+          "key": "missing@tracks.3.array.bindings.0.sample_axis"
+        },
+        {
+          "count": 1,
+          "key": "model_type@tracks.2.array.x_scale"
+        },
+        {
+          "count": 1,
+          "key": "model_type@tracks.3.array.x_scale"
+        },
+        {
+          "count": 1,
+          "key": "too_short@tracks.3.array.bindings"
+        }
+      ],
+      "structural_rejection_count": 3
+    }
+  ]
+}
