@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from types import SimpleNamespace
 
 import pytest
+from pydantic import ValidationError
 from scripts.exp_tw00_corpus import load_corpus
 from scripts.exp_tw02i_input import build_typed_worker_input, serialize_provider_input
 from scripts.exp_tw02r_contract import SectionDraft, load_golden_drafts
@@ -17,6 +18,7 @@ from scripts.exp_tw03_provider import (
     run_first_attempt,
     run_section_attempts,
     serialize_evidence,
+    summarize_attempts,
 )
 
 from wellplot.agent.providers.base import (
@@ -200,6 +202,63 @@ def test_unvalidated_structured_result_is_a_failure_without_repair() -> None:
 
     assert evidence.outcome is AttemptOutcome.STRUCTURED_OUTPUT_FAILURE
     assert evidence.draft is None
+    assert len(backend.calls) == 1
+
+
+def test_structured_output_failure_counts_as_provider_call_success() -> None:
+    """A completed call with unusable structured output stays in the funnel."""
+    bundle, context, requirements = _fixture_inputs("main_pass")
+    backend = _FakeBackend(
+        result=StructuredGenerationResult(
+            value=SimpleNamespace(not_a_section_draft=True),
+            metrics=ProviderMetrics(latency_ms=5),
+        )
+    )
+
+    evidence = _run(
+        run_first_attempt(
+            "main_pass",
+            backend,
+            provider_id="fake",
+            model_id="test-model",
+            config=AttemptConfig(timeout_seconds=30),
+            bundle=bundle,
+            section_context=context,
+            gate_requirements=requirements,
+        )
+    )
+    aggregate = summarize_attempts("main_pass", (evidence,))
+
+    assert evidence.outcome is AttemptOutcome.STRUCTURED_OUTPUT_FAILURE
+    assert aggregate.provider_call_successes == 1
+    assert aggregate.structurally_valid_outputs == 0
+    assert aggregate.gate_a_valid_outputs == 0
+
+
+def test_unexpected_backend_validation_error_propagates() -> None:
+    """Unexpected backend implementation errors are not classified as evidence."""
+    bundle, context, requirements = _fixture_inputs("main_pass")
+    backend = _FakeBackend(
+        error=ValidationError.from_exception_data(
+            "BackendModel",
+            [{"type": "string_type", "loc": ("field",), "input": 1}],
+        )
+    )
+
+    with pytest.raises(ValidationError):
+        _run(
+            run_first_attempt(
+                "main_pass",
+                backend,
+                provider_id="fake",
+                model_id="test-model",
+                config=AttemptConfig(timeout_seconds=30),
+                bundle=bundle,
+                section_context=context,
+                gate_requirements=requirements,
+            )
+        )
+
     assert len(backend.calls) == 1
 
 

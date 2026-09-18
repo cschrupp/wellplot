@@ -8,7 +8,7 @@ from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
 from scripts.exp_tw00_corpus import FrozenWorkerCorpus, load_corpus
 from scripts.exp_tw02i_input import (
@@ -223,18 +223,6 @@ async def run_first_attempt(
                 **error.public_metadata(),
             ),
         )
-    except ValidationError:
-        return FirstAttemptEvidence(
-            **common,
-            outcome=AttemptOutcome.STRUCTURED_OUTPUT_FAILURE,
-            provider_failure=ProviderFailureEvidence(
-                category=ProviderFailureCategory.VALIDATION,
-                safe_message="The provider returned an invalid SectionDraft.",
-                retryable=False,
-                status_code=None,
-            ),
-        )
-
     if not isinstance(result, StructuredGenerationResult) or not isinstance(
         result.value, SectionDraft
     ):
@@ -323,7 +311,9 @@ def summarize_attempts(
         section_role=section_role,
         attempts=attempts,
         total_attempts=len(attempts),
-        provider_call_successes=sum(attempt.metrics is not None for attempt in attempts),
+        provider_call_successes=sum(
+            attempt.outcome is not AttemptOutcome.PROVIDER_FAILURE for attempt in attempts
+        ),
         structurally_valid_outputs=sum(attempt.draft is not None for attempt in attempts),
         gate_a_valid_outputs=sum(attempt.outcome is AttemptOutcome.SUCCESS for attempt in attempts),
         outcome_counts=outcome_counts,

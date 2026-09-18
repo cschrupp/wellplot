@@ -61,7 +61,9 @@ Evidence does not retain provider request bodies, raw provider text, SDK
 objects, credentials, authorization headers, filesystem paths, provenance
 records, canonical intents, or hidden reasoning. `ExperimentSummary` provides
 per-section counts for repeated independent attempts and sums available token
-and latency metrics.
+and latency metrics. A provider call counts as successful when it does not end
+in `provider_failure`, so completed calls with malformed structured output stay
+distinct from both provider failure and structurally valid output.
 
 ## Validation
 
@@ -75,6 +77,9 @@ Focused tests use fake asynchronous backends and prove:
 - prior attempt outputs and failure feedback do not enter later attempts;
 - evidence serialization is deterministic, path-free, and credential-free;
 - provider failure categories remain distinguishable.
+- completed structured-output failures remain separate from provider-call
+  failures;
+- unexpected backend exceptions propagate instead of becoming evidence rows.
 
 No live credentials or provider calls are required by the unit suite. The
 ten-attempt section runner is available for a separately configured live run.
