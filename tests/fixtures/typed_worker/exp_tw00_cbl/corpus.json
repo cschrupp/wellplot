@@ -1,0 +1,3837 @@
+{
+  "baseline_sha": "48fafb958b85069295f88fc249b3b9b68158c52a",
+  "capture_provenance": {
+    "capture_mode": "explicit fixture capture; no planner, provider, or discovery",
+    "source_fixture": "tests/fixtures/agentic_cbl/compile_contract.json",
+    "starter_fixture": "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
+  },
+  "fixture_sha256": "a0b0b6a936ca32de15b55d7f5d1807cb7376d3994ed2a242c19217811b1b4561",
+  "fixture_version": "exp-tw-00.cbl.v1",
+  "gate_a": {
+    "provider_attempts": 10,
+    "section_requirements": {
+      "main_pass": {
+        "source_association_required": true,
+        "tracks": [
+          {
+            "bindings": [
+              {
+                "channel": "ECGR_STGC",
+                "kind": "curve"
+              },
+              {
+                "channel": "TT",
+                "kind": "curve"
+              },
+              {
+                "channel": "TENS",
+                "kind": "curve"
+              },
+              {
+                "channel": "MTEM",
+                "kind": "curve"
+              }
+            ],
+            "kind": "normal"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "STIT",
+                "kind": "curve"
+              },
+              {
+                "channel": "TDSP",
+                "kind": "curve"
+              },
+              {
+                "channel": "VSEC",
+                "kind": "curve"
+              }
+            ],
+            "kind": "reference"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "CBL",
+                "kind": "curve"
+              },
+              {
+                "channel": "CBL",
+                "kind": "curve"
+              }
+            ],
+            "kind": "normal"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "VDL",
+                "kind": "raster"
+              }
+            ],
+            "kind": "array"
+          }
+        ]
+      },
+      "repeat_pass": {
+        "source_association_required": true,
+        "tracks": [
+          {
+            "bindings": [
+              {
+                "channel": "ECGR_STGC",
+                "kind": "curve"
+              },
+              {
+                "channel": "TT",
+                "kind": "curve"
+              },
+              {
+                "channel": "TENS",
+                "kind": "curve"
+              },
+              {
+                "channel": "MTEM",
+                "kind": "curve"
+              }
+            ],
+            "kind": "normal"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "STIT",
+                "kind": "curve"
+              },
+              {
+                "channel": "TDSP",
+                "kind": "curve"
+              },
+              {
+                "channel": "VSEC",
+                "kind": "curve"
+              }
+            ],
+            "kind": "reference"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "CBL",
+                "kind": "curve"
+              },
+              {
+                "channel": "CBL",
+                "kind": "curve"
+              }
+            ],
+            "kind": "normal"
+          },
+          {
+            "bindings": [
+              {
+                "channel": "VDL",
+                "kind": "raster"
+              }
+            ],
+            "kind": "array"
+          }
+        ]
+      }
+    },
+    "thresholds": {
+      "channel_valid_all_validated": true,
+      "host_reference_valid_all_validated": true,
+      "schema_valid_minimum": 9,
+      "semantic_usable_minimum": 8
+    },
+    "validity_rules": [
+      "A selected channel must belong to the selected source candidate.",
+      "curve bindings require selected-source scalar channels.",
+      "raster bindings require selected-source array channels.",
+      "Repeated bindings are counted with multiplicity."
+    ]
+  },
+  "host_only": {
+    "source_paths": {
+      "source-1": "workspace/data/CBL_Main.dlis",
+      "source-2": "workspace/data/CBL_Repeat.dlis"
+    },
+    "starter_document": {
+      "depth": {
+        "major_step": 10.0,
+        "minor_step": 2.0,
+        "scale": 240.0,
+        "unit": "ft"
+      },
+      "extensions": {
+        "compatibility": {
+          "format": "wellplot-logfile-v1",
+          "legacy_data": null,
+          "legacy_document": {
+            "bindings": {
+              "channels": [
+                {
+                  "channel": "ECGR_STGC",
+                  "kind": "curve",
+                  "label": "GR",
+                  "style": {
+                    "color": "#2e7d32"
+                  },
+                  "track_id": "combo"
+                }
+              ],
+              "on_missing": "skip"
+            },
+            "depth": {
+              "major_step": 10,
+              "minor_step": 2,
+              "scale": 240,
+              "unit": "ft"
+            },
+            "layout": {
+              "heading": {
+                "detail": {
+                  "kind": "cased_hole",
+                  "rows": [
+                    {
+                      "key": "date",
+                      "label": "Date",
+                      "values": [
+                        {
+                          "source_key": "DATE"
+                        },
+                        ""
+                      ]
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "keys": [
+                        "run_number",
+                        "direction"
+                      ],
+                      "label_cells": [
+                        "Run",
+                        "Direction"
+                      ]
+                    },
+                    {
+                      "key": "service_order",
+                      "label": "Service Order",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "driller_depth",
+                      "label": "Driller Depth"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "logged_depth",
+                      "label": "Logged Depth"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            {
+                              "source_key": "STOP"
+                            },
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "first_reading_bottom",
+                      "label": "First Reading (Bottom)"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            {
+                              "source_key": "STRT"
+                            },
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "last_reading",
+                      "label": "Last Reading"
+                    },
+                    {
+                      "key": "start_time",
+                      "label": "Start Time",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "end_time",
+                      "label": "End Time",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "drill_time",
+                      "label": "Drill Time",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "injection_type",
+                      "label": "Injection Type",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "fluid_density",
+                      "label": "Fluid Density",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "fluid_salinity",
+                      "label": "Fluid Salinity",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "fluid_level",
+                      "label": "Fluid Level"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "ft"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "cement_top",
+                      "label": "Cement Top"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "psi"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "head_pressure",
+                      "label": "Head Pressure"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "deg"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "maximum_deviation",
+                      "label": "Maximum Deviation"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "ft/min"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "nominal_speed",
+                      "label": "Nominal Speed"
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            "",
+                            "degF"
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "key": "bottom_temperature",
+                      "label": "Bottom Temperature"
+                    },
+                    {
+                      "key": "reference_log",
+                      "label": "Reference Log",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "reference_date",
+                      "label": "Reference Date",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "columns": [
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        },
+                        {
+                          "cells": [
+                            ""
+                          ]
+                        }
+                      ],
+                      "keys": [
+                        "equipment_number",
+                        "base"
+                      ],
+                      "label_cells": [
+                        "Equipment No.",
+                        "Base"
+                      ]
+                    },
+                    {
+                      "key": "logged_by",
+                      "label": "Logged By",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    },
+                    {
+                      "key": "witnessed_by",
+                      "label": "Witnessed By",
+                      "values": [
+                        "",
+                        ""
+                      ]
+                    }
+                  ],
+                  "title": "Cased Hole Metadata"
+                },
+                "enabled": true,
+                "general_fields": [
+                  {
+                    "key": "archive_no",
+                    "label": "Archive No.",
+                    "value": ""
+                  },
+                  {
+                    "key": "api_no",
+                    "label": "API No.",
+                    "value": ""
+                  },
+                  {
+                    "key": "version",
+                    "label": "Version",
+                    "value": ""
+                  },
+                  {
+                    "key": "company",
+                    "label": "Company",
+                    "source_key": "COMP"
+                  },
+                  {
+                    "key": "well",
+                    "label": "Well",
+                    "source_key": "WELL"
+                  },
+                  {
+                    "key": "field",
+                    "label": "Field",
+                    "source_key": "FLD"
+                  },
+                  {
+                    "key": "county",
+                    "label": "County",
+                    "source_key": "CNTY"
+                  },
+                  {
+                    "aliases": [
+                      "State",
+                      "State / Country"
+                    ],
+                    "key": "country",
+                    "label": "Country",
+                    "source_key": "CTRY"
+                  },
+                  {
+                    "key": "location",
+                    "label": "Location",
+                    "source_key": "LOC"
+                  },
+                  {
+                    "key": "section",
+                    "label": "Section",
+                    "value": ""
+                  },
+                  {
+                    "key": "township",
+                    "label": "Township",
+                    "value": ""
+                  },
+                  {
+                    "key": "range",
+                    "label": "Range",
+                    "value": ""
+                  },
+                  {
+                    "key": "footage",
+                    "label": "Footage",
+                    "value": ""
+                  },
+                  {
+                    "key": "latitude",
+                    "label": "Latitude",
+                    "source_key": "LATI"
+                  },
+                  {
+                    "key": "longitude",
+                    "label": "Longitude",
+                    "source_key": "LONG"
+                  },
+                  {
+                    "key": "logging_date",
+                    "label": "Logging Date",
+                    "source_key": "DATE"
+                  },
+                  {
+                    "key": "scale",
+                    "label": "Scale",
+                    "value": "ft 1:240"
+                  },
+                  {
+                    "key": "measured_from",
+                    "label": "Measured From",
+                    "value": ""
+                  },
+                  {
+                    "key": "log_measured_from",
+                    "label": "Log Measured From",
+                    "source_key": "LMF"
+                  },
+                  {
+                    "key": "perforation_measured_from",
+                    "label": "Perforation Measured From",
+                    "value": ""
+                  },
+                  {
+                    "key": "elevation_kb",
+                    "label": "KB",
+                    "source_key": "EKB"
+                  },
+                  {
+                    "key": "elevation_gl",
+                    "label": "GL",
+                    "source_key": "EGL"
+                  },
+                  {
+                    "key": "elevation_df",
+                    "label": "DF",
+                    "source_key": "EDF"
+                  },
+                  {
+                    "key": "top_log_interval",
+                    "label": "Top Log Interval",
+                    "source_key": "STRT"
+                  },
+                  {
+                    "key": "bottom_log_interval",
+                    "label": "Bottom Log Interval",
+                    "source_key": "STOP"
+                  },
+                  {
+                    "key": "fluid_type",
+                    "label": "Fluid Type",
+                    "value": ""
+                  },
+                  {
+                    "key": "service_company",
+                    "label": "Service Company",
+                    "source_key": "SRVC"
+                  }
+                ],
+                "provider_name": "Company",
+                "service_titles": [
+                  {
+                    "alignment": "center",
+                    "bold": true,
+                    "value": "Cased Hole Quicklook"
+                  },
+                  {
+                    "alignment": "center",
+                    "value": ""
+                  },
+                  {
+                    "alignment": "center",
+                    "value": ""
+                  }
+                ]
+              },
+              "log_sections": [
+                {
+                  "data": {
+                    "source_format": "dlis",
+                    "source_path": "CBL_Main.dlis"
+                  },
+                  "id": "main_pass",
+                  "subtitle": "CBL/VDL packet stress test starter",
+                  "title": "Main Pass",
+                  "tracks": [
+                    {
+                      "id": "combo",
+                      "kind": "normal",
+                      "position": 1,
+                      "title": "Combo",
+                      "width_mm": 30
+                    },
+                    {
+                      "id": "depth",
+                      "kind": "reference",
+                      "position": 2,
+                      "reference": {
+                        "axis": "depth",
+                        "define_layout": true,
+                        "major_step": 100,
+                        "scale_ratio": 240,
+                        "secondary_grid": {
+                          "display": true,
+                          "line_count": 4
+                        },
+                        "unit": "ft"
+                      },
+                      "title": "Depth",
+                      "width_mm": 18
+                    }
+                  ]
+                }
+              ],
+              "remarks": [
+                {
+                  "alignment": "left",
+                  "lines": [
+                    "This example uses publicly available or repository-provided demonstration data intended for educational use.",
+                    "Rendered layouts are independent reproductions generated by wellplot, not vendor-authored originals or official service-company deliverables.",
+                    "Original trademarks and service names remain the property of their respective owners.",
+                    "Confirm data provenance and redistribution rights before reusing outputs outside this repository."
+                  ],
+                  "title": "Public Data and IP Notice"
+                }
+              ],
+              "tail": {
+                "enabled": true
+              }
+            },
+            "page": {
+              "bottom_track_header_enabled": true,
+              "continuous": false,
+              "footer_height_mm": 0,
+              "header_height_mm": 0,
+              "margin_bottom_mm": 0,
+              "margin_left_mm": 0,
+              "margin_right_mm": 8,
+              "margin_top_mm": 0,
+              "orientation": "portrait",
+              "size": "A4",
+              "track_gap_mm": 0,
+              "track_header_height_mm": 30
+            }
+          },
+          "legacy_render": {
+            "backend": "matplotlib",
+            "continuous_strip_page_height_mm": 297.0,
+            "dpi": 144,
+            "matplotlib": {
+              "style": {
+                "grid": {
+                  "depth_major_linewidth": 0.65
+                },
+                "report": {
+                  "detail_header_fontsize": 9.0,
+                  "detail_label_fontsize": 6.4,
+                  "detail_value_fontsize": 6.4,
+                  "field_label_fontsize": 7.0,
+                  "field_value_fontsize": 7.8,
+                  "provider_fontsize": 16.0,
+                  "service_fontsize": 8.0,
+                  "summary_label_fontsize": 8.0,
+                  "summary_value_fontsize": 10.5,
+                  "tail_frame_height": 0.22,
+                  "tail_frame_y": 0.74,
+                  "tail_service_fontsize": 8.0
+                },
+                "section_title": {
+                  "background_color": "#0d3fb3",
+                  "border_color": "#0d3fb3",
+                  "border_linewidth": 0.8,
+                  "border_mode": "box",
+                  "padding_left": 0.03,
+                  "padding_right": 0.03,
+                  "subtitle_align": "center",
+                  "subtitle_color": "#eaf0ff",
+                  "subtitle_fontsize": 6.6,
+                  "subtitle_y": 0.22,
+                  "title_align": "center",
+                  "title_color": "#ffffff",
+                  "title_fontsize": 11.0,
+                  "title_y": 0.68
+                },
+                "track": {
+                  "x_tick_labelsize": 6.0
+                },
+                "track_header": {
+                  "background_color": "#eef2f8"
+                }
+              }
+            },
+            "output_path": "agent_cbl_log_example.pdf"
+          }
+        }
+      },
+      "header": {
+        "detail": {
+          "column_titles": [],
+          "kind": "cased_hole",
+          "rows": [
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "date",
+              "keys": [],
+              "label": "Date",
+              "label_cells": [],
+              "row_id": "detail.row_1",
+              "values": [
+                {
+                  "slot_id": "detail.row_1.value_1",
+                  "value": {
+                    "availability": "unknown",
+                    "default": "",
+                    "provenance": "unknown",
+                    "source_key": "DATE",
+                    "unit": null,
+                    "value": null
+                  }
+                },
+                {
+                  "slot_id": "detail.row_1.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_2.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_2.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": null,
+              "keys": [
+                "run_number",
+                "direction"
+              ],
+              "label": null,
+              "label_cells": [
+                "Run",
+                "Direction"
+              ],
+              "row_id": "detail.row_2",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "service_order",
+              "keys": [],
+              "label": "Service Order",
+              "label_cells": [],
+              "row_id": "detail.row_3",
+              "values": [
+                {
+                  "slot_id": "detail.row_3.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_3.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_4.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_4.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_4.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "driller_depth",
+              "keys": [],
+              "label": "Driller Depth",
+              "label_cells": [],
+              "row_id": "detail.row_4",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_5.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_5.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_5.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "logged_depth",
+              "keys": [],
+              "label": "Logged Depth",
+              "label_cells": [],
+              "row_id": "detail.row_5",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_6.column_1.cell_1",
+                      "value": {
+                        "availability": "unknown",
+                        "default": "",
+                        "provenance": "unknown",
+                        "source_key": "STOP",
+                        "unit": null,
+                        "value": null
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_6.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_6.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "first_reading_bottom",
+              "keys": [],
+              "label": "First Reading (Bottom)",
+              "label_cells": [],
+              "row_id": "detail.row_6",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_7.column_1.cell_1",
+                      "value": {
+                        "availability": "unknown",
+                        "default": "",
+                        "provenance": "unknown",
+                        "source_key": "STRT",
+                        "unit": null,
+                        "value": null
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_7.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_7.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "last_reading",
+              "keys": [],
+              "label": "Last Reading",
+              "label_cells": [],
+              "row_id": "detail.row_7",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "start_time",
+              "keys": [],
+              "label": "Start Time",
+              "label_cells": [],
+              "row_id": "detail.row_8",
+              "values": [
+                {
+                  "slot_id": "detail.row_8.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_8.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "end_time",
+              "keys": [],
+              "label": "End Time",
+              "label_cells": [],
+              "row_id": "detail.row_9",
+              "values": [
+                {
+                  "slot_id": "detail.row_9.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_9.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "drill_time",
+              "keys": [],
+              "label": "Drill Time",
+              "label_cells": [],
+              "row_id": "detail.row_10",
+              "values": [
+                {
+                  "slot_id": "detail.row_10.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_10.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "injection_type",
+              "keys": [],
+              "label": "Injection Type",
+              "label_cells": [],
+              "row_id": "detail.row_11",
+              "values": [
+                {
+                  "slot_id": "detail.row_11.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_11.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "fluid_density",
+              "keys": [],
+              "label": "Fluid Density",
+              "label_cells": [],
+              "row_id": "detail.row_12",
+              "values": [
+                {
+                  "slot_id": "detail.row_12.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_12.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "fluid_salinity",
+              "keys": [],
+              "label": "Fluid Salinity",
+              "label_cells": [],
+              "row_id": "detail.row_13",
+              "values": [
+                {
+                  "slot_id": "detail.row_13.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_13.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_14.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_14.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_14.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "fluid_level",
+              "keys": [],
+              "label": "Fluid Level",
+              "label_cells": [],
+              "row_id": "detail.row_14",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_15.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_15.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_15.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "cement_top",
+              "keys": [],
+              "label": "Cement Top",
+              "label_cells": [],
+              "row_id": "detail.row_15",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_16.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_16.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "psi"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_16.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "head_pressure",
+              "keys": [],
+              "label": "Head Pressure",
+              "label_cells": [],
+              "row_id": "detail.row_16",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_17.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_17.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "deg"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_17.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "maximum_deviation",
+              "keys": [],
+              "label": "Maximum Deviation",
+              "label_cells": [],
+              "row_id": "detail.row_17",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_18.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_18.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "ft/min"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_18.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "nominal_speed",
+              "keys": [],
+              "label": "Nominal Speed",
+              "label_cells": [],
+              "row_id": "detail.row_18",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_19.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    },
+                    {
+                      "slot_id": "detail.row_19.column_1.cell_2",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": "degF"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_19.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": "bottom_temperature",
+              "keys": [],
+              "label": "Bottom Temperature",
+              "label_cells": [],
+              "row_id": "detail.row_19",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "reference_log",
+              "keys": [],
+              "label": "Reference Log",
+              "label_cells": [],
+              "row_id": "detail.row_20",
+              "values": [
+                {
+                  "slot_id": "detail.row_20.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_20.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "reference_date",
+              "keys": [],
+              "label": "Reference Date",
+              "label_cells": [],
+              "row_id": "detail.row_21",
+              "values": [
+                {
+                  "slot_id": "detail.row_21.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_21.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_22.column_1.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                },
+                {
+                  "cells": [
+                    {
+                      "slot_id": "detail.row_22.column_2.cell_1",
+                      "value": {
+                        "availability": "available",
+                        "default": "",
+                        "provenance": "preserved",
+                        "source_key": null,
+                        "unit": null,
+                        "value": ""
+                      }
+                    }
+                  ]
+                }
+              ],
+              "key": null,
+              "keys": [
+                "equipment_number",
+                "base"
+              ],
+              "label": null,
+              "label_cells": [
+                "Equipment No.",
+                "Base"
+              ],
+              "row_id": "detail.row_22",
+              "values": []
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "logged_by",
+              "keys": [],
+              "label": "Logged By",
+              "label_cells": [],
+              "row_id": "detail.row_23",
+              "values": [
+                {
+                  "slot_id": "detail.row_23.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_23.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            },
+            {
+              "aliases": [],
+              "columns": [],
+              "key": "witnessed_by",
+              "keys": [],
+              "label": "Witnessed By",
+              "label_cells": [],
+              "row_id": "detail.row_24",
+              "values": [
+                {
+                  "slot_id": "detail.row_24.value_1",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                },
+                {
+                  "slot_id": "detail.row_24.value_2",
+                  "value": {
+                    "availability": "available",
+                    "default": "",
+                    "provenance": "preserved",
+                    "source_key": null,
+                    "unit": null,
+                    "value": ""
+                  }
+                }
+              ]
+            }
+          ],
+          "title": "Cased Hole Metadata"
+        },
+        "enabled": true,
+        "extensions": {
+          "compatibility": {
+            "legacy_heading": {
+              "detail": {
+                "kind": "cased_hole",
+                "rows": [
+                  {
+                    "key": "date",
+                    "label": "Date",
+                    "values": [
+                      {
+                        "source_key": "DATE"
+                      },
+                      ""
+                    ]
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "keys": [
+                      "run_number",
+                      "direction"
+                    ],
+                    "label_cells": [
+                      "Run",
+                      "Direction"
+                    ]
+                  },
+                  {
+                    "key": "service_order",
+                    "label": "Service Order",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "driller_depth",
+                    "label": "Driller Depth"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "logged_depth",
+                    "label": "Logged Depth"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          {
+                            "source_key": "STOP"
+                          },
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "first_reading_bottom",
+                    "label": "First Reading (Bottom)"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          {
+                            "source_key": "STRT"
+                          },
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "last_reading",
+                    "label": "Last Reading"
+                  },
+                  {
+                    "key": "start_time",
+                    "label": "Start Time",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "end_time",
+                    "label": "End Time",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "drill_time",
+                    "label": "Drill Time",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "injection_type",
+                    "label": "Injection Type",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "fluid_density",
+                    "label": "Fluid Density",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "fluid_salinity",
+                    "label": "Fluid Salinity",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "fluid_level",
+                    "label": "Fluid Level"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "ft"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "cement_top",
+                    "label": "Cement Top"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "psi"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "head_pressure",
+                    "label": "Head Pressure"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "deg"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "maximum_deviation",
+                    "label": "Maximum Deviation"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "ft/min"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "nominal_speed",
+                    "label": "Nominal Speed"
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          "",
+                          "degF"
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "key": "bottom_temperature",
+                    "label": "Bottom Temperature"
+                  },
+                  {
+                    "key": "reference_log",
+                    "label": "Reference Log",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "reference_date",
+                    "label": "Reference Date",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "columns": [
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      },
+                      {
+                        "cells": [
+                          ""
+                        ]
+                      }
+                    ],
+                    "keys": [
+                      "equipment_number",
+                      "base"
+                    ],
+                    "label_cells": [
+                      "Equipment No.",
+                      "Base"
+                    ]
+                  },
+                  {
+                    "key": "logged_by",
+                    "label": "Logged By",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  },
+                  {
+                    "key": "witnessed_by",
+                    "label": "Witnessed By",
+                    "values": [
+                      "",
+                      ""
+                    ]
+                  }
+                ],
+                "title": "Cased Hole Metadata"
+              },
+              "enabled": true,
+              "general_fields": [
+                {
+                  "key": "archive_no",
+                  "label": "Archive No.",
+                  "value": ""
+                },
+                {
+                  "key": "api_no",
+                  "label": "API No.",
+                  "value": ""
+                },
+                {
+                  "key": "version",
+                  "label": "Version",
+                  "value": ""
+                },
+                {
+                  "key": "company",
+                  "label": "Company",
+                  "source_key": "COMP"
+                },
+                {
+                  "key": "well",
+                  "label": "Well",
+                  "source_key": "WELL"
+                },
+                {
+                  "key": "field",
+                  "label": "Field",
+                  "source_key": "FLD"
+                },
+                {
+                  "key": "county",
+                  "label": "County",
+                  "source_key": "CNTY"
+                },
+                {
+                  "aliases": [
+                    "State",
+                    "State / Country"
+                  ],
+                  "key": "country",
+                  "label": "Country",
+                  "source_key": "CTRY"
+                },
+                {
+                  "key": "location",
+                  "label": "Location",
+                  "source_key": "LOC"
+                },
+                {
+                  "key": "section",
+                  "label": "Section",
+                  "value": ""
+                },
+                {
+                  "key": "township",
+                  "label": "Township",
+                  "value": ""
+                },
+                {
+                  "key": "range",
+                  "label": "Range",
+                  "value": ""
+                },
+                {
+                  "key": "footage",
+                  "label": "Footage",
+                  "value": ""
+                },
+                {
+                  "key": "latitude",
+                  "label": "Latitude",
+                  "source_key": "LATI"
+                },
+                {
+                  "key": "longitude",
+                  "label": "Longitude",
+                  "source_key": "LONG"
+                },
+                {
+                  "key": "logging_date",
+                  "label": "Logging Date",
+                  "source_key": "DATE"
+                },
+                {
+                  "key": "scale",
+                  "label": "Scale",
+                  "value": "ft 1:240"
+                },
+                {
+                  "key": "measured_from",
+                  "label": "Measured From",
+                  "value": ""
+                },
+                {
+                  "key": "log_measured_from",
+                  "label": "Log Measured From",
+                  "source_key": "LMF"
+                },
+                {
+                  "key": "perforation_measured_from",
+                  "label": "Perforation Measured From",
+                  "value": ""
+                },
+                {
+                  "key": "elevation_kb",
+                  "label": "KB",
+                  "source_key": "EKB"
+                },
+                {
+                  "key": "elevation_gl",
+                  "label": "GL",
+                  "source_key": "EGL"
+                },
+                {
+                  "key": "elevation_df",
+                  "label": "DF",
+                  "source_key": "EDF"
+                },
+                {
+                  "key": "top_log_interval",
+                  "label": "Top Log Interval",
+                  "source_key": "STRT"
+                },
+                {
+                  "key": "bottom_log_interval",
+                  "label": "Bottom Log Interval",
+                  "source_key": "STOP"
+                },
+                {
+                  "key": "fluid_type",
+                  "label": "Fluid Type",
+                  "value": ""
+                },
+                {
+                  "key": "service_company",
+                  "label": "Service Company",
+                  "source_key": "SRVC"
+                }
+              ],
+              "provider_name": "Company",
+              "service_titles": [
+                {
+                  "alignment": "center",
+                  "bold": true,
+                  "value": "Cased Hole Quicklook"
+                },
+                {
+                  "alignment": "center",
+                  "value": ""
+                },
+                {
+                  "alignment": "center",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        "general_fields": [
+          {
+            "aliases": [
+              "archive_no",
+              "Archive No."
+            ],
+            "key": "archive_no",
+            "label": "Archive No.",
+            "layout_path": null,
+            "slot_id": "general.archive_no",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "api_no",
+              "API No."
+            ],
+            "key": "api_no",
+            "label": "API No.",
+            "layout_path": null,
+            "slot_id": "general.api_no",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "version",
+              "Version"
+            ],
+            "key": "version",
+            "label": "Version",
+            "layout_path": null,
+            "slot_id": "general.version",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "company",
+              "Company"
+            ],
+            "key": "company",
+            "label": "Company",
+            "layout_path": null,
+            "slot_id": "general.company",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "COMP",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "well",
+              "Well"
+            ],
+            "key": "well",
+            "label": "Well",
+            "layout_path": null,
+            "slot_id": "general.well",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "WELL",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "field",
+              "Field"
+            ],
+            "key": "field",
+            "label": "Field",
+            "layout_path": null,
+            "slot_id": "general.field",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "FLD",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "county",
+              "County"
+            ],
+            "key": "county",
+            "label": "County",
+            "layout_path": null,
+            "slot_id": "general.county",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "CNTY",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "State",
+              "State / Country"
+            ],
+            "key": "country",
+            "label": "Country",
+            "layout_path": null,
+            "slot_id": "general.country",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "CTRY",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "location",
+              "Location"
+            ],
+            "key": "location",
+            "label": "Location",
+            "layout_path": null,
+            "slot_id": "general.location",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "LOC",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "section",
+              "Section"
+            ],
+            "key": "section",
+            "label": "Section",
+            "layout_path": null,
+            "slot_id": "general.section",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "township",
+              "Township"
+            ],
+            "key": "township",
+            "label": "Township",
+            "layout_path": null,
+            "slot_id": "general.township",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "range",
+              "Range"
+            ],
+            "key": "range",
+            "label": "Range",
+            "layout_path": null,
+            "slot_id": "general.range",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "footage",
+              "Footage"
+            ],
+            "key": "footage",
+            "label": "Footage",
+            "layout_path": null,
+            "slot_id": "general.footage",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "latitude",
+              "Latitude"
+            ],
+            "key": "latitude",
+            "label": "Latitude",
+            "layout_path": null,
+            "slot_id": "general.latitude",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "LATI",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "longitude",
+              "Longitude"
+            ],
+            "key": "longitude",
+            "label": "Longitude",
+            "layout_path": null,
+            "slot_id": "general.longitude",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "LONG",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "logging_date",
+              "Logging Date"
+            ],
+            "key": "logging_date",
+            "label": "Logging Date",
+            "layout_path": null,
+            "slot_id": "general.logging_date",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "DATE",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "scale",
+              "Scale"
+            ],
+            "key": "scale",
+            "label": "Scale",
+            "layout_path": null,
+            "slot_id": "general.scale",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": "ft 1:240"
+            }
+          },
+          {
+            "aliases": [
+              "measured_from",
+              "Measured From"
+            ],
+            "key": "measured_from",
+            "label": "Measured From",
+            "layout_path": null,
+            "slot_id": "general.measured_from",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "log_measured_from",
+              "Log Measured From"
+            ],
+            "key": "log_measured_from",
+            "label": "Log Measured From",
+            "layout_path": null,
+            "slot_id": "general.log_measured_from",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "LMF",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "perforation_measured_from",
+              "Perforation Measured From"
+            ],
+            "key": "perforation_measured_from",
+            "label": "Perforation Measured From",
+            "layout_path": null,
+            "slot_id": "general.perforation_measured_from",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "elevation_kb",
+              "KB"
+            ],
+            "key": "elevation_kb",
+            "label": "KB",
+            "layout_path": null,
+            "slot_id": "general.elevation_kb",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "EKB",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "elevation_gl",
+              "GL"
+            ],
+            "key": "elevation_gl",
+            "label": "GL",
+            "layout_path": null,
+            "slot_id": "general.elevation_gl",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "EGL",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "elevation_df",
+              "DF"
+            ],
+            "key": "elevation_df",
+            "label": "DF",
+            "layout_path": null,
+            "slot_id": "general.elevation_df",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "EDF",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "top_log_interval",
+              "Top Log Interval"
+            ],
+            "key": "top_log_interval",
+            "label": "Top Log Interval",
+            "layout_path": null,
+            "slot_id": "general.top_log_interval",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "STRT",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "bottom_log_interval",
+              "Bottom Log Interval"
+            ],
+            "key": "bottom_log_interval",
+            "label": "Bottom Log Interval",
+            "layout_path": null,
+            "slot_id": "general.bottom_log_interval",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "STOP",
+              "unit": null,
+              "value": null
+            }
+          },
+          {
+            "aliases": [
+              "fluid_type",
+              "Fluid Type"
+            ],
+            "key": "fluid_type",
+            "label": "Fluid Type",
+            "layout_path": null,
+            "slot_id": "general.fluid_type",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "aliases": [
+              "service_company",
+              "Service Company"
+            ],
+            "key": "service_company",
+            "label": "Service Company",
+            "layout_path": null,
+            "slot_id": "general.service_company",
+            "value": {
+              "availability": "unknown",
+              "default": "",
+              "provenance": "unknown",
+              "source_key": "SRVC",
+              "unit": null,
+              "value": null
+            }
+          }
+        ],
+        "provider_name": "Company",
+        "service_titles": [
+          {
+            "alignment": "center",
+            "auto_adjust": true,
+            "bold": true,
+            "font_size": null,
+            "italic": false,
+            "slot_id": "service_title.1",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": "Cased Hole Quicklook"
+            }
+          },
+          {
+            "alignment": "center",
+            "auto_adjust": true,
+            "bold": false,
+            "font_size": null,
+            "italic": false,
+            "slot_id": "service_title.2",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          },
+          {
+            "alignment": "center",
+            "auto_adjust": true,
+            "bold": false,
+            "font_size": null,
+            "italic": false,
+            "slot_id": "service_title.3",
+            "value": {
+              "availability": "available",
+              "default": "",
+              "provenance": "preserved",
+              "source_key": null,
+              "unit": null,
+              "value": ""
+            }
+          }
+        ],
+        "subtitle": null,
+        "tail_enabled": false,
+        "title": null
+      },
+      "name": "Agent CBL Starter",
+      "output": {
+        "backend": "matplotlib",
+        "continuous_strip_page_height_mm": 297.0,
+        "dpi": 144,
+        "extensions": {},
+        "output_path": "agent_cbl_log_example.pdf"
+      },
+      "page": {
+        "bottom_track_header_enabled": true,
+        "continuous": false,
+        "footer_height_mm": 0.0,
+        "header_height_mm": 0.0,
+        "height_mm": null,
+        "margin_bottom_mm": 0.0,
+        "margin_left_mm": 0.0,
+        "margin_right_mm": 8.0,
+        "margin_top_mm": 0.0,
+        "orientation": "portrait",
+        "size": "A4",
+        "track_gap_mm": 0.0,
+        "track_header_height_mm": 30.0,
+        "width_mm": null
+      },
+      "remarks": [
+        {
+          "alignment": "left",
+          "border": null,
+          "font_size": null,
+          "lines": [
+            "This example uses publicly available or repository-provided demonstration data intended for educational use.",
+            "Rendered layouts are independent reproductions generated by wellplot, not vendor-authored originals or official service-company deliverables.",
+            "Original trademarks and service names remain the property of their respective owners.",
+            "Confirm data provenance and redistribution rights before reusing outputs outside this repository."
+          ],
+          "remark_id": "remark-1",
+          "text": null,
+          "title": "Public Data and IP Notice",
+          "title_font_size": null
+        }
+      ],
+      "sections": [
+        {
+          "data_source": {
+            "source_format": "dlis",
+            "source_path": "CBL_Main.dlis"
+          },
+          "depth_range": null,
+          "extensions": {},
+          "id": "main_pass",
+          "subtitle": "CBL/VDL packet stress test starter",
+          "title": "Main Pass",
+          "tracks": [
+            {
+              "bindings": [
+                {
+                  "binding_id": "main_pass.combo.ECGR_STGC.1",
+                  "callouts": [],
+                  "channel": "ECGR_STGC",
+                  "extensions": {
+                    "compatibility": {
+                      "legacy_binding": {
+                        "channel": "ECGR_STGC",
+                        "kind": "curve",
+                        "label": "GR",
+                        "style": {
+                          "color": "#2e7d32"
+                        },
+                        "track_id": "combo"
+                      }
+                    }
+                  },
+                  "header_display": {
+                    "show_color": true,
+                    "show_limits": true,
+                    "show_name": true,
+                    "show_unit": true,
+                    "wrap_name": false
+                  },
+                  "kind": "curve",
+                  "label": "GR",
+                  "reference_overlay": null,
+                  "render_mode": "line",
+                  "scale": null,
+                  "style": {
+                    "alpha": 1.0,
+                    "color": "#2e7d32",
+                    "colormap": "viridis",
+                    "fill_alpha": 0.2,
+                    "fill_color": null,
+                    "line_style": "-",
+                    "line_width": 0.8
+                  },
+                  "value_labels": {
+                    "color": null,
+                    "font_family": null,
+                    "font_size": 5.5,
+                    "font_style": "normal",
+                    "font_weight": "normal",
+                    "format": "automatic",
+                    "horizontal_alignment": "center",
+                    "precision": 2,
+                    "step": 5.0,
+                    "vertical_alignment": "center"
+                  },
+                  "wrap": false
+                }
+              ],
+              "extensions": {
+                "compatibility": {
+                  "legacy_track": {
+                    "id": "combo",
+                    "kind": "normal",
+                    "position": 1,
+                    "title": "Combo",
+                    "width_mm": 30
+                  }
+                }
+              },
+              "fills": [],
+              "grid": {
+                "display": "below",
+                "horizontal_display": "below",
+                "horizontal_major_alpha": 0.35,
+                "horizontal_major_color": null,
+                "horizontal_major_thickness": null,
+                "horizontal_major_visible": true,
+                "horizontal_minor_alpha": 0.15,
+                "horizontal_minor_color": null,
+                "horizontal_minor_thickness": null,
+                "horizontal_minor_visible": true,
+                "major": true,
+                "major_alpha": 0.35,
+                "minor": true,
+                "minor_alpha": 0.15,
+                "vertical_display": "below",
+                "vertical_main_alpha": 0.35,
+                "vertical_main_color": null,
+                "vertical_main_line_count": 4,
+                "vertical_main_scale": "linear",
+                "vertical_main_spacing_mode": "count",
+                "vertical_main_thickness": null,
+                "vertical_main_visible": true,
+                "vertical_secondary_alpha": 0.15,
+                "vertical_secondary_color": null,
+                "vertical_secondary_line_count": 4,
+                "vertical_secondary_scale": "linear",
+                "vertical_secondary_spacing_mode": "count",
+                "vertical_secondary_thickness": null,
+                "vertical_secondary_visible": true
+              },
+              "id": "combo",
+              "kind": "normal",
+              "title": "Combo",
+              "track_header": {
+                "objects": [
+                  {
+                    "enabled": true,
+                    "kind": "title",
+                    "line_units": 1,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": true,
+                    "kind": "scale",
+                    "line_units": 1,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": true,
+                    "kind": "legend",
+                    "line_units": 2,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": false,
+                    "kind": "divisions",
+                    "line_units": 1,
+                    "reserve_space": false
+                  }
+                ]
+              },
+              "width_mm": 30.0,
+              "x_scale": null
+            },
+            {
+              "axis": "depth",
+              "bindings": [],
+              "define_layout": true,
+              "display_annotations_in_header": true,
+              "display_scale_in_header": true,
+              "display_unit_in_header": true,
+              "events": [],
+              "extensions": {
+                "compatibility": {
+                  "legacy_track": {
+                    "id": "depth",
+                    "kind": "reference",
+                    "position": 2,
+                    "reference": {
+                      "axis": "depth",
+                      "define_layout": true,
+                      "major_step": 100,
+                      "scale_ratio": 240,
+                      "secondary_grid": {
+                        "display": true,
+                        "line_count": 4
+                      },
+                      "unit": "ft"
+                    },
+                    "title": "Depth",
+                    "width_mm": 18
+                  }
+                }
+              },
+              "grid": {
+                "display": "below",
+                "horizontal_display": "below",
+                "horizontal_major_alpha": 0.35,
+                "horizontal_major_color": null,
+                "horizontal_major_thickness": null,
+                "horizontal_major_visible": true,
+                "horizontal_minor_alpha": 0.15,
+                "horizontal_minor_color": null,
+                "horizontal_minor_thickness": null,
+                "horizontal_minor_visible": true,
+                "major": true,
+                "major_alpha": 0.35,
+                "minor": true,
+                "minor_alpha": 0.15,
+                "vertical_display": "below",
+                "vertical_main_alpha": 0.35,
+                "vertical_main_color": null,
+                "vertical_main_line_count": 4,
+                "vertical_main_scale": "linear",
+                "vertical_main_spacing_mode": "count",
+                "vertical_main_thickness": null,
+                "vertical_main_visible": true,
+                "vertical_secondary_alpha": 0.15,
+                "vertical_secondary_color": null,
+                "vertical_secondary_line_count": 4,
+                "vertical_secondary_scale": "linear",
+                "vertical_secondary_spacing_mode": "count",
+                "vertical_secondary_thickness": null,
+                "vertical_secondary_visible": true
+              },
+              "id": "depth",
+              "kind": "reference",
+              "major_step": 100.0,
+              "minor_step": null,
+              "number_format": "automatic",
+              "precision": 2,
+              "scale_ratio": 240,
+              "secondary_grid_display": true,
+              "secondary_grid_line_count": 4,
+              "title": "Depth",
+              "track_header": {
+                "objects": [
+                  {
+                    "enabled": true,
+                    "kind": "title",
+                    "line_units": 1,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": true,
+                    "kind": "scale",
+                    "line_units": 1,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": true,
+                    "kind": "legend",
+                    "line_units": 2,
+                    "reserve_space": true
+                  },
+                  {
+                    "enabled": false,
+                    "kind": "divisions",
+                    "line_units": 1,
+                    "reserve_space": false
+                  }
+                ]
+              },
+              "unit": "ft",
+              "values_orientation": "horizontal",
+              "width_mm": 18.0
+            }
+          ]
+        }
+      ],
+      "subtitle": null,
+      "tail": {
+        "enabled": true,
+        "extensions": {
+          "compatibility": {
+            "legacy_tail": {
+              "enabled": true
+            }
+          }
+        }
+      },
+      "title": null
+    }
+  },
+  "worker_projection": {
+    "report_context": {
+      "header_slots": [
+        {
+          "key": "archive_no",
+          "label": "Archive No.",
+          "slot_id": "general.archive_no"
+        },
+        {
+          "key": "api_no",
+          "label": "API No.",
+          "slot_id": "general.api_no"
+        },
+        {
+          "key": "version",
+          "label": "Version",
+          "slot_id": "general.version"
+        },
+        {
+          "key": "company",
+          "label": "Company",
+          "slot_id": "general.company"
+        },
+        {
+          "key": "well",
+          "label": "Well",
+          "slot_id": "general.well"
+        },
+        {
+          "key": "field",
+          "label": "Field",
+          "slot_id": "general.field"
+        },
+        {
+          "key": "county",
+          "label": "County",
+          "slot_id": "general.county"
+        },
+        {
+          "key": "country",
+          "label": "Country",
+          "slot_id": "general.country"
+        },
+        {
+          "key": "location",
+          "label": "Location",
+          "slot_id": "general.location"
+        },
+        {
+          "key": "section",
+          "label": "Section",
+          "slot_id": "general.section"
+        },
+        {
+          "key": "township",
+          "label": "Township",
+          "slot_id": "general.township"
+        },
+        {
+          "key": "range",
+          "label": "Range",
+          "slot_id": "general.range"
+        },
+        {
+          "key": "footage",
+          "label": "Footage",
+          "slot_id": "general.footage"
+        },
+        {
+          "key": "latitude",
+          "label": "Latitude",
+          "slot_id": "general.latitude"
+        },
+        {
+          "key": "longitude",
+          "label": "Longitude",
+          "slot_id": "general.longitude"
+        },
+        {
+          "key": "logging_date",
+          "label": "Logging Date",
+          "slot_id": "general.logging_date"
+        },
+        {
+          "key": "scale",
+          "label": "Scale",
+          "slot_id": "general.scale"
+        },
+        {
+          "key": "measured_from",
+          "label": "Measured From",
+          "slot_id": "general.measured_from"
+        },
+        {
+          "key": "log_measured_from",
+          "label": "Log Measured From",
+          "slot_id": "general.log_measured_from"
+        },
+        {
+          "key": "perforation_measured_from",
+          "label": "Perforation Measured From",
+          "slot_id": "general.perforation_measured_from"
+        },
+        {
+          "key": "elevation_kb",
+          "label": "KB",
+          "slot_id": "general.elevation_kb"
+        },
+        {
+          "key": "elevation_gl",
+          "label": "GL",
+          "slot_id": "general.elevation_gl"
+        },
+        {
+          "key": "elevation_df",
+          "label": "DF",
+          "slot_id": "general.elevation_df"
+        },
+        {
+          "key": "top_log_interval",
+          "label": "Top Log Interval",
+          "slot_id": "general.top_log_interval"
+        },
+        {
+          "key": "bottom_log_interval",
+          "label": "Bottom Log Interval",
+          "slot_id": "general.bottom_log_interval"
+        },
+        {
+          "key": "fluid_type",
+          "label": "Fluid Type",
+          "slot_id": "general.fluid_type"
+        },
+        {
+          "key": "service_company",
+          "label": "Service Company",
+          "slot_id": "general.service_company"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "service_title.1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "service_title.2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "service_title.3"
+        },
+        {
+          "key": "date",
+          "label": "Date",
+          "slot_id": "detail.row_1.value_1"
+        },
+        {
+          "key": "date",
+          "label": "Date",
+          "slot_id": "detail.row_1.value_2"
+        },
+        {
+          "key": "run_number",
+          "label": "Run",
+          "slot_id": "detail.row_2.column_1.cell_1"
+        },
+        {
+          "key": "direction",
+          "label": "Direction",
+          "slot_id": "detail.row_2.column_2.cell_1"
+        },
+        {
+          "key": "service_order",
+          "label": "Service Order",
+          "slot_id": "detail.row_3.value_1"
+        },
+        {
+          "key": "service_order",
+          "label": "Service Order",
+          "slot_id": "detail.row_3.value_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_4.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_4.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_4.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_5.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_5.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_5.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_6.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_6.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_6.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_7.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_7.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_7.column_2.cell_1"
+        },
+        {
+          "key": "start_time",
+          "label": "Start Time",
+          "slot_id": "detail.row_8.value_1"
+        },
+        {
+          "key": "start_time",
+          "label": "Start Time",
+          "slot_id": "detail.row_8.value_2"
+        },
+        {
+          "key": "end_time",
+          "label": "End Time",
+          "slot_id": "detail.row_9.value_1"
+        },
+        {
+          "key": "end_time",
+          "label": "End Time",
+          "slot_id": "detail.row_9.value_2"
+        },
+        {
+          "key": "drill_time",
+          "label": "Drill Time",
+          "slot_id": "detail.row_10.value_1"
+        },
+        {
+          "key": "drill_time",
+          "label": "Drill Time",
+          "slot_id": "detail.row_10.value_2"
+        },
+        {
+          "key": "injection_type",
+          "label": "Injection Type",
+          "slot_id": "detail.row_11.value_1"
+        },
+        {
+          "key": "injection_type",
+          "label": "Injection Type",
+          "slot_id": "detail.row_11.value_2"
+        },
+        {
+          "key": "fluid_density",
+          "label": "Fluid Density",
+          "slot_id": "detail.row_12.value_1"
+        },
+        {
+          "key": "fluid_density",
+          "label": "Fluid Density",
+          "slot_id": "detail.row_12.value_2"
+        },
+        {
+          "key": "fluid_salinity",
+          "label": "Fluid Salinity",
+          "slot_id": "detail.row_13.value_1"
+        },
+        {
+          "key": "fluid_salinity",
+          "label": "Fluid Salinity",
+          "slot_id": "detail.row_13.value_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_14.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_14.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_14.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_15.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_15.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_15.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_16.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_16.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_16.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_17.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_17.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_17.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_18.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_18.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_18.column_2.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_19.column_1.cell_1"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_19.column_1.cell_2"
+        },
+        {
+          "key": null,
+          "label": null,
+          "slot_id": "detail.row_19.column_2.cell_1"
+        },
+        {
+          "key": "reference_log",
+          "label": "Reference Log",
+          "slot_id": "detail.row_20.value_1"
+        },
+        {
+          "key": "reference_log",
+          "label": "Reference Log",
+          "slot_id": "detail.row_20.value_2"
+        },
+        {
+          "key": "reference_date",
+          "label": "Reference Date",
+          "slot_id": "detail.row_21.value_1"
+        },
+        {
+          "key": "reference_date",
+          "label": "Reference Date",
+          "slot_id": "detail.row_21.value_2"
+        },
+        {
+          "key": "equipment_number",
+          "label": "Equipment No.",
+          "slot_id": "detail.row_22.column_1.cell_1"
+        },
+        {
+          "key": "base",
+          "label": "Base",
+          "slot_id": "detail.row_22.column_2.cell_1"
+        },
+        {
+          "key": "logged_by",
+          "label": "Logged By",
+          "slot_id": "detail.row_23.value_1"
+        },
+        {
+          "key": "logged_by",
+          "label": "Logged By",
+          "slot_id": "detail.row_23.value_2"
+        },
+        {
+          "key": "witnessed_by",
+          "label": "Witnessed By",
+          "slot_id": "detail.row_24.value_1"
+        },
+        {
+          "key": "witnessed_by",
+          "label": "Witnessed By",
+          "slot_id": "detail.row_24.value_2"
+        }
+      ]
+    },
+    "section_contexts": [
+      {
+        "channels": [],
+        "section_id": null,
+        "sources": [
+          {
+            "candidate_id": "source-1",
+            "channels": [
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "ECGR_STGC",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TT",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TENS",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "MTEM",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "STIT",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TDSP",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "VSEC",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "CBL",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "array",
+                "mnemonic": "VDL",
+                "shape": [],
+                "unit": null
+              }
+            ],
+            "dataset_name": "frozen-cbl-main_pass",
+            "source_format": "dlis"
+          }
+        ],
+        "task_index": 0
+      },
+      {
+        "channels": [],
+        "section_id": null,
+        "sources": [
+          {
+            "candidate_id": "source-2",
+            "channels": [
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "ECGR_STGC",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TT",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TENS",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "MTEM",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "STIT",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "TDSP",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "VSEC",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "scalar",
+                "mnemonic": "CBL",
+                "shape": [],
+                "unit": null
+              },
+              {
+                "aliases": [],
+                "kind": "array",
+                "mnemonic": "VDL",
+                "shape": [],
+                "unit": null
+              }
+            ],
+            "dataset_name": "frozen-cbl-repeat_pass",
+            "source_format": "dlis"
+          }
+        ],
+        "task_index": 1
+      }
+    ],
+    "semantic_plan": {
+      "report_task": {
+        "capability_ids": [
+          "report.standard"
+        ],
+        "constraints": [],
+        "goal": "Compile the requested header, remarks, page, output, and tail settings.",
+        "requirements": [
+          "service_title: Cement Bond Log",
+          "service_title: Variable Density Log",
+          "service_title: Gamma Ray - CCL"
+        ]
+      },
+      "section_tasks": [
+        {
+          "capability_ids": [
+            "binding.curve",
+            "binding.raster",
+            "section.log_plot",
+            "track.array",
+            "track.normal",
+            "track.reference"
+          ],
+          "constraints": [],
+          "existing_section_hint": null,
+          "goal": "Compile the main pass CBL/VDL strip section.",
+          "requirements": [
+            "Create the combo scalar track. Track kind: normal",
+            "Create the depth reference track. Track kind: reference",
+            "Create the CBL amplitude track. Track kind: normal",
+            "Create the VDL raster track. Track kind: array",
+            "Bind ECGR_STGC on combo. Use exact source channel 'ECGR_STGC'.",
+            "Bind TT on combo. Use exact source channel 'TT'.",
+            "Bind TENS on combo. Use exact source channel 'TENS'.",
+            "Bind MTEM on combo. Use exact source channel 'MTEM'.",
+            "Bind STIT on depth. Use exact source channel 'STIT'.",
+            "Bind TDSP on depth. Use exact source channel 'TDSP'.",
+            "Bind VSEC on depth. Use exact source channel 'VSEC'.",
+            "Bind the 0 to 100 CBL instance. Use exact source channel 'CBL'.",
+            "Bind the 0 to 10 CBL instance. Use exact source channel 'CBL'.",
+            "Bind the VDL waveform raster. Use exact source channel 'VDL'."
+          ],
+          "source_hints": [
+            "source-1"
+          ]
+        },
+        {
+          "capability_ids": [
+            "binding.curve",
+            "binding.raster",
+            "section.log_plot",
+            "track.array",
+            "track.normal",
+            "track.reference"
+          ],
+          "constraints": [],
+          "existing_section_hint": null,
+          "goal": "Compile the repeat pass CBL/VDL strip section.",
+          "requirements": [
+            "Create the combo scalar track. Track kind: normal",
+            "Create the depth reference track. Track kind: reference",
+            "Create the CBL amplitude track. Track kind: normal",
+            "Create the VDL raster track. Track kind: array",
+            "Bind ECGR_STGC on combo. Use exact source channel 'ECGR_STGC'.",
+            "Bind TT on combo. Use exact source channel 'TT'.",
+            "Bind TENS on combo. Use exact source channel 'TENS'.",
+            "Bind MTEM on combo. Use exact source channel 'MTEM'.",
+            "Bind STIT on depth. Use exact source channel 'STIT'.",
+            "Bind TDSP on depth. Use exact source channel 'TDSP'.",
+            "Bind VSEC on depth. Use exact source channel 'VSEC'.",
+            "Bind the 0 to 100 CBL instance. Use exact source channel 'CBL'.",
+            "Bind the 0 to 10 CBL instance. Use exact source channel 'CBL'.",
+            "Bind the VDL waveform raster. Use exact source channel 'VDL'."
+          ],
+          "source_hints": [
+            "source-2"
+          ]
+        }
+      ],
+      "summary": "Reconstruct the supported cased-hole CBL/VDL packet subset.",
+      "unresolved_requirements": [
+        "Well diagram, calibration reports, and vendor parameter tables are unsupported."
+      ]
+    }
+  },
+  "worker_projection_sha256": "90d6670df5fef4a6345a0d8f16ef35c50c732e9207915238277ce7f8ec72af97"
+}
