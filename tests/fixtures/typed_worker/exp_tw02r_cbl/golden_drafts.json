@@ -1,0 +1,118 @@
+{
+  "main_pass": {
+    "title": "Main Pass",
+    "source_candidate": "source-1",
+    "tracks": [
+      {
+        "role": "combo",
+        "kind": "normal",
+        "title": "Combo",
+        "bindings": [
+          {"semantic_id": "ecgr", "channel": "ECGR_STGC", "scale": {"minimum": 0, "maximum": 150}},
+          {"semantic_id": "tt", "channel": "TT", "scale": {"minimum": 200, "maximum": 400, "reverse": true}},
+          {"semantic_id": "tension", "channel": "TENS", "scale": {"minimum": 5000, "maximum": 0}},
+          {"semantic_id": "temperature", "channel": "MTEM", "scale": {"minimum": 100, "maximum": 500}}
+        ]
+      },
+      {
+        "role": "depth",
+        "kind": "reference",
+        "title": "Depth",
+        "bindings": [
+          {"semantic_id": "stit", "channel": "STIT", "scale": {"minimum": 0, "maximum": 50}},
+          {"semantic_id": "tdsp", "channel": "TDSP", "scale": {"minimum": 0, "maximum": 50}},
+          {"semantic_id": "vsec", "channel": "VSEC", "scale": {"minimum": 0, "maximum": 50}}
+        ]
+      },
+      {
+        "role": "cbl",
+        "kind": "normal",
+        "title": "CBL Amplitude",
+        "bindings": [
+          {"semantic_id": "cbl_0_100", "channel": "CBL", "scale": {"minimum": 0, "maximum": 100}},
+          {"semantic_id": "cbl_0_10", "channel": "CBL", "scale": {"minimum": 0, "maximum": 10}}
+        ]
+      },
+      {
+        "role": "vdl",
+        "kind": "array",
+        "title": "VDL",
+        "x_scale": {"minimum": 200, "maximum": 1200},
+        "bindings": [
+          {
+            "kind": "raster",
+            "semantic_id": "vdl",
+            "channel": "VDL",
+            "profile": "vdl",
+            "sample_axis": {
+              "unit": "us",
+              "minimum": 200,
+              "maximum": 1200,
+              "tick_count": 7,
+              "source_origin": 40,
+              "source_step": 10
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "repeat_pass": {
+    "title": "Repeat Pass",
+    "source_candidate": "source-2",
+    "tracks": [
+      {
+        "role": "combo",
+        "kind": "normal",
+        "title": "Combo",
+        "bindings": [
+          {"semantic_id": "ecgr", "channel": "ECGR_STGC", "scale": {"minimum": 0, "maximum": 150}},
+          {"semantic_id": "tt", "channel": "TT", "scale": {"minimum": 200, "maximum": 400, "reverse": true}},
+          {"semantic_id": "tension", "channel": "TENS", "scale": {"minimum": 5000, "maximum": 0}},
+          {"semantic_id": "temperature", "channel": "MTEM", "scale": {"minimum": 100, "maximum": 500}}
+        ]
+      },
+      {
+        "role": "depth",
+        "kind": "reference",
+        "title": "Depth",
+        "bindings": [
+          {"semantic_id": "stit", "channel": "STIT", "scale": {"minimum": 0, "maximum": 50}},
+          {"semantic_id": "tdsp", "channel": "TDSP", "scale": {"minimum": 0, "maximum": 50}},
+          {"semantic_id": "vsec", "channel": "VSEC", "scale": {"minimum": 0, "maximum": 50}}
+        ]
+      },
+      {
+        "role": "cbl",
+        "kind": "normal",
+        "title": "CBL Amplitude",
+        "bindings": [
+          {"semantic_id": "cbl_0_100", "channel": "CBL", "scale": {"minimum": 0, "maximum": 100}},
+          {"semantic_id": "cbl_0_10", "channel": "CBL", "scale": {"minimum": 0, "maximum": 10}}
+        ]
+      },
+      {
+        "role": "vdl",
+        "kind": "array",
+        "title": "VDL",
+        "x_scale": {"minimum": 200, "maximum": 1200},
+        "bindings": [
+          {
+            "kind": "raster",
+            "semantic_id": "vdl",
+            "channel": "VDL",
+            "profile": "vdl",
+            "sample_axis": {
+              "unit": "us",
+              "minimum": 200,
+              "maximum": 1200,
+              "tick_count": 7,
+              "source_origin": 40,
+              "source_step": 10
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
