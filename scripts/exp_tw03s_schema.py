@@ -24,6 +24,7 @@ from wellplot.agent.code_mode.enrichment import ResolvedSectionContext
 
 BASELINE_SHA = "151efd0"
 EXPERIMENT_VERSION = "exp-tw-03s.structural-schema.v1"
+TrackRole = Literal["combo", "depth", "cbl", "vdl"]
 
 
 class _StrengthenedModel(BaseModel):
@@ -39,7 +40,7 @@ class _StrengthenedModel(BaseModel):
 class NormalTrackDraftS(_StrengthenedModel):
     """Normal track whose ordered bindings are all scalar curves."""
 
-    role: str = Field(min_length=1)
+    role: TrackRole
     kind: Literal["normal"] = "normal"
     title: str = Field(min_length=1)
     x_scale: ScaleDraft | None = None
@@ -49,7 +50,7 @@ class NormalTrackDraftS(_StrengthenedModel):
 class ReferenceTrackDraftS(_StrengthenedModel):
     """Reference track whose ordered bindings are all scalar curves."""
 
-    role: str = Field(min_length=1)
+    role: TrackRole
     kind: Literal["reference"] = "reference"
     title: str = Field(min_length=1)
     x_scale: ScaleDraft | None = None
@@ -59,7 +60,7 @@ class ReferenceTrackDraftS(_StrengthenedModel):
 class ArrayTrackDraftS(_StrengthenedModel):
     """Array track whose bindings are rasters and which has an x scale."""
 
-    role: str = Field(min_length=1)
+    role: TrackRole
     kind: Literal["array"] = "array"
     title: str = Field(min_length=1)
     x_scale: ScaleDraft
@@ -311,6 +312,7 @@ __all__ = [
     "ReplayContractError",
     "ReplaySummary",
     "SectionDraftS",
+    "TrackRole",
     "TrackDraftS",
     "replay_evidence_file",
     "serialize_replay_results",

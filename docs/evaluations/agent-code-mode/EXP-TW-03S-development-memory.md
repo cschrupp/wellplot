@@ -25,6 +25,7 @@ mapping and are never copied by identity or transformed in place.
 
 The only added invariants are:
 
+- the historical track role domain remains `combo`, `depth`, `cbl`, or `vdl`;
 - normal tracks contain curve bindings;
 - reference tracks contain curve bindings;
 - array tracks contain raster bindings;

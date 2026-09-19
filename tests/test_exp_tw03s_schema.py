@@ -7,7 +7,12 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from scripts.exp_tw02r_contract import CurveBindingDraft, ScaleDraft, load_golden_drafts
+from scripts.exp_tw02r_contract import (
+    CurveBindingDraft,
+    ScaleDraft,
+    SectionDraft,
+    load_golden_drafts,
+)
 from scripts.exp_tw03_provider import (
     AttemptConfig,
     AttemptOutcome,
@@ -56,10 +61,15 @@ def _raster_binding() -> dict[str, object]:
     }
 
 
-def _track_payload(kind: str, binding: dict[str, object]) -> dict[str, object]:
+def _track_payload(
+    kind: str,
+    binding: dict[str, object],
+    *,
+    role: str = "combo",
+) -> dict[str, object]:
     """Return a structurally isolated track payload."""
     payload: dict[str, object] = {
-        "role": "arbitrary-role",
+        "role": role,
         "kind": kind,
         "title": "Arbitrary title",
         "bindings": [binding],
@@ -178,6 +188,16 @@ def test_scale_and_reversal_values_are_preserved_without_benchmark_literals() ->
     assert strengthened.tracks[0].bindings[0].scale.minimum == -10
     assert strengthened.tracks[0].bindings[0].scale.maximum == 10
     assert strengthened.tracks[0].bindings[0].scale.reverse is True
+
+
+def test_historical_and_strengthened_schemas_share_track_role_domain() -> None:
+    """The strengthening preserves historical role values without coupling them to kind."""
+    payload = _section_with_track(_track_payload("normal", _curve_binding(), role="anything"))
+
+    with pytest.raises(ValidationError):
+        SectionDraft.model_validate(payload)
+    with pytest.raises(ValidationError):
+        SectionDraftS.model_validate(payload)
 
 
 def test_semantic_track_order_remains_representable() -> None:
