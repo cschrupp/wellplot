@@ -67,5 +67,17 @@
   ],
   "first_observed_compatibility_collapse": "S0->S1",
   "unrun_variants": ["S2", "S3", "S4", "S5"],
+  "partial_observations": [
+    {
+      "schema_variant": "S2",
+      "section": "main_pass",
+      "completed_attempts": 6,
+      "structured_output_failures": 6,
+      "provider_failures": 0,
+      "section_aggregate_completed": false,
+      "included_in_completed_matrix": false,
+      "interpretation": "Retained incomplete raw observation only; excluded from TW-05 inference."
+    }
+  ],
   "interpretation": "The first observed collapse occurred when the track discriminator was introduced. This characterizes the measured transition without assigning a specific implementation bug."
 }

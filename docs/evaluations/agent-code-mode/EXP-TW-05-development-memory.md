@@ -6,7 +6,8 @@
 - Question: which structural schema feature first breaks the local
   llama.cpp/Qwen structured-output path between historical `SectionDraft` and
   strengthened `SectionDraftS`?
-- Status: experimental harness implemented; live characterization pending.
+- Status: live characterization complete through the first observed schema
+  transition; remediation not started.
 - Production delta: zero.
 
 This is a compatibility bisect, not a model-quality benchmark. The provider,
@@ -124,9 +125,18 @@ The first observed compatibility collapse is therefore `S0 → S1`, the
 introduction of the discriminated track union on `kind`. This localizes the
 collapse at the first measured transition, but does not establish a specific
 llama.cpp, Qwen, Pydantic, or discriminator implementation bug. S2 through S5
-were intentionally not run after the transition was localized; their schema
-definitions, hashes, and adjacent diff projections remain available for
-review, but they have no live result rows.
+were not included in the completed compatibility matrix after the transition
+was localized; their schema definitions, hashes, and adjacent diff
+projections remain available for review, but they have no completed live
+result rows.
+
+The retained raw workspace evidence also contains an incomplete S2
+`main_pass` sequence: attempts 1 through 6 all ended in
+`structured_output_failure / invalid_response`, after which the run was
+aborted before an S2 section aggregate was written. These six observations
+are preserved for auditability but are excluded from the TW-05 matrix and do
+not change the `S0 → S1` inference. S2 was not completed, and S3 through S5
+were not attempted.
 
 The compact live aggregate is committed as
 `EXP-TW-05-live-summary.json`, and the deterministic schema review artifact is
