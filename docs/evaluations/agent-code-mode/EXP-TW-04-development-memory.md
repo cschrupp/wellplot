@@ -108,13 +108,20 @@ Measured results:
 
 Qwen's 20 calls all ended at the structured-output boundary with the safe
 `invalid_response` category, so they provide no semantic-repair observations.
-OpenRouter completed all 20 first calls, reached Gate A on 6, and recovered 2
-of 6 semantic failures after one repair. The other four eligible cases ended
-with structured-output failure during repair. No attempt exceeded two calls.
+OpenRouter made 20 first provider calls. Twelve produced structurally valid
+`SectionDraftS` values and reached Gate A; 6 passed Gate A on the first
+attempt, while 6 were semantically invalid and repair-eligible. All 6 repair
+calls were made, and 2/6 repair-eligible cases were recovered. The other four
+eligible cases ended with structured-output failure during repair. Final
+success was 8/20, and no attempt exceeded two calls.
 
-The OpenRouter batch recorded 41,862 total tokens and 455,690.67 ms total
-latency across first and repair calls. Its first-attempt totals were 36,310
-tokens and 427,143.58 ms; repair added 5,552 tokens and 28,547.09 ms.
+OpenRouter recorded 41,862 tokens and 455,690.67 ms across calls for which
+provider-neutral metrics were available. First-attempt metric-bearing calls
+contributed 36,310 tokens / 427,143.58 ms, and successful structured repair
+responses contributed 5,552 tokens / 28,547.09 ms. Calls ending in
+`invalid_response` did not retain token/latency metrics, so these totals must
+not be interpreted as the complete compute, latency, or provider cost of all
+requests.
 
 ## Hard stop
 
