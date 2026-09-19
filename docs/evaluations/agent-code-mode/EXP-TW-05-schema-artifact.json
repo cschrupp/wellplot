@@ -1,0 +1,2917 @@
+{
+  "adjacent_diffs": [
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS1.additionalProperties",
+          "$defs.ArrayTrackDraftS1.description",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS1.properties.bindings.title",
+          "$defs.ArrayTrackDraftS1.properties.bindings.type",
+          "$defs.ArrayTrackDraftS1.properties.kind.const",
+          "$defs.ArrayTrackDraftS1.properties.kind.default",
+          "$defs.ArrayTrackDraftS1.properties.kind.title",
+          "$defs.ArrayTrackDraftS1.properties.kind.type",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS1.properties.role.title",
+          "$defs.ArrayTrackDraftS1.properties.role.type",
+          "$defs.ArrayTrackDraftS1.properties.title.minLength",
+          "$defs.ArrayTrackDraftS1.properties.title.title",
+          "$defs.ArrayTrackDraftS1.properties.title.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS1.required.0",
+          "$defs.ArrayTrackDraftS1.required.1",
+          "$defs.ArrayTrackDraftS1.required.2",
+          "$defs.ArrayTrackDraftS1.title",
+          "$defs.ArrayTrackDraftS1.type",
+          "$defs.NormalTrackDraftS1.additionalProperties",
+          "$defs.NormalTrackDraftS1.description",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS1.properties.bindings.title",
+          "$defs.NormalTrackDraftS1.properties.bindings.type",
+          "$defs.NormalTrackDraftS1.properties.kind.const",
+          "$defs.NormalTrackDraftS1.properties.kind.default",
+          "$defs.NormalTrackDraftS1.properties.kind.title",
+          "$defs.NormalTrackDraftS1.properties.kind.type",
+          "$defs.NormalTrackDraftS1.properties.role.enum.0",
+          "$defs.NormalTrackDraftS1.properties.role.enum.1",
+          "$defs.NormalTrackDraftS1.properties.role.enum.2",
+          "$defs.NormalTrackDraftS1.properties.role.enum.3",
+          "$defs.NormalTrackDraftS1.properties.role.title",
+          "$defs.NormalTrackDraftS1.properties.role.type",
+          "$defs.NormalTrackDraftS1.properties.title.minLength",
+          "$defs.NormalTrackDraftS1.properties.title.title",
+          "$defs.NormalTrackDraftS1.properties.title.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.default",
+          "$defs.NormalTrackDraftS1.required.0",
+          "$defs.NormalTrackDraftS1.required.1",
+          "$defs.NormalTrackDraftS1.required.2",
+          "$defs.NormalTrackDraftS1.title",
+          "$defs.NormalTrackDraftS1.type",
+          "$defs.ReferenceTrackDraftS1.additionalProperties",
+          "$defs.ReferenceTrackDraftS1.description",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS1.properties.kind.const",
+          "$defs.ReferenceTrackDraftS1.properties.kind.default",
+          "$defs.ReferenceTrackDraftS1.properties.kind.title",
+          "$defs.ReferenceTrackDraftS1.properties.kind.type",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS1.properties.role.title",
+          "$defs.ReferenceTrackDraftS1.properties.role.type",
+          "$defs.ReferenceTrackDraftS1.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS1.properties.title.title",
+          "$defs.ReferenceTrackDraftS1.properties.title.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS1.required.0",
+          "$defs.ReferenceTrackDraftS1.required.1",
+          "$defs.ReferenceTrackDraftS1.required.2",
+          "$defs.ReferenceTrackDraftS1.title",
+          "$defs.ReferenceTrackDraftS1.type",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.discriminator.propertyName",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref"
+        ],
+        "changed_paths": [
+          "description",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.TrackDraft.additionalProperties",
+          "$defs.TrackDraft.description",
+          "$defs.TrackDraft.properties.bindings.items.anyOf.0.$ref",
+          "$defs.TrackDraft.properties.bindings.items.anyOf.1.$ref",
+          "$defs.TrackDraft.properties.bindings.minItems",
+          "$defs.TrackDraft.properties.bindings.title",
+          "$defs.TrackDraft.properties.bindings.type",
+          "$defs.TrackDraft.properties.kind.enum.0",
+          "$defs.TrackDraft.properties.kind.enum.1",
+          "$defs.TrackDraft.properties.kind.enum.2",
+          "$defs.TrackDraft.properties.kind.title",
+          "$defs.TrackDraft.properties.kind.type",
+          "$defs.TrackDraft.properties.role.enum.0",
+          "$defs.TrackDraft.properties.role.enum.1",
+          "$defs.TrackDraft.properties.role.enum.2",
+          "$defs.TrackDraft.properties.role.enum.3",
+          "$defs.TrackDraft.properties.role.title",
+          "$defs.TrackDraft.properties.role.type",
+          "$defs.TrackDraft.properties.title.minLength",
+          "$defs.TrackDraft.properties.title.title",
+          "$defs.TrackDraft.properties.title.type",
+          "$defs.TrackDraft.properties.x_scale.anyOf.0.$ref",
+          "$defs.TrackDraft.properties.x_scale.anyOf.1.type",
+          "$defs.TrackDraft.properties.x_scale.default",
+          "$defs.TrackDraft.required.0",
+          "$defs.TrackDraft.required.1",
+          "$defs.TrackDraft.required.2",
+          "$defs.TrackDraft.required.3",
+          "$defs.TrackDraft.title",
+          "$defs.TrackDraft.type",
+          "properties.tracks.items.$ref"
+        ]
+      },
+      "from": "S0",
+      "to": "S1"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS2.additionalProperties",
+          "$defs.ArrayTrackDraftS2.description",
+          "$defs.ArrayTrackDraftS2.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS2.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackDraftS2.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS2.properties.bindings.title",
+          "$defs.ArrayTrackDraftS2.properties.bindings.type",
+          "$defs.ArrayTrackDraftS2.properties.kind.const",
+          "$defs.ArrayTrackDraftS2.properties.kind.default",
+          "$defs.ArrayTrackDraftS2.properties.kind.title",
+          "$defs.ArrayTrackDraftS2.properties.kind.type",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS2.properties.role.title",
+          "$defs.ArrayTrackDraftS2.properties.role.type",
+          "$defs.ArrayTrackDraftS2.properties.title.minLength",
+          "$defs.ArrayTrackDraftS2.properties.title.title",
+          "$defs.ArrayTrackDraftS2.properties.title.type",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS2.required.0",
+          "$defs.ArrayTrackDraftS2.required.1",
+          "$defs.ArrayTrackDraftS2.required.2",
+          "$defs.ArrayTrackDraftS2.title",
+          "$defs.ArrayTrackDraftS2.type",
+          "$defs.NormalTrackDraftS2.additionalProperties",
+          "$defs.NormalTrackDraftS2.description",
+          "$defs.NormalTrackDraftS2.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS2.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS2.properties.bindings.title",
+          "$defs.NormalTrackDraftS2.properties.bindings.type",
+          "$defs.NormalTrackDraftS2.properties.kind.const",
+          "$defs.NormalTrackDraftS2.properties.kind.default",
+          "$defs.NormalTrackDraftS2.properties.kind.title",
+          "$defs.NormalTrackDraftS2.properties.kind.type",
+          "$defs.NormalTrackDraftS2.properties.role.enum.0",
+          "$defs.NormalTrackDraftS2.properties.role.enum.1",
+          "$defs.NormalTrackDraftS2.properties.role.enum.2",
+          "$defs.NormalTrackDraftS2.properties.role.enum.3",
+          "$defs.NormalTrackDraftS2.properties.role.title",
+          "$defs.NormalTrackDraftS2.properties.role.type",
+          "$defs.NormalTrackDraftS2.properties.title.minLength",
+          "$defs.NormalTrackDraftS2.properties.title.title",
+          "$defs.NormalTrackDraftS2.properties.title.type",
+          "$defs.NormalTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS2.properties.x_scale.default",
+          "$defs.NormalTrackDraftS2.required.0",
+          "$defs.NormalTrackDraftS2.required.1",
+          "$defs.NormalTrackDraftS2.required.2",
+          "$defs.NormalTrackDraftS2.title",
+          "$defs.NormalTrackDraftS2.type",
+          "$defs.ReferenceTrackDraftS2.additionalProperties",
+          "$defs.ReferenceTrackDraftS2.description",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS2.properties.kind.const",
+          "$defs.ReferenceTrackDraftS2.properties.kind.default",
+          "$defs.ReferenceTrackDraftS2.properties.kind.title",
+          "$defs.ReferenceTrackDraftS2.properties.kind.type",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS2.properties.role.title",
+          "$defs.ReferenceTrackDraftS2.properties.role.type",
+          "$defs.ReferenceTrackDraftS2.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS2.properties.title.title",
+          "$defs.ReferenceTrackDraftS2.properties.title.type",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS2.required.0",
+          "$defs.ReferenceTrackDraftS2.required.1",
+          "$defs.ReferenceTrackDraftS2.required.2",
+          "$defs.ReferenceTrackDraftS2.title",
+          "$defs.ReferenceTrackDraftS2.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.ArrayTrackDraftS1.additionalProperties",
+          "$defs.ArrayTrackDraftS1.description",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS1.properties.bindings.title",
+          "$defs.ArrayTrackDraftS1.properties.bindings.type",
+          "$defs.ArrayTrackDraftS1.properties.kind.const",
+          "$defs.ArrayTrackDraftS1.properties.kind.default",
+          "$defs.ArrayTrackDraftS1.properties.kind.title",
+          "$defs.ArrayTrackDraftS1.properties.kind.type",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS1.properties.role.title",
+          "$defs.ArrayTrackDraftS1.properties.role.type",
+          "$defs.ArrayTrackDraftS1.properties.title.minLength",
+          "$defs.ArrayTrackDraftS1.properties.title.title",
+          "$defs.ArrayTrackDraftS1.properties.title.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS1.required.0",
+          "$defs.ArrayTrackDraftS1.required.1",
+          "$defs.ArrayTrackDraftS1.required.2",
+          "$defs.ArrayTrackDraftS1.title",
+          "$defs.ArrayTrackDraftS1.type",
+          "$defs.NormalTrackDraftS1.additionalProperties",
+          "$defs.NormalTrackDraftS1.description",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS1.properties.bindings.title",
+          "$defs.NormalTrackDraftS1.properties.bindings.type",
+          "$defs.NormalTrackDraftS1.properties.kind.const",
+          "$defs.NormalTrackDraftS1.properties.kind.default",
+          "$defs.NormalTrackDraftS1.properties.kind.title",
+          "$defs.NormalTrackDraftS1.properties.kind.type",
+          "$defs.NormalTrackDraftS1.properties.role.enum.0",
+          "$defs.NormalTrackDraftS1.properties.role.enum.1",
+          "$defs.NormalTrackDraftS1.properties.role.enum.2",
+          "$defs.NormalTrackDraftS1.properties.role.enum.3",
+          "$defs.NormalTrackDraftS1.properties.role.title",
+          "$defs.NormalTrackDraftS1.properties.role.type",
+          "$defs.NormalTrackDraftS1.properties.title.minLength",
+          "$defs.NormalTrackDraftS1.properties.title.title",
+          "$defs.NormalTrackDraftS1.properties.title.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.default",
+          "$defs.NormalTrackDraftS1.required.0",
+          "$defs.NormalTrackDraftS1.required.1",
+          "$defs.NormalTrackDraftS1.required.2",
+          "$defs.NormalTrackDraftS1.title",
+          "$defs.NormalTrackDraftS1.type",
+          "$defs.ReferenceTrackDraftS1.additionalProperties",
+          "$defs.ReferenceTrackDraftS1.description",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS1.properties.kind.const",
+          "$defs.ReferenceTrackDraftS1.properties.kind.default",
+          "$defs.ReferenceTrackDraftS1.properties.kind.title",
+          "$defs.ReferenceTrackDraftS1.properties.kind.type",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS1.properties.role.title",
+          "$defs.ReferenceTrackDraftS1.properties.role.type",
+          "$defs.ReferenceTrackDraftS1.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS1.properties.title.title",
+          "$defs.ReferenceTrackDraftS1.properties.title.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS1.required.0",
+          "$defs.ReferenceTrackDraftS1.required.1",
+          "$defs.ReferenceTrackDraftS1.required.2",
+          "$defs.ReferenceTrackDraftS1.title",
+          "$defs.ReferenceTrackDraftS1.type"
+        ]
+      },
+      "from": "S1",
+      "to": "S2"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS3.additionalProperties",
+          "$defs.ArrayTrackDraftS3.description",
+          "$defs.ArrayTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.ArrayTrackDraftS3.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS3.properties.bindings.title",
+          "$defs.ArrayTrackDraftS3.properties.bindings.type",
+          "$defs.ArrayTrackDraftS3.properties.kind.const",
+          "$defs.ArrayTrackDraftS3.properties.kind.default",
+          "$defs.ArrayTrackDraftS3.properties.kind.title",
+          "$defs.ArrayTrackDraftS3.properties.kind.type",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS3.properties.role.title",
+          "$defs.ArrayTrackDraftS3.properties.role.type",
+          "$defs.ArrayTrackDraftS3.properties.title.minLength",
+          "$defs.ArrayTrackDraftS3.properties.title.title",
+          "$defs.ArrayTrackDraftS3.properties.title.type",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS3.required.0",
+          "$defs.ArrayTrackDraftS3.required.1",
+          "$defs.ArrayTrackDraftS3.required.2",
+          "$defs.ArrayTrackDraftS3.title",
+          "$defs.ArrayTrackDraftS3.type",
+          "$defs.NormalTrackDraftS3.additionalProperties",
+          "$defs.NormalTrackDraftS3.description",
+          "$defs.NormalTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS3.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS3.properties.bindings.title",
+          "$defs.NormalTrackDraftS3.properties.bindings.type",
+          "$defs.NormalTrackDraftS3.properties.kind.const",
+          "$defs.NormalTrackDraftS3.properties.kind.default",
+          "$defs.NormalTrackDraftS3.properties.kind.title",
+          "$defs.NormalTrackDraftS3.properties.kind.type",
+          "$defs.NormalTrackDraftS3.properties.role.enum.0",
+          "$defs.NormalTrackDraftS3.properties.role.enum.1",
+          "$defs.NormalTrackDraftS3.properties.role.enum.2",
+          "$defs.NormalTrackDraftS3.properties.role.enum.3",
+          "$defs.NormalTrackDraftS3.properties.role.title",
+          "$defs.NormalTrackDraftS3.properties.role.type",
+          "$defs.NormalTrackDraftS3.properties.title.minLength",
+          "$defs.NormalTrackDraftS3.properties.title.title",
+          "$defs.NormalTrackDraftS3.properties.title.type",
+          "$defs.NormalTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS3.properties.x_scale.default",
+          "$defs.NormalTrackDraftS3.required.0",
+          "$defs.NormalTrackDraftS3.required.1",
+          "$defs.NormalTrackDraftS3.required.2",
+          "$defs.NormalTrackDraftS3.title",
+          "$defs.NormalTrackDraftS3.type",
+          "$defs.ReferenceTrackDraftS3.additionalProperties",
+          "$defs.ReferenceTrackDraftS3.description",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS3.properties.kind.const",
+          "$defs.ReferenceTrackDraftS3.properties.kind.default",
+          "$defs.ReferenceTrackDraftS3.properties.kind.title",
+          "$defs.ReferenceTrackDraftS3.properties.kind.type",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS3.properties.role.title",
+          "$defs.ReferenceTrackDraftS3.properties.role.type",
+          "$defs.ReferenceTrackDraftS3.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS3.properties.title.title",
+          "$defs.ReferenceTrackDraftS3.properties.title.type",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS3.required.0",
+          "$defs.ReferenceTrackDraftS3.required.1",
+          "$defs.ReferenceTrackDraftS3.required.2",
+          "$defs.ReferenceTrackDraftS3.title",
+          "$defs.ReferenceTrackDraftS3.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.ArrayTrackDraftS2.additionalProperties",
+          "$defs.ArrayTrackDraftS2.description",
+          "$defs.ArrayTrackDraftS2.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS2.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackDraftS2.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS2.properties.bindings.title",
+          "$defs.ArrayTrackDraftS2.properties.bindings.type",
+          "$defs.ArrayTrackDraftS2.properties.kind.const",
+          "$defs.ArrayTrackDraftS2.properties.kind.default",
+          "$defs.ArrayTrackDraftS2.properties.kind.title",
+          "$defs.ArrayTrackDraftS2.properties.kind.type",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS2.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS2.properties.role.title",
+          "$defs.ArrayTrackDraftS2.properties.role.type",
+          "$defs.ArrayTrackDraftS2.properties.title.minLength",
+          "$defs.ArrayTrackDraftS2.properties.title.title",
+          "$defs.ArrayTrackDraftS2.properties.title.type",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS2.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS2.required.0",
+          "$defs.ArrayTrackDraftS2.required.1",
+          "$defs.ArrayTrackDraftS2.required.2",
+          "$defs.ArrayTrackDraftS2.title",
+          "$defs.ArrayTrackDraftS2.type",
+          "$defs.NormalTrackDraftS2.additionalProperties",
+          "$defs.NormalTrackDraftS2.description",
+          "$defs.NormalTrackDraftS2.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS2.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS2.properties.bindings.title",
+          "$defs.NormalTrackDraftS2.properties.bindings.type",
+          "$defs.NormalTrackDraftS2.properties.kind.const",
+          "$defs.NormalTrackDraftS2.properties.kind.default",
+          "$defs.NormalTrackDraftS2.properties.kind.title",
+          "$defs.NormalTrackDraftS2.properties.kind.type",
+          "$defs.NormalTrackDraftS2.properties.role.enum.0",
+          "$defs.NormalTrackDraftS2.properties.role.enum.1",
+          "$defs.NormalTrackDraftS2.properties.role.enum.2",
+          "$defs.NormalTrackDraftS2.properties.role.enum.3",
+          "$defs.NormalTrackDraftS2.properties.role.title",
+          "$defs.NormalTrackDraftS2.properties.role.type",
+          "$defs.NormalTrackDraftS2.properties.title.minLength",
+          "$defs.NormalTrackDraftS2.properties.title.title",
+          "$defs.NormalTrackDraftS2.properties.title.type",
+          "$defs.NormalTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS2.properties.x_scale.default",
+          "$defs.NormalTrackDraftS2.required.0",
+          "$defs.NormalTrackDraftS2.required.1",
+          "$defs.NormalTrackDraftS2.required.2",
+          "$defs.NormalTrackDraftS2.title",
+          "$defs.NormalTrackDraftS2.type",
+          "$defs.ReferenceTrackDraftS2.additionalProperties",
+          "$defs.ReferenceTrackDraftS2.description",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS2.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS2.properties.kind.const",
+          "$defs.ReferenceTrackDraftS2.properties.kind.default",
+          "$defs.ReferenceTrackDraftS2.properties.kind.title",
+          "$defs.ReferenceTrackDraftS2.properties.kind.type",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS2.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS2.properties.role.title",
+          "$defs.ReferenceTrackDraftS2.properties.role.type",
+          "$defs.ReferenceTrackDraftS2.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS2.properties.title.title",
+          "$defs.ReferenceTrackDraftS2.properties.title.type",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS2.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS2.required.0",
+          "$defs.ReferenceTrackDraftS2.required.1",
+          "$defs.ReferenceTrackDraftS2.required.2",
+          "$defs.ReferenceTrackDraftS2.title",
+          "$defs.ReferenceTrackDraftS2.type"
+        ]
+      },
+      "from": "S2",
+      "to": "S3"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS4.additionalProperties",
+          "$defs.ArrayTrackDraftS4.description",
+          "$defs.ArrayTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.ArrayTrackDraftS4.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS4.properties.bindings.title",
+          "$defs.ArrayTrackDraftS4.properties.bindings.type",
+          "$defs.ArrayTrackDraftS4.properties.kind.const",
+          "$defs.ArrayTrackDraftS4.properties.kind.default",
+          "$defs.ArrayTrackDraftS4.properties.kind.title",
+          "$defs.ArrayTrackDraftS4.properties.kind.type",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS4.properties.role.title",
+          "$defs.ArrayTrackDraftS4.properties.role.type",
+          "$defs.ArrayTrackDraftS4.properties.title.minLength",
+          "$defs.ArrayTrackDraftS4.properties.title.title",
+          "$defs.ArrayTrackDraftS4.properties.title.type",
+          "$defs.ArrayTrackDraftS4.properties.x_scale.$ref",
+          "$defs.ArrayTrackDraftS4.required.0",
+          "$defs.ArrayTrackDraftS4.required.1",
+          "$defs.ArrayTrackDraftS4.required.2",
+          "$defs.ArrayTrackDraftS4.required.3",
+          "$defs.ArrayTrackDraftS4.title",
+          "$defs.ArrayTrackDraftS4.type",
+          "$defs.NormalTrackDraftS4.additionalProperties",
+          "$defs.NormalTrackDraftS4.description",
+          "$defs.NormalTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS4.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS4.properties.bindings.title",
+          "$defs.NormalTrackDraftS4.properties.bindings.type",
+          "$defs.NormalTrackDraftS4.properties.kind.const",
+          "$defs.NormalTrackDraftS4.properties.kind.default",
+          "$defs.NormalTrackDraftS4.properties.kind.title",
+          "$defs.NormalTrackDraftS4.properties.kind.type",
+          "$defs.NormalTrackDraftS4.properties.role.enum.0",
+          "$defs.NormalTrackDraftS4.properties.role.enum.1",
+          "$defs.NormalTrackDraftS4.properties.role.enum.2",
+          "$defs.NormalTrackDraftS4.properties.role.enum.3",
+          "$defs.NormalTrackDraftS4.properties.role.title",
+          "$defs.NormalTrackDraftS4.properties.role.type",
+          "$defs.NormalTrackDraftS4.properties.title.minLength",
+          "$defs.NormalTrackDraftS4.properties.title.title",
+          "$defs.NormalTrackDraftS4.properties.title.type",
+          "$defs.NormalTrackDraftS4.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS4.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS4.properties.x_scale.default",
+          "$defs.NormalTrackDraftS4.required.0",
+          "$defs.NormalTrackDraftS4.required.1",
+          "$defs.NormalTrackDraftS4.required.2",
+          "$defs.NormalTrackDraftS4.title",
+          "$defs.NormalTrackDraftS4.type",
+          "$defs.ReferenceTrackDraftS4.additionalProperties",
+          "$defs.ReferenceTrackDraftS4.description",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS4.properties.kind.const",
+          "$defs.ReferenceTrackDraftS4.properties.kind.default",
+          "$defs.ReferenceTrackDraftS4.properties.kind.title",
+          "$defs.ReferenceTrackDraftS4.properties.kind.type",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS4.properties.role.title",
+          "$defs.ReferenceTrackDraftS4.properties.role.type",
+          "$defs.ReferenceTrackDraftS4.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS4.properties.title.title",
+          "$defs.ReferenceTrackDraftS4.properties.title.type",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS4.required.0",
+          "$defs.ReferenceTrackDraftS4.required.1",
+          "$defs.ReferenceTrackDraftS4.required.2",
+          "$defs.ReferenceTrackDraftS4.title",
+          "$defs.ReferenceTrackDraftS4.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.ArrayTrackDraftS3.additionalProperties",
+          "$defs.ArrayTrackDraftS3.description",
+          "$defs.ArrayTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.ArrayTrackDraftS3.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS3.properties.bindings.title",
+          "$defs.ArrayTrackDraftS3.properties.bindings.type",
+          "$defs.ArrayTrackDraftS3.properties.kind.const",
+          "$defs.ArrayTrackDraftS3.properties.kind.default",
+          "$defs.ArrayTrackDraftS3.properties.kind.title",
+          "$defs.ArrayTrackDraftS3.properties.kind.type",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS3.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS3.properties.role.title",
+          "$defs.ArrayTrackDraftS3.properties.role.type",
+          "$defs.ArrayTrackDraftS3.properties.title.minLength",
+          "$defs.ArrayTrackDraftS3.properties.title.title",
+          "$defs.ArrayTrackDraftS3.properties.title.type",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS3.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS3.required.0",
+          "$defs.ArrayTrackDraftS3.required.1",
+          "$defs.ArrayTrackDraftS3.required.2",
+          "$defs.ArrayTrackDraftS3.title",
+          "$defs.ArrayTrackDraftS3.type",
+          "$defs.NormalTrackDraftS3.additionalProperties",
+          "$defs.NormalTrackDraftS3.description",
+          "$defs.NormalTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS3.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS3.properties.bindings.title",
+          "$defs.NormalTrackDraftS3.properties.bindings.type",
+          "$defs.NormalTrackDraftS3.properties.kind.const",
+          "$defs.NormalTrackDraftS3.properties.kind.default",
+          "$defs.NormalTrackDraftS3.properties.kind.title",
+          "$defs.NormalTrackDraftS3.properties.kind.type",
+          "$defs.NormalTrackDraftS3.properties.role.enum.0",
+          "$defs.NormalTrackDraftS3.properties.role.enum.1",
+          "$defs.NormalTrackDraftS3.properties.role.enum.2",
+          "$defs.NormalTrackDraftS3.properties.role.enum.3",
+          "$defs.NormalTrackDraftS3.properties.role.title",
+          "$defs.NormalTrackDraftS3.properties.role.type",
+          "$defs.NormalTrackDraftS3.properties.title.minLength",
+          "$defs.NormalTrackDraftS3.properties.title.title",
+          "$defs.NormalTrackDraftS3.properties.title.type",
+          "$defs.NormalTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS3.properties.x_scale.default",
+          "$defs.NormalTrackDraftS3.required.0",
+          "$defs.NormalTrackDraftS3.required.1",
+          "$defs.NormalTrackDraftS3.required.2",
+          "$defs.NormalTrackDraftS3.title",
+          "$defs.NormalTrackDraftS3.type",
+          "$defs.ReferenceTrackDraftS3.additionalProperties",
+          "$defs.ReferenceTrackDraftS3.description",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS3.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS3.properties.kind.const",
+          "$defs.ReferenceTrackDraftS3.properties.kind.default",
+          "$defs.ReferenceTrackDraftS3.properties.kind.title",
+          "$defs.ReferenceTrackDraftS3.properties.kind.type",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS3.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS3.properties.role.title",
+          "$defs.ReferenceTrackDraftS3.properties.role.type",
+          "$defs.ReferenceTrackDraftS3.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS3.properties.title.title",
+          "$defs.ReferenceTrackDraftS3.properties.title.type",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS3.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS3.required.0",
+          "$defs.ReferenceTrackDraftS3.required.1",
+          "$defs.ReferenceTrackDraftS3.required.2",
+          "$defs.ReferenceTrackDraftS3.title",
+          "$defs.ReferenceTrackDraftS3.type"
+        ]
+      },
+      "from": "S3",
+      "to": "S4"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS.additionalProperties",
+          "$defs.ArrayTrackDraftS.description",
+          "$defs.ArrayTrackDraftS.properties.bindings.items.$ref",
+          "$defs.ArrayTrackDraftS.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS.properties.bindings.title",
+          "$defs.ArrayTrackDraftS.properties.bindings.type",
+          "$defs.ArrayTrackDraftS.properties.kind.const",
+          "$defs.ArrayTrackDraftS.properties.kind.default",
+          "$defs.ArrayTrackDraftS.properties.kind.title",
+          "$defs.ArrayTrackDraftS.properties.kind.type",
+          "$defs.ArrayTrackDraftS.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS.properties.role.title",
+          "$defs.ArrayTrackDraftS.properties.role.type",
+          "$defs.ArrayTrackDraftS.properties.title.minLength",
+          "$defs.ArrayTrackDraftS.properties.title.title",
+          "$defs.ArrayTrackDraftS.properties.title.type",
+          "$defs.ArrayTrackDraftS.properties.x_scale.$ref",
+          "$defs.ArrayTrackDraftS.required.0",
+          "$defs.ArrayTrackDraftS.required.1",
+          "$defs.ArrayTrackDraftS.required.2",
+          "$defs.ArrayTrackDraftS.required.3",
+          "$defs.ArrayTrackDraftS.title",
+          "$defs.ArrayTrackDraftS.type",
+          "$defs.NormalTrackDraftS.additionalProperties",
+          "$defs.NormalTrackDraftS.description",
+          "$defs.NormalTrackDraftS.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS.properties.bindings.title",
+          "$defs.NormalTrackDraftS.properties.bindings.type",
+          "$defs.NormalTrackDraftS.properties.kind.const",
+          "$defs.NormalTrackDraftS.properties.kind.default",
+          "$defs.NormalTrackDraftS.properties.kind.title",
+          "$defs.NormalTrackDraftS.properties.kind.type",
+          "$defs.NormalTrackDraftS.properties.role.enum.0",
+          "$defs.NormalTrackDraftS.properties.role.enum.1",
+          "$defs.NormalTrackDraftS.properties.role.enum.2",
+          "$defs.NormalTrackDraftS.properties.role.enum.3",
+          "$defs.NormalTrackDraftS.properties.role.title",
+          "$defs.NormalTrackDraftS.properties.role.type",
+          "$defs.NormalTrackDraftS.properties.title.minLength",
+          "$defs.NormalTrackDraftS.properties.title.title",
+          "$defs.NormalTrackDraftS.properties.title.type",
+          "$defs.NormalTrackDraftS.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS.properties.x_scale.default",
+          "$defs.NormalTrackDraftS.required.0",
+          "$defs.NormalTrackDraftS.required.1",
+          "$defs.NormalTrackDraftS.required.2",
+          "$defs.NormalTrackDraftS.title",
+          "$defs.NormalTrackDraftS.type",
+          "$defs.ReferenceTrackDraftS.additionalProperties",
+          "$defs.ReferenceTrackDraftS.description",
+          "$defs.ReferenceTrackDraftS.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS.properties.kind.const",
+          "$defs.ReferenceTrackDraftS.properties.kind.default",
+          "$defs.ReferenceTrackDraftS.properties.kind.title",
+          "$defs.ReferenceTrackDraftS.properties.kind.type",
+          "$defs.ReferenceTrackDraftS.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS.properties.role.title",
+          "$defs.ReferenceTrackDraftS.properties.role.type",
+          "$defs.ReferenceTrackDraftS.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS.properties.title.title",
+          "$defs.ReferenceTrackDraftS.properties.title.type",
+          "$defs.ReferenceTrackDraftS.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS.required.0",
+          "$defs.ReferenceTrackDraftS.required.1",
+          "$defs.ReferenceTrackDraftS.required.2",
+          "$defs.ReferenceTrackDraftS.title",
+          "$defs.ReferenceTrackDraftS.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.ArrayTrackDraftS4.additionalProperties",
+          "$defs.ArrayTrackDraftS4.description",
+          "$defs.ArrayTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.ArrayTrackDraftS4.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS4.properties.bindings.title",
+          "$defs.ArrayTrackDraftS4.properties.bindings.type",
+          "$defs.ArrayTrackDraftS4.properties.kind.const",
+          "$defs.ArrayTrackDraftS4.properties.kind.default",
+          "$defs.ArrayTrackDraftS4.properties.kind.title",
+          "$defs.ArrayTrackDraftS4.properties.kind.type",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS4.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS4.properties.role.title",
+          "$defs.ArrayTrackDraftS4.properties.role.type",
+          "$defs.ArrayTrackDraftS4.properties.title.minLength",
+          "$defs.ArrayTrackDraftS4.properties.title.title",
+          "$defs.ArrayTrackDraftS4.properties.title.type",
+          "$defs.ArrayTrackDraftS4.properties.x_scale.$ref",
+          "$defs.ArrayTrackDraftS4.required.0",
+          "$defs.ArrayTrackDraftS4.required.1",
+          "$defs.ArrayTrackDraftS4.required.2",
+          "$defs.ArrayTrackDraftS4.required.3",
+          "$defs.ArrayTrackDraftS4.title",
+          "$defs.ArrayTrackDraftS4.type",
+          "$defs.NormalTrackDraftS4.additionalProperties",
+          "$defs.NormalTrackDraftS4.description",
+          "$defs.NormalTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.NormalTrackDraftS4.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS4.properties.bindings.title",
+          "$defs.NormalTrackDraftS4.properties.bindings.type",
+          "$defs.NormalTrackDraftS4.properties.kind.const",
+          "$defs.NormalTrackDraftS4.properties.kind.default",
+          "$defs.NormalTrackDraftS4.properties.kind.title",
+          "$defs.NormalTrackDraftS4.properties.kind.type",
+          "$defs.NormalTrackDraftS4.properties.role.enum.0",
+          "$defs.NormalTrackDraftS4.properties.role.enum.1",
+          "$defs.NormalTrackDraftS4.properties.role.enum.2",
+          "$defs.NormalTrackDraftS4.properties.role.enum.3",
+          "$defs.NormalTrackDraftS4.properties.role.title",
+          "$defs.NormalTrackDraftS4.properties.role.type",
+          "$defs.NormalTrackDraftS4.properties.title.minLength",
+          "$defs.NormalTrackDraftS4.properties.title.title",
+          "$defs.NormalTrackDraftS4.properties.title.type",
+          "$defs.NormalTrackDraftS4.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS4.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS4.properties.x_scale.default",
+          "$defs.NormalTrackDraftS4.required.0",
+          "$defs.NormalTrackDraftS4.required.1",
+          "$defs.NormalTrackDraftS4.required.2",
+          "$defs.NormalTrackDraftS4.title",
+          "$defs.NormalTrackDraftS4.type",
+          "$defs.ReferenceTrackDraftS4.additionalProperties",
+          "$defs.ReferenceTrackDraftS4.description",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.items.$ref",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS4.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS4.properties.kind.const",
+          "$defs.ReferenceTrackDraftS4.properties.kind.default",
+          "$defs.ReferenceTrackDraftS4.properties.kind.title",
+          "$defs.ReferenceTrackDraftS4.properties.kind.type",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS4.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS4.properties.role.title",
+          "$defs.ReferenceTrackDraftS4.properties.role.type",
+          "$defs.ReferenceTrackDraftS4.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS4.properties.title.title",
+          "$defs.ReferenceTrackDraftS4.properties.title.type",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS4.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS4.required.0",
+          "$defs.ReferenceTrackDraftS4.required.1",
+          "$defs.ReferenceTrackDraftS4.required.2",
+          "$defs.ReferenceTrackDraftS4.title",
+          "$defs.ReferenceTrackDraftS4.type"
+        ]
+      },
+      "from": "S4",
+      "to": "S5"
+    }
+  ],
+  "baseline_sha": "91c4151",
+  "experiment_version": "exp-tw-05.schema-bisect.v1",
+  "variants": [
+    {
+      "response_schema_sha256": "c19b81abe637e6d07c434a522ef01bd7e813bcbe16bb0e928044faa8217ab7e3",
+      "schema": {
+        "$defs": {
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          },
+          "TrackDraft": {
+            "additionalProperties": false,
+            "description": "One ordered semantic track; width and styling are host-completed.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "normal",
+                  "reference",
+                  "array"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "TrackDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Corrected semantic intent sufficient for the frozen CBL artifact.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/$defs/TrackDraft"
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraft",
+        "type": "object"
+      },
+      "schema_variant": "S0"
+    },
+    {
+      "response_schema_sha256": "e189118a3e075e07d8ee1fbf7b53560ec4b834dbf2f7e7af8bbde5b5b8e5aeb3",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 array track with optional x scale and mixed bindings.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS1",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 normal track with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS1",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 reference track with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS1",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "S1 section with only track-level discrimination added.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS1",
+                  "normal": "#/$defs/NormalTrackDraftS1",
+                  "reference": "#/$defs/ReferenceTrackDraftS1"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS1"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS1"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS1"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS1",
+        "type": "object"
+      },
+      "schema_variant": "S1"
+    },
+    {
+      "response_schema_sha256": "09ea9b7ed3009efa4472bca32be33478e093280103869354e59c4323d0e19543",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS2": {
+            "additionalProperties": false,
+            "description": "S2 array track with the S1 binding union unchanged.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS2",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS2": {
+            "additionalProperties": false,
+            "description": "S2 normal track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS2",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS2": {
+            "additionalProperties": false,
+            "description": "S2 reference track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS2",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "S2 section with normal/reference curve-only restrictions.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS2",
+                  "normal": "#/$defs/NormalTrackDraftS2",
+                  "reference": "#/$defs/ReferenceTrackDraftS2"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS2"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS2"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS2"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS2",
+        "type": "object"
+      },
+      "schema_variant": "S2"
+    },
+    {
+      "response_schema_sha256": "4c3d16e5c7ca9bac12a74d6470550259664dcd74bd9834c92aafc8390deed872",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS3": {
+            "additionalProperties": false,
+            "description": "S3 array track restricted to raster bindings.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/RasterBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS3",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS3": {
+            "additionalProperties": false,
+            "description": "S3 normal track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS3",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS3": {
+            "additionalProperties": false,
+            "description": "S3 reference track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS3",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "S3 section with array raster-only restrictions.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS3",
+                  "normal": "#/$defs/NormalTrackDraftS3",
+                  "reference": "#/$defs/ReferenceTrackDraftS3"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS3"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS3"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS3"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS3",
+        "type": "object"
+      },
+      "schema_variant": "S3"
+    },
+    {
+      "response_schema_sha256": "7e886061c11b388c00e610214ea9aca6bd814e69f6bf72ae7c5731125573a584",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS4": {
+            "additionalProperties": false,
+            "description": "S4 array track with required x scale and raster bindings.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/RasterBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "x_scale",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS4",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS4": {
+            "additionalProperties": false,
+            "description": "S4 normal track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS4",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS4": {
+            "additionalProperties": false,
+            "description": "S4 reference track restricted to scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS4",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "S4 section with the complete strengthened structural constraints.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS4",
+                  "normal": "#/$defs/NormalTrackDraftS4",
+                  "reference": "#/$defs/ReferenceTrackDraftS4"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS4"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS4"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS4"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS4",
+        "type": "object"
+      },
+      "schema_variant": "S4"
+    },
+    {
+      "response_schema_sha256": "55e7ebd724ee02d72c5318051be79f4720dfba9b35d7ccf4504b3d82054642dc",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS": {
+            "additionalProperties": false,
+            "description": "Array track whose bindings are rasters and which has an x scale.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/RasterBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "x_scale",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS": {
+            "additionalProperties": false,
+            "description": "Normal track whose ordered bindings are all scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS": {
+            "additionalProperties": false,
+            "description": "Reference track whose ordered bindings are all scalar curves.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "$ref": "#/$defs/CurveBindingDraft"
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Strengthened semantic section intent with structural track invariants.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS",
+                  "normal": "#/$defs/NormalTrackDraftS",
+                  "reference": "#/$defs/ReferenceTrackDraftS"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS",
+        "type": "object"
+      },
+      "schema_variant": "S5"
+    }
+  ]
+}

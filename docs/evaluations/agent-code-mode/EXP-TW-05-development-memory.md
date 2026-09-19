@@ -104,10 +104,36 @@ Focused tests cover:
 
 ## Live results
 
-Live results are not yet recorded. The initial control run was interrupted
-before any attempt record was produced and is inconclusive; it is not a
-control failure. After the corrected S0 control run succeeds, record the per
-variant/section funnel here and in a compact JSON aggregate:
+The first two local Python runs were inconclusive because the sandbox blocked
+the Python client before it could connect to llama.cpp. The approved network
+run used the verified local configuration and the exact historical TW-03
+prompt. Its S0 control reproduced structured validity across both sections:
+
+| Variant | Feature | Main structured | Repeat structured | Total structured | Gate-A successes |
+| --- | --- | ---: | ---: | ---: | ---: |
+| S0 | historical control | 10/10 | 10/10 | 20/20 | 8/20 |
+| S1 | track discriminator | 0/10 | 0/10 | 0/20 | 0/20 |
+
+S0 recorded 34,157 total tokens and 1,125,062.28 ms across metric-bearing
+calls. S1 made 20 provider calls, all of which ended at
+`structured_output_failure / invalid_response`; no provider transport failures
+were observed and no structured-output metrics were retained for those
+failures.
+
+The first observed compatibility collapse is therefore `S0 → S1`, the
+introduction of the discriminated track union on `kind`. This localizes the
+collapse at the first measured transition, but does not establish a specific
+llama.cpp, Qwen, Pydantic, or discriminator implementation bug. S2 through S5
+were intentionally not run after the transition was localized; their schema
+definitions, hashes, and adjacent diff projections remain available for
+review, but they have no live result rows.
+
+The compact live aggregate is committed as
+`EXP-TW-05-live-summary.json`, and the deterministic schema review artifact is
+committed as `EXP-TW-05-schema-artifact.json`. The raw redacted JSONL remains
+under `/tmp` and is not committed.
+
+The live aggregate records the per-variant/section funnel:
 
 ```text
 attempts
@@ -119,10 +145,9 @@ secondary Gate-A successes
 available token/latency metrics
 ```
 
-The interpretation must identify the first observed compatibility collapse,
-if any, without claiming a specific llama.cpp, Qwen, Pydantic, or discriminator
-bug beyond the measured transition. If S0 fails, stop and preserve that as a
-control failure.
+The interpretation does not claim a provider implementation defect beyond the
+measured transition. S0 did not fail, so the control was valid and the ladder
+was stopped only after S1 localized the first observed collapse.
 
 ## Hard stop
 

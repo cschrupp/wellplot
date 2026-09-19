@@ -1,0 +1,71 @@
+{
+  "baseline_sha": "91c4151",
+  "experiment_version": "exp-tw-05.schema-bisect.v1",
+  "provider": {
+    "provider_id": "llama_cpp",
+    "model_id": "qwen3.6-35b-a3b",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900.0,
+    "thinking": "disabled"
+  },
+  "schema_hashes": {
+    "S0": "c19b81abe637e6d07c434a522ef01bd7e813bcbe16bb0e928044faa8217ab7e3",
+    "S1": "e189118a3e075e07d8ee1fbf7b53560ec4b834dbf2f7e7af8bbde5b5b8e5aeb3",
+    "S2": "09ea9b7ed3009efa4472bca32be33478e093280103869354e59c4323d0e19543",
+    "S3": "4c3d16e5c7ca9bac12a74d6470550259664dcd74bd9834c92aafc8390deed872",
+    "S4": "7e886061c11b388c00e610214ea9aca6bd814e69f6bf72ae7c5731125573a584",
+    "S5": "55e7ebd724ee02d72c5318051be79f4720dfba9b35d7ccf4504b3d82054642dc"
+  },
+  "results": [
+    {
+      "schema_variant": "S0",
+      "feature": "historical control",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 8,
+      "sections": {
+        "main_pass": {
+          "structured": "10/10",
+          "gate_a_successes": 4,
+          "total_tokens": 17095,
+          "latency_ms": 552966.1496639964
+        },
+        "repeat_pass": {
+          "structured": "10/10",
+          "gate_a_successes": 4,
+          "total_tokens": 17062,
+          "latency_ms": 572096.1349480131
+        }
+      }
+    },
+    {
+      "schema_variant": "S1",
+      "feature": "track discriminator",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 0,
+      "structured_output_failures": 20,
+      "provider_failures": 0,
+      "gate_a_successes": 0,
+      "sections": {
+        "main_pass": {
+          "structured": "0/10",
+          "gate_a_successes": 0,
+          "metrics_available": false
+        },
+        "repeat_pass": {
+          "structured": "0/10",
+          "gate_a_successes": 0,
+          "metrics_available": false
+        }
+      }
+    }
+  ],
+  "first_observed_compatibility_collapse": "S0->S1",
+  "unrun_variants": ["S2", "S3", "S4", "S5"],
+  "interpretation": "The first observed collapse occurred when the track discriminator was introduced. This characterizes the measured transition without assigning a specific implementation bug."
+}
