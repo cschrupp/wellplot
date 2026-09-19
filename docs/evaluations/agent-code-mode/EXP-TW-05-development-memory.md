@@ -70,7 +70,8 @@ aggregate before advancing. If S0 does not produce structurally valid outputs
 for all attempts in both sections, the ladder stops and the result is
 classified as a control failure rather than interpreted causally. The CLI can
 also stop explicitly after `S0`, which is required before spending calls on
-downstream variants.
+downstream variants, and can resume at `S1` while appending to the existing
+redacted evidence file after a successful control.
 
 ## Evidence contract
 

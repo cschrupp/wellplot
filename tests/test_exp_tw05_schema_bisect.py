@@ -329,3 +329,37 @@ def test_ladder_can_stop_after_a_successful_s0_control(tmp_path: Path) -> None:
     )
     assert [summary.schema_variant for summary in summaries] == [SchemaVariant.S0]
     assert len(backends) == 2
+
+
+def test_ladder_can_resume_at_s1_without_repeating_s0(tmp_path: Path) -> None:
+    """A staged continuation starts at S1 and preserves prior JSONL records."""
+    backends: list[_FakeBackend] = []
+
+    def factory() -> _FakeBackend:
+        backend = _FakeBackend(
+            result_factory=lambda model: model.model_validate(  # type: ignore[attr-defined]
+                _golden_payload("main_pass" if len(backends) == 0 else "repeat_pass")
+            )
+        )
+        backends.append(backend)
+        return backend
+
+    output_path = tmp_path / "attempts.jsonl"
+    output_path.write_text('{"record_type":"prior"}\n', encoding="utf-8")
+    summaries = _run(
+        run_schema_ladder(
+            factory,
+            provider_id="fake",
+            model_id="test-model",
+            config=AttemptConfig(timeout_seconds=30),
+            attempt_count=1,
+            from_variant=SchemaVariant.S1,
+            through_variant=SchemaVariant.S1,
+            output_jsonl=output_path,
+            schema_output=tmp_path / "schemas.json",
+            append_output=True,
+        )
+    )
+    assert [summary.schema_variant for summary in summaries] == [SchemaVariant.S1]
+    assert len(backends) == 2
+    assert output_path.read_text(encoding="utf-8").startswith('{"record_type":"prior"}')

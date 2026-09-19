@@ -628,11 +628,19 @@ async def run_schema_ladder(
     output_jsonl: str | Path | None = None,
     schema_output: str | Path | None = None,
     through_variant: SchemaVariant | str | None = None,
+    from_variant: SchemaVariant | str | None = None,
+    append_output: bool = False,
 ) -> tuple[SchemaVariantSummary, ...]:
     """Run S0-to-S5 sequentially, stopping if the S0 control fails."""
     stop_variant = SchemaVariant(through_variant) if through_variant is not None else None
+    start_variant = SchemaVariant(from_variant) if from_variant is not None else SchemaVariant.S0
+    variant_ids = [item.variant for item in _VARIANTS]
+    if stop_variant is not None and variant_ids.index(stop_variant) < variant_ids.index(
+        start_variant
+    ):
+        raise ValueError("through_variant must not precede from_variant.")
     output_path = Path(output_jsonl) if output_jsonl is not None else None
-    if output_path is not None:
+    if output_path is not None and not append_output:
         output_path.write_text("", encoding="utf-8")
     if schema_output is not None:
         Path(schema_output).write_text(
@@ -641,7 +649,7 @@ async def run_schema_ladder(
         )
 
     results: list[SchemaVariantSummary] = []
-    for spec in _VARIANTS:
+    for spec in _VARIANTS[variant_ids.index(start_variant) :]:
         section_summaries = []
         for section_role in ("main_pass", "repeat_pass"):
             section_summary = await run_schema_section_attempts(
@@ -765,6 +773,16 @@ def _parse_args() -> argparse.Namespace:
         choices=[item.value for item in SchemaVariant],
         help="Stop after this variant instead of continuing the ladder.",
     )
+    parser.add_argument(
+        "--from-variant",
+        choices=[item.value for item in SchemaVariant],
+        help="Start at this variant when prior evidence is already present.",
+    )
+    parser.add_argument(
+        "--append-output",
+        action="store_true",
+        help="Append evidence instead of clearing the JSONL output first.",
+    )
     parser.add_argument("--output-jsonl", type=Path, required=True)
     parser.add_argument("--schema-output", type=Path, required=True)
     return parser.parse_args()
@@ -838,6 +856,8 @@ async def _main_async(args: argparse.Namespace) -> None:
         output_jsonl=args.output_jsonl,
         schema_output=args.schema_output,
         through_variant=args.through_variant,
+        from_variant=args.from_variant,
+        append_output=args.append_output,
     )
     print(
         json.dumps(
