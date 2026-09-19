@@ -117,6 +117,20 @@ def test_semantic_diff_uses_typed_input_not_golden_or_gate_state() -> None:
     assert changed[0].expected == "Changed typed task"
 
 
+def test_semantic_diff_reports_order_mismatch_from_typed_task() -> None:
+    """Track ordering diagnostics are derived from the typed task sequence."""
+    bundle, _context, _requirements = _inputs("main_pass")
+    golden = strengthen_golden_drafts()["main_pass"]
+    reordered = golden.model_copy(update={"tracks": tuple(reversed(golden.tracks))})
+
+    mismatches = semantic_mismatches(bundle, reordered)
+
+    order_mismatches = [item for item in mismatches if item.issue == "order_mismatch"]
+    assert len(order_mismatches) == 1
+    assert order_mismatches[0].output_path == "SectionDraft.tracks"
+    assert order_mismatches[0].provider_input_path == "task.tracks"
+
+
 def test_repair_task_is_path_free_and_deterministically_serialized() -> None:
     """Repair payload contains only typed input, prior draft, and mismatches."""
     bundle, _context, _requirements = _inputs("repeat_pass")

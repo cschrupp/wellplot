@@ -6,7 +6,9 @@
 - Question: when a provider returns a structurally valid `SectionDraftS` that
   is semantically wrong for the typed task, can one targeted repair call
   recover it using only worker-boundary information?
-- Status: harness implemented and validated; live provider evaluation pending.
+- Implementation commit: `602af4d`.
+- Status: harness and authorized live evaluation complete; stop before any
+  follow-up repair/orchestration slice.
 
 TW-04 is a semantic-repair experiment, not a general retry or resilience
 experiment. Provider transport/authentication/rate-limit/timeout failures and
@@ -91,11 +93,36 @@ The local Qwen and OpenRouter/Nemotron runs are separate exploratory provider
 evidence sets. They must not overwrite TW-03 evidence or be ranked as a formal
 cross-provider benchmark.
 
+The compact live aggregate is committed as
+`EXP-TW-04-live-summary.json`. The raw redacted JSONL artifacts remain under
+the temporary experiment workspace and are not committed.
+
+Measured results:
+
+| Provider/model | Role | First structured | First Gate A | Repair eligible / calls | Repair Gate A | Final success |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| llama.cpp / `qwen3.6-35b-a3b` | `main_pass` | 0/10 | 0/10 | 0 / 0 | 0/0 | 0/10 |
+| llama.cpp / `qwen3.6-35b-a3b` | `repeat_pass` | 0/10 | 0/10 | 0 / 0 | 0/0 | 0/10 |
+| OpenRouter / `nvidia/nemotron-3-ultra-550b-a55b:free` | `main_pass` | 6/10 | 3/10 | 3 / 3 | 1/3 | 4/10 |
+| OpenRouter / `nvidia/nemotron-3-ultra-550b-a55b:free` | `repeat_pass` | 6/10 | 3/10 | 3 / 3 | 1/3 | 4/10 |
+
+Qwen's 20 calls all ended at the structured-output boundary with the safe
+`invalid_response` category, so they provide no semantic-repair observations.
+OpenRouter completed all 20 first calls, reached Gate A on 6, and recovered 2
+of 6 semantic failures after one repair. The other four eligible cases ended
+with structured-output failure during repair. No attempt exceeded two calls.
+
+The OpenRouter batch recorded 41,862 total tokens and 455,690.67 ms total
+latency across first and repair calls. Its first-attempt totals were 36,310
+tokens and 427,143.58 ms; repair added 5,552 tokens and 28,547.09 ms.
+
 ## Hard stop
 
 Production delta remains zero. No files under `src/wellplot` are changed.
 TW-04 does not start planner changes, compiler changes, LangGraph, retries,
 repair loops, or production integration.
 
-After the harness and authorized live evidence are recorded, stop before any
-future repair/orchestration slice.
+The result supports the bounded semantic-repair mechanism as executable but
+does not justify broader retry/orchestration work: one provider never reached
+the strengthened schema, and the available OpenRouter repair conversion was
+2/6. Stop here before any future repair/orchestration slice.

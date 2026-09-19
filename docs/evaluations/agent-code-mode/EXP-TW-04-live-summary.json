@@ -1,0 +1,63 @@
+{
+  "baseline_sha": "21bd657",
+  "experiment_version": "exp-tw-04.single-semantic-repair.v1",
+  "implementation_commit": "602af4d",
+  "raw_artifacts": [
+    "exp-tw04-llama-cpp.jsonl",
+    "exp-tw04-openrouter-nemotron-ultra-free.jsonl"
+  ],
+  "summaries": [
+    {
+      "provider_id": "llama_cpp",
+      "model_id": "qwen3.6-35b-a3b",
+      "section_role": "main_pass",
+      "logical_attempts": 10,
+      "first_structurally_valid_count": 0,
+      "first_gate_a_success_count": 0,
+      "repair_eligible_count": 0,
+      "repair_calls": 0,
+      "repair_gate_a_success_count": 0,
+      "final_success_count": 0,
+      "final_outcomes": {"structured_output_failure": 10}
+    },
+    {
+      "provider_id": "llama_cpp",
+      "model_id": "qwen3.6-35b-a3b",
+      "section_role": "repeat_pass",
+      "logical_attempts": 10,
+      "first_structurally_valid_count": 0,
+      "first_gate_a_success_count": 0,
+      "repair_eligible_count": 0,
+      "repair_calls": 0,
+      "repair_gate_a_success_count": 0,
+      "final_success_count": 0,
+      "final_outcomes": {"structured_output_failure": 10}
+    },
+    {
+      "provider_id": "openrouter",
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "section_role": "main_pass",
+      "logical_attempts": 10,
+      "first_structurally_valid_count": 6,
+      "first_gate_a_success_count": 3,
+      "repair_eligible_count": 3,
+      "repair_calls": 3,
+      "repair_gate_a_success_count": 1,
+      "final_success_count": 4,
+      "final_outcomes": {"structured_output_failure": 6, "success": 4}
+    },
+    {
+      "provider_id": "openrouter",
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "section_role": "repeat_pass",
+      "logical_attempts": 10,
+      "first_structurally_valid_count": 6,
+      "first_gate_a_success_count": 3,
+      "repair_eligible_count": 3,
+      "repair_calls": 3,
+      "repair_gate_a_success_count": 1,
+      "final_success_count": 4,
+      "final_outcomes": {"structured_output_failure": 6, "success": 4}
+    }
+  ]
+}
