@@ -68,7 +68,9 @@ The staged runner executes 10 independent `main_pass` and 10 independent
 redacted JSONL before starting the next request and persists each section
 aggregate before advancing. If S0 does not produce structurally valid outputs
 for all attempts in both sections, the ladder stops and the result is
-classified as a control failure rather than interpreted causally.
+classified as a control failure rather than interpreted causally. The CLI can
+also stop explicitly after `S0`, which is required before spending calls on
+downstream variants.
 
 ## Evidence contract
 

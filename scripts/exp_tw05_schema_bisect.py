@@ -627,8 +627,10 @@ async def run_schema_ladder(
     attempt_count: int = 10,
     output_jsonl: str | Path | None = None,
     schema_output: str | Path | None = None,
+    through_variant: SchemaVariant | str | None = None,
 ) -> tuple[SchemaVariantSummary, ...]:
     """Run S0-to-S5 sequentially, stopping if the S0 control fails."""
+    stop_variant = SchemaVariant(through_variant) if through_variant is not None else None
     output_path = Path(output_jsonl) if output_jsonl is not None else None
     if output_path is not None:
         output_path.write_text("", encoding="utf-8")
@@ -668,6 +670,8 @@ async def run_schema_ladder(
                 section.structurally_valid_outputs != attempt_count for section in section_summaries
             )
         ):
+            break
+        if stop_variant is not None and spec.variant is stop_variant:
             break
     return tuple(results)
 
@@ -756,6 +760,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--max-output-tokens", type=int, default=16384)
     parser.add_argument("--timeout", type=float, default=900.0)
     parser.add_argument("--attempts", type=int, default=10)
+    parser.add_argument(
+        "--through-variant",
+        choices=[item.value for item in SchemaVariant],
+        help="Stop after this variant instead of continuing the ladder.",
+    )
     parser.add_argument("--output-jsonl", type=Path, required=True)
     parser.add_argument("--schema-output", type=Path, required=True)
     return parser.parse_args()
@@ -828,6 +837,7 @@ async def _main_async(args: argparse.Namespace) -> None:
         attempt_count=args.attempts,
         output_jsonl=args.output_jsonl,
         schema_output=args.schema_output,
+        through_variant=args.through_variant,
     )
     print(
         json.dumps(

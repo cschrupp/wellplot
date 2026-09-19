@@ -300,3 +300,32 @@ def test_ladder_stops_after_s0_control_failure(tmp_path: Path) -> None:
     assert all(len(backend.calls) == 1 for backend in backends)
     records = tmp_path.joinpath("attempts.jsonl").read_text(encoding="utf-8").splitlines()
     assert sum('"record_type": "attempt"' in line for line in records) == 2
+
+
+def test_ladder_can_stop_after_a_successful_s0_control(tmp_path: Path) -> None:
+    """The staged runner can measure S0 without spending downstream calls."""
+    backends: list[_FakeBackend] = []
+
+    def factory() -> _FakeBackend:
+        backend = _FakeBackend(
+            result_factory=lambda model: model.model_validate(  # type: ignore[attr-defined]
+                _golden_payload("main_pass" if len(backends) == 0 else "repeat_pass")
+            )
+        )
+        backends.append(backend)
+        return backend
+
+    summaries = _run(
+        run_schema_ladder(
+            factory,
+            provider_id="fake",
+            model_id="test-model",
+            config=AttemptConfig(timeout_seconds=30),
+            attempt_count=1,
+            through_variant=SchemaVariant.S0,
+            output_jsonl=tmp_path / "attempts.jsonl",
+            schema_output=tmp_path / "schemas.json",
+        )
+    )
+    assert [summary.schema_variant for summary in summaries] == [SchemaVariant.S0]
+    assert len(backends) == 2
