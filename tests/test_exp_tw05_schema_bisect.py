@@ -16,6 +16,7 @@ from scripts.exp_tw02r_contract import SectionDraft, load_golden_drafts
 from scripts.exp_tw03_provider import AttemptConfig, AttemptOutcome
 from scripts.exp_tw05_schema_bisect import (
     BASELINE_SHA,
+    DEFAULT_SYSTEM_PROMPT,
     SchemaVariant,
     SectionDraftS1,
     SectionDraftS2,
@@ -243,6 +244,7 @@ def test_every_variant_uses_identical_provider_input_and_one_call() -> None:
         assert len(backend.calls) == 1
         request, response_model = backend.calls[0]
         assert request.user_prompt == expected_prompt
+        assert request.system_prompt == DEFAULT_SYSTEM_PROMPT
         assert response_model is spec.response_model
     assert {backend.calls[0][0].user_prompt for backend in backends} == {expected_prompt}
 
@@ -296,3 +298,5 @@ def test_ladder_stops_after_s0_control_failure(tmp_path: Path) -> None:
     assert summaries[0].schema_variant is SchemaVariant.S0
     assert len(backends) == 2
     assert all(len(backend.calls) == 1 for backend in backends)
+    records = tmp_path.joinpath("attempts.jsonl").read_text(encoding="utf-8").splitlines()
+    assert sum('"record_type": "attempt"' in line for line in records) == 2

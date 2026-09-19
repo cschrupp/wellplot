@@ -46,10 +46,17 @@ other task-specific role/kind rule.
 
 The primary live target is the local llama.cpp OpenAI-compatible endpoint using
 Qwen `qwen3.6-35b-a3b`, with the same endpoint/backend settings used by the
-TW-03 and TW-04 local evidence. Each attempt uses the exact deterministic
-`serialize_provider_input(TypedWorkerInputBundle)` payload. The system
-instruction is shared across all variants and contains no schema-specific
-hints.
+TW-03 and TW-04 local evidence: JSON Schema mode, `max_tokens`, timeout 900,
+and `chat_template_kwargs.enable_thinking=false`. Each attempt uses the exact
+deterministic `serialize_provider_input(TypedWorkerInputBundle)` payload and
+the exact historical TW-03 system instruction:
+
+```text
+Return exactly one SectionDraft that matches the typed input bundle. Use no fields outside the SectionDraft schema.
+```
+
+That instruction is shared across all variants and contains no
+schema-specific hints.
 
 There is exactly one structured generation call per attempt. Provider and
 structured-output failures are terminal. No repair, retry, fallback, raw
@@ -57,10 +64,11 @@ response parsing, custom grammar, provider switching, or orchestration is
 present.
 
 The staged runner executes 10 independent `main_pass` and 10 independent
-`repeat_pass` attempts per variant. It persists each section aggregate before
-advancing. If S0 does not produce structurally valid outputs for all attempts
-in both sections, the ladder stops and the result is classified as a control
-failure rather than interpreted causally.
+`repeat_pass` attempts per variant. It flushes each completed attempt to the
+redacted JSONL before starting the next request and persists each section
+aggregate before advancing. If S0 does not produce structurally valid outputs
+for all attempts in both sections, the ladder stops and the result is
+classified as a control failure rather than interpreted causally.
 
 ## Evidence contract
 
@@ -93,8 +101,9 @@ Focused tests cover:
 
 ## Live results
 
-Live results are not yet recorded. No provider calls were made as part of the
-implementation checkpoint. After the local ladder runs, record the per
+Live results are not yet recorded. The initial control run was interrupted
+before any attempt record was produced and is inconclusive; it is not a
+control failure. After the corrected S0 control run succeeds, record the per
 variant/section funnel here and in a compact JSON aggregate:
 
 ```text

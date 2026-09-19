@@ -48,6 +48,10 @@ from wellplot.agent.providers.base import (
 BASELINE_SHA = "91c4151"
 EXPERIMENT_VERSION = "exp-tw-05.schema-bisect.v1"
 SectionRole = Literal["main_pass", "repeat_pass"]
+DEFAULT_SYSTEM_PROMPT = (
+    "Return exactly one SectionDraft that matches the typed input bundle. "
+    "Use no fields outside the SectionDraft schema."
+)
 TrackRole = Literal["combo", "depth", "cbl", "vdl"]
 
 
@@ -417,10 +421,7 @@ def structured_request(
 ) -> StructuredGenerationRequest:
     """Build the identical provider request used for every schema variant."""
     return StructuredGenerationRequest(
-        system_prompt=(
-            "Return exactly one section draft matching the typed input bundle. "
-            "Use no fields outside the supplied structured response schema."
-        ),
+        system_prompt=DEFAULT_SYSTEM_PROMPT,
         user_prompt=serialize_provider_input(bundle),
         timeout_seconds=config.timeout_seconds,
         temperature=config.temperature,
@@ -533,28 +534,29 @@ async def run_schema_section_attempts(
     bundle: TypedWorkerInputBundle | None = None,
     section_context: ResolvedSectionContext | None = None,
     gate_requirements: Mapping[str, object] | None = None,
+    attempt_sink: Callable[[SchemaAttemptEvidence], None] | None = None,
 ) -> SchemaSectionSummary:
     """Run independent first attempts for one variant and section."""
     if attempt_count < 1:
         raise ValueError("attempt_count must be at least one.")
-    attempts = tuple(
-        [
-            await run_schema_attempt(
-                section_role,
-                variant,
-                backend_factory(),
-                provider_id=provider_id,
-                model_id=model_id,
-                config=config,
-                attempt_index=index,
-                bundle=bundle,
-                section_context=section_context,
-                gate_requirements=gate_requirements,
-            )
-            for index in range(1, attempt_count + 1)
-        ]
-    )
-    return summarize_schema_section(attempts)
+    attempts: list[SchemaAttemptEvidence] = []
+    for index in range(1, attempt_count + 1):
+        attempt = await run_schema_attempt(
+            section_role,
+            variant,
+            backend_factory(),
+            provider_id=provider_id,
+            model_id=model_id,
+            config=config,
+            attempt_index=index,
+            bundle=bundle,
+            section_context=section_context,
+            gate_requirements=gate_requirements,
+        )
+        attempts.append(attempt)
+        if attempt_sink is not None:
+            attempt_sink(attempt)
+    return summarize_schema_section(tuple(attempts))
 
 
 def summarize_schema_section(
@@ -648,6 +650,11 @@ async def run_schema_ladder(
                 model_id=model_id,
                 config=config,
                 attempt_count=attempt_count,
+                attempt_sink=(
+                    (lambda attempt: _append_attempt_record(output_path, attempt))
+                    if output_path is not None
+                    else None
+                ),
             )
             section_summaries.append(section_summary)
             if output_path is not None:
@@ -673,15 +680,20 @@ def serialize_evidence(value: BaseModel) -> str:
 def _append_records(path: Path, value: SchemaSectionSummary | SchemaVariantSummary) -> None:
     """Append an aggregate record without retaining raw provider responses."""
     if isinstance(value, SchemaSectionSummary):
-        records = [
-            {"record_type": "attempt", **attempt.model_dump(mode="json")}
-            for attempt in value.attempts
-        ]
-        records.append({"record_type": "section_summary", **value.model_dump(mode="json")})
+        records = [{"record_type": "section_summary", **value.model_dump(mode="json")}]
     else:
         records = [{"record_type": "variant_summary", **value.model_dump(mode="json")}]
     with path.open("a", encoding="utf-8") as handle:
         handle.write("\n".join(json.dumps(record, sort_keys=True) for record in records) + "\n")
+        handle.flush()
+
+
+def _append_attempt_record(path: Path, attempt: SchemaAttemptEvidence) -> None:
+    """Flush one completed attempt before the next provider call begins."""
+    record = {"record_type": "attempt", **attempt.model_dump(mode="json")}
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(record, sort_keys=True) + "\n")
+        handle.flush()
 
 
 def _attempt_metrics(metrics: ProviderMetrics) -> AttemptMetrics:
@@ -839,6 +851,7 @@ __all__ = [
     "ArrayTrackDraftS3",
     "ArrayTrackDraftS4",
     "BASELINE_SHA",
+    "DEFAULT_SYSTEM_PROMPT",
     "EXPERIMENT_VERSION",
     "NormalTrackDraftS1",
     "NormalTrackDraftS2",
