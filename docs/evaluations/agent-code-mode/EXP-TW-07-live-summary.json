@@ -1,0 +1,80 @@
+{
+  "baseline_sha": "1f5da6e",
+  "implementation_commit": "d4c73d3",
+  "experiment_version": "exp-tw-07.discriminator-default-bisect.v1",
+  "provider": {
+    "provider_id": "llama_cpp",
+    "model_id": "qwen3.6-35b-a3b",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900.0,
+    "thinking": "disabled"
+  },
+  "schema_hashes": {
+    "D0": "7d259d7fd0a69a1e375344d0d0e9d9f1f56c65224fc01acdbf710c144f920730",
+    "D1": "c84f11aa31cdd129cc7986336ed3231f5c4b9951b628a5374f8b744296b04ab4"
+  },
+  "results": [
+    {
+      "schema_variant": "D0",
+      "feature": "required literal tag",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 4,
+      "metric_bearing_calls": 20,
+      "input_tokens_total": 15400,
+      "output_tokens_total": 19001,
+      "total_tokens_total": 34401,
+      "latency_ms_total": 1151472.2836649888,
+      "sections": {
+        "main_pass": {
+          "structured": "10/10",
+          "gate_a_successes": 2,
+          "total_tokens": 17382,
+          "latency_ms": 578058.3994819899
+        },
+        "repeat_pass": {
+          "structured": "10/10",
+          "gate_a_successes": 2,
+          "total_tokens": 17019,
+          "latency_ms": 573413.884182999
+        }
+      }
+    },
+    {
+      "schema_variant": "D1",
+      "feature": "defaulted literal tag",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 0,
+      "structured_output_failures": 20,
+      "provider_failures": 0,
+      "gate_a_successes": 0,
+      "metric_bearing_calls": 0,
+      "input_tokens_total": null,
+      "output_tokens_total": null,
+      "total_tokens_total": null,
+      "latency_ms_total": null,
+      "sections": {
+        "main_pass": {
+          "structured": "0/10",
+          "gate_a_successes": 0,
+          "total_tokens": null,
+          "latency_ms": null
+        },
+        "repeat_pass": {
+          "structured": "0/10",
+          "gate_a_successes": 0,
+          "total_tokens": null,
+          "latency_ms": null
+        }
+      }
+    }
+  ],
+  "first_structural_collapse": "D0->D1",
+  "not_completed_variants": [],
+  "interpretation": "D0 and D1 use the same native model factory and names. The only schema change is the defaulted discriminator tag and its resulting requiredness change. D0 remained structurally compatible while D1 collapsed to invalid_response across both sections."
+}
