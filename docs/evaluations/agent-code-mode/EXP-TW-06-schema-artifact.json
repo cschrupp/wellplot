@@ -1,0 +1,4069 @@
+{
+  "adjacent_diffs": [
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.TrackDraftU1.additionalProperties",
+          "$defs.TrackDraftU1.description",
+          "$defs.TrackDraftU1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.TrackDraftU1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.TrackDraftU1.properties.bindings.minItems",
+          "$defs.TrackDraftU1.properties.bindings.title",
+          "$defs.TrackDraftU1.properties.bindings.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.0.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.0.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.1.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.1.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.2.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.2.type",
+          "$defs.TrackDraftU1.properties.kind.title",
+          "$defs.TrackDraftU1.properties.role.enum.0",
+          "$defs.TrackDraftU1.properties.role.enum.1",
+          "$defs.TrackDraftU1.properties.role.enum.2",
+          "$defs.TrackDraftU1.properties.role.enum.3",
+          "$defs.TrackDraftU1.properties.role.title",
+          "$defs.TrackDraftU1.properties.role.type",
+          "$defs.TrackDraftU1.properties.title.minLength",
+          "$defs.TrackDraftU1.properties.title.title",
+          "$defs.TrackDraftU1.properties.title.type",
+          "$defs.TrackDraftU1.properties.x_scale.anyOf.0.$ref",
+          "$defs.TrackDraftU1.properties.x_scale.anyOf.1.type",
+          "$defs.TrackDraftU1.properties.x_scale.default",
+          "$defs.TrackDraftU1.required.0",
+          "$defs.TrackDraftU1.required.1",
+          "$defs.TrackDraftU1.required.2",
+          "$defs.TrackDraftU1.required.3",
+          "$defs.TrackDraftU1.title",
+          "$defs.TrackDraftU1.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.TrackDraft.additionalProperties",
+          "$defs.TrackDraft.description",
+          "$defs.TrackDraft.properties.bindings.items.anyOf.0.$ref",
+          "$defs.TrackDraft.properties.bindings.items.anyOf.1.$ref",
+          "$defs.TrackDraft.properties.bindings.minItems",
+          "$defs.TrackDraft.properties.bindings.title",
+          "$defs.TrackDraft.properties.bindings.type",
+          "$defs.TrackDraft.properties.kind.enum.0",
+          "$defs.TrackDraft.properties.kind.enum.1",
+          "$defs.TrackDraft.properties.kind.enum.2",
+          "$defs.TrackDraft.properties.kind.title",
+          "$defs.TrackDraft.properties.kind.type",
+          "$defs.TrackDraft.properties.role.enum.0",
+          "$defs.TrackDraft.properties.role.enum.1",
+          "$defs.TrackDraft.properties.role.enum.2",
+          "$defs.TrackDraft.properties.role.enum.3",
+          "$defs.TrackDraft.properties.role.title",
+          "$defs.TrackDraft.properties.role.type",
+          "$defs.TrackDraft.properties.title.minLength",
+          "$defs.TrackDraft.properties.title.title",
+          "$defs.TrackDraft.properties.title.type",
+          "$defs.TrackDraft.properties.x_scale.anyOf.0.$ref",
+          "$defs.TrackDraft.properties.x_scale.anyOf.1.type",
+          "$defs.TrackDraft.properties.x_scale.default",
+          "$defs.TrackDraft.required.0",
+          "$defs.TrackDraft.required.1",
+          "$defs.TrackDraft.required.2",
+          "$defs.TrackDraft.required.3",
+          "$defs.TrackDraft.title",
+          "$defs.TrackDraft.type"
+        ],
+        "track_schema_equivalent": false
+      },
+      "from": "U0",
+      "to": "U1"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackU.additionalProperties",
+          "$defs.ArrayTrackU.description",
+          "$defs.ArrayTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackU.properties.bindings.minItems",
+          "$defs.ArrayTrackU.properties.bindings.title",
+          "$defs.ArrayTrackU.properties.bindings.type",
+          "$defs.ArrayTrackU.properties.kind.const",
+          "$defs.ArrayTrackU.properties.kind.title",
+          "$defs.ArrayTrackU.properties.kind.type",
+          "$defs.ArrayTrackU.properties.role.enum.0",
+          "$defs.ArrayTrackU.properties.role.enum.1",
+          "$defs.ArrayTrackU.properties.role.enum.2",
+          "$defs.ArrayTrackU.properties.role.enum.3",
+          "$defs.ArrayTrackU.properties.role.title",
+          "$defs.ArrayTrackU.properties.role.type",
+          "$defs.ArrayTrackU.properties.title.minLength",
+          "$defs.ArrayTrackU.properties.title.title",
+          "$defs.ArrayTrackU.properties.title.type",
+          "$defs.ArrayTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackU.properties.x_scale.default",
+          "$defs.ArrayTrackU.required.0",
+          "$defs.ArrayTrackU.required.1",
+          "$defs.ArrayTrackU.required.2",
+          "$defs.ArrayTrackU.required.3",
+          "$defs.ArrayTrackU.title",
+          "$defs.ArrayTrackU.type",
+          "$defs.NormalTrackU.additionalProperties",
+          "$defs.NormalTrackU.description",
+          "$defs.NormalTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.NormalTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.NormalTrackU.properties.bindings.minItems",
+          "$defs.NormalTrackU.properties.bindings.title",
+          "$defs.NormalTrackU.properties.bindings.type",
+          "$defs.NormalTrackU.properties.kind.const",
+          "$defs.NormalTrackU.properties.kind.title",
+          "$defs.NormalTrackU.properties.kind.type",
+          "$defs.NormalTrackU.properties.role.enum.0",
+          "$defs.NormalTrackU.properties.role.enum.1",
+          "$defs.NormalTrackU.properties.role.enum.2",
+          "$defs.NormalTrackU.properties.role.enum.3",
+          "$defs.NormalTrackU.properties.role.title",
+          "$defs.NormalTrackU.properties.role.type",
+          "$defs.NormalTrackU.properties.title.minLength",
+          "$defs.NormalTrackU.properties.title.title",
+          "$defs.NormalTrackU.properties.title.type",
+          "$defs.NormalTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackU.properties.x_scale.default",
+          "$defs.NormalTrackU.required.0",
+          "$defs.NormalTrackU.required.1",
+          "$defs.NormalTrackU.required.2",
+          "$defs.NormalTrackU.required.3",
+          "$defs.NormalTrackU.title",
+          "$defs.NormalTrackU.type",
+          "$defs.ReferenceTrackU.additionalProperties",
+          "$defs.ReferenceTrackU.description",
+          "$defs.ReferenceTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ReferenceTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ReferenceTrackU.properties.bindings.minItems",
+          "$defs.ReferenceTrackU.properties.bindings.title",
+          "$defs.ReferenceTrackU.properties.bindings.type",
+          "$defs.ReferenceTrackU.properties.kind.const",
+          "$defs.ReferenceTrackU.properties.kind.title",
+          "$defs.ReferenceTrackU.properties.kind.type",
+          "$defs.ReferenceTrackU.properties.role.enum.0",
+          "$defs.ReferenceTrackU.properties.role.enum.1",
+          "$defs.ReferenceTrackU.properties.role.enum.2",
+          "$defs.ReferenceTrackU.properties.role.enum.3",
+          "$defs.ReferenceTrackU.properties.role.title",
+          "$defs.ReferenceTrackU.properties.role.type",
+          "$defs.ReferenceTrackU.properties.title.minLength",
+          "$defs.ReferenceTrackU.properties.title.title",
+          "$defs.ReferenceTrackU.properties.title.type",
+          "$defs.ReferenceTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackU.properties.x_scale.default",
+          "$defs.ReferenceTrackU.required.0",
+          "$defs.ReferenceTrackU.required.1",
+          "$defs.ReferenceTrackU.required.2",
+          "$defs.ReferenceTrackU.required.3",
+          "$defs.ReferenceTrackU.title",
+          "$defs.ReferenceTrackU.type",
+          "properties.tracks.items.anyOf.0.$ref",
+          "properties.tracks.items.anyOf.1.$ref",
+          "properties.tracks.items.anyOf.2.$ref"
+        ],
+        "changed_paths": [
+          "description",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.TrackDraftU1.additionalProperties",
+          "$defs.TrackDraftU1.description",
+          "$defs.TrackDraftU1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.TrackDraftU1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.TrackDraftU1.properties.bindings.minItems",
+          "$defs.TrackDraftU1.properties.bindings.title",
+          "$defs.TrackDraftU1.properties.bindings.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.0.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.0.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.1.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.1.type",
+          "$defs.TrackDraftU1.properties.kind.anyOf.2.const",
+          "$defs.TrackDraftU1.properties.kind.anyOf.2.type",
+          "$defs.TrackDraftU1.properties.kind.title",
+          "$defs.TrackDraftU1.properties.role.enum.0",
+          "$defs.TrackDraftU1.properties.role.enum.1",
+          "$defs.TrackDraftU1.properties.role.enum.2",
+          "$defs.TrackDraftU1.properties.role.enum.3",
+          "$defs.TrackDraftU1.properties.role.title",
+          "$defs.TrackDraftU1.properties.role.type",
+          "$defs.TrackDraftU1.properties.title.minLength",
+          "$defs.TrackDraftU1.properties.title.title",
+          "$defs.TrackDraftU1.properties.title.type",
+          "$defs.TrackDraftU1.properties.x_scale.anyOf.0.$ref",
+          "$defs.TrackDraftU1.properties.x_scale.anyOf.1.type",
+          "$defs.TrackDraftU1.properties.x_scale.default",
+          "$defs.TrackDraftU1.required.0",
+          "$defs.TrackDraftU1.required.1",
+          "$defs.TrackDraftU1.required.2",
+          "$defs.TrackDraftU1.required.3",
+          "$defs.TrackDraftU1.title",
+          "$defs.TrackDraftU1.type",
+          "properties.tracks.items.$ref"
+        ],
+        "track_schema_equivalent": false
+      },
+      "from": "U1",
+      "to": "U2"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.discriminator.propertyName",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref"
+        ],
+        "changed_paths": [
+          "description",
+          "title"
+        ],
+        "removed_paths": [
+          "properties.tracks.items.anyOf.0.$ref",
+          "properties.tracks.items.anyOf.1.$ref",
+          "properties.tracks.items.anyOf.2.$ref"
+        ],
+        "track_schema_equivalent": false
+      },
+      "from": "U2",
+      "to": "U3"
+    },
+    {
+      "diff": {
+        "added_paths": [
+          "$defs.ArrayTrackDraftS1.additionalProperties",
+          "$defs.ArrayTrackDraftS1.description",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackDraftS1.properties.bindings.minItems",
+          "$defs.ArrayTrackDraftS1.properties.bindings.title",
+          "$defs.ArrayTrackDraftS1.properties.bindings.type",
+          "$defs.ArrayTrackDraftS1.properties.kind.const",
+          "$defs.ArrayTrackDraftS1.properties.kind.default",
+          "$defs.ArrayTrackDraftS1.properties.kind.title",
+          "$defs.ArrayTrackDraftS1.properties.kind.type",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.0",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.1",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.2",
+          "$defs.ArrayTrackDraftS1.properties.role.enum.3",
+          "$defs.ArrayTrackDraftS1.properties.role.title",
+          "$defs.ArrayTrackDraftS1.properties.role.type",
+          "$defs.ArrayTrackDraftS1.properties.title.minLength",
+          "$defs.ArrayTrackDraftS1.properties.title.title",
+          "$defs.ArrayTrackDraftS1.properties.title.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackDraftS1.properties.x_scale.default",
+          "$defs.ArrayTrackDraftS1.required.0",
+          "$defs.ArrayTrackDraftS1.required.1",
+          "$defs.ArrayTrackDraftS1.required.2",
+          "$defs.ArrayTrackDraftS1.title",
+          "$defs.ArrayTrackDraftS1.type",
+          "$defs.NormalTrackDraftS1.additionalProperties",
+          "$defs.NormalTrackDraftS1.description",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.NormalTrackDraftS1.properties.bindings.minItems",
+          "$defs.NormalTrackDraftS1.properties.bindings.title",
+          "$defs.NormalTrackDraftS1.properties.bindings.type",
+          "$defs.NormalTrackDraftS1.properties.kind.const",
+          "$defs.NormalTrackDraftS1.properties.kind.default",
+          "$defs.NormalTrackDraftS1.properties.kind.title",
+          "$defs.NormalTrackDraftS1.properties.kind.type",
+          "$defs.NormalTrackDraftS1.properties.role.enum.0",
+          "$defs.NormalTrackDraftS1.properties.role.enum.1",
+          "$defs.NormalTrackDraftS1.properties.role.enum.2",
+          "$defs.NormalTrackDraftS1.properties.role.enum.3",
+          "$defs.NormalTrackDraftS1.properties.role.title",
+          "$defs.NormalTrackDraftS1.properties.role.type",
+          "$defs.NormalTrackDraftS1.properties.title.minLength",
+          "$defs.NormalTrackDraftS1.properties.title.title",
+          "$defs.NormalTrackDraftS1.properties.title.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackDraftS1.properties.x_scale.default",
+          "$defs.NormalTrackDraftS1.required.0",
+          "$defs.NormalTrackDraftS1.required.1",
+          "$defs.NormalTrackDraftS1.required.2",
+          "$defs.NormalTrackDraftS1.title",
+          "$defs.NormalTrackDraftS1.type",
+          "$defs.ReferenceTrackDraftS1.additionalProperties",
+          "$defs.ReferenceTrackDraftS1.description",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.minItems",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.title",
+          "$defs.ReferenceTrackDraftS1.properties.bindings.type",
+          "$defs.ReferenceTrackDraftS1.properties.kind.const",
+          "$defs.ReferenceTrackDraftS1.properties.kind.default",
+          "$defs.ReferenceTrackDraftS1.properties.kind.title",
+          "$defs.ReferenceTrackDraftS1.properties.kind.type",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.0",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.1",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.2",
+          "$defs.ReferenceTrackDraftS1.properties.role.enum.3",
+          "$defs.ReferenceTrackDraftS1.properties.role.title",
+          "$defs.ReferenceTrackDraftS1.properties.role.type",
+          "$defs.ReferenceTrackDraftS1.properties.title.minLength",
+          "$defs.ReferenceTrackDraftS1.properties.title.title",
+          "$defs.ReferenceTrackDraftS1.properties.title.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackDraftS1.properties.x_scale.default",
+          "$defs.ReferenceTrackDraftS1.required.0",
+          "$defs.ReferenceTrackDraftS1.required.1",
+          "$defs.ReferenceTrackDraftS1.required.2",
+          "$defs.ReferenceTrackDraftS1.title",
+          "$defs.ReferenceTrackDraftS1.type"
+        ],
+        "changed_paths": [
+          "description",
+          "properties.tracks.items.discriminator.mapping.array",
+          "properties.tracks.items.discriminator.mapping.normal",
+          "properties.tracks.items.discriminator.mapping.reference",
+          "properties.tracks.items.oneOf.0.$ref",
+          "properties.tracks.items.oneOf.1.$ref",
+          "properties.tracks.items.oneOf.2.$ref",
+          "title"
+        ],
+        "removed_paths": [
+          "$defs.ArrayTrackU.additionalProperties",
+          "$defs.ArrayTrackU.description",
+          "$defs.ArrayTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ArrayTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ArrayTrackU.properties.bindings.minItems",
+          "$defs.ArrayTrackU.properties.bindings.title",
+          "$defs.ArrayTrackU.properties.bindings.type",
+          "$defs.ArrayTrackU.properties.kind.const",
+          "$defs.ArrayTrackU.properties.kind.title",
+          "$defs.ArrayTrackU.properties.kind.type",
+          "$defs.ArrayTrackU.properties.role.enum.0",
+          "$defs.ArrayTrackU.properties.role.enum.1",
+          "$defs.ArrayTrackU.properties.role.enum.2",
+          "$defs.ArrayTrackU.properties.role.enum.3",
+          "$defs.ArrayTrackU.properties.role.title",
+          "$defs.ArrayTrackU.properties.role.type",
+          "$defs.ArrayTrackU.properties.title.minLength",
+          "$defs.ArrayTrackU.properties.title.title",
+          "$defs.ArrayTrackU.properties.title.type",
+          "$defs.ArrayTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.ArrayTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.ArrayTrackU.properties.x_scale.default",
+          "$defs.ArrayTrackU.required.0",
+          "$defs.ArrayTrackU.required.1",
+          "$defs.ArrayTrackU.required.2",
+          "$defs.ArrayTrackU.required.3",
+          "$defs.ArrayTrackU.title",
+          "$defs.ArrayTrackU.type",
+          "$defs.NormalTrackU.additionalProperties",
+          "$defs.NormalTrackU.description",
+          "$defs.NormalTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.NormalTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.NormalTrackU.properties.bindings.minItems",
+          "$defs.NormalTrackU.properties.bindings.title",
+          "$defs.NormalTrackU.properties.bindings.type",
+          "$defs.NormalTrackU.properties.kind.const",
+          "$defs.NormalTrackU.properties.kind.title",
+          "$defs.NormalTrackU.properties.kind.type",
+          "$defs.NormalTrackU.properties.role.enum.0",
+          "$defs.NormalTrackU.properties.role.enum.1",
+          "$defs.NormalTrackU.properties.role.enum.2",
+          "$defs.NormalTrackU.properties.role.enum.3",
+          "$defs.NormalTrackU.properties.role.title",
+          "$defs.NormalTrackU.properties.role.type",
+          "$defs.NormalTrackU.properties.title.minLength",
+          "$defs.NormalTrackU.properties.title.title",
+          "$defs.NormalTrackU.properties.title.type",
+          "$defs.NormalTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.NormalTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.NormalTrackU.properties.x_scale.default",
+          "$defs.NormalTrackU.required.0",
+          "$defs.NormalTrackU.required.1",
+          "$defs.NormalTrackU.required.2",
+          "$defs.NormalTrackU.required.3",
+          "$defs.NormalTrackU.title",
+          "$defs.NormalTrackU.type",
+          "$defs.ReferenceTrackU.additionalProperties",
+          "$defs.ReferenceTrackU.description",
+          "$defs.ReferenceTrackU.properties.bindings.items.anyOf.0.$ref",
+          "$defs.ReferenceTrackU.properties.bindings.items.anyOf.1.$ref",
+          "$defs.ReferenceTrackU.properties.bindings.minItems",
+          "$defs.ReferenceTrackU.properties.bindings.title",
+          "$defs.ReferenceTrackU.properties.bindings.type",
+          "$defs.ReferenceTrackU.properties.kind.const",
+          "$defs.ReferenceTrackU.properties.kind.title",
+          "$defs.ReferenceTrackU.properties.kind.type",
+          "$defs.ReferenceTrackU.properties.role.enum.0",
+          "$defs.ReferenceTrackU.properties.role.enum.1",
+          "$defs.ReferenceTrackU.properties.role.enum.2",
+          "$defs.ReferenceTrackU.properties.role.enum.3",
+          "$defs.ReferenceTrackU.properties.role.title",
+          "$defs.ReferenceTrackU.properties.role.type",
+          "$defs.ReferenceTrackU.properties.title.minLength",
+          "$defs.ReferenceTrackU.properties.title.title",
+          "$defs.ReferenceTrackU.properties.title.type",
+          "$defs.ReferenceTrackU.properties.x_scale.anyOf.0.$ref",
+          "$defs.ReferenceTrackU.properties.x_scale.anyOf.1.type",
+          "$defs.ReferenceTrackU.properties.x_scale.default",
+          "$defs.ReferenceTrackU.required.0",
+          "$defs.ReferenceTrackU.required.1",
+          "$defs.ReferenceTrackU.required.2",
+          "$defs.ReferenceTrackU.required.3",
+          "$defs.ReferenceTrackU.title",
+          "$defs.ReferenceTrackU.type"
+        ],
+        "track_schema_equivalent": false
+      },
+      "from": "U3",
+      "to": "U4"
+    }
+  ],
+  "baseline_sha": "2e317e1",
+  "experiment_version": "exp-tw-06.union-bisect.v1",
+  "u2_u3_branch_equivalence": {
+    "ArrayTrackU": true,
+    "NormalTrackU": true,
+    "ReferenceTrackU": true
+  },
+  "variants": [
+    {
+      "normalized_track_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "items": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "curve",
+                      "default": "curve",
+                      "type": "string"
+                    },
+                    "scale": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "linear",
+                          "default": "linear",
+                          "type": "string"
+                        },
+                        "maximum": {
+                          "type": "number"
+                        },
+                        "minimum": {
+                          "type": "number"
+                        },
+                        "reverse": {
+                          "default": false,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "minimum",
+                        "maximum"
+                      ],
+                      "type": "object"
+                    },
+                    "semantic_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "semantic_id",
+                    "channel",
+                    "scale"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "raster",
+                      "default": "raster",
+                      "type": "string"
+                    },
+                    "profile": {
+                      "const": "vdl",
+                      "default": "vdl",
+                      "type": "string"
+                    },
+                    "sample_axis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "maximum": {
+                          "type": "number"
+                        },
+                        "minimum": {
+                          "type": "number"
+                        },
+                        "source_origin": {
+                          "type": "number"
+                        },
+                        "source_step": {
+                          "type": "number"
+                        },
+                        "tick_count": {
+                          "minimum": 2,
+                          "type": "integer"
+                        },
+                        "unit": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "unit",
+                        "minimum",
+                        "maximum",
+                        "tick_count",
+                        "source_origin",
+                        "source_step"
+                      ],
+                      "type": "object"
+                    },
+                    "semantic_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "semantic_id",
+                    "channel",
+                    "sample_axis"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "normal",
+              "reference",
+              "array"
+            ],
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "combo",
+              "depth",
+              "cbl",
+              "vdl"
+            ],
+            "type": "string"
+          },
+          "x_scale": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "linear",
+                    "default": "linear",
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "type": "number"
+                  },
+                  "minimum": {
+                    "type": "number"
+                  },
+                  "reverse": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "minimum",
+                  "maximum"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "role",
+          "kind",
+          "title",
+          "bindings"
+        ],
+        "type": "object"
+      },
+      "response_model": "SectionDraft",
+      "response_schema_sha256": "c19b81abe637e6d07c434a522ef01bd7e813bcbe16bb0e928044faa8217ab7e3",
+      "schema": {
+        "$defs": {
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          },
+          "TrackDraft": {
+            "additionalProperties": false,
+            "description": "One ordered semantic track; width and styling are host-completed.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "enum": [
+                  "normal",
+                  "reference",
+                  "array"
+                ],
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "TrackDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "Corrected semantic intent sufficient for the frozen CBL artifact.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/$defs/TrackDraft"
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraft",
+        "type": "object"
+      },
+      "schema_variant": "U0"
+    },
+    {
+      "normalized_track_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "bindings": {
+            "items": {
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "curve",
+                      "default": "curve",
+                      "type": "string"
+                    },
+                    "scale": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "const": "linear",
+                          "default": "linear",
+                          "type": "string"
+                        },
+                        "maximum": {
+                          "type": "number"
+                        },
+                        "minimum": {
+                          "type": "number"
+                        },
+                        "reverse": {
+                          "default": false,
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "minimum",
+                        "maximum"
+                      ],
+                      "type": "object"
+                    },
+                    "semantic_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "semantic_id",
+                    "channel",
+                    "scale"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "channel": {
+                      "minLength": 1,
+                      "type": "string"
+                    },
+                    "kind": {
+                      "const": "raster",
+                      "default": "raster",
+                      "type": "string"
+                    },
+                    "profile": {
+                      "const": "vdl",
+                      "default": "vdl",
+                      "type": "string"
+                    },
+                    "sample_axis": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "maximum": {
+                          "type": "number"
+                        },
+                        "minimum": {
+                          "type": "number"
+                        },
+                        "source_origin": {
+                          "type": "number"
+                        },
+                        "source_step": {
+                          "type": "number"
+                        },
+                        "tick_count": {
+                          "minimum": 2,
+                          "type": "integer"
+                        },
+                        "unit": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "unit",
+                        "minimum",
+                        "maximum",
+                        "tick_count",
+                        "source_origin",
+                        "source_step"
+                      ],
+                      "type": "object"
+                    },
+                    "semantic_id": {
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "semantic_id",
+                    "channel",
+                    "sample_axis"
+                  ],
+                  "type": "object"
+                }
+              ]
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "const": "normal",
+                "type": "string"
+              },
+              {
+                "const": "reference",
+                "type": "string"
+              },
+              {
+                "const": "array",
+                "type": "string"
+              }
+            ]
+          },
+          "role": {
+            "enum": [
+              "combo",
+              "depth",
+              "cbl",
+              "vdl"
+            ],
+            "type": "string"
+          },
+          "x_scale": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "const": "linear",
+                    "default": "linear",
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "type": "number"
+                  },
+                  "minimum": {
+                    "type": "number"
+                  },
+                  "reverse": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "minimum",
+                  "maximum"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "role",
+          "kind",
+          "title",
+          "bindings"
+        ],
+        "type": "object"
+      },
+      "response_model": "SectionDraftU1",
+      "response_schema_sha256": "c8cbb9737e2d048e6763d5f57990d42783e17a8b30fb649c83c6520192d62706",
+      "schema": {
+        "$defs": {
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          },
+          "TrackDraftU1": {
+            "additionalProperties": false,
+            "description": "Historical track shape with a field-level literal union for kind.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "normal",
+                    "type": "string"
+                  },
+                  {
+                    "const": "reference",
+                    "type": "string"
+                  },
+                  {
+                    "const": "array",
+                    "type": "string"
+                  }
+                ],
+                "title": "Kind"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "TrackDraftU1",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "U1 section with only the field-level kind representation changed.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "$ref": "#/$defs/TrackDraftU1"
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftU1",
+        "type": "object"
+      },
+      "schema_variant": "U1"
+    },
+    {
+      "normalized_track_schema": {
+        "anyOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "response_model": "SectionDraftU2",
+      "response_schema_sha256": "b9e361f59c187995c1aae45087a854aabdc336d241f17e74759c4cc6d8bee412",
+      "schema": {
+        "$defs": {
+          "ArrayTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 array branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackU",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 normal branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackU",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 reference branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackU",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "U2 section with an ordinary union of branch track models.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackU"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackU"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackU"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftU2",
+        "type": "object"
+      },
+      "schema_variant": "U2"
+    },
+    {
+      "normalized_track_schema": {
+        "discriminator": {
+          "mapping": {
+            "array": "#/$defs/ArrayTrackU",
+            "normal": "#/$defs/NormalTrackU",
+            "reference": "#/$defs/ReferenceTrackU"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "response_model": "SectionDraftU3",
+      "response_schema_sha256": "6f8cf97ae248738d3303ab156caeb1a0756c71fea68a991e974fb1cc8d08e297",
+      "schema": {
+        "$defs": {
+          "ArrayTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 array branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackU",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 normal branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackU",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackU": {
+            "additionalProperties": false,
+            "description": "U2/U3 reference branch with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "kind",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackU",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "U3 section with the U2 branches wrapped in a discriminator.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackU",
+                  "normal": "#/$defs/NormalTrackU",
+                  "reference": "#/$defs/ReferenceTrackU"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackU"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackU"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackU"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftU3",
+        "type": "object"
+      },
+      "schema_variant": "U3"
+    },
+    {
+      "normalized_track_schema": {
+        "discriminator": {
+          "mapping": {
+            "array": "#/$defs/ArrayTrackDraftS1",
+            "normal": "#/$defs/NormalTrackDraftS1",
+            "reference": "#/$defs/ReferenceTrackDraftS1"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "curve",
+                          "default": "curve",
+                          "type": "string"
+                        },
+                        "scale": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "linear",
+                              "default": "linear",
+                              "type": "string"
+                            },
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "reverse": {
+                              "default": false,
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "minimum",
+                            "maximum"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "scale"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "channel": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "kind": {
+                          "const": "raster",
+                          "default": "raster",
+                          "type": "string"
+                        },
+                        "profile": {
+                          "const": "vdl",
+                          "default": "vdl",
+                          "type": "string"
+                        },
+                        "sample_axis": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "maximum": {
+                              "type": "number"
+                            },
+                            "minimum": {
+                              "type": "number"
+                            },
+                            "source_origin": {
+                              "type": "number"
+                            },
+                            "source_step": {
+                              "type": "number"
+                            },
+                            "tick_count": {
+                              "minimum": 2,
+                              "type": "integer"
+                            },
+                            "unit": {
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "unit",
+                            "minimum",
+                            "maximum",
+                            "tick_count",
+                            "source_origin",
+                            "source_step"
+                          ],
+                          "type": "object"
+                        },
+                        "semantic_id": {
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "semantic_id",
+                        "channel",
+                        "sample_axis"
+                      ],
+                      "type": "object"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "const": "linear",
+                        "default": "linear",
+                        "type": "string"
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "minimum",
+                      "maximum"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "response_model": "SectionDraftS1",
+      "response_schema_sha256": "e189118a3e075e07d8ee1fbf7b53560ec4b834dbf2f7e7af8bbde5b5b8e5aeb3",
+      "schema": {
+        "$defs": {
+          "ArrayTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 array track with optional x scale and mixed bindings.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "array",
+                "default": "array",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ArrayTrackDraftS1",
+            "type": "object"
+          },
+          "CurveBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered scalar view, including identity for repeated channels.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "curve",
+                "default": "curve",
+                "title": "Kind",
+                "type": "string"
+              },
+              "scale": {
+                "$ref": "#/$defs/ScaleDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "scale"
+            ],
+            "title": "CurveBindingDraft",
+            "type": "object"
+          },
+          "NormalTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 normal track with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "normal",
+                "default": "normal",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "NormalTrackDraftS1",
+            "type": "object"
+          },
+          "RasterBindingDraft": {
+            "additionalProperties": false,
+            "description": "One ordered array view and its scientific display semantics.",
+            "properties": {
+              "channel": {
+                "minLength": 1,
+                "title": "Channel",
+                "type": "string"
+              },
+              "kind": {
+                "const": "raster",
+                "default": "raster",
+                "title": "Kind",
+                "type": "string"
+              },
+              "profile": {
+                "const": "vdl",
+                "default": "vdl",
+                "title": "Profile",
+                "type": "string"
+              },
+              "sample_axis": {
+                "$ref": "#/$defs/SampleAxisDraft"
+              },
+              "semantic_id": {
+                "minLength": 1,
+                "title": "Semantic Id",
+                "type": "string"
+              }
+            },
+            "required": [
+              "semantic_id",
+              "channel",
+              "sample_axis"
+            ],
+            "title": "RasterBindingDraft",
+            "type": "object"
+          },
+          "ReferenceTrackDraftS1": {
+            "additionalProperties": false,
+            "description": "S1 reference track with historical binding permissiveness.",
+            "properties": {
+              "bindings": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/CurveBindingDraft"
+                    },
+                    {
+                      "$ref": "#/$defs/RasterBindingDraft"
+                    }
+                  ]
+                },
+                "minItems": 1,
+                "title": "Bindings",
+                "type": "array"
+              },
+              "kind": {
+                "const": "reference",
+                "default": "reference",
+                "title": "Kind",
+                "type": "string"
+              },
+              "role": {
+                "enum": [
+                  "combo",
+                  "depth",
+                  "cbl",
+                  "vdl"
+                ],
+                "title": "Role",
+                "type": "string"
+              },
+              "title": {
+                "minLength": 1,
+                "title": "Title",
+                "type": "string"
+              },
+              "x_scale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ScaleDraft"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null
+              }
+            },
+            "required": [
+              "role",
+              "title",
+              "bindings"
+            ],
+            "title": "ReferenceTrackDraftS1",
+            "type": "object"
+          },
+          "SampleAxisDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned VDL sample-axis semantics.",
+            "properties": {
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "source_origin": {
+                "title": "Source Origin",
+                "type": "number"
+              },
+              "source_step": {
+                "title": "Source Step",
+                "type": "number"
+              },
+              "tick_count": {
+                "minimum": 2,
+                "title": "Tick Count",
+                "type": "integer"
+              },
+              "unit": {
+                "minLength": 1,
+                "title": "Unit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "unit",
+              "minimum",
+              "maximum",
+              "tick_count",
+              "source_origin",
+              "source_step"
+            ],
+            "title": "SampleAxisDraft",
+            "type": "object"
+          },
+          "ScaleDraft": {
+            "additionalProperties": false,
+            "description": "Worker-owned scalar or raster axis scale.",
+            "properties": {
+              "kind": {
+                "const": "linear",
+                "default": "linear",
+                "title": "Kind",
+                "type": "string"
+              },
+              "maximum": {
+                "title": "Maximum",
+                "type": "number"
+              },
+              "minimum": {
+                "title": "Minimum",
+                "type": "number"
+              },
+              "reverse": {
+                "default": false,
+                "title": "Reverse",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "minimum",
+              "maximum"
+            ],
+            "title": "ScaleDraft",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
+        "description": "S1 section with only track-level discrimination added.",
+        "properties": {
+          "source_candidate": {
+            "minLength": 1,
+            "title": "Source Candidate",
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "tracks": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "array": "#/$defs/ArrayTrackDraftS1",
+                  "normal": "#/$defs/NormalTrackDraftS1",
+                  "reference": "#/$defs/ReferenceTrackDraftS1"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/NormalTrackDraftS1"
+                },
+                {
+                  "$ref": "#/$defs/ReferenceTrackDraftS1"
+                },
+                {
+                  "$ref": "#/$defs/ArrayTrackDraftS1"
+                }
+              ]
+            },
+            "minItems": 1,
+            "title": "Tracks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "source_candidate",
+          "tracks"
+        ],
+        "title": "SectionDraftS1",
+        "type": "object"
+      },
+      "schema_variant": "U4"
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "baseline_sha": "2e317e1",
+  "implementation_commit": "5c4b3a3",
+  "experiment_version": "exp-tw-06.union-bisect.v1",
+  "provider": {
+    "provider_id": "llama_cpp",
+    "model_id": "qwen3.6-35b-a3b",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900.0,
+    "thinking": "disabled"
+  },
+  "schema_hashes": {
+    "U0": "c19b81abe637e6d07c434a522ef01bd7e813bcbe16bb0e928044faa8217ab7e3",
+    "U1": "c8cbb9737e2d048e6763d5f57990d42783e17a8b30fb649c83c6520192d62706",
+    "U2": "b9e361f59c187995c1aae45087a854aabdc336d241f17e74759c4cc6d8bee412",
+    "U3": "6f8cf97ae248738d3303ab156caeb1a0756c71fea68a991e974fb1cc8d08e297",
+    "U4": "e189118a3e075e07d8ee1fbf7b53560ec4b834dbf2f7e7af8bbde5b5b8e5aeb3"
+  },
+  "results": [
+    {
+      "schema_variant": "U0",
+      "feature": "historical control",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 6,
+      "sections": {
+        "main_pass": {"structured": "10/10", "gate_a_successes": 4, "total_tokens": 17542, "latency_ms": 1133102.7847990044},
+        "repeat_pass": {"structured": "10/10", "gate_a_successes": 2, "total_tokens": 17152, "latency_ms": 1080505.497025988}
+      }
+    },
+    {
+      "schema_variant": "U1",
+      "feature": "field-level literal union",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 4,
+      "sections": {
+        "main_pass": {"structured": "10/10", "gate_a_successes": 1, "total_tokens": 16847, "latency_ms": 506177.69153104746},
+        "repeat_pass": {"structured": "10/10", "gate_a_successes": 3, "total_tokens": 16611, "latency_ms": 525534.5523970027}
+      }
+    },
+    {
+      "schema_variant": "U2",
+      "feature": "ordinary track model union",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 3,
+      "sections": {
+        "main_pass": {"structured": "10/10", "gate_a_successes": 3, "total_tokens": 16759, "latency_ms": 524662.6310130232},
+        "repeat_pass": {"structured": "10/10", "gate_a_successes": 0, "total_tokens": 16800, "latency_ms": 560691.8109719845}
+      }
+    },
+    {
+      "schema_variant": "U3",
+      "feature": "discriminated union over the U2 branches",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "provider_failures": 0,
+      "gate_a_successes": 4,
+      "sections": {
+        "main_pass": {"structured": "10/10", "gate_a_successes": 2, "total_tokens": 16875, "latency_ms": 532575.3957650159},
+        "repeat_pass": {"structured": "10/10", "gate_a_successes": 2, "total_tokens": 16801, "latency_ms": 558503.3258579642}
+      }
+    },
+    {
+      "schema_variant": "U4",
+      "feature": "exact TW-05 S1 control",
+      "total_attempts": 20,
+      "provider_call_successes": 20,
+      "structurally_valid_outputs": 0,
+      "structured_output_failures": 20,
+      "provider_failures": 0,
+      "gate_a_successes": 0,
+      "sections": {
+        "main_pass": {"structured": "0/10", "gate_a_successes": 0, "total_tokens": null, "latency_ms": null},
+        "repeat_pass": {"structured": "0/10", "gate_a_successes": 0, "total_tokens": null, "latency_ms": null}
+      }
+    }
+  ],
+  "first_observed_degradation": "U3->U4",
+  "first_complete_collapse": "U3->U4",
+  "not_completed_variants": [],
+  "interpretation": "U0 through U3 remained structurally compatible. U4, the exact TW-05 S1 model, reproduced the complete invalid-response collapse. The result localizes the incompatibility to residual U3-to-S1 schema differences without attributing it to the discriminator keyword alone."
+}
