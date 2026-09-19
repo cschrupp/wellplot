@@ -66,7 +66,7 @@
     }
   ],
   "first_observed_compatibility_collapse": "S0->S1",
-  "unrun_variants": ["S2", "S3", "S4", "S5"],
+  "not_completed_variants": ["S2", "S3", "S4", "S5"],
   "partial_observations": [
     {
       "schema_variant": "S2",
