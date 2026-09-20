@@ -73,9 +73,11 @@ Validation at the implementation checkpoint:
 - `git diff --check` passed
 - Zero changes under the pre-existing CM-55 files or public routing paths
 
-The current full repository suite was not used as a CM-56 gate. Existing
-unrelated worktree changes remain untouched and the prior CM-55R baseline
-comparison remains the authoritative full-suite qualification.
+The full repository suite completed with `1542 passed, 10 failed, 2 skipped,
+11 subtests passed`. The ten failures are confined to the previously unrelated
+agent/tool-contract and graph report/section tests; no CM-56 change touched
+those files. Existing unrelated worktree changes remain untouched. The exact
+failure nodes and qualification are recorded in `CM-56-live-summary.json`.
 
 ## Live Controls
 
@@ -103,6 +105,7 @@ advertising model `qwen3.6-35b-a3b`:
 - 3 sequential attempts per case
 - 30 case-level rows and 33 section outcomes
 - evidence: `CM-56-live-qwen.jsonl`
+- aggregate summary: `CM-56-live-summary.json`
 - evidence SHA-256: `e383983a6fa84b629d994b9adea4019c70e326bec91f4e4fb8bb9a69c9161137`
 - provider payload/path redaction scan: passed
 
@@ -125,6 +128,13 @@ contains four rows whose bounded error type is
 retained as observed downstream evidence and do not override the earlier
 input-sufficiency stop condition.
 
+The four rows classified by the unchanged harness as
+`DETERMINISTIC_COMPILER_FAILURE` have raw error type
+`SectionSemanticValidationError`; they failed during typed context validation
+before deterministic compilation. The program-worker comparator was not run
+after the decisive input-contract stop, so no additional inference or provider
+comparison is implied by CM-56.
+
 CM-56 therefore stops at `STOP_INPUT_CONTRACT`. No CM-57 scope is authorized
 by this evidence, and no production routing or provider code was changed.
 
@@ -133,8 +143,9 @@ by this evidence, and no production routing or provider code was changed.
 CM-56 does not implement provider generation outside the shadow harness,
 repair, typed-worker routing, public cutover, revision support, capability
 extensions, source discovery, persistence, rendering, MCP changes, or legacy
-deletion. If the live matrix shows missing planner/enricher semantics, the
-next slice is CM-56R rather than a prompt-only workaround.
+deletion. The next separately authorized slice is CM-56R for planner-to-worker
+source and explicit scientific-requirement preservation; it must rerun this
+unchanged typed worker before any prompt or worker changes are considered.
 
 ## Decision
 

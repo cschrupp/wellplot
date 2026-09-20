@@ -1,0 +1,63 @@
+{
+  "experiment": "CM-56",
+  "evidence_file": "CM-56-live-qwen.jsonl",
+  "evidence_sha256": "e383983a6fa84b629d994b9adea4019c70e326bec91f4e4fb8bb9a69c9161137",
+  "provider": {
+    "backend": "openai_compatible",
+    "model": "qwen3.6-35b-a3b",
+    "endpoint": "controlled local llama.cpp",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900,
+    "thinking": false,
+    "sequential": true
+  },
+  "matrix": {
+    "case_count": 10,
+    "attempts_per_case": 3,
+    "case_rows": 30,
+    "section_outcomes": 33
+  },
+  "classification_counts": {
+    "INPUT_INSUFFICIENT": 21,
+    "PLANNER_FAILURE": 6,
+    "DETERMINISTIC_COMPILER_FAILURE": 4,
+    "SCHEMA_COMPATIBILITY_FAILURE": 1,
+    "TYPED_WORKER_SEMANTIC_FAILURE": 1
+  },
+  "input_sufficiency_losses": {
+    "source_grounding": 21,
+    "scale_semantics": 5,
+    "repeated_view_fact": 1,
+    "sample_axis_fact": 1
+  },
+  "raw_error_types": {
+    "SectionSemanticValidationError": 4,
+    "ProviderRequestError": 3,
+    "PlannerSemanticFailure": 4
+  },
+  "interpretation": {
+    "decision": "STOP_INPUT_CONTRACT",
+    "dominant_boundary": "planner_to_enricher_source_and_requirement_preservation",
+    "validation_rows": "The four rows classified by the harness as DETERMINISTIC_COMPILER_FAILURE have raw error type SectionSemanticValidationError and occurred during typed context validation before deterministic compilation.",
+    "program_comparator": "not_executed_after_decisive_input_stop",
+    "provider_raw_content_retained": false,
+    "canonical_paths_retained": false
+  },
+  "full_suite": {
+    "result": "1542 passed, 10 failed, 2 skipped, 11 subtests passed",
+    "failure_nodes": [
+      "tests/test_agent.py::AgentTests::test_server_command_prefers_sibling_entry_point",
+      "tests/test_agent.py::AgentTests::test_server_env_propagates_current_pythonpath",
+      "tests/test_agent_tool_contract.py::test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract",
+      "tests/test_graph_report_worker.py::test_live_report_failure_is_corrected_without_mutating_the_scaffold",
+      "tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[reconstruct]",
+      "tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[revise]",
+      "tests/test_graph_report_worker.py::test_rejected_report_never_becomes_an_accepted_artifact",
+      "tests/test_graph_report_worker.py::test_explicit_report_layout_changes_and_revision_clears_remain_supported",
+      "tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[reconstruct]",
+      "tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[revise]"
+    ],
+    "cm56_regression_scope": "No CM-56 change touched the listed failure files; the untracked graph report test file was pre-existing worktree state."
+  }
+}

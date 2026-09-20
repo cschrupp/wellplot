@@ -168,7 +168,9 @@ fragment through the SDK runtime.
 | EXP-TW-00…08 Typed-worker experiments | Complete (final evidence baseline `68232ee`) | Frozen CBL corpus, typed semantic contract, deterministic compiler, schema bisect, and required-discriminator remediation validate the replacement candidate experimentally |
 | CM-54 Typed section-worker contract | Complete (design; baseline `5c98ad1`) | Static semantic contract, ownership boundary, representability matrix, input-sufficiency boundary, and integration constraints are frozen; no production behavior changed |
 | CM-55 Typed section models/compiler | Complete (`34c6491`) | Static semantic models, strict context validation, host-owned identity allocation, sparse canonical section intent, and CM-55R contract hardening pass deterministic evidence; routing remains unchanged |
-| CM-56…58 Typed section-worker adoption | Planned | Measure real planner/enricher sufficiency, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
+| CM-56 Typed section-worker shadow validation | Complete (`239cb09`) | Live shadow matrix stops at `STOP_INPUT_CONTRACT`; planner-to-worker source and requirement preservation must be addressed before cutover |
+| CM-56R Planner-to-worker semantic preservation | Next planning gate | Preserve source hints and explicit scientific requirements; rerun the unchanged typed worker; no routing or worker prompt changes |
+| CM-57…58 Typed section-worker cutover and acceptance | Blocked | Requires successful CM-56R evidence and the unchanged public/default-route gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
 
@@ -190,10 +192,12 @@ reference  -> curve bindings only
 array      -> raster bindings only and requires x_scale
 ```
 
-The production planner-to-enricher input contract still requires validation
-against this richer worker input before cutover. CM-54 through CM-58 own that
-adoption and acceptance work. The report worker remains program-based pending
-separate evidence, and CM-60+ legacy deletion remains blocked.
+CM-56 live evidence shows that the production planner-to-enricher input
+contract does not yet preserve the richer worker input reliably, especially
+source references. CM-56R owns that narrow preservation correction and must
+rerun the unchanged typed worker before CM-57. The report worker remains
+program-based pending separate evidence, and CM-60+ legacy deletion remains
+blocked.
 
 ## CM-00 Scope Boundary
 
