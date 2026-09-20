@@ -1,0 +1,87 @@
+{
+  "experiment": "EXP-TW-08",
+  "baseline_sha": "79f3173",
+  "implementation_commit": "4fd71c3",
+  "provider": "llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "request": {
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900.0,
+    "thinking": false,
+    "system_prompt": "Return exactly one SectionDraft that matches the typed input bundle. Use no fields outside the SectionDraft schema."
+  },
+  "variants": [
+    {
+      "variant": "R0",
+      "description": "Existing SectionDraftS with defaulted track discriminator tags",
+      "response_schema_sha256": "55e7ebd724ee02d72c5318051be79f4720dfba9b35d7ccf4504b3d82054642dc",
+      "attempts": 20,
+      "provider_call_successes": 20,
+      "provider_failures": 0,
+      "structurally_valid_outputs": 1,
+      "structured_output_failures": 19,
+      "gate_a_successes": 0,
+      "metric_bearing_calls": 1,
+      "total_tokens": 1678,
+      "latency_ms": 55652.98691600037,
+      "sections": {
+        "main_pass": {
+          "attempts": 10,
+          "structurally_valid_outputs": 0,
+          "structured_output_failures": 10,
+          "gate_a_successes": 0
+        },
+        "repeat_pass": {
+          "attempts": 10,
+          "structurally_valid_outputs": 1,
+          "structured_output_failures": 9,
+          "gate_a_successes": 0,
+          "total_tokens": 1678,
+          "latency_ms": 55652.98691600037
+        }
+      }
+    },
+    {
+      "variant": "R1",
+      "description": "SectionDraftS with required track discriminator tags",
+      "response_schema_sha256": "d37b404d3e050c968e2f40dad3f0f44a41d9591fbe31998f0f1f5919bc3440ac",
+      "attempts": 20,
+      "provider_call_successes": 20,
+      "provider_failures": 0,
+      "structurally_valid_outputs": 20,
+      "structured_output_failures": 0,
+      "gate_a_successes": 20,
+      "metric_bearing_calls": 20,
+      "total_tokens": 34886,
+      "latency_ms": 1143368.8848340097,
+      "sections": {
+        "main_pass": {
+          "attempts": 10,
+          "structurally_valid_outputs": 10,
+          "structured_output_failures": 0,
+          "gate_a_successes": 10,
+          "total_tokens": 17311,
+          "latency_ms": 549072.4126500136
+        },
+        "repeat_pass": {
+          "attempts": 10,
+          "structurally_valid_outputs": 10,
+          "structured_output_failures": 0,
+          "gate_a_successes": 10,
+          "total_tokens": 17575,
+          "latency_ms": 594296.4721839962
+        }
+      }
+    }
+  ],
+  "deterministic_evidence": {
+    "tw03s_invariants_all_true": true,
+    "golden_semantics_equivalent": true,
+    "gate_a_equivalent": true,
+    "compiler_projection_equivalent": true,
+    "r0_r1_non_kind_schema_identical": true,
+    "r1_full_union_rejects_omitted_kind": true
+  },
+  "interpretation": "Required track discriminator tags recover structured-output compatibility and Gate-A validity for this local llama.cpp/Qwen path while preserving the TW-03S structural guarantees. R0 was not a perfect zero-success rerun, but it remained strongly incompatible at 1/20 versus R1 at 20/20. This is experimental evidence only and does not authorize a production schema change."
+}
