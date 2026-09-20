@@ -7,7 +7,7 @@
 - Slice: CM-55 deterministic typed section models and compiler
 - Initial evidence: `25df6d7`
 - CM-55R correction commit: `c2173f7`
-- Final frozen CM-55 baseline: `c2173f7`
+- Final frozen/evidence baseline: `34c6491`
 - Status: complete; production routing remains unchanged
 - Next boundary: CM-56 real planner/enricher shadow or A/B validation
 
@@ -121,17 +121,43 @@ Ruff format --check passed
 git diff --check passed
 ```
 
-The required full-suite run completed as:
+The required full-suite run at the finalized CM-55R head completed as:
 
 ```text
-1531 passed, 10 failed, 2 skipped, 11 subtests passed
+34c6491: 1531 passed, 10 failed, 2 skipped, 11 subtests passed
 ```
 
-The ten failures were outside this slice: two known baseline signature tests
-in `tests/test_agent.py`, one unrelated tool-budget assertion in
-`tests/test_agent_tool_contract.py`, and seven tests in unrelated graph-worker
-files (`tests/test_graph_report_worker.py` and
-`tests/test_graph_section_submission.py`). No CM-55R test failed.
+The pre-CM-55R A/B run used the `25df6d7` source archive with the same local
+data and untracked graph-report test artifacts needed to execute the same test
+set:
+
+```text
+25df6d7: 1517 passed, 10 failed, 2 skipped, 11 subtests passed
+```
+
+The clean archive without those local artifacts produced `1489 passed, 14
+failed`; the additional failures were missing-file/fixture errors caused by
+the clean extraction, so that result was not used for node-by-node comparison.
+
+The ten failing node IDs were identical at both compared heads, with
+equivalent failure semantics:
+
+```text
+tests/test_agent.py::AgentTests::test_server_command_prefers_sibling_entry_point
+tests/test_agent.py::AgentTests::test_server_env_propagates_current_pythonpath
+tests/test_agent_tool_contract.py::test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract
+tests/test_graph_report_worker.py::test_live_report_failure_is_corrected_without_mutating_the_scaffold
+tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[reconstruct]
+tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[revise]
+tests/test_graph_report_worker.py::test_rejected_report_never_becomes_an_accepted_artifact
+tests/test_graph_report_worker.py::test_explicit_report_layout_changes_and_revision_clears_remain_supported
+tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[reconstruct]
+tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[revise]
+```
+
+The repository-wide suite is not globally green at either baseline. CM-55R
+introduces no additional full-suite failures relative to the pre-CM-55R
+baseline; no CM-55R test failed.
 
 ## Deferred Work
 

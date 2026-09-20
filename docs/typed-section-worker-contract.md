@@ -1,7 +1,7 @@
 # Typed Section-Worker Contract
 
 - **Status:** Implemented deterministic substrate; CM-56 validation pending
-- **Implementation:** CM-55/CM-55R complete (`c2173f7`); routing remains unchanged
+- **Implementation:** CM-55/CM-55R complete (`34c6491`; implementation `c2173f7`); routing remains unchanged
 - **Design baseline:** `5c98ad1`
 - **Architecture authority:** [Code Mode architecture contract](agent-code-mode-architecture.md)
 - **Evidence authority:** [consolidated typed-worker memory](evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md)
@@ -478,7 +478,7 @@ scientific-use-case branches to the worker schema, compiler, or graph topology.
 ## CM-55 Boundary
 
 CM-55/CM-55R implement the static production models and deterministic semantic
-compiler defined here. The correction baseline `c2173f7` preserves the matrix
+compiler defined here. The finalized evidence baseline `34c6491` preserves the matrix
 as an explicit gate, validates against the actual canonical models, and leaves
 production routing unchanged. CM-55 does not inherit permission for planner
 changes, real-provider cutover, repair, fallback, or graph integration beyond

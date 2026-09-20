@@ -2757,7 +2757,7 @@ remain gated by later evidence and acceptance.
 
 ### CM-55 — Add the production typed section contract
 
-Complete at `c2173f7` after CM-55R correction. The production static semantic
+Complete at `34c6491` after CM-55R correction (`c2173f7`). The production static semantic
 section models, strict context validator, host identity allocation, and
 deterministic sparse `AuthoringDocumentIntent` compiler defined by CM-54 are
 implemented. The validated boundary is new-section reconstruction only;
