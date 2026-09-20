@@ -5,7 +5,7 @@
 - Slice: CM-56 real planner/enricher to typed-section shadow validation
 - Baseline: `6984b36` (CM-55R baseline-comparison evidence)
 - Implementation checkpoint: `018c882`
-- State: deterministic checkpoint complete; live evidence not started
+- State: deterministic checkpoint and local live matrix complete
 - Production routing: unchanged; `ProgramSectionCompiler` remains active
 
 ## Question
@@ -90,9 +90,43 @@ The pinned local live configuration is recorded in
 - thinking disabled
 - sequential attempts
 
-No live rows are included in this checkpoint. After review of this commit,
-the live stage must use the unchanged code, prompt, schema, corpus, and
-controls. Any live summary belongs in a later evidence-only commit.
+The implementation checkpoint contained no live rows. The completed live
+matrix is recorded separately in `CM-56-live-qwen.jsonl`; its code, prompt,
+schema, corpus, and controls were unchanged from the checkpoint.
+
+## Local Live Result
+
+The unchanged matrix was run against the verified local llama.cpp endpoint
+advertising model `qwen3.6-35b-a3b`:
+
+- 10 frozen cases
+- 3 sequential attempts per case
+- 30 case-level rows and 33 section outcomes
+- evidence: `CM-56-live-qwen.jsonl`
+- evidence SHA-256: `e383983a6fa84b629d994b9adea4019c70e326bec91f4e4fb8bb9a69c9161137`
+- provider payload/path redaction scan: passed
+
+Section-outcome classification counts were:
+
+```text
+INPUT_INSUFFICIENT                  21
+PLANNER_FAILURE                      6
+DETERMINISTIC_COMPILER_FAILURE      4
+SCHEMA_COMPATIBILITY_FAILURE        1
+TYPED_WORKER_SEMANTIC_FAILURE       1
+```
+
+The dominant and gate-determining result is `INPUT_INSUFFICIENT`: the real
+planner output did not consistently preserve the source and scientific facts
+declared by the held-out cases. This is an input-contract result, not a reason
+to add prompt examples, worker repair, or source inference. The run also
+contains four rows whose bounded error type is
+`SectionSemanticValidationError` and one typed semantic failure; those are
+retained as observed downstream evidence and do not override the earlier
+input-sufficiency stop condition.
+
+CM-56 therefore stops at `STOP_INPUT_CONTRACT`. No CM-57 scope is authorized
+by this evidence, and no production routing or provider code was changed.
 
 ## Deferred Work
 
@@ -104,5 +138,5 @@ next slice is CM-56R rather than a prompt-only workaround.
 
 ## Decision
 
-**PROCEED to the controlled CM-56 local live stage after the implementation
-checkpoint is pushed. Do not begin CM-57.**
+**STOP at CM-56 input-contract evidence. Plan CM-56R separately; do not begin
+CM-57.**
