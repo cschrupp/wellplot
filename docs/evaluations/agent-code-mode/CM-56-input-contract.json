@@ -1,0 +1,37 @@
+{
+  "experiment": "CM-56",
+  "version": "cm56.typed-section-input.v1",
+  "response_model": "wellplot.agent.code_mode.section_semantics.SectionSemanticDraft",
+  "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+  "response_schema_chars": 5388,
+  "system_prompt_sha256": "19b0e289d2fa8ea362840aa94d90ad43cdea5b2ebdc866363df1ef28a38f2d49",
+  "case_corpus": "tests/fixtures/typed_worker/cm56_shadow_cases.json",
+  "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+  "case_corpus_bytes": 13032,
+  "provider_payload": {
+    "includes": [
+      "SectionTask goal, capability IDs, source hints, requirements, and constraints",
+      "selected capability descriptors",
+      "opaque source candidate IDs",
+      "bounded channel mnemonic, kind, unit, description, and recognition aliases"
+    ],
+    "excludes": [
+      "canonical paths",
+      "source format",
+      "document internals",
+      "sibling section context",
+      "generated canonical IDs",
+      "provider response content",
+      "program SDK or repair instructions"
+    ]
+  },
+  "live_controls": {
+    "provider": "openai_compatible",
+    "model": "Qwen3.6-35B-A3B-MTP-GGUF",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900,
+    "thinking": false,
+    "sequential": true
+  }
+}

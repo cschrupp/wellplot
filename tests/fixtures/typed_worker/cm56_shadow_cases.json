@@ -1,0 +1,176 @@
+{
+  "version": "cm56.shadow.v1",
+  "cases": [
+    {
+      "case_id": "cbl_continuity",
+      "group": "tw_core",
+      "request": "Create two new log plot sections, Main Pass from the main source and Repeat Pass from the repeat source. For both sections use normal, reference, and array tracks. Bind ECGR_STGC on Combo at 0 to 150, TT at 200 to 400 reversed, TENS at 5000 to 0, MTEM at 100 to 500, STIT, TDSP, and VSEC each at 0 to 50, two distinct CBL views at 0 to 100 and 0 to 10, and the VDL waveform as a VDL raster with x scale 200 to 1200, sample unit us, source origin 40, source step 10, and 7 ticks.",
+      "sources": [
+        {
+          "candidate_id": "main-source",
+          "filename": "main.dlis",
+          "source_format": "dlis",
+          "labels": ["main", "Main Pass"],
+          "channels": [
+            {"mnemonic": "ECGR_STGC", "kind": "scalar"},
+            {"mnemonic": "TT", "kind": "scalar"},
+            {"mnemonic": "TENS", "kind": "scalar"},
+            {"mnemonic": "MTEM", "kind": "scalar"},
+            {"mnemonic": "STIT", "kind": "scalar"},
+            {"mnemonic": "TDSP", "kind": "scalar"},
+            {"mnemonic": "VSEC", "kind": "scalar"},
+            {"mnemonic": "CBL", "kind": "scalar"},
+            {"mnemonic": "VDL", "kind": "array", "shape": [64]}
+          ]
+        },
+        {
+          "candidate_id": "repeat-source",
+          "filename": "repeat.dlis",
+          "source_format": "dlis",
+          "labels": ["repeat", "Repeat Pass"],
+          "channels": [
+            {"mnemonic": "ECGR_STGC", "kind": "scalar"},
+            {"mnemonic": "TT", "kind": "scalar"},
+            {"mnemonic": "TENS", "kind": "scalar"},
+            {"mnemonic": "MTEM", "kind": "scalar"},
+            {"mnemonic": "STIT", "kind": "scalar"},
+            {"mnemonic": "TDSP", "kind": "scalar"},
+            {"mnemonic": "VSEC", "kind": "scalar"},
+            {"mnemonic": "CBL", "kind": "scalar"},
+            {"mnemonic": "VDL", "kind": "array", "shape": [64]}
+          ]
+        }
+      ],
+      "expected_sections": [
+        {
+          "title": "Main Pass",
+          "source_candidate": "main-source",
+          "tracks": [
+            {"kind": "normal", "title": "Combo", "bindings": [
+              {"channel": "ECGR_STGC", "scale": {"minimum": 0, "maximum": 150}},
+              {"channel": "TT", "scale": {"minimum": 200, "maximum": 400, "reverse": true}},
+              {"channel": "TENS", "scale": {"minimum": 5000, "maximum": 0}},
+              {"channel": "MTEM", "scale": {"minimum": 100, "maximum": 500}}
+            ]},
+            {"kind": "reference", "title": "Depth", "bindings": [
+              {"channel": "STIT", "scale": {"minimum": 0, "maximum": 50}},
+              {"channel": "TDSP", "scale": {"minimum": 0, "maximum": 50}},
+              {"channel": "VSEC", "scale": {"minimum": 0, "maximum": 50}}
+            ]},
+            {"kind": "normal", "title": "CBL Amplitude", "bindings": [
+              {"channel": "CBL", "scale": {"minimum": 0, "maximum": 100}},
+              {"channel": "CBL", "scale": {"minimum": 0, "maximum": 10}}
+            ]},
+            {"kind": "array", "title": "VDL", "x_scale": {"minimum": 200, "maximum": 1200}, "bindings": [
+              {"kind": "raster", "channel": "VDL", "profile": "vdl", "sample_axis": {"unit": "us", "source_origin": 40, "source_step": 10, "minimum": 200, "maximum": 1200, "tick_count": 7}}
+            ]}
+          ]
+        },
+        {
+          "title": "Repeat Pass",
+          "source_candidate": "repeat-source",
+          "tracks": [
+            {"kind": "normal", "title": "Combo", "bindings": [
+              {"channel": "ECGR_STGC", "scale": {"minimum": 0, "maximum": 150}},
+              {"channel": "TT", "scale": {"minimum": 200, "maximum": 400, "reverse": true}},
+              {"channel": "TENS", "scale": {"minimum": 5000, "maximum": 0}},
+              {"channel": "MTEM", "scale": {"minimum": 100, "maximum": 500}}
+            ]},
+            {"kind": "reference", "title": "Depth", "bindings": [
+              {"channel": "STIT", "scale": {"minimum": 0, "maximum": 50}},
+              {"channel": "TDSP", "scale": {"minimum": 0, "maximum": 50}},
+              {"channel": "VSEC", "scale": {"minimum": 0, "maximum": 50}}
+            ]},
+            {"kind": "normal", "title": "CBL Amplitude", "bindings": [
+              {"channel": "CBL", "scale": {"minimum": 0, "maximum": 100}},
+              {"channel": "CBL", "scale": {"minimum": 0, "maximum": 10}}
+            ]},
+            {"kind": "array", "title": "VDL", "x_scale": {"minimum": 200, "maximum": 1200}, "bindings": [
+              {"kind": "raster", "channel": "VDL", "profile": "vdl", "sample_axis": {"unit": "us", "source_origin": 40, "source_step": 10, "minimum": 200, "maximum": 1200, "tick_count": 7}}
+            ]}
+          ]
+        }
+      ],
+      "input_facts": {
+        "main_source": {"section_candidate": "main-source", "source": "context", "needles": ["main-source", "CBL", "VDL"]},
+        "repeat_source": {"section_candidate": "repeat-source", "source": "context", "needles": ["repeat-source", "CBL", "VDL"]},
+        "scientific_requirements": {"source": "task", "needles": ["5000", "1200", "source origin 40"]}
+      }
+    },
+    {
+      "case_id": "scalar_linear",
+      "group": "generalization",
+      "request": "Create one new normal track titled Gamma Ray from the scalar source. Bind GR with a linear scale from 0 to 150.",
+      "sources": [{"candidate_id": "scalar-source", "filename": "scalar.las", "source_format": "las", "labels": ["scalar"], "channels": [{"mnemonic": "GR", "kind": "scalar"}, {"mnemonic": "RT", "kind": "scalar"}]}],
+      "expected_sections": [{"title": "Gamma Ray", "source_candidate": "scalar-source", "tracks": [{"kind": "normal", "title": "Gamma Ray", "bindings": [{"channel": "GR", "scale": {"minimum": 0, "maximum": 150}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["scalar-source", "GR"]}, "scale": {"source": "task", "needles": ["0", "150"]}}
+    },
+    {
+      "case_id": "reverse_scale",
+      "group": "generalization",
+      "request": "Create one new normal track titled Resistivity from the scalar source. Bind RT with a linear scale from 200 to 0 and reverse direction enabled.",
+      "sources": [{"candidate_id": "scalar-source", "filename": "scalar.las", "source_format": "las", "labels": ["scalar"], "channels": [{"mnemonic": "RT", "kind": "scalar"}]}],
+      "expected_sections": [{"title": "Resistivity", "source_candidate": "scalar-source", "tracks": [{"kind": "normal", "title": "Resistivity", "bindings": [{"channel": "RT", "scale": {"minimum": 200, "maximum": 0, "reverse": true}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["scalar-source", "RT"]}, "reverse": {"source": "task", "needles": ["reverse"]}}
+    },
+    {
+      "case_id": "repeated_channel",
+      "group": "generalization",
+      "request": "Create one new normal track titled CBL Views from the scalar source. Bind the scalar CBL channel twice as two distinct views, with scales 0 to 100 and 0 to 10, preserving both bindings.",
+      "sources": [{"candidate_id": "scalar-source", "filename": "scalar.las", "source_format": "las", "labels": ["scalar"], "channels": [{"mnemonic": "CBL", "kind": "scalar"}]}],
+      "expected_sections": [{"title": "CBL Views", "source_candidate": "scalar-source", "tracks": [{"kind": "normal", "title": "CBL Views", "bindings": [{"channel": "CBL", "scale": {"minimum": 0, "maximum": 100}}, {"channel": "CBL", "scale": {"minimum": 0, "maximum": 10}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["scalar-source", "CBL"]}, "multiplicity": {"source": "task", "needles": ["twice", "0 to 100", "0 to 10"]}}
+    },
+    {
+      "case_id": "source_selection",
+      "group": "generalization",
+      "request": "Create one new normal track titled Selected Gamma Ray using the secondary source, not the primary source. Bind GR with a scale from 0 to 150.",
+      "sources": [
+        {"candidate_id": "primary-source", "filename": "scalar.las", "source_format": "las", "labels": ["primary"], "channels": [{"mnemonic": "GR", "kind": "scalar"}]},
+        {"candidate_id": "secondary-source", "filename": "secondary.las", "source_format": "las", "labels": ["secondary"], "channels": [{"mnemonic": "GR", "kind": "scalar"}]}
+      ],
+      "expected_sections": [{"title": "Selected Gamma Ray", "source_candidate": "secondary-source", "tracks": [{"kind": "normal", "title": "Selected Gamma Ray", "bindings": [{"channel": "GR", "scale": {"minimum": 0, "maximum": 150}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["secondary-source", "GR"]}, "selection": {"source": "task", "needles": ["secondary source"]}}
+    },
+    {
+      "case_id": "vdl_sample_axis",
+      "group": "tw_core",
+      "request": "Create one new array track titled VDL from the raster source. Bind VDL as a vdl raster with x scale 200 to 1200, sample unit us, source origin 40, source step 10, and 7 ticks.",
+      "sources": [{"candidate_id": "raster-source", "filename": "raster.dlis", "source_format": "dlis", "labels": ["raster"], "channels": [{"mnemonic": "VDL", "kind": "array", "shape": [64]}]}],
+      "expected_sections": [{"title": "VDL", "source_candidate": "raster-source", "tracks": [{"kind": "array", "title": "VDL", "x_scale": {"minimum": 200, "maximum": 1200}, "bindings": [{"kind": "raster", "channel": "VDL", "profile": "vdl", "sample_axis": {"unit": "us", "source_origin": 40, "source_step": 10, "minimum": 200, "maximum": 1200, "tick_count": 7}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["raster-source", "VDL"]}, "axis": {"source": "task", "needles": ["source origin 40", "source step 10", "7 ticks"]}}
+    },
+    {
+      "case_id": "log_scale",
+      "group": "generalization",
+      "request": "Create one new normal track titled Density from the scalar source. Bind DENS with a logarithmic scale from 1 to 1000.",
+      "sources": [{"candidate_id": "scalar-source", "filename": "scalar.las", "source_format": "las", "labels": ["scalar"], "channels": [{"mnemonic": "DENS", "kind": "scalar"}]}],
+      "expected_sections": [{"title": "Density", "source_candidate": "scalar-source", "tracks": [{"kind": "normal", "title": "Density", "bindings": [{"channel": "DENS", "scale": {"kind": "log", "minimum": 1, "maximum": 1000}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["scalar-source", "DENS"]}, "scale": {"source": "task", "needles": ["logarithmic", "1000"]}}
+    },
+    {
+      "case_id": "tangential_scale",
+      "group": "generalization",
+      "request": "Create one new normal track titled Tension from the scalar source. Bind TENS with a tangential scale from 0 to 5000.",
+      "sources": [{"candidate_id": "scalar-source", "filename": "scalar.las", "source_format": "las", "labels": ["scalar"], "channels": [{"mnemonic": "TENS", "kind": "scalar"}]}],
+      "expected_sections": [{"title": "Tension", "source_candidate": "scalar-source", "tracks": [{"kind": "normal", "title": "Tension", "bindings": [{"channel": "TENS", "scale": {"kind": "tangential", "minimum": 0, "maximum": 5000}}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["scalar-source", "TENS"]}, "scale": {"source": "task", "needles": ["tangential", "5000"]}}
+    },
+    {
+      "case_id": "generic_raster",
+      "group": "generalization",
+      "request": "Create one new array track titled Image from the raster source. Bind IMAGE as a generic raster with x scale 0 to 100.",
+      "sources": [{"candidate_id": "raster-source", "filename": "raster.dlis", "source_format": "dlis", "labels": ["raster"], "channels": [{"mnemonic": "IMAGE", "kind": "array", "shape": [32]}]}],
+      "expected_sections": [{"title": "Image", "source_candidate": "raster-source", "tracks": [{"kind": "array", "title": "Image", "x_scale": {"minimum": 0, "maximum": 100}, "bindings": [{"kind": "raster", "channel": "IMAGE", "profile": "generic"}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["raster-source", "IMAGE"]}, "scale": {"source": "task", "needles": ["0 to 100"]}}
+    },
+    {
+      "case_id": "waveform",
+      "group": "generalization",
+      "request": "Create one new array track titled Waveform from the raster source. Bind WAVE as a waveform raster with x scale 0 to 50.",
+      "sources": [{"candidate_id": "raster-source", "filename": "raster.dlis", "source_format": "dlis", "labels": ["raster"], "channels": [{"mnemonic": "WAVE", "kind": "array", "shape": [32]}]}],
+      "expected_sections": [{"title": "Waveform", "source_candidate": "raster-source", "tracks": [{"kind": "array", "title": "Waveform", "x_scale": {"minimum": 0, "maximum": 50}, "bindings": [{"kind": "raster", "channel": "WAVE", "profile": "waveform"}]}]}],
+      "input_facts": {"source": {"source": "context", "needles": ["raster-source", "WAVE"]}, "scale": {"source": "task", "needles": ["waveform", "0 to 50"]}}
+    }
+  ]
+}
