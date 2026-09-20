@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from enum import StrEnum
 
+from ...authoring_program.errors import AuthoringProgramError
 from ...authoring_program.ids import IdAllocator
 from ...model.authoring import (
     AuthoringDataSource,
@@ -31,11 +33,29 @@ from .section_semantics import (
 )
 
 
+class SectionSemanticCompilationErrorCode(StrEnum):
+    """Stable failures raised while compiling a validated semantic draft."""
+
+    SECTION_ID_HINT_INVALID = "section_id_hint_invalid"
+    IDENTITY_ALLOCATION_FAILED = "identity_allocation_failed"
+
+
+class SectionSemanticCompilationError(ValueError):
+    """Safe deterministic failure at the semantic compiler boundary."""
+
+    def __init__(self, code: SectionSemanticCompilationErrorCode, message: str) -> None:
+        """Store a stable code without exposing substrate exceptions."""
+        self.code = code
+        super().__init__(message)
+
+
 def compile_section_semantics(
     draft: SectionSemanticDraft | Mapping[str, object],
     *,
     section_context: ResolvedSectionContext,
     document: AuthoringDocumentSpec,
+    section_id_hint: str,
+    allocator: IdAllocator | None = None,
 ) -> AuthoringDocumentIntent:
     """Validate and compile one typed draft into a sparse section intent.
 
@@ -44,35 +64,50 @@ def compile_section_semantics(
     """
     if not isinstance(document, AuthoringDocumentSpec):
         raise TypeError("Typed section compilation requires an AuthoringDocumentSpec.")
+    if (
+        not isinstance(section_id_hint, str)
+        or not section_id_hint
+        or section_id_hint != section_id_hint.strip()
+    ):
+        raise SectionSemanticCompilationError(
+            SectionSemanticCompilationErrorCode.SECTION_ID_HINT_INVALID,
+            "Host section_id_hint must be a non-empty trimmed string.",
+        )
     validated = validate_section_semantics(draft, section_context=section_context)
     source = next(
         candidate
         for candidate in section_context.sources
         if candidate.candidate_id == validated.source_candidate
     )
-    allocator = _allocator_for(document)
-    section_id = allocator.allocate_section(validated.title)
-    tracks = [
-        _compile_track(
-            track,
-            allocator=allocator,
+    try:
+        host_allocator = allocator if allocator is not None else _allocator_for(document)
+        section_id = host_allocator.allocate_section(section_id_hint)
+        tracks = [
+            _compile_track(
+                track,
+                allocator=host_allocator,
+                section_id=section_id,
+            )
+            for track in validated.tracks
+        ]
+        section = AuthoringSectionIntent(
             section_id=section_id,
+            title=validated.title,
+            data_source=AuthoringDataSource(
+                source_path=source.canonical_path,
+                source_format=source.source_format,
+            ),
+            tracks=tracks,
         )
-        for track in validated.tracks
-    ]
-    section = AuthoringSectionIntent(
-        section_id=section_id,
-        title=validated.title,
-        data_source=AuthoringDataSource(
-            source_path=source.canonical_path,
-            source_format=source.source_format,
-        ),
-        tracks=tracks,
-    )
-    return AuthoringDocumentIntent(sections=[section])
+        return AuthoringDocumentIntent(sections=[section])
+    except AuthoringProgramError:
+        raise SectionSemanticCompilationError(
+            SectionSemanticCompilationErrorCode.IDENTITY_ALLOCATION_FAILED,
+            "Host identity allocation failed during semantic compilation.",
+        ) from None
 
 
-def _allocator_for(document: object) -> IdAllocator:
+def _allocator_for(document: AuthoringDocumentSpec) -> IdAllocator:
     """Seed host identity allocation from the existing canonical document."""
     sections = document.sections
     return IdAllocator(
@@ -192,4 +227,8 @@ def _compile_sample_axis(axis: SemanticSampleAxis) -> AuthoringRasterSampleAxisS
     )
 
 
-__all__ = ["compile_section_semantics"]
+__all__ = [
+    "SectionSemanticCompilationError",
+    "SectionSemanticCompilationErrorCode",
+    "compile_section_semantics",
+]

@@ -1,0 +1,27 @@
+{
+  "baseline_sha": "25df6d7",
+  "response_model": "wellplot.agent.code_mode.section_semantics.SectionSemanticDraft",
+  "schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+  "schema_chars": 5388,
+  "track_discriminator": "kind",
+  "track_branches": {
+    "normal": "NormalTrackSemanticDraft",
+    "reference": "ReferenceTrackSemanticDraft",
+    "array": "ArrayTrackSemanticDraft"
+  },
+  "track_kind_required": {
+    "normal": true,
+    "reference": true,
+    "array": true
+  },
+  "track_kind_defaults": {
+    "normal": null,
+    "reference": null,
+    "array": null
+  },
+  "binding_kind_defaults": {
+    "curve": "curve",
+    "raster": "raster"
+  },
+  "request_specific_literals": false
+}

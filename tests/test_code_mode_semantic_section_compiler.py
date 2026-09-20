@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -28,10 +29,21 @@ from wellplot.agent.code_mode.section_semantics import (
     SemanticScaleKind,
     validate_section_semantics,
 )
-from wellplot.agent.code_mode.semantic_section_compiler import compile_section_semantics
+from wellplot.agent.code_mode.semantic_section_compiler import (
+    SectionSemanticCompilationError,
+    SectionSemanticCompilationErrorCode,
+    compile_section_semantics,
+)
+from wellplot.authoring_defaults import generic_authoring_defaults
+from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_program.errors import ProgramNameError
+from wellplot.authoring_program.ids import IdAllocator
+from wellplot.authoring_reconciler import reconcile_authoring
+from wellplot.authoring_service import AuthoringService
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 GOLDEN_PATH = Path("tests/fixtures/typed_worker/exp_tw02r_cbl/golden_drafts.json")
+SCHEMA_SUMMARY_PATH = Path("docs/evaluations/agent-code-mode/CM-55-schema-summary.json")
 
 
 def _document() -> AuthoringDocumentSpec:
@@ -170,6 +182,35 @@ def test_track_discriminators_are_required(track_type: type[object]) -> None:
     assert "default" not in schema["properties"]["kind"]
 
 
+def test_native_schema_summary_is_deterministic_and_matches_artifact() -> None:
+    """The committed schema summary describes the native static response model."""
+    schema = SectionSemanticDraft.model_json_schema()
+    canonical = json.dumps(schema, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    repeat = json.dumps(
+        SectionSemanticDraft.model_json_schema(),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    summary = json.loads(SCHEMA_SUMMARY_PATH.read_text(encoding="utf-8"))
+
+    assert canonical == repeat
+    assert summary["response_model"] == (
+        "wellplot.agent.code_mode.section_semantics.SectionSemanticDraft"
+    )
+    assert summary["schema_sha256"] == hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    assert summary["schema_chars"] == len(canonical)
+    assert summary["track_discriminator"] == "kind"
+    assert summary["track_kind_required"] == {
+        "normal": True,
+        "reference": True,
+        "array": True,
+    }
+    assert summary["track_kind_defaults"] == {"normal": None, "reference": None, "array": None}
+    assert summary["binding_kind_defaults"] == {"curve": "curve", "raster": "raster"}
+    assert summary["request_specific_literals"] is False
+
+
 def test_structural_schema_is_strict_and_preserves_branch_shapes() -> None:
     """Strict models reject extras and cross-kind binding shapes."""
     with pytest.raises(ValidationError):
@@ -266,6 +307,7 @@ def test_tw_golden_drafts_compile_through_production_models(section_key: str) ->
         _golden_drafts()[section_key],
         section_context=_cbl_context(section_key),
         document=_document(),
+        section_id_hint=f"tw-{section_key}",
     )
     section = intent.sections[0]
     assert section.title == ("Main Pass" if section_key == "main_pass" else "Repeat Pass")
@@ -285,8 +327,18 @@ def test_compilation_is_deterministic_and_allocates_host_ids() -> None:
     """Identical inputs produce identical sparse intent and host-owned IDs."""
     draft = _normal_draft()
     context = _context(_source())
-    first = compile_section_semantics(draft, section_context=context, document=_document())
-    second = compile_section_semantics(draft, section_context=context, document=_document())
+    first = compile_section_semantics(
+        draft,
+        section_context=context,
+        document=_document(),
+        section_id_hint="planned-section-7",
+    )
+    second = compile_section_semantics(
+        draft,
+        section_context=context,
+        document=_document(),
+        section_id_hint="planned-section-7",
+    )
 
     assert first == second
     section = first.sections[0]
@@ -295,6 +347,76 @@ def test_compilation_is_deterministic_and_allocates_host_ids() -> None:
     assert section.section_id != draft.title
     assert track.track_id != draft.tracks[0].semantic_id
     assert binding.binding_id != draft.tracks[0].bindings[0].semantic_id
+
+
+def test_host_section_id_hint_controls_identity_not_model_title() -> None:
+    """Canonical section identity follows the host hint and not semantic title text."""
+    context = _context(_source())
+    document = _document()
+    first = compile_section_semantics(
+        _normal_draft(),
+        section_context=context,
+        document=document,
+        section_id_hint="planned-section-7",
+    )
+    same_hint_different_title = compile_section_semantics(
+        _normal_draft().model_copy(update={"title": "A Different Title"}),
+        section_context=context,
+        document=document,
+        section_id_hint="planned-section-7",
+    )
+    different_hint_same_title = compile_section_semantics(
+        _normal_draft(),
+        section_context=context,
+        document=document,
+        section_id_hint="planned-section-8",
+    )
+
+    assert first.sections[0].section_id == "planned-section-7"
+    assert same_hint_different_title.sections[0].section_id == "planned-section-7"
+    assert different_hint_same_title.sections[0].section_id == "planned-section-8"
+    assert first.sections[0].section_id != "gamma-ray"
+    assert "section_id" not in _normal_draft().model_dump(mode="json")
+
+
+@pytest.mark.parametrize("invalid_hint", [None, "", "   ", " planned-section ", 42])
+def test_invalid_host_section_id_hint_has_stable_compilation_error(
+    invalid_hint: object,
+) -> None:
+    """Invalid host identity hints fail before allocator substrate errors."""
+    with pytest.raises(SectionSemanticCompilationError) as error:
+        compile_section_semantics(
+            _normal_draft(),
+            section_context=_context(_source()),
+            document=_document(),
+            section_id_hint=invalid_hint,  # type: ignore[arg-type]
+        )
+    assert error.value.code is SectionSemanticCompilationErrorCode.SECTION_ID_HINT_INVALID
+
+
+def test_explicit_host_allocator_is_used_without_a_second_identity_universe() -> None:
+    """An injected allocator receives the allocation rather than being replaced."""
+    allocator = IdAllocator(section_ids=("existing",))
+    intent = compile_section_semantics(
+        _normal_draft(),
+        section_context=_context(_source()),
+        document=_document(),
+        section_id_hint="injected-section",
+        allocator=allocator,
+    )
+    section_id = intent.sections[0].section_id
+    assert section_id == "injected-section"
+    assert allocator.section_is_reserved(section_id)
+
+
+def test_empty_sample_axis_is_invalid_but_partial_axes_are_valid() -> None:
+    """A present axis needs one value, while valid partial forms remain allowed."""
+    with pytest.raises(ValidationError):
+        SemanticSampleAxis()
+    assert SemanticSampleAxis(unit="us").unit == "us"
+    assert SemanticSampleAxis(tick_count=2).tick_count == 2
+    assert SemanticSampleAxis(source_origin=40, source_step=10).source_step == 10
+    assert SemanticSampleAxis(minimum=200, maximum=1200).maximum == 1200
 
 
 def test_repeated_channels_and_order_are_preserved_without_defaults() -> None:
@@ -318,6 +440,7 @@ def test_repeated_channels_and_order_are_preserved_without_defaults() -> None:
         draft,
         section_context=_context(_source()),
         document=_document(),
+        section_id_hint="planned-section-7",
     )
     payload = intent.model_dump(mode="json", exclude_unset=True)
     track = payload["sections"][0]["tracks"][0]
@@ -368,6 +491,7 @@ def test_scale_profile_and_sample_axis_semantics_compile_without_renderer_policy
         draft,
         section_context=_context(_source()),
         document=_document(),
+        section_id_hint="planned-array-7",
     )
     track = intent.sections[0].tracks[0]
     binding = track.bindings[0]
@@ -411,6 +535,41 @@ def test_context_validation_rejects_unknown_source_and_wrong_source_channel() ->
             section_context=_context(source_one, source_two),
         )
     assert missing_channel.value.code is SectionSemanticErrorCode.CHANNEL_MISSING
+
+
+def test_context_validation_rejects_duplicate_source_candidate_ids() -> None:
+    """Duplicate host source identities are ambiguous rather than first-match wins."""
+    duplicate = _source("source-1", path="/host/input/first.las")
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(
+            _normal_draft(),
+            section_context=_context(duplicate, _source("source-1", path="/host/input/second.las")),
+        )
+    assert error.value.code is SectionSemanticErrorCode.SOURCE_CANDIDATE_AMBIGUOUS
+
+
+def test_context_validation_rejects_duplicate_channel_mnemonics() -> None:
+    """Duplicate selected-source mnemonics are ambiguous rather than overwritten."""
+    source = _source(
+        channels=(
+            ChannelContext(mnemonic="GR", kind="scalar"),
+            ChannelContext(mnemonic="GR", kind="scalar", unit="gAPI"),
+        )
+    )
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(_normal_draft(), section_context=_context(source))
+    assert error.value.code is SectionSemanticErrorCode.CHANNEL_AMBIGUOUS
+
+
+def test_context_validation_does_not_resolve_channel_aliases() -> None:
+    """Output channel selection remains exact-mnemonic only."""
+    source = _source(channels=(ChannelContext(mnemonic="GR", kind="scalar", aliases=("GAMMA",)),))
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(
+            _normal_draft(channel="GAMMA"),
+            section_context=_context(source),
+        )
+    assert error.value.code is SectionSemanticErrorCode.CHANNEL_MISSING
 
 
 def test_context_validation_rejects_channel_kind_mismatch_and_duplicate_semantics() -> None:
@@ -471,8 +630,65 @@ def test_existing_section_revision_is_explicitly_deferred() -> None:
             _normal_draft(),
             section_context=_context(_source(), section_id="existing"),
             document=_document(),
+            section_id_hint="planned-section-7",
         )
     assert error.value.code is SectionSemanticErrorCode.REVISION_UNSUPPORTED
+
+
+class _FailingAllocator(IdAllocator):
+    """Allocator test double that exposes substrate failures at the boundary."""
+
+    def allocate_section(self, id_hint: str | None = None) -> str:
+        """Raise the lower-level error that CM-55R must wrap."""
+        raise ProgramNameError("internal allocator detail")
+
+
+def test_allocator_errors_are_wrapped_as_semantic_compilation_errors() -> None:
+    """Program-substrate identity errors do not escape the semantic API."""
+    with pytest.raises(SectionSemanticCompilationError) as error:
+        compile_section_semantics(
+            _normal_draft(),
+            section_context=_context(_source()),
+            document=_document(),
+            section_id_hint="planned-section-7",
+            allocator=_FailingAllocator(),
+        )
+    assert error.value.code is SectionSemanticCompilationErrorCode.IDENTITY_ALLOCATION_FAILED
+
+
+def test_sparse_intent_enters_the_canonical_defaults_and_execution_path() -> None:
+    """Canonical defaults complete sparse intent downstream, not in the compiler."""
+    context = _context(_source())
+    intent = compile_section_semantics(
+        _normal_draft(),
+        section_context=context,
+        document=_document(),
+        section_id_hint="planned-section-7",
+    )
+    sparse = intent.model_dump(mode="json", exclude_unset=True)
+    sparse_track = sparse["sections"][0]["tracks"][0]
+    assert "width_mm" not in sparse_track
+    assert "style" not in sparse_track["bindings"][0]
+
+    section_id = intent.sections[0].section_id
+    source = context.sources[0]
+    available_channels = {
+        section_id: [
+            {"mnemonic": channel.mnemonic, "kind": channel.kind} for channel in source.channels
+        ]
+    }
+    plan = reconcile_authoring(
+        intent,
+        existing=_document(),
+        defaults=generic_authoring_defaults(intent).defaults,
+        available_channels=available_channels,
+    )
+    assert plan.ready is True
+    result = execute_authoring_plan(AuthoringService(_document()), plan)
+    assert result.success is True
+    completed_track = result.document.sections[-1].tracks[0]
+    assert completed_track.width_mm > 0
+    assert completed_track.bindings[0].style is not None
 
 
 def test_semantic_models_are_path_free() -> None:

@@ -69,6 +69,18 @@ class SemanticSampleAxis(_SemanticModel):
     @model_validator(mode="after")
     def validate_pairs(self) -> SemanticSampleAxis:
         """Require complete source and display bound pairs."""
+        if all(
+            value is None
+            for value in (
+                self.unit,
+                self.source_origin,
+                self.source_step,
+                self.minimum,
+                self.maximum,
+                self.tick_count,
+            )
+        ):
+            raise ValueError("Sample-axis semantics must contain at least one value.")
         if (self.source_origin is None) != (self.source_step is None):
             raise ValueError("Sample-axis source_origin and source_step must be paired.")
         if self.source_step == 0:
@@ -148,7 +160,9 @@ class SectionSemanticErrorCode(StrEnum):
 
     REVISION_UNSUPPORTED = "revision_unsupported"
     SOURCE_CANDIDATE_MISSING = "source_candidate_missing"
+    SOURCE_CANDIDATE_AMBIGUOUS = "source_candidate_ambiguous"
     CHANNEL_MISSING = "channel_missing"
+    CHANNEL_AMBIGUOUS = "channel_ambiguous"
     CHANNEL_KIND_MISMATCH = "channel_kind_mismatch"
     DUPLICATE_TRACK_ID = "duplicate_track_semantic_id"
     DUPLICATE_BINDING_ID = "duplicate_binding_semantic_id"
@@ -183,21 +197,25 @@ def validate_section_semantics(
             "Track semantic IDs must be unique within one section.",
         )
 
-    source = next(
-        (
-            candidate
-            for candidate in section_context.sources
-            if candidate.candidate_id == validated.source_candidate
-        ),
-        None,
-    )
-    if source is None:
+    source_ids = [source.candidate_id for source in section_context.sources]
+    if len(source_ids) != len(set(source_ids)):
+        raise SectionSemanticValidationError(
+            SectionSemanticErrorCode.SOURCE_CANDIDATE_AMBIGUOUS,
+            "Section context contains duplicate source candidate IDs.",
+        )
+
+    matching_sources = [
+        source
+        for source in section_context.sources
+        if source.candidate_id == validated.source_candidate
+    ]
+    if not matching_sources:
         raise SectionSemanticValidationError(
             SectionSemanticErrorCode.SOURCE_CANDIDATE_MISSING,
             "The selected source candidate is not available in section context.",
         )
+    source = matching_sources[0]
 
-    channels = {channel.mnemonic: channel for channel in source.channels}
     for track in validated.tracks:
         binding_ids = [binding.semantic_id for binding in track.bindings]
         if len(binding_ids) != len(set(binding_ids)):
@@ -206,12 +224,20 @@ def validate_section_semantics(
                 f"Binding semantic IDs must be unique within track '{track.semantic_id}'.",
             )
         for binding in track.bindings:
-            channel = channels.get(binding.channel)
-            if channel is None:
+            matching_channels = [
+                channel for channel in source.channels if channel.mnemonic == binding.channel
+            ]
+            if not matching_channels:
                 raise SectionSemanticValidationError(
                     SectionSemanticErrorCode.CHANNEL_MISSING,
                     f"Channel '{binding.channel}' is not available from the selected source.",
                 )
+            if len(matching_channels) > 1:
+                raise SectionSemanticValidationError(
+                    SectionSemanticErrorCode.CHANNEL_AMBIGUOUS,
+                    f"Channel '{binding.channel}' is duplicated in the selected source.",
+                )
+            channel = matching_channels[0]
             expected_kind = "scalar" if binding.kind == "curve" else "array"
             if channel.kind != expected_kind:
                 raise SectionSemanticValidationError(
