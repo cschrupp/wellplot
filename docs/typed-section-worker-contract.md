@@ -1,7 +1,7 @@
 # Typed Section-Worker Contract
 
-- **Status:** Approved production design contract
-- **Implementation:** CM-55, separately authorized
+- **Status:** Implemented deterministic substrate; CM-56 validation pending
+- **Implementation:** CM-55/CM-55R complete (`c2173f7`); routing remains unchanged
 - **Design baseline:** `5c98ad1`
 - **Architecture authority:** [Code Mode architecture contract](agent-code-mode-architecture.md)
 - **Evidence authority:** [consolidated typed-worker memory](evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md)
@@ -13,10 +13,10 @@ semantic section worker. It converts the EXP-TW-00 through EXP-TW-08 evidence
 into a general Wellplot contract without copying the CBL benchmark taxonomy or
 implementing the worker.
 
-CM-54 is design-only. CM-55 owns production models and deterministic compiler
-implementation. No routing, graph, provider, planner, enrichment, repair,
-MCP, notebook, renderer, persistence, or test behavior changes are part of
-this contract slice.
+CM-54 is design-only. CM-55/CM-55R implement the production models and
+deterministic compiler. No routing, graph, provider, planner, enrichment,
+repair, MCP, notebook, renderer, persistence, or test behavior changes are
+part of this contract slice.
 
 ## Production Flow
 
@@ -477,8 +477,9 @@ scientific-use-case branches to the worker schema, compiler, or graph topology.
 
 ## CM-55 Boundary
 
-CM-55 may implement the static production models and deterministic semantic
-compiler defined here. It must preserve the matrix as an explicit gate,
-validate against the actual canonical models, and leave production routing
-unchanged. CM-55 does not inherit permission for planner changes, real-provider
-cutover, repair, fallback, or graph integration beyond the contract boundary.
+CM-55/CM-55R implement the static production models and deterministic semantic
+compiler defined here. The correction baseline `c2173f7` preserves the matrix
+as an explicit gate, validates against the actual canonical models, and leaves
+production routing unchanged. CM-55 does not inherit permission for planner
+changes, real-provider cutover, repair, fallback, or graph integration beyond
+the contract boundary. CM-56 owns real planner/enricher sufficiency evidence.

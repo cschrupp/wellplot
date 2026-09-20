@@ -2757,12 +2757,13 @@ remain gated by later evidence and acceptance.
 
 ### CM-55 — Add the production typed section contract
 
-Complete at `a818676`. Add the production static semantic section models,
-context validator, host identity allocation, and deterministic sparse
-`AuthoringDocumentIntent` compiler defined by CM-54. The validated boundary is
-new-section reconstruction only; existing-section revision and unrepresented
-canonical capabilities remain explicitly deferred. Existing routing and the
-program-based section worker are unchanged.
+Complete at `c2173f7` after CM-55R correction. The production static semantic
+section models, strict context validator, host identity allocation, and
+deterministic sparse `AuthoringDocumentIntent` compiler defined by CM-54 are
+implemented. The validated boundary is new-section reconstruction only;
+existing-section revision and unrepresented canonical capabilities remain
+explicitly deferred. Existing routing and the program-based section worker are
+unchanged.
 
 CM-55 adds no provider generation, prompt, repair, planner, enrichment,
 workflow, routing, MCP, notebook, persistence, renderer, or legacy-deletion

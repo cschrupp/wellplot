@@ -2,9 +2,12 @@
 
 ## Slice
 
-- Baseline: `fdbaf44`
+- Baseline: `25df6d7`
 - Implementation: `a818676`
 - Slice: CM-55 deterministic typed section models and compiler
+- Initial evidence: `25df6d7`
+- CM-55R correction commit: `c2173f7`
+- Final frozen CM-55 baseline: `c2173f7`
 - Status: complete; production routing remains unchanged
 - Next boundary: CM-56 real planner/enricher shadow or A/B validation
 
@@ -63,6 +66,35 @@ host-side `AuthoringDataSource` intent after source validation.
 The compiler does not reconcile, execute, render, persist, call providers, or
 repair invalid output.
 
+## CM-55R Correction
+
+CM-55R closed the deterministic contract gaps found after the initial CM-55
+evidence commit. The compiler now requires a trimmed host-owned
+`section_id_hint`, accepts an optional host `IdAllocator`, and never derives
+canonical section identity from the semantic title. Source candidate and
+channel selection are exact and reject duplicate identities with stable
+`source_candidate_ambiguous` and `channel_ambiguous` errors. Empty sample-axis
+objects are rejected while valid partial axis pairs remain supported.
+
+Identity-allocation substrate failures are wrapped as the dedicated
+`SectionSemanticCompilationError` with stable `identity_allocation_failed`
+classification; raw allocator details do not cross the semantic boundary.
+The downstream proof now passes sparse intent through ordinary canonical
+defaults, reconciliation, service execution, and completion without moving
+presentation policy into the compiler.
+
+The native schema summary is committed at
+`CM-55-schema-summary.json`:
+
+```text
+response model: wellplot.agent.code_mode.section_semantics.SectionSemanticDraft
+schema SHA-256: 93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4
+canonical schema characters: 5388
+track discriminator: kind (required, no defaults)
+binding defaults: curve / raster tags only
+request-specific literals: false
+```
+
 ## Evidence
 
 The focused CM-55 suite covers:
@@ -82,12 +114,24 @@ The focused CM-55 suite covers:
 Validation:
 
 ```text
-16 focused CM-55 tests passed
-69 adjacent architecture/Code Mode tests passed
+30 focused CM-55R compiler tests passed
+91 focused architecture/Code Mode regression tests passed
 Ruff check passed
 Ruff format --check passed
 git diff --check passed
 ```
+
+The required full-suite run completed as:
+
+```text
+1531 passed, 10 failed, 2 skipped, 11 subtests passed
+```
+
+The ten failures were outside this slice: two known baseline signature tests
+in `tests/test_agent.py`, one unrelated tool-budget assertion in
+`tests/test_agent_tool_contract.py`, and seven tests in unrelated graph-worker
+files (`tests/test_graph_report_worker.py` and
+`tests/test_graph_section_submission.py`). No CM-55R test failed.
 
 ## Deferred Work
 
