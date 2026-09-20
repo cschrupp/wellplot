@@ -56,8 +56,8 @@ Each variant used ten independent `main_pass` and ten independent
 `repeat_pass` attempts with:
 
 - the exact TW-02I serialized provider input;
-- the exact historical TW-03 system prompt:
-  `Return exactly one SectionDraft that matches the typed input bundle. Use no fields outside the SectionDraft schema.`;
+- the exact TW-04 system prompt used by the harness:
+  `Return exactly one SectionDraftS matching the typed input bundle. Use no fields outside the SectionDraftS schema.`;
 - local `llama_cpp`, model `qwen3.6-35b-a3b`;
 - temperature `1.0`, `max_tokens=16384`, timeout `900` seconds;
 - `enable_thinking=false`;

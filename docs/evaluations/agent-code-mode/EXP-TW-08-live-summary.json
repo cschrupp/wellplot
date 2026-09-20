@@ -9,7 +9,7 @@
     "max_output_tokens": 16384,
     "timeout_seconds": 900.0,
     "thinking": false,
-    "system_prompt": "Return exactly one SectionDraft that matches the typed input bundle. Use no fields outside the SectionDraft schema."
+    "system_prompt": "Return exactly one SectionDraftS matching the typed input bundle. Use no fields outside the SectionDraftS schema."
   },
   "variants": [
     {
