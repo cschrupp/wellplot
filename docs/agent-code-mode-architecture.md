@@ -2,6 +2,7 @@
 
 - **Status:** Approved architecture; v2 is the default host engine, with v1 retained only through explicit compatibility selection.
 - **Migration authority:** [Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md)
+- **Typed section-worker contract:** [Typed section-worker contract](typed-section-worker-contract.md)
 - **Frozen v1 reference:** `f03f76bda097bf93e4c640e0fc1a6b82b372bd0c` (`f03f76b`) on `mcp-stabilization`
 
 ## Purpose
@@ -165,7 +166,8 @@ fragment through the SDK runtime.
 | CM-53 Default v2 engine | In progress | v2 default routing and explicit v1 compatibility are implemented; public transition acceptance remains open because program-based section generation is not stable under the unchanged live gate |
 | CM-53R/R2/R3 Robustness and worker contracts | Complete (evidence baseline `68232ee`) | Planner/source grounding and exact program-worker contracts were hardened; live evidence led to the typed section-worker experiments rather than a routing change |
 | EXP-TW-00…08 Typed-worker experiments | Complete (final evidence baseline `68232ee`) | Frozen CBL corpus, typed semantic contract, deterministic compiler, schema bisect, and required-discriminator remediation validate the replacement candidate experimentally |
-| CM-54…58 Typed section-worker adoption | Planned | Reconcile, implement, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
+| CM-54 Typed section-worker contract | Complete (design; baseline `5c98ad1`) | Static semantic contract, ownership boundary, representability matrix, input-sufficiency boundary, and integration constraints are frozen; no production behavior changed |
+| CM-55…58 Typed section-worker adoption | Planned | Implement, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
 

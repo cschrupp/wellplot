@@ -2741,9 +2741,19 @@ the EXP-TW evidence without changing routing until their designated gates:
 
 ### CM-54 — Reconcile production scope with typed-worker evidence
 
-Define the promoted static typed semantic section-worker contract and its
-migration boundary. Do not implement the replacement in this documentation
-slice.
+Complete as a documentation-only design slice at baseline `5c98ad1`. The
+promoted contract is recorded in
+[`docs/typed-section-worker-contract.md`](typed-section-worker-contract.md)
+and its development memory. It freezes the static semantic response shape,
+required track discriminators, worker/host ownership, repeated-binding and
+ordering invariants, the EXP-TW representability matrix, planner/enricher
+input-sufficiency boundary, reconstruction/revision limits, and graph/result
+integration constraints.
+
+CM-54 changes no production behavior, routing, provider, planner, enrichment,
+graph, repair, MCP, notebook, persistence, rendering, or test behavior.
+CM-55 is the separately authorized implementation slice; CM-56 through CM-58
+remain gated by later evidence and acceptance.
 
 ### CM-55 — Add the production typed section contract
 
