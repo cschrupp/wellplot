@@ -5,15 +5,17 @@
 **Audience:** Wellplot maintainers, Codex coding agents, reviewers, future plugin authors
 **Primary objective:** Replace fragile long-horizon MCP tool inference with a modular natural-language compiler that can grow as Wellplot gains new scientific visualization capabilities.
 
-> **Supersession notice (2026-09-13):** This document remains the historical
+> **Supersession notice (2026-09-19):** This document remains the historical
 > record of the v1 typed structured-graph architecture and its LG migration
 > slices. New agent-architecture work is governed by
 > [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md) and
 > [`wellplot_agentic_code_mode_migration_plan.md`](wellplot_agentic_code_mode_migration_plan.md).
 > v1 remains the operational/reference implementation and is frozen except for
-> critical correctness fixes. Code Mode v2 is approved as the target
-> architecture but does not yet exist as a production route. This notice does
-> not rewrite or invalidate the historical implementation record below.
+> critical correctness fixes. Code Mode v2 became the default host route during
+> CM-53, but the CM-53 transition remains acceptance-open. EXP-TW-00 through
+> EXP-TW-08 subsequently revised the active section-worker boundary toward a
+> static typed semantic worker and deterministic compiler. This notice does not
+> rewrite or invalidate the historical implementation record below.
 
 ---
 

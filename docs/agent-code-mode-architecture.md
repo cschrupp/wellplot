@@ -6,12 +6,23 @@
 
 ## Purpose
 
-Code Mode replaces the model-facing v1 pattern of request-specific, deeply nested
-structured artifacts with a constrained Wellplot Authoring SDK. Models will write
-small Wellplot programs; a Wellplot-owned parser and interpreter will convert
-them into `AuthoringDocumentIntent` fragments. The existing canonical authoring,
-reconciliation, validation, persistence, rendering, and verification layers
-remain the only mutation authority.
+Code Mode retains the v2 planner, enrichment, LangGraph fan-out, deterministic
+merge, and canonical authoring stack while using the narrowest validated worker
+boundary for each task. Report tasks currently retain the program-based
+`ReportProgramCompiler` pending separate evidence. Section tasks are the
+promoted replacement candidate from EXP-TW-00 through EXP-TW-08:
+
+```text
+static typed semantic section draft
+        -> deterministic semantic compiler
+        -> AuthoringDocumentIntent
+```
+
+The existing canonical authoring, reconciliation, validation, persistence,
+rendering, and verification layers remain the only mutation authority. The
+restricted Wellplot program/SDK subsystem remains a valid deterministic
+execution substrate, but model-generated SDK programs are no longer the
+preferred section-worker representation.
 
 This document is the concise implementation contract. The migration plan is the
 normative slice-by-slice specification and evidence record.
@@ -21,7 +32,7 @@ normative slice-by-slice specification and evidence record.
 | Engine | Status during CM-00 through early CM slices | Routing |
 |---|---|---|
 | v1 structured graph | Explicit compatibility implementation; frozen except critical correctness fixes | `engine="v1"` only |
-| v2 Code Mode | Default host engine for ambiguous public helpers; explicit agentic MCP route | Default route |
+| v2 Code Mode | Default host engine for ambiguous public helpers; explicit agentic MCP route; CM-53 transition acceptance remains open | Default route |
 
 v1 remains available for the transition window through explicit compatibility
 selection. It is not deleted or behaviorally rewritten by CM-53; deprecation
@@ -58,9 +69,13 @@ Forbidden reverse dependencies:
   state IR.
 - Model programs are transient input. They never edit YAML, renderer objects,
   or persisted files directly.
-- The v2 worker path uses static command and capability argument models. It
-  must not create request-specific output schemas with runtime `create_model`,
-  `Literal`, or runtime unions to force document construction.
+- The v2 worker path must not create request-specific output schemas with
+  runtime `create_model`, synthesized `Literal`, or synthesized unions to
+  force document construction. Static Pydantic semantic section models are
+  permitted and preferred when their contract is task-independent.
+- Section track discriminator tags are explicit required fields. This is a
+  narrow worker-schema compatibility invariant, not a rule that all Pydantic
+  fields must be required or that defaults are globally forbidden.
 - The host allocates canonical IDs for new objects. Models may supply readable
   hints but do not establish identity correctness.
 - Capabilities own their static argument model and deterministic handler. Adding
@@ -89,8 +104,10 @@ Forbidden reverse dependencies:
 ### LangGraph
 
 LangGraph coordinates a small planner, deterministic source/context resolution,
-parallel report and section program workers, and intent merging. It does not
-encode domain capability branches or execute MCP calls.
+parallel report and section workers, and intent merging. The report worker is
+currently program-based; the validated typed semantic section-worker candidate
+is scheduled for CM-54 through CM-58 adoption. It does not encode domain
+capability branches or execute MCP calls.
 
 ### MCP
 
@@ -144,10 +161,36 @@ fragment through the SDK runtime.
 | CM-48 Bounded visual correction | Complete (`2e8fe54`) | Root-only section visual review, bounded failure evidence, source redaction, private preservation, and render/review gates pass |
 | CM-50 Direct Python v2 API | Complete (`7496553`) | Injected async AgentSession projects build/revise results with provider-aligned limits, without MCP, mutation, or persistence |
 | CM-51 MCP cutover | Complete (`7b27529`) | Opt-in agentic MCP tools delegate to the v2 session/graph service and privately apply verified intents; root-relative paths, safe terminal tracing, and rollback evidence hardened |
-| CM-52 Notebook cutover | Complete (`07534a1`) | ProjectSession uses the direct v2 Python path for local authoring with timeout-contract hardening; AgenticMcpClient remains MCP-backed and the default engine remains v1 |
-| CM-53 Default v2 engine | In progress | Ambiguous host helpers default to v2; CM-53R2 bounds planner recovery, grounds source examples, and makes reconstruction hint fallback explicit; explicit `engine="v1"` preserves the legacy transition path; live acceptance remains open |
+| CM-52 Notebook cutover | Complete (`07534a1`) | ProjectSession uses the direct v2 Python path for local authoring with timeout-contract hardening; AgenticMcpClient remains MCP-backed |
+| CM-53 Default v2 engine | In progress | v2 default routing and explicit v1 compatibility are implemented; public transition acceptance remains open because program-based section generation is not stable under the unchanged live gate |
+| CM-53R/R2/R3 Robustness and worker contracts | Complete (evidence baseline `68232ee`) | Planner/source grounding and exact program-worker contracts were hardened; live evidence led to the typed section-worker experiments rather than a routing change |
+| EXP-TW-00…08 Typed-worker experiments | Complete (final evidence baseline `68232ee`) | Frozen CBL corpus, typed semantic contract, deterministic compiler, schema bisect, and required-discriminator remediation validate the replacement candidate experimentally |
+| CM-54…58 Typed section-worker adoption | Planned | Reconcile, implement, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
+
+## Post-TW Section-Worker Decision
+
+The v2 orchestration architecture remains active. CM-53 routing implemented
+the default host path, but its public transition acceptance remains open:
+unchanged live acceptance did not pass reliably at the program-based section
+worker boundary. This is not a CM-53 routing implementation failure.
+
+EXP-TW-00 through EXP-TW-08 provide the empirical basis for the next phase.
+They validate a small static typed semantic section contract, required track
+discriminator tags, and deterministic semantic compilation while preserving
+the TW-03S invariants:
+
+```text
+normal     -> curve bindings only
+reference  -> curve bindings only
+array      -> raster bindings only and requires x_scale
+```
+
+The production planner-to-enricher input contract still requires validation
+against this richer worker input before cutover. CM-54 through CM-58 own that
+adoption and acceptance work. The report worker remains program-based pending
+separate evidence, and CM-60+ legacy deletion remains blocked.
 
 ## CM-00 Scope Boundary
 

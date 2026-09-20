@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-08-14
+Last updated: 2026-09-19
 
 ## Scope Summary
 
@@ -31,22 +31,39 @@ not require users to understand hidden internal orchestration rules.
 The canonical MCP/agent direction for that mission is documented in
 [docs/mcp-authoring-model.md](mcp-authoring-model.md).
 
-The active agent recovery sequence is
-[docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md). It supersedes the
-provider-facing compiler portions of the earlier `0.6-G`, `0.6-J`, and `0.6-K`
-programs. The project is now under an eval-first feature freeze: each agent
-slice must improve a named end-state evaluation or reduce measured complexity,
-and the completed recovery must be a net deletion of production code.
+The active agent authorities are the concise
+[Code Mode architecture contract](agent-code-mode-architecture.md) and the
+[Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md), with
+the [consolidated typed-worker memory](evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md)
+as the empirical basis for the current section-worker revision. The older
+`0.6-L` MCP recovery plan is historical development evidence, not the active
+agent recovery sequence. The project remains under an eval-first feature
+freeze: each agent slice must improve a named end-state evaluation or reduce
+measured complexity.
+
+## Current Agent Architecture Status
+
+Code Mode v2 routing and the default host path are implemented, but the CM-53
+public transition acceptance gate remains open. The program-based section
+worker did not achieve stable public live acceptance. EXP-TW-00 through
+EXP-TW-08 validated a static typed semantic section-worker candidate with
+required track discriminator tags and a deterministic semantic compiler.
+
+The next active migration sequence is CM-54 through CM-58. CM-60 and later
+reachability/deletion work remains blocked until that revised path passes
+unchanged public acceptance. The report worker remains program-based pending
+separate evidence; the LangGraph planner, enrichment, fan-out, deterministic
+merge, `AuthoringService`, validation, rollback, persistence gates, and v2
+host routing remain active architecture.
 
 ## Current Release Assessment
 
 The repository contains substantial post-`0.3.0` capability. The deterministic
-`0.6.0` contract foundation passes its focused repository tests, but live
-notebook execution reopened the provider-compilation release gate. Existing
-recorded-provider acceptance proves deterministic payload execution, not real
-model tool use. Publication requires the `0.6-L` simplification and evidence
-gates, unchanged-prompt notebook acceptance, and the maintainer release
-workflow.
+`0.6.0` contract foundation passes its focused repository tests. Agent release
+readiness remains gated by the open CM-53 transition, the CM-54 through CM-58
+typed section-worker sequence, unchanged public acceptance, and the maintainer
+release workflow. The earlier `0.6-L` simplification remains historical
+evidence, not a current routing instruction.
 
 Current assessment:
 
@@ -58,7 +75,7 @@ Current assessment:
 | Python construction API | implemented | retain with typed compatibility path |
 | Python object editing API | partial | complete before release |
 | MCP deterministic tools | broad capability roster | route through canonical object service |
-| provider-neutral agent | deterministic execution works, but generated inventories and `submit_*` compiler tools fail with real providers | replace compiler layers with one simple loop over a small stable MCP tool profile, then delete superseded paths |
+| provider-neutral agent | v2 orchestration/default routing is implemented, but the program-based section worker has not achieved stable public live acceptance | proceed through CM-54…58 typed section-worker adoption; keep the report worker program-based pending separate evidence |
 | packet planning/blueprints | useful development evidence, unsafe as authority | demote to scaffolds/fixtures |
 | release metadata | `0.6.0` | publish through the verified release workflow |
 
@@ -155,7 +172,11 @@ is superseded by the approved `0.6.0` program below.
   - `layout.log_sections[*].data.source_path`
   - `layout.log_sections[*].data.source_format`
 
-## Approved `0.6.0` Deterministic Contract Program
+## Historical `0.6.0` Deterministic Contract Program
+
+The following program is preserved as historical release-planning evidence. It
+is not the active agent migration authority; the Code Mode documents and the
+typed-worker evidence now govern agent architecture.
 
 The immediate release program consolidates the deterministic authoring side
 before further agent expansion:
@@ -206,11 +227,11 @@ Detailed plans:
 - [docs/mcp-implementation-plan.md](mcp-implementation-plan.md)
 - [docs/mcp-agent-recovery-plan.md](mcp-agent-recovery-plan.md)
 
-Release rule:
+Historical release rule:
 
-- do not publish `0.6.0` until the deterministic contract remains green and all
-  `0.6-L` simplification, live-provider, held-out, notebook, deletion, and
-  release gates pass
+- do not publish `0.6.0` until the deterministic contract remains green and the
+  historical `0.6-L` release gates, current CM transition gates, and maintainer
+  release workflow have been assessed
 
 ## Completed Slice: Experimental MCP Server (2026-04-28)
 
@@ -597,22 +618,21 @@ Longer-term / UI-centric:
 
 ## Immediate Next Tasks
 
-- Start `0.6-L0` by freezing agent behavior and recording end-state, context,
-  tool, provider, and code-size baselines for the unchanged notebook prompts.
-- Complete `0.6-L1` and `0.6-L2` only after a stable MCP authoring profile meets
-  its tool-count, schema-size, service-parity, and model-selection gates.
-- Replace natural-language compiler paths with one direct MCP tool loop in
-  `0.6-L3`; do not add LangGraph, memory, generated submission tools, or another
-  fallback route.
-- Make later ergonomic corrections only when a named evaluation fails and a
-  generic cross-domain test proves the correction is not example-specific.
-- Delete superseded inventory, intent, branch compiler, reconciliation bridge,
-  compatibility routing, and their compiler-only fixtures in `0.6-L5`.
-- Run the OpenAI, NVIDIA-compatible, local-compatible, held-out, notebook,
-  package, and documentation gates before release.
-- Do not run the maintainer release workflow until the complete `0.6-L`
-  evidence chain passes and production agent code is at least 2,500 lines below
-  the diagnostic baseline.
+- Scope CM-54 separately to reconcile the production architecture with the
+  typed-worker evidence; do not implement it as part of this roadmap update.
+- Treat CM-55 through CM-58 as the next high-level sequence: add the promoted
+  typed section contract, exercise it against the real planner/enricher
+  boundary, cut it into the v2 graph only after shadow evidence, and rerun the
+  unchanged public/default-route acceptance gate.
+- Keep CM-53 transition acceptance open until the revised section worker passes
+  that unchanged gate; do not begin CM-60+ legacy deletion work first.
+- Keep the report worker program-based pending separate evidence; do not infer
+  a report-worker migration from the section-worker experiments.
+- Continue release hardening and the product/rendering work below independently
+  of the agent migration sequence.
+- Do not run the maintainer release workflow until the active CM transition and
+  product release gates pass; the historical `0.6-L` evidence remains available
+  for comparison and is not the active agent sequence.
 - Maintain release hardening:
   - keep PyPI trusted publishing and post-release install verification healthy
   - clean up remaining workflow maintenance noise such as action runtime deprecation warnings

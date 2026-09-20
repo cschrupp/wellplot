@@ -7,6 +7,9 @@
 - **Baseline commit:** `f03f76bda097bf93e4c640e0fc1a6b82b372bd0c`
 - **Baseline commit message:** `Strengthen graph report requirement compilation`
 - **Prepared:** 2026-09-13
+- **Current architecture-revision evidence baseline:** `68232ee`
+- **Current status:** CM-53 routing is implemented; public transition acceptance
+  remains open pending the typed section-worker phase below.
 - **Primary objective:** Make full natural-language well-log generation reliable while reducing agent/runtime complexity and removing legacy orchestration code.
 - **Secondary objective:** Make new Wellplot capabilities extensible without adding graph branches or central request-specific schema logic.
 
@@ -69,6 +72,48 @@ The model is no longer responsible for constructing an exact, deeply nested fina
 Instead, the model writes a short program against a stable domain API. The program is **not arbitrary Python** and is **never executed with `exec()` or `eval()`**. It is parsed as Python syntax, validated against a small allowed AST, and interpreted by Wellplot. All operations are converted deterministically into the existing canonical authoring intent and executed through the existing deterministic service layer.
 
 This is a migration of the **model-facing instruction set**, not a rewrite of the Wellplot domain model or renderer.
+
+## 2026-09-19 Post-CM-53R3 Architecture Revision
+
+The original migration hypothesis was that section workers should write
+restricted Wellplot SDK programs. That hypothesis supported the CM-10 through
+CM-53 implementation sequence and remains the historical rationale for the
+program kernel, report worker, graph, and cutover work.
+
+Repeated public live failures at the program-based section-worker boundary,
+followed by EXP-TW-00 through EXP-TW-08, now require a narrower section-worker
+decision:
+
+```text
+section task
+    -> static typed semantic section draft
+    -> deterministic semantic compiler
+    -> AuthoringDocumentIntent
+```
+
+The TW experiments validated this boundary for the frozen CBL corpus and
+showed that required track discriminator tags preserve the strengthened
+semantic invariants while restoring the tested local structured-output path.
+They did not authorize unconditional production cutover. The report worker
+remains program-based pending separate evidence, and the planner, enrichment,
+LangGraph fan-out, deterministic merge, `AuthoringService`, and v2 routing
+remain active.
+
+The next high-level migration phase is intentionally separate from this
+revision:
+
+```text
+CM-54  reconcile production architecture and define the promoted typed section contract
+CM-55  add production static section models and deterministic semantic compiler
+CM-56  exercise the real planner/enricher boundary with shadow/A-B evidence
+CM-56R strengthen planner-to-section information only if evidence requires it
+CM-57  replace ProgramSectionCompiler in the v2 graph after validation
+CM-58  rerun unchanged public/default-route acceptance
+CM-60+ resume reachability and legacy deletion only after CM-58 acceptance
+```
+
+These are high-level sequence markers only. Detailed contracts require
+separate authorization for each slice.
 
 ---
 
@@ -2687,6 +2732,44 @@ Stop feature work on old engine.
 
 Primary live acceptance meets target with v2 default.
 
+## Phase 5A — Typed Section-Worker Adoption
+
+CM-53 routing is implemented, but the public transition remains open because
+the unchanged live acceptance gate has not passed reliably for the
+program-based section worker. The following slices resume the CM lineage using
+the EXP-TW evidence without changing routing until their designated gates:
+
+### CM-54 — Reconcile production scope with typed-worker evidence
+
+Define the promoted static typed semantic section-worker contract and its
+migration boundary. Do not implement the replacement in this documentation
+slice.
+
+### CM-55 — Add the production typed section contract
+
+Add the production static semantic section models and deterministic semantic
+compiler while preserving existing routing.
+
+### CM-56 — Exercise the real planner/enricher boundary
+
+Run the typed worker against real production task/context inputs with shadow or
+A/B evidence while leaving the current route unchanged.
+
+### CM-56R — Evidence-driven input strengthening, if required
+
+Only if CM-56 demonstrates insufficient planner-to-section information,
+strengthen that semantic boundary without introducing benchmark-specific rules.
+
+### CM-57 — Cut over the validated section worker
+
+Replace `ProgramSectionCompiler` in the v2 graph only after the preceding
+evidence supports the change. The report worker remains program-based.
+
+### CM-58 — Re-run unchanged public acceptance
+
+Re-run the unchanged public/default-route acceptance contract and determine
+whether the CM-53 transition can close.
+
 ---
 
 # Phase 6 — Legacy deletion
@@ -3304,6 +3387,12 @@ This is more model-usable than a full JSON Schema dump.
 
 ---
 
+> **Historical pre-TW planning note:** Sections 30 onward preserve the original
+> pre-EXP-TW migration assumptions and review criteria. The dated architecture
+> revision above and the CM-54 through CM-58 phase inserted after CM-53 govern
+> current sequencing; these sections are retained so the original reasoning is
+> not rewritten.
+
 # 30. Handling defaults
 
 Do not require the model to emit defaults.
@@ -3508,7 +3597,7 @@ The architecture migration is complete only when all of the following are true:
 
 - natural-language requests enter one production agent path;
 - one small semantic planner decomposes the request;
-- section/report workers emit constrained Wellplot programs;
+- pre-TW section/report workers emit constrained Wellplot programs;
 - programs are interpreted, never arbitrarily executed;
 - program operations compile to `AuthoringDocumentIntent`;
 - `AuthoringService` remains mutation authority;

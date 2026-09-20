@@ -268,3 +268,42 @@ When a decision changes, update this file with:
     discoverable and testable across YAML, Python, MCP, and agent workflows
   - retaining the existing data and render layers limits migration risk while
     correcting the public authoring boundary
+
+## Section-Worker Boundary Revision After EXP-TW-00…08
+
+- Previous decision:
+  - Code Mode v2 section workers generate constrained Wellplot SDK programs
+    that are parsed and interpreted into `AuthoringDocumentIntent`.
+- New decision:
+  - The v2 orchestration architecture remains, but section workers will
+    migrate to a small static typed semantic output contract compiled
+    deterministically into `AuthoringDocumentIntent`.
+  - The report worker remains program-based until separately evaluated.
+  - The validated section contract preserves normal-to-curve,
+    reference-to-curve, and array-to-raster semantics; array tracks require
+    `x_scale`.
+  - Track discriminator tags are required fields in the section worker
+    contract. This is not a global prohibition on Pydantic defaults.
+- Effective date:
+  - 2026-09-19
+- Rationale:
+  - CM-53R3 public live evidence showed continuing model-adherence failures at
+    the program-based section-worker boundary.
+  - EXP-TW-03 established reliable structured generation with the permissive
+    historical section schema, while EXP-TW-03S established useful structural
+    invariants.
+  - EXP-TW-05 and EXP-TW-06 localized a structured-output compatibility
+    collapse to the strengthened union representation.
+  - EXP-TW-07 measured required discriminator tags at `20/20` structured
+    versus defaulted tags at `0/20`.
+  - EXP-TW-08 measured the complete strengthened schema at `1/20` structured
+    with defaulted tags versus `20/20` structured and `20/20` Gate-A-valid
+    with required tags.
+  - The tested local llama.cpp/Qwen result supports the typed section-worker
+    candidate without proving a universal provider or schema-library rule.
+  - The earlier August `0.6-L` no-LangGraph recovery guidance remains
+    historical evidence and is no longer the active architecture authority.
+
+The superseded program-generation decision remains in the historical record;
+CM-54 through CM-58 define the separately authorized path for production
+adoption and acceptance.

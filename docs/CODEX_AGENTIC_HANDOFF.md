@@ -3,12 +3,14 @@
 > **Historical v1 guidance.** This document records the LG-1 through LG-4
 > structured-graph migration that produced the current operational/reference
 > implementation. It is not active implementation guidance for new agent
-> architecture work. Code Mode v2 is the approved target; read
-> [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md) and the
-> [Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md)
-> before changing agent architecture. During CM-00 through early CM slices, v1
-> remains frozen except for critical correctness fixes and v2 is not
-> production-routed.
+> architecture work. Current baseline: `68232ee`. CM-53 default v2 routing
+> exists, but transition acceptance remains open. EXP-TW-00 through EXP-TW-08
+> revised the planned section-worker boundary toward a static typed semantic
+> worker and deterministic compiler. Read
+> [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md), the
+> [Code Mode migration plan](wellplot_agentic_code_mode_migration_plan.md), and
+> the [consolidated typed-worker memory](evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md)
+> before making agent changes.
 
 Read `docs/wellplot-agentic-natural-language-architecture.md` completely before changing code.
 

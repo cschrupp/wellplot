@@ -1,8 +1,21 @@
 # MCP Agent Simplification And Recovery Plan
 
+> **Historical supersession notice (2026-09-19):** This document records the
+> August `0.6-L` recovery program and is no longer the active agent-architecture
+> authority. Later Code Mode migration work adopted LangGraph and progressed
+> through CM-53. EXP-TW-00 through EXP-TW-08 subsequently revised the
+> section-worker boundary toward a static typed semantic worker and
+> deterministic compiler. Read
+> [`agent-code-mode-architecture.md`](agent-code-mode-architecture.md),
+> [`wellplot_agentic_code_mode_migration_plan.md`](wellplot_agentic_code_mode_migration_plan.md),
+> and the [consolidated typed-worker memory](evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md)
+> for active guidance. The L0–L* body below is preserved as historical
+> evidence.
+
 Last updated: 2026-08-14
 
-Status: approved implementation direction; L1, L2, and L3 implemented, L4 in progress
+Status: historical implementation record; L1, L2, and L3 implemented, L4
+evidence preserved
 
 ## Purpose
 
@@ -16,7 +29,8 @@ Pydantic models, `AuthoringService`, defaults, validation, rendering, and safe
 persistence remain the product foundation. The correction is focused on the
 model-facing tool surface and `wellplot.agent` orchestration.
 
-This program is the active `0.6-L` release-recovery sequence. It supersedes the
+This document records the historical `0.6-L` release-recovery sequence. It
+superseded the
 provider-facing compilation architecture described by `0.6-G`, `0.6-J`, and
 `0.6-K`, including request inventories, scoped intent submissions, generated
 branch-operation submission tools, and automatic compatibility routing. Those
