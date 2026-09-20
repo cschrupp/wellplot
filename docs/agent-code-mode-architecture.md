@@ -167,7 +167,8 @@ fragment through the SDK runtime.
 | CM-53R/R2/R3 Robustness and worker contracts | Complete (evidence baseline `68232ee`) | Planner/source grounding and exact program-worker contracts were hardened; live evidence led to the typed section-worker experiments rather than a routing change |
 | EXP-TW-00…08 Typed-worker experiments | Complete (final evidence baseline `68232ee`) | Frozen CBL corpus, typed semantic contract, deterministic compiler, schema bisect, and required-discriminator remediation validate the replacement candidate experimentally |
 | CM-54 Typed section-worker contract | Complete (design; baseline `5c98ad1`) | Static semantic contract, ownership boundary, representability matrix, input-sufficiency boundary, and integration constraints are frozen; no production behavior changed |
-| CM-55…58 Typed section-worker adoption | Planned | Implement, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
+| CM-55 Typed section models/compiler | Complete (`a818676`) | Static semantic models, context validation, host identity allocation, and sparse canonical section intent pass deterministic evidence; routing remains unchanged |
+| CM-56…58 Typed section-worker adoption | Planned | Measure real planner/enricher sufficiency, shadow-test, cut over, and revalidate the typed section worker; production routing remains unchanged until the designated acceptance gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
 

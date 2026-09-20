@@ -2757,8 +2757,16 @@ remain gated by later evidence and acceptance.
 
 ### CM-55 — Add the production typed section contract
 
-Add the production static semantic section models and deterministic semantic
-compiler while preserving existing routing.
+Complete at `a818676`. Add the production static semantic section models,
+context validator, host identity allocation, and deterministic sparse
+`AuthoringDocumentIntent` compiler defined by CM-54. The validated boundary is
+new-section reconstruction only; existing-section revision and unrepresented
+canonical capabilities remain explicitly deferred. Existing routing and the
+program-based section worker are unchanged.
+
+CM-55 adds no provider generation, prompt, repair, planner, enrichment,
+workflow, routing, MCP, notebook, persistence, renderer, or legacy-deletion
+behavior. CM-56 owns real planner/enricher shadow or A/B evidence.
 
 ### CM-56 — Exercise the real planner/enricher boundary
 
