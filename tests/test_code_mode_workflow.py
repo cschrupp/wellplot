@@ -89,10 +89,14 @@ class _Planner:
 
     plan_value: SemanticPlan
     summaries: list[dict[str, object]] = field(default_factory=list)
+    temperatures: list[float | None] = field(default_factory=list)
+    source_summaries: list[dict[str, object]] = field(default_factory=list)
 
     async def plan(self, **kwargs: object) -> SemanticPlan:
         """Record bounded planning context and return the configured plan."""
         self.summaries.append(kwargs["current_document_summary"])
+        self.temperatures.append(kwargs["temperature"])
+        self.source_summaries.append(kwargs["source_summary"])
         return self.plan_value
 
 
@@ -179,10 +183,10 @@ class _SectionAdapter:
         return await self.workers.compile_section(**kwargs)
 
 
-def _graph(plan: SemanticPlan, workers: _Workers) -> object:
+def _graph(plan: SemanticPlan, workers: _Workers, planner: _Planner | None = None) -> object:
     """Build a graph with host fakes at every v2 boundary."""
     dependencies = CodeModeGraphDependencies(
-        planner=_Planner(plan),  # type: ignore[arg-type]
+        planner=planner or _Planner(plan),  # type: ignore[arg-type]
         enricher=_Enricher(),  # type: ignore[arg-type]
         report_compiler=_ReportAdapter(workers),  # type: ignore[arg-type]
         section_compiler=_SectionAdapter(workers),  # type: ignore[arg-type]
@@ -246,6 +250,34 @@ def test_graph_supports_report_only_and_section_only_plans() -> None:
     )
     section_result = _invoke(section_plan, _Workers())
     assert section_result["merged_intent"]["sections"][0]["section_id"] == "section-0"
+
+
+def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
+    """Planner sampling is fixed while worker configuration remains separate."""
+    plan = SemanticPlan(
+        summary="section only",
+        section_tasks=(SectionTask(goal="first section", capability_ids=("section.log_plot",)),),
+    )
+    planner = _Planner(plan)
+    state = _state(plan)
+    state["source_candidates"] = [
+        {
+            "candidate_id": "secret-source-id",
+            "root_id": "input",
+            "path": "/secret/main.las",
+            "labels": ["main pass"],
+        }
+    ]
+
+    asyncio.run(_graph(plan, _Workers(), planner).ainvoke(state))
+
+    assert planner.temperatures == [0.0]
+    assert planner.source_summaries == [
+        {
+            "version": "cm56r3.source-summary.v1",
+            "sources": [{"labels": ["main pass"], "channels": []}],
+        }
+    ]
 
 
 def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:

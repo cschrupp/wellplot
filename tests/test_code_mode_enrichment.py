@@ -197,6 +197,42 @@ def test_source_selection_is_bounded_to_explicit_candidates(tmp_path: Path) -> N
     assert loader.calls == []
 
 
+def test_single_explicit_source_is_selected_without_a_source_hint(tmp_path: Path) -> None:
+    """One host-approved source is deterministic even when the planner omits a hint."""
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    enricher, loader = _enricher(tmp_path)
+
+    result = enricher.enrich(
+        plan=_plan(),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+
+    assert [source.candidate_id for source in result.sections[0].sources] == ["main.las"]
+    assert len(loader.calls) == 1
+
+
+def test_multiple_explicit_sources_without_a_hint_fail_as_ambiguous(tmp_path: Path) -> None:
+    """Host code never guesses among multiple candidates without a semantic hint."""
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    (tmp_path / "repeat.las").write_text("source", encoding="utf-8")
+    enricher, loader = _enricher(tmp_path)
+
+    with pytest.raises(SemanticEnrichmentError) as caught:
+        enricher.enrich(
+            plan=_plan(),
+            document=_document(),
+            source_candidates=(
+                _candidate(tmp_path, name="main.las"),
+                _candidate(tmp_path, name="repeat.las", labels=("repeat",)),
+            ),
+        )
+
+    assert caught.value.code is EnrichmentErrorCode.SOURCE_AMBIGUOUS
+    assert caught.value.candidates == ("main.las", "repeat.las")
+    assert loader.calls == []
+
+
 @pytest.mark.parametrize(
     "candidate_path",
     ("../outside.las",),

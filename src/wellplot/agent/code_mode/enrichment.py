@@ -445,6 +445,15 @@ def _select_sources(
 ) -> tuple[_NormalizedCandidate, ...]:
     """Select only bounded candidates using conservative lexical matching."""
     if not task.source_hints:
+        if len(candidates) == 1:
+            return (candidates[0],)
+        if len(candidates) > 1:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_AMBIGUOUS,
+                "Multiple explicit source candidates require a source hint.",
+                task_index=task_index,
+                candidates=tuple(candidate.candidate_id for candidate in candidates),
+            )
         return ()
     selected: dict[str, _NormalizedCandidate] = {}
     for hint in task.source_hints:

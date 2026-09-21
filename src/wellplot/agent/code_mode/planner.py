@@ -121,6 +121,7 @@ class SemanticPlanner:
         request: str,
         mode: CompilationMode,
         current_document_summary: Mapping[str, object] | None = None,
+        source_summary: Mapping[str, object] | None = None,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -133,6 +134,7 @@ class SemanticPlanner:
             "request": request,
             "mode": mode,
             "current_document_summary": dict(current_document_summary or {}),
+            "source_summary": _safe_source_summary(source_summary),
             "capabilities": _planning_catalog(self.registry),
         }
         invalid_response_retry_used = False
@@ -172,6 +174,7 @@ class SemanticPlanner:
                 _correction_request(
                     mode=mode,
                     request=request,
+                    source_summary=source_summary,
                     previous_plan=plan,
                     diagnostic=first_error,
                     registry=self.registry,
@@ -290,6 +293,7 @@ def _correction_request(
     *,
     mode: CompilationMode,
     request: str,
+    source_summary: Mapping[str, object] | None = None,
     previous_plan: SemanticPlan,
     diagnostic: PlannerSemanticError,
     registry: CapabilityRegistry,
@@ -301,6 +305,7 @@ def _correction_request(
     context = {
         "mode": mode,
         "original_request": _safe_correction_text(request),
+        "source_summary": _safe_source_summary(source_summary),
         "capabilities": _planning_catalog(registry),
         "previous_plan": _safe_plan_for_correction(previous_plan),
         "diagnostic": {
@@ -351,6 +356,56 @@ def _safe_correction_text(value: str) -> str:
     return re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s,;]+", "[redacted-path]", value)
 
 
+def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, object]:
+    """Project host source facts without IDs, paths, or parser details."""
+    if summary is None:
+        return {"version": "1", "sources": []}
+    raw_sources = summary.get("sources", ())
+    if not isinstance(raw_sources, (list, tuple)):
+        raise ValueError("Source summary sources must be a sequence.")
+
+    sources: list[dict[str, object]] = []
+    for raw_source in raw_sources:
+        if not isinstance(raw_source, Mapping):
+            raise ValueError("Source summary entries must be mappings.")
+        raw_labels = raw_source.get("labels", ())
+        raw_channels = raw_source.get("channels", ())
+        if not isinstance(raw_labels, (list, tuple)):
+            raise ValueError("Source summary labels must be a sequence.")
+        if not isinstance(raw_channels, (list, tuple)):
+            raise ValueError("Source summary channels must be a sequence.")
+
+        channels: list[dict[str, str]] = []
+        for raw_channel in raw_channels:
+            if not isinstance(raw_channel, Mapping):
+                raise ValueError("Source summary channels must be mappings.")
+            mnemonic = raw_channel.get("mnemonic")
+            kind = raw_channel.get("kind")
+            if not isinstance(mnemonic, str) or not mnemonic.strip():
+                raise ValueError("Source summary channel mnemonics must be non-empty text.")
+            if not isinstance(kind, str) or not kind.strip():
+                raise ValueError("Source summary channel kinds must be non-empty text.")
+            channels.append(
+                {
+                    "mnemonic": _safe_correction_text(mnemonic),
+                    "kind": _safe_correction_text(kind),
+                }
+            )
+
+        labels = [
+            _safe_correction_text(label)
+            for label in raw_labels
+            if isinstance(label, str) and label.strip()
+        ]
+        sources.append({"labels": labels, "channels": channels})
+
+    version = summary.get("version", "1")
+    return {
+        "version": _safe_correction_text(str(version)),
+        "sources": sources,
+    }
+
+
 def _require_nonempty_items(values: tuple[str, ...]) -> None:
     """Require each semantic list item to contain meaningful text."""
     if any(not isinstance(value, str) or not value.strip() for value in values):
@@ -373,6 +428,10 @@ input source in natural language, preserve that clue in SectionTask.source_hints
 Source hints are ordered semantic clues for later host resolution. Do not emit
 filesystem paths, source formats, host candidate IDs, or invented source
 identities. Keep source clues attached to the section they describe.
+When the bounded source summary contains multiple sources and the request selects
+one of them, copy one supplied source label exactly into source_hints; do not
+paraphrase, abbreviate, or invent a source label. The host resolves that label
+against its explicit candidates later.
 
 Preserve explicit scientific requirements needed by downstream section work,
 including channel names, repeated binding requests, track kinds, scale types,

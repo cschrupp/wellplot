@@ -188,6 +188,37 @@ def test_planner_makes_one_static_structured_call() -> None:
     assert "binding_id" not in prompt
 
 
+def test_planner_receives_path_free_source_summary_as_separate_context() -> None:
+    """Source labels and channel facts are separate from the natural request."""
+    backend = _RecordedBackend(_plan_payload())
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Build the main pass.",
+            mode="reconstruct",
+            source_summary={
+                "version": "test.v1",
+                "sources": [
+                    {
+                        "candidate_id": "secret-source-id",
+                        "path": "/secret/CBL.dlis",
+                        "labels": ["main pass"],
+                        "channels": [{"mnemonic": "CBL", "kind": "scalar"}],
+                    }
+                ],
+            },
+            timeout_seconds=5.0,
+        )
+    )
+
+    prompt = backend.requests[0].user_prompt
+    assert '"labels":["main pass"]' in prompt
+    assert '"mnemonic":"CBL"' in prompt
+    assert "secret-source-id" not in prompt
+    assert "/secret/CBL.dlis" not in prompt
+
+
 def test_planner_prompt_defines_source_and_scientific_preservation() -> None:
     """The planner contract requires worker-relevant semantics to survive planning."""
     backend = _RecordedBackend(_plan_payload())
@@ -362,6 +393,29 @@ def test_correction_request_preserves_redacted_original_semantics() -> None:
     assert "TT 200-400 reverse" in correction.user_prompt
     assert "7 ticks" in correction.user_prompt
     assert "main source" in correction.user_prompt
+
+
+def test_correction_request_preserves_the_separate_source_summary() -> None:
+    """Semantic correction receives the same bounded source facts."""
+    plan = SemanticPlan(
+        summary="Build a section.",
+        section_tasks=(
+            SectionTask(goal="Build the section.", capability_ids=("section.log_plot",)),
+        ),
+    )
+    correction = _correction_request(
+        mode="reconstruct",
+        request="Build the section.",
+        source_summary={"sources": [{"labels": ["main pass"], "channels": []}]},
+        previous_plan=plan,
+        diagnostic=PlannerSemanticError("unknown_capability", "Unknown capability id."),
+        registry=create_builtin_registry(),
+        timeout_seconds=5.0,
+        temperature=0.0,
+        max_output_tokens=1000,
+    )
+
+    assert '"labels":["main pass"]' in correction.user_prompt
 
 
 def test_planner_returns_bounded_failure_after_invalid_correction() -> None:

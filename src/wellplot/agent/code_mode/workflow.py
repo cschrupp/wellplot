@@ -55,8 +55,9 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             request=state["request"],
             mode=state.get("mode", "reconstruct"),
             current_document_summary=summary.model_dump(mode="json"),
+            source_summary=_planner_source_summary(state),
             timeout_seconds=state["timeout_seconds"],
-            temperature=state.get("temperature"),
+            temperature=0.0,
             max_output_tokens=state.get("max_output_tokens"),
         )
         return {"plan": plan.model_dump(mode="json")}
@@ -282,6 +283,18 @@ def _worker_payload(
             **scoped,
         },
     )
+
+
+def _planner_source_summary(state: CodeModeGraphState) -> dict[str, object]:
+    """Build provider-safe source facts without candidate identities or paths."""
+    candidates = [
+        SourceCandidate.model_validate(candidate)
+        for candidate in state.get("source_candidates", [])
+    ]
+    return {
+        "version": "cm56r3.source-summary.v1",
+        "sources": [{"labels": list(candidate.labels), "channels": []} for candidate in candidates],
+    }
 
 
 def _isolated_section_context(
