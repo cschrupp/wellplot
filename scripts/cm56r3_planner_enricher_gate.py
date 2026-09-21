@@ -111,6 +111,7 @@ async def run_attempt(
             "error_type": type(error).__name__,
             "error_code": getattr(error, "code", None),
             "provider_category": None,
+            "planner_calls": backend.structured_calls,
             "plan": safe_plan_projection(plan),
             "enrichment": None,
             "elapsed_ms": (time.perf_counter() - started) * 1000,
