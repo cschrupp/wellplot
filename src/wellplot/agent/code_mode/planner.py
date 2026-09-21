@@ -171,6 +171,7 @@ class SemanticPlanner:
             corrected = await self.backend.generate_structured(
                 _correction_request(
                     mode=mode,
+                    request=request,
                     previous_plan=plan,
                     diagnostic=first_error,
                     registry=self.registry,
@@ -288,6 +289,7 @@ def _planning_request(
 def _correction_request(
     *,
     mode: CompilationMode,
+    request: str,
     previous_plan: SemanticPlan,
     diagnostic: PlannerSemanticError,
     registry: CapabilityRegistry,
@@ -298,6 +300,7 @@ def _correction_request(
     """Build one bounded correction request without host identities."""
     context = {
         "mode": mode,
+        "original_request": _safe_correction_text(request),
         "capabilities": _planning_catalog(registry),
         "previous_plan": _safe_plan_for_correction(previous_plan),
         "diagnostic": {
@@ -308,10 +311,11 @@ def _correction_request(
     return StructuredGenerationRequest(
         system_prompt=_PLANNER_SYSTEM_PROMPT,
         user_prompt=(
-            "Correct the previous SemanticPlan using only the capability catalogue. "
-            "Return the corrected structured response model and preserve the intended "
-            "semantic work.\n\nCorrection context:\n"
-            + json.dumps(context, sort_keys=True, separators=(",", ":"))
+            "Correct the previous SemanticPlan using the original request, the "
+            "previous plan, the diagnostic, and the capability catalogue. Preserve "
+            "all explicit source and scientific semantics while correcting the "
+            "reported problem. Return the corrected structured response model."
+            "\n\nCorrection context:\n" + json.dumps(context, sort_keys=True, separators=(",", ":"))
         ),
         timeout_seconds=timeout_seconds,
         temperature=temperature,
@@ -320,7 +324,7 @@ def _correction_request(
 
 
 def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
-    """Project semantic intent without identities or source-selection hints."""
+    """Project semantic intent without host identities or canonical source IDs."""
     report_task = None if plan.report_task is None else _safe_task_for_correction(plan.report_task)
     return {
         "summary": _safe_correction_text(plan.summary),
@@ -331,12 +335,15 @@ def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
 
 def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, object]:
     """Preserve semantic task text while excluding host-owned selection fields."""
-    return {
+    payload: dict[str, object] = {
         "goal": _safe_correction_text(task.goal),
         "capability_ids": list(task.capability_ids),
         "requirements": [_safe_correction_text(value) for value in task.requirements],
         "constraints": [_safe_correction_text(value) for value in task.constraints],
     }
+    if isinstance(task, SectionTask):
+        payload["source_hints"] = [_safe_correction_text(value) for value in task.source_hints]
+    return payload
 
 
 def _safe_correction_text(value: str) -> str:
@@ -360,6 +367,20 @@ Select capability IDs exactly as listed in the static capability catalogue. A
 SectionTask describes what one logical section should accomplish; its list order
 does not specify document order or execution order. Existing-section hints are
 advisory natural-language clues only and are resolved later by host code.
+
+When a section request identifies or distinguishes a source, pass, run, or other
+input source in natural language, preserve that clue in SectionTask.source_hints.
+Source hints are ordered semantic clues for later host resolution. Do not emit
+filesystem paths, source formats, host candidate IDs, or invented source
+identities. Keep source clues attached to the section they describe.
+
+Preserve explicit scientific requirements needed by downstream section work,
+including channel names, repeated binding requests, track kinds, scale types,
+numeric bounds, units, reverse direction, raster profiles, and sample-axis
+values such as origin, step, limits, and tick count. Do not summarize away
+explicit values or categorical semantics that a downstream worker needs without
+the original request. Use requirements and constraints for this semantic text;
+do not emit document mechanics or implementation details.
 
 Report-only requests must use report_task with an empty section_tasks collection;
 do not invent a dummy section task.

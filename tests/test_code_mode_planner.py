@@ -10,11 +10,14 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from wellplot.agent.code_mode.planner import (
+    PlannerSemanticError,
     PlannerSemanticFailure,
     ReportTask,
     SectionTask,
     SemanticPlan,
     SemanticPlanner,
+    _correction_request,
+    _safe_task_for_correction,
     validate_semantic_plan,
 )
 from wellplot.agent.providers.base import (
@@ -185,6 +188,26 @@ def test_planner_makes_one_static_structured_call() -> None:
     assert "binding_id" not in prompt
 
 
+def test_planner_prompt_defines_source_and_scientific_preservation() -> None:
+    """The planner contract requires worker-relevant semantics to survive planning."""
+    backend = _RecordedBackend(_plan_payload())
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    prompt = backend.requests[0].system_prompt
+    assert "SectionTask.source_hints" in prompt
+    assert "numeric bounds" in prompt
+    assert "repeated binding requests" in prompt
+    assert "sample-axis" in prompt
+
+
 def test_planner_preserves_revise_mode_as_semantic_context() -> None:
     """Revision mode is sent to the provider without identity-bearing state."""
     backend = _RecordedBackend(_plan_payload())
@@ -267,8 +290,78 @@ def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
     assert "Show the main CBL and VDL interpretation." in correction_prompt
     assert "Include depth and cement-bond measurements." in correction_prompt
     assert "Keep the section readable." in correction_prompt
-    assert "source_hints" not in correction_prompt
+    assert "source_hints" in correction_prompt
+    assert "use the staged CBL DLIS" in correction_prompt
     assert "existing_section_hint" not in correction_prompt
+
+
+def test_section_correction_projection_preserves_source_and_scientific_requirements() -> None:
+    """Section correction context retains semantic clues without host identities."""
+    task = SectionTask(
+        goal="Build the secondary section.",
+        capability_ids=("section.log_plot",),
+        source_hints=("secondary source", "/secret/well/repeat.dlis"),
+        requirements=(
+            "Bind CBL twice with scales 0 to 100 and 0 to 10.",
+            "Use source origin 40, source step 10, and 7 ticks.",
+        ),
+        constraints=("Keep the 200-400 scale reversed.",),
+    )
+
+    projected = _safe_task_for_correction(task)
+
+    assert projected["source_hints"] == ["secondary source", "[redacted-path]"]
+    assert projected["requirements"] == [
+        "Bind CBL twice with scales 0 to 100 and 0 to 10.",
+        "Use source origin 40, source step 10, and 7 ticks.",
+    ]
+    assert projected["constraints"] == ["Keep the 200-400 scale reversed."]
+
+
+def test_report_correction_projection_does_not_add_source_hints() -> None:
+    """Report correction context remains free of section-only source hints."""
+    projected = _safe_task_for_correction(
+        ReportTask(
+            goal="Update the report.",
+            requirements=("Keep the 0 to 100 scale.",),
+        )
+    )
+
+    assert "source_hints" not in projected
+
+
+def test_correction_request_preserves_redacted_original_semantics() -> None:
+    """Semantic correction sees safe original evidence without exposing paths."""
+    request = "Use C:\\logs\\well.las, GR 0 to 150, TT 200-400 reverse, 7 ticks."
+    plan = SemanticPlan(
+        summary="Build a section.",
+        section_tasks=(
+            SectionTask(
+                goal="Build the section.",
+                capability_ids=("section.log_plot",),
+                source_hints=("main source",),
+                requirements=("Preserve 0 to 150.",),
+            ),
+        ),
+    )
+
+    correction = _correction_request(
+        mode="reconstruct",
+        request=request,
+        previous_plan=plan,
+        diagnostic=PlannerSemanticError("unknown_capability", "Unknown capability id."),
+        registry=create_builtin_registry(),
+        timeout_seconds=5.0,
+        temperature=0.0,
+        max_output_tokens=1000,
+    )
+
+    assert "[redacted-path]" in correction.user_prompt
+    assert "C:\\logs\\well.las" not in correction.user_prompt
+    assert "GR 0 to 150" in correction.user_prompt
+    assert "TT 200-400 reverse" in correction.user_prompt
+    assert "7 ticks" in correction.user_prompt
+    assert "main source" in correction.user_prompt
 
 
 def test_planner_returns_bounded_failure_after_invalid_correction() -> None:

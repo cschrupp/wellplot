@@ -1,0 +1,19 @@
+{
+  "experiment": "CM-56R",
+  "baseline_sha": "728e652",
+  "implementation_checkpoint": "pre-live",
+  "semantic_plan_schema_sha256": "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3",
+  "section_task_schema_sha256": "f81e80b2bf7f4967cfc7f105a4a8a487a8a3352beefe057b6f6814c33a45fa3e",
+  "planner_system_prompt_sha256_before": "cb704977d2e167cbc6c6cce18e92c6df17cea0bfe9f31fa4c2d966d041ee2c72",
+  "planner_system_prompt_sha256_after": "f32d9ec68dc1aaee291ae6a14cd589ae49757c3bb42cbeea0a35b908e8bd3a98",
+  "source_hints_preserved_in_correction": true,
+  "scientific_requirements_preserved_in_correction": true,
+  "redacted_original_request_in_correction": true,
+  "planner_call_bound_changed": false,
+  "typed_worker_prompt_changed": false,
+  "typed_response_schema_changed": false,
+  "case_corpus_changed": false,
+  "enricher_changed": false,
+  "routing_changed": false,
+  "live_evidence": null
+}
