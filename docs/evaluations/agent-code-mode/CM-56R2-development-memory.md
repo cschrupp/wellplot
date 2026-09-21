@@ -5,6 +5,7 @@
 - Slice: planner-only reliability and source-context diagnostic
 - Baseline: `bfb539e`
 - Implementation checkpoint: `e72a999`
+- Evidence checkpoint: `d9fa8b1`
 - Production routing: unchanged; `ProgramSectionCompiler` remains active
 - Typed worker: not invoked by this experiment
 

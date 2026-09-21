@@ -1,6 +1,7 @@
 {
   "experiment": "CM-56R2",
   "implementation_checkpoint": "e72a999",
+  "evidence_checkpoint": "d9fa8b1",
   "baseline": "bfb539e",
   "evidence_file": "/tmp/cm56r2-live-qwen.jsonl",
   "evidence_sha256": "5d2c1c4f9d9a6f488f66e8fd98eca3095268169d811e9a3926db060d8fb34037",

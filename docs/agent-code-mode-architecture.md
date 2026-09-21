@@ -170,7 +170,7 @@ fragment through the SDK runtime.
 | CM-55 Typed section models/compiler | Complete (`34c6491`) | Static semantic models, strict context validation, host-owned identity allocation, sparse canonical section intent, and CM-55R contract hardening pass deterministic evidence; routing remains unchanged |
 | CM-56 Typed section-worker shadow validation | Complete (`239cb09`) | Live shadow matrix stops at `STOP_INPUT_CONTRACT`; planner-to-worker source and requirement preservation must be addressed before cutover |
 | CM-56R Planner-to-worker semantic preservation | Complete (`0f649ef`; implementation `39dbc6a`) | Source/scientific preservation contract applied and unchanged matrix rerun; terminal planner failures yield `STOP_PLANNER_RELIABILITY`, so CM-57 remains blocked |
-| CM-56R2 Planner reliability diagnostic | Complete (`e72a999`; evidence pending) | Four planner-only temperature/source-summary variants completed; temperature 0 removed planner failures but source-summary context did not resolve enrichment source losses; no production fix authorized |
+| CM-56R2 Planner reliability diagnostic | Complete (`d9fa8b1`; implementation `e72a999`) | Four planner-only temperature/source-summary variants completed; temperature 0 removed planner failures but source-summary context did not resolve enrichment source losses; no production fix authorized |
 | CM-57…58 Typed section-worker cutover and acceptance | Blocked | Requires successful CM-56R evidence and the unchanged public/default-route gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
