@@ -1,0 +1,36 @@
+{
+  "experiment": "CM-56R3",
+  "provider": "openai_compat_local_llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "planner_temperature": 0.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "attempts_per_case": 3,
+  "case_count": 10,
+  "row_count": 30,
+  "raw_evidence": {
+    "path": "/tmp/cm56r3-live-qwen-corrected.jsonl",
+    "sha256": "9935238c0e6f0fbc6c450dc30c26c02506e54c9d76913b063a5d5082ce2439ae"
+  },
+  "classification_counts": {
+    "PLANNED_AND_ENRICHED": 26,
+    "PLANNER_FAILURE": 3,
+    "ENRICHMENT_FAILURE": 1
+  },
+  "planner_failures": {
+    "case_id": "reverse_scale",
+    "count": 3,
+    "provider_invalid_response": 2,
+    "missing_section_capability": 1
+  },
+  "enrichment_failures": {
+    "case_id": "source_selection",
+    "code": "source_ambiguous",
+    "count": 1,
+    "source_missing": 0
+  },
+  "typed_worker_invocations": 0,
+  "stage_2_run": false,
+  "decision": "STOP_PLANNER_RELIABILITY",
+  "bookkeeping_note": "The completed raw run predates the one-line runner correction in 26086cd; its single enrichment-failure row omits planner_calls, without affecting classification or gate precedence."
+}
