@@ -1,0 +1,92 @@
+{
+  "experiment": "CM-56R2",
+  "implementation_checkpoint": "e72a999",
+  "baseline": "bfb539e",
+  "evidence_file": "/tmp/cm56r2-live-qwen.jsonl",
+  "evidence_sha256": "5d2c1c4f9d9a6f488f66e8fd98eca3095268169d811e9a3926db060d8fb34037",
+  "evidence_bytes": 165708,
+  "provider": {
+    "backend": "openai_compatible",
+    "model": "qwen3.6-35b-a3b",
+    "endpoint": "controlled local llama.cpp",
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900,
+    "sequential": true
+  },
+  "matrix": {
+    "cases": 10,
+    "attempts_per_variant": 30,
+    "variants": 4,
+    "total_rows": 120,
+    "typed_worker_calls": 0
+  },
+  "variants": {
+    "A": {
+      "temperature": 1.0,
+      "source_summary": false,
+      "planned": 22,
+      "enrichment_failures": 5,
+      "planner_failures": 3,
+      "planner_failure_codes": {
+        "missing_section_capability": 2,
+        "invalid_response": 1
+      },
+      "source_hints_nonempty_in_plans": 10
+    },
+    "B": {
+      "temperature": 0.0,
+      "source_summary": false,
+      "planned": 24,
+      "enrichment_failures": 6,
+      "planner_failures": 0,
+      "source_hints_nonempty_in_plans": 15
+    },
+    "C": {
+      "temperature": 1.0,
+      "source_summary": true,
+      "planned": 22,
+      "enrichment_failures": 5,
+      "planner_failures": 3,
+      "planner_failure_codes": {
+        "missing_section_capability": 2,
+        "invalid_response": 1
+      },
+      "source_hints_nonempty_in_plans": 14
+    },
+    "D": {
+      "temperature": 0.0,
+      "source_summary": true,
+      "planned": 22,
+      "enrichment_failures": 8,
+      "planner_failures": 0,
+      "source_hints_nonempty_in_plans": 9
+    }
+  },
+  "enrichment_failure_codes": {
+    "A": {"source_missing": 5},
+    "B": {"source_missing": 6},
+    "C": {"source_missing": 5},
+    "D": {"source_missing": 8}
+  },
+  "hypothesis_readout": {
+    "temperature": "Temperature 0.0 eliminated terminal planner failures in this matrix; temperature 1.0 produced three planner failures in both no-summary and summary variants.",
+    "source_summary": "The bounded source summary did not eliminate source_missing enrichment failures and increased them in the temperature-0 comparison from 6 to 8.",
+    "capability_selection": "The observed planner semantic failures were missing_section_capability; they occurred only at temperature 1.0, so this matrix does not isolate capability burden from sampling reliability.",
+    "source_hint_preservation": "Source hints were still inconsistently emitted; summary inclusion was not sufficient to make source selection reliable."
+  },
+  "redaction": {
+    "provider_response_content_retained": false,
+    "host_paths_retained": false,
+    "source_identity_fields_retained": false,
+    "scan": "passed"
+  },
+  "decision": "DIAGNOSTIC_COMPLETE_NO_PRODUCTION_FIX",
+  "next_boundary": "Plan a separately authorized minimal planner reliability/input-contract correction from the A-D evidence.",
+  "runtime_delta": {
+    "src_wellplot": "unchanged",
+    "typed_worker": "unchanged",
+    "enrichment": "unchanged",
+    "routing": "unchanged",
+    "fallback_or_repair": "none"
+  }
+}
