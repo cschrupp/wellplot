@@ -5,6 +5,7 @@
 - Slice: planner-to-worker semantic preservation
 - Baseline: `728e652`
 - Implementation checkpoint: `39dbc6a`
+- Evidence checkpoint: `0f649ef`
 - State: live causal rerun and full-suite qualification complete
 - Production routing: unchanged; `ProgramSectionCompiler` remains active
 
