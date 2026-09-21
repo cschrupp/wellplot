@@ -1,0 +1,108 @@
+{
+  "experiment": "CM-56R",
+  "implementation_checkpoint": "39dbc6a",
+  "baseline": "728e652",
+  "evidence_file": "/tmp/cm56r-live-qwen.jsonl",
+  "evidence_sha256": "4494d1470a5eb2defdbf1929561115e2c8a5defd2179c399ce455001c0b92e99",
+  "provider": {
+    "backend": "openai_compatible",
+    "model": "qwen3.6-35b-a3b",
+    "endpoint": "controlled local llama.cpp",
+    "temperature": 1.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900,
+    "thinking": false,
+    "sequential": true
+  },
+  "matrix": {
+    "case_count": 10,
+    "attempts_per_case": 3,
+    "case_rows": 30,
+    "section_outcomes": 33,
+    "stage_1": true,
+    "stage_2": false
+  },
+  "classification_counts": {
+    "PLANNER_FAILURE": 8,
+    "ENRICHMENT_FAILURE": 4,
+    "INPUT_INSUFFICIENT": 11,
+    "DETERMINISTIC_COMPILER_FAILURE": 3,
+    "TYPED_WORKER_SEMANTIC_FAILURE": 7
+  },
+  "planner_failure_counts": {
+    "PlannerSemanticFailure": 6,
+    "ProviderRequestError": 2,
+    "provider_invalid_response": 2
+  },
+  "input_sufficiency_losses": {
+    "source": 10,
+    "selection": 1,
+    "scale": 1,
+    "multiplicity": 2,
+    "axis": 1
+  },
+  "raw_error_types": {
+    "PlannerSemanticFailure": 6,
+    "ProviderRequestError": 2,
+    "SemanticEnrichmentError": 4,
+    "SectionSemanticValidationError": 3
+  },
+  "comparison_to_cm56": {
+    "stage_1_case_rows": [30, 30],
+    "section_outcomes": [33, 33],
+    "input_insufficient": [21, 11],
+    "source_grounding_lost": [21, 10],
+    "scale_semantics_lost": [5, 1],
+    "multiplicity_lost": [1, 2],
+    "sample_axis_lost": [1, 1],
+    "planner_terminal_failures": [6, 8]
+  },
+  "input_preservation_matrix": [
+    {"case": "scalar_linear", "source": "missing", "result": "INPUT_INSUFFICIENT or downstream"},
+    {"case": "reverse_scale", "source": "missing", "result": "planner/enrichment failures present"},
+    {"case": "repeated_channel", "source": "missing", "result": "multiplicity loss remains"},
+    {"case": "source_selection", "source": "present or selection missing", "result": "selection loss remains"},
+    {"case": "vdl_sample_axis", "source": "planner/enrichment failures present", "result": "axis loss observed"},
+    {"case": "log_scale", "source": "present", "result": "downstream outcomes observed"},
+    {"case": "tangential_scale", "source": "planner failures present", "result": "planner reliability gate"},
+    {"case": "generic_raster", "source": "present or planner failure", "result": "downstream outcomes observed"},
+    {"case": "waveform", "source": "planner/enrichment failures present", "result": "planner reliability gate"}
+  ],
+  "decision_precedence": {
+    "terminal_planner_failure": true,
+    "input_sufficiency_gate": false,
+    "decision": "STOP_PLANNER_RELIABILITY",
+    "stage_2_reason": "Stage 1 planner reliability gate failed; confirmation attempts were not authorized."
+  },
+  "frozen_artifacts": {
+    "typed_worker_prompt_sha256": "19b0e289d2fa8ea362840aa94d90ad43cdea5b2ebdc866363df1ef28a38f2d49",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e"
+  },
+  "runtime_delta": {
+    "planner": "changed only by 39dbc6a",
+    "enrichment": "unchanged",
+    "typed_worker": "unchanged",
+    "response_schema": "unchanged",
+    "case_corpus": "unchanged",
+    "shadow_harness": "unchanged",
+    "routing": "unchanged",
+    "fallback_or_repair": "none added"
+  },
+  "full_suite": {
+    "result": "1546 passed, 10 failed, 2 skipped, 11 subtests passed",
+    "failure_nodes": [
+      "tests/test_agent.py::AgentTests::test_server_command_prefers_sibling_entry_point",
+      "tests/test_agent.py::AgentTests::test_server_env_propagates_current_pythonpath",
+      "tests/test_agent_tool_contract.py::test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract",
+      "tests/test_graph_report_worker.py::test_live_report_failure_is_corrected_without_mutating_the_scaffold",
+      "tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[reconstruct]",
+      "tests/test_graph_report_worker.py::test_canonical_report_error_is_returned_for_bounded_correction[revise]",
+      "tests/test_graph_report_worker.py::test_rejected_report_never_becomes_an_accepted_artifact",
+      "tests/test_graph_report_worker.py::test_explicit_report_layout_changes_and_revision_clears_remain_supported",
+      "tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[reconstruct]",
+      "tests/test_graph_section_submission.py::test_section_instructions_require_native_submission[revise]"
+    ],
+    "comparison_to_cm56": "The same ten failure node IDs as CM-56; the four additional passes are the new planner tests."
+  }
+}

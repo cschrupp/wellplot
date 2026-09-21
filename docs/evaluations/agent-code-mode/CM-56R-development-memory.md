@@ -4,8 +4,8 @@
 
 - Slice: planner-to-worker semantic preservation
 - Baseline: `728e652`
-- Implementation checkpoint: pre-live
-- State: deterministic remediation complete; live causal rerun pending
+- Implementation checkpoint: `39dbc6a`
+- State: live causal rerun and full-suite qualification complete
 - Production routing: unchanged; `ProgramSectionCompiler` remains active
 
 ## Causal Question
@@ -70,9 +70,9 @@ Qwen/llama.cpp configuration and the same frozen harness.
 - No production routing, worker, schema, compiler, enricher, provider, MCP,
   notebook, or graph changes
 
-## Live Gate
+## Live Evidence
 
-The unchanged CM-56 matrix is required after the implementation checkpoint:
+The unchanged CM-56 matrix ran after the implementation checkpoint:
 
 - provider: OpenAI-compatible local llama.cpp
 - model: `qwen3.6-35b-a3b`
@@ -82,11 +82,28 @@ The unchanged CM-56 matrix is required after the implementation checkpoint:
 - thinking: disabled
 - sequential attempts
 
-Stage 1 must have zero terminal planner failures and preserve source grounding,
-scale semantics, repeated-view facts, and sample-axis facts for every frozen
-case. Only if that gate passes may the confirmation attempts run.
+The raw incremental evidence remains under `/tmp/cm56r-live-qwen.jsonl` and is
+not committed. Its SHA-256 is
+`4494d1470a5eb2defdbf1929561115e2c8a5defd2179c399ce455001c0b92e99`.
 
-The final decision is pending. It must be one of `INPUT_CONTRACT_FIXED`,
+The completed stage-1 matrix contains 30 case rows and 33 section outcomes.
+There were 8 terminal planner failures, 4 enrichment failures, 11 input
+insufficiency outcomes, 3 typed context-validation failures, and 7 typed
+semantic failures. Planner failures consisted of 6 `PlannerSemanticFailure`
+outcomes and 2 invalid structured-response `ProviderRequestError` outcomes.
+
+For outcomes that reached the input audit, missing facts were: source 10,
+selection 1, scale 1, multiplicity 2, and axis 1. These are retained as
+secondary evidence; the locked decision precedence stops first on terminal
+planner reliability.
+
+Stage 2 was not run because the stage-1 planner reliability gate failed.
+
+The final decision is `STOP_PLANNER_RELIABILITY`. It is one of the authorized
+CM-56R terminal outcomes and does not authorize CM-57. The final aggregate is
+recorded in `CM-56R-live-summary.json`.
+
+The authorized decision set is `INPUT_CONTRACT_FIXED`,
 `STOP_INPUT_CONTRACT`, `STOP_PLANNER_RELIABILITY`,
 `STOP_SCHEMA_COMPATIBILITY`, `STOP_TYPED_CONTEXT_GROUNDING`,
 `STOP_TYPED_WORKER_SEMANTICS`, or `INCONCLUSIVE_PROVIDER_INFRA`.
@@ -97,3 +114,25 @@ CM-56R does not begin CM-57. The typed section worker remains shadow-only, the
 production section route remains `ProgramSectionCompiler`, and no fallback,
 repair, routing, or worker prompt change is permitted before live evidence is
 reviewed.
+
+## Full-Suite Qualification
+
+The full repository suite completed with:
+
+`1546 passed, 10 failed, 2 skipped, 11 subtests passed`
+
+The same ten failure node IDs documented for CM-56 failed again. The four
+additional passes are the new planner tests, so CM-56R introduced no new full-
+suite failure. The failures remain outside the CM-56R change set, including
+the pre-existing untracked graph-worker test file.
+
+## Decision
+
+**STOP_PLANNER_RELIABILITY**
+
+The planner remediation preserved source and scientific semantics on the paths
+that completed, but eight terminal planner failures remain in the stage-1
+matrix. Stage 2 was therefore not run. The typed worker remains shadow-only,
+and CM-57/CM-58 remain blocked. A later slice must address planner reliability
+separately; this slice does not add another correction call, worker repair,
+fallback, or routing change.

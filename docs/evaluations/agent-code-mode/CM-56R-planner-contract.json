@@ -1,7 +1,7 @@
 {
   "experiment": "CM-56R",
   "baseline_sha": "728e652",
-  "implementation_checkpoint": "pre-live",
+  "implementation_checkpoint": "39dbc6a",
   "semantic_plan_schema_sha256": "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3",
   "section_task_schema_sha256": "f81e80b2bf7f4967cfc7f105a4a8a487a8a3352beefe057b6f6814c33a45fa3e",
   "planner_system_prompt_sha256_before": "cb704977d2e167cbc6c6cce18e92c6df17cea0bfe9f31fa4c2d966d041ee2c72",
@@ -15,5 +15,22 @@
   "case_corpus_changed": false,
   "enricher_changed": false,
   "routing_changed": false,
-  "live_evidence": null
+  "live_evidence": {
+    "raw_file": "/tmp/cm56r-live-qwen.jsonl",
+    "raw_sha256": "4494d1470a5eb2defdbf1929561115e2c8a5defd2179c399ce455001c0b92e99",
+    "case_rows": 30,
+    "section_outcomes": 33,
+    "stage": "stage_1",
+    "stage_2_executed": false,
+    "decision": "STOP_PLANNER_RELIABILITY",
+    "terminal_planner_failures": 8,
+    "input_sufficiency_losses": {
+      "source": 10,
+      "selection": 1,
+      "scale": 1,
+      "multiplicity": 2,
+      "axis": 1
+    },
+    "frozen_downstream_unchanged": true
+  }
 }
