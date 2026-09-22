@@ -4,9 +4,10 @@
 
 - Slice: planner/provider failure forensics
 - Baseline: `755f59e`
-- Pre-live diagnostic checkpoint: pending
+- Pre-live diagnostic checkpoint: `096c8a7`
 - Production changes: none
-- Live matrix: not run
+- Live matrix: incomplete; `7/20` rows flushed
+- Live decision: `INCONCLUSIVE_PROVIDER_INFRA`
 - CM-57: blocked
 
 ## Purpose
@@ -62,6 +63,42 @@ worker, graph, or corpus change is part of CM-56R4.
 
 ## Hard Stop
 
-Freeze this diagnostic code before the live matrix. After the twenty live rows,
+Freeze this diagnostic code before the live matrix. After the live attempt,
 record aggregate evidence and stop. Do not begin remediation or CM-57 in this
 slice.
+
+## Live Evidence
+
+The live runner used the controlled local llama.cpp endpoint with the frozen
+Qwen configuration and the unchanged CM-56 corpus. It flushed seven rows before
+the eighth request stopped producing HTTP response headers for longer than the
+configured 900-second request window. The process was then interrupted after
+the external wait; this is not classified as a Wellplot provider category
+because no response or adapter error existed to inspect.
+
+- Raw evidence: `/tmp/cm56r4-live-qwen.jsonl`
+- Raw SHA-256: `59fb4fa55362fc1056d3b449b4172c3c93ff1e222dc6ce08be12167b24013a6c`
+- Completed rows: `7/20`
+- `reverse_scale`: `7/10` completed; all seven were
+  `REVERSE_PLAN_SUCCESS`, one structured call each, with valid JSON, Pydantic,
+  and semantic-plan validation.
+- `source_selection`: `0/10` completed.
+- Typed-worker calls: `0`.
+- Raw content committed: no.
+
+## Validation
+
+- Focused forensic tests: `13 passed`.
+- Full suite: `1568 passed, 10 failed, 2 skipped, 11 subtests passed`.
+- The ten failing node IDs match the documented baseline/unrelated worktree
+  failures; CM-56R4 added its thirteen tests to the passing count.
+- Ruff check and format check passed.
+- JSON validation passed for the contract and live summary.
+- `git diff --check` passed.
+
+The partial result demonstrates that the forensic path can capture successful
+planner responses, but it cannot distinguish the source-selection failure
+classes until the provider completes the first case. The authorized decision
+is therefore `INCONCLUSIVE_PROVIDER_INFRA`, not a planner/schema/source
+finding. No remediation, retry policy, provider change, or CM-57 work follows
+from this partial run.

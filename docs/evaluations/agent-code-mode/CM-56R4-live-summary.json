@@ -1,0 +1,46 @@
+{
+  "experiment": "CM-56R4",
+  "baseline_sha": "755f59e",
+  "diagnostic_checkpoint": "096c8a7",
+  "provider": "openai_compat_local_llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "planner_temperature": 0.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "attempts_per_case": 10,
+  "cases": ["reverse_scale", "source_selection"],
+  "expected_row_count": 20,
+  "completed_row_count": 7,
+  "raw_evidence": {
+    "path": "/tmp/cm56r4-live-qwen.jsonl",
+    "sha256": "59fb4fa55362fc1056d3b449b4172c3c93ff1e222dc6ce08be12167b24013a6c"
+  },
+  "classification_counts": {
+    "REVERSE_PLAN_SUCCESS": 7
+  },
+  "case_progress": {
+    "reverse_scale": 7,
+    "source_selection": 0
+  },
+  "provider_call_counts": {
+    "completed_response_calls": 7,
+    "response_shape_failures": 0,
+    "structured_output_failures": 0,
+    "semantic_plan_failures": 0,
+    "unobserved_stalled_call": 1
+  },
+  "typed_worker_calls": 0,
+  "raw_provider_content_committed": false,
+  "validation": {
+    "focused_tests": "13 passed",
+    "full_suite": "1568 passed, 10 failed, 2 skipped, 11 subtests passed",
+    "known_baseline_failures_only": true,
+    "ruff": "passed",
+    "format": "passed",
+    "json": "passed",
+    "git_diff_check": "passed"
+  },
+  "decision": "INCONCLUSIVE_PROVIDER_INFRA",
+  "decision_reason": "The eighth request stopped producing response headers before a forensic response or adapter error could be captured; source-selection evidence is absent.",
+  "stage_2_run": false
+}
