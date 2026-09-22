@@ -129,3 +129,17 @@ arm is incomplete, and the repeated initial semantic correction is itself
 relevant planner evidence. The overall CM-56R4 decision remains
 `INCONCLUSIVE_PROVIDER_INFRA`; the two raw datasets remain independent and are
 not merged.
+
+## Source Continuation Checkpoint
+
+The frozen R4 runner was not modified after live execution began. A separate
+evaluation-only wrapper, `scripts/cm56r4_source_continuation.py`, imports its
+existing `run_attempt()` and adds exactly seven sequential attempts for the
+unchanged `source_selection` case. It asserts the frozen corpus hash and
+refuses to append to an existing output file. The continuation is not a new
+planner/provider experiment and does not alter production behavior.
+
+Before running it, the local llama.cpp server must be restarted with persistent
+stdout/stderr logging so a further disappearance can be classified as a server
+exit/crash rather than an HTTP client wait. The continuation output remains a
+separate raw artifact at `/tmp/cm56r4-source-continuation-qwen.jsonl`.
