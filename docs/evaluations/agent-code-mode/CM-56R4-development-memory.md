@@ -102,3 +102,30 @@ classes until the provider completes the first case. The authorized decision
 is therefore `INCONCLUSIVE_PROVIDER_INFRA`, not a planner/schema/source
 finding. No remediation, retry policy, provider change, or CM-57 work follows
 from this partial run.
+
+## Fresh Rerun Evidence
+
+After the local `/v1/models` health check confirmed `qwen3.6-35b-a3b`, a
+trivial same-model request returned successfully with the frozen temperature
+and token budget. A fresh matrix was then started at a separate path; it was
+not appended to the interrupted dataset. The local server stopped responding
+during the fourth source-selection request, so this run also stopped before its
+20-row exit bar.
+
+- Fresh raw evidence: `/tmp/cm56r4-live-qwen-rerun.jsonl`
+- Fresh raw SHA-256: `055ee2216ef0c599ab8c45cdce38a816dae6f381ee2a46674ac86782322b825c`
+- Completed rows: `13/20`
+- `reverse_scale`: `10/10` final `REVERSE_PLAN_SUCCESS`; every attempt used
+  two calls, with an initial schema-valid `missing_section_capability` plan
+  followed by a valid `semantic_correction` plan.
+- `source_selection`: `3/10`; all three were
+  `SOURCE_EXACT_SECONDARY` and `ENRICHED_SECONDARY` with one call each.
+- The remaining seven source attempts produced no response evidence.
+- Typed-worker calls: `0`.
+- Fresh raw content committed: no.
+
+This fresh partial run does not justify `FORENSICS_NO_REPRODUCTION`: the source
+arm is incomplete, and the repeated initial semantic correction is itself
+relevant planner evidence. The overall CM-56R4 decision remains
+`INCONCLUSIVE_PROVIDER_INFRA`; the two raw datasets remain independent and are
+not merged.

@@ -172,7 +172,7 @@ fragment through the SDK runtime.
 | CM-56R Planner-to-worker semantic preservation | Complete (`0f649ef`; implementation `39dbc6a`) | Source/scientific preservation contract applied and unchanged matrix rerun; terminal planner failures yield `STOP_PLANNER_RELIABILITY`, so CM-57 remains blocked |
 | CM-56R2 Planner reliability diagnostic | Complete (`d9fa8b1`; implementation `e72a999`) | Four planner-only temperature/source-summary variants completed; temperature 0 removed planner failures but source-summary context did not resolve enrichment source losses; no production fix authorized |
 | CM-56R3 Planner/source grounding correction | Complete (`26086cd`; implementation `9cd0071`) | Fixed planner temperature and separate path-free source context; singleton source selection passed, but 3/30 planner failures yield `STOP_PLANNER_RELIABILITY`; typed-worker rerun remains blocked |
-| CM-56R4 Planner/provider failure forensics | Complete (diagnostic checkpoint `096c8a7`) | Evaluation-only response forensics flushed 7/20 local rows before an external response-header stall; decision `INCONCLUSIVE_PROVIDER_INFRA`; no production remediation authorized |
+| CM-56R4 Planner/provider failure forensics | Complete (diagnostic checkpoint `096c8a7`) | Two independent local audits stopped before 20 rows (`7/20` and `13/20`) after server stalls; decision `INCONCLUSIVE_PROVIDER_INFRA`; no production remediation authorized |
 | CM-57…58 Typed section-worker cutover and acceptance | Blocked | Requires successful CM-56R evidence and the unchanged public/default-route gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
@@ -203,10 +203,11 @@ program-based pending separate evidence, and CM-60+ legacy deletion remains
 blocked.
 
 CM-56R4 added no production behavior. Its local provider forensic audit was
-incomplete: seven reverse-scale rows completed successfully, then the provider
-stalled before source-selection evidence could be collected. The result is
-`INCONCLUSIVE_PROVIDER_INFRA`; no planner, provider, worker, or routing
-remediation is authorized by that partial run.
+incomplete in two independent attempts: the first flushed seven successful
+reverse-scale rows, and the fresh rerun flushed ten reverse-scale rows plus
+three exact-secondary source-selection rows before the provider stalled again.
+The result is `INCONCLUSIVE_PROVIDER_INFRA`; no planner, provider, worker, or
+routing remediation is authorized by these partial runs.
 
 ## CM-00 Scope Boundary
 

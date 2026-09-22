@@ -1,0 +1,47 @@
+{
+  "experiment": "CM-56R4",
+  "dataset": "fresh_rerun",
+  "baseline_sha": "755f59e",
+  "diagnostic_checkpoint": "096c8a7",
+  "provider": "openai_compat_local_llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "planner_temperature": 0.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "attempts_per_case": 10,
+  "cases": ["reverse_scale", "source_selection"],
+  "expected_row_count": 20,
+  "completed_row_count": 13,
+  "raw_evidence": {
+    "path": "/tmp/cm56r4-live-qwen-rerun.jsonl",
+    "sha256": "055ee2216ef0c599ab8c45cdce38a816dae6f381ee2a46674ac86782322b825c"
+  },
+  "classification_counts": {
+    "REVERSE_PLAN_SUCCESS": 10,
+    "ENRICHED_SECONDARY": 3
+  },
+  "source_plan_counts": {
+    "SOURCE_EXACT_SECONDARY": 3
+  },
+  "case_progress": {
+    "reverse_scale": 10,
+    "source_selection": 3
+  },
+  "planner_call_counts": {
+    "one_call": 3,
+    "two_calls": 10
+  },
+  "reverse_initial_semantic_error": {
+    "code": "missing_section_capability",
+    "count": 10,
+    "corrected_successfully": 10
+  },
+  "provider_response_failures": 0,
+  "typed_worker_calls": 0,
+  "raw_provider_content_committed": false,
+  "unobserved_stalled_calls": 1,
+  "decision": "INCONCLUSIVE_PROVIDER_INFRA",
+  "decision_reason": "The local server stopped before seven source-selection attempts could produce forensic rows; the source arm is incomplete.",
+  "interrupted_dataset_sha256": "59fb4fa55362fc1056d3b449b4172c3c93ff1e222dc6ce08be12167b24013a6c",
+  "stage_2_run": false
+}
