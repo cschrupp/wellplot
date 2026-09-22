@@ -77,6 +77,10 @@ The harness flushes every completed row immediately. A structured response
 validation failure is recorded as a completed provider call with invalid typed
 output; a typed provider-boundary failure remains a provider failure. An
 unexpected implementation exception is not converted into experiment evidence.
+Explicit-input provenance failures are recorded as pre-generation diagnostic
+rows and do not abort the remaining matrix. Scale kinds are emitted only when
+the task explicitly states a `<kind> scale`; generic "log plot" wording is not
+treated as scientific scale evidence.
 
 Repeated-channel planner reliability is a separate ten-attempt planner-only
 arm using the current production source-summary boundary. Its results are not

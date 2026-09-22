@@ -450,9 +450,9 @@ def _scale_for_range(
     if pair is None:
         return None
     kind = None
-    for candidate in ("log", "tangential", "linear"):
-        if candidate in lower_text:
-            kind = candidate
+    for candidate in ("logarithmic", "log", "tangential", "linear"):
+        if re.search(rf"\b{candidate}\s+scale\b", lower_text):
+            kind = "log" if candidate == "logarithmic" else candidate
             break
     reverse = True if "reverse" in lower_text or "reversed" in lower_text else None
     scale = ExplicitScale(kind=kind, minimum=pair[0], maximum=pair[1], reverse=reverse)
@@ -1001,7 +1001,15 @@ async def run_representation_attempt(
             "elapsed_ms": (time.perf_counter() - started) * 1000,
         }
     task, section_context = selected
-    pair = build_pair_input(task, section_context=section_context, registry=registry)
+    try:
+        pair = build_pair_input(task, section_context=section_context, registry=registry)
+    except ValueError as error:
+        return {
+            **base,
+            "classification": "EXPLICIT_INPUT_PROVENANCE_FAILURE",
+            "error_type": type(error).__name__,
+            "elapsed_ms": (time.perf_counter() - started) * 1000,
+        }
     expected_sections = list(case.get("expected_sections", ()))
     expected = expected_sections[0] if expected_sections else {}
     audit = audit_input_sufficiency(

@@ -124,6 +124,23 @@ def test_repeated_channel_is_preserved_as_a_separate_planner_fact() -> None:
     assert REPEATED_CHANNEL_ATTEMPTS == 10
 
 
+def test_scale_kind_is_not_inferred_from_generic_log_plot_wording() -> None:
+    """A scale kind is emitted only when task prose states it explicitly."""
+    case = _case("scalar_linear")
+    task = SectionTask(
+        goal="Create one new normal track in a log plot from the scalar source.",
+        capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+        source_hints=("scalar-source",),
+        requirements=("Bind GR with a scale from 0 to 150",),
+    )
+    context = _resolved(case, task)
+    block, records = build_explicit_semantics(task, section_context=context)
+    audit = audit_explicit_semantics(block, records, task=task, section_context=context)
+    assert audit.valid
+    assert block.tracks[0].bindings[0].scale is not None
+    assert block.tracks[0].bindings[0].scale.kind is None
+
+
 def test_missing_task_fact_invalidates_b_before_provider_generation() -> None:
     """B never fills a missing scientific fact from an expected answer."""
     case = _case("vdl_sample_axis")
