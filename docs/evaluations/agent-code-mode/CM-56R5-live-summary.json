@@ -1,0 +1,136 @@
+{
+  "experiment": "CM-56R5",
+  "authorized_baseline_sha": "00d055f",
+  "live_harness_checkpoint": "227f248",
+  "provider": "openai_compat_local_llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "planner_temperature": 0.0,
+  "worker_temperature": 1.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+  "typed_prompt_sha256": "19b0e289d2fa8ea362840aa94d90ad43cdea5b2ebdc866363df1ef28a38f2d49",
+  "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+  "representation": {
+    "cases": [
+      "scalar_linear",
+      "reverse_scale",
+      "generic_raster",
+      "waveform",
+      "cbl_continuity",
+      "vdl_sample_axis"
+    ],
+    "attempts_per_case": 3,
+    "paired_rows": 18,
+    "planner_enrichment_boundary_invocations": 18,
+    "variant_a_worker_calls": 18,
+    "variant_b_worker_calls": 18,
+    "variant_a": {
+      "structured_valid": 18,
+      "context_valid": 14,
+      "compiler_valid": 14,
+      "semantic_accepted": 0
+    },
+    "variant_b": {
+      "structured_valid": 18,
+      "context_valid": 15,
+      "compiler_valid": 15,
+      "semantic_accepted": 0
+    },
+    "input_sufficient_rows": 15,
+    "input_insufficient_rows": 3,
+    "case_findings": {
+      "scalar_linear": {
+        "a_context_valid": "2/3",
+        "b_context_valid": "3/3",
+        "a_semantic_accepted": "0/3",
+        "b_semantic_accepted": "0/3",
+        "finding": "INCONCLUSIVE_REPRESENTATION"
+      },
+      "reverse_scale": {
+        "a_context_valid": "3/3",
+        "b_context_valid": "3/3",
+        "a_semantic_accepted": "0/3",
+        "b_semantic_accepted": "0/3",
+        "finding": "TYPED_BOUNDARY_FAILURE"
+      },
+      "generic_raster": {
+        "a_context_valid": "2/3",
+        "b_context_valid": "3/3",
+        "a_semantic_accepted": "0/3",
+        "b_semantic_accepted": "0/3",
+        "finding": "INCONCLUSIVE_REPRESENTATION"
+      },
+      "waveform": {
+        "a_context_valid": "3/3",
+        "b_context_valid": "3/3",
+        "a_semantic_accepted": "0/3",
+        "b_semantic_accepted": "0/3",
+        "finding": "TYPED_BOUNDARY_FAILURE"
+      },
+      "cbl_continuity": {
+        "a_context_valid": "1/3",
+        "b_context_valid": "0/3",
+        "a_semantic_accepted": "0/3",
+        "b_semantic_accepted": "0/3",
+        "a_context_errors": {
+          "channel_missing": 2
+        },
+        "b_context_errors": {
+          "duplicate_binding_semantic_id": 2,
+          "channel_kind_mismatch": 1
+        },
+        "finding": "INCONCLUSIVE_REPRESENTATION"
+      }
+    },
+    "primary_verdict": "INCONCLUSIVE_REPRESENTATION",
+    "primary_verdict_reason": "No B arm produced consistent semantic acceptance. B improved context validity for scalar and generic raster, while reverse and waveform remained typed semantic failures and CBL produced a distinct context-failure pattern.",
+    "vdl_preservation_control": {
+      "input_sufficient": "0/3",
+      "axis_facts_retained": [
+        "source_origin",
+        "source_step"
+      ],
+      "axis_facts_missing": [
+        "unit",
+        "tick_count"
+      ],
+      "a_structured_valid": "3/3",
+      "b_structured_valid": "3/3",
+      "a_semantic_accepted": "0/3",
+      "b_semantic_accepted": "0/3",
+      "finding": "PRESERVATION_CONTROL_INPUT_INSUFFICIENT"
+    }
+  },
+  "repeated_channel": {
+    "attempts": 10,
+    "planner_attempts": 10,
+    "typed_worker_calls": 0,
+    "classification_counts": {
+      "PLANNER_FAILURE": 10
+    },
+    "provider_category_counts": {
+      "invalid_response": 10
+    },
+    "finding": "REPEATED_CHANNEL_PLANNER_SCHEMA_FAILURE",
+    "separate_from_representation_verdict": true
+  },
+  "raw_evidence": [
+    {
+      "path": "/tmp/cm56r5-representation-qwen-rerun.jsonl",
+      "sha256": "65389bc1c02fef2163acf7f770da01e4774f7d03d7ec9e1b64da5ce794ad43f",
+      "rows": 18
+    },
+    {
+      "path": "/tmp/cm56r5-repeated-channel-qwen.jsonl",
+      "sha256": "41f0189cd826bd235b00b37dd617ceb35d40664dd1cca0500d84ccc0e76668c8",
+      "rows": 10
+    }
+  ],
+  "raw_provider_content_committed": false,
+  "redaction_scan": "passed",
+  "stage_2_run": false,
+  "cm57_started": false,
+  "decision": "STOP_BEFORE_CM57",
+  "decision_reason": "CM-56R5 produced diagnostic A/B and repeated-channel evidence only. The mixed representation result and separate planner schema failures require review before any production contract, prompt, worker, or routing change."
+}

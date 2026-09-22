@@ -4,9 +4,11 @@
 
 - Slice: typed-input representation forensics
 - Baseline: `aa0195f`
-- Implementation: pre-live checkpoint
+- Implementation checkpoint: `f3ed28a`
+- Evidence correction: `00d055f`
+- Live extraction correction: `227f248`
 - Production changes: none
-- Live inference: not authorized before checkpoint review
+- Live inference: complete; diagnostic only
 - CM-57: blocked
 - Repeated-channel arm: implemented as a separate ten-attempt planner-only run
 
@@ -113,10 +115,55 @@ Mixed or nonrepeatable           -> INCONCLUSIVE_REPRESENTATION
 Planner reliability and VDL semantic-preservation findings remain separate
 from this decision.
 
+## Live Evidence
+
+The authorized local Qwen run used the frozen controls above. The first
+escalated attempt was interrupted before any row after the sandboxed network
+path exceeded its wait; it is not part of the evidence. A fresh run with the
+`227f248` extraction correction completed all eighteen paired representation
+rows, and a separate run completed all ten repeated-channel planner rows.
+
+Representation evidence:
+
+- Raw JSONL: `/tmp/cm56r5-representation-qwen-rerun.jsonl`.
+- SHA-256: `65389bc1c02fef2163acf7f770da01e4774f7d03d7ec9e1b64da5ce794ad43f`.
+- Six cases, three paired attempts each; 18 planner/enrichment boundary
+  invocations and 36 typed-worker calls.
+- Variant A: 18/18 structured, 14/18 context-valid, 14/18 compiler-valid,
+  0/18 semantic acceptance.
+- Variant B: 18/18 structured, 15/18 context-valid, 15/18 compiler-valid,
+  0/18 semantic acceptance.
+- Primary verdict: `INCONCLUSIVE_REPRESENTATION`. No B arm produced
+  consistent semantic acceptance. Scalar and generic raster showed improved
+  context validity, reverse and waveform remained typed semantic failures, and
+  CBL produced a distinct context-failure pattern.
+
+The VDL preservation control is separate: its planner input was insufficient in
+all three rows. `source_origin` and `source_step` survived into task prose;
+`unit` and `tick_count` did not. Neither A nor B achieved semantic acceptance.
+No request-complete axis facts were restored.
+
+Repeated-channel evidence:
+
+- Raw JSONL: `/tmp/cm56r5-repeated-channel-qwen.jsonl`.
+- SHA-256: `41f0189cd826bd235b00b37dd617ceb35d40664dd1cca0500d84ccc0e76668c8`.
+- Ten planner-only attempts; typed-worker calls: zero. Each terminal
+  `invalid_response` is retained as an attempt-level result, not conflated with
+  a successful planner response.
+- All ten ended as `PLANNER_FAILURE` with provider category
+  `invalid_response`.
+- This finding is separate from and does not override the representation
+  verdict.
+
+Raw provider content was not committed. Both raw artifacts passed the bounded
+redaction scan. The aggregate is recorded in
+`CM-56R5-live-summary.json`.
+
 ## Hard Stop
 
 This slice adds evaluation-only scripts, tests, and evidence documentation.
 No `src/wellplot` file, production prompt, schema, compiler, planner, enricher,
-routing, retry, repair, fallback, or acceptance contract may change. Commit and
-push the pre-live checkpoint, then stop for review before any live provider
-calls. CM-57 remains blocked regardless of the R5 result.
+routing, retry, repair, fallback, or acceptance contract changed. The live
+evidence is complete; stop here for review. No CM-57, production contract
+redesign, prompt modification, repair, or routing change follows from this
+slice. CM-57 remains blocked.
