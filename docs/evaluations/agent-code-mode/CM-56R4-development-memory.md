@@ -26,7 +26,7 @@ It does not repair or reinterpret any failure.
 - Maximum output tokens: `16384`.
 - Request timeout: `900` seconds.
 - Thinking: disabled by the existing local provider configuration.
-- Corpus SHA-256: `4ebae0b37defbdf38bcbf443f3332ed930b5d260bffc283473405cafdb4ea327e`.
+- Corpus SHA-256: `4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e`.
 
 The runner uses the same rich case source summary as the CM-56R3 diagnostic
 helper. Before live execution, the difference from the production workflow is

@@ -44,7 +44,7 @@ from wellplot.capabilities import create_builtin_registry
 
 EXPERIMENT_VERSION = "CM-56R4"
 BASELINE_SHA = "755f59e"
-CASE_CORPUS_SHA256 = "4ebae0b37defbdf38bcbf443f3332ed930b5d260bffc283473405cafdb4ea327e"
+CASE_CORPUS_SHA256 = "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e"
 PLANNER_TEMPERATURE = 0.0
 PRIMARY_CASE_IDS = ("reverse_scale", "source_selection")
 
