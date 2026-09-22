@@ -45,6 +45,9 @@ feedback.
 Every B field has an executable provenance record classified as `task`,
 `context`, or `diagnostic_local_identity`. B construction fails before provider
 generation if any emitted field cannot be verified against its declared source.
+Evidence rows retain only a safe locator and SHA-256 evidence digest; they do
+not retain flattened task prose or source/context text. Synthetic POSIX and
+Windows path-shaped task text is covered by serialized-row redaction tests.
 Missing VDL axis facts remain missing; R5 does not restore them from the
 original request for the primary representation verdict.
 

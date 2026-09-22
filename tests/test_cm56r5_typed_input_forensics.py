@@ -157,3 +157,34 @@ def test_b_input_contains_no_paths_or_expected_artifact_references() -> None:
     assert (
         RESPONSE_SCHEMA_SHA256 == "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
     )
+
+
+def test_serialized_pair_and_audit_redact_path_shaped_task_text() -> None:
+    """Evidence retains locators and hashes, never planner task prose."""
+    case = _case("scalar_linear")
+    posix_path = "/secret/well/input.dlis"
+    windows_path = r"C:\\secret\\well\\input.dlis"
+    task = SectionTask(
+        goal=(
+            "Create one new normal track titled Gamma Ray from the scalar source. "
+            f"Do not persist {posix_path} or {windows_path}."
+        ),
+        capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+        source_hints=("scalar-source",),
+        requirements=("linear scale from 0 to 150",),
+    )
+    context = _resolved(case, task)
+    pair = build_pair_input(task, section_context=context, registry=create_builtin_registry())
+    evidence_row = {
+        "variant_a": pair.variant_a,
+        "variant_b": pair.variant_b,
+        "audit": pair.audit.model_dump(mode="json"),
+    }
+    serialized = json.dumps(evidence_row, sort_keys=True)
+    assert posix_path not in serialized
+    assert windows_path not in serialized
+    assert all("evidence_text" not in type(record).model_fields for record in pair.audit.records)
+    assert {record.evidence_path for record in pair.audit.records} >= {
+        "task.goal_requirements_constraints",
+        "context.source.candidate_id",
+    }

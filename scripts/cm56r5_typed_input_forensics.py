@@ -148,7 +148,7 @@ class ProvenanceRecord(_DiagnosticModel):
     provider_path: str = Field(min_length=1)
     evidence_path: str = Field(min_length=1)
     evidence_class: Literal["task", "context", "diagnostic_local_identity"]
-    evidence_text: str = ""
+    evidence_sha256: str = Field(min_length=64, max_length=64)
 
 
 class ExplicitSemanticAudit(_DiagnosticModel):
@@ -728,16 +728,36 @@ def _record(
     evidence_class: Literal["task", "context", "diagnostic_local_identity"],
     evidence_text: str,
 ) -> ProvenanceRecord:
-    """Create one explicit provenance record."""
+    """Create a provenance record without retaining source text."""
+    evidence_path = _provenance_path(provider_path, evidence_class)
+    evidence_value = str(value) if evidence_class == "diagnostic_local_identity" else evidence_text
     return ProvenanceRecord(
         output_path=output_path,
         provider_path=provider_path.removeprefix("explicit_semantics."),
-        evidence_path=evidence_class,
+        evidence_path=evidence_path,
         evidence_class=evidence_class,
-        evidence_text=str(value)
-        if evidence_class == "diagnostic_local_identity"
-        else evidence_text,
+        evidence_sha256=_sha256(evidence_value),
     )
+
+
+def _provenance_path(
+    provider_path: str,
+    evidence_class: Literal["task", "context", "diagnostic_local_identity"],
+) -> str:
+    """Return a safe locator instead of retaining matched task/context text."""
+    if evidence_class == "diagnostic_local_identity":
+        return "diagnostic_local_identity"
+    if evidence_class == "context":
+        if provider_path == "source_candidate":
+            return "context.source.candidate_id"
+        if provider_path.endswith(".channel"):
+            return "context.source.channel.mnemonic"
+        return "context.source"
+    if ".kind" in provider_path:
+        return "task.capability_ids"
+    if "source" in provider_path:
+        return "task.source_hints"
+    return "task.goal_requirements_constraints"
 
 
 def _value_at_path(value: object, path: str) -> object | None:
