@@ -1,0 +1,48 @@
+{
+  "experiment": "CM-56R4",
+  "baseline_sha": "755f59e",
+  "diagnostic_checkpoint": "096c8a7",
+  "provider": "openai_compat_local_llama_cpp",
+  "model": "qwen3.6-35b-a3b",
+  "planner_temperature": 0.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "typed_worker_calls": 0,
+  "raw_provider_content_committed": false,
+  "datasets": [
+    {
+      "name": "interrupted_initial",
+      "path": "/tmp/cm56r4-live-qwen.jsonl",
+      "sha256": "59fb4fa55362fc1056d3b449b4172c3c93ff1e222dc6ce08be12167b24013a6c",
+      "rows": 7,
+      "case_counts": {"reverse_scale": 7, "source_selection": 0}
+    },
+    {
+      "name": "fresh_rerun",
+      "path": "/tmp/cm56r4-live-qwen-rerun.jsonl",
+      "sha256": "055ee2216ef0c599ab8c45cdce38a816dae6f381ee2a46674ac86782322b825c",
+      "rows": 13,
+      "case_counts": {"reverse_scale": 10, "source_selection": 3}
+    },
+    {
+      "name": "source_continuation",
+      "path": "/tmp/cm56r4-source-continuation-qwen.jsonl",
+      "sha256": "bb637eb27b18a3f733c0f94f8fa166161c9002bea66ea67705ef71c43696f5fb",
+      "rows": 7,
+      "case_counts": {"reverse_scale": 0, "source_selection": 7}
+    }
+  ],
+  "completed_observations": {
+    "reverse_scale": 17,
+    "reverse_final_success": 17,
+    "source_selection": 10,
+    "source_exact_secondary": 10,
+    "enriched_secondary": 10,
+    "terminal_provider_or_schema_failures": 0,
+    "initial_missing_section_capability_corrected": 10
+  },
+  "decision": "FORENSICS_NO_REPRODUCTION",
+  "decision_reason": "The prior terminal reverse-planner and source-ambiguity failures did not reproduce under the frozen R4 controls; bounded semantic correction resolved the repeated initial capability omission.",
+  "operational_note": "The local llama.cpp server stalled during two partial matrix attempts; raw datasets remain separate and no Wellplot remediation is authorized.",
+  "stage_2_run": false
+}

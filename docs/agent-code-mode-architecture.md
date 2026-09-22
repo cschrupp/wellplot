@@ -172,7 +172,7 @@ fragment through the SDK runtime.
 | CM-56R Planner-to-worker semantic preservation | Complete (`0f649ef`; implementation `39dbc6a`) | Source/scientific preservation contract applied and unchanged matrix rerun; terminal planner failures yield `STOP_PLANNER_RELIABILITY`, so CM-57 remains blocked |
 | CM-56R2 Planner reliability diagnostic | Complete (`d9fa8b1`; implementation `e72a999`) | Four planner-only temperature/source-summary variants completed; temperature 0 removed planner failures but source-summary context did not resolve enrichment source losses; no production fix authorized |
 | CM-56R3 Planner/source grounding correction | Complete (`26086cd`; implementation `9cd0071`) | Fixed planner temperature and separate path-free source context; singleton source selection passed, but 3/30 planner failures yield `STOP_PLANNER_RELIABILITY`; typed-worker rerun remains blocked |
-| CM-56R4 Planner/provider failure forensics | Complete (diagnostic checkpoint `096c8a7`) | Two independent local audits stopped before 20 rows (`7/20` and `13/20`) after server stalls; decision `INCONCLUSIVE_PROVIDER_INFRA`; no production remediation authorized |
+| CM-56R4 Planner/provider failure forensics | Complete (evidence `364cf23`) | Cross-artifact evidence reaches `17/17` reverse success and `10/10` exact-secondary source selection; decision `FORENSICS_NO_REPRODUCTION`; local server instability remains operational only |
 | CM-57…58 Typed section-worker cutover and acceptance | Blocked | Requires successful CM-56R evidence and the unchanged public/default-route gate |
 | CM-60 through CM-62 Legacy deletion | Not started | Reachability gate authorizes removals |
 | CM-70 through CM-73 Release hardening | Not started | Security, live-eval, and release gates pass |
@@ -202,12 +202,12 @@ rerun the unchanged typed worker before CM-57. The report worker remains
 program-based pending separate evidence, and CM-60+ legacy deletion remains
 blocked.
 
-CM-56R4 added no production behavior. Its local provider forensic audit was
-incomplete in two independent attempts: the first flushed seven successful
-reverse-scale rows, and the fresh rerun flushed ten reverse-scale rows plus
-three exact-secondary source-selection rows before the provider stalled again.
-The result is `INCONCLUSIVE_PROVIDER_INFRA`; no planner, provider, worker, or
-routing remediation is authorized by these partial runs.
+CM-56R4 added no production behavior. Its two partial audits plus the frozen
+seven-call source continuation provide `17/17` final reverse-plan successes and
+`10/10` exact-secondary source-selection/enrichment outcomes. The forensic
+decision is `FORENSICS_NO_REPRODUCTION`; the observed local server stalls are
+operational evidence only. No planner, provider, worker, or routing remediation
+is authorized by CM-56R4.
 
 ## CM-00 Scope Boundary
 

@@ -143,3 +143,31 @@ Before running it, the local llama.cpp server must be restarted with persistent
 stdout/stderr logging so a further disappearance can be classified as a server
 exit/crash rather than an HTTP client wait. The continuation output remains a
 separate raw artifact at `/tmp/cm56r4-source-continuation-qwen.jsonl`.
+
+## Final Cross-Artifact Evidence
+
+The source continuation completed all seven attempts. It is combined only for
+analysis with the three source-selection rows in the fresh rerun; all raw
+JSONL files remain separate.
+
+- Source continuation raw SHA-256:
+  `bb637eb27b18a3f733c0f94f8fa166161c9002bea66ea67705ef71c43696f5fb`.
+- Reverse-scale observations: `17/17` final plans succeeded across the two
+  independent R4 datasets. The seven interrupted-run observations used one
+  call each; all ten fresh-rerun observations used one initial semantic-invalid
+  plan followed by one successful semantic correction.
+- Source-selection observations: `10/10` had an exact `secondary` hint and
+  `10/10` enriched the secondary candidate successfully.
+- Terminal provider/schema failures: `0` in the completed 20-row R4 evidence.
+- Typed-worker calls: `0`.
+
+The completed cross-artifact result is `FORENSICS_NO_REPRODUCTION` for the
+previous terminal reverse-planner and source-ambiguity failures. The repeated
+initial `missing_section_capability` response is retained as a bounded planner
+efficiency observation, not treated as a terminal failure because correction
+resolved it in all ten fresh reverse attempts. Local llama.cpp process/request
+instability remains an operational concern for future long live matrices, but
+it does not justify a Wellplot remediation slice here.
+
+CM-56R4 now hard-stops before typed-worker reruns and CM-57. The next evaluation
+step is the full frozen CM-56 typed shadow gate, not another planner fix.
