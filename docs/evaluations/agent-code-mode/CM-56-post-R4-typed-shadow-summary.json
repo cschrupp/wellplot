@@ -1,0 +1,63 @@
+{
+  "experiment": "CM-56 post-R4 typed shadow",
+  "experiment_version": "CM-56-post-r4-typed-shadow.v1",
+  "implementation_checkpoint": "796917f",
+  "provider": "local llama.cpp",
+  "model": "qwen3.6-35b-a3b",
+  "stage": "stage1",
+  "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+  "typed_system_prompt_sha256": "19b0e289d2fa8ea362840aa94d90ad43cdea5b2ebdc866363df1ef28a38f2d49",
+  "typed_response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+  "planner_temperature": 0.0,
+  "worker_temperature": 1.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900,
+  "raw_artifact": "/tmp/cm56-post-r4-typed-shadow-stage1-qwen.jsonl",
+  "raw_sha256": "0664120fef22105d9c3fef22aebc092dc89c56c8b480df88202e1f4f1b4f75e9",
+  "raw_rows": 30,
+  "top_level_attempts": 30,
+  "section_attempts": 33,
+  "classification_counts": {
+    "INPUT_INSUFFICIENT": 3,
+    "PLANNER_FAILURE": 3,
+    "TYPED_CONTEXT_GROUNDING_FAILURE": 4,
+    "TYPED_WORKER_SEMANTIC_FAILURE": 23
+  },
+  "by_case": {
+    "cbl_continuity": {
+      "TYPED_CONTEXT_GROUNDING_FAILURE": 4,
+      "TYPED_WORKER_SEMANTIC_FAILURE": 2
+    },
+    "generic_raster": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "log_scale": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "repeated_channel": {
+      "PLANNER_FAILURE": 3
+    },
+    "reverse_scale": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "scalar_linear": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "source_selection": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "tangential_scale": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    },
+    "vdl_sample_axis": {
+      "INPUT_INSUFFICIENT": 3
+    },
+    "waveform": {
+      "TYPED_WORKER_SEMANTIC_FAILURE": 3
+    }
+  },
+  "decision": "STOP_PLANNER_RELIABILITY",
+  "stage2_run": false,
+  "production_changes": 0,
+  "frozen_cm56r4_files_changed": 0
+}

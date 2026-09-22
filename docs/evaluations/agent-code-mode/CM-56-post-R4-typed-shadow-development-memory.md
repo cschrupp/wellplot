@@ -4,7 +4,8 @@
 
 - Slice: post-CM-56R4 typed-worker shadow gate
 - Baseline: `f11b595`
-- Implementation status: pre-live checkpoint
+- Implementation checkpoint: `796917f`
+- Implementation status: stage 1 complete
 - Production changes: none
 - CM-57: blocked
 
@@ -67,4 +68,46 @@ behavior, add repair/retry policy, alter the acceptance contract, or begin
 CM-57. Run stage one first, review its summary, and stop before stage two unless
 the stage-one gate is clean.
 
-**PROCEED to the stage-one live gate only after review of this checkpoint.**
+Stage one was run only after this checkpoint was committed and the local model
+identity was verified.
+
+## Stage-1 Evidence
+
+The controlled local llama.cpp endpoint reported model
+`qwen3.6-35b-a3b`. Stage one completed all three attempts for each of the ten
+frozen cases, producing thirty top-level rows and thirty-three section rows
+because the CBL continuity case has two sections per attempt.
+
+- Raw evidence: `/tmp/cm56-post-r4-typed-shadow-stage1-qwen.jsonl`
+- Raw SHA-256: `0664120fef22105d9c3fef22aebc092dc89c56c8b480df88202e1f4f1b4f75e9`
+- Aggregate: `CM-56-post-R4-typed-shadow-summary.json`
+- Planner failures: `3`
+- Enrichment failures: `0`
+- Input-insufficiency rows: `3`
+- Typed-context grounding failures: `4`
+- Typed semantic failures: `23`
+- Provider/schema failures: `0`
+
+The per-case distribution is retained in the aggregate JSON. The repeated
+channel case produced three planner failures, while the VDL/sample-axis case
+produced three input-insufficiency rows. The remaining completed section rows
+were typed semantic or context-grounding failures. The redaction scan found no
+host paths, source paths, canonical paths, or raw provider-response fields in
+the JSONL.
+
+The locked decision precedence therefore yields:
+
+```text
+STOP_PLANNER_RELIABILITY
+```
+
+Stage two was not run. No inference is made from the absence of stage-two
+evidence, and no production remediation or CM-57 work follows from this
+evaluation slice.
+
+## Final Hard Stop
+
+Freeze the stage-one evidence and stop at CM-56 post-R4 typed shadow. Any next
+step must be separately authorized and must address the observed planner/input
+and typed-worker evidence without changing the frozen CM-56R4 forensics or
+silently altering the acceptance contract.
