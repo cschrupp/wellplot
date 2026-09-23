@@ -183,4 +183,73 @@ authorization.
 
 Validation for the rework: 28 focused tests and 66 focused-plus-adjacent tests
 pass; Ruff lint and formatting, Python compilation, JSON validation, and
-`git diff --check` pass. R8R live inference remains **NOT STARTED**.
+`git diff --check` pass. R8R live inference is complete as recorded above.
+
+## CM-56R8R-F1 Binding-Scale Forensics
+
+CM-56R8R-F1 is a zero-provider-call forensic slice against baseline
+`518fc68512c0a405a20761140736f786b906114e`. It reads the frozen R8R evidence
+only and does not change production code, the R8R summary, the raw JSONL, or
+any provider contract.
+
+Evidence integrity passed:
+
+- Frozen raw population: 15 complete paired rows, five cases x three attempts,
+  and 30 worker calls.
+- Raw evidence: `/tmp/cm56r8r-live-qwen.jsonl`, SHA-256
+  `bf1274b987c948e68c36f4f0de6a945860fce6baf97e32f335943bfbb3c16aca`.
+- Evaluator, semantic-contract, evaluation-contract, corpus, and response
+  schema hashes match the frozen R8R artifacts.
+- Provider calls in F1: `0`.
+
+The six scalar rows were inspected, not only the failing rows. The three
+regressed paired rows are `reverse_scale` attempts 0, 1, and 2. In each row:
+
+```text
+expected:  minimum=200, maximum=0, reverse=true
+A:         minimum=200, maximum=0, reverse=true
+B:         minimum=0,   maximum=200, reverse=true
+```
+
+`scalar_linear` is the no-endpoint-regression control: all three B rows retain
+`minimum=0`, `maximum=150`, and `reverse=false`. Its A failures are title-only
+and do not affect the binding-scale result.
+
+The primary forensic classification is
+`MINMAX_NAME_CONFLICT_SIGNATURE`. It is assigned from the exact endpoint swap,
+the A/expected match, and preservation of the expected kind and reverse flag;
+it is not derived from the case ID. The result is consistent with the model
+emitting numerically sorted values for fields named `minimum` and `maximum`,
+but does not establish model reasoning or psychological causation. No
+contract-example anchoring, track-scale-copy, or cross-case-value signature
+was found in the three regressions. The frozen R8R decision remains
+`SEMANTIC_CONTRACT_PARTIAL_RECOVERY` unchanged.
+
+The forensic artifact is
+`CM-56R8R-binding-scale-forensics.json`. It contains the bounded six-row
+endpoint table, per-case A/B results, extracted numeric literals and explicit
+range pairs from the semantic-contract examples, and the static IR audit.
+
+The static audit found:
+
+- No validator requires `minimum <= maximum`; descending endpoint pairs are
+  legal under the current semantic and canonical models.
+- The semantic compiler preserves endpoint order exactly.
+- `reverse` is a separate downstream axis-orientation field. Linear rendering
+  reverses the stored ordered pair when `reverse=true`; tangential
+  normalization also uses the stored order.
+- Therefore `minimum=200`, `maximum=0`, `reverse=true` is internally coherent
+  in the current path. The names may be less descriptive than `from`/`to`, but
+  no rename is proposed by F1.
+
+Operator-reported execution note: the direct CLI initially failed before any
+provider call because a stale `args.attempts` reference remained after frozen
+CLI overrides had been removed. No provider call occurred during that startup
+failure. The authorized run then executed once through `run_matrix()` using
+the frozen in-memory attempts value `3`, without changing the authorized
+harness. This note is operator-reported and not independently verified by a
+provider log.
+
+F1 is diagnostic only. It does not authorize a schema rename, prompt change,
+semantic-contract change, provider change, or CM-57 work. CM-57 remains
+blocked pending a separate design and authorization.

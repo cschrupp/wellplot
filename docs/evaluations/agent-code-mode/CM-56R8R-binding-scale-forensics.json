@@ -1,0 +1,748 @@
+{
+  "baseline": "518fc68512c0a405a20761140736f786b906114e",
+  "contract_example_pairs": [
+    {
+      "example": "An array track titled Array View can use ARRAY_Q with x scale 10 to 90.",
+      "pair": [
+        10,
+        90
+      ]
+    },
+    {
+      "example": "CALX with a linear scale from -25 to 75 maps its range to binding.scale.",
+      "pair": [
+        -25,
+        75
+      ]
+    }
+  ],
+  "contract_numeric_literals": [
+    "10",
+    "90",
+    "-25",
+    "75",
+    "12",
+    "2",
+    "5"
+  ],
+  "findings": [
+    "All three endpoint regressions are in reverse_scale; scalar_linear is a no-regression control.",
+    "The reverse-scale B pair is the exact expected endpoint swap with kind and reverse preserved.",
+    "The endpoint result is consistent with a minimum/maximum naming conflict, not proof of model reasoning.",
+    "The frozen R8R decision remains SEMANTIC_CONTRACT_PARTIAL_RECOVERY."
+  ],
+  "integrity": {
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "evaluation_contract_sha256": "3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da",
+    "evaluator_source_sha256": "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49",
+    "population": "15 rows, five cases x three attempts",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+    "semantic_contract_sha256": "1f1ec51c7122b28a87e707051ee7c9203cb13e5b4c0aadf773228fdbfad61eb0"
+  },
+  "per_case": {
+    "generic_raster": {
+      "A": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [
+          "tracks[0].bindings[0].profile"
+        ],
+        "full_acceptance": "0/3",
+        "scientific_only_pass": "0/3"
+      },
+      "B": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "3/3",
+        "scientific_only_pass": "3/3"
+      }
+    },
+    "reverse_scale": {
+      "A": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "3/3",
+        "scientific_only_pass": "3/3"
+      },
+      "B": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [
+          "tracks[0].bindings[0].scale.maximum",
+          "tracks[0].bindings[0].scale.minimum"
+        ],
+        "full_acceptance": "0/3",
+        "scientific_only_pass": "0/3"
+      }
+    },
+    "scalar_linear": {
+      "A": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "0/3",
+        "scientific_only_pass": "3/3"
+      },
+      "B": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "3/3",
+        "scientific_only_pass": "3/3"
+      }
+    },
+    "vdl_sample_axis": {
+      "A": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [
+          "tracks[0].bindings[0].profile",
+          "tracks[0].bindings[0].sample_axis.tick_count"
+        ],
+        "full_acceptance": "0/3",
+        "scientific_only_pass": "0/3"
+      },
+      "B": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "3/3",
+        "scientific_only_pass": "3/3"
+      }
+    },
+    "waveform": {
+      "A": {
+        "extra_scientific_leaves": [
+          "tracks[0].bindings[0].sample_axis.maximum",
+          "tracks[0].bindings[0].sample_axis.minimum"
+        ],
+        "failed_scientific_leaves": [
+          "tracks[0].bindings[0].profile",
+          "tracks[0].bindings[0].sample_axis.maximum",
+          "tracks[0].bindings[0].sample_axis.minimum"
+        ],
+        "full_acceptance": "0/3",
+        "scientific_only_pass": "0/3"
+      },
+      "B": {
+        "extra_scientific_leaves": [],
+        "failed_scientific_leaves": [],
+        "full_acceptance": "3/3",
+        "scientific_only_pass": "3/3"
+      }
+    }
+  },
+  "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+  "production_changes": 0,
+  "provider_calls": 0,
+  "raw_evidence": {
+    "path": "/tmp/cm56r8r-live-qwen.jsonl",
+    "rows": 15,
+    "sha256": "bf1274b987c948e68c36f4f0de6a945860fce6baf97e32f335943bfbb3c16aca"
+  },
+  "regressed_leaves": 6,
+  "regressed_rows": [
+    {
+      "attempt_index": 0,
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "signatures": [
+        "MINMAX_NAME_CONFLICT_SIGNATURE"
+      ]
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "signatures": [
+        "MINMAX_NAME_CONFLICT_SIGNATURE"
+      ]
+    },
+    {
+      "attempt_index": 2,
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "signatures": [
+        "MINMAX_NAME_CONFLICT_SIGNATURE"
+      ]
+    }
+  ],
+  "scalar_rows": [
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "WRONG_VALUE",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 0,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "scalar_linear",
+      "endpoint_analysis": {
+        "evidence": {},
+        "primary_signature": "NO_ENDPOINT_REGRESSION_REPRODUCED",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": false,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": true,
+          "b_matches_expected": true,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "NO_ENDPOINT_REGRESSION_REPRODUCED"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 150,
+        "minimum": 0,
+        "reverse": false
+      },
+      "request_scale_phrase": "Create one new normal track titled Gamma Ray from the scalar source. Bind GR with a linear scale from 0 to 150."
+    },
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "WRONG_VALUE",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 1,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "scalar_linear",
+      "endpoint_analysis": {
+        "evidence": {},
+        "primary_signature": "NO_ENDPOINT_REGRESSION_REPRODUCED",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": false,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": true,
+          "b_matches_expected": true,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "NO_ENDPOINT_REGRESSION_REPRODUCED"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 150,
+        "minimum": 0,
+        "reverse": false
+      },
+      "request_scale_phrase": "Create one new normal track titled Gamma Ray from the scalar source. Bind GR with a linear scale from 0 to 150."
+    },
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "WRONG_VALUE",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 2,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 150.0,
+        "minimum": 0.0,
+        "reverse": false
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "scalar_linear",
+      "endpoint_analysis": {
+        "evidence": {},
+        "primary_signature": "NO_ENDPOINT_REGRESSION_REPRODUCED",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": false,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": true,
+          "b_matches_expected": true,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "NO_ENDPOINT_REGRESSION_REPRODUCED"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 150,
+        "minimum": 0,
+        "reverse": false
+      },
+      "request_scale_phrase": "Create one new normal track titled Gamma Ray from the scalar source. Bind GR with a linear scale from 0 to 150."
+    },
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 0.0,
+        "minimum": 200.0,
+        "reverse": true
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 0,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 200.0,
+        "minimum": 0.0,
+        "reverse": true
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.minimum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 0,
+        "minimum": 200,
+        "reverse": true
+      },
+      "request_scale_phrase": "Create one new normal track titled Resistivity from the scalar source. Bind RT with a linear scale from 200 to 0 and reverse direction enabled."
+    },
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 0.0,
+        "minimum": 200.0,
+        "reverse": true
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 1,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 200.0,
+        "minimum": 0.0,
+        "reverse": true
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.minimum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 0,
+        "minimum": 200,
+        "reverse": true
+      },
+      "request_scale_phrase": "Create one new normal track titled Resistivity from the scalar source. Bind RT with a linear scale from 200 to 0 and reverse direction enabled."
+    },
+    {
+      "a_generated": {
+        "kind": "linear",
+        "maximum": 0.0,
+        "minimum": 200.0,
+        "reverse": true
+      },
+      "a_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "PASS",
+        "tracks[0].bindings[0].scale.minimum": "PASS",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "attempt_index": 2,
+      "b_generated": {
+        "kind": "linear",
+        "maximum": 200.0,
+        "minimum": 0.0,
+        "reverse": true
+      },
+      "b_leaf_statuses": {
+        "source_selection_valid": "PASS",
+        "title_valid": "PASS",
+        "track_count_valid": "PASS",
+        "track_order_valid": "PASS",
+        "track_titles_valid": "PASS",
+        "tracks[0].binding_channels": "PASS",
+        "tracks[0].binding_count": "PASS",
+        "tracks[0].binding_ids": "PASS",
+        "tracks[0].binding_order": "PASS",
+        "tracks[0].bindings[0].scale.kind": "PASS",
+        "tracks[0].bindings[0].scale.maximum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.minimum": "WRONG_VALUE",
+        "tracks[0].bindings[0].scale.reverse": "PASS"
+      },
+      "case_id": "reverse_scale",
+      "endpoint_analysis": {
+        "evidence": {
+          "minmax_name_conflict": {
+            "b_ascending": true,
+            "b_pair": [
+              0,
+              200
+            ],
+            "expected_descending": true,
+            "expected_pair": [
+              200,
+              0
+            ]
+          }
+        },
+        "primary_signature": "MINMAX_NAME_CONFLICT_SIGNATURE",
+        "relationships": {
+          "a_matches_expected": true,
+          "b_has_same_unordered_endpoints": true,
+          "b_is_exact_swap": true,
+          "b_is_sorted_ascending": true,
+          "b_is_sorted_descending": false,
+          "b_kind_matches_expected": true,
+          "b_matches_a": false,
+          "b_matches_expected": false,
+          "b_reverse_matches_expected": true
+        },
+        "signatures": [
+          "MINMAX_NAME_CONFLICT_SIGNATURE"
+        ]
+      },
+      "expected": {
+        "kind": "linear",
+        "maximum": 0,
+        "minimum": 200,
+        "reverse": true
+      },
+      "request_scale_phrase": "Create one new normal track titled Resistivity from the scalar source. Bind RT with a linear scale from 200 to 0 and reverse direction enabled."
+    }
+  ],
+  "scale_ir_semantics": {
+    "compiler_preserves_order": true,
+    "descending_endpoint_pair_allowed": true,
+    "downstream_interpretation": "Linear axis ranges use [minimum, maximum] unless reverse is true, in which case the renderer reverses the ordered pair. Tangential normalization also retains the stored endpoint order.",
+    "evidence_locations": [
+      "src/wellplot/agent/code_mode/section_semantics.py:40-67",
+      "src/wellplot/agent/code_mode/semantic_section_compiler.py:206-214",
+      "src/wellplot/model/authoring.py:503-519",
+      "src/wellplot/model/document.py:549-570",
+      "src/wellplot/renderers/plotly.py:202-229",
+      "src/wellplot/renderers/plotly.py:303-311"
+    ],
+    "field_naming_assessment": "minimum/maximum are canonical field names, but this path preserves ordered display endpoints; no rename is recommended in this slice.",
+    "minimum_le_maximum_enforced": false,
+    "questions": {
+      "q1_minimum_le_maximum_validator": false,
+      "q2_descending_pair_legal": true,
+      "q3_compiler_order": "preserved exactly",
+      "q4_reverse": "separate downstream axis-orientation field",
+      "q5_minimum_maximum": "ordered endpoints in this semantic path, despite names",
+      "q6_200_0_reverse_true": "internally coherent",
+      "q7_from_to_names": "possibly more descriptive; no rename recommendation"
+    },
+    "reverse_descending_pair_coherent": true,
+    "reverse_is_separate_field": true
+  },
+  "version": "cm56r8r.binding-scale-forensics.v1"
+}
