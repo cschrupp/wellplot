@@ -28,7 +28,6 @@ from scripts.cm56_typed_section_shadow import (
 )
 from scripts.cm56r6_authoritative_request import (
     AUTHORITATIVE_REQUEST_SYSTEM_PROMPT,
-    _generation_request,
     _select_case_section,
     _sha256,
     build_authoritative_worker_input,
@@ -50,13 +49,18 @@ from wellplot.agent.code_mode.typed_section_worker import (
     build_typed_section_input,
     serialize_typed_section_input,
 )
-from wellplot.agent.providers.base import ModelBackendProtocol, ProviderRequestError
+from wellplot.agent.providers.base import (
+    ModelBackendProtocol,
+    ProviderRequestError,
+    StructuredGenerationRequest,
+)
 from wellplot.authoring_program.inspection import AuthoringInspectionFacade
 from wellplot.capabilities import CapabilityRegistry, create_builtin_registry
 
 EXPERIMENT_VERSION = "CM-56R8R"
 EVALUATOR_VERSION = "cm56r8r.corrected-evaluator.v1"
 BASELINE_SHA = "17da03e"
+FROZEN_MODEL = "Qwen3.6-35B-A3B-MTP-GGUF"
 CASE_CORPUS_SHA256 = "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e"
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / (
     "docs/evaluations/agent-code-mode/CM-56R8R-semantic-contracts.json"
@@ -70,6 +74,8 @@ WORKER_TEMPERATURE = 0.0
 MAX_OUTPUT_TOKENS = 16384
 TIMEOUT_SECONDS = 900.0
 ATTEMPTS = 3
+MAX_TOKENS_PARAMETER = "max_tokens"
+EVALUATOR_SOURCE_PATH = Path(__file__).resolve()
 REPRESENTATION_CASES = (
     "scalar_linear",
     "reverse_scale",
@@ -114,6 +120,11 @@ class CorrectedSemanticEvaluation:
     def accepted(self) -> bool:
         """Return whether all applicable semantics passed without extras."""
         return not self.omissions and not self.unrequested_semantics
+
+
+def evaluator_source_sha256() -> str:
+    """Return the exact digest of the evaluator source used for execution."""
+    return _sha256_bytes(EVALUATOR_SOURCE_PATH.read_bytes())
 
 
 def _canonical_json(value: object) -> str:
@@ -317,6 +328,11 @@ def evaluate_semantic_draft_r8r(
         checks[path] = passed
         statuses[path] = "PASS" if passed else "WRONG_VALUE"
 
+    def add_unrequested(paths: Sequence[str]) -> None:
+        for path in paths:
+            statuses[path] = "UNREQUESTED_EXTRA"
+            unrequested.append(path)
+
     add_check("title_valid", draft.title == expected.get("title"))
     add_check("source_selection_valid", draft.source_candidate == expected.get("source_candidate"))
     expected_tracks = list(expected.get("tracks", ()))
@@ -345,9 +361,16 @@ def evaluate_semantic_draft_r8r(
                 intrinsic_defaults=_SCALE_DEFAULTS,
             )
             statuses.update(scale_statuses)
-            unrequested.extend(extras)
+            add_unrequested(extras)
         elif actual_track.x_scale is not None:
-            unrequested.append(f"{prefix}.x_scale")
+            _, extras = _compare_nested(
+                path=f"{prefix}.x_scale",
+                expected=None,
+                actual=actual_track.x_scale,
+                normalizer=normalize_scale,
+                intrinsic_defaults=_SCALE_DEFAULTS,
+            )
+            add_unrequested(extras)
 
         expected_bindings = list(expected_track.get("bindings", ()))
         actual_bindings = list(actual_track.bindings)
@@ -378,7 +401,10 @@ def evaluate_semantic_draft_r8r(
                         elif field_name == "sample_axis":
                             normalized = normalize_sample_axis(expected_value)
                         else:
-                            normalized = {"value": expected_value}
+                            normalized = None
+                        if field_name == "profile":
+                            statuses[f"{binding_prefix}.profile"] = "MISSING"
+                            continue
                         for field in normalized or {}:
                             statuses[f"{binding_prefix}.{field_name}.{field}"] = "MISSING"
                 continue
@@ -391,9 +417,16 @@ def evaluate_semantic_draft_r8r(
                     intrinsic_defaults=_SCALE_DEFAULTS,
                 )
                 statuses.update(scale_statuses)
-                unrequested.extend(extras)
+                add_unrequested(extras)
             elif getattr(actual_binding, "scale", None) is not None:
-                unrequested.append(f"{binding_prefix}.scale")
+                _, extras = _compare_nested(
+                    path=f"{binding_prefix}.scale",
+                    expected=None,
+                    actual=getattr(actual_binding, "scale", None),
+                    normalizer=normalize_scale,
+                    intrinsic_defaults=_SCALE_DEFAULTS,
+                )
+                add_unrequested(extras)
             if "profile" in expected_binding:
                 expected_profile = _enum_value(expected_binding["profile"])
                 actual_profile = _enum_value(getattr(actual_binding, "profile", None))
@@ -402,7 +435,7 @@ def evaluate_semantic_draft_r8r(
                     "MISSING" if actual_profile is None else status
                 )
             elif getattr(actual_binding, "profile", None) is not None:
-                unrequested.append(f"{binding_prefix}.profile")
+                add_unrequested((f"{binding_prefix}.profile",))
             if "sample_axis" in expected_binding:
                 axis_statuses, extras = _compare_nested(
                     path=f"{binding_prefix}.sample_axis",
@@ -412,9 +445,16 @@ def evaluate_semantic_draft_r8r(
                     intrinsic_defaults={},
                 )
                 statuses.update(axis_statuses)
-                unrequested.extend(extras)
+                add_unrequested(extras)
             elif getattr(actual_binding, "sample_axis", None) is not None:
-                unrequested.append(f"{binding_prefix}.sample_axis")
+                _, extras = _compare_nested(
+                    path=f"{binding_prefix}.sample_axis",
+                    expected=None,
+                    actual=getattr(actual_binding, "sample_axis", None),
+                    normalizer=normalize_sample_axis,
+                    intrinsic_defaults={},
+                )
+                add_unrequested(extras)
 
     omissions = tuple(sorted(path for path, status in statuses.items() if status != "PASS"))
     return CorrectedSemanticEvaluation(
@@ -456,13 +496,84 @@ def _eligible(result: Mapping[str, object]) -> bool:
     )
 
 
+def _r8r_generation_request(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    timeout_seconds: float,
+) -> StructuredGenerationRequest:
+    """Build the worker request from the frozen R8R execution controls."""
+    return StructuredGenerationRequest(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        timeout_seconds=timeout_seconds,
+        temperature=WORKER_TEMPERATURE,
+        max_output_tokens=MAX_OUTPUT_TOKENS,
+    )
+
+
+def _population_integrity(
+    rows: Sequence[Mapping[str, object]],
+    *,
+    expected_by_case: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
+    """Check that rows form the complete, comparable R8R population."""
+    expected_cases = set(REPRESENTATION_CASES)
+    reasons: list[str] = []
+    expected_keys = {
+        (case_id, attempt_index)
+        for case_id in REPRESENTATION_CASES
+        for attempt_index in range(ATTEMPTS)
+    }
+    actual_keys: list[tuple[object, object]] = [
+        (row.get("case_id"), row.get("attempt_index")) for row in rows
+    ]
+
+    if len(rows) != len(expected_keys):
+        reasons.append("row_count")
+    if set(expected_by_case) != expected_cases:
+        reasons.append("expected_case_population")
+    if len(set(actual_keys)) != len(actual_keys):
+        reasons.append("duplicate_case_attempt")
+    if set(actual_keys) != expected_keys:
+        reasons.append("missing_or_unexpected_case_attempt")
+    for row in rows:
+        input_sufficiency = row.get("input_sufficiency")
+        if (
+            not isinstance(input_sufficiency, Mapping)
+            or input_sufficiency.get("sufficient") is not True
+        ):
+            reasons.append("input_insufficient")
+        if row.get("semantic_contract_only_diff") is not True:
+            reasons.append("semantic_contract_diff")
+        for variant in ("a", "b"):
+            value = row.get(variant)
+            if not isinstance(value, Mapping) or not _eligible(value):
+                reasons.append(f"{variant}_not_evaluation_eligible")
+
+    return {
+        "complete": not reasons,
+        "expected_rows": len(expected_keys),
+        "actual_rows": len(rows),
+        "expected_cases": list(REPRESENTATION_CASES),
+        "actual_cases": sorted(
+            {str(row.get("case_id")) for row in rows if row.get("case_id") is not None}
+        ),
+        "reasons": sorted(set(reasons)),
+    }
+
+
 def aggregate_r8r_rows(
     rows: Sequence[Mapping[str, object]],
     *,
     expected_by_case: Mapping[str, Mapping[str, object]],
 ) -> dict[str, object]:
     """Aggregate corrected leaf statuses without changing generated outputs."""
-    result: dict[str, object] = {}
+    result: dict[str, object] = {
+        "evaluator_version": EVALUATOR_VERSION,
+        "evaluator_source_sha256": evaluator_source_sha256(),
+    }
+    population = _population_integrity(rows, expected_by_case=expected_by_case)
     pairwise: dict[str, dict[str, int]] = defaultdict(
         lambda: {"both_pass": 0, "a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0}
     )
@@ -548,7 +659,7 @@ def aggregate_r8r_rows(
 
     b_scientific_pass = result["B"]["scientific_only_pass"]["numerator"]
     b_eligible = result["B"]["evaluation_eligible"]
-    if not rows:
+    if not population["complete"]:
         decision = "INCONCLUSIVE_SEMANTIC_CONTRACT"
     elif recoveries == 0:
         decision = "SEMANTIC_CONTRACT_NO_RECOVERY"
@@ -561,6 +672,7 @@ def aggregate_r8r_rows(
     result["pairwise_scientific_leaves"] = dict(sorted(pairwise.items()))
     result["scientific_recoveries"] = recoveries
     result["scientific_regressions"] = regressions
+    result["population_integrity"] = population
     result["decision"] = decision
     return result
 
@@ -578,7 +690,7 @@ async def _generate_corrected_variant(
     """Run one provider response through corrected evaluation only."""
     try:
         generated = await backend.generate_structured(
-            request=_generation_request(
+            request=_r8r_generation_request(
                 system_prompt=system_prompt,
                 user_prompt=serialized_input,
                 timeout_seconds=timeout_seconds,
@@ -667,6 +779,7 @@ async def run_corrected_attempt(
     case: Mapping[str, object],
     *,
     backend: ModelBackendProtocol,
+    model: str,
     planner: SemanticPlanner,
     registry: CapabilityRegistry,
     contracts_artifact: Mapping[str, object],
@@ -677,6 +790,21 @@ async def run_corrected_attempt(
     attempt_index: int,
 ) -> dict[str, object]:
     """Run one shared planner/enrichment result through corrected A and B."""
+    row_metadata = {
+        "experiment_version": EXPERIMENT_VERSION,
+        "baseline_sha": BASELINE_SHA,
+        "evaluator_version": EVALUATOR_VERSION,
+        "evaluator_source_sha256": evaluator_source_sha256(),
+        "execution_controls": {
+            "model": model,
+            "planner_temperature": PLANNER_TEMPERATURE,
+            "worker_temperature": WORKER_TEMPERATURE,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
+            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+            "timeout_seconds": timeout_seconds,
+            "attempts_per_case": ATTEMPTS,
+        },
+    }
     document = _document()
     request = _case_request(case)
     started = time.perf_counter()
@@ -700,8 +828,7 @@ async def run_corrected_attempt(
         )
     except (ProviderRequestError, SemanticEnrichmentError) as error:
         return {
-            "experiment_version": EXPERIMENT_VERSION,
-            "baseline_sha": BASELINE_SHA,
+            **row_metadata,
             "case_id": case["case_id"],
             "attempt_index": attempt_index,
             "classification": "PLANNER_OR_ENRICHMENT_FAILURE",
@@ -714,8 +841,7 @@ async def run_corrected_attempt(
     selected = _select_case_section(str(case["case_id"]), plan, enriched)
     if selected is None:
         return {
-            "experiment_version": EXPERIMENT_VERSION,
-            "baseline_sha": BASELINE_SHA,
+            **row_metadata,
             "case_id": case["case_id"],
             "attempt_index": attempt_index,
             "classification": "PLANNER_SECTION_SELECTION_FAILURE",
@@ -757,8 +883,7 @@ async def run_corrected_attempt(
         timeout_seconds=timeout_seconds,
     )
     return {
-        "experiment_version": EXPERIMENT_VERSION,
-        "baseline_sha": BASELINE_SHA,
+        **row_metadata,
         "case_id": case["case_id"],
         "attempt_index": attempt_index,
         "classification": "PAIRED_TYPED_ATTEMPT",
@@ -791,18 +916,61 @@ async def run_corrected_attempt(
     }
 
 
+def validate_frozen_execution_controls(args: argparse.Namespace) -> None:
+    """Reject any live invocation that differs from the frozen R8R controls."""
+    expected = {
+        "model": FROZEN_MODEL,
+        "planner_temperature": PLANNER_TEMPERATURE,
+        "worker_temperature": WORKER_TEMPERATURE,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+        "timeout": TIMEOUT_SECONDS,
+        "attempts": ATTEMPTS,
+    }
+    actual = {
+        "model": getattr(args, "model", None),
+        "planner_temperature": getattr(args, "planner_temperature", PLANNER_TEMPERATURE),
+        "worker_temperature": getattr(args, "worker_temperature", WORKER_TEMPERATURE),
+        "max_output_tokens": getattr(args, "max_output_tokens", MAX_OUTPUT_TOKENS),
+        "max_tokens_parameter": getattr(args, "max_tokens_parameter", MAX_TOKENS_PARAMETER),
+        "timeout": getattr(args, "timeout", TIMEOUT_SECONDS),
+        "attempts": getattr(args, "attempts", ATTEMPTS),
+    }
+    mismatches = {
+        name: {"expected": expected[name], "actual": actual[name]}
+        for name in expected
+        if actual[name] != expected[name]
+    }
+    if mismatches:
+        raise ValueError(f"CM-56R8R frozen controls rejected: {mismatches}")
+
+
+def ensure_empty_evidence_path(path: Path) -> None:
+    """Allow only a new or empty output file for one R8R population."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and path.stat().st_size > 0:
+        raise FileExistsError(f"Refusing to append to non-empty CM-56R8R evidence file: {path}")
+
+
 async def run_matrix(args: argparse.Namespace) -> None:
     """Run the corrected live matrix only after separate authorization."""
     from scripts.cm56_typed_section_shadow import _provider_configuration
 
     if case_corpus_sha256() != CASE_CORPUS_SHA256:
         raise RuntimeError("CM-56 corpus hash changed from the frozen baseline.")
+    validate_frozen_execution_controls(args)
+    ensure_empty_evidence_path(args.output_jsonl)
     contracts_artifact, contract_sha256 = load_semantic_contracts()
     evaluation_contract, evaluation_contract_sha256 = load_evaluation_contract()
-    backend = _provider_configuration(args)
+    provider_values = vars(args).copy()
+    provider_values.update(
+        timeout=TIMEOUT_SECONDS,
+        max_tokens_parameter=MAX_TOKENS_PARAMETER,
+    )
+    provider_args = argparse.Namespace(**provider_values)
+    backend = _provider_configuration(provider_args)
     registry = create_builtin_registry()
     cases = [case for case in load_case_definitions() if case["case_id"] in REPRESENTATION_CASES]
-    args.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
     with args.output_jsonl.open("a", encoding="utf-8") as handle:
         for case in cases:
             planner = SemanticPlanner(backend=backend, registry=registry)
@@ -810,13 +978,14 @@ async def run_matrix(args: argparse.Namespace) -> None:
                 row = await run_corrected_attempt(
                     case,
                     backend=backend,
+                    model=args.model,
                     planner=planner,
                     registry=registry,
                     contracts_artifact=contracts_artifact,
                     contract_sha256=contract_sha256,
                     evaluation_contract=evaluation_contract,
                     evaluation_contract_sha256=evaluation_contract_sha256,
-                    timeout_seconds=args.timeout,
+                    timeout_seconds=TIMEOUT_SECONDS,
                     attempt_index=attempt_index,
                 )
                 handle.write(json.dumps(row, sort_keys=True) + "\n")
@@ -830,10 +999,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--api-key-file")
     parser.add_argument("--api-key-env", default="OPENAI_COMPAT_API_KEY")
-    parser.add_argument("--max-output-tokens", type=int, default=MAX_OUTPUT_TOKENS)
-    parser.add_argument("--max-tokens-parameter", default="max_tokens")
-    parser.add_argument("--timeout", type=float, default=TIMEOUT_SECONDS)
-    parser.add_argument("--attempts", type=int, default=ATTEMPTS)
     parser.add_argument("--output-jsonl", type=Path, required=True)
     return parser
 

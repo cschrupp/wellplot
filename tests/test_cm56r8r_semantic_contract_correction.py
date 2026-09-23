@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+from argparse import Namespace
+from pathlib import Path
 
 import pytest
 from scripts.cm56_typed_section_shadow import case_corpus_sha256, load_case_definitions
@@ -11,22 +14,29 @@ from scripts.cm56r8r_semantic_contract_correction import (
     BASELINE_SHA,
     CASE_CORPUS_SHA256,
     EVALUATION_CONTRACT_VERSION,
+    EVALUATOR_SOURCE_PATH,
     EVALUATOR_VERSION,
+    FROZEN_MODEL,
     MAX_OUTPUT_TOKENS,
+    MAX_TOKENS_PARAMETER,
     PLANNER_TEMPERATURE,
     REPRESENTATION_CASES,
     RESPONSE_SCHEMA_SHA256,
     TIMEOUT_SECONDS,
     WORKER_TEMPERATURE,
+    aggregate_r8r_rows,
     build_contract_system_prompt,
     build_contract_worker_input,
     corrected_expected_for_case,
+    ensure_empty_evidence_path,
     evaluate_semantic_draft_r8r,
+    evaluator_source_sha256,
     load_evaluation_contract,
     load_semantic_contracts,
     normalize_sample_axis,
     normalize_scale,
     semantic_contract_only_differs,
+    validate_frozen_execution_controls,
 )
 
 from wellplot.agent.code_mode.section_semantics import (
@@ -72,6 +82,42 @@ def _curve_expected(scale: dict[str, object]) -> dict[str, object]:
                 "kind": "normal",
                 "title": "Calibration",
                 "bindings": [{"kind": "curve", "channel": "CALX", "scale": scale}],
+            }
+        ],
+    }
+
+
+def _raster_draft(
+    *,
+    bindings: tuple[RasterBindingSemanticDraft, ...],
+) -> SectionSemanticDraft:
+    """Build a synthetic array draft for raster leaf tests."""
+    return SectionSemanticDraft(
+        title="Array View",
+        source_candidate="source-1",
+        tracks=(
+            ArrayTrackSemanticDraft(
+                semantic_id="array",
+                kind="array",
+                title="Array View",
+                x_scale=SemanticScale(minimum=10, maximum=90),
+                bindings=bindings,
+            ),
+        ),
+    )
+
+
+def _raster_expected(*, bindings: list[dict[str, object]]) -> dict[str, object]:
+    """Build a synthetic expected array projection for raster leaf tests."""
+    return {
+        "title": "Array View",
+        "source_candidate": "source-1",
+        "tracks": [
+            {
+                "kind": "array",
+                "title": "Array View",
+                "x_scale": {"minimum": 10, "maximum": 90},
+                "bindings": bindings,
             }
         ],
     }
@@ -258,8 +304,77 @@ def test_sample_axis_leaf_statuses_distinguish_missing_wrong_and_extra() -> None
     evaluation = evaluate_semantic_draft_r8r(actual, expected=expected)
     source_step_status = evaluation.leaf_statuses["tracks[0].bindings[0].sample_axis.source_step"]
     assert source_step_status == "WRONG_VALUE"
+    assert (
+        evaluation.leaf_statuses["tracks[0].bindings[0].sample_axis.minimum"] == "UNREQUESTED_EXTRA"
+    )
+    assert (
+        evaluation.leaf_statuses["tracks[0].bindings[0].sample_axis.maximum"] == "UNREQUESTED_EXTRA"
+    )
     assert "tracks[0].bindings[0].sample_axis.minimum" in evaluation.unrequested_semantics
     assert "tracks[0].bindings[0].sample_axis.maximum" in evaluation.unrequested_semantics
+
+
+def test_unrequested_sample_axis_leaves_block_scientific_only_pass() -> None:
+    """Scientific extras are failures even when every requested leaf matches."""
+    expected = _raster_expected(
+        bindings=[{"kind": "raster", "channel": "ARRAY_Q", "profile": "generic"}]
+    )
+    draft = _raster_draft(
+        bindings=(
+            RasterBindingSemanticDraft(
+                semantic_id="array-q",
+                channel="ARRAY_Q",
+                profile="generic",
+                sample_axis=SemanticSampleAxis(minimum=1, maximum=2),
+            ),
+        )
+    )
+    evaluation = evaluate_semantic_draft_r8r(draft, expected=expected)
+    row_variant = {
+        "structured_valid": True,
+        "context_valid": True,
+        "compiler_valid": True,
+        "semantic_accepted": evaluation.accepted,
+        "leaf_statuses": evaluation.leaf_statuses,
+    }
+    rows = [
+        {
+            "case_id": case_id,
+            "attempt_index": attempt_index,
+            "input_sufficiency": {"sufficient": True},
+            "semantic_contract_only_diff": True,
+            "a": row_variant,
+            "b": row_variant,
+        }
+        for case_id, attempt_index in [("scalar_linear", 0)]
+    ]
+    aggregate = aggregate_r8r_rows(
+        rows,
+        expected_by_case={case_id: {} for case_id in REPRESENTATION_CASES},
+    )
+    assert aggregate["B"]["scientific_only_pass"]["numerator"] == 0
+
+
+def test_missing_raster_profile_uses_binding_leaf_path() -> None:
+    """An absent raster binding reports profile at the binding leaf itself."""
+    expected = _raster_expected(
+        bindings=[
+            {"kind": "raster", "channel": "ARRAY_Q", "profile": "generic"},
+            {"kind": "raster", "channel": "ARRAY_W", "profile": "waveform"},
+        ]
+    )
+    actual = _raster_draft(
+        bindings=(
+            RasterBindingSemanticDraft(
+                semantic_id="array-q",
+                channel="ARRAY_Q",
+                profile="generic",
+            ),
+        )
+    )
+    evaluation = evaluate_semantic_draft_r8r(actual, expected=expected)
+    assert evaluation.leaf_statuses["tracks[0].bindings[1].profile"] == "MISSING"
+    assert "tracks[0].bindings[1].profile.value" not in evaluation.leaf_statuses
 
 
 def test_vdl_overlay_removes_only_unsupported_sample_axis_bounds() -> None:
@@ -379,6 +494,113 @@ def test_vdl_overlay_is_not_in_provider_contract() -> None:
     assert "remove_expected_paths" not in serialized
 
 
+def _complete_population_rows() -> list[dict[str, object]]:
+    """Build a fully comparable synthetic 15-row population."""
+    variant = {
+        "structured_valid": True,
+        "context_valid": True,
+        "compiler_valid": True,
+        "semantic_accepted": True,
+        "leaf_statuses": {
+            "tracks[0].bindings[0].scale.minimum": "PASS",
+        },
+    }
+    rows: list[dict[str, object]] = []
+    for case_id in REPRESENTATION_CASES:
+        for attempt_index in range(3):
+            rows.append(
+                {
+                    "case_id": case_id,
+                    "attempt_index": attempt_index,
+                    "input_sufficiency": {"sufficient": True},
+                    "semantic_contract_only_diff": True,
+                    "a": dict(variant),
+                    "b": dict(variant),
+                }
+            )
+    return rows
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "provider_failure",
+        "context_invalid",
+        "missing_pair",
+        "duplicate_case_attempt",
+        "input_insufficient",
+        "contract_diff",
+    ],
+)
+def test_population_integrity_fails_closed(mutation: str) -> None:
+    """Any incomplete or incomparable arm blocks the architecture decision."""
+    rows = _complete_population_rows()
+    if mutation == "provider_failure":
+        rows[0]["a"] = {"structured_valid": False, "context_valid": False}
+    elif mutation == "context_invalid":
+        rows[0]["a"]["context_valid"] = False
+    elif mutation == "missing_pair":
+        rows[0].pop("b")
+    elif mutation == "duplicate_case_attempt":
+        rows[-1]["case_id"] = rows[0]["case_id"]
+        rows[-1]["attempt_index"] = rows[0]["attempt_index"]
+    elif mutation == "input_insufficient":
+        rows[0]["input_sufficiency"] = {"sufficient": False}
+    elif mutation == "contract_diff":
+        rows[0]["semantic_contract_only_diff"] = False
+
+    result = aggregate_r8r_rows(
+        rows,
+        expected_by_case={case_id: {} for case_id in REPRESENTATION_CASES},
+    )
+    assert result["decision"] == "INCONCLUSIVE_SEMANTIC_CONTRACT"
+    assert result["population_integrity"]["complete"] is False
+
+
+def test_complete_population_can_produce_architecture_decision() -> None:
+    """The exact 15-row population is eligible for the normal decision logic."""
+    result = aggregate_r8r_rows(
+        _complete_population_rows(),
+        expected_by_case={case_id: {} for case_id in REPRESENTATION_CASES},
+    )
+    assert result["population_integrity"]["complete"] is True
+    assert result["decision"] == "SEMANTIC_CONTRACT_NO_RECOVERY"
+
+
+def test_evidence_records_the_exact_evaluator_source() -> None:
+    """Evidence provenance is derived from the source executed by the harness."""
+    expected = hashlib.sha256(Path(EVALUATOR_SOURCE_PATH).read_bytes()).hexdigest()
+    assert evaluator_source_sha256() == expected
+    assert len(evaluator_source_sha256()) == 64
+
+
+def test_frozen_live_controls_reject_drift() -> None:
+    """Model and execution-control changes cannot reuse the R8R identity."""
+    validate_frozen_execution_controls(Namespace(model=FROZEN_MODEL))
+    for field, value in (
+        ("model", "other-model"),
+        ("max_output_tokens", 8192),
+        ("max_tokens_parameter", "max_completion_tokens"),
+        ("timeout", 60.0),
+        ("attempts", 2),
+    ):
+        args = Namespace(model=FROZEN_MODEL)
+        setattr(args, field, value)
+        with pytest.raises(ValueError, match="frozen controls"):
+            validate_frozen_execution_controls(args)
+
+
+def test_evidence_file_mixing_is_rejected(tmp_path: Path) -> None:
+    """A non-empty output cannot silently receive a second population."""
+    path = tmp_path / "r8r.jsonl"
+    path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(FileExistsError, match="non-empty"):
+        ensure_empty_evidence_path(path)
+
+    empty_path = tmp_path / "empty.jsonl"
+    ensure_empty_evidence_path(empty_path)
+
+
 def test_frozen_case_and_schema_controls_remain_unchanged() -> None:
     """R8R uses the frozen CM-56 corpus and CM-55 response schema."""
     assert BASELINE_SHA == "17da03e"
@@ -388,9 +610,11 @@ def test_frozen_case_and_schema_controls_remain_unchanged() -> None:
     )
     assert EVALUATION_CONTRACT_VERSION == "cm56r8r.semantic-evaluation.v1"
     assert EVALUATOR_VERSION == "cm56r8r.corrected-evaluator.v1"
+    assert FROZEN_MODEL == "Qwen3.6-35B-A3B-MTP-GGUF"
     assert PLANNER_TEMPERATURE == 0.0
     assert WORKER_TEMPERATURE == 0.0
     assert MAX_OUTPUT_TOKENS == 16384
+    assert MAX_TOKENS_PARAMETER == "max_tokens"
     assert TIMEOUT_SECONDS == 900.0
     assert REPRESENTATION_CASES == (
         "scalar_linear",
