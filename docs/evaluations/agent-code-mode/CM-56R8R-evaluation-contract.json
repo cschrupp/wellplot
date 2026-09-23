@@ -1,0 +1,37 @@
+{
+  "version": "cm56r8r.semantic-evaluation.v1",
+  "normalization": {
+    "scale_model": "wellplot.agent.code_mode.section_semantics.SemanticScale",
+    "sample_axis_model": "wellplot.agent.code_mode.section_semantics.SemanticSampleAxis",
+    "exclude_none": true,
+    "default_semantics": {
+      "scale.kind": "linear",
+      "scale.reverse": false
+    }
+  },
+  "scientific_families": [
+    "track_scale",
+    "binding_scale",
+    "raster_profile",
+    "sample_axis"
+  ],
+  "case_overlays": {
+    "vdl_sample_axis": {
+      "sample_axis_expected_policy": "explicit_request_only",
+      "remove_expected_paths": [
+        "tracks[0].bindings[0].sample_axis.minimum",
+        "tracks[0].bindings[0].sample_axis.maximum"
+      ],
+      "provenance": {
+        "historical_expectation": "The frozen fixture mirrors the track x-scale in sample-axis minimum/maximum.",
+        "r8r_interpretation": "Those fields are independent and are removed unless explicitly requested as sample-axis semantics.",
+        "production_basis": "SemanticSampleAxis and ArrayTrackSemanticDraft.x_scale are separate fields; the typed compiler maps them independently."
+      }
+    }
+  },
+  "leaf_fields": {
+    "scale": ["kind", "minimum", "maximum", "reverse", "unit"],
+    "sample_axis": ["unit", "source_origin", "source_step", "minimum", "maximum", "tick_count"]
+  },
+  "status_values": ["PASS", "MISSING", "WRONG_VALUE", "UNREQUESTED_EXTRA"]
+}

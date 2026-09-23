@@ -1,0 +1,180 @@
+{
+  "version": "cm56r8r.semantic-contracts.v1",
+  "contracts": [
+    {
+      "capability_id": "track.normal",
+      "purpose": "Represents a normal scalar-track container for ordered curve bindings.",
+      "mappings": [
+        {
+          "concept": "normal track kind",
+          "language_patterns": ["normal scalar track"],
+          "targets": {"track.kind": "normal"}
+        },
+        {
+          "concept": "requested track title",
+          "language_patterns": ["track titled <title>"],
+          "targets": {"track.title": "<title>"}
+        },
+        {
+          "concept": "ordered curve bindings",
+          "language_patterns": ["bind <channel> as a curve"],
+          "targets": {"track.bindings": "ordered curve binding list"}
+        }
+      ],
+      "field_semantics": {
+        "kind": "The semantic kind of the track container.",
+        "title": "The requested human-readable title of this track.",
+        "bindings": "Ordered curve bindings; repeated channel references remain distinct bindings."
+      },
+      "distinctions": [
+        "A normal track is not a source candidate and does not select a filesystem path.",
+        "A track title is not a curve scale."
+      ],
+      "examples": [
+        "A normal track titled Calibration can contain a curve binding for CALX."
+      ]
+    },
+    {
+      "capability_id": "track.array",
+      "purpose": "Represents an array-track container with an explicit horizontal numeric domain.",
+      "mappings": [
+        {
+          "concept": "array track kind",
+          "language_patterns": ["array track", "image track"],
+          "targets": {"track.kind": "array"}
+        },
+        {
+          "concept": "array track horizontal scale",
+          "language_patterns": ["x scale A to B", "horizontal scale A to B", "horizontal range A to B"],
+          "targets": {
+            "track.x_scale.kind": "linear",
+            "track.x_scale.minimum": "A",
+            "track.x_scale.maximum": "B"
+          }
+        },
+        {
+          "concept": "ordered raster bindings",
+          "language_patterns": ["bind <channel> as a raster"],
+          "targets": {"track.bindings": "ordered raster binding list"}
+        }
+      ],
+      "field_semantics": {
+        "x_scale": "The horizontal numeric domain of the array track.",
+        "bindings": "Ordered raster bindings whose sample semantics remain on each binding."
+      },
+      "distinctions": [
+        "track.x_scale is not binding.scale.",
+        "track.x_scale is not automatically binding.sample_axis.minimum or binding.sample_axis.maximum.",
+        "An array track does not authorize channels outside the resolved source context."
+      ],
+      "examples": [
+        "An array track titled Array View can use ARRAY_Q with x scale 10 to 90."
+      ]
+    },
+    {
+      "capability_id": "binding.curve",
+      "purpose": "Represents one scalar source channel drawn as a curve.",
+      "mappings": [
+        {
+          "concept": "exact scalar channel",
+          "language_patterns": ["bind <channel> as a curve"],
+          "targets": {"binding.channel": "<channel>"}
+        },
+        {
+          "concept": "linear curve scale",
+          "language_patterns": ["<channel> with a linear scale from A to B"],
+          "targets": {
+            "binding.scale.kind": "linear",
+            "binding.scale.minimum": "A",
+            "binding.scale.maximum": "B"
+          }
+        },
+        {
+          "concept": "logarithmic curve scale",
+          "language_patterns": ["<channel> with a log scale from A to B", "<channel> with a logarithmic scale from A to B"],
+          "targets": {
+            "binding.scale.kind": "log",
+            "binding.scale.minimum": "A",
+            "binding.scale.maximum": "B"
+          }
+        },
+        {
+          "concept": "tangential curve scale",
+          "language_patterns": ["<channel> with a tangential scale from A to B"],
+          "targets": {
+            "binding.scale.kind": "tangential",
+            "binding.scale.minimum": "A",
+            "binding.scale.maximum": "B"
+          }
+        },
+        {
+          "concept": "curve reversal",
+          "language_patterns": ["reverse <channel>", "reversed <channel>"],
+          "targets": {"binding.scale.reverse": true}
+        }
+      ],
+      "field_semantics": {
+        "channel": "The exact mnemonic of the selected scalar source channel.",
+        "scale": "The numeric display scale of this individual curve."
+      },
+      "distinctions": [
+        "A curve-specific numeric range maps to binding.scale, not track.x_scale.",
+        "Do not infer reverse=true when reversal is not requested.",
+        "Repeated channel references in separate requested views remain separate bindings."
+      ],
+      "examples": [
+        "CALX with a linear scale from -25 to 75 maps its range to binding.scale.",
+        "A requested reversed curve preserves reverse=true in binding.scale."
+      ]
+    },
+    {
+      "capability_id": "binding.raster",
+      "purpose": "Represents array samples from one selected source channel.",
+      "mappings": [
+        {
+          "concept": "exact array channel",
+          "language_patterns": ["bind <channel> as a raster"],
+          "targets": {"binding.channel": "<channel>"}
+        },
+        {
+          "concept": "raster profile",
+          "language_patterns": ["generic raster", "waveform raster", "VDL raster"],
+          "targets": {"binding.profile": "generic | waveform | vdl"}
+        },
+        {
+          "concept": "sample unit",
+          "language_patterns": ["sample unit U"],
+          "targets": {"binding.sample_axis.unit": "U"}
+        },
+        {
+          "concept": "sample source origin",
+          "language_patterns": ["source origin X"],
+          "targets": {"binding.sample_axis.source_origin": "X"}
+        },
+        {
+          "concept": "sample source step",
+          "language_patterns": ["source step X"],
+          "targets": {"binding.sample_axis.source_step": "X"}
+        },
+        {
+          "concept": "sample-axis tick count",
+          "language_patterns": ["N ticks"],
+          "targets": {"binding.sample_axis.tick_count": "N"}
+        }
+      ],
+      "field_semantics": {
+        "profile": "The semantic interpretation family of the raster samples.",
+        "sample_axis": "Explicit semantics for the raster sample dimension."
+      },
+      "distinctions": [
+        "sample_axis describes the raster sample dimension, not the array track horizontal x_scale.",
+        "sample_axis.minimum and sample_axis.maximum require explicit sample-axis semantics.",
+        "Profile names describe semantic raster interpretation and are not source filenames."
+      ],
+      "examples": [
+        "A synthetic raster named ARRAY_W can use profile waveform.",
+        "A sample unit ms, source origin 12, source step 2, and 5 ticks map to sample_axis fields."
+      ]
+    }
+  ]
+}
