@@ -4,7 +4,7 @@
 
 - Slice: corrected semantic evaluation contract
 - Baseline: `17da03e`
-- Implementation checkpoint: pending
+- Implementation checkpoint: `3f8c0d9`
 - Provider calls: `0`
 - Live inference: not started
 - Production changes: `0`
