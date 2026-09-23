@@ -1,0 +1,2407 @@
+{
+  "baseline": "3ea8484",
+  "cases": {
+    "cbl_continuity": {
+      "A": {
+        "context_invalid": 3,
+        "evaluation_eligible": 0,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 0,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      },
+      "C": {
+        "context_invalid": 3,
+        "evaluation_eligible": 0,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 0,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      }
+    },
+    "generic_raster": {
+      "A": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 3
+      },
+      "C": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 3,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      }
+    },
+    "reverse_scale": {
+      "A": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 3,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      },
+      "C": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 3,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      }
+    },
+    "scalar_linear": {
+      "A": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 3,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      },
+      "C": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 3,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 0,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 0,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      }
+    },
+    "vdl_sample_axis": {
+      "A": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 3,
+          "raster_profile": 3,
+          "sample_axis": 3,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      },
+      "C": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 0,
+          "raster_profile": 3,
+          "sample_axis": 3,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      }
+    },
+    "waveform": {
+      "A": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 3,
+          "raster_profile": 3,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 0
+      },
+      "C": {
+        "context_invalid": 0,
+        "evaluation_eligible": 3,
+        "family_failure_rows": {
+          "binding_scale": 0,
+          "binding_topology": 0,
+          "labels": 3,
+          "raster_profile": 3,
+          "sample_axis": 0,
+          "source_grounding": 0,
+          "track_scale": 3,
+          "track_topology": 0
+        },
+        "rows": 3,
+        "scientific_failure_rows": 3,
+        "semantic_accepted": 0,
+        "unrequested_semantic_rows": 3
+      }
+    }
+  },
+  "check_statistics": {
+    "A": {
+      "source_selection_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "source_grounding",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "title_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 6,
+          "percent": 40.0
+        },
+        "fail_rows": 6,
+        "family": "labels",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 9,
+          "percent": 60.0
+        },
+        "pass_rows": 9
+      },
+      "track_count_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "track_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "track_order_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "track_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "track_titles_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "labels",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_channels": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_count": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_ids": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_order": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].bindings[0].profile": {
+        "applicable_rows": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 6,
+          "percent": 66.67
+        },
+        "fail_rows": 6,
+        "family": "raster_profile",
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 3,
+          "percent": 33.33
+        },
+        "pass_rows": 3
+      },
+      "tracks[0].bindings[0].sample_axis": {
+        "applicable_rows": 3,
+        "fail_rate": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0
+        },
+        "fail_rows": 3,
+        "family": "sample_axis",
+        "pass_rate": {
+          "denominator": 3,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      },
+      "tracks[0].bindings[0].scale": {
+        "applicable_rows": 6,
+        "fail_rate": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0
+        },
+        "fail_rows": 6,
+        "family": "binding_scale",
+        "pass_rate": {
+          "denominator": 6,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      },
+      "tracks[0].x_scale": {
+        "applicable_rows": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "fail_rows": 9,
+        "family": "track_scale",
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      }
+    },
+    "C": {
+      "source_selection_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "source_grounding",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "title_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 3,
+          "percent": 20.0
+        },
+        "fail_rows": 3,
+        "family": "labels",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 12,
+          "percent": 80.0
+        },
+        "pass_rows": 12
+      },
+      "track_count_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "track_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "track_order_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "track_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "track_titles_valid": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "labels",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_channels": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_count": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_ids": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].binding_order": {
+        "applicable_rows": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "fail_rows": 0,
+        "family": "binding_topology",
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "pass_rows": 15
+      },
+      "tracks[0].bindings[0].profile": {
+        "applicable_rows": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "fail_rows": 9,
+        "family": "raster_profile",
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      },
+      "tracks[0].bindings[0].sample_axis": {
+        "applicable_rows": 3,
+        "fail_rate": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0
+        },
+        "fail_rows": 3,
+        "family": "sample_axis",
+        "pass_rate": {
+          "denominator": 3,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      },
+      "tracks[0].bindings[0].scale": {
+        "applicable_rows": 6,
+        "fail_rate": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0
+        },
+        "fail_rows": 6,
+        "family": "binding_scale",
+        "pass_rate": {
+          "denominator": 6,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      },
+      "tracks[0].x_scale": {
+        "applicable_rows": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "fail_rows": 9,
+        "family": "track_scale",
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "pass_rows": 0
+      }
+    }
+  },
+  "cm57_started": false,
+  "context_invalid": {
+    "A": {
+      "channel_missing": 3
+    },
+    "C": {
+      "channel_missing": 3
+    }
+  },
+  "decision": "SCIENTIFIC_SEMANTICS_SYSTEMIC",
+  "diagnostic_projections": {
+    "A": {
+      "failure_class_counts": {
+        "MIXED_SEMANTIC_FAILURE": 6,
+        "SCIENTIFIC_SEMANTIC_FAILURE": 9
+      },
+      "label_only_rejections": 0,
+      "row_profiles": [
+        {
+          "attempt_index": 0,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 4,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 4,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 4,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].x_scale"
+          ],
+          "failed_families": [
+            "track_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].x_scale"
+          ],
+          "failed_families": [
+            "track_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].x_scale"
+          ],
+          "failed_families": [
+            "track_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": false,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "A"
+        }
+      ],
+      "scientific_only_pass": {
+        "eligible_rows": 15,
+        "rows": 0
+      },
+      "topology_pass": {
+        "eligible_rows": 15,
+        "rows": 15
+      },
+      "unrequested_only_rejections": 0
+    },
+    "C": {
+      "failure_class_counts": {
+        "MIXED_SEMANTIC_FAILURE": 9,
+        "SCIENTIFIC_SEMANTIC_FAILURE": 6
+      },
+      "label_only_rejections": 0,
+      "row_profiles": [
+        {
+          "attempt_index": 0,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "scalar_linear",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "reverse_scale",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 1,
+          "failed_checks": [
+            "tracks[0].bindings[0].scale"
+          ],
+          "failed_families": [
+            "binding_scale"
+          ],
+          "failure_class": "SCIENTIFIC_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "reverse": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "vdl_sample_axis",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile",
+            "tracks[0].bindings[0].sample_axis"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "sample_axis",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "axis": "missing",
+              "source": "present"
+            },
+            "missing_fact_ids": [
+              "axis"
+            ],
+            "sufficient": false
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 2,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 2,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "generic_raster",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 2,
+          "failed_checks": [
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 0,
+          "unrequested_families": [],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 0,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 1,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        },
+        {
+          "attempt_index": 2,
+          "case_id": "waveform",
+          "context_error_code": null,
+          "evaluation_eligible": true,
+          "failed_check_count": 3,
+          "failed_checks": [
+            "title_valid",
+            "tracks[0].x_scale",
+            "tracks[0].bindings[0].profile"
+          ],
+          "failed_families": [
+            "labels",
+            "raster_profile",
+            "track_scale"
+          ],
+          "failure_class": "MIXED_SEMANTIC_FAILURE",
+          "input_sufficiency": {
+            "facts": {
+              "scale": "present",
+              "source": "present"
+            },
+            "missing_fact_ids": [],
+            "sufficient": true
+          },
+          "label_only_rejection": false,
+          "scientific_failure_present": true,
+          "scientific_only_pass": false,
+          "semantic_accepted": false,
+          "source_original_request_access": true,
+          "topology_failure_present": false,
+          "topology_pass": true,
+          "unrequested_count": 1,
+          "unrequested_families": [
+            "sample_axis"
+          ],
+          "unrequested_only_rejection": false,
+          "variant": "C"
+        }
+      ],
+      "scientific_only_pass": {
+        "eligible_rows": 15,
+        "rows": 0
+      },
+      "topology_pass": {
+        "eligible_rows": 15,
+        "rows": 15
+      },
+      "unrequested_only_rejections": 0
+    }
+  },
+  "eligibility": {
+    "A": {
+      "context_invalid": 3,
+      "evaluation_eligible": 15,
+      "rows": 18
+    },
+    "C": {
+      "context_invalid": 3,
+      "evaluation_eligible": 15,
+      "rows": 18
+    }
+  },
+  "evidence": {
+    "case_distribution": {
+      "cbl_continuity": 3,
+      "generic_raster": 3,
+      "reverse_scale": 3,
+      "scalar_linear": 3,
+      "vdl_sample_axis": 3,
+      "waveform": 3
+    },
+    "corpus_path": "tests/fixtures/typed_worker/cm56_shadow_cases.json",
+    "corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "evidence_path": "/tmp/cm56r6-authoritative-qwen-rerun.jsonl",
+    "evidence_sha256": "bf59a618dbff03b4a529e0f3d484e22c04c74a6eb7203ac3410142c30d50a8ff",
+    "rows": 18
+  },
+  "experiment": "CM-56R7",
+  "families": {
+    "A": {
+      "binding_scale": {
+        "applicable_check_instances": 6,
+        "eligible_rows_with_family_applicable": 6,
+        "fail_rate": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0
+        },
+        "failed_check_instances": 6,
+        "pass_rate": {
+          "denominator": 6,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 6
+      },
+      "binding_topology": {
+        "applicable_check_instances": 60,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 60,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 60,
+          "numerator": 60,
+          "percent": 100.0
+        },
+        "passed_check_instances": 60,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      },
+      "labels": {
+        "applicable_check_instances": 30,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 30,
+          "numerator": 6,
+          "percent": 20.0
+        },
+        "failed_check_instances": 6,
+        "pass_rate": {
+          "denominator": 30,
+          "numerator": 24,
+          "percent": 80.0
+        },
+        "passed_check_instances": 24,
+        "rows_with_all_family_checks_passing": 9,
+        "rows_with_any_family_failure": 6
+      },
+      "raster_profile": {
+        "applicable_check_instances": 9,
+        "eligible_rows_with_family_applicable": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 6,
+          "percent": 66.67
+        },
+        "failed_check_instances": 6,
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 3,
+          "percent": 33.33
+        },
+        "passed_check_instances": 3,
+        "rows_with_all_family_checks_passing": 3,
+        "rows_with_any_family_failure": 6
+      },
+      "sample_axis": {
+        "applicable_check_instances": 3,
+        "eligible_rows_with_family_applicable": 3,
+        "fail_rate": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0
+        },
+        "failed_check_instances": 3,
+        "pass_rate": {
+          "denominator": 3,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 3
+      },
+      "source_grounding": {
+        "applicable_check_instances": 15,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "passed_check_instances": 15,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      },
+      "track_scale": {
+        "applicable_check_instances": 9,
+        "eligible_rows_with_family_applicable": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "failed_check_instances": 9,
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 9
+      },
+      "track_topology": {
+        "applicable_check_instances": 30,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 30,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 30,
+          "numerator": 30,
+          "percent": 100.0
+        },
+        "passed_check_instances": 30,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      }
+    },
+    "C": {
+      "binding_scale": {
+        "applicable_check_instances": 6,
+        "eligible_rows_with_family_applicable": 6,
+        "fail_rate": {
+          "denominator": 6,
+          "numerator": 6,
+          "percent": 100.0
+        },
+        "failed_check_instances": 6,
+        "pass_rate": {
+          "denominator": 6,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 6
+      },
+      "binding_topology": {
+        "applicable_check_instances": 60,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 60,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 60,
+          "numerator": 60,
+          "percent": 100.0
+        },
+        "passed_check_instances": 60,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      },
+      "labels": {
+        "applicable_check_instances": 30,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 30,
+          "numerator": 3,
+          "percent": 10.0
+        },
+        "failed_check_instances": 3,
+        "pass_rate": {
+          "denominator": 30,
+          "numerator": 27,
+          "percent": 90.0
+        },
+        "passed_check_instances": 27,
+        "rows_with_all_family_checks_passing": 12,
+        "rows_with_any_family_failure": 3
+      },
+      "raster_profile": {
+        "applicable_check_instances": 9,
+        "eligible_rows_with_family_applicable": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "failed_check_instances": 9,
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 9
+      },
+      "sample_axis": {
+        "applicable_check_instances": 3,
+        "eligible_rows_with_family_applicable": 3,
+        "fail_rate": {
+          "denominator": 3,
+          "numerator": 3,
+          "percent": 100.0
+        },
+        "failed_check_instances": 3,
+        "pass_rate": {
+          "denominator": 3,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 3
+      },
+      "source_grounding": {
+        "applicable_check_instances": 15,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 15,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 15,
+          "numerator": 15,
+          "percent": 100.0
+        },
+        "passed_check_instances": 15,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      },
+      "track_scale": {
+        "applicable_check_instances": 9,
+        "eligible_rows_with_family_applicable": 9,
+        "fail_rate": {
+          "denominator": 9,
+          "numerator": 9,
+          "percent": 100.0
+        },
+        "failed_check_instances": 9,
+        "pass_rate": {
+          "denominator": 9,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "passed_check_instances": 0,
+        "rows_with_all_family_checks_passing": 0,
+        "rows_with_any_family_failure": 9
+      },
+      "track_topology": {
+        "applicable_check_instances": 30,
+        "eligible_rows_with_family_applicable": 15,
+        "fail_rate": {
+          "denominator": 30,
+          "numerator": 0,
+          "percent": 0.0
+        },
+        "failed_check_instances": 0,
+        "pass_rate": {
+          "denominator": 30,
+          "numerator": 30,
+          "percent": 100.0
+        },
+        "passed_check_instances": 30,
+        "rows_with_all_family_checks_passing": 15,
+        "rows_with_any_family_failure": 0
+      }
+    }
+  },
+  "pairwise": {
+    "by_case": {
+      "generic_raster": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 3,
+        "both_fail": 3,
+        "both_pass": 27
+      },
+      "reverse_scale": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 27
+      },
+      "scalar_linear": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 27
+      },
+      "vdl_sample_axis": {
+        "a_fail_c_pass": 3,
+        "a_pass_c_fail": 0,
+        "both_fail": 9,
+        "both_pass": 24
+      },
+      "waveform": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 9,
+        "both_pass": 24
+      }
+    },
+    "by_check": {
+      "source_selection_valid": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "title_valid": {
+        "a_fail_c_pass": 3,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 9
+      },
+      "track_count_valid": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "track_order_valid": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "track_titles_valid": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "tracks[0].binding_channels": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "tracks[0].binding_count": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "tracks[0].binding_ids": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "tracks[0].binding_order": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "tracks[0].bindings[0].profile": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 3,
+        "both_fail": 6,
+        "both_pass": 0
+      },
+      "tracks[0].bindings[0].sample_axis": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 0
+      },
+      "tracks[0].bindings[0].scale": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 6,
+        "both_pass": 0
+      },
+      "tracks[0].x_scale": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 9,
+        "both_pass": 0
+      }
+    },
+    "by_family": {
+      "binding_scale": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 6,
+        "both_pass": 0
+      },
+      "binding_topology": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 60
+      },
+      "labels": {
+        "a_fail_c_pass": 3,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 24
+      },
+      "raster_profile": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 3,
+        "both_fail": 6,
+        "both_pass": 0
+      },
+      "sample_axis": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 3,
+        "both_pass": 0
+      },
+      "source_grounding": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 15
+      },
+      "track_scale": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 9,
+        "both_pass": 0
+      },
+      "track_topology": {
+        "a_fail_c_pass": 0,
+        "a_pass_c_fail": 0,
+        "both_fail": 0,
+        "both_pass": 30
+      }
+    },
+    "improvement_by_family": {
+      "binding_scale": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      },
+      "binding_topology": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      },
+      "labels": {
+        "c_recoveries": 3,
+        "c_regressions": 0,
+        "net_delta": 3
+      },
+      "raster_profile": {
+        "c_recoveries": 0,
+        "c_regressions": 3,
+        "net_delta": -3
+      },
+      "sample_axis": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      },
+      "source_grounding": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      },
+      "track_scale": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      },
+      "track_topology": {
+        "c_recoveries": 0,
+        "c_regressions": 0,
+        "net_delta": 0
+      }
+    },
+    "overall": {
+      "a_fail_c_pass": 3,
+      "a_pass_c_fail": 3,
+      "both_fail": 27,
+      "both_pass": 129
+    }
+  },
+  "production_changes": 0,
+  "provider_calls": 0,
+  "source_experiment": "CM-56R6",
+  "systemic_families": [
+    {
+      "applicable": 6,
+      "failed": 6,
+      "family": "binding_scale",
+      "pass_rate": {
+        "denominator": 6,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "A"
+    },
+    {
+      "applicable": 3,
+      "failed": 3,
+      "family": "sample_axis",
+      "pass_rate": {
+        "denominator": 3,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "A"
+    },
+    {
+      "applicable": 9,
+      "failed": 9,
+      "family": "track_scale",
+      "pass_rate": {
+        "denominator": 9,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "A"
+    },
+    {
+      "applicable": 6,
+      "failed": 6,
+      "family": "binding_scale",
+      "pass_rate": {
+        "denominator": 6,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "C"
+    },
+    {
+      "applicable": 9,
+      "failed": 9,
+      "family": "raster_profile",
+      "pass_rate": {
+        "denominator": 9,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "C"
+    },
+    {
+      "applicable": 3,
+      "failed": 3,
+      "family": "sample_axis",
+      "pass_rate": {
+        "denominator": 3,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "C"
+    },
+    {
+      "applicable": 9,
+      "failed": 9,
+      "family": "track_scale",
+      "pass_rate": {
+        "denominator": 9,
+        "numerator": 0,
+        "percent": 0.0
+      },
+      "variant": "C"
+    }
+  ],
+  "vdl_attribution": {
+    "A": {
+      "UPSTREAM_FACT_NOT_PRESERVED": 3,
+      "evaluation_eligible": 3,
+      "sample_axis_failure_rows": 3,
+      "worker_semantic_failure": 0
+    },
+    "C": {
+      "UPSTREAM_FACT_NOT_PRESERVED": 0,
+      "evaluation_eligible": 3,
+      "sample_axis_failure_rows": 3,
+      "worker_semantic_failure": 3
+    }
+  }
+}
