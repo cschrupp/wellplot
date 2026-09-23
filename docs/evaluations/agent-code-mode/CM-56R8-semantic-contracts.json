@@ -1,0 +1,132 @@
+{
+  "version": "cm56r8.semantic-contracts.v1",
+  "contracts": [
+    {
+      "capability_id": "track.normal",
+      "purpose": "Represents a normal scalar-track container for one or more curve bindings.",
+      "field_semantics": {
+        "kind": {
+          "meaning": "The semantic kind of the track container.",
+          "mapping": "Use kind normal for a normal track."
+        },
+        "title": {
+          "meaning": "The requested human-readable title of this track.",
+          "mapping": "Use an explicit track title from the authoritative request."
+        },
+        "bindings": {
+          "meaning": "Ordered curve bindings belonging to this track.",
+          "mapping": "Preserve requested binding order and multiplicity."
+        }
+      },
+      "distinctions": [
+        "A normal track is not a source candidate and does not select a filesystem path.",
+        "A track title is not a curve scale."
+      ],
+      "examples": [
+        "A normal track titled Calibration can contain a curve binding for CALX."
+      ],
+      "provenance": [
+        "SectionSemanticDraft track kind and title fields",
+        "track.normal capability definition",
+        "typed section context validator track-shape invariant"
+      ]
+    },
+    {
+      "capability_id": "track.array",
+      "purpose": "Represents an array-track container whose horizontal coordinate may have a numeric domain.",
+      "field_semantics": {
+        "kind": {
+          "meaning": "The semantic kind of the track container.",
+          "mapping": "Use kind array for an array track."
+        },
+        "title": {
+          "meaning": "The requested human-readable title of this track.",
+          "mapping": "Use an explicit track title from the authoritative request."
+        },
+        "x_scale": {
+          "meaning": "The horizontal coordinate range of the array track.",
+          "mapping": "Phrases such as x scale, horizontal scale, or horizontal range A to B map to track.x_scale.minimum=A and track.x_scale.maximum=B when they refer to the array track."
+        },
+        "bindings": {
+          "meaning": "Ordered raster bindings belonging to this array track.",
+          "mapping": "Preserve requested binding order and multiplicity."
+        }
+      },
+      "distinctions": [
+        "track.x_scale is the array-track horizontal coordinate range.",
+        "track.x_scale is not binding.scale, which belongs to an individual curve binding.",
+        "An array track does not authorize channels outside the resolved source context."
+      ],
+      "examples": [
+        "An array track titled Array View can use ARRAY_X with x scale 10 to 90."
+      ],
+      "provenance": [
+        "SectionSemanticDraft array track and x_scale fields",
+        "track.array capability definition",
+        "typed section context validator array/raster invariant"
+      ]
+    },
+    {
+      "capability_id": "binding.curve",
+      "purpose": "Represents one scalar source channel drawn as a curve.",
+      "field_semantics": {
+        "channel": {
+          "meaning": "The exact mnemonic of the selected scalar source channel.",
+          "mapping": "Use an exact channel mnemonic supplied by the resolved source context."
+        },
+        "scale": {
+          "meaning": "The numeric horizontal display scale of this individual curve.",
+          "mapping": "A channel-specific range maps to binding.scale. A linear scale maps kind linear; logarithmic or log scale maps kind log; tangential scale maps kind tangential; explicit reverse or reversed maps reverse true."
+        }
+      },
+      "distinctions": [
+        "Do not use track.x_scale for the numeric scale of an individual scalar curve.",
+        "Do not infer reverse when the authoritative request does not request reversal.",
+        "A repeated channel in separate requested views remains separate bindings."
+      ],
+      "examples": [
+        "CALX with a linear scale from -25 to 75 maps its range to binding.scale.",
+        "A requested reversed curve preserves reverse=true in binding.scale."
+      ],
+      "provenance": [
+        "SectionSemanticDraft curve binding channel and scale fields",
+        "binding.curve capability definition",
+        "semantic scale validator kind and reverse invariants"
+      ]
+    },
+    {
+      "capability_id": "binding.raster",
+      "purpose": "Represents array samples from one selected source channel.",
+      "field_semantics": {
+        "channel": {
+          "meaning": "The exact mnemonic of the selected array source channel.",
+          "mapping": "Use an exact array channel mnemonic supplied by the resolved source context."
+        },
+        "profile": {
+          "meaning": "The semantic interpretation family of the raster samples.",
+          "mapping": "Generic raster maps to generic; waveform raster maps to waveform; VDL raster maps to vdl."
+        },
+        "sample_axis": {
+          "meaning": "The physical or sample coordinate associated with the raster sample dimension.",
+          "mapping": "Sample unit U maps to sample_axis.unit; source origin X maps to source_axis.source_origin; source step X maps to sample_axis.source_step; N ticks maps to sample_axis.tick_count."
+        }
+      },
+      "distinctions": [
+        "sample_axis describes the raster sample dimension, not the array track horizontal x_scale.",
+        "source_origin is the coordinate of the first source sample.",
+        "source_step is the distance between consecutive source samples.",
+        "tick_count is the requested number of displayed sample-axis ticks.",
+        "Profile names describe semantic raster interpretation and are not source filenames."
+      ],
+      "examples": [
+        "A synthetic waveform raster named ARRAY_W can use profile waveform.",
+        "A sample unit ms, source origin 12, source step 2, and 5 ticks map to sample_axis fields."
+      ],
+      "provenance": [
+        "SectionSemanticDraft raster binding profile and sample_axis fields",
+        "binding.raster capability definition",
+        "sample-axis and raster-profile semantic enum invariants"
+      ]
+    }
+  ]
+}
