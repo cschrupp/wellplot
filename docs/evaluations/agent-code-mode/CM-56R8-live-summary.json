@@ -1,0 +1,71 @@
+{
+  "experiment_version": "CM-56R8",
+  "baseline_sha": "a8acbf1",
+  "implementation_checkpoint": "d9f6b54",
+  "provider": {
+    "kind": "openai_compat",
+    "model": "Qwen3.6-35B-A3B-MTP-GGUF",
+    "base_url": "http://192.168.2.142:8888/v1",
+    "planner_temperature": 0.0,
+    "worker_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "timeout_seconds": 900
+  },
+  "case_ids": [
+    "scalar_linear",
+    "reverse_scale",
+    "generic_raster",
+    "waveform",
+    "vdl_sample_axis"
+  ],
+  "attempts_per_case": 3,
+  "paired_rows": 15,
+  "worker_calls": 30,
+  "raw_evidence": {
+    "path": "/tmp/cm56r8-live-qwen.jsonl",
+    "rows": 15,
+    "sha256": "a23ff0cb122d1f872cfa9cf0df117cd6c3e02001ffb7a4b6567559a74d4d7edb"
+  },
+  "frozen_hashes": {
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+    "semantic_contract_sha256": "2e2d65d764112597ed73e400c1b3c2547ea0c62c2d340f24abfb7ac4f639dbd5",
+    "a_system_prompt_sha256": "15eae9bfa9aeadb35081093d0e89e1528c18e6a24c76da9f3d99e1c6a5e18368",
+    "b_system_prompt_sha256": "50ab6a13b51cded8e923ce21f157a38d87d084fc39fba0967cf65acf61c94b35"
+  },
+  "integrity": {
+    "input_sufficiency_pass": "15/15",
+    "a_structured_context_compiler_valid": "15/15",
+    "b_structured_context_compiler_valid": "15/15",
+    "provider_failures": 0,
+    "semantic_contract_only_diff": "15/15",
+    "redaction_scan": "passed"
+  },
+  "results": {
+    "a": {
+      "scientific_only_pass": "0/15",
+      "semantic_accepted": "0/15",
+      "track_x_scale": "0/9",
+      "binding_scale": "0/6",
+      "raster_profile": "0/9",
+      "sample_axis": "0/3"
+    },
+    "b": {
+      "scientific_only_pass": "0/15",
+      "semantic_accepted": "0/15",
+      "track_x_scale": "0/9",
+      "binding_scale": "0/6",
+      "raster_profile": "9/9",
+      "sample_axis": "0/3"
+    },
+    "pairwise": {
+      "scientific_recoveries": 9,
+      "scientific_regressions": 0,
+      "raster_profile_a_fail_b_pass": 9,
+      "scale_a_fail_b_pass": 0,
+      "x_scale_a_fail_b_pass": 0,
+      "sample_axis_a_fail_b_pass": 0
+    },
+    "decision": "SEMANTIC_CONTRACT_FIELD_RECOVERY_ONLY"
+  }
+}

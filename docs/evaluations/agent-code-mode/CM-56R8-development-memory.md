@@ -4,9 +4,9 @@
 
 - Slice: capability-local semantic contract diagnostic
 - Baseline: `a8acbf1`
-- Implementation checkpoint: `aefd7aa`
-- Provider calls: `0`
-- Live inference: not started
+- Implementation checkpoint: `d9f6b54`
+- Provider calls: `30` (`15` A + `15` B)
+- Live inference: complete
 - Production changes: `0`
 - CM-57: blocked
 
@@ -60,10 +60,41 @@ canonical IDs, paths, or provider fields are used to construct them.
 
 ## Hard Stop Before Live Inference
 
-The harness and contract artifact must be reviewed and pushed before any model
-call. The live plan is 15 paired attempts and 30 worker calls at planner and
-worker temperature `0.0`, maximum output tokens `16384`, and timeout `900`
-seconds. This checkpoint intentionally does not run that matrix.
+The harness and contract artifact were reviewed and pushed before the model
+call. The live matrix used 15 paired attempts and 30 worker calls at planner
+and worker temperature `0.0`, maximum output tokens `16384`, and timeout `900`
+seconds.
+
+## Live Evidence
+
+The authorized local Qwen matrix completed with exactly 15 paired rows and no
+provider failures. The raw JSONL remains outside the repository:
+
+- Path: `/tmp/cm56r8-live-qwen.jsonl`
+- SHA-256: `a23ff0cb122d1f872cfa9cf0df117cd6c3e02001ffb7a4b6567559a74d4d7edb`
+- Cases: five cases, three paired attempts each
+- Input sufficiency: `15/15`
+- A/B structured, context, and compiler validity: `15/15` for each arm
+
+The complete aggregate is in `CM-56R8-live-summary.json`. A and B both had
+`0/15` scientific-only passes and `0/15` full semantic acceptance. B recovered
+all nine applicable raster-profile checks with no regressions, but recovered
+none of the track-scale, binding-scale, or sample-axis checks:
+
+```text
+                         A          B
+track.x_scale            0/9        0/9
+binding.scale            0/6        0/6
+raster.profile           0/9        9/9
+sample_axis              0/3        0/3
+scientific-only          0/15       0/15
+full semantic acceptance 0/15       0/15
+```
+
+The frozen decision is `SEMANTIC_CONTRACT_FIELD_RECOVERY_ONLY`: capability-local
+contracts improved raster-profile mapping, but did not establish complete
+scientific semantic recovery. The experiment does not authorize a production
+semantic-contract subsystem, prompt change, worker repair, or CM-57.
 
 R8 will use the existing `SectionSemanticDraft`, deterministic compiler,
 context validator, and evaluator unchanged. It will report scientific-only
@@ -74,5 +105,5 @@ regressions, and the exact capability-contract hash.
 
 No production planner, enricher, workflow, schema, compiler, typed worker,
 provider adapter, routing, retry, fallback, evaluator, or acceptance change is
-authorized. No raw provider output or live evidence is committed. CM-57 remains
-blocked pending separate review of the pre-live checkpoint.
+authorized. The raw provider evidence remains outside the repository. CM-57
+remains blocked pending separate review of the live result.
