@@ -12,7 +12,7 @@
 
 Artifact hashes:
 
-- Corrected evaluator: `458c97370f00a1e353da763ea41a28a7d82b23065f9cbd2d3026343a103ef49f`
+- Corrected evaluator: `c64e96239e1fea142b4b178cb5f7442389e8bb563d10f576fac1dd48de91ca94`
 - Semantic contracts: `1f1ec51c7122b28a87e707051ee7c9203cb13e5b4c0aadf773228fdbfad61eb0`
 - Evaluation contract: `3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da`
 
@@ -80,7 +80,8 @@ and the transparent VDL expected-semantic overlay with provenance.
 
 ## Corrected Evaluator
 
-The R8R evaluator uses the same `SemanticScale` model for expected and generated
+The corrected evaluator version is `cm56r8r.corrected-evaluator.v1`. It uses the
+same `SemanticScale` model for expected and generated
 values, preserving explicit units and rejecting wrong bounds, transforms, and
 reverse flags. It uses the same symmetric treatment for `SemanticSampleAxis`
 without injecting compiler presentation defaults such as tick count 5.

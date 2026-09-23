@@ -55,6 +55,7 @@ from wellplot.authoring_program.inspection import AuthoringInspectionFacade
 from wellplot.capabilities import CapabilityRegistry, create_builtin_registry
 
 EXPERIMENT_VERSION = "CM-56R8R"
+EVALUATOR_VERSION = "cm56r8r.corrected-evaluator.v1"
 BASELINE_SHA = "17da03e"
 CASE_CORPUS_SHA256 = "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e"
 CONTRACT_PATH = Path(__file__).resolve().parents[1] / (

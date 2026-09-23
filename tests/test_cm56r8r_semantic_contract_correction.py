@@ -11,8 +11,13 @@ from scripts.cm56r8r_semantic_contract_correction import (
     BASELINE_SHA,
     CASE_CORPUS_SHA256,
     EVALUATION_CONTRACT_VERSION,
+    EVALUATOR_VERSION,
+    MAX_OUTPUT_TOKENS,
+    PLANNER_TEMPERATURE,
     REPRESENTATION_CASES,
     RESPONSE_SCHEMA_SHA256,
+    TIMEOUT_SECONDS,
+    WORKER_TEMPERATURE,
     build_contract_system_prompt,
     build_contract_worker_input,
     corrected_expected_for_case,
@@ -382,6 +387,11 @@ def test_frozen_case_and_schema_controls_remain_unchanged() -> None:
         "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
     )
     assert EVALUATION_CONTRACT_VERSION == "cm56r8r.semantic-evaluation.v1"
+    assert EVALUATOR_VERSION == "cm56r8r.corrected-evaluator.v1"
+    assert PLANNER_TEMPERATURE == 0.0
+    assert WORKER_TEMPERATURE == 0.0
+    assert MAX_OUTPUT_TOKENS == 16384
+    assert TIMEOUT_SECONDS == 900.0
     assert REPRESENTATION_CASES == (
         "scalar_linear",
         "reverse_scale",
