@@ -1,0 +1,124 @@
+# CM-56R8R-S1 Development Memory
+
+## Status
+
+- Slice: selective semantic-contract pre-live implementation
+- Baseline: `7e0233421f8c9c6142d35eaeb29f533a0604667b`
+- Experiment version: `CM-56R8R-S1`
+- Provider calls: `0`
+- Production changes: `0`
+- Live inference: **NOT STARTED**
+- CM-57: blocked
+
+## Governing Hypothesis
+
+CM-56R8R-F1 found that the full semantic contract recovered raster-profile and
+sample-axis semantics but regressed the already-correct reverse binding-scale
+mapping. The three regressions all emitted the exact endpoint swap
+`200 -> 0` to `0 -> 200` while preserving `kind=linear` and `reverse=true`.
+F1 classified that relationship as
+`MINMAX_NAME_CONFLICT_SIGNATURE`, without claiming access to model reasoning.
+
+S1 therefore tests the minimum intervention: retain the authoritative worker's
+generic scale behavior and add only the WellPlot-specific raster/sample-axis
+guidance that R8R demonstrated was useful.
+
+## Experimental Boundary
+
+Variant A is unchanged from the accepted R8R control:
+
+```text
+typed worker input
+    + authoritative original request
+    + AUTHORITATIVE_REQUEST_SYSTEM_PROMPT
+```
+
+Variant S is exactly A plus one `selective_semantic_contracts` JSON field and a
+bounded contract-use instruction. It receives no A output, evaluator result,
+expected projection, or repair information. Both arms share one planner and
+enrichment result, the same response schema, context validator, compiler,
+evaluator, provider, and future execution controls.
+
+## Selective Contract
+
+Artifact:
+`CM-56R8R-S1-selective-semantic-contracts.json`
+
+- Version: `cm56r8r-s1.selective-semantic-contracts.v1`
+- SHA-256: `c6dd637e3b9f287f796a76cf147acd29fbacaa9c350f6d9ab4ae8c0e5360a02f`
+- Capability contract included: `binding.raster` only.
+- Included mappings: `binding.profile`, `binding.sample_axis.unit`,
+  `binding.sample_axis.source_origin`, `binding.sample_axis.source_step`, and
+  `binding.sample_axis.tick_count`.
+- Included distinction: `track.x_scale` is the array-track horizontal domain;
+  `binding.sample_axis` is the raster-internal sample coordinate system, and
+  track bounds must not be copied into sample-axis bounds without an independent
+  request.
+- Scale mappings present: none.
+- Binding-scale targets present: none.
+- Track-x-scale numeric mapping targets present: none.
+- Concrete numeric scale examples: none.
+
+The artifact contains no case IDs, frozen source IDs, expected titles,
+benchmark endpoint tuples, expected projections, or R8R failure values. Its
+machine-checkable mapping targets are structurally tested rather than checked
+only by substring.
+
+## Frozen Provenance And Controls
+
+- Corpus SHA-256: `4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e`
+- Response schema SHA-256: `93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4`
+- Evaluation contract SHA-256: `3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da`
+- Evaluator version: `cm56r8r.corrected-evaluator.v1`
+- Evaluator source SHA-256: `4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49`
+- Future model: `Qwen3.6-35B-A3B-MTP-GGUF`
+- Planner and worker temperature: `0.0`
+- Maximum output tokens: `16384` using `max_tokens`
+- Timeout: `900` seconds
+- Attempts per case: `3`
+- Future population: five cases, 15 paired rows, 30 worker calls
+- Future output: `/tmp/cm56r8r-s1-live-qwen.jsonl`
+
+The new runner has no mutable CLI options for temperatures, token limits,
+timeout, or attempts. It rejects injected control mismatches and refuses to
+append to a non-empty evidence file. Its default CLI path performs only
+pre-live validation; provider execution requires a separate explicit live flag.
+
+## Pre-Live Evaluation Inventory
+
+The harness derives applicable scientific leaves from the frozen corpus and
+corrected evaluation contract without sending this inventory to a provider:
+
+```text
+scalar_linear:
+    binding scale
+reverse_scale:
+    binding scale
+generic_raster:
+    track scale, raster profile
+waveform:
+    track scale, raster profile, no unrequested sample-axis bounds
+vdl_sample_axis:
+    track scale, raster profile, sample unit/origin/step/tick_count
+```
+
+The future decision is exact and regression-dominant: incomplete populations
+are inconclusive; any A-pass/S-fail scale leaf produces
+`SELECTIVE_CONTRACT_REGRESSION`; otherwise complete profile/sample-axis
+recovery with no scientific extras is full recovery, partial target recovery
+is partial recovery, and no target recovery is no benefit.
+
+## Validation
+
+The pre-live command path produced metadata only and made no network request.
+The focused S1 tests and adjacent R8R/R8R-F1 tests pass: `52 passed`.
+Ruff, formatting, Python compilation, JSON validation, redaction scanning, and
+`git diff --check` pass. No production files or historical R8R/F1 artifacts
+were modified.
+
+## Hard Stop
+
+This checkpoint authorizes no provider calls, one-case smoke inference, prompt
+redesign, schema change, production integration, routing change, repair,
+fallback, or CM-57 work. Live inference remains **NOT STARTED** and requires
+independent review plus separate explicit authorization.

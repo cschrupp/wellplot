@@ -1,0 +1,68 @@
+{
+  "version": "cm56r8r-s1.selective-semantic-contracts.v1",
+  "contracts": [
+    {
+      "capability_id": "binding.raster",
+      "purpose": "Documents raster-profile and sample-axis semantics that are specific to WellPlot.",
+      "mappings": [
+        {
+          "concept": "raster profile",
+          "language_patterns": [
+            "generic raster",
+            "waveform raster",
+            "VDL raster"
+          ],
+          "targets": {
+            "binding.profile": "generic | waveform | vdl"
+          }
+        },
+        {
+          "concept": "sample unit",
+          "language_patterns": [
+            "sample unit U"
+          ],
+          "targets": {
+            "binding.sample_axis.unit": "U"
+          }
+        },
+        {
+          "concept": "sample source origin",
+          "language_patterns": [
+            "source origin X"
+          ],
+          "targets": {
+            "binding.sample_axis.source_origin": "X"
+          }
+        },
+        {
+          "concept": "sample source step",
+          "language_patterns": [
+            "source step X"
+          ],
+          "targets": {
+            "binding.sample_axis.source_step": "X"
+          }
+        },
+        {
+          "concept": "sample-axis tick count",
+          "language_patterns": [
+            "N ticks"
+          ],
+          "targets": {
+            "binding.sample_axis.tick_count": "N"
+          }
+        }
+      ],
+      "field_semantics": {
+        "profile": "The semantic interpretation family of raster samples.",
+        "sample_axis": "The coordinate system of samples within this raster binding."
+      },
+      "distinctions": [
+        "track.x_scale is the horizontal domain of the array track.",
+        "binding.sample_axis is the coordinate system within the raster binding.",
+        "track.x_scale and binding.sample_axis represent different semantic dimensions.",
+        "Do not copy track.x_scale into sample_axis.minimum or sample_axis.maximum unless the request independently specifies those sample-axis bounds."
+      ]
+    }
+  ]
+}
