@@ -6,7 +6,7 @@
 - Baseline: `2db8d9f`
 - Production changes: none
 - CM-57: blocked
-- Live inference: not started
+- Live inference: complete; diagnostic only
 
 ## Purpose
 
@@ -89,3 +89,38 @@ schemas, compilers, planner behavior, enricher behavior, routing, retries,
 repair, fallback, persistence, or production acceptance. No CM-57 work starts
 from this checkpoint. Live evidence, if authorized and run, must be recorded
 separately and reviewed before any production contract change.
+
+## Live Evidence
+
+The authorized local Qwen run used the frozen controls above. The A/C
+representation arm completed 18 paired rows (36 worker calls):
+
+- Variant A: 18/18 provider calls completed, 18/18 structured, 15/18 context/compiler-valid, 0/18 semantic acceptance.
+- Variant C: 18/18 provider calls completed, 18/18 structured, 15/18 context/compiler-valid, 0/18 semantic acceptance.
+- Both arms had the same three `channel_missing` CBL outcomes.
+- Fifteen rows passed context/compiler validation, but every row had semantic omissions or other evaluator failures.
+- The VDL control retained insufficient planner input for three rows; no hidden axis facts were restored.
+- The A/C payload relation was exact: C added only `authoritative_original_request`, with the path-redacted request and the explicit authority prompt.
+
+The representation verdict is therefore `TYPED_WORKER_SEMANTICS_REMAINS`, not
+`REPRESENTATION_INSUFFICIENT`: request preservation did not improve semantic
+acceptance under the same typed schema/compiler/evaluator path.
+
+The separate repeated-channel arm completed ten planner-only attempts. All ten
+were `PLAN_SUCCESS` with one provider call, valid JSON, valid `SemanticPlan`,
+and valid semantic-plan validation. The earlier 10/10 `invalid_response`
+finding did not reproduce under these frozen local controls; it is retained as
+historical evidence, not erased or reclassified.
+
+Raw artifacts:
+
+- A/C JSONL: `/tmp/cm56r6-authoritative-qwen-rerun.jsonl`, SHA-256 `bf59a618dbff03b4a529e0f3d484e22c04c74a6eb7203ac3410142c30d50a8ff`.
+- Repeated-channel JSONL: `/tmp/cm56r6-repeated-channel-qwen.jsonl`, SHA-256 `ac761b98b387f1cb25f4abc42c11939e2f6d61a4c6f1d812fa4573116ed3904f`.
+- Both raw artifacts passed the bounded redaction scan. Raw provider content was not committed.
+
+## Final Stop
+
+CM-56R6 does not authorize a production semantic-worker redesign, prompt
+change, planner change, schema change, repair behavior, or CM-57. The next
+decision requires separate review of the remaining worker-semantic failure
+and the non-reproduced repeated-channel result.

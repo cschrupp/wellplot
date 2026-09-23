@@ -1,0 +1,69 @@
+{
+  "experiment": "CM-56R6",
+  "baseline": "2db8d9f",
+  "model": "qwen3.6-35b-a3b",
+  "endpoint_kind": "controlled_local_openai_compatible",
+  "planner_temperature": 0.0,
+  "worker_temperature": 0.0,
+  "max_output_tokens": 16384,
+  "timeout_seconds": 900.0,
+  "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+  "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+  "authoritative_prompt_sha256": "15eae9bfa9aeadb35081093d0e89e1528c18e6a24c76da9f3d99e1c6a5e18368",
+  "representation_arm": {
+    "raw_jsonl": "/tmp/cm56r6-authoritative-qwen-rerun.jsonl",
+    "raw_jsonl_sha256": "bf59a618dbff03b4a529e0f3d484e22c04c74a6eb7203ac3410142c30d50a8ff",
+    "cases": [
+      "scalar_linear",
+      "reverse_scale",
+      "generic_raster",
+      "waveform",
+      "cbl_continuity",
+      "vdl_sample_axis"
+    ],
+    "paired_rows": 18,
+    "provider_calls": 36,
+    "variant_a": {
+      "provider_call_completed": 18,
+      "structured_valid": 18,
+      "context_valid": 15,
+      "compiler_valid": 15,
+      "semantic_accepted": 0,
+      "error_codes": {
+        "channel_missing": 3
+      }
+    },
+    "variant_c": {
+      "provider_call_completed": 18,
+      "structured_valid": 18,
+      "context_valid": 15,
+      "compiler_valid": 15,
+      "semantic_accepted": 0,
+      "error_codes": {
+        "channel_missing": 3
+      }
+    },
+    "input_sufficiency": {
+      "sufficient_rows": 15,
+      "missing_axis_rows": 3
+    },
+    "authoritative_field_only_diff": true,
+    "verdict": "TYPED_WORKER_SEMANTICS_REMAINS"
+  },
+  "repeated_channel_arm": {
+    "raw_jsonl": "/tmp/cm56r6-repeated-channel-qwen.jsonl",
+    "raw_jsonl_sha256": "ac761b98b387f1cb25f4abc42c11939e2f6d61a4c6f1d812fa4573116ed3904f",
+    "attempts": 10,
+    "typed_worker_calls": 0,
+    "classifications": {
+      "PLAN_SUCCESS": 10
+    },
+    "provider_categories": {},
+    "verdict": "FORENSICS_NO_REPRODUCTION"
+  },
+  "decision": "STOP_BEFORE_CM57",
+  "decision_reason": "Authoritative request preservation did not improve semantic acceptance, and the repeated-channel invalid-response failure did not reproduce. No production contract change is justified by this diagnostic alone.",
+  "production_changes": 0,
+  "raw_provider_content_committed": false,
+  "redaction_scan": "passed"
+}
