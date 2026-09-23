@@ -18,6 +18,7 @@ Architectural invariant:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Literal
@@ -37,6 +38,103 @@ CapabilityCategory = Literal[
 
 CapabilityCompiler = Callable[[BaseModel], AuthoringDocumentIntent]
 CapabilityHandler = Callable[[BaseModel], object]
+
+_MAX_SEMANTIC_MAPPINGS = 8
+_MAX_SEMANTIC_LANGUAGE_PATTERNS = 8
+_MAX_SEMANTIC_DISTINCTIONS = 4
+_SEMANTIC_TARGET_PATH = r"[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+"
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilitySemanticMapping:
+    """Immutable developer-authored guidance for one semantic concept."""
+
+    concept: str
+    language_patterns: tuple[str, ...]
+    targets: tuple[tuple[str, str], ...]
+
+    def __post_init__(self) -> None:
+        """Validate one capability-owned semantic mapping declaration."""
+        _validate_nonempty_text(self.concept, "concept")
+        _require_tuple(self.language_patterns, "language_patterns")
+        _require_tuple(self.targets, "targets")
+        if not self.language_patterns:
+            raise ValueError("Capability semantic mappings require a language pattern.")
+        if not self.targets:
+            raise ValueError("Capability semantic mappings require a target.")
+        if len(self.language_patterns) > _MAX_SEMANTIC_LANGUAGE_PATTERNS:
+            raise ValueError(
+                "Capability semantic mappings support at most "
+                f"{_MAX_SEMANTIC_LANGUAGE_PATTERNS} language patterns."
+            )
+
+        normalized_patterns: set[str] = set()
+        for pattern in self.language_patterns:
+            _validate_nonempty_text(pattern, "language pattern")
+            normalized_pattern = pattern.strip().casefold()
+            if normalized_pattern in normalized_patterns:
+                raise ValueError(f"Duplicate capability language pattern: {pattern!r}.")
+            normalized_patterns.add(normalized_pattern)
+
+        target_paths: set[str] = set()
+        for target in self.targets:
+            if not isinstance(target, tuple) or len(target) != 2:
+                raise TypeError("Capability semantic targets must be (path, value cue) tuples.")
+            target_path, value_cue = target
+            _validate_nonempty_text(target_path, "target path")
+            _validate_nonempty_text(value_cue, "target value cue")
+            if re.fullmatch(_SEMANTIC_TARGET_PATH, target_path) is None:
+                raise ValueError(f"Invalid capability semantic target path: {target_path!r}.")
+            if target_path in target_paths:
+                raise ValueError(f"Duplicate capability semantic target path: {target_path!r}.")
+            target_paths.add(target_path)
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilitySemanticMetadata:
+    """Immutable optional semantic guidance owned by one capability."""
+
+    purpose: str
+    mappings: tuple[CapabilitySemanticMapping, ...] = ()
+    distinctions: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Validate metadata structure without interpreting semantic targets."""
+        _validate_nonempty_text(self.purpose, "purpose")
+        _require_tuple(self.mappings, "mappings")
+        _require_tuple(self.distinctions, "distinctions")
+        if len(self.mappings) > _MAX_SEMANTIC_MAPPINGS:
+            raise ValueError(
+                f"Capability semantic metadata supports at most {_MAX_SEMANTIC_MAPPINGS} mappings."
+            )
+        if len(self.distinctions) > _MAX_SEMANTIC_DISTINCTIONS:
+            raise ValueError(
+                "Capability semantic metadata supports at most "
+                f"{_MAX_SEMANTIC_DISTINCTIONS} distinctions."
+            )
+
+        concepts: set[str] = set()
+        language_patterns: set[str] = set()
+        for mapping in self.mappings:
+            if not isinstance(mapping, CapabilitySemanticMapping):
+                raise TypeError("Capability semantic mappings must use CapabilitySemanticMapping.")
+            concept_key = mapping.concept.strip().casefold()
+            if concept_key in concepts:
+                raise ValueError(f"Duplicate capability semantic concept: {mapping.concept!r}.")
+            concepts.add(concept_key)
+            for pattern in mapping.language_patterns:
+                pattern_key = pattern.strip().casefold()
+                if pattern_key in language_patterns:
+                    raise ValueError(f"Duplicate capability language pattern: {pattern!r}.")
+                language_patterns.add(pattern_key)
+
+        distinctions: set[str] = set()
+        for distinction in self.distinctions:
+            _validate_nonempty_text(distinction, "distinction")
+            distinction_key = distinction.strip().casefold()
+            if distinction_key in distinctions:
+                raise ValueError(f"Duplicate capability semantic distinction: {distinction!r}.")
+            distinctions.add(distinction_key)
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +166,7 @@ class CapabilitySpec:
     handler: CapabilityHandler | None = None
     worker_hints: tuple[str, ...] = ()
     examples: tuple[str, ...] = ()
+    semantic_metadata: CapabilitySemanticMetadata | None = None
 
     def __post_init__(self) -> None:
         """Validate aliases and the optional all-or-nothing v2 contract."""
@@ -85,6 +184,10 @@ class CapabilitySpec:
             raise TypeError("Capability handler must be callable.")
         _validate_text_sequence(self.worker_hints, "worker_hints")
         _validate_text_sequence(self.examples, "examples")
+        if self.semantic_metadata is not None and not isinstance(
+            self.semantic_metadata, CapabilitySemanticMetadata
+        ):
+            raise TypeError("Capability semantic_metadata must use CapabilitySemanticMetadata.")
 
     @property
     def supports_v2(self) -> bool:
@@ -155,3 +258,15 @@ def _validate_text_sequence(values: tuple[str, ...], field_name: str) -> None:
     for value in values:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"Capability {field_name} must contain non-empty strings.")
+
+
+def _require_tuple(value: object, field_name: str) -> None:
+    """Reject mutable containers instead of retaining caller-owned references."""
+    if not isinstance(value, tuple):
+        raise TypeError(f"Capability semantic {field_name} must be a tuple.")
+
+
+def _validate_nonempty_text(value: object, field_name: str) -> None:
+    """Require exact, non-blank declaration text without normalizing it."""
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"Capability semantic {field_name} must be a non-empty string.")

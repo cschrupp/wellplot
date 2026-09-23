@@ -31,7 +31,7 @@ from ..model.intent import (
     AuthoringSectionIntent,
     AuthoringTrackIntent,
 )
-from .base import CapabilitySpec
+from .base import CapabilitySemanticMapping, CapabilitySemanticMetadata, CapabilitySpec
 from .bindings import (
     CurveBindingArgs,
     RasterBindingArgs,
@@ -87,6 +87,69 @@ class ReportArtifact(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     intent: ReportIntent
+
+
+_RASTER_SEMANTIC_METADATA = CapabilitySemanticMetadata(
+    purpose=(
+        "Describe WellPlot-specific raster profile and sample-axis semantics for "
+        "depth-indexed array bindings."
+    ),
+    mappings=(
+        CapabilitySemanticMapping(
+            concept="generic raster profile",
+            language_patterns=("generic raster",),
+            targets=(("binding.profile", "generic"),),
+        ),
+        CapabilitySemanticMapping(
+            concept="waveform raster profile",
+            language_patterns=("waveform raster",),
+            targets=(("binding.profile", "waveform"),),
+        ),
+        CapabilitySemanticMapping(
+            concept="VDL raster profile",
+            language_patterns=("VDL raster",),
+            targets=(("binding.profile", "vdl"),),
+        ),
+        CapabilitySemanticMapping(
+            concept="sample unit",
+            language_patterns=("sample unit",),
+            targets=(("binding.sample_axis.unit", "use the explicitly requested sample unit"),),
+        ),
+        CapabilitySemanticMapping(
+            concept="source origin",
+            language_patterns=("source origin",),
+            targets=(
+                (
+                    "binding.sample_axis.source_origin",
+                    "preserve the explicitly requested source origin",
+                ),
+            ),
+        ),
+        CapabilitySemanticMapping(
+            concept="source step",
+            language_patterns=("source step",),
+            targets=(
+                (
+                    "binding.sample_axis.source_step",
+                    "preserve the explicitly requested source step",
+                ),
+            ),
+        ),
+        CapabilitySemanticMapping(
+            concept="sample-axis tick count",
+            language_patterns=("tick count", "ticks"),
+            targets=(
+                ("binding.sample_axis.tick_count", "use the explicitly requested tick count"),
+            ),
+        ),
+    ),
+    distinctions=(
+        "track.x_scale describes the array track's horizontal numeric domain.",
+        "binding.sample_axis describes the raster binding's internal sample coordinate system.",
+        "Do not populate binding.sample_axis.minimum or binding.sample_axis.maximum by copying "
+        "track.x_scale bounds unless sample-axis bounds are independently requested.",
+    ),
+)
 
 
 def _compile_log_plot_section(artifact: BaseModel) -> AuthoringDocumentIntent:
@@ -263,6 +326,7 @@ def builtin_capabilities() -> tuple[CapabilitySpec, ...]:
                 "binding.raster(operation='create', section_id='main', track_id='vdl', "
                 "channel='VDL', profile='vdl')",
             ),
+            semantic_metadata=_RASTER_SEMANTIC_METADATA,
         ),
         CapabilitySpec(
             capability_id="fill.curve",
