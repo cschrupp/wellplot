@@ -4,7 +4,8 @@
 
 - Slice: corrected semantic evaluation contract
 - Baseline: `17da03e`
-- Implementation checkpoint: `3f8c0d9`
+- Pre-live review baseline: `9988908`
+- Implementation checkpoint: `d6e291c`
 - Provider calls: `0`
 - Live inference: not started
 - Production changes: `0`
@@ -12,7 +13,8 @@
 
 Artifact hashes:
 
-- Corrected evaluator: `c64e96239e1fea142b4b178cb5f7442389e8bb563d10f576fac1dd48de91ca94`
+- Corrected evaluator: `4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49`
+- Evaluator version: `cm56r8r.corrected-evaluator.v1`
 - Semantic contracts: `1f1ec51c7122b28a87e707051ee7c9203cb13e5b4c0aadf773228fdbfad61eb0`
 - Evaluation contract: `3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da`
 
@@ -104,10 +106,26 @@ never included in either provider payload.
 
 ## Hard Stop Before Live Inference
 
+The pre-live review rework is bounded to the corrected evaluator and its
+focused tests. Scientific extras are recorded as explicit `UNREQUESTED_EXTRA`
+leaf statuses, including extra scale and sample-axis fields. Missing raster
+profiles use the binding leaf path
+`tracks[i].bindings[j].profile`. Population aggregation remains diagnostic for
+partial rows but emits `INCONCLUSIVE_SEMANTIC_CONTRACT` unless all 15 exact
+case/attempt pairs are present, input-sufficient, contract-only-different, and
+evaluation-eligible in both arms.
+
+Every future row and aggregate carries the evaluator version and exact source
+digest of the evaluator executed. The live runner freezes the R8 controls at
+execution time: model `Qwen3.6-35B-A3B-MTP-GGUF`, planner and worker temperature
+`0.0`, maximum output tokens `16384`, `max_tokens`, timeout `900` seconds, and
+three attempts per case. Control overrides are rejected, and the runner refuses
+to append to a non-empty JSONL evidence path.
+
 The R8R evaluator, contracts, VDL audit, tests, and evidence policy must be
 reviewed and pushed before any model call. The future run is exactly 15 paired
 rows and 30 worker calls across the five frozen R8 cases, using the unchanged
-local Qwen controls. This implementation slice makes zero provider calls.
+local Qwen controls. This rework makes zero provider calls.
 
 Historical artifacts remain untouched:
 
@@ -123,3 +141,7 @@ No production planner, enricher, workflow, schema, compiler, typed worker,
 provider adapter, routing, retry, fallback, evaluator, or acceptance change is
 authorized. CM-57 remains blocked pending independent review and separate live
 authorization.
+
+Validation for the rework: 28 focused tests and 66 focused-plus-adjacent tests
+pass; Ruff lint and formatting, Python compilation, JSON validation, and
+`git diff --check` pass. R8R live inference remains **NOT STARTED**.
