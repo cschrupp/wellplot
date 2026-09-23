@@ -4,7 +4,7 @@
 
 - Slice: capability-local semantic contract diagnostic
 - Baseline: `a8acbf1`
-- Implementation checkpoint: pending
+- Implementation checkpoint: `aefd7aa`
 - Provider calls: `0`
 - Live inference: not started
 - Production changes: `0`
