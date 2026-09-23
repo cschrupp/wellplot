@@ -5,6 +5,7 @@
 - Project: WellPlot
 - Branch: `eval/mcp-stabilization`
 - Design baseline: `3eec5173bb08ba7a6de9e417d71819247e2dc699`
+- Correction baseline: `f6ae1f12e0cbda4cfcaa4ff8125201c72cf6623b`
 - Scope: production design only
 - Provider calls: `0`
 - Production changes: `0`
@@ -113,34 +114,60 @@ CM-57 does not include:
 
 ## 6. Current Production Architecture
 
-The relevant production path is:
+The active LangGraph section route is still the program worker:
 
 ```text
-CapabilitySpec declarations
+CodeModeGraphDependencies
+    section_compiler = ProgramSectionCompiler
         ↓
-CapabilityRegistry
+build_compile_graph()
         ↓
-SemanticPlanner.plan()
+compile_worker node
         ↓
-SectionTask.capability_ids
+ProgramSectionCompiler.compile(...)
         ↓
-SemanticEnricher.enrich()
+AuthoringDocumentIntent
+```
+
+The exact active wiring is in
+`src/wellplot/agent/code_mode/workflow.py`: `CodeModeGraphDependencies` types
+`section_compiler` as `ProgramSectionCompiler`, `build_compile_graph()` invokes
+`dependencies.section_compiler.compile()` for section sends, and the graph
+construction is used by `CodeModeCompileFacade` in `facade.py`.
+
+The typed semantic path is a separate shadow/component path, not the active
+graph compiler:
+
+```text
+TypedSectionCompiler
         ↓
-ResolvedSectionContext
+TypedSectionWorkerInput
         ↓
-TypedSectionCompiler.compile()
-        ↓
-build_typed_section_input()
-        ↓
-serialize_typed_section_input()
-        ↓
-generate_structured(..., response_model=SectionSemanticDraft)
+SectionSemanticDraft
         ↓
 validate_section_semantics()
         ↓
 compile_section_semantics()
         ↓
 AuthoringDocumentIntent
+```
+
+CM-56 and S1 validated this typed component, but it is not currently injected
+into `CodeModeGraphDependencies` and does not replace `ProgramSectionCompiler`.
+The truthful migration sequence is therefore:
+
+```text
+Today:
+    LangGraph → ProgramSectionCompiler
+
+Validated experimental typed path:
+    original request + typed context + selective metadata
+        → TypedSectionCompiler
+
+Future:
+    freeze the production typed input contract
+        → shadow-test that exact contract
+        → separately decide graph activation
 ```
 
 The authoritative locations are:
@@ -153,6 +180,8 @@ The authoritative locations are:
   built-in capability declarations, including `binding.raster`.
 - `src/wellplot/agent/code_mode/planner.py`: `SectionTask`, `SemanticPlanner`,
   planner capability validation, and the compact planning catalog.
+- `src/wellplot/agent/code_mode/workflow.py`: active graph dependencies,
+  `ProgramSectionCompiler` injection, dynamic worker dispatch, and graph merge.
 - `src/wellplot/agent/code_mode/enrichment.py`: `SourceContext`,
   `ResolvedSectionContext`, deterministic source/channel resolution, and host
   source ownership.
@@ -212,6 +241,20 @@ canonical capability identifiers through the registry, preserves source and
 channel order from the host context, and exposes exact channel mnemonics plus
 recognition aliases. `serialize_typed_section_input()` uses deterministic JSON
 ordering and compact separators.
+
+The accepted S1 experiment did not use this payload alone. Its A and S arms
+used:
+
+```text
+current typed task/context input
+    + authoritative original request
+    + selective metadata for S
+```
+
+The current production `TypedSectionWorkerInput` has no
+`authoritative_request` field. Therefore S1 proves the selective intervention
+only in combination with an authoritative request, not on the current
+production payload by itself. CM-57 must not claim otherwise.
 
 The current payload deliberately excludes canonical source paths, document
 internals, runtime IDs, renderer settings, provider responses, and evaluation
@@ -332,13 +375,67 @@ The selector must not fuzzy-match, infer, search, or ask the provider which
 metadata to use. A capability with no metadata is omitted. An empty contract
 object should not be emitted merely to make the payload shape uniform.
 
+### 11.1 Authoritative Request Decision
+
+The future production typed worker should include the host-provided original
+request. This is the selected decision:
+
+```text
+INCLUDE_AUTHORITATIVE_REQUEST_IN_FUTURE_TYPED_WORKER
+```
+
+S1 used the authoritative original request in both A and S. The current
+production `TypedSectionWorkerInput` does not, so S1 does not validate the
+proposed production payload yet. Before CM-57B production integration, a
+separate input-boundary experiment must compare:
+
+```text
+P:   current TypedSectionWorkerInput
+P+S: current TypedSectionWorkerInput + selective metadata
+```
+
+with no authoritative request, and separately compare the selected future
+contract. That experiment must use the same response schema, evaluator,
+context, compiler, and no-repair policy. Its purpose is to determine whether
+the request is necessary rather than to silently attribute S1's result to a
+payload it did not test.
+
+The reason to prefer the request in the future contract is evidence-based: S1
+validated it, it preserves user-authored semantics that the planner may
+compress, and it keeps planner task decomposition separate from worker semantic
+interpretation. The request is not planner output, expected semantics, or
+evaluation provenance.
+
+The future host flow is:
+
+```text
+CodeModeGraphState.request
+        ↓
+isolated section worker payload
+        ↓
+TypedSectionCompiler.compile(..., authoritative_request=...)
+        ↓
+TypedSectionWorkerInput.authoritative_request
+```
+
+The value remains user-authored natural language. It must be copied from host
+graph state, not reconstructed from `SectionTask`, and must not be synthesized
+from evaluator or canonical document data.
+
+Section isolation remains mandatory. A typed worker may receive only the
+original request, its single `SectionTask`, its single `ResolvedSectionContext`,
+and selected capability metadata. It must not receive sibling contexts, sibling
+outputs, graph-wide evaluation data, or unrelated canonical source data.
+
 ## 12. Worker Serialization
 
-The future provider-safe payload should extend the existing typed input without
-altering the existing `section_task`, `capabilities`, or `sources` objects:
+The future provider-safe payload should extend the existing typed input with
+the selected request and metadata, without altering the existing `section_task`,
+`capabilities`, or `sources` objects:
 
 ```json
 {
+  "authoritative_request": "...",
   "section_task": {},
   "capabilities": [],
   "sources": [],
@@ -372,14 +469,19 @@ typed semantic target paths, and value cues. It must not contain:
 The provider boundary remains:
 
 ```text
+authoritative original request
 SectionTask
 bounded generic capability descriptors
 selected capability-local semantic metadata
 bounded opaque source/channel context
-authoritative natural-language request
         ↓
 structured SectionSemanticDraft
 ```
+
+`authoritative_request` is host-provided user intent. It is not capability
+metadata, planner output, evaluation provenance, or a substitute for the
+typed task/context contracts. No canonical path or runtime identity is added
+by carrying it.
 
 ## 13. Prompt Integration
 
@@ -692,6 +794,13 @@ into provider input. Each future shadow row should retain input hashes,
 metadata hashes, schema hash, evaluator hash, model controls, structured
 validity, context validity, compiler validity, and leaf-level semantic status.
 
+The shadow harness must evaluate the complete future typed input boundary. Once
+the authoritative-request decision is implemented, every row must record the
+request-bearing payload hash and prove that the worker received only its own
+request, task, context, and selected metadata. The current S1 summary cannot be
+reused as proof of that production-native boundary without this input-contract
+check.
+
 ## 24. Implementation Slices
 
 The minimum future decomposition is:
@@ -709,21 +818,26 @@ isolation.
 Add the provider-safe `semantic_contracts` projection to
 `TypedSectionWorkerInput`, select contracts from task capability IDs, add the
 small prompt paragraph, and test omission, ordering, redaction, size bounds,
-target allowlisting, and A/S-equivalent payload isolation. Keep the existing
-production route unchanged and do not add repair or fallback.
+target allowlisting, and A/S-equivalent payload isolation. Add the selected
+`authoritative_request` only after the separate input-boundary experiment has
+frozen that contract. Keep the active `ProgramSectionCompiler` route unchanged
+and do not add repair or fallback. CM-57B is blocked until the request-bearing
+future payload is independently justified.
 
 ### CM-57C — Broader typed-worker shadow evaluation
 
 Run the new unseen corpus through the real planner/enricher boundary and the
-typed worker in shadow mode. Compare scientific leaves, source/channel
-validity, repeated-channel preservation, title behavior, and canonical
-projection stability. Keep provider controls and evidence handling explicit.
+typed worker in shadow mode using the exact request-bearing future payload.
+Compare scientific leaves, source/channel validity, repeated-channel
+preservation, title behavior, and canonical projection stability. Keep provider
+controls and evidence handling explicit.
 
 ### CM-57D — Production activation decision
 
 Only after CM-57C is independently accepted should a separate authorization
-define any public/default route activation. CM-57D is not authorized by this
-design checkpoint.
+define graph/routing integration. CM-57D owns the explicit decision between
+`ProgramSectionCompiler` and `TypedSectionCompiler` in
+`CodeModeGraphDependencies`; it is not authorized by this design checkpoint.
 
 ### Separate identity slice
 
@@ -792,11 +906,12 @@ CapabilityRegistry
                         │
                         ▼
               TypedSectionWorkerInput
-             ┌──────────┴───────────┐
-             │                      │
-         task/context       semantic_contracts
-             │                      │
-             └──────────┬───────────┘
+             ┌──────────┼───────────┬──────────────┐
+             │          │           │              │
+ authoritative  task/context  semantic_contracts  sources
+ request
+             │          │           │              │
+             └──────────┴───────────┴──────────────┘
                         ▼
               structured generation
                         ▼
@@ -847,5 +962,24 @@ Title decision:
 SEPARATE_FIDELITY_SLICE
 ```
 
-CM-57 implementation is not started. CM-57A requires separate implementation
-authorization after independent design review.
+Current route status:
+
+```text
+Active section route: PROGRAM_SECTION_COMPILER
+Typed semantic route: NOT YET ACTIVE
+```
+
+Input-boundary status:
+
+```text
+Authoritative-request production decision:
+INCLUDE_AUTHORITATIVE_REQUEST_IN_FUTURE_TYPED_WORKER
+
+CM-57A blocked by request decision: NO
+CM-57B blocked by request decision: YES
+```
+
+CM-57A can be implemented independently as metadata model/registry work after
+separate authorization. CM-57B must wait until the request-bearing production
+input contract is frozen and the no-request P/P+S boundary experiment has been
+reviewed. CM-57 implementation is otherwise not started.
