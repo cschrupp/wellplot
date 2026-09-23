@@ -1,0 +1,103 @@
+{
+  "experiment_version": "CM-56R8R-S1",
+  "status": "complete",
+  "authorized_checkpoint": "7f3d33802cb3025cab05b4c84c9188a3e1b5c0e6",
+  "design_baseline_sha": "7e0233421f8c9c6142d35eaeb29f533a0604667b",
+  "provider": {
+    "backend": "openai_compat",
+    "base_url": "http://192.168.2.142:8888/v1",
+    "model": "Qwen3.6-35B-A3B-MTP-GGUF"
+  },
+  "execution_controls": {
+    "planner_temperature": 0.0,
+    "worker_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900.0,
+    "attempts_per_case": 3
+  },
+  "artifacts": {
+    "harness_source_sha256": "5fdb33a2e6a302ab553df8b007a0d86b62c1f64ac0e8dfeef06dddfa4e9963ab",
+    "selective_contract_sha256": "c6dd637e3b9f287f796a76cf147acd29fbacaa9c350f6d9ab4ae8c0e5360a02f",
+    "evaluator_version": "cm56r8r.corrected-evaluator.v1",
+    "evaluator_source_sha256": "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49",
+    "evaluation_contract_sha256": "3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da",
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
+  },
+  "raw_evidence": {
+    "path": "/tmp/cm56r8r-s1-live-qwen.jsonl",
+    "sha256": "43345200d356677a9c88ac77997c14c5d16c6d973711e38d17a1dea6ea86ae1c",
+    "retained_outside_repository": true
+  },
+  "population": {
+    "rows": 15,
+    "expected_rows": 15,
+    "cases": {
+      "scalar_linear": 3,
+      "reverse_scale": 3,
+      "generic_raster": 3,
+      "waveform": 3,
+      "vdl_sample_axis": 3
+    },
+    "attempts": {
+      "0": 5,
+      "1": 5,
+      "2": 5
+    },
+    "input_sufficiency": "15/15",
+    "selective_contract_only_diff": "15/15",
+    "a_evaluation_eligible": "15/15",
+    "s_evaluation_eligible": "15/15",
+    "integrity": "PASS"
+  },
+  "provider_requests": {
+    "planner_calls": 15,
+    "worker_calls": 30,
+    "total_backend_requests": 45,
+    "provider_failures": 0
+  },
+  "results": {
+    "A": {
+      "full_semantic_acceptance": "3/15",
+      "track_scale": "36/36",
+      "binding_scale": "24/24",
+      "raster_profile": "0/9",
+      "sample_axis": "9/18"
+    },
+    "S": {
+      "full_semantic_acceptance": "12/15",
+      "track_scale": "36/36",
+      "binding_scale": "24/24",
+      "raster_profile": "9/9",
+      "sample_axis": "12/12"
+    },
+    "scale_regressions": 0,
+    "target_recoveries": 12,
+    "unrequested_scientific_extras": 0,
+    "decision": "SELECTIVE_CONTRACT_FULL_RECOVERY"
+  },
+  "pairwise_scientific_leaves": {
+    "profile_recoveries": 9,
+    "sample_axis_recoveries": 3,
+    "scale_both_pass": 60,
+    "scale_regressions": 0
+  },
+  "historical_comparison": {
+    "r8r_A": {
+      "track_scale": "36/36",
+      "binding_scale": "24/24",
+      "raster_profile": "0/9",
+      "sample_axis": "partial"
+    },
+    "r8r_B": {
+      "track_scale": "36/36",
+      "binding_scale": "18/24",
+      "raster_profile": "9/9",
+      "sample_axis": "12/12"
+    },
+    "f1_reverse_scale_regressions": 6
+  },
+  "production_changes": 0,
+  "cm57": "blocked"
+}

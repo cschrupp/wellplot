@@ -2,12 +2,17 @@
 
 ## Status
 
-- Slice: selective semantic-contract pre-live implementation
+- Slice: selective semantic-contract live evaluation
 - Baseline: `7e0233421f8c9c6142d35eaeb29f533a0604667b`
 - Experiment version: `CM-56R8R-S1`
-- Provider calls: `0`
+- Authorized checkpoint: `7f3d33802cb3025cab05b4c84c9188a3e1b5c0e6`
+- Worker calls: `30` (`15` A, `15` S)
+- Planner calls: `15`
+- Total backend requests: `45`
+- Provider failures: `0`
 - Production changes: `0`
-- Live inference: **NOT STARTED**
+- Live inference: **COMPLETE**
+- Decision: `SELECTIVE_CONTRACT_FULL_RECOVERY`
 - CM-57: blocked
 
 ## Governing Hypothesis
@@ -127,17 +132,64 @@ are inconclusive; any A-pass/S-fail scale leaf produces
 recovery with no scientific extras is full recovery, partial target recovery
 is partial recovery, and no target recovery is no benefit.
 
+## Live Inference
+
+The authorized run used the local llama.cpp OpenAI-compatible endpoint with
+model `Qwen3.6-35B-A3B-MTP-GGUF`, planner and worker temperature `0.0`,
+`16384` maximum output tokens using `max_tokens`, a `900` second timeout, and
+three attempts for each of the five frozen cases. The run used checkpoint
+`7f3d33802cb3025cab05b4c84c9188a3e1b5c0e6` and wrote the raw evidence to
+`/tmp/cm56r8r-s1-live-qwen.jsonl`.
+
+The raw evidence SHA-256 is
+`43345200d356677a9c88ac77997c14c5d16c6d973711e38d17a1dea6ea86ae1c` and the
+raw file remains outside the repository. The bounded committed aggregate is
+`CM-56R8R-S1-live-summary.json`.
+
+Population integrity passed:
+
+```text
+rows                         15/15
+cases                        5 × 3
+input sufficiency            15/15
+selective-contract-only diff 15/15
+A evaluation eligible        15/15
+S evaluation eligible        15/15
+provider failures            0
+scale regressions            0
+unrequested scientific extras 0
+```
+
+The paired scientific results were:
+
+```text
+                         A       S
+full semantic acceptance 3/15    12/15
+track scale              36/36   36/36
+binding scale            24/24   24/24
+raster profile           0/9     9/9
+sample axis              9/18    12/12
+```
+
+S recovered twelve targeted scientific leaves without regressing any scale
+leaf. The frozen decision logic therefore returns
+`SELECTIVE_CONTRACT_FULL_RECOVERY`. Against the accepted R8R full-contract B
+result, S retains profile and sample-axis recovery while avoiding the six
+reverse-scale endpoint regressions identified by F1.
+
 ## Validation
 
 The pre-live command path produced metadata only and made no network request.
-The focused S1 tests and adjacent R8R/R8R-F1 tests pass: `60 passed`.
+Before live execution, the focused S1 tests and adjacent R8R/R8R-F1 tests
+passed: `60 passed`. The live JSONL passed the frozen aggregation and
+population-integrity checks described above.
 Ruff, formatting, Python compilation, JSON validation, redaction scanning, and
 `git diff --check` pass. No production files or historical R8R/F1 artifacts
 were modified.
 
 ## Hard Stop
 
-This checkpoint authorizes no provider calls, one-case smoke inference, prompt
-redesign, schema change, production integration, routing change, repair,
-fallback, or CM-57 work. Live inference remains **NOT STARTED** and requires
-independent review plus separate explicit authorization.
+The live evidence authorizes no prompt redesign, schema change, production
+integration, routing change, repair, fallback, or CM-57 work. CM-56R8R-S1 is
+complete as an evaluation slice; the next decision requires independent review
+of the bounded summary and raw evidence hash.
