@@ -6,8 +6,8 @@
 - Baseline: `17da03e`
 - Pre-live review baseline: `9988908`
 - Implementation checkpoint: `d6e291c`
-- Provider calls: `0`
-- Live inference: not started
+- Provider calls: `30`
+- Live inference: complete
 - Production changes: `0`
 - CM-57: blocked
 
@@ -122,10 +122,49 @@ execution time: model `Qwen3.6-35B-A3B-MTP-GGUF`, planner and worker temperature
 three attempts per case. Control overrides are rejected, and the runner refuses
 to append to a non-empty JSONL evidence path.
 
-The R8R evaluator, contracts, VDL audit, tests, and evidence policy must be
-reviewed and pushed before any model call. The future run is exactly 15 paired
-rows and 30 worker calls across the five frozen R8 cases, using the unchanged
-local Qwen controls. This rework makes zero provider calls.
+The R8R evaluator, contracts, VDL audit, tests, and evidence policy were
+reviewed and pushed before the authorized model call. The matrix used exactly
+15 paired rows and 30 worker calls across the five frozen R8 cases, using the
+unchanged local Qwen controls. The pre-live rework itself made zero provider
+calls.
+
+## Live Evidence
+
+The authorized matrix completed once through the local Qwen endpoint. The raw
+JSONL remains outside the repository:
+
+- Path: `/tmp/cm56r8r-live-qwen.jsonl`
+- SHA-256: `bf1274b987c948e68c36f4f0de6a945860fce6baf97e32f335943bfbb3c16aca`
+- Population: 15 paired rows, five cases, three attempts per case
+- Worker calls: 30, provider failures: 0
+- Input sufficiency: `15/15`
+- A/B evaluation eligibility: `15/15` each
+- Semantic-contract-only difference: `15/15`
+- Evaluator version/source hash and all frozen artifact hashes: identical across rows
+
+The bounded aggregate is in `CM-56R8R-live-summary.json`. Corrected R8R
+results are:
+
+```text
+                              A          B
+track scale                  36/36      36/36
+binding scale                24/24      18/24
+raster profile                0/9        9/9
+sample axis                   9/18      12/12
+scientific-only               6/15      12/15
+full semantic acceptance      3/15      12/15
+```
+
+There were 12 scientific A-fail/B-pass recoveries and 6 A-pass/B-fail
+regressions, producing the frozen decision
+`SEMANTIC_CONTRACT_PARTIAL_RECOVERY`. The regressions are retained in the
+leaf-level summary; no manual reinterpretation or threshold was applied.
+
+Compared with the valid R8 observation, raster profile remains `A 0/9 -> B
+9/9`. R8R is the first corrected symmetric `SemanticScale` measurement, and
+the VDL result is the first measurement under the `explicit_request_only`
+sample-axis policy. R8's historical scale-family rates are not reused as
+corrected baselines.
 
 Historical artifacts remain untouched:
 

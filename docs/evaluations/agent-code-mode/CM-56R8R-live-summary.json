@@ -1,0 +1,121 @@
+{
+  "experiment_version": "CM-56R8R",
+  "authorized_checkpoint": "0c80533f69b7fe8c2bb37142ec4db8c376fe27bf",
+  "provider": {
+    "kind": "openai_compat",
+    "model": "Qwen3.6-35B-A3B-MTP-GGUF",
+    "base_url": "http://192.168.2.142:8888/v1",
+    "planner_temperature": 0.0,
+    "worker_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900.0
+  },
+  "cases": [
+    "scalar_linear",
+    "reverse_scale",
+    "generic_raster",
+    "waveform",
+    "vdl_sample_axis"
+  ],
+  "attempts_per_case": 3,
+  "paired_rows": 15,
+  "worker_calls": 30,
+  "raw_evidence": {
+    "path": "/tmp/cm56r8r-live-qwen.jsonl",
+    "rows": 15,
+    "sha256": "bf1274b987c948e68c36f4f0de6a945860fce6baf97e32f335943bfbb3c16aca"
+  },
+  "integrity": {
+    "population_complete": true,
+    "population_reasons": [],
+    "input_sufficiency": "15/15",
+    "semantic_contract_only_diff": "15/15",
+    "a_evaluation_eligible": "15/15",
+    "b_evaluation_eligible": "15/15",
+    "provider_failures": 0,
+    "evaluator_version": "cm56r8r.corrected-evaluator.v1",
+    "evaluator_source_sha256": "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49",
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+    "semantic_contract_sha256": "1f1ec51c7122b28a87e707051ee7c9203cb13e5b4c0aadf773228fdbfad61eb0",
+    "evaluation_contract_sha256": "3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da",
+    "execution_controls_identical": true
+  },
+  "results": {
+    "A": {
+      "scientific_only_pass": "6/15",
+      "full_semantic_acceptance": "3/15",
+      "families": {
+        "track_scale": {"pass": 36, "applicable": 36, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "binding_scale": {"pass": 24, "applicable": 24, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "raster_profile": {"pass": 0, "applicable": 9, "missing": 9, "wrong_value": 0, "unrequested_extra": 0},
+        "sample_axis": {"pass": 9, "applicable": 18, "missing": 3, "wrong_value": 0, "unrequested_extra": 6}
+      },
+      "leaves": {
+        "tracks[0].x_scale.kind": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.minimum": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.maximum": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.reverse": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.kind": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.minimum": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.maximum": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.reverse": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].profile": {"pass": 0, "applicable": 9, "missing": 9, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.unit": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.source_origin": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.source_step": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.minimum": {"pass": 0, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 3},
+        "tracks[0].bindings[0].sample_axis.maximum": {"pass": 0, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 3},
+        "tracks[0].bindings[0].sample_axis.tick_count": {"pass": 0, "applicable": 3, "missing": 3, "wrong_value": 0, "unrequested_extra": 0}
+      }
+    },
+    "B": {
+      "scientific_only_pass": "12/15",
+      "full_semantic_acceptance": "12/15",
+      "families": {
+        "track_scale": {"pass": 36, "applicable": 36, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "binding_scale": {"pass": 18, "applicable": 24, "missing": 0, "wrong_value": 6, "unrequested_extra": 0},
+        "raster_profile": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "sample_axis": {"pass": 12, "applicable": 12, "missing": 0, "wrong_value": 0, "unrequested_extra": 0}
+      },
+      "leaves": {
+        "tracks[0].x_scale.kind": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.minimum": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.maximum": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].x_scale.reverse": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.kind": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.minimum": {"pass": 3, "applicable": 6, "missing": 0, "wrong_value": 3, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.maximum": {"pass": 3, "applicable": 6, "missing": 0, "wrong_value": 3, "unrequested_extra": 0},
+        "tracks[0].bindings[0].scale.reverse": {"pass": 6, "applicable": 6, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].profile": {"pass": 9, "applicable": 9, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.unit": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.source_origin": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.source_step": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0},
+        "tracks[0].bindings[0].sample_axis.tick_count": {"pass": 3, "applicable": 3, "missing": 0, "wrong_value": 0, "unrequested_extra": 0}
+      }
+    }
+  },
+  "pairwise_scientific_leaves": {
+    "tracks[0].bindings[0].profile": {"a_fail_b_pass": 9, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 0},
+    "tracks[0].bindings[0].sample_axis.source_origin": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 3},
+    "tracks[0].bindings[0].sample_axis.source_step": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 3},
+    "tracks[0].bindings[0].sample_axis.tick_count": {"a_fail_b_pass": 3, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 0},
+    "tracks[0].bindings[0].sample_axis.unit": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 3},
+    "tracks[0].bindings[0].scale.kind": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 6},
+    "tracks[0].bindings[0].scale.maximum": {"a_fail_b_pass": 0, "a_pass_b_fail": 3, "both_fail": 0, "both_pass": 3},
+    "tracks[0].bindings[0].scale.minimum": {"a_fail_b_pass": 0, "a_pass_b_fail": 3, "both_fail": 0, "both_pass": 3},
+    "tracks[0].bindings[0].scale.reverse": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 6},
+    "tracks[0].x_scale.kind": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 9},
+    "tracks[0].x_scale.maximum": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 9},
+    "tracks[0].x_scale.minimum": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 9},
+    "tracks[0].x_scale.reverse": {"a_fail_b_pass": 0, "a_pass_b_fail": 0, "both_fail": 0, "both_pass": 9}
+  },
+  "scientific_recoveries": 12,
+  "scientific_regressions": 6,
+  "r8_comparison": {
+    "raster_profile": {"A": "0/9", "B": "9/9"},
+    "note": "R8R is the first corrected symmetric SemanticScale measurement; VDL uses explicit_request_only sample-axis policy."
+  },
+  "decision": "SEMANTIC_CONTRACT_PARTIAL_RECOVERY"
+}
