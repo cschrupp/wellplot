@@ -84,6 +84,25 @@ timeout, or attempts. It rejects injected control mismatches and refuses to
 append to a non-empty evidence file. Its default CLI path performs only
 pre-live validation; provider execution requires a separate explicit live flag.
 
+## Pre-Live Review Rework
+
+The rework baseline was `5ff18b6584064d54a14df852510aab4e0e55f7c5`. The
+selective contract artifact was not modified. The harness now records the
+exact source-byte SHA-256 through a local `harness_source_sha256()` helper and
+keeps the design baseline separate from live authorization provenance:
+
+```text
+design_baseline_sha = 7e0233421f8c9c6142d35eaeb29f533a0604667b
+authorized_checkpoint = explicit 40-character lowercase SHA supplied only for live execution
+```
+
+The live runner rejects a missing, short, non-hex, uppercase, or otherwise
+invalid checkpoint before provider construction. It also validates selective
+contract, evaluator, evaluation-contract, corpus, and response-schema hashes
+before provider construction. The future evidence-row builder is exercised by
+a provider-free synthetic A/S row test and includes the complete provenance
+fields required for a successful paired attempt.
+
 ## Pre-Live Evaluation Inventory
 
 The harness derives applicable scientific leaves from the frozen corpus and
@@ -111,7 +130,7 @@ is partial recovery, and no target recovery is no benefit.
 ## Validation
 
 The pre-live command path produced metadata only and made no network request.
-The focused S1 tests and adjacent R8R/R8R-F1 tests pass: `52 passed`.
+The focused S1 tests and adjacent R8R/R8R-F1 tests pass: `60 passed`.
 Ruff, formatting, Python compilation, JSON validation, redaction scanning, and
 `git diff --check` pass. No production files or historical R8R/F1 artifacts
 were modified.

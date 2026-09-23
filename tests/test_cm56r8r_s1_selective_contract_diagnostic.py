@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from argparse import Namespace
 from pathlib import Path
@@ -9,22 +10,27 @@ from pathlib import Path
 import pytest
 from scripts.cm56r8r_s1_selective_contract_diagnostic import (
     ATTEMPTS,
-    BASELINE_SHA,
     CASE_CORPUS_SHA256,
+    DESIGN_BASELINE_SHA,
     EVALUATION_CONTRACT_SHA256,
     EVALUATOR_SHA256,
     EXPERIMENT_VERSION,
     FROZEN_MODEL,
     REPRESENTATION_CASES,
     RESPONSE_SCHEMA_SHA256,
+    S1_HARNESS_PATH,
     _mapping_targets,
     aggregate_s1_rows,
     build_pre_live_metadata,
     build_selective_system_prompt,
     build_selective_worker_input,
+    build_successful_evidence_row,
     ensure_empty_evidence_path,
+    harness_source_sha256,
     load_selective_contracts,
     selective_contract_only_differs,
+    validate_authorized_checkpoint,
+    validate_frozen_artifacts,
     validate_frozen_execution_controls,
     validate_selective_contract_artifact,
 )
@@ -97,7 +103,8 @@ def test_pre_live_metadata_freezes_provenance_and_expected_families() -> None:
     """Metadata is derived from frozen artifacts without provider execution."""
     metadata = build_pre_live_metadata()
     assert metadata["experiment_version"] == EXPERIMENT_VERSION
-    assert metadata["authorized_checkpoint"] == BASELINE_SHA
+    assert metadata["design_baseline_sha"] == DESIGN_BASELINE_SHA
+    assert metadata["authorized_checkpoint"] is None
     assert metadata["provider_calls"] == 0
     assert metadata["production_changes"] == 0
     assert metadata["corpus_sha256"] == CASE_CORPUS_SHA256
@@ -122,6 +129,101 @@ def test_frozen_controls_and_cli_attempt_path() -> None:
     validate_frozen_execution_controls(args)
     assert not hasattr(args, "attempts")
     assert ATTEMPTS == 3
+
+
+def test_harness_source_hash_is_bytes_based() -> None:
+    """Live row source provenance hashes the exact harness bytes."""
+    digest = hashlib.sha256(Path(S1_HARNESS_PATH).read_bytes()).hexdigest()
+    assert harness_source_sha256() == digest
+    assert len(digest) == 64
+
+
+def test_live_flag_without_checkpoint_is_rejected() -> None:
+    """The live CLI gate requires explicit execution provenance."""
+    from scripts.cm56r8r_s1_selective_contract_diagnostic import _parser
+
+    args = _parser().parse_args(
+        [
+            "--model",
+            FROZEN_MODEL,
+            "--base-url",
+            "http://example.invalid/v1",
+            "--live-authorized",
+        ]
+    )
+    with pytest.raises(ValueError, match="full lowercase 40-character"):
+        validate_authorized_checkpoint(args.authorized_checkpoint)
+
+
+@pytest.mark.parametrize("checkpoint", [None, "5ff18b6", "g" * 40, "A" * 40])
+def test_invalid_live_checkpoint_is_rejected_before_provider_use(
+    checkpoint: object,
+) -> None:
+    """Missing, short, non-hex, and uppercase checkpoints fail closed."""
+    with pytest.raises(ValueError, match="full lowercase 40-character"):
+        validate_authorized_checkpoint(checkpoint)
+
+
+def test_successful_evidence_row_construction_is_provider_free() -> None:
+    """The complete successful row path is covered without a backend call."""
+    artifact, contract_sha = load_selective_contracts()
+    authoritative = json.dumps({"request": "bounded"}, sort_keys=True)
+    selective = build_selective_worker_input(
+        authoritative,
+        contracts=artifact["contracts"],
+    )
+    result = {"structured_valid": True, "context_valid": True, "compiler_valid": True}
+    row = build_successful_evidence_row(
+        case_id="synthetic",
+        attempt_index=0,
+        model=FROZEN_MODEL,
+        authorized_checkpoint="a" * 40,
+        selective_contract_sha256=contract_sha,
+        evaluation_contract_sha256=EVALUATION_CONTRACT_SHA256,
+        input_sufficiency={"sufficient": True, "facts": [], "missing_fact_ids": []},
+        authoritative_input=authoritative,
+        selective_input=selective,
+        a_result=result,
+        s_result=result,
+        elapsed_ms=1.0,
+    )
+    required = {
+        "experiment_version",
+        "design_baseline_sha",
+        "authorized_checkpoint",
+        "harness_source_sha256",
+        "selective_contract_sha256",
+        "evaluator_version",
+        "evaluator_source_sha256",
+        "evaluation_contract_sha256",
+        "case_corpus_sha256",
+        "response_schema_sha256",
+        "execution_controls",
+        "case_id",
+        "attempt_index",
+        "selective_contract_only_diff",
+        "input_sufficiency",
+        "a",
+        "s",
+    }
+    assert required <= row.keys()
+    assert row["authorized_checkpoint"] == "a" * 40
+    assert row["selective_contract_only_diff"] is True
+
+
+def test_artifact_hash_drift_is_rejected_before_provider_use() -> None:
+    """Frozen artifact digests are checked independently of model execution."""
+    with pytest.raises(ValueError, match="selective-contract hash"):
+        validate_frozen_artifacts(
+            selective_contract_sha256_value="0" * 64,
+            evaluation_contract_sha256=EVALUATION_CONTRACT_SHA256,
+        )
+    _, contract_sha = load_selective_contracts()
+    with pytest.raises(ValueError, match="evaluation-contract hash"):
+        validate_frozen_artifacts(
+            selective_contract_sha256_value=contract_sha,
+            evaluation_contract_sha256="0" * 64,
+        )
 
 
 def test_wrong_frozen_model_is_rejected() -> None:

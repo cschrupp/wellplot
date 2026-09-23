@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import re
 import time
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -52,12 +53,13 @@ from scripts.cm56r8r_semantic_contract_correction import (
 )
 from wellplot.agent.code_mode.enrichment import SemanticEnrichmentError
 from wellplot.agent.code_mode.planner import SemanticPlanner
+from wellplot.agent.code_mode.typed_section_worker import response_schema_sha256
 from wellplot.agent.providers.base import ModelBackendProtocol, ProviderRequestError
 from wellplot.authoring_program.inspection import AuthoringInspectionFacade
 from wellplot.capabilities import CapabilityRegistry, create_builtin_registry
 
 EXPERIMENT_VERSION = "CM-56R8R-S1"
-BASELINE_SHA = "7e0233421f8c9c6142d35eaeb29f533a0604667b"
+DESIGN_BASELINE_SHA = "7e0233421f8c9c6142d35eaeb29f533a0604667b"
 CASE_CORPUS_SHA256 = "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e"
 EVALUATION_CONTRACT_SHA256 = "3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da"
 EVALUATOR_SHA256 = "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49"
@@ -71,6 +73,7 @@ SELECTIVE_CONTRACT_VERSION = "cm56r8r-s1.selective-semantic-contracts.v1"
 SELECTIVE_CAPABILITY_IDS = ("binding.raster",)
 ATTEMPTS = 3
 S1_OUTPUT_PATH = Path("/tmp/cm56r8r-s1-live-qwen.jsonl")
+S1_HARNESS_PATH = Path(__file__).resolve()
 
 SELECTIVE_CONTRACT_INSTRUCTION = (
     "\n\nSelective semantic-contract use:\n"
@@ -111,6 +114,18 @@ _FORBIDDEN_TEXT = (
 def _sha256_bytes(value: bytes) -> str:
     """Return a SHA-256 digest for exact artifact bytes."""
     return hashlib.sha256(value).hexdigest()
+
+
+def harness_source_sha256() -> str:
+    """Return the exact SHA-256 digest of this S1 harness source."""
+    return _sha256_bytes(S1_HARNESS_PATH.read_bytes())
+
+
+def validate_authorized_checkpoint(value: object) -> str:
+    """Require a full lowercase hexadecimal Git SHA for live execution."""
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise ValueError("S1 live execution requires a full lowercase 40-character Git SHA.")
+    return value
 
 
 def selective_contract_sha256() -> str:
@@ -276,9 +291,12 @@ def build_pre_live_metadata() -> dict[str, object]:
         raise ValueError("Frozen evaluation-contract hash changed.")
     if case_corpus_sha256() != CASE_CORPUS_SHA256:
         raise ValueError("Frozen case-corpus hash changed.")
+    if response_schema_sha256() != RESPONSE_SCHEMA_SHA256:
+        raise ValueError("Frozen response-schema hash changed.")
     return {
         "experiment_version": EXPERIMENT_VERSION,
-        "authorized_checkpoint": BASELINE_SHA,
+        "design_baseline_sha": DESIGN_BASELINE_SHA,
+        "authorized_checkpoint": None,
         "provider_calls": 0,
         "production_changes": 0,
         "selective_contract_version": artifact["version"],
@@ -305,6 +323,24 @@ def build_pre_live_metadata() -> dict[str, object]:
             "worker_calls": 30,
         },
     }
+
+
+def validate_frozen_artifacts(
+    *,
+    selective_contract_sha256_value: str,
+    evaluation_contract_sha256: str,
+) -> None:
+    """Reject artifact drift before any provider backend is constructed."""
+    if selective_contract_sha256_value != selective_contract_sha256():
+        raise ValueError("Frozen selective-contract hash changed.")
+    if evaluation_contract_sha256 != EVALUATION_CONTRACT_SHA256:
+        raise ValueError("Frozen evaluation-contract hash changed.")
+    if evaluator_source_sha256() != EVALUATOR_SHA256:
+        raise ValueError("Frozen evaluator source hash changed.")
+    if case_corpus_sha256() != CASE_CORPUS_SHA256:
+        raise ValueError("Frozen case-corpus hash changed.")
+    if response_schema_sha256() != RESPONSE_SCHEMA_SHA256:
+        raise ValueError("Frozen response-schema hash changed.")
 
 
 def _population_integrity(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
@@ -451,6 +487,55 @@ def aggregate_s1_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]
     }
 
 
+def build_successful_evidence_row(
+    *,
+    case_id: str,
+    attempt_index: int,
+    model: str,
+    authorized_checkpoint: str,
+    selective_contract_sha256: str,
+    evaluation_contract_sha256: str,
+    input_sufficiency: Mapping[str, object],
+    authoritative_input: str,
+    selective_input: str,
+    a_result: Mapping[str, object],
+    s_result: Mapping[str, object],
+    elapsed_ms: float,
+) -> dict[str, object]:
+    """Build one successful paired evidence row without provider access."""
+    return {
+        "experiment_version": EXPERIMENT_VERSION,
+        "design_baseline_sha": DESIGN_BASELINE_SHA,
+        "authorized_checkpoint": validate_authorized_checkpoint(authorized_checkpoint),
+        "harness_source_sha256": harness_source_sha256(),
+        "selective_contract_sha256": selective_contract_sha256,
+        "evaluator_version": EVALUATOR_VERSION,
+        "evaluator_source_sha256": evaluator_source_sha256(),
+        "evaluation_contract_sha256": evaluation_contract_sha256,
+        "case_corpus_sha256": CASE_CORPUS_SHA256,
+        "response_schema_sha256": RESPONSE_SCHEMA_SHA256,
+        "execution_controls": {
+            "model": model,
+            "planner_temperature": PLANNER_TEMPERATURE,
+            "worker_temperature": WORKER_TEMPERATURE,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
+            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+            "timeout_seconds": TIMEOUT_SECONDS,
+            "attempts_per_case": ATTEMPTS,
+        },
+        "case_id": case_id,
+        "attempt_index": attempt_index,
+        "selective_contract_only_diff": selective_contract_only_differs(
+            authoritative_input,
+            selective_input,
+        ),
+        "input_sufficiency": dict(input_sufficiency),
+        "a": dict(a_result),
+        "s": dict(s_result),
+        "elapsed_ms": elapsed_ms,
+    }
+
+
 async def run_s1_attempt(
     case: Mapping[str, object],
     *,
@@ -462,6 +547,7 @@ async def run_s1_attempt(
     contract_sha256: str,
     evaluation_contract: Mapping[str, object],
     evaluation_contract_sha256: str,
+    authorized_checkpoint: str,
     attempt_index: int,
 ) -> dict[str, object]:
     """Run one shared planner/enrichment result through independent A/S calls."""
@@ -543,44 +629,29 @@ async def run_s1_attempt(
         expected=expected,
         timeout_seconds=TIMEOUT_SECONDS,
     )
-    return {
-        "experiment_version": EXPERIMENT_VERSION,
-        "authorized_checkpoint": BASELINE_SHA,
-        "harness_source_sha256": _sha256(Path(__file__).read_bytes()),
-        "selective_contract_sha256": contract_sha256,
-        "evaluator_version": EVALUATOR_VERSION,
-        "evaluator_source_sha256": evaluator_source_sha256(),
-        "evaluation_contract_sha256": evaluation_contract_sha256,
-        "case_corpus_sha256": case_corpus_sha256(),
-        "response_schema_sha256": RESPONSE_SCHEMA_SHA256,
-        "execution_controls": {
-            "model": model,
-            "planner_temperature": PLANNER_TEMPERATURE,
-            "worker_temperature": WORKER_TEMPERATURE,
-            "max_output_tokens": MAX_OUTPUT_TOKENS,
-            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
-            "timeout_seconds": TIMEOUT_SECONDS,
-            "attempts_per_case": ATTEMPTS,
-        },
-        "case_id": case["case_id"],
-        "attempt_index": attempt_index,
-        "a_system_prompt_sha256": _sha256(AUTHORITATIVE_REQUEST_SYSTEM_PROMPT),
-        "s_system_prompt_sha256": _sha256(build_selective_system_prompt()),
-        "authoritative_input_sha256": _sha256(authoritative_input),
-        "selective_input_sha256": _sha256(selective_input),
-        "selective_contract_only_diff": selective_contract_only_differs(
-            authoritative_input,
-            selective_input,
-        ),
-        "input_sufficiency": {
+    row = build_successful_evidence_row(
+        case_id=str(case["case_id"]),
+        attempt_index=attempt_index,
+        model=model,
+        authorized_checkpoint=authorized_checkpoint,
+        selective_contract_sha256=contract_sha256,
+        evaluation_contract_sha256=evaluation_contract_sha256,
+        input_sufficiency={
             "sufficient": audit.sufficient,
             "facts": audit.facts,
             "missing_fact_ids": audit.missing_fact_ids,
         },
-        "a": result_a,
-        "s": result_s,
-        "elapsed_ms": (time.perf_counter() - started) * 1000,
-    }
+        authoritative_input=authoritative_input,
+        selective_input=selective_input,
+        a_result=result_a,
+        s_result=result_s,
+        elapsed_ms=(time.perf_counter() - started) * 1000,
+    )
+    row["a_system_prompt_sha256"] = _sha256(AUTHORITATIVE_REQUEST_SYSTEM_PROMPT)
+    row["s_system_prompt_sha256"] = _sha256(build_selective_system_prompt())
+    row["authoritative_input_sha256"] = _sha256(authoritative_input)
+    row["selective_input_sha256"] = _sha256(selective_input)
+    return row
 
 
 async def run_matrix(args: argparse.Namespace) -> None:
@@ -588,6 +659,9 @@ async def run_matrix(args: argparse.Namespace) -> None:
     from scripts.cm56_typed_section_shadow import _provider_configuration
 
     validate_frozen_execution_controls(args)
+    authorized_checkpoint = validate_authorized_checkpoint(
+        getattr(args, "authorized_checkpoint", None)
+    )
     if case_corpus_sha256() != CASE_CORPUS_SHA256:
         raise RuntimeError("CM-56 corpus hash changed from the frozen baseline.")
     ensure_empty_evidence_path(args.output_jsonl)
@@ -599,6 +673,10 @@ async def run_matrix(args: argparse.Namespace) -> None:
         raise ValueError("Frozen evaluator source hash changed.")
     if evaluation_contract_sha256 != EVALUATION_CONTRACT_SHA256:
         raise ValueError("Frozen evaluation-contract hash changed.")
+    validate_frozen_artifacts(
+        selective_contract_sha256_value=contract_sha256,
+        evaluation_contract_sha256=evaluation_contract_sha256,
+    )
     provider_values = vars(args).copy()
     provider_values.update(
         timeout=TIMEOUT_SECONDS,
@@ -621,6 +699,7 @@ async def run_matrix(args: argparse.Namespace) -> None:
                     contract_sha256=contract_sha256,
                     evaluation_contract=evaluation_contract,
                     evaluation_contract_sha256=evaluation_contract_sha256,
+                    authorized_checkpoint=authorized_checkpoint,
                     attempt_index=attempt_index,
                 )
                 handle.write(json.dumps(row, sort_keys=True) + "\n")
@@ -635,6 +714,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--api-key-file")
     parser.add_argument("--api-key-env", default="OPENAI_COMPAT_API_KEY")
     parser.add_argument("--output-jsonl", type=Path, default=S1_OUTPUT_PATH)
+    parser.add_argument("--authorized-checkpoint")
     parser.add_argument("--live-authorized", action="store_true")
     return parser
 
@@ -645,6 +725,7 @@ def main() -> None:
     if not args.live_authorized:
         print(json.dumps(build_pre_live_metadata(), indent=2, sort_keys=True))
         return
+    validate_authorized_checkpoint(args.authorized_checkpoint)
     asyncio.run(run_matrix(args))
 
 
