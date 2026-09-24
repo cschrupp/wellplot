@@ -479,12 +479,13 @@ def validate_frozen_artifacts(registry: CapabilityRegistry) -> dict[str, object]
 
 def _variant_counts(rows: Sequence[Mapping[str, object]], arm: str) -> dict[str, object]:
     """Aggregate eligibility and scientific leaves for one arm."""
+    eligibility_fields = ("structured_valid", "context_valid", "compiler_valid")
     eligible = [
         row["arms"][arm]
         for row in rows
         if isinstance(row.get("arms"), Mapping)
         and isinstance(row["arms"].get(arm), Mapping)
-        and row["arms"][arm].get("compiler_valid")
+        and all(row["arms"][arm].get(name) is True for name in eligibility_fields)
     ]
     family_counts: dict[str, dict[str, int]] = defaultdict(lambda: {"pass": 0, "applicable": 0})
     accepted = sum(bool(value.get("semantic_accepted")) for value in eligible)
@@ -508,8 +509,46 @@ def _variant_counts(rows: Sequence[Mapping[str, object]], arm: str) -> dict[str,
     }
 
 
+_ELIGIBILITY_FIELDS = ("structured_valid", "context_valid", "compiler_valid")
+
+
+def _sufficiency_summary(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Report per-arm input sufficiency and factorial transitions."""
+    counts: dict[str, dict[str, int | str]] = {}
+    for arm in ARM_ORDER:
+        sufficient = sum(
+            1
+            for row in rows
+            if isinstance(row.get("input_sufficiency"), Mapping)
+            and isinstance(row["input_sufficiency"].get(arm), Mapping)
+            and row["input_sufficiency"][arm].get("sufficient") is True
+        )
+        counts[arm] = {
+            "sufficient": sufficient,
+            "total": len(rows),
+            "ratio": f"{sufficient}/{len(rows)}",
+        }
+
+    transitions: dict[str, int] = {}
+    for left, right in (("P", "R"), ("S", "RS"), ("P", "S"), ("R", "RS")):
+        for left_state, right_state, label in (
+            (False, True, "insufficient_to_sufficient"),
+            (True, False, "sufficient_to_insufficient"),
+        ):
+            transitions[f"{left}_{right}_{label}"] = sum(
+                1
+                for row in rows
+                if isinstance(row.get("input_sufficiency"), Mapping)
+                and isinstance(row["input_sufficiency"].get(left), Mapping)
+                and isinstance(row["input_sufficiency"].get(right), Mapping)
+                and row["input_sufficiency"][left].get("sufficient") is left_state
+                and row["input_sufficiency"][right].get("sufficient") is right_state
+            )
+    return {"arms": counts, "transitions": transitions}
+
+
 def _population_integrity(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
-    """Fail closed unless all 15 shared rows contain four isolated arms."""
+    """Fail closed unless all rows contain four isolated, eligible arms."""
     expected = {
         (case_id, attempt) for case_id in REPRESENTATION_CASES for attempt in range(ATTEMPTS)
     }
@@ -523,11 +562,13 @@ def _population_integrity(rows: Sequence[Mapping[str, object]]) -> dict[str, obj
         reasons.append("duplicate_case_attempt")
     for row in rows:
         input_sufficiency = row.get("input_sufficiency")
-        if (
-            not isinstance(input_sufficiency, Mapping)
-            or input_sufficiency.get("all_arms_sufficient") is not True
-        ):
-            reasons.append("input_insufficient")
+        if not isinstance(input_sufficiency, Mapping):
+            reasons.append("missing_sufficiency_audit")
+        else:
+            for arm in ARM_ORDER:
+                audit = input_sufficiency.get(arm)
+                if not isinstance(audit, Mapping) or not isinstance(audit.get("sufficient"), bool):
+                    reasons.append(f"missing_{arm}_sufficiency")
         flags = row.get("variant_flags", {})
         if not isinstance(flags, Mapping):
             reasons.append("missing_variant_flags")
@@ -537,6 +578,8 @@ def _population_integrity(rows: Sequence[Mapping[str, object]]) -> dict[str, obj
                 "request_only_diff",
                 "semantic_only_diff",
                 "future_contract_only_diff",
+                "rs_without_request_equals_s",
+                "rs_without_semantic_equals_r",
             )
         ):
             reasons.append("variant_isolation")
@@ -546,7 +589,9 @@ def _population_integrity(rows: Sequence[Mapping[str, object]]) -> dict[str, obj
             continue
         for arm in ARM_ORDER:
             value = arms[arm]
-            if not isinstance(value, Mapping) or value.get("structured_valid") is not True:
+            if not isinstance(value, Mapping) or not all(
+                value.get(name) is True for name in _ELIGIBILITY_FIELDS
+            ):
                 reasons.append(f"{arm}_not_evaluation_eligible")
     return {
         "complete": not reasons,
@@ -561,8 +606,9 @@ def _pairwise_counts(
     rows: Sequence[Mapping[str, object]],
     left: str,
     right: str,
-) -> dict[str, dict[str, int]]:
-    """Compare scientific leaf statuses for two arms."""
+) -> dict[str, object]:
+    """Compare expected leaves and unrequested extras for two arms."""
+    inventory = expected_family_inventory()
     result: dict[str, dict[str, int]] = defaultdict(
         lambda: {
             "both_pass": 0,
@@ -571,6 +617,14 @@ def _pairwise_counts(
             "both_fail": 0,
         }
     )
+    extras: dict[str, object] = {
+        "right_new": 0,
+        "left_removed": 0,
+        "both": 0,
+        "right_new_by_family": defaultdict(int),
+        "left_removed_by_family": defaultdict(int),
+        "both_by_family": defaultdict(int),
+    }
     for row in rows:
         arms = row.get("arms", {})
         if not isinstance(arms, Mapping):
@@ -583,11 +637,12 @@ def _pairwise_counts(
         right_statuses = right_value.get("leaf_statuses", {})
         if not isinstance(left_statuses, Mapping) or not isinstance(right_statuses, Mapping):
             continue
-        for path in sorted(set(left_statuses) & set(right_statuses)):
+        expected_paths = set(inventory.get(str(row.get("case_id")), ()))
+        for path in sorted(expected_paths):
             if _family(str(path)) is None:
                 continue
-            left_pass = left_statuses[path] == "PASS"
-            right_pass = right_statuses[path] == "PASS"
+            left_pass = left_statuses.get(path, "MISSING") == "PASS"
+            right_pass = right_statuses.get(path, "MISSING") == "PASS"
             bucket = result[str(path)]
             if left_pass and right_pass:
                 bucket["both_pass"] += 1
@@ -597,38 +652,64 @@ def _pairwise_counts(
                 bucket["left_pass_right_fail"] += 1
             else:
                 bucket["both_fail"] += 1
-    return dict(sorted(result.items()))
+        for path in sorted((set(left_statuses) | set(right_statuses)) - expected_paths):
+            family = _family(str(path))
+            if family is None:
+                continue
+            left_extra = left_statuses.get(path) == "UNREQUESTED_EXTRA"
+            right_extra = right_statuses.get(path) == "UNREQUESTED_EXTRA"
+            if not left_extra and right_extra:
+                extras["right_new"] += 1
+                extras["right_new_by_family"][family] += 1
+            elif left_extra and not right_extra and path not in right_statuses:
+                extras["left_removed"] += 1
+                extras["left_removed_by_family"][family] += 1
+            elif left_extra and right_extra:
+                extras["both"] += 1
+                extras["both_by_family"][family] += 1
+    return {
+        "leaves": dict(sorted(result.items())),
+        "unrequested_extras": {
+            key: dict(value) if isinstance(value, defaultdict) else value
+            for key, value in extras.items()
+        },
+    }
 
 
-def _factor_classification(pairwise: Mapping[str, Mapping[str, int]]) -> str:
-    """Classify one factor from exact leaf-level changes."""
-    recoveries = sum(value["left_fail_right_pass"] for value in pairwise.values())
-    regressions = sum(value["left_pass_right_fail"] for value in pairwise.values())
+def _factor_classification(*comparisons: Mapping[str, object], prefix: str) -> str:
+    """Classify one factor across both of its factorial contrasts."""
+    recoveries = 0
+    regressions = 0
+    for comparison in comparisons:
+        leaves = comparison.get("leaves", {})
+        if isinstance(leaves, Mapping):
+            recoveries += sum(
+                value["left_fail_right_pass"]
+                for value in leaves.values()
+                if isinstance(value, Mapping)
+            )
+            regressions += sum(
+                value["left_pass_right_fail"]
+                for value in leaves.values()
+                if isinstance(value, Mapping)
+            )
+        extras = comparison.get("unrequested_extras", {})
+        if isinstance(extras, Mapping):
+            recoveries += int(extras.get("left_removed", 0))
+            regressions += int(extras.get("right_new", 0))
     if regressions and recoveries:
-        return "REQUEST_MIXED_EFFECT"
+        return f"{prefix}_MIXED_EFFECT"
     if regressions:
-        return "REQUEST_REGRESSION"
+        return f"{prefix}_REGRESSION"
     if recoveries:
-        return "REQUEST_CONTRIBUTES"
-    return "REQUEST_NO_MEASURABLE_EFFECT"
-
-
-def _classify_metadata(pairwise: Mapping[str, Mapping[str, int]]) -> str:
-    """Classify metadata contribution independently of request contribution."""
-    recoveries = sum(value["left_fail_right_pass"] for value in pairwise.values())
-    regressions = sum(value["left_pass_right_fail"] for value in pairwise.values())
-    if regressions and recoveries:
-        return "METADATA_MIXED_EFFECT"
-    if regressions:
-        return "METADATA_REGRESSION"
-    if recoveries:
-        return "METADATA_CONTRIBUTES"
-    return "METADATA_NO_MEASURABLE_EFFECT"
+        return f"{prefix}_CONTRIBUTES"
+    return f"{prefix}_NO_MEASURABLE_EFFECT"
 
 
 def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
     """Aggregate factorial evidence with protected-scale regression dominance."""
     population = _population_integrity(rows)
+    inventory = expected_family_inventory()
     comparisons = {
         f"{left}_to_{right}": _pairwise_counts(rows, left, right)
         for left, right in (("P", "R"), ("P", "S"), ("R", "RS"), ("S", "RS"))
@@ -639,12 +720,17 @@ def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
     protected_regressions = sum(
         bucket["left_pass_right_fail"]
         for comparison in (r_to_rs, p_to_rs)
-        for path, bucket in comparison.items()
+        for path, bucket in comparison["leaves"].items()
         if _family(path) in protected_families
+    )
+    protected_regressions += sum(
+        comparison["unrequested_extras"]["right_new_by_family"].get(family, 0)
+        for comparison in (r_to_rs, p_to_rs)
+        for family in protected_families
     )
     target_recoveries = sum(
         bucket["left_fail_right_pass"]
-        for path, bucket in p_to_rs.items()
+        for path, bucket in p_to_rs["leaves"].items()
         if _family(path) in {"raster_profile", "sample_axis"}
     )
     rs_values = [
@@ -652,12 +738,14 @@ def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
         for row in rows
         if isinstance(row.get("arms"), Mapping) and isinstance(row["arms"].get("RS"), Mapping)
     ]
-    rs_target_statuses = [
-        status
-        for value in rs_values
-        for path, status in value.get("leaf_statuses", {}).items()
-        if _family(str(path)) in {"raster_profile", "sample_axis"}
-    ]
+    rs_target_statuses: list[str] = []
+    for row in rows:
+        arms = row.get("arms", {})
+        rs_value = arms.get("RS", {}) if isinstance(arms, Mapping) else {}
+        statuses = rs_value.get("leaf_statuses", {}) if isinstance(rs_value, Mapping) else {}
+        for path in inventory.get(str(row.get("case_id")), ()):
+            if _family(path) in {"raster_profile", "sample_axis"}:
+                rs_target_statuses.append(statuses.get(path, "MISSING"))
     rs_target_complete = bool(rs_target_statuses) and all(
         status == "PASS" for status in rs_target_statuses
     )
@@ -667,7 +755,9 @@ def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
         for path, status in value.get("leaf_statuses", {}).items()
         if _family(str(path)) in {"track_scale", "binding_scale", "raster_profile", "sample_axis"}
     )
-    if not population["complete"]:
+    sufficiency = _sufficiency_summary(rows)
+    rs_sufficient = sufficiency["arms"]["RS"]["sufficient"] == len(rows)
+    if not population["complete"] or not rs_sufficient:
         decision = "INCONCLUSIVE_INPUT_BOUNDARY"
     elif protected_regressions:
         decision = "FUTURE_TYPED_INPUT_REGRESSION"
@@ -678,10 +768,15 @@ def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
     return {
         "experiment_version": EXPERIMENT_VERSION,
         "population_integrity": population,
+        "input_sufficiency": sufficiency,
         "arms": {arm: _variant_counts(rows, arm) for arm in ARM_ORDER},
         "comparisons": comparisons,
-        "request_contribution": _factor_classification(comparisons["P_to_R"]),
-        "metadata_contribution": _classify_metadata(comparisons["P_to_S"]),
+        "request_contribution": _factor_classification(
+            comparisons["P_to_R"], comparisons["S_to_RS"], prefix="REQUEST"
+        ),
+        "metadata_contribution": _factor_classification(
+            comparisons["P_to_S"], comparisons["R_to_RS"], prefix="METADATA"
+        ),
         "protected_scale_regressions": protected_regressions,
         "target_recoveries": target_recoveries,
         "rs_target_complete": rs_target_complete,

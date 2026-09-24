@@ -79,7 +79,12 @@ The unchanged corrected evaluator reports `track_scale`, `binding_scale`,
 `raster_profile`, and `sample_axis` leaves with the frozen `PASS`, `MISSING`,
 `WRONG_VALUE`, and `UNREQUESTED_EXTRA` statuses. Pairwise accounting reports
 `P->R`, `P->S`, `R->RS`, and `S->RS`. Protected scale regressions dominate the
-future-contract decision.
+future-contract decision. Input insufficiency in P/R/S is retained as factorial
+evidence rather than invalidating the population; RS must be sufficient for all
+15 rows before the future contract can validate. Request contribution combines
+P->R and S->RS, while metadata contribution combines P->S and R->RS. Expected
+leaves use the frozen case inventory, and right-only `UNREQUESTED_EXTRA` leaves
+count as regressions, including protected scale extras.
 
 Allowed future decisions are `FUTURE_TYPED_INPUT_VALIDATED`,
 `FUTURE_TYPED_INPUT_PARTIAL`, `FUTURE_TYPED_INPUT_REGRESSION`, and

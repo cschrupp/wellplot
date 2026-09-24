@@ -31,6 +31,7 @@ from scripts.cm57_input_boundary_experiment import (
     build_evidence_row,
     build_pre_live_metadata,
     ensure_empty_evidence_path,
+    expected_family_inventory,
     harness_source_sha256,
     select_production_semantic_metadata,
     semantic_metadata_projection_sha256,
@@ -72,23 +73,34 @@ def _population(
     r: dict[str, str] | None = None,
     s: dict[str, str] | None = None,
     rs: dict[str, str] | None = None,
+    sufficient: dict[str, bool] | None = None,
 ) -> list[dict[str, object]]:
     """Build a complete synthetic five-case by three-attempt population."""
     statuses = {"P": p, "R": r or p, "S": s or p, "RS": rs or p}
+    sufficient = sufficient or dict.fromkeys(ARM_ORDER, True)
+    inventory = expected_family_inventory()
     rows: list[dict[str, object]] = []
     for case_id in REPRESENTATION_CASES:
         for attempt_index in range(ATTEMPTS):
+            case_statuses = {
+                arm: {path: statuses[arm].get(path, "PASS") for path in inventory[case_id]}
+                for arm in ARM_ORDER
+            }
             rows.append(
                 {
                     "case_id": case_id,
                     "attempt_index": attempt_index,
-                    "input_sufficiency": {"all_arms_sufficient": True},
+                    "input_sufficiency": {
+                        arm: {"sufficient": sufficient[arm]} for arm in ARM_ORDER
+                    },
                     "variant_flags": {
                         "request_only_diff": True,
                         "semantic_only_diff": True,
                         "future_contract_only_diff": True,
+                        "rs_without_request_equals_s": True,
+                        "rs_without_semantic_equals_r": True,
                     },
-                    "arms": {arm: _arm(statuses[arm]) for arm in ARM_ORDER},
+                    "arms": {arm: _arm(case_statuses[arm]) for arm in ARM_ORDER},
                 }
             )
     return rows
@@ -325,3 +337,156 @@ def test_request_and_metadata_contribution_classifications_are_separate() -> Non
     )
     assert result["request_contribution"] == "REQUEST_CONTRIBUTES"
     assert result["metadata_contribution"] == "METADATA_CONTRIBUTES"
+
+
+def test_arm_insufficiency_is_diagnostic_but_rs_sufficiency_validates_future_contract() -> None:
+    """P/S insufficiency may remain evidence when R/RS make the contract sufficient."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_FAIL},
+            r={**_SCALE_PASS, **_TARGET_PASS},
+            s={**_SCALE_PASS, **_TARGET_FAIL},
+            rs={**_SCALE_PASS, **_TARGET_PASS},
+            sufficient={"P": False, "R": True, "S": False, "RS": True},
+        )
+    )
+
+    assert result["population_integrity"]["complete"] is True
+    assert result["input_sufficiency"]["arms"]["P"]["ratio"] == "0/15"
+    assert result["input_sufficiency"]["arms"]["RS"]["ratio"] == "15/15"
+    assert result["input_sufficiency"]["transitions"]["P_R_insufficient_to_sufficient"] == 15
+    assert result["decision"] == "FUTURE_TYPED_INPUT_VALIDATED"
+
+
+def test_rs_insufficiency_is_inconclusive_even_with_valid_outputs() -> None:
+    """The future contract cannot validate when any RS input is insufficient."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_FAIL},
+            rs={**_SCALE_PASS, **_TARGET_PASS},
+            sufficient={"P": True, "R": True, "S": True, "RS": False},
+        )
+    )
+
+    assert result["population_integrity"]["complete"] is True
+    assert result["decision"] == "INCONCLUSIVE_INPUT_BOUNDARY"
+
+
+def test_provider_eligibility_failure_is_inconclusive() -> None:
+    """A non-eligible arm cannot support a conclusive semantic comparison."""
+    rows = _population(
+        p={**_SCALE_PASS, **_TARGET_PASS},
+        r={**_SCALE_PASS, **_TARGET_PASS},
+        s={**_SCALE_PASS, **_TARGET_PASS},
+        rs={**_SCALE_PASS, **_TARGET_PASS},
+    )
+    rows[0]["arms"]["S"]["context_valid"] = False
+
+    result = aggregate_rows(rows)
+
+    assert result["decision"] == "INCONCLUSIVE_INPUT_BOUNDARY"
+    assert "S_not_evaluation_eligible" in result["population_integrity"]["reasons"]
+
+
+def test_request_factor_uses_the_second_background_contrast() -> None:
+    """P to R can be neutral while S to RS shows the request effect."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_FAIL},
+            r={**_SCALE_PASS, **_TARGET_FAIL},
+            s={**_SCALE_PASS, **_TARGET_FAIL},
+            rs={**_SCALE_PASS, **_TARGET_PASS},
+        )
+    )
+
+    assert result["request_contribution"] == "REQUEST_CONTRIBUTES"
+
+
+def test_request_regression_uses_the_second_background_contrast() -> None:
+    """A request regression visible only with metadata is not hidden by P to R."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_PASS},
+            r={**_SCALE_PASS, **_TARGET_PASS},
+            s={**_SCALE_PASS, **_TARGET_PASS},
+            rs={**_SCALE_PASS, **_TARGET_FAIL},
+        )
+    )
+
+    assert result["request_contribution"] == "REQUEST_REGRESSION"
+
+
+def test_metadata_factor_uses_the_second_background_contrast() -> None:
+    """R to RS contributes even when P to S is neutral."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_FAIL},
+            r={**_SCALE_PASS, **_TARGET_FAIL},
+            s={**_SCALE_PASS, **_TARGET_FAIL},
+            rs={**_SCALE_PASS, **_TARGET_PASS},
+        )
+    )
+
+    assert result["metadata_contribution"] == "METADATA_CONTRIBUTES"
+
+
+def test_metadata_regression_uses_the_second_background_contrast() -> None:
+    """R to RS regression is classified even when P to S is neutral."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_PASS},
+            r={**_SCALE_PASS, **_TARGET_PASS},
+            s={**_SCALE_PASS, **_TARGET_PASS},
+            rs={**_SCALE_PASS, **_TARGET_FAIL},
+        )
+    )
+
+    assert result["metadata_contribution"] == "METADATA_REGRESSION"
+
+
+def test_unrequested_extra_is_counted_as_regression_and_extra_removal_as_recovery() -> None:
+    """Scientific extras participate in pairwise factor accounting."""
+    extra_path = "tracks[1].x_scale.minimum"
+    new_extra_rows = _population(
+        p={**_SCALE_PASS, **_TARGET_PASS},
+        r={**_SCALE_PASS, **_TARGET_PASS},
+        s={**_SCALE_PASS, **_TARGET_PASS},
+        rs={**_SCALE_PASS, **_TARGET_PASS},
+    )
+    for row in new_extra_rows:
+        row["arms"]["RS"]["leaf_statuses"][extra_path] = "UNREQUESTED_EXTRA"
+    new_extra_result = aggregate_rows(new_extra_rows)
+    extras = new_extra_result["comparisons"]["R_to_RS"]["unrequested_extras"]
+    assert extras["right_new"] == 15
+    assert new_extra_result["protected_scale_regressions"] == 30
+    assert new_extra_result["decision"] == "FUTURE_TYPED_INPUT_REGRESSION"
+
+    removed_extra_rows = _population(
+        p={**_SCALE_PASS, **_TARGET_PASS},
+        r={**_SCALE_PASS, **_TARGET_PASS},
+        s={**_SCALE_PASS, **_TARGET_PASS},
+        rs={**_SCALE_PASS, **_TARGET_PASS},
+    )
+    for row in removed_extra_rows:
+        row["arms"]["R"]["leaf_statuses"][extra_path] = "UNREQUESTED_EXTRA"
+    removed_extra_result = aggregate_rows(removed_extra_rows)
+    removed = removed_extra_result["comparisons"]["R_to_RS"]["unrequested_extras"]
+    assert removed["left_removed"] == 15
+    assert removed_extra_result["metadata_contribution"] == "METADATA_CONTRIBUTES"
+
+
+def test_missing_expected_leaf_is_retained_in_pairwise_accounting() -> None:
+    """Expected inventory paths are compared as MISSING rather than dropped."""
+    rows = _population(
+        p={**_SCALE_PASS, **_TARGET_PASS},
+        r={**_SCALE_PASS, **_TARGET_PASS},
+        s={**_SCALE_PASS, **_TARGET_PASS},
+        rs={**_SCALE_PASS, **_TARGET_PASS},
+    )
+    missing_path = "tracks[0].bindings[0].profile"
+    for row in rows:
+        row["arms"]["S"]["leaf_statuses"].pop(missing_path, None)
+
+    comparison = aggregate_rows(rows)["comparisons"]["P_to_S"]
+
+    assert comparison["leaves"][missing_path]["left_pass_right_fail"] == 9
