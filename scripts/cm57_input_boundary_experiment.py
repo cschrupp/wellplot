@@ -763,8 +763,10 @@ def aggregate_rows(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
         decision = "FUTURE_TYPED_INPUT_REGRESSION"
     elif rs_target_complete and rs_extras == 0:
         decision = "FUTURE_TYPED_INPUT_VALIDATED"
-    else:
+    elif target_recoveries > 0:
         decision = "FUTURE_TYPED_INPUT_PARTIAL"
+    else:
+        decision = "FUTURE_TYPED_INPUT_NO_BENEFIT"
     return {
         "experiment_version": EXPERIMENT_VERSION,
         "population_integrity": population,

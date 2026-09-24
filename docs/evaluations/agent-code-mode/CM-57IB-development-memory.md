@@ -88,7 +88,10 @@ count as regressions, including protected scale extras.
 
 Allowed future decisions are `FUTURE_TYPED_INPUT_VALIDATED`,
 `FUTURE_TYPED_INPUT_PARTIAL`, `FUTURE_TYPED_INPUT_REGRESSION`, and
-`INCONCLUSIVE_INPUT_BOUNDARY`. No live conclusion is recorded here.
+`FUTURE_TYPED_INPUT_NO_BENEFIT`, plus `INCONCLUSIVE_INPUT_BOUNDARY` for
+invalid populations or insufficient RS input. `FUTURE_TYPED_INPUT_NO_BENEFIT`
+is a conclusive complete result with no target recovery and no protected-scale
+regression. No live conclusion is recorded here.
 
 ## Hard Stop
 

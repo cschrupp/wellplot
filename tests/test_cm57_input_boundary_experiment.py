@@ -325,6 +325,21 @@ def test_partial_and_incomplete_future_contract_decisions() -> None:
     assert aggregate_rows([])["decision"] == "INCONCLUSIVE_INPUT_BOUNDARY"
 
 
+def test_zero_target_recovery_is_a_conclusive_no_benefit_result() -> None:
+    """Complete, eligible zero-recovery evidence is not mislabeled as partial."""
+    result = aggregate_rows(
+        _population(
+            p={**_SCALE_PASS, **_TARGET_FAIL},
+            r={**_SCALE_PASS, **_TARGET_FAIL},
+            s={**_SCALE_PASS, **_TARGET_FAIL},
+            rs={**_SCALE_PASS, **_TARGET_FAIL},
+        )
+    )
+
+    assert result["target_recoveries"] == 0
+    assert result["decision"] == "FUTURE_TYPED_INPUT_NO_BENEFIT"
+
+
 def test_request_and_metadata_contribution_classifications_are_separate() -> None:
     """Factor classifications use their own direct comparisons."""
     result = aggregate_rows(
