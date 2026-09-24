@@ -100,3 +100,39 @@ the typed worker, prompts under production code, planner/enricher behavior,
 graph/routing, identity, or CM-57B. It does not run Qwen, a smoke request, or a
 partial factorial. Separate authorization is required for the future 15-row /
 60-worker-call live matrix.
+
+## Live Evidence
+
+The authorized live matrix completed once at checkpoint
+`d60e786f3ad10c5740bc4023e5c725ea2c3e0748` using the frozen local Qwen
+configuration. Raw evidence is retained outside the repository at
+`/tmp/cm57ib-live-qwen.jsonl`; its SHA-256 is
+`23aeee3a2c6fa2951710139e46e13f7be6aee0b136659438066c56e9155a983b`.
+
+The population is complete: 15 rows, 15 planner calls, and 60 worker calls,
+with no provider failures. Input sufficiency was P `12/15`, R `15/15`, S
+`12/15`, and RS `15/15`; the P-to-R and S-to-RS insufficiency-to-sufficiency
+transitions each occurred three times. All four arms were evaluation-eligible
+for all 15 rows. Full semantic acceptance was P `7/15`, R `6/15`, S `10/15`,
+and RS `15/15`.
+
+Scientific family counts were: track scale P/R/S/RS `36/36`; binding scale
+P/R/S/RS `24/24`; raster profile P `3/9`, R `0/9`, S `9/9`, RS `9/9`; and
+sample axis P `9/12`, R `3/18`, S `12/12`, RS `12/12`. The four raw comparisons
+remain in `CM-57IB-live-summary.json`. Request contribution was classified as
+`REQUEST_REGRESSION` because the request contrasts introduced right-only
+unrequested sample-axis leaves in `P->R`; metadata contribution was
+`METADATA_CONTRIBUTES`. Protected scale regressions were `0`, target recoveries
+were `9`, RS target semantics were complete, and RS scientific extras were
+`0`.
+
+The frozen final decision is `FUTURE_TYPED_INPUT_VALIDATED`. Per-case semantic
+acceptance was stable across all three attempts for every case/arm except
+`reverse_scale`, where P and S were `1/3` and non-stable; R and RS were `3/3`.
+The other cases were stable: `scalar_linear` P/R/S/RS `3/3`,
+`generic_raster` `0/0/3/3`, `waveform` `3/0/3/3`, and `vdl_sample_axis`
+`0/0/3/3`.
+
+The live summary is evidence-only. Production changes remain `0`, the harness
+was not changed after authorization, historical artifacts were not modified,
+and CM-57B remains blocked pending independent live-evidence review.

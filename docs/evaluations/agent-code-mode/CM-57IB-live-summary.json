@@ -1,0 +1,1083 @@
+{
+  "arms": {
+    "P": {
+      "evaluation_eligible": 15,
+      "families": {
+        "binding_scale": {
+          "applicable": 24,
+          "fail": 0,
+          "pass": 24
+        },
+        "raster_profile": {
+          "applicable": 9,
+          "fail": 6,
+          "pass": 3
+        },
+        "sample_axis": {
+          "applicable": 12,
+          "fail": 3,
+          "pass": 9
+        },
+        "track_scale": {
+          "applicable": 36,
+          "fail": 0,
+          "pass": 36
+        }
+      },
+      "full_semantic_acceptance": "7/15"
+    },
+    "R": {
+      "evaluation_eligible": 15,
+      "families": {
+        "binding_scale": {
+          "applicable": 24,
+          "fail": 0,
+          "pass": 24
+        },
+        "raster_profile": {
+          "applicable": 9,
+          "fail": 9,
+          "pass": 0
+        },
+        "sample_axis": {
+          "applicable": 18,
+          "fail": 15,
+          "pass": 3
+        },
+        "track_scale": {
+          "applicable": 36,
+          "fail": 0,
+          "pass": 36
+        }
+      },
+      "full_semantic_acceptance": "6/15"
+    },
+    "RS": {
+      "evaluation_eligible": 15,
+      "families": {
+        "binding_scale": {
+          "applicable": 24,
+          "fail": 0,
+          "pass": 24
+        },
+        "raster_profile": {
+          "applicable": 9,
+          "fail": 0,
+          "pass": 9
+        },
+        "sample_axis": {
+          "applicable": 12,
+          "fail": 0,
+          "pass": 12
+        },
+        "track_scale": {
+          "applicable": 36,
+          "fail": 0,
+          "pass": 36
+        }
+      },
+      "full_semantic_acceptance": "15/15"
+    },
+    "S": {
+      "evaluation_eligible": 15,
+      "families": {
+        "binding_scale": {
+          "applicable": 24,
+          "fail": 0,
+          "pass": 24
+        },
+        "raster_profile": {
+          "applicable": 9,
+          "fail": 0,
+          "pass": 9
+        },
+        "sample_axis": {
+          "applicable": 12,
+          "fail": 0,
+          "pass": 12
+        },
+        "track_scale": {
+          "applicable": 36,
+          "fail": 0,
+          "pass": 36
+        }
+      },
+      "full_semantic_acceptance": "10/15"
+    }
+  },
+  "authorized_checkpoint": "d60e786f3ad10c5740bc4023e5c725ea2c3e0748",
+  "case_summary": {
+    "generic_raster": {
+      "arms": {
+        "P": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        },
+        "R": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        },
+        "RS": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "S": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        }
+      },
+      "attempts": 3
+    },
+    "reverse_scale": {
+      "arms": {
+        "P": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "1/3",
+          "semantic_results": [
+            false,
+            true,
+            false
+          ],
+          "stable_semantic_result": false
+        },
+        "R": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "RS": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "S": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "1/3",
+          "semantic_results": [
+            false,
+            true,
+            false
+          ],
+          "stable_semantic_result": false
+        }
+      },
+      "attempts": 3
+    },
+    "scalar_linear": {
+      "arms": {
+        "P": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "R": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "RS": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "S": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "raster_profile": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 0,
+              "pass": 0
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        }
+      },
+      "attempts": 3
+    },
+    "vdl_sample_axis": {
+      "arms": {
+        "P": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 12,
+              "pass": 9
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        },
+        "R": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 12,
+              "pass": 3
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        },
+        "RS": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "S": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 12,
+              "pass": 12
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        }
+      },
+      "attempts": 3
+    },
+    "waveform": {
+      "arms": {
+        "P": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "R": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 0
+            },
+            "sample_axis": {
+              "applicable": 6,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "0/3",
+          "semantic_results": [
+            false,
+            false,
+            false
+          ],
+          "stable_semantic_result": true
+        },
+        "RS": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        },
+        "S": {
+          "attempts": 3,
+          "families": {
+            "binding_scale": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "raster_profile": {
+              "applicable": 3,
+              "pass": 3
+            },
+            "sample_axis": {
+              "applicable": 0,
+              "pass": 0
+            },
+            "track_scale": {
+              "applicable": 12,
+              "pass": 12
+            }
+          },
+          "semantic_acceptance": "3/3",
+          "semantic_results": [
+            true,
+            true,
+            true
+          ],
+          "stable_semantic_result": true
+        }
+      },
+      "attempts": 3
+    }
+  },
+  "comparisons": {
+    "P_to_R": {
+      "leaves": {
+        "tracks[0].bindings[0].profile": {
+          "both_fail": 6,
+          "both_pass": 0,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 3
+        },
+        "tracks[0].bindings[0].sample_axis.source_origin": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 3
+        },
+        "tracks[0].bindings[0].sample_axis.source_step": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 3
+        },
+        "tracks[0].bindings[0].sample_axis.tick_count": {
+          "both_fail": 3,
+          "both_pass": 0,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.unit": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.reverse": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        }
+      },
+      "unrequested_extras": {
+        "both": 0,
+        "both_by_family": {},
+        "left_removed": 0,
+        "left_removed_by_family": {},
+        "right_new": 6,
+        "right_new_by_family": {
+          "sample_axis": 6
+        }
+      }
+    },
+    "P_to_S": {
+      "leaves": {
+        "tracks[0].bindings[0].profile": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 6,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_origin": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_step": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.tick_count": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 3,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.unit": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.reverse": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        }
+      },
+      "unrequested_extras": {
+        "both": 0,
+        "both_by_family": {},
+        "left_removed": 0,
+        "left_removed_by_family": {},
+        "right_new": 0,
+        "right_new_by_family": {}
+      }
+    },
+    "R_to_RS": {
+      "leaves": {
+        "tracks[0].bindings[0].profile": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 9,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_origin": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 3,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_step": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 3,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.tick_count": {
+          "both_fail": 0,
+          "both_pass": 0,
+          "left_fail_right_pass": 3,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.unit": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.reverse": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        }
+      },
+      "unrequested_extras": {
+        "both": 0,
+        "both_by_family": {},
+        "left_removed": 6,
+        "left_removed_by_family": {
+          "sample_axis": 6
+        },
+        "right_new": 0,
+        "right_new_by_family": {}
+      }
+    },
+    "S_to_RS": {
+      "leaves": {
+        "tracks[0].bindings[0].profile": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_origin": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.source_step": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.tick_count": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].sample_axis.unit": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 6,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].bindings[0].scale.reverse": {
+          "both_fail": 0,
+          "both_pass": 3,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.maximum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        },
+        "tracks[0].x_scale.minimum": {
+          "both_fail": 0,
+          "both_pass": 9,
+          "left_fail_right_pass": 0,
+          "left_pass_right_fail": 0
+        }
+      },
+      "unrequested_extras": {
+        "both": 0,
+        "both_by_family": {},
+        "left_removed": 0,
+        "left_removed_by_family": {},
+        "right_new": 0,
+        "right_new_by_family": {}
+      }
+    }
+  },
+  "execution_controls": {
+    "attempts_per_case": 3,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "timeout_seconds": 900.0,
+    "worker_temperature": 0.0
+  },
+  "experiment_version": "CM-57IB",
+  "final_decision": "FUTURE_TYPED_INPUT_VALIDATED",
+  "frozen_artifacts": {
+    "case_corpus_sha256": "4ebae0b37defbdf38bcb743f3332ed930b5d260bffc283473405cafdb4ea327e",
+    "evaluation_contract_sha256": "3e6c3c36d967acb60e6bb7cda13db95d76ed7a754eb92c4bcf5688d76b0da4da",
+    "evaluator_source_sha256": "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49",
+    "evaluator_version": "cm56r8r.corrected-evaluator.v1",
+    "production_metadata_projection_sha256": "67aa2d6f579343e60f9261eb654fd62bde21605b1c8c68f080b5b74ff01c3f46",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
+  },
+  "harness_source_sha256": "b59e9f681c74367d18f21ec79b76dc75d287e4c0da54a545949fe3c36eff4021",
+  "input_sufficiency": {
+    "arms": {
+      "P": {
+        "ratio": "12/15",
+        "sufficient": 12,
+        "total": 15
+      },
+      "R": {
+        "ratio": "15/15",
+        "sufficient": 15,
+        "total": 15
+      },
+      "RS": {
+        "ratio": "15/15",
+        "sufficient": 15,
+        "total": 15
+      },
+      "S": {
+        "ratio": "12/15",
+        "sufficient": 12,
+        "total": 15
+      }
+    },
+    "transitions": {
+      "P_R_insufficient_to_sufficient": 3,
+      "P_R_sufficient_to_insufficient": 0,
+      "P_S_insufficient_to_sufficient": 0,
+      "P_S_sufficient_to_insufficient": 0,
+      "R_RS_insufficient_to_sufficient": 0,
+      "R_RS_sufficient_to_insufficient": 0,
+      "S_RS_insufficient_to_sufficient": 3,
+      "S_RS_sufficient_to_insufficient": 0
+    }
+  },
+  "metadata_contribution": "METADATA_CONTRIBUTES",
+  "population": {
+    "attempts_per_case": 3,
+    "cases": [
+      "scalar_linear",
+      "reverse_scale",
+      "generic_raster",
+      "waveform",
+      "vdl_sample_axis"
+    ],
+    "expected_rows": 15
+  },
+  "population_integrity": {
+    "actual_rows": 15,
+    "complete": true,
+    "expected_cases": [
+      "scalar_linear",
+      "reverse_scale",
+      "generic_raster",
+      "waveform",
+      "vdl_sample_axis"
+    ],
+    "expected_rows": 15,
+    "reasons": []
+  },
+  "protected_scale_regressions": 0,
+  "provider_calls": {
+    "failures": 0,
+    "planner": 15,
+    "total": 75,
+    "worker": 60
+  },
+  "raw_evidence_path": "/tmp/cm57ib-live-qwen.jsonl",
+  "raw_evidence_sha256": "23aeee3a2c6fa2951710139e46e13f7be6aee0b136659438066c56e9155a983b",
+  "request_contribution": "REQUEST_REGRESSION",
+  "row_count": 15,
+  "rs_target_complete": true,
+  "rs_unrequested_scientific_extras": 0,
+  "target_recoveries": 9
+}
