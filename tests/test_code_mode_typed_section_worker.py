@@ -28,8 +28,10 @@ from wellplot.agent.code_mode.typed_section_worker import (
     TypedSectionWorkerError,
     TypedSectionWorkerErrorCode,
     build_typed_section_input,
+    build_typed_section_provider_input,
     response_schema_sha256,
     serialize_typed_section_input,
+    serialize_typed_section_provider_input,
 )
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
@@ -187,15 +189,17 @@ def test_compile_uses_one_structured_call_and_returns_host_intent() -> None:
             section_context=_context(),
             document=_document(),
             section_id_hint="cm56-section",
+            authoritative_request="Create a Gamma Ray section from /secret/well/main.las.",
             timeout_seconds=30,
         )
     )
     assert len(backend.calls) == 1
     request, response_model = backend.calls[0]
     assert response_model is SectionSemanticDraft
-    assert request.user_prompt == serialize_typed_section_input(
-        build_typed_section_input(
+    assert request.user_prompt == serialize_typed_section_provider_input(
+        build_typed_section_provider_input(
             _task(),
+            authoritative_request="Create a Gamma Ray section from /secret/well/main.las.",
             section_context=_context(),
             registry=create_builtin_registry(),
         )
@@ -221,6 +225,7 @@ def test_revision_is_rejected_before_provider_call() -> None:
                 section_context=context,
                 document=_document(),
                 section_id_hint="cm56-section",
+                authoritative_request="Create a Gamma Ray section from /secret/well/main.las.",
                 timeout_seconds=30,
                 mode="revise",
             )
@@ -242,6 +247,7 @@ def test_unsupported_capability_is_rejected_before_provider_call() -> None:
                 section_context=_context(),
                 document=_document(),
                 section_id_hint="cm56-section",
+                authoritative_request="Create a Gamma Ray section from /secret/well/main.las.",
                 timeout_seconds=30,
             )
         )
@@ -262,6 +268,7 @@ def test_provider_error_is_not_retried_or_normalized() -> None:
                 section_context=_context(),
                 document=_document(),
                 section_id_hint="cm56-section",
+                authoritative_request="Create a Gamma Ray section from /secret/well/main.las.",
                 timeout_seconds=30,
             )
         )

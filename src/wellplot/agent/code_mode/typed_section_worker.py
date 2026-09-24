@@ -22,7 +22,18 @@ from .section_semantics import SectionSemanticDraft, validate_section_semantics
 from .semantic_section_compiler import compile_section_semantics
 
 TYPED_SECTION_INPUT_VERSION = "cm56.typed-section-input.v1"
+TYPED_SECTION_PROVIDER_INPUT_VERSION = "cm57.typed-section-provider-input.v1"
 RESPONSE_SCHEMA_SHA256 = "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
+TYPED_SECTION_SEMANTIC_METADATA_MAX_BYTES = 8192
+TYPED_SECTION_SEMANTIC_TARGET_PATHS = frozenset(
+    {
+        "binding.profile",
+        "binding.sample_axis.unit",
+        "binding.sample_axis.source_origin",
+        "binding.sample_axis.source_step",
+        "binding.sample_axis.tick_count",
+    }
+)
 TYPED_SECTION_CAPABILITIES = frozenset(
     {
         "section.log_plot",
@@ -53,6 +64,22 @@ Semantic IDs are local descriptive identifiers only. Do not generate canonical
 Wellplot IDs, filesystem paths, SDK calls, programs, renderer settings, styles,
 widths, grids, or unsupported fields. Do not invent semantics that were not
 requested."""
+
+REQUEST_INSTRUCTION = (
+    "\n\nInput authority:\n"
+    "The authoritative_request field contains the user's original request and is "
+    "the authoritative source of requested semantics. The section task provides "
+    "scoped decomposition and routing. The bounded source/channel context provides "
+    "available inputs. Preserve explicit semantics requested by the authoritative "
+    "request, but do not invent semantics absent from it."
+)
+SEMANTIC_INSTRUCTION = (
+    "\n\nCapability semantic metadata:\n"
+    "The semantic_contracts field contains capability-specific WellPlot meanings "
+    "that require explicit clarification. Use those mappings where applicable. "
+    "For semantics not documented there, interpret the section task and normal "
+    "SectionSemanticDraft schema without adding extra semantics."
+)
 
 _POSIX_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])/(?:[^\s\"'<>]+/)+[^\s\"'<>]+")
 _WINDOWS_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/][^\s\"'<>]+")
@@ -110,6 +137,37 @@ class TypedSectionWorkerInput(_TypedInputModel):
     sources: tuple[TypedSectionSourceInput, ...]
 
 
+class TypedSectionSemanticTargetInput(_TypedInputModel):
+    """One provider-safe semantic target and its interpretation cue."""
+
+    path: str = Field(min_length=1)
+    value_cue: str = Field(min_length=1)
+
+
+class TypedSectionSemanticMappingInput(_TypedInputModel):
+    """One provider-safe capability semantic mapping."""
+
+    concept: str = Field(min_length=1)
+    language_patterns: tuple[str, ...] = Field(min_length=1)
+    targets: tuple[TypedSectionSemanticTargetInput, ...] = Field(min_length=1)
+
+
+class TypedSectionSemanticContractInput(_TypedInputModel):
+    """One provider-safe semantic contract projected from a capability spec."""
+
+    capability_id: str = Field(min_length=1)
+    purpose: str = Field(min_length=1)
+    mappings: tuple[TypedSectionSemanticMappingInput, ...] = ()
+    distinctions: tuple[str, ...] = ()
+
+
+class TypedSectionProviderInput(TypedSectionWorkerInput):
+    """Validated production provider payload extending the historical base input."""
+
+    authoritative_request: str = Field(min_length=1)
+    semantic_contracts: tuple[TypedSectionSemanticContractInput, ...] | None = None
+
+
 class TypedSectionRepresentabilityError(ValueError):
     """A selected capability cannot be expressed by the initial typed contract."""
 
@@ -124,6 +182,7 @@ class TypedSectionWorkerErrorCode(StrEnum):
     """Stable preflight failures owned by the typed worker boundary."""
 
     REVISION_UNSUPPORTED = "revision_unsupported"
+    INPUT_CONTRACT_INVALID = "input_contract_invalid"
 
 
 class TypedSectionWorkerError(ValueError):
@@ -162,6 +221,7 @@ class TypedSectionCompiler:
         section_context: ResolvedSectionContext,
         document: AuthoringDocumentSpec,
         section_id_hint: str,
+        authoritative_request: str,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -175,16 +235,20 @@ class TypedSectionCompiler:
             )
         _validate_schema_digest()
         _validate_representability(task, self.registry)
-        worker_input = build_typed_section_input(
+        worker_input = build_typed_section_provider_input(
             task,
+            authoritative_request=authoritative_request,
             section_context=section_context,
             registry=self.registry,
         )
-        serialized = serialize_typed_section_input(worker_input)
+        serialized = serialize_typed_section_provider_input(worker_input)
         schema_digest = response_schema_sha256()
+        system_prompt = build_typed_section_system_prompt(
+            has_semantic_contracts=bool(worker_input.semantic_contracts)
+        )
         generated = await self.backend.generate_structured(
             StructuredGenerationRequest(
-                system_prompt=TYPED_SECTION_SYSTEM_PROMPT,
+                system_prompt=system_prompt,
                 user_prompt=serialized,
                 timeout_seconds=timeout_seconds,
                 temperature=temperature,
@@ -206,7 +270,7 @@ class TypedSectionCompiler:
             metrics=generated.metrics,
             provider_input_sha256=_sha256(serialized),
             provider_input_chars=len(serialized),
-            system_prompt_sha256=_sha256(TYPED_SECTION_SYSTEM_PROMPT),
+            system_prompt_sha256=_sha256(system_prompt),
             response_schema_sha256=schema_digest,
         )
 
@@ -270,6 +334,103 @@ def serialize_typed_section_input(value: TypedSectionWorkerInput) -> str:
     )
 
 
+def build_typed_section_provider_input(
+    task: SectionTask,
+    *,
+    authoritative_request: str,
+    section_context: ResolvedSectionContext,
+    registry: CapabilityRegistry,
+) -> TypedSectionProviderInput:
+    """Build the validated RS provider contract without changing the base input."""
+    base = build_typed_section_input(
+        task,
+        section_context=section_context,
+        registry=registry,
+    )
+    if not isinstance(authoritative_request, str) or not authoritative_request.strip():
+        raise TypedSectionWorkerError(
+            TypedSectionWorkerErrorCode.INPUT_CONTRACT_INVALID,
+            "The authoritative request must be a non-empty string.",
+        )
+    safe_request = _safe_text(authoritative_request)
+    contracts = _project_semantic_metadata(_selected_specs(task, registry))
+    return TypedSectionProviderInput(
+        section_task=base.section_task,
+        capabilities=base.capabilities,
+        sources=base.sources,
+        authoritative_request=safe_request,
+        semantic_contracts=contracts or None,
+    )
+
+
+def serialize_typed_section_provider_input(value: TypedSectionProviderInput) -> str:
+    """Serialize the provider contract, omitting only absent semantic contracts."""
+    payload = value.model_dump(mode="json")
+    if value.semantic_contracts is None:
+        payload.pop("semantic_contracts", None)
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def build_typed_section_system_prompt(*, has_semantic_contracts: bool) -> str:
+    """Compose the frozen production prompt from applicable provider factors."""
+    prompt = TYPED_SECTION_SYSTEM_PROMPT + REQUEST_INSTRUCTION
+    if has_semantic_contracts:
+        prompt += SEMANTIC_INSTRUCTION
+    return prompt
+
+
+def _project_semantic_metadata(
+    specs: tuple[CapabilitySpec, ...],
+) -> tuple[TypedSectionSemanticContractInput, ...]:
+    """Project selected capability metadata into the typed worker vocabulary."""
+    contracts: list[TypedSectionSemanticContractInput] = []
+    seen: set[str] = set()
+    for spec in specs:
+        if spec.capability_id in seen:
+            continue
+        seen.add(spec.capability_id)
+        metadata = spec.semantic_metadata
+        if metadata is None:
+            continue
+        mappings: list[TypedSectionSemanticMappingInput] = []
+        for mapping in metadata.mappings:
+            targets: list[TypedSectionSemanticTargetInput] = []
+            for path, value_cue in mapping.targets:
+                if path not in TYPED_SECTION_SEMANTIC_TARGET_PATHS:
+                    raise TypedSectionWorkerError(
+                        TypedSectionWorkerErrorCode.INPUT_CONTRACT_INVALID,
+                        "Capability semantic metadata targets an unsupported typed field.",
+                    )
+                targets.append(TypedSectionSemanticTargetInput(path=path, value_cue=value_cue))
+            mappings.append(
+                TypedSectionSemanticMappingInput(
+                    concept=mapping.concept,
+                    language_patterns=mapping.language_patterns,
+                    targets=tuple(targets),
+                )
+            )
+        contracts.append(
+            TypedSectionSemanticContractInput(
+                capability_id=spec.capability_id,
+                purpose=metadata.purpose,
+                mappings=tuple(mappings),
+                distinctions=metadata.distinctions,
+            )
+        )
+    serialized = json.dumps(
+        [contract.model_dump(mode="json") for contract in contracts],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    if len(serialized.encode("utf-8")) > TYPED_SECTION_SEMANTIC_METADATA_MAX_BYTES:
+        raise TypedSectionWorkerError(
+            TypedSectionWorkerErrorCode.INPUT_CONTRACT_INVALID,
+            "Capability semantic metadata exceeds the typed worker size limit.",
+        )
+    return tuple(contracts)
+
+
 def response_schema_sha256() -> str:
     """Return the canonical digest of the static production response schema."""
     schema = SectionSemanticDraft.model_json_schema()
@@ -330,18 +491,28 @@ __all__ = [
     "RESPONSE_SCHEMA_SHA256",
     "TYPED_SECTION_CAPABILITIES",
     "TYPED_SECTION_INPUT_VERSION",
+    "TYPED_SECTION_PROVIDER_INPUT_VERSION",
+    "TYPED_SECTION_SEMANTIC_METADATA_MAX_BYTES",
+    "TYPED_SECTION_SEMANTIC_TARGET_PATHS",
     "TYPED_SECTION_SYSTEM_PROMPT",
     "TypedSectionCapabilityInput",
     "TypedSectionChannelInput",
     "TypedSectionCompiler",
     "TypedSectionGenerationResult",
+    "TypedSectionProviderInput",
     "TypedSectionRepresentabilityError",
+    "TypedSectionSemanticContractInput",
+    "TypedSectionSemanticMappingInput",
+    "TypedSectionSemanticTargetInput",
     "TypedSectionSourceInput",
     "TypedSectionTaskInput",
     "TypedSectionWorkerInput",
     "TypedSectionWorkerError",
     "TypedSectionWorkerErrorCode",
     "build_typed_section_input",
+    "build_typed_section_provider_input",
+    "build_typed_section_system_prompt",
     "response_schema_sha256",
     "serialize_typed_section_input",
+    "serialize_typed_section_provider_input",
 ]
