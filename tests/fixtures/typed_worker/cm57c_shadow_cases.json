@@ -1,0 +1,634 @@
+{
+  "version": "cm57c.shadow.v1",
+  "cases": [
+    {
+      "case_id": "curve_linear_new_values",
+      "category": "generic_curve",
+      "request": "Create one log section with a normal track called Natural Gamma using the curve pack. Plot GR on that track with a linear range from -5 to 125.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "GR", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Natural Gamma",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Natural Gamma",
+              "bindings": [
+                {"channel": "GR", "scale": {"minimum": -5, "maximum": 125}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "GR"]},
+        "semantics": {"source": "request", "needles": ["GR", "-5", "125", "linear"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "curve_log_new_values",
+      "category": "generic_curve",
+      "request": "Create one section with a normal track named Deep Resistivity from the curve pack. Display RT logarithmically from 0.2 to 2000.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "RT", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Deep Resistivity",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Deep Resistivity",
+              "bindings": [
+                {"channel": "RT", "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "RT"]},
+        "semantics": {"source": "request", "needles": ["RT", "logarithmically", "0.2", "2000"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "curve_tangential_new_values",
+      "category": "generic_curve",
+      "request": "Build one normal track titled Cable Load from the curve pack. Show TENS with a tangential scale spanning 250 to 4250.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "TENS", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Cable Load",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Cable Load",
+              "bindings": [
+                {"channel": "TENS", "scale": {"kind": "tangential", "minimum": 250, "maximum": 4250}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "TENS"]},
+        "semantics": {"source": "request", "needles": ["TENS", "tangential", "250", "4250"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "curve_reverse_new_values",
+      "category": "generic_curve",
+      "request": "Create a normal Resistivity Reverse track from the curve pack. Bind RT from 350 down to 25 and enable reverse direction.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "RT", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Resistivity Reverse",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Resistivity Reverse",
+              "bindings": [
+                {"channel": "RT", "scale": {"minimum": 350, "maximum": 25, "reverse": true}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "RT"]},
+        "semantics": {"source": "request", "needles": ["RT", "350", "25", "reverse"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "repeated_channel_new_values",
+      "category": "repeated_channel",
+      "request": "Create one normal track titled Bond Views from the curve pack. Use the CBL channel twice as two separate bindings. The first view spans 12 to 88 and the second spans -8 to 18. Keep both views in that order.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "CBL", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Bond Views",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Bond Views",
+              "bindings": [
+                {"channel": "CBL", "scale": {"minimum": 12, "maximum": 88}},
+                {"channel": "CBL", "scale": {"minimum": -8, "maximum": 18}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "CBL"]},
+        "semantics": {"source": "request", "needles": ["CBL", "twice", "12", "88", "-8", "18"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale", "multiplicity"]
+    },
+    {
+      "case_id": "multi_curve_order",
+      "category": "generic_curve",
+      "request": "Create one normal track named Petrophysics from the curve pack. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order.",
+      "sources": [
+        {
+          "candidate_id": "curve-pack",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["curve pack", "curve"],
+          "channels": [
+            {"mnemonic": "GR", "kind": "scalar"},
+            {"mnemonic": "RT", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Petrophysics",
+          "source_candidate": "curve-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Petrophysics",
+              "bindings": [
+                {"channel": "GR", "scale": {"minimum": -10, "maximum": 140}},
+                {"channel": "RT", "scale": {"kind": "log", "minimum": 0.1, "maximum": 10000}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["curve-pack", "GR", "RT"]},
+        "semantics": {"source": "request", "needles": ["GR", "RT", "-10", "140", "0.1", "10000"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "reference_track_multi_curve",
+      "category": "reference_track",
+      "request": "Create one reference track called Depth QC from the depth run. Put STIT first with a linear scale from -20 to 40 and TDSP second from 5 to 75.",
+      "sources": [
+        {
+          "candidate_id": "depth-run",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["depth run", "depth"],
+          "channels": [
+            {"mnemonic": "STIT", "kind": "scalar"},
+            {"mnemonic": "TDSP", "kind": "scalar"}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.reference", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Depth QC",
+          "source_candidate": "depth-run",
+          "tracks": [
+            {
+              "kind": "reference",
+              "title": "Depth QC",
+              "bindings": [
+                {"channel": "STIT", "scale": {"minimum": -20, "maximum": 40}},
+                {"channel": "TDSP", "scale": {"minimum": 5, "maximum": 75}}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["depth-run", "STIT", "TDSP"]},
+        "semantics": {"source": "request", "needles": ["STIT", "TDSP", "-20", "40", "5", "75"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "alternate_source_selection",
+      "category": "source_selection",
+      "request": "Create a Gamma Check track using the alternate survey rather than the primary run. Plot GR from 15 to 165.",
+      "sources": [
+        {
+          "candidate_id": "survey-primary",
+          "filename": "scalar.las",
+          "source_format": "las",
+          "labels": ["primary run", "primary survey"],
+          "channels": [{"mnemonic": "GR", "kind": "scalar"}]
+        },
+        {
+          "candidate_id": "survey-alternate",
+          "filename": "secondary.las",
+          "source_format": "las",
+          "labels": ["alternate survey", "alternate run"],
+          "channels": [{"mnemonic": "GR", "kind": "scalar"}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.normal", "binding.curve"],
+      "expected_sections": [
+        {
+          "title": "Gamma Check",
+          "source_candidate": "survey-alternate",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Gamma Check",
+              "bindings": [{"channel": "GR", "scale": {"minimum": 15, "maximum": 165}}]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["survey-alternate", "GR"]},
+        "selection": {"source": "request", "needles": ["alternate survey", "primary run"]},
+        "semantics": {"source": "request", "needles": ["GR", "15", "165"]}
+      },
+      "primary_families": ["source_selection", "topology", "binding_scale"]
+    },
+    {
+      "case_id": "generic_profile_paraphrase",
+      "category": "generic_raster",
+      "request": "Create an array track titled Image Panel from the image pack. Bind IMAGE using the generic profile and use a horizontal range from 15 to 85.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "IMAGE", "kind": "array", "shape": [32]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Image Panel",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Image Panel",
+              "x_scale": {"minimum": 15, "maximum": 85},
+              "bindings": [{"kind": "raster", "channel": "IMAGE", "profile": "generic"}]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "IMAGE"]},
+        "semantics": {"source": "request", "needles": ["IMAGE", "generic profile", "15", "85"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile"]
+    },
+    {
+      "case_id": "waveform_profile_paraphrase",
+      "category": "waveform_raster",
+      "request": "Create an array track called Wave Display from the image pack. Render WAVE with the waveform profile across an x range of -40 to 60.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "WAVE", "kind": "array", "shape": [32]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Wave Display",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Wave Display",
+              "x_scale": {"minimum": -40, "maximum": 60},
+              "bindings": [{"kind": "raster", "channel": "WAVE", "profile": "waveform"}]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "WAVE"]},
+        "semantics": {"source": "request", "needles": ["WAVE", "waveform profile", "-40", "60"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile"]
+    },
+    {
+      "case_id": "vdl_axis_new_values",
+      "category": "vdl_raster",
+      "request": "Create an array track titled Variable Density from the image pack. Use VDL with the VDL profile. Set the track horizontal scale from 175 to 925. For the raster sample axis use unit us, source origin 22.5, source step 2.5, and 9 ticks.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "VDL", "kind": "array", "shape": [64]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Variable Density",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Variable Density",
+              "x_scale": {"minimum": 175, "maximum": 925},
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "channel": "VDL",
+                  "profile": "vdl",
+                  "sample_axis": {"unit": "us", "source_origin": 22.5, "source_step": 2.5, "tick_count": 9}
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "VDL"]},
+        "semantics": {"source": "request", "needles": ["VDL", "VDL profile", "175", "925", "22.5", "2.5", "9 ticks"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile", "sample_axis"]
+    },
+    {
+      "case_id": "sample_axis_unit_ticks_only",
+      "category": "partial_sample_axis",
+      "request": "Create an array track titled Timing Image from the image pack. Use IMAGE with the generic profile and an x scale from 2 to 66. For the raster sample axis specify unit ms and 6 ticks only.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "IMAGE", "kind": "array", "shape": [32]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Timing Image",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Timing Image",
+              "x_scale": {"minimum": 2, "maximum": 66},
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "channel": "IMAGE",
+                  "profile": "generic",
+                  "sample_axis": {"unit": "ms", "tick_count": 6}
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "IMAGE"]},
+        "semantics": {"source": "request", "needles": ["IMAGE", "generic profile", "2", "66", "unit ms", "6 ticks"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile", "sample_axis"]
+    },
+    {
+      "case_id": "independent_sample_bounds",
+      "category": "independent_sample_bounds",
+      "request": "Create an array track titled Windowed Wave from the image pack. Use WAVE with the waveform profile and set the track x scale from -100 to 100. Set the raster sample-axis unit to us, its display bounds to 20 through 80, and use 5 ticks.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "WAVE", "kind": "array", "shape": [32]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Windowed Wave",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Windowed Wave",
+              "x_scale": {"minimum": -100, "maximum": 100},
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "channel": "WAVE",
+                  "profile": "waveform",
+                  "sample_axis": {"unit": "us", "minimum": 20, "maximum": 80, "tick_count": 5}
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "WAVE"]},
+        "semantics": {"source": "request", "needles": ["WAVE", "waveform profile", "-100", "100", "unit to us", "20", "80", "5 ticks"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile", "sample_axis"]
+    },
+    {
+      "case_id": "raster_profile_omitted_negative",
+      "category": "negative_no_profile",
+      "request": "Create an array track titled Diagnostics from the image pack. Bind IMAGE and use a track x scale from 5 to 95. Do not choose a raster profile and do not add sample-axis settings.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [{"mnemonic": "IMAGE", "kind": "array", "shape": [32]}]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Diagnostics",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Diagnostics",
+              "x_scale": {"minimum": 5, "maximum": 95},
+              "bindings": [{"kind": "raster", "channel": "IMAGE"}]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "IMAGE"]},
+        "semantics": {"source": "request", "needles": ["IMAGE", "5", "95", "Do not choose a raster profile", "do not add sample-axis settings"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile", "scientific_extras"]
+    },
+    {
+      "case_id": "multi_raster_binding_order",
+      "category": "multi_raster",
+      "request": "Create one array track titled Image Stack from the image pack with an x scale from 0 to 120. Bind IMAGE first using the generic profile and WAVE second using the waveform profile. Keep that binding order.",
+      "sources": [
+        {
+          "candidate_id": "image-pack",
+          "filename": "raster.dlis",
+          "source_format": "dlis",
+          "labels": ["image pack", "image"],
+          "channels": [
+            {"mnemonic": "IMAGE", "kind": "array", "shape": [32]},
+            {"mnemonic": "WAVE", "kind": "array", "shape": [32]}
+          ]
+        }
+      ],
+      "expected_capabilities": ["section.log_plot", "track.array", "binding.raster"],
+      "expected_sections": [
+        {
+          "title": "Image Stack",
+          "source_candidate": "image-pack",
+          "tracks": [
+            {
+              "kind": "array",
+              "title": "Image Stack",
+              "x_scale": {"minimum": 0, "maximum": 120},
+              "bindings": [
+                {"kind": "raster", "channel": "IMAGE", "profile": "generic"},
+                {"kind": "raster", "channel": "WAVE", "profile": "waveform"}
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["image-pack", "IMAGE", "WAVE"]},
+        "semantics": {"source": "request", "needles": ["IMAGE", "WAVE", "generic profile", "waveform profile", "0", "120"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "raster_profile", "multiplicity"]
+    },
+    {
+      "case_id": "mixed_curve_raster_section",
+      "category": "mixed_curve_raster",
+      "request": "Create one log section from the combined pack. First add a normal track titled Curves with GR from 5 to 155 and RT logarithmically from 0.2 to 2000. Then add an array track titled VDL Panel using VDL with the VDL profile, x scale 100 to 900, and a sample axis with unit us, source origin 30, source step 5, and 8 ticks. Keep the normal track before the array track.",
+      "sources": [
+        {
+          "candidate_id": "combined-pack",
+          "filename": "main.dlis",
+          "source_format": "dlis",
+          "labels": ["combined pack", "combined"],
+          "channels": [
+            {"mnemonic": "GR", "kind": "scalar"},
+            {"mnemonic": "RT", "kind": "scalar"},
+            {"mnemonic": "VDL", "kind": "array", "shape": [64]}
+          ]
+        }
+      ],
+      "expected_capabilities": [
+        "section.log_plot",
+        "track.normal",
+        "binding.curve",
+        "track.array",
+        "binding.raster"
+      ],
+      "expected_sections": [
+        {
+          "title": "Combined Curves and VDL",
+          "source_candidate": "combined-pack",
+          "tracks": [
+            {
+              "kind": "normal",
+              "title": "Curves",
+              "bindings": [
+                {"channel": "GR", "scale": {"minimum": 5, "maximum": 155}},
+                {"channel": "RT", "scale": {"kind": "log", "minimum": 0.2, "maximum": 2000}}
+              ]
+            },
+            {
+              "kind": "array",
+              "title": "VDL Panel",
+              "x_scale": {"minimum": 100, "maximum": 900},
+              "bindings": [
+                {
+                  "kind": "raster",
+                  "channel": "VDL",
+                  "profile": "vdl",
+                  "sample_axis": {"unit": "us", "source_origin": 30, "source_step": 5, "tick_count": 8}
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "input_facts": {
+        "source": {"source": "context", "needles": ["combined-pack", "GR", "RT", "VDL"]},
+        "semantics": {"source": "request", "needles": ["GR", "RT", "VDL", "5", "155", "0.2", "2000", "100", "900", "source origin 30", "source step 5", "8 ticks"]}
+      },
+      "primary_families": ["source_selection", "topology", "track_scale", "binding_scale", "raster_profile", "sample_axis", "multiplicity"]
+    }
+  ]
+}
