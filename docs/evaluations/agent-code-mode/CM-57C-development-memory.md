@@ -8,6 +8,14 @@ production-native typed section boundary against a new 16-case corpus, with two
 future attempts per case. The resulting population is 32 rows and has one
 RS-production arm; the earlier P/R/S factorial is not repeated.
 
+This is the design baseline only. A future live run must receive a separate
+full lowercase 40-character `--authorized-checkpoint`; the harness requires
+the checkout to equal that SHA and records it on every raw row. It also records
+`design_baseline_sha` separately. Before provider construction, the harness
+compares the reviewed script, corpus, production typed worker/planner, frozen
+CM-56 evaluator/corpus, and CM-56 source directory byte-for-byte with the
+authorized commit. Unrelated worktree changes remain allowed.
+
 The future path is the real production sequence:
 
 ```text
@@ -98,6 +106,19 @@ raster target-only semantic gap
 all primary semantics pass
   -> GENERALIZATION_VALIDATED
 ```
+
+Regression is determined from failed scientific families rather than case
+category. Source selection, topology, track/binding scale, multiplicity, and
+scientific extras dominate raster-profile/sample-axis target gaps. An
+unclassified scientific failure also fails closed as a regression. Title
+fidelity is reported separately: a title-only mismatch may leave scientific
+acceptance true while making full acceptance and title fidelity false.
+
+After a complete population, the append-only raw rows are grouped by case and
+the two normalized `semantic_projection` values are compared with only local
+`semantic_id` fields removed. The summary reports `same_semantic_projection`,
+`stable_cases`, `unstable_cases`, and unavailable projections without making a
+statistical claim.
 
 ## Hard Stop
 

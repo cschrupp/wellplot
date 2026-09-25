@@ -15,7 +15,12 @@ from scripts.cm56_typed_section_shadow import build_fixture_enricher, build_sour
 
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan, SemanticPlanner
 from wellplot.agent.code_mode.typed_section_worker import TypedSectionCompiler
-from wellplot.agent.providers.base import ProviderMetrics, StructuredGenerationResult
+from wellplot.agent.providers.base import (
+    ProviderFailureCategory,
+    ProviderMetrics,
+    ProviderRequestError,
+    StructuredGenerationResult,
+)
 from wellplot.capabilities import create_builtin_registry
 
 
@@ -62,6 +67,26 @@ class _ReplayBackend:
         raise AssertionError("CM-57C must not use legacy program generation.")
 
 
+class _ProviderFailureBackend:
+    """Raise one bounded provider infrastructure failure for planner testing."""
+
+    structured_calls = 0
+
+    async def generate_structured(
+        self,
+        request: object,
+        *,
+        response_model: type[BaseModel],
+    ) -> StructuredGenerationResult[BaseModel]:
+        del request, response_model
+        self.structured_calls += 1
+        raise ProviderRequestError(ProviderFailureCategory.TRANSPORT, "transport unavailable")
+
+    async def generate_program(self, request: object) -> object:
+        del request
+        raise AssertionError("CM-57C must not use legacy program generation.")
+
+
 def _case(case_id: str) -> Mapping[str, object]:
     return next(case for case in cm57c.load_case_definitions() if case["case_id"] == case_id)
 
@@ -72,7 +97,7 @@ def _complete_rows(cases: tuple[Mapping[str, object], ...]) -> list[dict[str, ob
             "case_id": case["case_id"],
             "category": case["category"],
             "attempt_index": attempt,
-            "authorized_checkpoint": cm57c.BASELINE_SHA,
+            "authorized_checkpoint": cm57c.DESIGN_BASELINE_SHA,
             "pipeline_class": "SUCCESS",
             "scientific_acceptance": True,
             "unrequested_scientific_semantics": (),
@@ -100,6 +125,7 @@ def test_prelive_report_is_provider_free_and_hash_locked() -> None:
 
     assert report["provider_calls"] == 0
     assert report["live_inference"] == "NOT_STARTED"
+    assert report["design_baseline_sha"] == cm57c.DESIGN_BASELINE_SHA
     assert report["response_schema_sha256"] == cm57c.RESPONSE_SCHEMA_SHA256
     assert report["metadata_projection_sha256"] == cm57c.EXPECTED_METADATA_SHA256
     assert report["prompt_hashes"]["base"] == cm57c.EXPECTED_BASE_PROMPT_SHA256
@@ -200,13 +226,64 @@ def test_evaluator_includes_source_and_topology_checks_in_scientific_gate() -> N
     }
 
 
+def test_title_only_mismatch_is_secondary_not_scientific_failure() -> None:
+    """Keep title fidelity separate from scientific and full acceptance."""
+    case = _case("curve_linear_new_values")
+    draft = cm57c._gold_model(case).model_copy(update={"title": "Different title"})
+
+    evaluation = cm57c.evaluate_draft(draft, expected=case["expected_sections"][0])
+
+    assert evaluation["scientific_acceptance"] is True
+    assert evaluation["full_semantic_acceptance"] is False
+    assert evaluation["title_fidelity"] is False
+
+
+def test_planner_provider_infrastructure_failure_is_not_semantic_failure() -> None:
+    """Classify planner transport failure as provider infrastructure evidence."""
+    case = _case("curve_linear_new_values")
+    backend = _ProviderFailureBackend()
+    registry = create_builtin_registry()
+    planner = SemanticPlanner(backend=backend, registry=registry)
+    compiler = TypedSectionCompiler(backend=backend, registry=registry)
+
+    row = asyncio.run(
+        cm57c.run_case_attempt(
+            case,
+            planner=planner,
+            typed=compiler,
+            registry=registry,
+            attempt_index=0,
+            authorized_checkpoint="b" * 40,
+        )
+    )
+
+    assert row["pipeline_class"] == "PROVIDER_INFRA_FAILURE"
+    assert row["provider_category"] == "transport"
+    assert row["authorized_checkpoint"] == "b" * 40
+
+
+def test_checkpoint_validation_requires_lowercase_full_sha() -> None:
+    """Reject incomplete, uppercase, and non-hex live authorization values."""
+    assert cm57c.validate_authorized_checkpoint("a" * 40) == "a" * 40
+    for invalid in (None, "a" * 39, "A" * 40, "g" * 40):
+        with pytest.raises(ValueError, match="full lowercase"):
+            cm57c.validate_authorized_checkpoint(invalid)
+
+
 def test_pipeline_failure_can_be_classified_without_input_audit() -> None:
     """Classify a planner failure even without provider-input evidence."""
     cases = cm57c.load_case_definitions()
     rows = _complete_rows(cases)
     rows[0]["pipeline_class"] = "PLANNER_FAILURE"
 
-    assert cm57c._final_decision(rows, cases) == "GENERALIZATION_PIPELINE_FAILURE"
+    assert (
+        cm57c._final_decision(
+            rows,
+            cases,
+            authorized_checkpoint=cm57c.DESIGN_BASELINE_SHA,
+        )
+        == "GENERALIZATION_PIPELINE_FAILURE"
+    )
 
 
 def test_population_integrity_rejects_duplicate_or_missing_rows() -> None:
@@ -216,7 +293,11 @@ def test_population_integrity_rejects_duplicate_or_missing_rows() -> None:
     rows.pop()
     rows.append(dict(rows[0]))
 
-    result = cm57c._population_integrity(rows, cases)
+    result = cm57c._population_integrity(
+        rows,
+        cases,
+        authorized_checkpoint=cm57c.DESIGN_BASELINE_SHA,
+    )
 
     assert result["complete"] is False
     assert "duplicate_case_attempt" in result["reasons"]
@@ -233,4 +314,48 @@ def test_future_live_output_path_rejects_nonempty_evidence(
     monkeypatch.setattr(cm57c, "OUTPUT_PATH", output)
 
     with pytest.raises(RuntimeError, match="non-empty evidence path"):
-        asyncio.run(cm57c._run_live(object()))
+        asyncio.run(
+            cm57c._run_live(
+                object(),
+                authorized_checkpoint=cm57c.DESIGN_BASELINE_SHA,
+            )
+        )
+
+
+def test_family_based_decision_makes_generic_failures_regressions() -> None:
+    """A failed generic family dominates even when its case is raster-labeled."""
+    cases = cm57c.load_case_definitions()
+    rows = _complete_rows(cases)
+    rows[0]["category"] = "generic_raster"
+    rows[0]["scientific_acceptance"] = False
+    rows[0]["scientific_family_counts"] = {
+        "binding_scale": {"pass": 0, "fail": 1},
+    }
+
+    assert (
+        cm57c._final_decision(
+            rows,
+            cases,
+            authorized_checkpoint=cm57c.DESIGN_BASELINE_SHA,
+        )
+        == "GENERALIZATION_REGRESSION"
+    )
+
+
+def test_repeatability_summary_ignores_semantic_ids() -> None:
+    """Report stable and unstable cases from normalized semantic projections."""
+    cases = cm57c.load_case_definitions()
+    rows = _complete_rows(cases)
+    for row in rows:
+        row["semantic_projection"] = {"tracks": [{"title": "same"}]}
+    rows[-1]["semantic_projection"] = {"tracks": [{"title": "different"}]}
+
+    summary = cm57c.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=cm57c.DESIGN_BASELINE_SHA,
+    )
+
+    assert summary["population_integrity"]["complete"] is True
+    assert "curve_linear_new_values" in summary["repeatability"]["stable_cases"]
+    assert "mixed_curve_raster_section" in summary["repeatability"]["unstable_cases"]

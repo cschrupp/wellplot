@@ -7,6 +7,8 @@ import asyncio
 import hashlib
 import json
 import os
+import re
+import subprocess
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -67,7 +69,7 @@ CASE_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm57c_shadow_cases.json"
 OLD_CASE_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm56_shadow_cases.json"
 SOURCE_ROOT = REPO_ROOT / "tests/fixtures/typed_worker/cm56_sources"
 OUTPUT_PATH = Path("/tmp/cm57c-live-qwen.jsonl")
-BASELINE_SHA = "639332ddb4258569fedd65155eafaf5c220eb6b2"
+DESIGN_BASELINE_SHA = "639332ddb4258569fedd65155eafaf5c220eb6b2"
 EXPERIMENT_VERSION = "CM-57C"
 FROZEN_MODEL = "qwen3.6-35b-a3b"
 PLANNER_TEMPERATURE = 0.0
@@ -113,6 +115,27 @@ RASTER_TARGET_CATEGORIES = {
     "multi_raster",
     "mixed_curve_raster",
 }
+REGRESSION_FAMILIES = frozenset(
+    {
+        "source_selection",
+        "topology",
+        "track_scale",
+        "binding_scale",
+        "multiplicity",
+        "scientific_extras",
+    }
+)
+TARGET_FAMILIES = frozenset({"raster_profile", "sample_axis"})
+CHECKPOINT_RE = re.compile(r"^[0-9a-f]{40}$")
+GUARDED_FILES = (
+    "scripts/cm57c_shadow_generalization.py",
+    "tests/fixtures/typed_worker/cm57c_shadow_cases.json",
+    "src/wellplot/agent/code_mode/typed_section_worker.py",
+    "src/wellplot/agent/code_mode/planner.py",
+    "scripts/cm56r8r_semantic_contract_correction.py",
+    "tests/fixtures/typed_worker/cm56_shadow_cases.json",
+)
+GUARDED_DIRECTORIES = ("tests/fixtures/typed_worker/cm56_sources",)
 
 
 @dataclass
@@ -157,6 +180,59 @@ def sha256_text(value: str) -> str:
 def artifact_sha256(path: Path) -> str:
     """Hash one repository artifact by exact bytes."""
     return sha256_bytes(path.read_bytes())
+
+
+def validate_authorized_checkpoint(value: object) -> str:
+    """Require the full lowercase SHA used to authorize live execution."""
+    if not isinstance(value, str) or CHECKPOINT_RE.fullmatch(value) is None:
+        raise ValueError("CM-57C requires a full lowercase 40-character checkpoint SHA.")
+    return value
+
+
+def _git_output(*arguments: str) -> bytes:
+    """Return exact output from a local Git command."""
+    return subprocess.check_output(
+        ["git", *arguments],
+        cwd=REPO_ROOT,
+        stderr=subprocess.STDOUT,
+    )
+
+
+def current_checkout_sha() -> str:
+    """Return the current checkout's full commit SHA."""
+    return _git_output("rev-parse", "HEAD").decode().strip()
+
+
+def _guarded_paths_at_commit(checkpoint: str) -> tuple[str, ...]:
+    """Return all tracked files covered by the reviewed artifact guard."""
+    paths = list(GUARDED_FILES)
+    for directory in GUARDED_DIRECTORIES:
+        output = _git_output("ls-tree", "-r", "--name-only", checkpoint, "--", directory)
+        paths.extend(line for line in output.decode().splitlines() if line)
+    return tuple(sorted(set(paths)))
+
+
+def verify_reviewed_checkout(checkpoint: str) -> None:
+    """Reject a live run unless checkout and guarded artifacts match the review SHA."""
+    checkpoint = validate_authorized_checkpoint(checkpoint)
+    if current_checkout_sha() != checkpoint:
+        raise RuntimeError("CM-57C checkout does not match the authorized checkpoint.")
+    guarded_paths = _guarded_paths_at_commit(checkpoint)
+    for relative_path in guarded_paths:
+        path = REPO_ROOT / relative_path
+        if not path.is_file():
+            raise RuntimeError(f"CM-57C guarded artifact is missing: {relative_path}")
+        expected = _git_output("show", f"{checkpoint}:{relative_path}")
+        if path.read_bytes() != expected:
+            raise RuntimeError(f"CM-57C guarded artifact drifted: {relative_path}")
+    for directory in GUARDED_DIRECTORIES:
+        root = REPO_ROOT / directory
+        current_paths = tuple(
+            sorted(str(path.relative_to(REPO_ROOT)) for path in root.rglob("*") if path.is_file())
+        )
+        expected_paths = tuple(path for path in guarded_paths if path.startswith(f"{directory}/"))
+        if current_paths != expected_paths:
+            raise RuntimeError(f"CM-57C guarded directory drifted: {directory}")
 
 
 def load_case_definitions(path: Path = CASE_PATH) -> tuple[dict[str, object], ...]:
@@ -395,7 +471,9 @@ def evaluate_draft(
     evaluation = evaluate_semantic_draft_r8r(draft, expected=expected)
     title_paths = {"title_valid", "track_titles_valid"}
     title_statuses = {
-        path: status for path, status in evaluation.checks.items() if path in title_paths
+        path: "PASS" if passed else "WRONG_VALUE"
+        for path, passed in evaluation.checks.items()
+        if path in title_paths
     }
     scientific_statuses = {
         path: "PASS" if passed else "WRONG_VALUE"
@@ -425,7 +503,7 @@ def evaluate_draft(
         "leaf_statuses": evaluation.leaf_statuses,
         "scientific_family_counts": family_counts,
         "scientific_acceptance": scientific_acceptance,
-        "full_semantic_acceptance": evaluation.accepted,
+        "full_semantic_acceptance": evaluation.accepted and all(evaluation.checks.values()),
         "title_fidelity": all(status == "PASS" for status in title_statuses.values()),
         "title_statuses": title_statuses,
         "unrequested_scientific_semantics": evaluation.unrequested_semantics,
@@ -488,6 +566,7 @@ def _base_row(
     attempt_index: int,
     planner_calls: int,
     pipeline_class: str,
+    authorized_checkpoint: str = DESIGN_BASELINE_SHA,
     error: BaseException | None = None,
     plan: SemanticPlan | None = None,
     enriched: object | None = None,
@@ -503,7 +582,8 @@ def _base_row(
         )
     return {
         "experiment_version": EXPERIMENT_VERSION,
-        "authorized_checkpoint": BASELINE_SHA,
+        "design_baseline_sha": DESIGN_BASELINE_SHA,
+        "authorized_checkpoint": authorized_checkpoint,
         "case_id": case["case_id"],
         "category": case["category"],
         "attempt_index": attempt_index,
@@ -534,6 +614,7 @@ async def run_case_attempt(
     typed: TypedSectionCompiler,
     registry: CapabilityRegistry,
     attempt_index: int,
+    authorized_checkpoint: str = DESIGN_BASELINE_SHA,
     enricher_factory: object = build_fixture_enricher,
 ) -> dict[str, object]:
     """Run one real planner/enricher/provider-input/typed-worker attempt."""
@@ -560,7 +641,8 @@ async def run_case_attempt(
             case,
             attempt_index=attempt_index,
             planner_calls=planner_calls,
-            pipeline_class="PLANNER_FAILURE",
+            pipeline_class=_pipeline_class(error),
+            authorized_checkpoint=authorized_checkpoint,
             error=error,
         )
         row["elapsed_ms"] = (time.perf_counter() - started) * 1000
@@ -577,6 +659,7 @@ async def run_case_attempt(
             attempt_index=attempt_index,
             planner_calls=planner_calls,
             pipeline_class="PLANNER_FAILURE",
+            authorized_checkpoint=authorized_checkpoint,
             plan=plan,
         )
         row["planner_capabilities"] = list(planner_capabilities)
@@ -592,6 +675,7 @@ async def run_case_attempt(
             attempt_index=attempt_index,
             planner_calls=planner_calls,
             pipeline_class="PLANNER_FAILURE",
+            authorized_checkpoint=authorized_checkpoint,
             plan=plan,
         )
         row["planner_capabilities"] = list(planner_capabilities)
@@ -613,6 +697,7 @@ async def run_case_attempt(
             attempt_index=attempt_index,
             planner_calls=planner_calls,
             pipeline_class="ENRICHMENT_FAILURE",
+            authorized_checkpoint=authorized_checkpoint,
             error=error,
             plan=plan,
         )
@@ -626,6 +711,7 @@ async def run_case_attempt(
             attempt_index=attempt_index,
             planner_calls=planner_calls,
             pipeline_class="ENRICHMENT_FAILURE",
+            authorized_checkpoint=authorized_checkpoint,
             plan=plan,
             enriched=enriched,
         )
@@ -642,6 +728,7 @@ async def run_case_attempt(
         attempt_index=attempt_index,
         planner_calls=planner_calls,
         pipeline_class="SUCCESS",
+        authorized_checkpoint=authorized_checkpoint,
         plan=plan,
         enriched=enriched,
     )
@@ -734,6 +821,8 @@ async def run_case_attempt(
 def _population_integrity(
     rows: Sequence[Mapping[str, object]],
     cases: Sequence[Mapping[str, object]],
+    *,
+    authorized_checkpoint: str,
 ) -> dict[str, object]:
     """Require exactly two complete rows for each of the 16 cases."""
     expected = {(case["case_id"], attempt) for case in cases for attempt in range(ATTEMPTS)}
@@ -746,16 +835,69 @@ def _population_integrity(
     if actual != expected:
         reasons.append("missing_or_unexpected_case_attempt")
     for row in rows:
-        if row.get("authorized_checkpoint") != BASELINE_SHA:
+        if row.get("authorized_checkpoint") != authorized_checkpoint:
             reasons.append("checkpoint_mismatch")
-    return {"complete": not reasons, "reasons": sorted(set(reasons)), "actual_rows": len(rows)}
+    return {
+        "complete": not reasons,
+        "reasons": sorted(set(reasons)),
+        "actual_rows": len(rows),
+        "expected_checkpoint": authorized_checkpoint,
+    }
+
+
+def _failed_scientific_families(row: Mapping[str, object]) -> set[str]:
+    """Return families with at least one failed scientific leaf."""
+    counts = row.get("scientific_family_counts")
+    if not isinstance(counts, Mapping):
+        return set()
+    failed: set[str] = set()
+    for family, value in counts.items():
+        if isinstance(value, Mapping) and int(value.get("fail", 0)) > 0:
+            failed.add(str(family))
+    return failed
+
+
+def _repeatability_summary(rows: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Compare the two semantic projections for each case without statistics."""
+    by_case: dict[str, list[Mapping[str, object]]] = {}
+    for row in rows:
+        by_case.setdefault(str(row["case_id"]), []).append(row)
+    cases: dict[str, dict[str, object]] = {}
+    stable: list[str] = []
+    unstable: list[str] = []
+    unavailable: list[str] = []
+    for case_id, case_rows in sorted(by_case.items()):
+        projections = [row.get("semantic_projection") for row in case_rows]
+        if len(projections) != ATTEMPTS or any(projection is None for projection in projections):
+            same: bool | None = None
+            unavailable.append(case_id)
+        else:
+            same = projections[0] == projections[1]
+            (stable if same else unstable).append(case_id)
+        cases[case_id] = {
+            "attempt_count": len(case_rows),
+            "same_semantic_projection": same,
+        }
+    return {
+        "cases": cases,
+        "stable_cases": stable,
+        "unstable_cases": unstable,
+        "unavailable_cases": unavailable,
+    }
 
 
 def _final_decision(
-    rows: Sequence[Mapping[str, object]], cases: Sequence[Mapping[str, object]]
+    rows: Sequence[Mapping[str, object]],
+    cases: Sequence[Mapping[str, object]],
+    *,
+    authorized_checkpoint: str,
 ) -> str:
     """Apply CM-57C decision precedence without aggregate thresholds."""
-    population = _population_integrity(rows, cases)
+    population = _population_integrity(
+        rows,
+        cases,
+        authorized_checkpoint=authorized_checkpoint,
+    )
     if not population["complete"]:
         return "INCONCLUSIVE_GENERALIZATION"
     if any(row.get("pipeline_class") == "PROVIDER_INFRA_FAILURE" for row in rows):
@@ -770,55 +912,110 @@ def _final_decision(
     }
     if any(row.get("pipeline_class") in pipeline_failures for row in rows):
         return "GENERALIZATION_PIPELINE_FAILURE"
-    for row in rows:
-        if row.get("category") in PROTECTED_GENERIC_CATEGORIES and not row.get(
-            "scientific_acceptance", False
-        ):
+    successful_rows = [row for row in rows if row.get("pipeline_class") == "SUCCESS"]
+    for row in successful_rows:
+        failed_families = _failed_scientific_families(row)
+        if failed_families & REGRESSION_FAMILIES:
             return "GENERALIZATION_REGRESSION"
-        if row.get("category") == "negative_no_profile" and row.get(
-            "unrequested_scientific_semantics"
-        ):
+        if not row.get("scientific_acceptance", False) and not failed_families:
             return "GENERALIZATION_REGRESSION"
-    if any(
-        row.get("category") in RASTER_TARGET_CATEGORIES
-        and not row.get("scientific_acceptance", False)
-        for row in rows
-    ):
+        if failed_families - TARGET_FAMILIES:
+            return "GENERALIZATION_REGRESSION"
+    if any(_failed_scientific_families(row) & TARGET_FAMILIES for row in successful_rows):
         return "GENERALIZATION_TARGET_GAP"
     return "GENERALIZATION_VALIDATED"
 
 
+def summarize_population(
+    rows: Sequence[Mapping[str, object]],
+    cases: Sequence[Mapping[str, object]],
+    *,
+    authorized_checkpoint: str,
+) -> dict[str, object]:
+    """Summarize immutable raw rows after a complete future population."""
+    return {
+        "experiment_version": EXPERIMENT_VERSION,
+        "design_baseline_sha": DESIGN_BASELINE_SHA,
+        "authorized_checkpoint": authorized_checkpoint,
+        "population_integrity": _population_integrity(
+            rows,
+            cases,
+            authorized_checkpoint=authorized_checkpoint,
+        ),
+        "repeatability": _repeatability_summary(rows),
+        "decision": _final_decision(
+            rows,
+            cases,
+            authorized_checkpoint=authorized_checkpoint,
+        ),
+    }
+
+
 def _self_test_decisions(cases: Sequence[Mapping[str, object]]) -> None:
     """Exercise all final labels with synthetic evidence populations."""
+    checkpoint = "a" * 40
     complete = [
         {
             "case_id": case["case_id"],
             "category": case["category"],
             "attempt_index": attempt,
-            "authorized_checkpoint": BASELINE_SHA,
+            "authorized_checkpoint": checkpoint,
             "input_sufficiency": {"sufficient": True},
             "pipeline_class": "SUCCESS",
             "scientific_acceptance": True,
             "unrequested_scientific_semantics": (),
+            "scientific_family_counts": {},
         }
         for case in cases
         for attempt in range(ATTEMPTS)
     ]
-    assert _final_decision(complete, cases) == "GENERALIZATION_VALIDATED"
+    assert _final_decision(complete, cases, authorized_checkpoint=checkpoint) == (
+        "GENERALIZATION_VALIDATED"
+    )
     target_gap = [dict(row) for row in complete]
     for row in target_gap:
         if row["category"] == "generic_raster":
             row["scientific_acceptance"] = False
-    assert _final_decision(target_gap, cases) == "GENERALIZATION_TARGET_GAP"
+            row["scientific_family_counts"] = {"raster_profile": {"pass": 0, "fail": 1}}
+    assert (
+        _final_decision(
+            target_gap,
+            cases,
+            authorized_checkpoint=checkpoint,
+        )
+        == "GENERALIZATION_TARGET_GAP"
+    )
     regression = [dict(row) for row in complete]
     regression[0]["scientific_acceptance"] = False
-    assert _final_decision(regression, cases) == "GENERALIZATION_REGRESSION"
+    regression[0]["scientific_family_counts"] = {"binding_scale": {"pass": 0, "fail": 1}}
+    assert (
+        _final_decision(
+            regression,
+            cases,
+            authorized_checkpoint=checkpoint,
+        )
+        == "GENERALIZATION_REGRESSION"
+    )
     pipeline = [dict(row) for row in complete]
     pipeline[0]["pipeline_class"] = "SCHEMA_COMPATIBILITY_FAILURE"
-    assert _final_decision(pipeline, cases) == "GENERALIZATION_PIPELINE_FAILURE"
+    assert (
+        _final_decision(
+            pipeline,
+            cases,
+            authorized_checkpoint=checkpoint,
+        )
+        == "GENERALIZATION_PIPELINE_FAILURE"
+    )
     infra = [dict(row) for row in complete]
     infra[0]["pipeline_class"] = "PROVIDER_INFRA_FAILURE"
-    assert _final_decision(infra, cases) == "INCONCLUSIVE_GENERALIZATION"
+    assert (
+        _final_decision(
+            infra,
+            cases,
+            authorized_checkpoint=checkpoint,
+        )
+        == "INCONCLUSIVE_GENERALIZATION"
+    )
 
 
 def prelive_report() -> dict[str, object]:
@@ -869,7 +1066,7 @@ def prelive_report() -> dict[str, object]:
         raise ValueError("Corrected evaluator source drifted before CM-57C live authorization.")
     return {
         "experiment_version": EXPERIMENT_VERSION,
-        "baseline": BASELINE_SHA,
+        "design_baseline_sha": DESIGN_BASELINE_SHA,
         "corpus_sha256": artifact_sha256(CASE_PATH),
         "harness_source_sha256": artifact_sha256(Path(__file__).resolve()),
         "typed_worker_source_sha256": artifact_sha256(
@@ -896,6 +1093,7 @@ def prelive_report() -> dict[str, object]:
         },
         "decision_self_tests": "PASS",
         "live_inference": "NOT_STARTED",
+        "live_authorization": "REQUIRES_EXPLICIT_CHECKOUT_SHA",
     }
 
 
@@ -921,17 +1119,20 @@ def _provider_configuration(args: argparse.Namespace) -> ModelBackendProtocol:
     )
 
 
-async def _run_live(args: argparse.Namespace) -> None:
+async def _run_live(args: argparse.Namespace, *, authorized_checkpoint: str) -> None:
     """Run the frozen 32-row live population and flush rows incrementally."""
     if OUTPUT_PATH.exists() and OUTPUT_PATH.stat().st_size:
         raise RuntimeError(f"Refusing to append to non-empty evidence path {OUTPUT_PATH}.")
+    authorized_checkpoint = validate_authorized_checkpoint(authorized_checkpoint)
+    verify_reviewed_checkout(authorized_checkpoint)
     cases = load_case_definitions()
     registry = create_builtin_registry()
     backend = CountingBackend(_provider_configuration(args))
     planner = SemanticPlanner(backend=backend, registry=registry)
     typed = TypedSectionCompiler(backend=backend, registry=registry)
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_PATH.open("x", encoding="utf-8") as handle:
+    rows: list[dict[str, object]] = []
+    with OUTPUT_PATH.open("a", encoding="utf-8") as handle:
         for case in cases:
             for attempt_index in range(ATTEMPTS):
                 row = await run_case_attempt(
@@ -940,9 +1141,22 @@ async def _run_live(args: argparse.Namespace) -> None:
                     typed=typed,
                     registry=registry,
                     attempt_index=attempt_index,
+                    authorized_checkpoint=authorized_checkpoint,
                 )
+                rows.append(row)
                 handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
+    print(
+        json.dumps(
+            summarize_population(
+                rows,
+                cases,
+                authorized_checkpoint=authorized_checkpoint,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -963,11 +1177,13 @@ def main() -> None:
     if not args.live_authorized:
         print(json.dumps(report, indent=2, sort_keys=True))
         return
-    if args.authorized_checkpoint != BASELINE_SHA:
-        raise SystemExit("CM-57C live mode requires the full authorized checkpoint SHA.")
+    try:
+        authorized_checkpoint = validate_authorized_checkpoint(args.authorized_checkpoint)
+    except ValueError as error:
+        raise SystemExit(str(error)) from error
     if not args.base_url:
         raise SystemExit("CM-57C live mode requires an explicitly configured base URL.")
-    asyncio.run(_run_live(args))
+    asyncio.run(_run_live(args, authorized_checkpoint=authorized_checkpoint))
 
 
 if __name__ == "__main__":  # pragma: no cover
