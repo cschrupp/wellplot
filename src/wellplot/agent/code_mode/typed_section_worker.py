@@ -164,6 +164,12 @@ class TypedSectionSemanticContractInput(_TypedInputModel):
 class TypedSectionProviderInput(TypedSectionWorkerInput):
     """Validated production provider payload extending the historical base input."""
 
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=False,
+    )
+
     authoritative_request: str = Field(min_length=1)
     semantic_contracts: tuple[TypedSectionSemanticContractInput, ...] | None = None
 

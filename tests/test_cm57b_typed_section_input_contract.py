@@ -205,6 +205,34 @@ def _metadata(
     )
 
 
+def _metadata_projection_bytes(registry: CapabilityRegistry) -> int:
+    """Return the canonical UTF-8 size of the selected metadata projection."""
+    provider = build_typed_section_provider_input(
+        _task(raster=True),
+        authoritative_request=REQUEST,
+        section_context=_context(raster=True),
+        registry=registry,
+    )
+    projection = json.dumps(
+        [contract.model_dump(mode="json") for contract in provider.semantic_contracts or ()],
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return len(projection.encode("utf-8"))
+
+
+def _metadata_with_projection_bytes(target_size: int) -> CapabilityRegistry:
+    """Construct test metadata whose canonical projection has the target size."""
+    baseline = _metadata_projection_bytes(
+        _registry_with_raster_metadata(_metadata(target_path="binding.profile", value_cue="x"))
+    )
+    value_length = 1 + target_size - baseline
+    return _registry_with_raster_metadata(
+        _metadata(target_path="binding.profile", value_cue="x" * value_length)
+    )
+
+
 def _compile(
     backend: _Backend,
     *,
@@ -263,6 +291,19 @@ def test_scalar_provider_input_is_base_plus_redacted_request() -> None:
     )
     assert "semantic_contracts" not in provider
     assert provider == base
+
+
+def test_authoritative_request_preserves_outer_whitespace() -> None:
+    """Only path-shaped text is changed in the authoritative request factor."""
+    request = "  Plot GR from 0 to 150 gAPI.  "
+    provider = build_typed_section_provider_input(
+        _task(),
+        authoritative_request=request,
+        section_context=_context(),
+        registry=_registry(),
+    )
+    payload = json.loads(serialize_typed_section_provider_input(provider))
+    assert payload["authoritative_request"] == request
 
 
 def test_raster_provider_input_projects_metadata_and_redacts_paths() -> None:
@@ -362,6 +403,34 @@ def test_oversized_metadata_fails_before_provider_call() -> None:
     registry = _registry_with_raster_metadata(
         _metadata(target_path="binding.profile", value_cue="x" * 9000)
     )
+    with pytest.raises(TypedSectionWorkerError) as error:
+        _compile(
+            backend,
+            task=_task(raster=True),
+            context=_context(raster=True),
+            registry=registry,
+        )
+    assert error.value.code is TypedSectionWorkerErrorCode.INPUT_CONTRACT_INVALID
+    assert not backend.calls
+
+
+def test_exact_metadata_byte_limit_is_accepted() -> None:
+    """The inclusive 8192-byte semantic metadata limit is preserved."""
+    registry = _metadata_with_projection_bytes(8192)
+    assert _metadata_projection_bytes(registry) == 8192
+    provider = build_typed_section_provider_input(
+        _task(raster=True),
+        authoritative_request=REQUEST,
+        section_context=_context(raster=True),
+        registry=registry,
+    )
+    assert provider.semantic_contracts is not None
+
+
+def test_metadata_one_byte_over_limit_fails_before_provider_call() -> None:
+    """The 8193-byte semantic metadata projection is rejected before generation."""
+    backend = _Backend(value=_raster_draft(), calls=[])
+    registry = _metadata_with_projection_bytes(8193)
     with pytest.raises(TypedSectionWorkerError) as error:
         _compile(
             backend,
