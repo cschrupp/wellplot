@@ -1,0 +1,116 @@
+{
+  "experiment_version": "CM-57C",
+  "design_baseline_sha": "639332ddb4258569fedd65155eafaf5c220eb6b2",
+  "authorized_execution_checkpoint": "df9b6181eeb6b70cf26f9b1940449f66a217a248",
+  "harness_source_sha256": "068b16766afc46776a80ae0204e78836da8eabbbcc05f26bac7b6d2953d140f1",
+  "raw_evidence": {
+    "path": "/tmp/cm57c-live-qwen.jsonl",
+    "sha256": "57df9720bc2eb7b05fcb815de84062815382b13c84f5878da8c948e08e41cba8",
+    "rows": 32
+  },
+  "population": {
+    "expected_rows": 32,
+    "actual_rows": 32,
+    "attempts_per_case": 2,
+    "cases": 16,
+    "complete": true,
+    "reasons": []
+  },
+  "provider": {
+    "backend": "openai_compat",
+    "base_url": "http://192.168.2.142:8888/v1",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "worker_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900,
+    "planner_provider_calls": 43,
+    "worker_provider_calls": 11,
+    "provider_infrastructure_failures": 0
+  },
+  "artifacts": {
+    "corpus_sha256": "3acac04abbe8d20902bc1785d71cf3b8b0a9d7caf623ea79ed2eca8617842181",
+    "response_schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
+    "metadata_projection_sha256": "67aa2d6f579343e60f9261eb654fd62bde21605b1c8c68f080b5b74ff01c3f46",
+    "evaluator_version": "cm56r8r.corrected-evaluator.v1",
+    "evaluator_source_sha256": "4bddc22e5a8267cd36e96624884eba8c8578fdd229c7d71c0bd7986bcab12e49",
+    "typed_worker_source_sha256": "66e1a3fb7a1464ec18461083627401afdfec7481831b2bbf0e334c1ef46d7b21",
+    "planner_source_sha256": "300010b4f2ace413b2b33823277700a80153c6add5ad40abbd3e708dba40c6bf",
+    "prompt_sha256": {
+      "base": "19b0e289d2fa8ea362840aa94d90ad43cdea5b2ebdc866363df1ef28a38f2d49",
+      "request_only": "7e519241911d3fbd61d8de4134c71ae69b98646a6b4e5a4ea61ba0a7a0318f69",
+      "request_plus_metadata": "10ed56fc716165dca783f6d92805b7541f63b4044dcbcd4ac0207191f0771a80"
+    }
+  },
+  "pipeline_counts": {
+    "PLANNER_FAILURE": 21,
+    "SUCCESS": 11,
+    "typed_structured_valid": 11,
+    "typed_context_valid": 11,
+    "typed_compiler_valid": 11,
+    "input_sufficient": 11,
+    "scientific_acceptance": 6,
+    "full_semantic_acceptance": 4,
+    "title_fidelity": 9
+  },
+  "scientific_family_totals": {
+    "binding_scale": {"pass": 22, "fail": 2},
+    "multiplicity": {"pass": 22, "fail": 0},
+    "raster_profile": {"pass": 7, "fail": 0},
+    "sample_axis": {"pass": 6, "fail": 7},
+    "scientific_extras": {"pass": 0, "fail": 4},
+    "source_selection": {"pass": 11, "fail": 0},
+    "topology": {"pass": 44, "fail": 0},
+    "track_scale": {"pass": 28, "fail": 1}
+  },
+  "repeatability": {
+    "stable_cases": [
+      "curve_reverse_new_values",
+      "independent_sample_bounds",
+      "reference_track_multi_curve",
+      "waveform_profile_paraphrase"
+    ],
+    "unstable_cases": ["generic_profile_paraphrase"],
+    "unavailable_cases": [
+      "alternate_source_selection",
+      "curve_linear_new_values",
+      "curve_log_new_values",
+      "curve_tangential_new_values",
+      "mixed_curve_raster_section",
+      "multi_curve_order",
+      "multi_raster_binding_order",
+      "raster_profile_omitted_negative",
+      "repeated_channel_new_values",
+      "sample_axis_unit_ticks_only",
+      "vdl_axis_new_values"
+    ]
+  },
+  "case_results": {
+    "alternate_source_selection": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "curve_linear_new_values": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "curve_log_new_values": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "curve_reverse_new_values": {"pipeline": ["SUCCESS", "SUCCESS"], "scientific": [false, false], "full": [false, false]},
+    "curve_tangential_new_values": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "generic_profile_paraphrase": {"pipeline": ["SUCCESS", "SUCCESS"], "scientific": [true, false], "full": [true, false]},
+    "independent_sample_bounds": {"pipeline": ["SUCCESS", "SUCCESS"], "scientific": [false, false], "full": [false, false]},
+    "mixed_curve_raster_section": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "multi_curve_order": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "multi_raster_binding_order": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "raster_profile_omitted_negative": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "reference_track_multi_curve": {"pipeline": ["SUCCESS", "SUCCESS"], "scientific": [true, true], "full": [true, true]},
+    "repeated_channel_new_values": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "sample_axis_unit_ticks_only": {"pipeline": ["PLANNER_FAILURE", "SUCCESS"], "scientific": [false, true], "full": [false, true]},
+    "vdl_axis_new_values": {"pipeline": ["PLANNER_FAILURE", "PLANNER_FAILURE"], "scientific": [false, false]},
+    "waveform_profile_paraphrase": {"pipeline": ["SUCCESS", "SUCCESS"], "scientific": [true, true], "full": [false, false]}
+  },
+  "integrity": {
+    "production_changes": 0,
+    "harness_changed_after_authorization": false,
+    "corpus_changed_after_authorization": false,
+    "prompt_schema_metadata_routing_changes": false,
+    "raw_evidence_modified_after_run": false
+  },
+  "decision": "GENERALIZATION_PIPELINE_FAILURE",
+  "interpretation": "The typed worker reached successful validation/compiler execution for 11 of 32 rows, but the existing planner/enricher boundary produced 21 capability-mismatch failures. No provider infrastructure failure occurred. The result is not a typed-worker generalization acceptance and does not authorize CM-57D."
+}
