@@ -157,3 +157,30 @@ immutable and the committed aggregate is
 `CM-57C-live-summary.json`. No production, prompt, schema, metadata, routing,
 corpus, or harness changes were made after live authorization. CM-57D remains
 blocked.
+
+## CM-57C-R3 Design Opened
+
+CM-57C-R3 is a design-only follow-up to the accepted
+`GENERALIZATION_PIPELINE_FAILURE` at baseline
+`5356bcfcb61607831aaf25837dbd830e978d7ff4`. It records the evidence-backed
+planner remediation without changing production code or making provider calls.
+
+The proposed architecture exposes the existing
+`CapabilitySpec.allowed_parents` relationship through the planner-safe catalog,
+adds one generic instruction that capability IDs are complete unique capability
+types, and validates duplicate IDs plus selected-capability parent closure.
+The existing bounded semantic correction remains the only correction mechanism.
+There is no automatic capability injection, deduplication, child inference,
+per-capability planner switch, or worker semantic metadata in the planner
+catalog.
+
+The ambiguous 13-row report/unresolved planner gate is not split because the
+frozen evidence cannot distinguish its causes. Report-task and
+`unresolved_requirements` semantics therefore remain unchanged. The repeated
+reverse, explicit sample-axis-bound, and unstable unrequested-default findings
+remain deferred typed-worker work.
+
+The primary design artifact is
+`CM-57C-R3-planner-remediation-design.md`; the proposed ADR is
+`docs/architecture/ADR-CM57-planner-capability-contract.md`. CM-57P1, CM-57P2,
+and CM-57D remain unstarted or blocked pending independent design review.
