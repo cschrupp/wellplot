@@ -3,9 +3,12 @@
 ## Status
 
 CM-57P3 is an evaluation-only planner micro-bisect against the frozen CM-57P2
-evidence checkpoint `be6297fe710ffa59d5e0fa222db0d37544ea6455`. This
-pre-live implementation checkpoint authorizes zero provider calls and zero
-production changes. Live inference remains separately unauthorized.
+evidence checkpoint `be6297fe710ffa59d5e0fa222db0d37544ea6455`. The reviewed
+live checkpoint was `2e4f26f94670b8fa43cd7bea1246cb414c87bc41`; its complete
+32-row population is recorded in
+`CM-57P3-live-summary.json`. The live result is
+`PROMPT_CONTRACT_PARTIAL_RECOVERY`. No production files or worker/program
+calls were involved.
 
 CM-57P2 closed as `PLANNER_CONTRACT_REGRESSION`: the production planner's
 parent-closure validation was effective, but the live result still showed
@@ -65,20 +68,20 @@ Do not create an empty, placeholder, summary-only, or bookkeeping report_task
 for section-local work.
 ```
 
-## Future Live Matrix
+## Live Matrix
 
-The future matrix reuses all 16 frozen CM-57C cases and runs two attempts per
+The authorized matrix reused all 16 frozen CM-57C cases and ran two attempts per
 case, producing 32 paired shared rows and 128 planner executions. Each shared
 row constructs the request and path-free source summary once, then runs arms in
 the fixed order `P`, `W`, `R`, `WR`. The frozen controls are model
 `qwen3.6-35b-a3b`, planner temperature `0.0`, `max_tokens=16384`, and a
 900-second timeout. No workers, enrichment, typed output, or graph execution
-are part of P3.
+were part of P3. The runner flushed each completed paired row to the preserved
+raw JSONL evidence file.
 
 Evidence is bounded to plan shape, capability IDs, counts, classifications,
 metrics, and hashes. Provider payloads, prose, paths, and hidden reasoning are
-not retained. The future runner flushes each completed paired row to a new
-`/tmp/cm57p3-work-unit-bisect-qwen.jsonl` file and refuses a non-empty file.
+not retained. The runner refuses a non-empty evidence file before execution.
 The P2 summary anchor is
 `0aa20622e319117a1920f2a9809404fc00f087582c6c90786a159229c7b5e6fe`, with raw
 evidence SHA
@@ -120,7 +123,22 @@ CM-57B capability metadata boundary. It does not modify
 `src/wellplot/**`, P2, the corpus, planner schema/catalog, routing, enrichment,
 typed workers, or graph topology. CM-57D remains blocked.
 
-The implementation checkpoint must pass focused P3 tests, adjacent P2 and
-planner tests, Ruff, formatting, Python compilation, JSON validation,
-redaction/path scans, and `git diff --check`. Provider calls remain zero until
-a separate live authorization review.
+The implementation checkpoint passed focused P3 tests, adjacent P2 and planner
+tests, Ruff, formatting, Python compilation, JSON validation, redaction/path
+scans, and `git diff --check`. The completed live evidence contains 32 rows
+with raw SHA
+`84dd0a9b9a9b6288f7442211cc72b427512db39128d8b976c12e378888aca1a0` and
+158 planner provider calls; worker/program calls remained zero.
+
+## Completed Live Evidence
+
+The full aggregate is preserved in
+`docs/evaluations/agent-code-mode/CM-57P3-live-summary.json`. The principal
+final contract counts were P `2/32`, W `12/32`, R `28/32`, and WR
+`30/32`. WR improved over P without a fragmentation or report-task
+regression, so the frozen decision is `PROMPT_CONTRACT_PARTIAL_RECOVERY`.
+Semantic correction was used in P `14`, W `4`, R `8`, and WR `4`
+rows, with recoveries `2`, `2`, `4`, and `2`, respectively. There were
+no provider infrastructure or schema failures. The raw JSONL remains outside
+the repository at `/tmp/cm57p3-work-unit-bisect-qwen.jsonl` and is preserved
+unchanged for independent review.

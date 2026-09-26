@@ -1,0 +1,404 @@
+{
+  "arm_metrics": {
+    "P": {
+      "final_contract_passes": 2,
+      "final_duplicates": 2,
+      "final_empty_report_task": 18,
+      "final_fragmentation_with_gap": 0,
+      "final_nonempty_report_task": 0,
+      "final_parent_closure_failures": 0,
+      "final_plan_available": 26,
+      "final_planner_success": 26,
+      "final_report_task_present": 18,
+      "final_section_count_failures": 2,
+      "final_single_task_closure_omission": 8,
+      "final_union_exact_expected": 18,
+      "final_unresolved_requirements": 0,
+      "final_work_unit_fragmentation": 2,
+      "final_wrong_selection": 0,
+      "initial_contract_passes": 0,
+      "initial_duplicates": 2,
+      "initial_empty_report_task": 22,
+      "initial_fragmentation_with_gap": 2,
+      "initial_nonempty_report_task": 0,
+      "initial_parent_closure_failures": 14,
+      "initial_plan_available": 32,
+      "initial_report_task_present": 22,
+      "initial_section_count_failures": 12,
+      "initial_single_task_closure_omission": 10,
+      "initial_union_exact_expected": 20,
+      "initial_unresolved_requirements": 0,
+      "initial_work_unit_fragmentation": 10,
+      "initial_wrong_selection": 0,
+      "invalid_response_retries": 0,
+      "planner_schema_failures": 0,
+      "planner_semantic_failures": 6,
+      "provider_calls": 46,
+      "provider_infrastructure_failures": 0,
+      "rows_without_semantic_correction": 18,
+      "semantic_correction_failures": 12,
+      "semantic_correction_recoveries": 2,
+      "semantic_corrections": 14
+    },
+    "R": {
+      "final_contract_passes": 28,
+      "final_duplicates": 0,
+      "final_empty_report_task": 0,
+      "final_fragmentation_with_gap": 0,
+      "final_nonempty_report_task": 0,
+      "final_parent_closure_failures": 0,
+      "final_plan_available": 31,
+      "final_planner_success": 31,
+      "final_report_task_present": 0,
+      "final_section_count_failures": 0,
+      "final_single_task_closure_omission": 3,
+      "final_union_exact_expected": 28,
+      "final_unresolved_requirements": 0,
+      "final_work_unit_fragmentation": 0,
+      "final_wrong_selection": 0,
+      "initial_contract_passes": 24,
+      "initial_duplicates": 2,
+      "initial_empty_report_task": 0,
+      "initial_fragmentation_with_gap": 0,
+      "initial_nonempty_report_task": 0,
+      "initial_parent_closure_failures": 6,
+      "initial_plan_available": 32,
+      "initial_report_task_present": 0,
+      "initial_section_count_failures": 6,
+      "initial_single_task_closure_omission": 0,
+      "initial_union_exact_expected": 32,
+      "initial_unresolved_requirements": 0,
+      "initial_work_unit_fragmentation": 6,
+      "initial_wrong_selection": 0,
+      "invalid_response_retries": 0,
+      "planner_schema_failures": 0,
+      "planner_semantic_failures": 1,
+      "provider_calls": 40,
+      "provider_infrastructure_failures": 0,
+      "rows_without_semantic_correction": 24,
+      "semantic_correction_failures": 4,
+      "semantic_correction_recoveries": 4,
+      "semantic_corrections": 8
+    },
+    "W": {
+      "final_contract_passes": 12,
+      "final_duplicates": 0,
+      "final_empty_report_task": 20,
+      "final_fragmentation_with_gap": 0,
+      "final_nonempty_report_task": 0,
+      "final_parent_closure_failures": 0,
+      "final_plan_available": 32,
+      "final_planner_success": 32,
+      "final_report_task_present": 20,
+      "final_section_count_failures": 0,
+      "final_single_task_closure_omission": 0,
+      "final_union_exact_expected": 32,
+      "final_unresolved_requirements": 0,
+      "final_work_unit_fragmentation": 0,
+      "final_wrong_selection": 0,
+      "initial_contract_passes": 10,
+      "initial_duplicates": 0,
+      "initial_empty_report_task": 20,
+      "initial_fragmentation_with_gap": 0,
+      "initial_nonempty_report_task": 0,
+      "initial_parent_closure_failures": 4,
+      "initial_plan_available": 32,
+      "initial_report_task_present": 20,
+      "initial_section_count_failures": 0,
+      "initial_single_task_closure_omission": 4,
+      "initial_union_exact_expected": 28,
+      "initial_unresolved_requirements": 0,
+      "initial_work_unit_fragmentation": 0,
+      "initial_wrong_selection": 0,
+      "invalid_response_retries": 0,
+      "planner_schema_failures": 0,
+      "planner_semantic_failures": 0,
+      "provider_calls": 36,
+      "provider_infrastructure_failures": 0,
+      "rows_without_semantic_correction": 28,
+      "semantic_correction_failures": 2,
+      "semantic_correction_recoveries": 2,
+      "semantic_corrections": 4
+    },
+    "WR": {
+      "final_contract_passes": 30,
+      "final_duplicates": 0,
+      "final_empty_report_task": 0,
+      "final_fragmentation_with_gap": 0,
+      "final_nonempty_report_task": 0,
+      "final_parent_closure_failures": 0,
+      "final_plan_available": 32,
+      "final_planner_success": 32,
+      "final_report_task_present": 0,
+      "final_section_count_failures": 0,
+      "final_single_task_closure_omission": 2,
+      "final_union_exact_expected": 30,
+      "final_unresolved_requirements": 0,
+      "final_work_unit_fragmentation": 0,
+      "final_wrong_selection": 0,
+      "initial_contract_passes": 28,
+      "initial_duplicates": 0,
+      "initial_empty_report_task": 0,
+      "initial_fragmentation_with_gap": 2,
+      "initial_nonempty_report_task": 0,
+      "initial_parent_closure_failures": 4,
+      "initial_plan_available": 32,
+      "initial_report_task_present": 0,
+      "initial_section_count_failures": 2,
+      "initial_single_task_closure_omission": 2,
+      "initial_union_exact_expected": 28,
+      "initial_unresolved_requirements": 0,
+      "initial_work_unit_fragmentation": 0,
+      "initial_wrong_selection": 0,
+      "invalid_response_retries": 0,
+      "planner_schema_failures": 0,
+      "planner_semantic_failures": 0,
+      "provider_calls": 36,
+      "provider_infrastructure_failures": 0,
+      "rows_without_semantic_correction": 28,
+      "semantic_correction_failures": 2,
+      "semantic_correction_recoveries": 2,
+      "semantic_corrections": 4
+    }
+  },
+  "controls": {
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "timeout_seconds": 900.0
+  },
+  "decision": "PROMPT_CONTRACT_PARTIAL_RECOVERY",
+  "experiment_version": "CM-57P3",
+  "factor_tables": {
+    "P_to_R": {
+      "fragmentation": {
+        "CORRECT_TO_CORRECT": 23,
+        "CORRECT_TO_FRAGMENTED": 0,
+        "FRAGMENTED_TO_CORRECT": 2,
+        "FRAGMENTED_TO_FRAGMENTED": 0,
+        "UNAVAILABLE": 7
+      },
+      "full_contract": {
+        "BOTH_FAIL": 4,
+        "BOTH_PASS": 2,
+        "LEFT_ONLY_PASS": 0,
+        "RIGHT_ONLY_PASS": 26
+      },
+      "neutral": {
+        "final_contract_ok": {
+          "both_false": 4,
+          "both_true": 2,
+          "left_true_only": 0,
+          "right_true_only": 26
+        }
+      },
+      "report_task": {
+        "ABSENT_TO_ABSENT": 8,
+        "ABSENT_TO_PRESENT": 0,
+        "REPORT_PRESENT_TO_ABSENT": 17,
+        "REPORT_PRESENT_TO_PRESENT": 0,
+        "UNAVAILABLE": 7
+      }
+    },
+    "P_to_W": {
+      "fragmentation": {
+        "CORRECT_TO_CORRECT": 24,
+        "CORRECT_TO_FRAGMENTED": 0,
+        "FRAGMENTED_TO_CORRECT": 2,
+        "FRAGMENTED_TO_FRAGMENTED": 0,
+        "UNAVAILABLE": 6
+      },
+      "full_contract": {
+        "BOTH_FAIL": 20,
+        "BOTH_PASS": 2,
+        "LEFT_ONLY_PASS": 0,
+        "RIGHT_ONLY_PASS": 10
+      },
+      "neutral": {
+        "final_contract_ok": {
+          "both_false": 20,
+          "both_true": 2,
+          "left_true_only": 0,
+          "right_true_only": 10
+        }
+      },
+      "report_task": {
+        "ABSENT_TO_ABSENT": 4,
+        "ABSENT_TO_PRESENT": 4,
+        "REPORT_PRESENT_TO_ABSENT": 6,
+        "REPORT_PRESENT_TO_PRESENT": 12,
+        "UNAVAILABLE": 6
+      }
+    },
+    "R_to_WR": {
+      "fragmentation": {
+        "CORRECT_TO_CORRECT": 31,
+        "CORRECT_TO_FRAGMENTED": 0,
+        "FRAGMENTED_TO_CORRECT": 0,
+        "FRAGMENTED_TO_FRAGMENTED": 0,
+        "UNAVAILABLE": 1
+      },
+      "full_contract": {
+        "BOTH_FAIL": 0,
+        "BOTH_PASS": 26,
+        "LEFT_ONLY_PASS": 2,
+        "RIGHT_ONLY_PASS": 4
+      },
+      "neutral": {
+        "final_contract_ok": {
+          "both_false": 0,
+          "both_true": 26,
+          "left_true_only": 2,
+          "right_true_only": 4
+        }
+      },
+      "report_task": {
+        "ABSENT_TO_ABSENT": 31,
+        "ABSENT_TO_PRESENT": 0,
+        "REPORT_PRESENT_TO_ABSENT": 0,
+        "REPORT_PRESENT_TO_PRESENT": 0,
+        "UNAVAILABLE": 1
+      }
+    },
+    "W_to_WR": {
+      "fragmentation": {
+        "CORRECT_TO_CORRECT": 32,
+        "CORRECT_TO_FRAGMENTED": 0,
+        "FRAGMENTED_TO_CORRECT": 0,
+        "FRAGMENTED_TO_FRAGMENTED": 0,
+        "UNAVAILABLE": 0
+      },
+      "full_contract": {
+        "BOTH_FAIL": 2,
+        "BOTH_PASS": 12,
+        "LEFT_ONLY_PASS": 0,
+        "RIGHT_ONLY_PASS": 18
+      },
+      "neutral": {
+        "final_contract_ok": {
+          "both_false": 2,
+          "both_true": 12,
+          "left_true_only": 0,
+          "right_true_only": 18
+        }
+      },
+      "report_task": {
+        "ABSENT_TO_ABSENT": 12,
+        "ABSENT_TO_PRESENT": 0,
+        "REPORT_PRESENT_TO_ABSENT": 20,
+        "REPORT_PRESENT_TO_PRESENT": 0,
+        "UNAVAILABLE": 0
+      }
+    }
+  },
+  "live_evidence": {
+    "authorized_checkpoint": "2e4f26f94670b8fa43cd7bea1246cb414c87bc41",
+    "production_changes": 0,
+    "provider_calls_total": 158,
+    "raw_jsonl": "/tmp/cm57p3-work-unit-bisect-qwen.jsonl",
+    "raw_rows": 32,
+    "raw_sha256": "84dd0a9b9a9b6288f7442211cc72b427512db39128d8b976c12e378888aca1a0",
+    "worker_program_calls": 0
+  },
+  "population": {
+    "actual_rows": 32,
+    "arms_per_row": 4,
+    "attempts_per_case": 2,
+    "cases": 16,
+    "complete": true,
+    "expected_rows": 32,
+    "reasons": []
+  },
+  "repeatability": {
+    "stable_cases": {
+      "P": [
+        "alternate_source_selection",
+        "curve_linear_new_values",
+        "curve_log_new_values",
+        "curve_reverse_new_values",
+        "curve_tangential_new_values",
+        "mixed_curve_raster_section",
+        "multi_raster_binding_order",
+        "raster_profile_omitted_negative",
+        "reference_track_multi_curve",
+        "repeated_channel_new_values",
+        "sample_axis_unit_ticks_only",
+        "vdl_axis_new_values",
+        "waveform_profile_paraphrase"
+      ],
+      "R": [
+        "alternate_source_selection",
+        "curve_linear_new_values",
+        "curve_log_new_values",
+        "curve_reverse_new_values",
+        "curve_tangential_new_values",
+        "independent_sample_bounds",
+        "mixed_curve_raster_section",
+        "multi_curve_order",
+        "multi_raster_binding_order",
+        "raster_profile_omitted_negative",
+        "reference_track_multi_curve",
+        "repeated_channel_new_values",
+        "sample_axis_unit_ticks_only",
+        "vdl_axis_new_values"
+      ],
+      "W": [
+        "alternate_source_selection",
+        "curve_linear_new_values",
+        "curve_log_new_values",
+        "curve_reverse_new_values",
+        "curve_tangential_new_values",
+        "generic_profile_paraphrase",
+        "independent_sample_bounds",
+        "mixed_curve_raster_section",
+        "multi_curve_order",
+        "multi_raster_binding_order",
+        "raster_profile_omitted_negative",
+        "reference_track_multi_curve",
+        "repeated_channel_new_values",
+        "sample_axis_unit_ticks_only",
+        "vdl_axis_new_values",
+        "waveform_profile_paraphrase"
+      ],
+      "WR": [
+        "alternate_source_selection",
+        "curve_linear_new_values",
+        "curve_log_new_values",
+        "curve_reverse_new_values",
+        "curve_tangential_new_values",
+        "generic_profile_paraphrase",
+        "independent_sample_bounds",
+        "mixed_curve_raster_section",
+        "multi_curve_order",
+        "multi_raster_binding_order",
+        "raster_profile_omitted_negative",
+        "reference_track_multi_curve",
+        "repeated_channel_new_values",
+        "sample_axis_unit_ticks_only",
+        "vdl_axis_new_values",
+        "waveform_profile_paraphrase"
+      ]
+    },
+    "unavailable_cases": {
+      "P": [
+        "generic_profile_paraphrase",
+        "independent_sample_bounds",
+        "multi_curve_order"
+      ],
+      "R": [
+        "waveform_profile_paraphrase"
+      ],
+      "W": [],
+      "WR": []
+    },
+    "unstable_cases": {
+      "P": [],
+      "R": [
+        "generic_profile_paraphrase"
+      ],
+      "W": [],
+      "WR": []
+    }
+  }
+}
