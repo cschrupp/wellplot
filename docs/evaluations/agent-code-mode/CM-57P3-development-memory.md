@@ -21,6 +21,15 @@ The four arms are fixed and ordered `P`, `W`, `R`, `WR`:
 - `R`: P plus the frozen report-task boundary instruction.
 - `WR`: P plus W and R, in that order.
 
+Frozen provenance hashes:
+
+- W instruction: `e0ce6bf0fe598dc438a65ecb08a8a88a45f1aeda8e66e85158d90f1f46dac5c4`
+- R instruction: `12fd2c40e407cb7d5d0e21effd66493e20e99468e3a97b89ac0186b40648c5b5`
+- P prompt: `5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18`
+- W prompt: `9e831e7d5d37e35d6f125e98591d77d8f06c2985e102a13514853a5ff8b78404`
+- R prompt: `fe8db9c9cba4cf7bf13d79c3e838eaa53e19770fbf6dd764cdcf93020008c563`
+- WR prompt: `5a0e49f077e45587e19470f962b09528a4a485a0d05725eb285cef676de1035f`
+
 The actual production `SemanticPlanner.plan()` is used in every arm. An
 evaluation-only provider wrapper asserts the production prompt and replaces
 only `system_prompt`; user prompt, response model, timeout, temperature, and
@@ -83,6 +92,13 @@ single-task closure omission, report pollution, parent closure, wrong
 selection, and the four paired factor transition tables. Population integrity
 requires exactly 32 rows, 16 cases, attempts `{0, 1}`, one checkpoint, and all
 four arms per row.
+
+The aggregate keeps initial and final semantic metrics separate from terminal
+planner outcomes. Missing final facts on schema, semantic, or infrastructure
+failures are never treated as semantic facts. Terminal counts include planner
+success, semantic failures, schema failures, and provider infrastructure
+failures. Pair tables retain neutral boolean buckets as well as explicit
+full-contract, fragmentation, and report-task transition labels.
 
 The only allowed primary decisions are:
 

@@ -465,7 +465,47 @@ async def run_shared_row(
 
 def _arm(row: dict[str, object], arm: str) -> dict[str, object]:
     """Return one arm result from a shared evidence row."""
-    return row["arms"][arm]  # type: ignore[return-value]
+    arms = row.get("arms")
+    if not isinstance(arms, dict):
+        return {}
+    result = arms.get(arm)
+    return result if isinstance(result, dict) else {}
+
+
+def _final_fact(
+    arm_result: dict[str, object],
+    key: str,
+    default: object = False,
+) -> object:
+    """Read one final semantic fact without manufacturing facts for failures."""
+    facts = arm_result.get("final_facts")
+    if not isinstance(facts, dict):
+        return default
+    return facts.get(key, default)
+
+
+def _phase_fact(
+    arm_result: dict[str, object],
+    phase: Literal["initial", "final"],
+    key: str,
+    default: object = False,
+) -> object:
+    """Read one initial or final semantic fact safely."""
+    facts = arm_result.get("initial_facts") if phase == "initial" else arm_result.get("final_facts")
+    if not isinstance(facts, dict):
+        return default
+    return facts.get(key, default)
+
+
+def _phase_contract_ok(arm_result: dict[str, object], phase: Literal["initial", "final"]) -> bool:
+    """Determine contract success for a structurally available plan phase."""
+    facts = arm_result.get(f"{phase}_facts")
+    if not isinstance(facts, dict):
+        return False
+    try:
+        return final_contract_ok(facts)
+    except KeyError:
+        return False
 
 
 def _pair_table(rows: list[dict[str, object]], left: str, right: str, key: str) -> dict[str, int]:
@@ -476,10 +516,27 @@ def _pair_table(rows: list[dict[str, object]], left: str, right: str, key: str) 
         right_value = bool(_arm(row, right).get(key))
         counts[(left_value, right_value)] += 1
     return {
-        "both_pass": counts[(True, True)],
-        "left_only": counts[(True, False)],
-        "right_only": counts[(False, True)],
-        "both_fail": counts[(False, False)],
+        "both_true": counts[(True, True)],
+        "left_true_only": counts[(True, False)],
+        "right_true_only": counts[(False, True)],
+        "both_false": counts[(False, False)],
+    }
+
+
+def _semantic_pair_table(
+    table: dict[str, int],
+    *,
+    true_true: str,
+    true_false: str,
+    false_true: str,
+    false_false: str,
+) -> dict[str, int]:
+    """Rename neutral boolean buckets for one explicitly defined semantic metric."""
+    return {
+        true_true: table["both_true"],
+        true_false: table["left_true_only"],
+        false_true: table["right_true_only"],
+        false_false: table["both_false"],
     }
 
 
@@ -496,13 +553,37 @@ def factor_tables(rows: list[dict[str, object]]) -> dict[str, object]:
         "work_unit_fragmentation": "work_unit_fragmentation",
         "report_task_present": "report_task_present",
     }
-    return {
-        pair_name: {
+    tables: dict[str, object] = {}
+    for pair_name, (left, right) in pairs.items():
+        raw = {
             metric_name: _pair_table(rows, left, right, metric_key)
             for metric_name, metric_key in metrics.items()
         }
-        for pair_name, (left, right) in pairs.items()
-    }
+        tables[pair_name] = {
+            "neutral": raw,
+            "full_contract": _semantic_pair_table(
+                raw["final_contract_ok"],
+                true_true="BOTH_PASS",
+                true_false="LEFT_ONLY_PASS",
+                false_true="RIGHT_ONLY_PASS",
+                false_false="BOTH_FAIL",
+            ),
+            "fragmentation": _semantic_pair_table(
+                raw["work_unit_fragmentation"],
+                true_true="FRAGMENTED_TO_FRAGMENTED",
+                true_false="FRAGMENTED_TO_CORRECT",
+                false_true="CORRECT_TO_FRAGMENTED",
+                false_false="CORRECT_TO_CORRECT",
+            ),
+            "report_task": _semantic_pair_table(
+                raw["report_task_present"],
+                true_true="REPORT_PRESENT_TO_PRESENT",
+                true_false="REPORT_PRESENT_TO_ABSENT",
+                false_true="ABSENT_TO_PRESENT",
+                false_false="ABSENT_TO_ABSENT",
+            ),
+        }
+    return tables
 
 
 def population_integrity(
@@ -526,7 +607,7 @@ def population_integrity(
         by_case.setdefault(case_id, set()).add(attempt)
     if any(indexes != set(range(ATTEMPTS)) for indexes in by_case.values()):
         reasons.append("attempt_index_mismatch")
-    if any(set(row.get("arms", {})) != set(ARMS) for row in rows):
+    if any(not isinstance(row.get("arms"), dict) or set(row["arms"]) != set(ARMS) for row in rows):
         reasons.append("arm_set_mismatch")
     checkpoints = {row.get("authorized_checkpoint") for row in rows}
     if None in checkpoints or len(checkpoints) != 1:
@@ -539,6 +620,104 @@ def population_integrity(
 def _count_arm(rows: list[dict[str, object]], arm: str, key: str) -> int:
     """Count one boolean arm metric."""
     return sum(bool(_arm(row, arm).get(key)) for row in rows)
+
+
+def _phase_metrics(
+    rows: list[dict[str, object]],
+    arm: str,
+    phase: Literal["initial", "final"],
+) -> dict[str, int]:
+    """Aggregate semantic facts for one planner phase, excluding terminal failures."""
+    available = [
+        _arm(row, arm) for row in rows if isinstance(_arm(row, arm).get(f"{phase}_facts"), dict)
+    ]
+    prefix = f"{phase}_"
+    return {
+        f"{prefix}plan_available": sum(
+            bool(_arm(row, arm).get(f"{phase}_plan_available")) for row in rows
+        )
+        if phase == "initial"
+        else sum(bool(_arm(row, arm).get("final_planner_success")) for row in rows),
+        f"{prefix}contract_passes": sum(_phase_contract_ok(_arm(row, arm), phase) for row in rows),
+        f"{prefix}section_count_failures": sum(
+            not bool(_phase_fact(result, phase, "section_count_ok")) for result in available
+        ),
+        f"{prefix}work_unit_fragmentation": sum(
+            bool(_phase_fact(result, phase, "work_unit_fragmentation")) for result in available
+        ),
+        f"{prefix}fragmentation_with_gap": sum(
+            bool(_phase_fact(result, phase, "fragmentation_with_gap")) for result in available
+        ),
+        f"{prefix}single_task_closure_omission": sum(
+            bool(_phase_fact(result, phase, "single_task_closure_omission")) for result in available
+        ),
+        f"{prefix}report_task_present": sum(
+            bool(_phase_fact(result, phase, "report_task_present")) for result in available
+        ),
+        f"{prefix}empty_report_task": sum(
+            bool(_phase_fact(result, phase, "empty_report_task")) for result in available
+        ),
+        f"{prefix}nonempty_report_task": sum(
+            bool(_phase_fact(result, phase, "report_task_present"))
+            and not bool(_phase_fact(result, phase, "empty_report_task"))
+            for result in available
+        ),
+        f"{prefix}union_exact_expected": sum(
+            bool(_phase_fact(result, phase, "union_exact_expected")) for result in available
+        ),
+        f"{prefix}wrong_selection": sum(
+            bool(_phase_fact(result, phase, "wrong_capability_selection")) for result in available
+        ),
+        f"{prefix}duplicates": sum(
+            bool(_phase_fact(result, phase, "duplicate_capabilities")) for result in available
+        ),
+        f"{prefix}parent_closure_failures": sum(
+            not bool(_phase_fact(result, phase, "parent_closure_valid")) for result in available
+        ),
+        f"{prefix}unresolved_requirements": sum(
+            bool(_phase_fact(result, phase, "unresolved_present")) for result in available
+        ),
+    }
+
+
+def _terminal_metrics(rows: list[dict[str, object]], arm: str) -> dict[str, int]:
+    """Aggregate terminal planner outcomes without treating them as semantic facts."""
+    results = [_arm(row, arm) for row in rows]
+    return {
+        "final_planner_success": sum(
+            bool(result.get("final_planner_success")) for result in results
+        ),
+        "planner_semantic_failures": sum(
+            result.get("final_classification") == "PLANNER_SEMANTIC_FAILURE" for result in results
+        ),
+        "planner_schema_failures": sum(
+            result.get("final_classification") == "PLANNER_SCHEMA_FAILURE" for result in results
+        ),
+        "provider_infrastructure_failures": sum(
+            bool(result.get("provider_infrastructure_failure")) for result in results
+        ),
+    }
+
+
+def _correction_metrics(rows: list[dict[str, object]], arm: str) -> dict[str, int]:
+    """Aggregate bounded correction and retry outcomes for one arm."""
+    results = [_arm(row, arm) for row in rows]
+    used = [bool(result.get("semantic_correction_used")) for result in results]
+    return {
+        "semantic_corrections": sum(used),
+        "semantic_correction_recoveries": sum(
+            used[index] and bool(results[index].get("final_contract_ok"))
+            for index in range(len(results))
+        ),
+        "semantic_correction_failures": sum(
+            used[index] and not bool(results[index].get("final_contract_ok"))
+            for index in range(len(results))
+        ),
+        "invalid_response_retries": sum(
+            bool(result.get("invalid_response_retry_used")) for result in results
+        ),
+        "rows_without_semantic_correction": sum(not item for item in used),
+    }
 
 
 def decision(
@@ -556,8 +735,8 @@ def decision(
     p_passes = _count_arm(rows, "P", "final_contract_ok")
     wr_passes = _count_arm(rows, "WR", "final_contract_ok")
     wrong_selection_regression = any(
-        _arm(row, "WR").get("final_facts", {}).get("wrong_capability_selection")
-        and not _arm(row, "P").get("final_facts", {}).get("wrong_capability_selection")
+        bool(_final_fact(_arm(row, "WR"), "wrong_capability_selection"))
+        and not bool(_final_fact(_arm(row, "P"), "wrong_capability_selection"))
         for row in rows
     )
     fragmentation_regression = _count_arm(rows, "WR", "work_unit_fragmentation") > _count_arm(
@@ -591,7 +770,7 @@ def repeatability(rows: list[dict[str, object]]) -> dict[str, object]:
     for case_id, case_rows in sorted(by_case.items()):
         for arm in ARMS:
             values = [_arm(row, arm).get("final_facts") for row in case_rows]
-            if any(value is None for value in values):
+            if len(values) != ATTEMPTS or any(value is None for value in values):
                 unavailable[arm].append(case_id)
             elif values[0] == values[1]:
                 stable[arm].append(case_id)
@@ -622,23 +801,12 @@ def summarize_population(
         "decision": decision(rows, cases, expected_checkpoint=authorized_checkpoint),
         "arm_metrics": {
             arm: {
-                "final_contract_passes": _count_arm(rows, arm, "final_contract_ok"),
-                "report_task_present": _count_arm(rows, arm, "report_task_present"),
-                "work_unit_fragmentation": _count_arm(rows, arm, "work_unit_fragmentation"),
-                "fragmentation_with_gap": _count_arm(rows, arm, "fragmentation_with_gap"),
-                "single_task_closure_omission": _count_arm(
-                    rows, arm, "single_task_closure_omission"
-                ),
+                **_phase_metrics(rows, arm, "initial"),
+                **_phase_metrics(rows, arm, "final"),
+                **_terminal_metrics(rows, arm),
+                **_correction_metrics(rows, arm),
                 "provider_calls": sum(
                     int(_arm(row, arm).get("planner_call_count", 0)) for row in rows
-                ),
-                "semantic_corrections": sum(
-                    bool(_arm(row, arm).get("semantic_correction_used")) for row in rows
-                ),
-                "correction_recoveries": sum(
-                    bool(_arm(row, arm).get("semantic_correction_used"))
-                    and bool(_arm(row, arm).get("final_contract_ok"))
-                    for row in rows
                 ),
             }
             for arm in ARMS

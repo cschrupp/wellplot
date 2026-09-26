@@ -29,6 +29,7 @@ class Backend:
 
     plan: SemanticPlan
     requests: list[StructuredGenerationRequest] = field(default_factory=list)
+    response_models: list[type[BaseModel]] = field(default_factory=list)
 
     async def generate_structured(
         self,
@@ -38,6 +39,7 @@ class Backend:
     ) -> StructuredGenerationResult[BaseModel]:
         """Return the fixed plan after recording the request."""
         self.requests.append(request)
+        self.response_models.append(response_model)
         return StructuredGenerationResult(
             value=response_model.model_validate(self.plan),
             metrics=ProviderMetrics(),
@@ -65,10 +67,9 @@ def _valid_plan() -> SemanticPlan:
     )
 
 
-def _request(arm: p3.Arm) -> tuple[Backend, p3.PromptArmBackend]:
-    delegate = Backend(_valid_plan())
-    wrapper = p3.PromptArmBackend(delegate=delegate, arm=arm, forwarded_requests=[])
-    planner = SemanticPlanner(backend=wrapper, registry=create_builtin_registry())
+def _run_planner(backend: object) -> None:
+    """Run one planner request against the supplied backend."""
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())  # type: ignore[arg-type]
     asyncio.run(
         planner.plan(
             request="Create one section.",
@@ -78,6 +79,18 @@ def _request(arm: p3.Arm) -> tuple[Backend, p3.PromptArmBackend]:
             max_output_tokens=100,
         )
     )
+
+
+def _request(
+    arm: p3.Arm,
+    *,
+    wrapped: bool = True,
+) -> tuple[Backend, p3.PromptArmBackend | None]:
+    delegate = Backend(_valid_plan())
+    wrapper = (
+        p3.PromptArmBackend(delegate=delegate, arm=arm, forwarded_requests=[]) if wrapped else None
+    )
+    _run_planner(wrapper if wrapper is not None else delegate)
     return delegate, wrapper
 
 
@@ -98,6 +111,7 @@ def test_prompt_composition_is_deterministic_and_factorial() -> None:
 def test_prompt_arm_changes_only_system_prompt(arm: p3.Arm) -> None:
     """Every arm preserves all non-system provider request fields."""
     delegate, wrapper = _request(arm)
+    assert wrapper is not None
     assert len(delegate.requests) == len(wrapper.forwarded_requests) == 1
     forwarded = wrapper.forwarded_requests[0]
     assert forwarded.user_prompt == delegate.requests[0].user_prompt
@@ -124,9 +138,12 @@ def test_prompt_wrapper_rejects_production_prompt_drift_before_delegate() -> Non
 
 def test_p_arm_is_production_equivalent() -> None:
     """The P wrapper emits the same request as direct production planning."""
-    direct, _ = _request("P")
+    direct, _ = _request("P", wrapped=False)
     wrapped, wrapper = _request("P")
+    assert wrapper is not None
     assert direct.requests == wrapped.requests == wrapper.forwarded_requests
+    assert direct.response_models == wrapped.response_models == [SemanticPlan]
+    assert wrapper.forwarded_requests[0] is wrapped.requests[0]
 
 
 def test_wrapper_returns_provider_result_without_modification() -> None:
@@ -170,6 +187,37 @@ def test_correction_path_uses_same_factor_prompt() -> None:
     )
 
 
+def test_direct_and_p_wrapped_correction_requests_are_equivalent() -> None:
+    """Direct production and P-wrapped correction paths emit equal requests."""
+    case = _case()
+    duplicate = SemanticPlan(
+        summary="duplicate",
+        section_tasks=(
+            SectionTask(
+                goal="duplicate",
+                capability_ids=tuple(case["expected_capabilities"]) * 2,
+            ),
+        ),
+    )
+    direct = _SequenceBackend(plan=_valid_plan(), responses=[duplicate, _valid_plan()])
+    wrapped_delegate = _SequenceBackend(plan=_valid_plan(), responses=[duplicate, _valid_plan()])
+    wrapper = p3.PromptArmBackend(
+        delegate=wrapped_delegate,
+        arm="P",
+        forwarded_requests=[],
+    )
+    planner_direct = SemanticPlanner(backend=direct, registry=create_builtin_registry())
+    planner_wrapped = SemanticPlanner(backend=wrapper, registry=create_builtin_registry())
+    for planner in (planner_direct, planner_wrapped):
+        asyncio.run(
+            planner.plan(request="Create one section.", mode="reconstruct", timeout_seconds=1.0)
+        )
+    assert direct.requests == wrapped_delegate.requests == wrapper.forwarded_requests
+    assert (
+        direct.response_models == wrapped_delegate.response_models == [SemanticPlan, SemanticPlan]
+    )
+
+
 @dataclass
 class _SequenceBackend(Backend):
     responses: list[SemanticPlan] = field(default_factory=list)
@@ -182,6 +230,7 @@ class _SequenceBackend(Backend):
     ) -> StructuredGenerationResult[BaseModel]:
         """Return the next configured plan."""
         self.requests.append(request)
+        self.response_models.append(response_model)
         return StructuredGenerationResult(
             value=response_model.model_validate(self.responses.pop(0)),
             metrics=ProviderMetrics(),
@@ -255,10 +304,16 @@ def test_factor_tables_report_all_transition_buckets() -> None:
     rows[2]["arms"]["R"]["final_contract_ok"] = False
     rows[3]["arms"]["WR"]["final_contract_ok"] = False
     table = p3.factor_tables(rows)
-    assert sum(table["P_to_W"]["final_contract_ok"].values()) == len(rows)
-    assert sum(table["P_to_R"]["final_contract_ok"].values()) == len(rows)
-    assert sum(table["W_to_WR"]["final_contract_ok"].values()) == len(rows)
-    assert sum(table["R_to_WR"]["final_contract_ok"].values()) == len(rows)
+    assert sum(table["P_to_W"]["neutral"]["final_contract_ok"].values()) == len(rows)
+    assert sum(table["P_to_R"]["neutral"]["final_contract_ok"].values()) == len(rows)
+    assert sum(table["W_to_WR"]["neutral"]["final_contract_ok"].values()) == len(rows)
+    assert sum(table["R_to_WR"]["neutral"]["final_contract_ok"].values()) == len(rows)
+    assert set(table["P_to_W"]["fragmentation"]) == {
+        "FRAGMENTED_TO_FRAGMENTED",
+        "FRAGMENTED_TO_CORRECT",
+        "CORRECT_TO_CORRECT",
+        "CORRECT_TO_FRAGMENTED",
+    }
 
 
 def test_decision_precedence_covers_recovery_and_regression() -> None:
@@ -272,6 +327,90 @@ def test_decision_precedence_covers_recovery_and_regression() -> None:
     assert p3.decision(rows, cases, expected_checkpoint=p3.BASELINE_SHA) == (
         "PROMPT_CONTRACT_REGRESSION"
     )
+
+
+def test_terminal_failures_are_decision_safe() -> None:
+    """Semantic and schema terminal outcomes never crash aggregation."""
+    cases = p3.p2.load_case_definitions()
+    rows = _population()
+    rows[0]["arms"]["WR"].update(
+        {
+            "final_contract_ok": False,
+            "final_facts": None,
+            "final_classification": "PLANNER_SEMANTIC_FAILURE",
+            "final_planner_success": False,
+        }
+    )
+    assert p3.decision(rows, cases, expected_checkpoint=p3.BASELINE_SHA) == (
+        "PROMPT_CONTRACT_REGRESSION"
+    )
+
+    rows = _population()
+    rows[0]["arms"]["P"].update(
+        {
+            "final_contract_ok": False,
+            "final_facts": None,
+            "final_classification": "PLANNER_SEMANTIC_FAILURE",
+            "final_planner_success": False,
+        }
+    )
+    assert p3.decision(rows, cases, expected_checkpoint=p3.BASELINE_SHA) == (
+        "PROMPT_CONTRACT_FULL_RECOVERY"
+    )
+
+    rows = _population()
+    for arm in ("P", "WR"):
+        rows[0]["arms"][arm].update(
+            {
+                "final_contract_ok": False,
+                "final_facts": None,
+                "final_classification": "PLANNER_SCHEMA_FAILURE",
+                "final_planner_success": False,
+            }
+        )
+    assert p3.decision(rows, cases, expected_checkpoint=p3.BASELINE_SHA) == (
+        "PROMPT_CONTRACT_NO_RECOVERY"
+    )
+
+    rows = _population()
+    rows[0]["arms"]["WR"]["provider_infrastructure_failure"] = True
+    assert p3.decision(rows, cases, expected_checkpoint=p3.BASELINE_SHA) == (
+        "INCONCLUSIVE_PLANNER_MICRO_BISECT"
+    )
+
+
+def test_repeatability_marks_partial_cases_unavailable() -> None:
+    """Incomplete per-case attempts do not cause an index error."""
+    result = p3.repeatability(_population()[:1])
+    assert result["unavailable_cases"]["P"] == [_case()["case_id"]]
+
+
+def test_summary_exposes_initial_final_and_terminal_arm_metrics() -> None:
+    """Aggregates retain both semantic phases and terminal outcomes."""
+    summary = p3.summarize_population(
+        _population(),
+        p3.p2.load_case_definitions(),
+        authorized_checkpoint=p3.BASELINE_SHA,
+    )
+    metrics = summary["arm_metrics"]["WR"]
+    expected_keys = {
+        "initial_contract_passes",
+        "initial_work_unit_fragmentation",
+        "initial_empty_report_task",
+        "initial_union_exact_expected",
+        "final_contract_passes",
+        "final_fragmentation_with_gap",
+        "final_nonempty_report_task",
+        "final_duplicates",
+        "final_parent_closure_failures",
+        "final_unresolved_requirements",
+        "planner_semantic_failures",
+        "planner_schema_failures",
+        "provider_infrastructure_failures",
+        "semantic_correction_failures",
+        "rows_without_semantic_correction",
+    }
+    assert expected_keys <= set(metrics)
 
 
 def test_prelive_report_makes_no_provider_calls() -> None:
