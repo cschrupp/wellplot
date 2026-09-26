@@ -21,6 +21,10 @@ run requires an explicit `--live-authorized` flag, a full lowercase checkout
 SHA, an explicit base URL, and the configured key source. The future runner
 also rejects a non-empty evidence file before provider construction.
 
+CM-57P2-R1 is the narrow pre-live evidence-guard correction against the
+committed P2 checkpoint. It keeps the same experiment and adds no provider
+calls or production changes.
+
 ## Evaluation Boundary
 
 Each future row calls the actual production `SemanticPlanner.plan()` once for
@@ -84,6 +88,12 @@ The future live guard covers the P2 harness, the P1 planner and capability
 authority, the CM-57C corpus and historical summary, the production source
 summary helpers, and the source fixture directory. It rejects checkout or
 artifact drift before provider construction.
+
+The same shared `verify_frozen_contract()` guard runs in both the default
+pre-live path and the future live path. The live ordering is: validate the
+authorized checkpoint, reject a non-empty evidence path, verify the reviewed
+checkout and byte-level guarded artifacts, verify all frozen semantic hashes,
+and only then construct the provider.
 
 ## Bounded Evidence
 
@@ -158,12 +168,19 @@ more than 11 and fewer than 32 valid contracts
 Historical CM-57C success/failure transitions and two-attempt final contract
 repeatability are retained as separate bounded aggregate evidence.
 
+Population integrity requires every case to contain exactly attempt indexes
+`{0, 1}` and every completed row to contain one consistent authorized
+checkpoint. The aggregate records the four historical transitions
+`PASS_TO_PASS`, `PASS_TO_FAIL`, `FAIL_TO_PASS`, and `FAIL_TO_FAIL`; their total
+must equal 32. The `FAIL_TO_PASS` and `PASS_TO_FAIL` counts are checked against
+the independent recovery and regression counters.
+
 ## Deterministic Validation
 
 Pre-live validation completed without provider calls:
 
 ```text
-focused CM-57P2 tests: 15 passed
+focused CM-57P2/R1 tests: 20 passed
 pre-live CLI:           PRELIVE_READY
 provider calls:         0
 production changes:     0

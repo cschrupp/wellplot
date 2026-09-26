@@ -253,9 +253,12 @@ def test_population_decision_precedence_and_thresholds() -> None:
         {
             "case_id": case["case_id"],
             "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
             "final_classification": "PLANNER_CONTRACT_OK",
             "provider_infrastructure_failure": False,
             "historical_success_regression": False,
+            "historical_recovered": True,
         }
         for case in cases
         for attempt in range(p2.ATTEMPTS)
@@ -263,6 +266,7 @@ def test_population_decision_precedence_and_thresholds() -> None:
 
     assert p2.planner_decision(base, cases) == "PLANNER_CONTRACT_VALIDATED"
     base[0]["final_classification"] = "WRONG_CAPABILITY_SELECTION"
+    base[0]["historical_recovered"] = False
     assert p2.planner_decision(base, cases) == "PLANNER_CONTRACT_REGRESSION"
     base[0]["final_classification"] = "PLANNER_CONTRACT_OK"
     base[0]["provider_infrastructure_failure"] = True
@@ -283,6 +287,149 @@ def test_population_integrity_rejects_duplicates_and_missing_rows() -> None:
 
     assert complete is False
     assert "duplicate_case_attempt" in reasons
+
+
+def test_population_integrity_requires_exact_attempt_indexes() -> None:
+    """Population integrity rejects an otherwise complete 0,2 attempt pair."""
+    cases = _cases()
+    rows = [
+        {
+            "case_id": case["case_id"],
+            "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+        }
+        for case in cases
+        for attempt in range(p2.ATTEMPTS)
+    ]
+    rows[-1]["attempt_index"] = 2
+
+    complete, reasons = p2.population_integrity(rows, cases)
+
+    assert complete is False
+    assert "attempt_index_mismatch" in reasons
+
+
+def test_mixed_authorized_checkpoints_are_inconclusive() -> None:
+    """A mixed checkpoint population cannot receive a planner decision."""
+    cases = _cases()
+    rows = [
+        {
+            "case_id": case["case_id"],
+            "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "provider_infrastructure_failure": False,
+            "historical_recovered": True,
+            "historical_success_regression": False,
+        }
+        for case in cases
+        for attempt in range(p2.ATTEMPTS)
+    ]
+    rows[-1]["authorized_checkpoint"] = "f" * 40
+
+    assert p2.planner_decision(rows, cases) == "INCONCLUSIVE_PLANNER_EVALUATION"
+
+
+def test_transition_matrix_counts_all_four_paths() -> None:
+    """Historical and final planner outcomes retain all four transitions."""
+    cases = _cases()
+    rows = [
+        {
+            "case_id": case["case_id"],
+            "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "historical_recovered": True,
+            "historical_success_regression": False,
+        }
+        for case in cases
+        for attempt in range(p2.ATTEMPTS)
+    ]
+    rows[0].update(historical_pipeline="SUCCESS", historical_recovered=False)
+    rows[1].update(
+        historical_pipeline="SUCCESS",
+        final_classification="PLANNER_SEMANTIC_FAILURE",
+        historical_recovered=False,
+        historical_success_regression=True,
+    )
+    rows[2].update(historical_pipeline="PLANNER_FAILURE", historical_recovered=True)
+    for row in rows[3:]:
+        row.update(
+            historical_pipeline="PLANNER_FAILURE",
+            final_classification="PLANNER_SEMANTIC_FAILURE",
+            historical_recovered=False,
+        )
+
+    transitions = p2.transition_matrix(rows)
+
+    assert transitions == {
+        "PASS_TO_PASS": 1,
+        "PASS_TO_FAIL": 1,
+        "FAIL_TO_PASS": 1,
+        "FAIL_TO_FAIL": 29,
+    }
+    assert sum(transitions.values()) == 32
+
+
+def test_summary_exposes_other_gate_counts_and_independent_initial_metrics() -> None:
+    """Aggregate evidence retains gates and multi-gap initial facts independently."""
+    cases = _cases()
+    rows = [
+        {
+            "case_id": case["case_id"],
+            "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "historical_recovered": True,
+            "historical_success_regression": False,
+            "provider_infrastructure_failure": False,
+            "initial_facts": {},
+            "final_facts": {},
+            "call_trace": [],
+            "planner_call_count": 1,
+        }
+        for case in cases
+        for attempt in range(p2.ATTEMPTS)
+    ]
+    rows[0]["initial_classification"] = "INITIAL_MULTIPLE_CONTRACT_GAPS"
+    rows[0]["initial_facts"] = {
+        "missing_capabilities": ["binding.curve"],
+        "duplicate_capabilities": ["track.normal"],
+        "parent_closure_valid": False,
+        "unexpected_capabilities": ["track.reference"],
+        "report_task_present": True,
+        "unresolved_present": True,
+    }
+    rows[0]["final_classification"] = "UNEXPECTED_REPORT_TASK"
+    rows[0]["historical_recovered"] = False
+    rows[0]["final_facts"] = {"report_task_present": True, "unresolved_present": False}
+    rows[1]["final_classification"] = "UNRESOLVED_REQUIREMENTS"
+    rows[1]["historical_recovered"] = False
+    rows[1]["final_facts"] = {"report_task_present": False, "unresolved_present": True}
+    rows[2]["final_classification"] = "REPORT_AND_UNRESOLVED"
+    rows[2]["historical_recovered"] = False
+    rows[2]["final_facts"] = {"report_task_present": True, "unresolved_present": True}
+
+    summary = p2.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=p2.BASELINE_SHA,
+    )
+
+    assert summary["final_gate_counts"] == {
+        "UNEXPECTED_REPORT_TASK": 1,
+        "UNRESOLVED_REQUIREMENTS": 1,
+        "REPORT_AND_UNRESOLVED": 1,
+    }
+    assert summary["initial_contract_metrics"]["initial_closure_omissions"] == 1
+    assert summary["initial_contract_metrics"]["initial_duplicates"] == 1
+    assert summary["initial_contract_metrics"]["initial_parent_closure_failures"] == 1
+    assert summary["initial_contract_metrics"]["initial_wrong_selections"] == 1
+    assert summary["initial_contract_metrics"]["initial_unexpected_report_tasks"] == 1
+    assert summary["initial_contract_metrics"]["initial_unresolved_requirements"] == 1
 
 
 def test_nonempty_future_evidence_path_is_rejected_before_provider_creation(
@@ -306,6 +453,30 @@ def test_nonempty_future_evidence_path_is_rejected_before_provider_creation(
                 "a" * 40,
             )
         )
+
+
+def test_live_path_runs_frozen_guard_before_provider_construction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A frozen-contract failure aborts live setup before provider construction."""
+    monkeypatch.setattr(p2, "OUTPUT_PATH", tmp_path / "empty.jsonl")
+    monkeypatch.setattr(p2, "verify_reviewed_checkout", lambda checkpoint: None)
+    provider_calls: list[bool] = []
+    monkeypatch.setattr(
+        p2,
+        "verify_frozen_contract",
+        lambda: (_ for _ in ()).throw(RuntimeError("planner source drifted")),
+    )
+    monkeypatch.setattr(
+        p2,
+        "_provider_configuration",
+        lambda args: provider_calls.append(True),
+    )
+
+    with pytest.raises(RuntimeError, match="planner source drifted"):
+        asyncio.run(p2._run_live(argparse_namespace(), p2.BASELINE_SHA))
+
+    assert provider_calls == []
 
 
 def argparse_namespace() -> SimpleNamespace:

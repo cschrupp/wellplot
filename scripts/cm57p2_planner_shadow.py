@@ -175,6 +175,40 @@ def _source_matrix(cases: tuple[dict[str, object], ...]) -> tuple[list[dict[str,
     return matrix, sha256_bytes(serialized.encode("utf-8"))
 
 
+def verify_frozen_contract() -> dict[str, object]:
+    """Verify every frozen semantic input before any future provider construction."""
+    cases = load_case_definitions()
+    _, historical_summary_sha, _ = _historical_summary()
+    _, source_summary_sha = _source_matrix(cases)
+    registry = create_builtin_registry()
+    from wellplot.agent.code_mode.planner import _PLANNER_SYSTEM_PROMPT
+
+    prompt_sha = sha256_bytes(_PLANNER_SYSTEM_PROMPT.encode("utf-8"))
+    planner_sha = artifact_sha256(REPO_ROOT / "src/wellplot/agent/code_mode/planner.py")
+    catalog_sha = sha256_bytes(canonical_json(_planning_catalog(registry)).encode("utf-8"))
+    if prompt_sha != EXPECTED_PROMPT_SHA256:
+        raise RuntimeError("CM-57P1 planner prompt drifted.")
+    if planner_sha != EXPECTED_PLANNER_SOURCE_SHA256:
+        raise RuntimeError("CM-57P1 planner source drifted.")
+    if catalog_sha != EXPECTED_CATALOG_SHA256:
+        raise RuntimeError("CM-57P1 planner catalog projection drifted.")
+    if artifact_sha256(CASE_PATH) != EXPECTED_CORPUS_SHA256:
+        raise RuntimeError("CM-57C corpus drifted.")
+    if historical_summary_sha != EXPECTED_HISTORICAL_SUMMARY_SHA256:
+        raise RuntimeError("CM-57C historical summary drifted.")
+    if source_summary_sha != EXPECTED_SOURCE_MATRIX_SHA256:
+        raise RuntimeError("CM-57P2 source-summary matrix drifted.")
+    return {
+        "cases": len(cases),
+        "corpus_sha256": EXPECTED_CORPUS_SHA256,
+        "historical_summary_sha256": EXPECTED_HISTORICAL_SUMMARY_SHA256,
+        "source_summary_matrix_sha256": EXPECTED_SOURCE_MATRIX_SHA256,
+        "planner_prompt_sha256": EXPECTED_PROMPT_SHA256,
+        "planner_source_sha256": EXPECTED_PLANNER_SOURCE_SHA256,
+        "planner_catalog_sha256": EXPECTED_CATALOG_SHA256,
+    }
+
+
 def _plan_projection(plan: SemanticPlan) -> dict[str, object]:
     """Project only bounded planner shape evidence, never semantic prose."""
     return {
@@ -472,9 +506,12 @@ async def run_planner_attempt(
 
 
 def population_integrity(
-    rows: list[dict[str, object]], cases: tuple[dict[str, object], ...]
+    rows: list[dict[str, object]],
+    cases: tuple[dict[str, object], ...],
+    *,
+    expected_checkpoint: str | None = None,
 ) -> tuple[bool, list[str]]:
-    """Validate the exact future 32-row population shape."""
+    """Validate the exact future population shape and checkpoint provenance."""
     expected_ids = {str(case["case_id"]) for case in cases}
     reasons: list[str] = []
     if len(rows) != len(cases) * ATTEMPTS:
@@ -484,21 +521,49 @@ def population_integrity(
         reasons.append("duplicate_case_attempt")
     if {pair[0] for pair in pairs} != expected_ids:
         reasons.append("case_set_mismatch")
-    counts = Counter(pair[0] for pair in pairs)
-    if any(count != ATTEMPTS for count in counts.values()):
-        reasons.append("attempt_count_mismatch")
+    attempts_by_case: dict[str, set[object]] = {}
+    for case_id, attempt_index in pairs:
+        attempts_by_case.setdefault(case_id, set()).add(attempt_index)
+    expected_attempts = set(range(ATTEMPTS))
+    if any(indexes != expected_attempts for indexes in attempts_by_case.values()):
+        reasons.append("attempt_index_mismatch")
+    checkpoints = {row.get("authorized_checkpoint") for row in rows}
+    if (
+        None in checkpoints
+        or not checkpoints
+        or not all(isinstance(checkpoint, str) for checkpoint in checkpoints)
+    ):
+        reasons.append("authorized_checkpoint_missing")
+    elif len(checkpoints) != 1:
+        reasons.append("mixed_authorized_checkpoint")
+    elif expected_checkpoint is not None and checkpoints != {expected_checkpoint}:
+        reasons.append("authorized_checkpoint_mismatch")
     return not reasons, reasons
 
 
 def planner_decision(
     rows: list[dict[str, object]],
     cases: tuple[dict[str, object], ...],
+    *,
+    expected_checkpoint: str | None = None,
 ) -> str:
     """Apply the frozen CM-57P2 decision precedence."""
-    complete, _ = population_integrity(rows, cases)
+    complete, _ = population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=expected_checkpoint,
+    )
     if not complete:
         return "INCONCLUSIVE_PLANNER_EVALUATION"
     if any(row.get("provider_infrastructure_failure") for row in rows):
+        return "INCONCLUSIVE_PLANNER_EVALUATION"
+    transitions = transition_matrix(rows)
+    historical_recovered = sum(bool(row.get("historical_recovered")) for row in rows)
+    historical_regressions = sum(bool(row.get("historical_success_regression")) for row in rows)
+    if (
+        transitions["FAIL_TO_PASS"] != historical_recovered
+        or transitions["PASS_TO_FAIL"] != historical_regressions
+    ):
         return "INCONCLUSIVE_PLANNER_EVALUATION"
     if any(row.get("historical_success_regression") for row in rows):
         return "PLANNER_CONTRACT_REGRESSION"
@@ -531,14 +596,89 @@ def repeatability(rows: list[dict[str, object]]) -> dict[str, object]:
     return {"stable_cases": stable, "unstable_cases": unstable, "unavailable_cases": unavailable}
 
 
+def transition_matrix(rows: list[dict[str, object]]) -> dict[str, int]:
+    """Count historical planner PASS/FAIL to final contract PASS/FAIL paths."""
+    transitions = Counter(
+        (
+            "PASS" if row.get("historical_pipeline") == "SUCCESS" else "FAIL",
+            "PASS" if row.get("final_classification") == "PLANNER_CONTRACT_OK" else "FAIL",
+        )
+        for row in rows
+    )
+    return {
+        "PASS_TO_PASS": transitions[("PASS", "PASS")],
+        "PASS_TO_FAIL": transitions[("PASS", "FAIL")],
+        "FAIL_TO_PASS": transitions[("FAIL", "PASS")],
+        "FAIL_TO_FAIL": transitions[("FAIL", "FAIL")],
+    }
+
+
+def _initial_metric_counts(rows: list[dict[str, object]]) -> dict[str, int]:
+    """Count independent initial planner-contract facts."""
+    facts = [row.get("initial_facts") or {} for row in rows]
+    return {
+        "initial_closure_omissions": sum(bool(item.get("missing_capabilities")) for item in facts),
+        "initial_duplicates": sum(bool(item.get("duplicate_capabilities")) for item in facts),
+        "initial_parent_closure_failures": sum(
+            not bool(item.get("parent_closure_valid", True)) for item in facts
+        ),
+        "initial_wrong_selections": sum(
+            bool(item.get("unexpected_capabilities")) for item in facts
+        ),
+        "initial_unexpected_report_tasks": sum(
+            bool(item.get("report_task_present")) for item in facts
+        ),
+        "initial_unresolved_requirements": sum(
+            bool(item.get("unresolved_present")) for item in facts
+        ),
+    }
+
+
+def _final_metric_counts(rows: list[dict[str, object]]) -> dict[str, int]:
+    """Count independent final planner-contract facts."""
+    facts = [row.get("final_facts") or {} for row in rows]
+    return {
+        "final_closure_omissions": sum(bool(item.get("missing_capabilities")) for item in facts),
+        "final_duplicates": sum(bool(item.get("duplicate_capabilities")) for item in facts),
+        "final_parent_closure_failures": sum(
+            not bool(item.get("parent_closure_valid", True)) for item in facts if item
+        ),
+        "final_wrong_selections": sum(bool(item.get("unexpected_capabilities")) for item in facts),
+        "final_unexpected_report_tasks": sum(
+            bool(item.get("report_task_present")) for item in facts
+        ),
+        "final_unresolved_requirements": sum(
+            bool(item.get("unresolved_present")) for item in facts
+        ),
+        "final_report_and_unresolved": sum(
+            bool(item.get("report_task_present")) and bool(item.get("unresolved_present"))
+            for item in facts
+        ),
+    }
+
+
 def summarize_population(
     rows: list[dict[str, object]],
     cases: tuple[dict[str, object], ...],
+    *,
+    authorized_checkpoint: str | None = None,
 ) -> dict[str, object]:
     """Build bounded aggregate evidence for a completed future population."""
     complete, reasons = population_integrity(rows, cases)
     classifications = Counter(str(row.get("final_classification")) for row in rows)
     initial = Counter(str(row.get("initial_classification")) for row in rows)
+    transitions = transition_matrix(rows)
+    initial_metrics = _initial_metric_counts(rows)
+    final_metrics = _final_metric_counts(rows)
+    historical_recovered = sum(bool(row.get("historical_recovered")) for row in rows)
+    historical_regressions = sum(bool(row.get("historical_success_regression")) for row in rows)
+    transition_consistent = (
+        transitions["FAIL_TO_PASS"] == historical_recovered
+        and transitions["PASS_TO_FAIL"] == historical_regressions
+    )
+    if not transition_consistent:
+        complete = False
+        reasons.append("historical_transition_mismatch")
     return {
         "experiment_version": EXPERIMENT_VERSION,
         "population": {
@@ -549,9 +689,23 @@ def summarize_population(
             "complete": complete,
             "reasons": reasons,
         },
-        "decision": planner_decision(rows, cases),
+        "decision": planner_decision(
+            rows,
+            cases,
+            expected_checkpoint=authorized_checkpoint,
+        ),
         "final_classifications": dict(sorted(classifications.items())),
         "initial_classifications": dict(sorted(initial.items())),
+        "historical_transitions": transitions,
+        "historical_transition_total": sum(transitions.values()),
+        "historical_transition_consistent": transition_consistent,
+        "initial_contract_metrics": initial_metrics,
+        "final_contract_metrics": final_metrics,
+        "final_gate_counts": {
+            "UNEXPECTED_REPORT_TASK": classifications.get("UNEXPECTED_REPORT_TASK", 0),
+            "UNRESOLVED_REQUIREMENTS": classifications.get("UNRESOLVED_REQUIREMENTS", 0),
+            "REPORT_AND_UNRESOLVED": classifications.get("REPORT_AND_UNRESOLVED", 0),
+        },
         "metrics": {
             "planner_calls": sum(int(row.get("planner_call_count", 0)) for row in rows),
             "initial_ok": sum(
@@ -607,9 +761,14 @@ def summarize_population(
             "final_ok": sum(
                 row.get("final_classification") == "PLANNER_CONTRACT_OK" for row in rows
             ),
-            "historical_recovered": sum(bool(row.get("historical_recovered")) for row in rows),
-            "historical_success_regressions": sum(
-                bool(row.get("historical_success_regression")) for row in rows
+            "historical_recovered": historical_recovered,
+            "historical_success_regressions": historical_regressions,
+            "rows_no_correction": sum(
+                not any(
+                    call.get("call_kind") == "SEMANTIC_CORRECTION"
+                    for call in row.get("call_trace", ())
+                )
+                for row in rows
             ),
         },
         "repeatability": repeatability(rows),
@@ -622,55 +781,51 @@ def _self_test_decisions(cases: tuple[dict[str, object], ...]) -> None:
         {
             "case_id": case["case_id"],
             "attempt_index": attempt,
+            "authorized_checkpoint": BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
             "final_classification": "PLANNER_CONTRACT_OK",
             "provider_infrastructure_failure": False,
             "historical_success_regression": False,
-            "historical_recovered": False,
+            "historical_recovered": True,
         }
         for case in cases
         for attempt in range(ATTEMPTS)
     ]
-    assert planner_decision(base, cases) == "PLANNER_CONTRACT_VALIDATED"
+    assert planner_decision(base, cases, expected_checkpoint=BASELINE_SHA) == (
+        "PLANNER_CONTRACT_VALIDATED"
+    )
     regression = [dict(row) for row in base]
     regression[0]["final_classification"] = "WRONG_CAPABILITY_SELECTION"
-    assert planner_decision(regression, cases) == "PLANNER_CONTRACT_REGRESSION"
+    regression[0]["historical_recovered"] = False
+    assert planner_decision(regression, cases, expected_checkpoint=BASELINE_SHA) == (
+        "PLANNER_CONTRACT_REGRESSION"
+    )
     incomplete = [dict(row) for row in base]
     for row in incomplete[:20]:
         row["final_classification"] = "PLANNER_SEMANTIC_FAILURE"
-    assert planner_decision(incomplete, cases) == "PLANNER_CONTRACT_IMPROVED_BUT_INCOMPLETE"
+        row["historical_recovered"] = False
+    assert planner_decision(incomplete, cases, expected_checkpoint=BASELINE_SHA) == (
+        "PLANNER_CONTRACT_IMPROVED_BUT_INCOMPLETE"
+    )
     not_improved = [dict(row) for row in base]
     for row in not_improved[:21]:
         row["final_classification"] = "PLANNER_SEMANTIC_FAILURE"
+        row["historical_recovered"] = False
     for row in not_improved[21:]:
         row["final_classification"] = "PLANNER_CONTRACT_OK"
-    assert planner_decision(not_improved, cases) == "PLANNER_CONTRACT_NOT_IMPROVED"
+    assert planner_decision(not_improved, cases, expected_checkpoint=BASELINE_SHA) == (
+        "PLANNER_CONTRACT_NOT_IMPROVED"
+    )
     invalid = base[:-1]
-    assert planner_decision(invalid, cases) == "INCONCLUSIVE_PLANNER_EVALUATION"
+    assert planner_decision(invalid, cases, expected_checkpoint=BASELINE_SHA) == (
+        "INCONCLUSIVE_PLANNER_EVALUATION"
+    )
 
 
 def prelive_report() -> dict[str, object]:
     """Run all provider-free guards and return the future-run contract."""
+    contract = verify_frozen_contract()
     cases = load_case_definitions()
-    _historical_summary()
-    _, source_hash = _source_matrix(cases)
-    if source_hash != EXPECTED_SOURCE_MATRIX_SHA256:
-        raise RuntimeError("CM-57P2 source-summary matrix drifted.")
-    registry = create_builtin_registry()
-    prompt_sha = sha256_bytes(
-        __import__(
-            "wellplot.agent.code_mode.planner", fromlist=["_PLANNER_SYSTEM_PROMPT"]
-        )._PLANNER_SYSTEM_PROMPT.encode("utf-8")
-    )
-    planner_sha = artifact_sha256(REPO_ROOT / "src/wellplot/agent/code_mode/planner.py")
-    catalog_sha = sha256_bytes(canonical_json(_planning_catalog(registry)).encode("utf-8"))
-    if prompt_sha != EXPECTED_PROMPT_SHA256:
-        raise RuntimeError("CM-57P1 planner prompt drifted.")
-    if planner_sha != EXPECTED_PLANNER_SOURCE_SHA256:
-        raise RuntimeError("CM-57P1 planner source drifted.")
-    if catalog_sha != EXPECTED_CATALOG_SHA256:
-        raise RuntimeError("CM-57P1 planner catalog projection drifted.")
-    if artifact_sha256(CASE_PATH) != EXPECTED_CORPUS_SHA256:
-        raise RuntimeError("CM-57C corpus drifted.")
     _self_test_decisions(cases)
     return {
         "status": "PRELIVE_READY",
@@ -678,12 +833,7 @@ def prelive_report() -> dict[str, object]:
         "baseline_sha": BASELINE_SHA,
         "provider_calls": 0,
         "production_changes": 0,
-        "corpus_sha256": EXPECTED_CORPUS_SHA256,
-        "historical_summary_sha256": EXPECTED_HISTORICAL_SUMMARY_SHA256,
-        "source_summary_matrix_sha256": EXPECTED_SOURCE_MATRIX_SHA256,
-        "planner_prompt_sha256": EXPECTED_PROMPT_SHA256,
-        "planner_source_sha256": EXPECTED_PLANNER_SOURCE_SHA256,
-        "planner_catalog_sha256": EXPECTED_CATALOG_SHA256,
+        **contract,
         "future_controls": {
             "model": FROZEN_MODEL,
             "planner_temperature": PLANNER_TEMPERATURE,
@@ -753,9 +903,11 @@ def _provider_configuration(args: argparse.Namespace) -> ModelBackendProtocol:
 
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     """Run the future 32-row planner-only population incrementally."""
+    checkpoint = validate_authorized_checkpoint(checkpoint)
     if OUTPUT_PATH.exists() and OUTPUT_PATH.stat().st_size:
         raise RuntimeError(f"Refusing to append to non-empty evidence path {OUTPUT_PATH}.")
     verify_reviewed_checkout(checkpoint)
+    verify_frozen_contract()
     cases = load_case_definitions()
     _, source_hash = _source_matrix(cases)
     if source_hash != EXPECTED_SOURCE_MATRIX_SHA256:
@@ -780,7 +932,13 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
                 rows.append(row)
                 handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
-    print(json.dumps(summarize_population(rows, cases), indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            summarize_population(rows, cases, authorized_checkpoint=checkpoint),
+            indent=2,
+            sort_keys=True,
+        )
+    )
 
 
 def _parser() -> argparse.ArgumentParser:
