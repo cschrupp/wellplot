@@ -664,7 +664,11 @@ def summarize_population(
     authorized_checkpoint: str | None = None,
 ) -> dict[str, object]:
     """Build bounded aggregate evidence for a completed future population."""
-    complete, reasons = population_integrity(rows, cases)
+    complete, reasons = population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=authorized_checkpoint,
+    )
     classifications = Counter(str(row.get("final_classification")) for row in rows)
     initial = Counter(str(row.get("initial_classification")) for row in rows)
     transitions = transition_matrix(rows)

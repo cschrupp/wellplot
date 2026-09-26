@@ -331,6 +331,31 @@ def test_mixed_authorized_checkpoints_are_inconclusive() -> None:
     assert p2.planner_decision(rows, cases) == "INCONCLUSIVE_PLANNER_EVALUATION"
 
 
+def test_summary_population_complete_requires_expected_checkpoint() -> None:
+    """Displayed population completeness uses the supplied checkpoint guard."""
+    cases = _cases()
+    rows = [
+        {
+            "case_id": case["case_id"],
+            "attempt_index": attempt,
+            "authorized_checkpoint": p2.BASELINE_SHA,
+            "historical_pipeline": "PLANNER_FAILURE",
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "historical_recovered": True,
+            "historical_success_regression": False,
+            "provider_infrastructure_failure": False,
+        }
+        for case in cases
+        for attempt in range(p2.ATTEMPTS)
+    ]
+
+    summary = p2.summarize_population(rows, cases, authorized_checkpoint="f" * 40)
+
+    assert summary["population"]["complete"] is False
+    assert "authorized_checkpoint_mismatch" in summary["population"]["reasons"]
+    assert summary["decision"] == "INCONCLUSIVE_PLANNER_EVALUATION"
+
+
 def test_transition_matrix_counts_all_four_paths() -> None:
     """Historical and final planner outcomes retain all four transitions."""
     cases = _cases()
