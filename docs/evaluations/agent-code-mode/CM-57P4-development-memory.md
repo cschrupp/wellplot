@@ -206,3 +206,46 @@ report/section fixture failures. No R1 test or R1 implementation file failed.
 Hard stop: do not run Qwen, a smoke case, RW, RC, or any other provider call
 until separate live authorization. Do not begin CM-57D or typed-worker
 remediation from this slice.
+
+## CM-57P4 Live Inference
+
+The authorized live matrix ran once at checkpoint
+`c44f163ef605f8d892bf6d114c6a6a3258756ca5` using the frozen local Qwen
+configuration. The raw evidence remains outside the repository at
+`/tmp/cm57p4-prompt-interaction-qwen.jsonl`:
+
+- Rows: `32`.
+- Raw SHA-256:
+  `84984fe9903e43396633c87682eb341342f8ac406d296d29dfb47b32b02cd001`.
+- Provider calls: `156`.
+- Worker/program calls: `0`.
+- Production changes: `0`.
+
+Population integrity passed. The final decision is
+`INCONCLUSIVE_PROMPT_INTERACTION_BISECT`, because the R control had one
+provider infrastructure failure and three rows without final semantic facts.
+Those rows remain unavailable in pairwise semantic tables; they are not
+interpreted as planner success or failure.
+
+Final arm evidence:
+
+- `R`: `25/29` final contract passes among available final plans; `29/32`
+  final plans available; `14` semantic corrections with `11` recoveries and
+  `3` failures; `46` provider calls; `1` provider infrastructure failure.
+- `WR`: `28/32` final contract passes; `6` semantic corrections with `4`
+  recoveries and `2` failures; `38` provider calls.
+- `RW`: `32/32` final contract passes; `8` semantic corrections, all
+  recoveries; `40` provider calls.
+- `RC`: `32/32` final contract passes with no semantic correction; `32`
+  provider calls.
+
+The historical mixed-section sentinel reproduced the intended interaction:
+`R` passed `2/2`, `WR` passed `0/2`, `RW` passed `2/2`, and `RC` passed `2/2`.
+The `WR -> RW` comparison recovered four full-contract rows, while `RW -> RC`
+was `32/32` both-pass. The R-side unavailable rows prevent a conclusive
+primary decision despite the complete row population.
+
+The bounded aggregate is recorded in
+`CM-57P4-live-summary.json`. No production prompt adoption, typed-worker
+remediation, CM-57D work, or additional live inference is authorized by this
+evidence-only closure.
