@@ -197,14 +197,17 @@ class SemanticPlanner:
 def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> SemanticPlan:
     """Validate selected capabilities without resolving document structure."""
     if plan.report_task is not None:
-        _validate_capabilities(
+        report_specs = _validate_capabilities(
             plan.report_task.capability_ids,
             registry,
             task_kind="report",
         )
+        _validate_unique_capabilities(plan.report_task.capability_ids)
+        _validate_parent_closure(report_specs, plan.report_task.capability_ids)
 
     for task in plan.section_tasks:
         specs = _validate_capabilities(task.capability_ids, registry, task_kind="section")
+        _validate_unique_capabilities(task.capability_ids)
         categories = {spec.category for spec in specs}
         if "section" not in categories:
             raise PlannerSemanticError(
@@ -216,6 +219,7 @@ def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> 
                 "wrong_task_category",
                 "SectionTask selected a report capability.",
             )
+        _validate_parent_closure(specs, task.capability_ids)
     return plan
 
 
@@ -252,6 +256,34 @@ def _validate_capabilities(
     return tuple(specs)
 
 
+def _validate_unique_capabilities(capability_ids: tuple[str, ...]) -> None:
+    """Reject repeated canonical capability types without normalizing them."""
+    if len(capability_ids) == len(set(capability_ids)):
+        return
+    raise PlannerSemanticError(
+        "duplicate_capability",
+        "A semantic task selected the same capability type more than once.",
+    )
+
+
+def _validate_parent_closure(
+    specs: tuple[object, ...],
+    capability_ids: tuple[str, ...],
+) -> None:
+    """Require every selected capability to include one registered parent."""
+    selected = set(capability_ids)
+    for spec in specs:
+        allowed_parents = tuple(getattr(spec, "allowed_parents", ()))
+        if not allowed_parents or selected.intersection(allowed_parents):
+            continue
+        parent_text = ", ".join(allowed_parents)
+        raise PlannerSemanticError(
+            "missing_capability_parent",
+            f"Capability {spec.capability_id!r} requires one selected parent capability "
+            f"from: {parent_text}.",
+        )
+
+
 def _planning_catalog(registry: CapabilityRegistry) -> tuple[dict[str, object], ...]:
     """Expose only static semantic capability descriptors to the provider."""
     catalog: list[dict[str, object]] = []
@@ -261,6 +293,7 @@ def _planning_catalog(registry: CapabilityRegistry) -> tuple[dict[str, object], 
                 "id": descriptor["id"],
                 "category": descriptor["category"],
                 "description": descriptor["description"],
+                "allowed_parents": descriptor.get("allowed_parents", []),
                 "planning_hints": descriptor.get("planning_hints", []),
                 "schema_version": descriptor.get("schema_version", "1"),
             }
@@ -422,6 +455,13 @@ Select capability IDs exactly as listed in the static capability catalogue. A
 SectionTask describes what one logical section should accomplish; its list order
 does not specify document order or execution order. Existing-section hints are
 advisory natural-language clues only and are resolved later by host code.
+
+For each work unit, select the complete set of capability types needed to
+represent the requested structure. Capability IDs identify capability types,
+not requested object instances; list each capability ID at most once. When a
+selected capability declares allowed parent capabilities, select an appropriate
+allowed parent needed to contain it, applying the same rule through the
+structural capability hierarchy. Do not add capabilities for semantics that were not requested.
 
 When a section request identifies or distinguishes a source, pass, run, or other
 input source in natural language, preserve that clue in SectionTask.source_hints.

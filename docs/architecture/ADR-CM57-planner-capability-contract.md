@@ -1,9 +1,10 @@
 # ADR-CM57: Planner Capability Contract
 
-- **Status:** PROPOSED
+- **Status:** ACCEPTED
 - **Date:** 2026-09-25
 - **Baseline:** `5356bcfcb61607831aaf25837dbd830e978d7ff4`
 - **Scope:** semantic planner contract design only
+- **Accepted at:** `b34c544a40780eb96d8ca45f220f3ed6ae9be4b8`
 
 ## Context
 

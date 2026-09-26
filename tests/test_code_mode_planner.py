@@ -27,7 +27,7 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
-from wellplot.capabilities import CapabilityRegistry, create_builtin_registry
+from wellplot.capabilities import CapabilityRegistry, CapabilitySpec, create_builtin_registry
 
 
 @dataclass
@@ -237,6 +237,94 @@ def test_planner_prompt_defines_source_and_scientific_preservation() -> None:
     assert "numeric bounds" in prompt
     assert "repeated binding requests" in prompt
     assert "sample-axis" in prompt
+
+
+def test_planner_catalog_exposes_only_structural_parent_metadata() -> None:
+    """The planner sees registry relationships but not worker implementation data."""
+    backend = _RecordedBackend(_plan_payload())
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    context = json.loads(backend.requests[0].user_prompt.split("Context:\n", 1)[1])
+    catalog = {entry["id"]: entry for entry in context["capabilities"]}
+    assert catalog["binding.raster"]["allowed_parents"] == ["track.array"]
+    assert catalog["binding.curve"]["allowed_parents"] == [
+        "track.normal",
+        "track.reference",
+    ]
+    forbidden_fields = {
+        "semantic_metadata",
+        "worker_hints",
+        "arguments_schema",
+        "artifact_schema",
+        "examples",
+        "handler",
+        "compiler",
+    }
+    assert not forbidden_fields.intersection(key for entry in catalog.values() for key in entry)
+
+
+def test_planner_prompt_defines_complete_unique_capability_types() -> None:
+    """The generic prompt explains closure without benchmark-specific examples."""
+    backend = _RecordedBackend(_plan_payload())
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Build a section.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    prompt = backend.requests[0].system_prompt
+    assert "complete set of capability types" in prompt
+    assert "not requested object instances" in prompt
+    assert "at most once" in prompt
+    assert "allowed parent capabilities" in prompt
+    assert "Do not add capabilities for semantics that were not requested" in prompt
+    assert not any(value in prompt for value in ("CM-57C", "curve_linear_new_values", "CBL", "VDL"))
+
+
+def test_initial_and_correction_catalogs_include_the_same_structural_metadata() -> None:
+    """Semantic correction uses the same planner-safe catalog as initial planning."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "capability_ids": (
+                "section.log_plot",
+                "binding.curve",
+                "binding.curve",
+            ),
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Build a section.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    initial = json.loads(backend.requests[0].user_prompt.split("Context:\n", 1)[1])
+    correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
+    assert correction["capabilities"] == initial["capabilities"]
+    assert correction["previous_plan"]["section_tasks"][0]["capability_ids"] == [
+        "section.log_plot",
+        "binding.curve",
+        "binding.curve",
+    ]
 
 
 def test_planner_preserves_revise_mode_as_semantic_context() -> None:
@@ -631,6 +719,275 @@ def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None
             ),
             registry,
         )
+
+
+def _section_plan(capability_ids: tuple[str, ...]) -> SemanticPlan:
+    """Build a minimal section plan for structural capability validation tests."""
+    return SemanticPlan(
+        summary="Validate a section capability set.",
+        section_tasks=(
+            SectionTask(
+                goal="Represent the requested section.",
+                capability_ids=capability_ids,
+            ),
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    "capability_ids",
+    (
+        ("section.log_plot",),
+        ("section.log_plot", "track.normal", "binding.curve"),
+        ("section.log_plot", "track.reference", "binding.curve"),
+        ("section.log_plot", "track.array", "binding.raster"),
+        (
+            "binding.raster",
+            "section.log_plot",
+            "track.array",
+            "track.normal",
+            "binding.curve",
+        ),
+    ),
+)
+def test_selected_capability_parent_closure_accepts_valid_sets(
+    capability_ids: tuple[str, ...],
+) -> None:
+    """Parent validation is generic and independent of capability ordering."""
+    registry = create_builtin_registry()
+
+    assert validate_semantic_plan(_section_plan(capability_ids), registry)
+
+
+@pytest.mark.parametrize(
+    "capability_ids, expected_parents",
+    (
+        (("section.log_plot", "binding.raster"), ("track.array",)),
+        (("section.log_plot", "binding.curve"), ("track.normal", "track.reference")),
+    ),
+)
+def test_selected_capability_parent_closure_reports_missing_parent(
+    capability_ids: tuple[str, ...],
+    expected_parents: tuple[str, ...],
+) -> None:
+    """Missing structural parents fail without host-side parent selection."""
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(_section_plan(capability_ids), create_builtin_registry())
+
+    assert caught.value.code == "missing_capability_parent"
+    for parent in expected_parents:
+        assert parent in caught.value.safe_message
+
+
+def test_duplicate_section_capability_is_not_silently_deduplicated() -> None:
+    """Repeated capability types remain planner evidence and fail validation."""
+    plan = _section_plan(("section.log_plot", "track.normal", "binding.curve", "binding.curve"))
+
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(plan, create_builtin_registry())
+
+    assert caught.value.code == "duplicate_capability"
+
+
+def test_duplicate_report_capability_is_rejected() -> None:
+    """The unique-type rule applies to report work as well as section work."""
+    plan = SemanticPlan(
+        summary="Duplicate report capability.",
+        report_task=ReportTask(
+            goal="Update the report.",
+            capability_ids=("report.standard", "report.standard"),
+        ),
+    )
+
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(plan, create_builtin_registry())
+
+    assert caught.value.code == "duplicate_capability"
+
+
+def test_duplicate_plan_enters_correction_without_host_normalization() -> None:
+    """A duplicate is corrected by the bounded planner path, not by the host."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "capability_ids": (
+                "section.log_plot",
+                "track.normal",
+                "binding.curve",
+                "binding.curve",
+            ),
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
+    )
+
+    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert len(backend.requests) == 2
+    correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
+    assert correction["diagnostic"]["code"] == "duplicate_capability"
+    assert correction["previous_plan"]["section_tasks"][0]["capability_ids"][-2:] == [
+        "binding.curve",
+        "binding.curve",
+    ]
+
+
+def test_missing_parent_enters_correction_without_host_injection() -> None:
+    """A parent gap is corrected by the planner rather than closed deterministically."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "capability_ids": ("section.log_plot", "binding.raster"),
+        },
+    )
+    corrected = _plan_payload()
+    corrected["section_tasks"] = (
+        {
+            **corrected["section_tasks"][0],
+            "capability_ids": ("section.log_plot", "track.array", "binding.raster"),
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, corrected])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
+    )
+
+    assert result == SemanticPlan.model_validate(corrected)
+    assert len(backend.requests) == 2
+    correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
+    assert correction["diagnostic"]["code"] == "missing_capability_parent"
+    assert correction["diagnostic"]["message"]
+    assert correction["previous_plan"]["section_tasks"][0]["capability_ids"] == [
+        "section.log_plot",
+        "binding.raster",
+    ]
+
+
+def test_invalid_duplicate_correction_stays_bounded() -> None:
+    """A duplicate surviving correction becomes a bounded typed failure."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "capability_ids": ("section.log_plot", "binding.curve", "binding.curve"),
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, invalid])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
+        )
+
+    assert caught.value.code == "duplicate_capability"
+    assert len(backend.requests) == 2
+
+
+def test_invalid_parent_correction_stays_bounded() -> None:
+    """A parent gap surviving correction becomes a bounded typed failure."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "capability_ids": ("section.log_plot", "binding.raster"),
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, invalid])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
+        )
+
+    assert caught.value.code == "missing_capability_parent"
+    assert len(backend.requests) == 2
+
+
+def _synthetic_registry() -> CapabilityRegistry:
+    """Return a test-only capability graph for plugin-style closure checks."""
+    return CapabilityRegistry(
+        (
+            CapabilitySpec(
+                capability_id="section.synthetic",
+                category="section",
+                description="Synthetic section capability.",
+                artifact_model=BaseModel,
+                compiler=lambda _artifact: None,
+            ),
+            CapabilitySpec(
+                capability_id="track.synthetic",
+                category="track",
+                description="Synthetic track capability.",
+                artifact_model=BaseModel,
+                compiler=lambda _artifact: None,
+                allowed_parents=("section.synthetic",),
+            ),
+            CapabilitySpec(
+                capability_id="binding.synthetic",
+                category="binding",
+                description="Synthetic binding capability.",
+                artifact_model=BaseModel,
+                compiler=lambda _artifact: None,
+                allowed_parents=("track.synthetic",),
+            ),
+        )
+    )
+
+
+def test_parent_closure_uses_registry_metadata_for_synthetic_capabilities() -> None:
+    """Plugin-style parent relationships need no built-in capability branches."""
+    registry = _synthetic_registry()
+    incomplete = _section_plan(("section.synthetic", "binding.synthetic"))
+    complete = _section_plan(("section.synthetic", "track.synthetic", "binding.synthetic"))
+
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(incomplete, registry)
+    assert caught.value.code == "missing_capability_parent"
+    assert validate_semantic_plan(complete, registry) == complete
+
+
+def test_mixed_report_and_section_work_remains_valid() -> None:
+    """Planner capability validation does not impose report/section exclusivity."""
+    plan = SemanticPlan(
+        summary="Update the report and add one section.",
+        report_task=ReportTask(
+            goal="Update the report.",
+            capability_ids=("report.standard",),
+        ),
+        section_tasks=(
+            SectionTask(
+                goal="Add a curve section.",
+                capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+            ),
+        ),
+    )
+
+    assert validate_semantic_plan(plan, create_builtin_registry()) == plan
+
+
+def test_unresolved_requirements_remain_legal() -> None:
+    """Planner remediation does not redefine unresolved semantic requirements."""
+    plan = SemanticPlan(
+        summary="Keep one unsupported request visible.",
+        section_tasks=(
+            SectionTask(
+                goal="Add a curve section.",
+                capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+            ),
+        ),
+        unresolved_requirements=("Keep the unsupported detail visible.",),
+    )
+
+    assert validate_semantic_plan(plan, create_builtin_registry()) == plan
 
 
 def test_semantic_planner_does_not_require_a_specific_registry_implementation() -> None:
