@@ -278,7 +278,11 @@ def _population() -> list[dict[str, object]]:
                             "provider_infrastructure_failure": False,
                             "work_unit_fragmentation": False,
                             "report_task_present": False,
-                            "final_facts": {"wrong_capability_selection": False},
+                            "final_facts": {
+                                "wrong_capability_selection": False,
+                                "work_unit_fragmentation": False,
+                                "report_task_present": False,
+                            },
                         }
                         for arm in p3.ARMS
                     },
@@ -299,10 +303,10 @@ def test_population_integrity_requires_all_four_arms() -> None:
 def test_factor_tables_report_all_transition_buckets() -> None:
     """Pair tables account for every shared row."""
     rows = _population()
-    rows[0]["arms"]["P"]["final_contract_ok"] = False
-    rows[1]["arms"]["W"]["final_contract_ok"] = False
-    rows[2]["arms"]["R"]["final_contract_ok"] = False
-    rows[3]["arms"]["WR"]["final_contract_ok"] = False
+    rows[0]["arms"]["P"]["final_facts"]["work_unit_fragmentation"] = True
+    rows[0]["arms"]["W"]["final_facts"]["work_unit_fragmentation"] = True
+    rows[1]["arms"]["P"]["final_facts"]["work_unit_fragmentation"] = True
+    rows[2]["arms"]["W"]["final_facts"]["work_unit_fragmentation"] = True
     table = p3.factor_tables(rows)
     assert sum(table["P_to_W"]["neutral"]["final_contract_ok"].values()) == len(rows)
     assert sum(table["P_to_R"]["neutral"]["final_contract_ok"].values()) == len(rows)
@@ -313,7 +317,49 @@ def test_factor_tables_report_all_transition_buckets() -> None:
         "FRAGMENTED_TO_CORRECT",
         "CORRECT_TO_CORRECT",
         "CORRECT_TO_FRAGMENTED",
+        "UNAVAILABLE",
     }
+    assert table["P_to_W"]["fragmentation"] == {
+        "FRAGMENTED_TO_FRAGMENTED": 1,
+        "FRAGMENTED_TO_CORRECT": 1,
+        "CORRECT_TO_CORRECT": len(rows) - 3,
+        "CORRECT_TO_FRAGMENTED": 1,
+        "UNAVAILABLE": 0,
+    }
+
+
+def test_terminal_semantic_facts_are_unavailable_in_pair_tables() -> None:
+    """Terminal semantic and schema failures are not semantic false values."""
+    rows = _population()
+    rows[0]["arms"]["P"]["final_facts"] = None
+    rows[0]["arms"]["P"]["final_contract_ok"] = False
+    rows[0]["arms"]["P"]["final_classification"] = "PLANNER_SEMANTIC_FAILURE"
+    table = p3.factor_tables(rows)["P_to_W"]
+    assert table["fragmentation"]["UNAVAILABLE"] == 1
+    assert table["report_task"]["UNAVAILABLE"] == 1
+    assert table["fragmentation"]["CORRECT_TO_CORRECT"] == len(rows) - 1
+    assert table["report_task"]["ABSENT_TO_ABSENT"] == len(rows) - 1
+    assert table["full_contract"]["RIGHT_ONLY_PASS"] == 1
+
+    rows = _population()
+    rows[0]["arms"]["P"]["final_facts"] = None
+    rows[0]["arms"]["W"]["final_facts"] = None
+    rows[0]["arms"]["P"]["final_contract_ok"] = False
+    rows[0]["arms"]["W"]["final_contract_ok"] = False
+    rows[0]["arms"]["P"]["final_classification"] = "PLANNER_SCHEMA_FAILURE"
+    rows[0]["arms"]["W"]["final_classification"] = "PLANNER_SCHEMA_FAILURE"
+    table = p3.factor_tables(rows)["P_to_W"]
+    assert table["fragmentation"]["UNAVAILABLE"] == 1
+    assert table["report_task"]["UNAVAILABLE"] == 1
+    assert table["fragmentation"]["CORRECT_TO_CORRECT"] == len(rows) - 1
+
+
+def test_semantic_pair_tables_conserve_population_rows() -> None:
+    """Every semantic transition table accounts for all shared rows."""
+    rows = _population()
+    for pair in p3.factor_tables(rows).values():
+        for metric in ("fragmentation", "report_task"):
+            assert sum(pair[metric].values()) == len(rows)
 
 
 def test_decision_precedence_covers_recovery_and_regression() -> None:

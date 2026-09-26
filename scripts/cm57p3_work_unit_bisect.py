@@ -524,19 +524,41 @@ def _pair_table(rows: list[dict[str, object]], left: str, right: str, key: str) 
 
 
 def _semantic_pair_table(
-    table: dict[str, int],
+    rows: list[dict[str, object]],
+    left: str,
+    right: str,
+    key: str,
     *,
     true_true: str,
     true_false: str,
     false_true: str,
     false_false: str,
 ) -> dict[str, int]:
-    """Rename neutral boolean buckets for one explicitly defined semantic metric."""
+    """Count semantic transitions only when both final fact dictionaries exist."""
+    counts = Counter()
+    for row in rows:
+        left_facts = _arm(row, left).get("final_facts")
+        right_facts = _arm(row, right).get("final_facts")
+        if not isinstance(left_facts, dict) or not isinstance(right_facts, dict):
+            counts["UNAVAILABLE"] += 1
+            continue
+        counts[(bool(left_facts.get(key)), bool(right_facts.get(key)))] += 1
     return {
-        true_true: table["both_true"],
-        true_false: table["left_true_only"],
-        false_true: table["right_true_only"],
-        false_false: table["both_false"],
+        true_true: counts[(True, True)],
+        true_false: counts[(True, False)],
+        false_true: counts[(False, True)],
+        false_false: counts[(False, False)],
+        "UNAVAILABLE": counts["UNAVAILABLE"],
+    }
+
+
+def _full_contract_pair_table(table: dict[str, int]) -> dict[str, int]:
+    """Rename full-contract boolean buckets without an availability bucket."""
+    return {
+        "BOTH_PASS": table["both_true"],
+        "LEFT_ONLY_PASS": table["left_true_only"],
+        "RIGHT_ONLY_PASS": table["right_true_only"],
+        "BOTH_FAIL": table["both_false"],
     }
 
 
@@ -548,35 +570,27 @@ def factor_tables(rows: list[dict[str, object]]) -> dict[str, object]:
         "W_to_WR": ("W", "WR"),
         "R_to_WR": ("R", "WR"),
     }
-    metrics = {
-        "final_contract_ok": "final_contract_ok",
-        "work_unit_fragmentation": "work_unit_fragmentation",
-        "report_task_present": "report_task_present",
-    }
     tables: dict[str, object] = {}
     for pair_name, (left, right) in pairs.items():
-        raw = {
-            metric_name: _pair_table(rows, left, right, metric_key)
-            for metric_name, metric_key in metrics.items()
-        }
+        raw = {"final_contract_ok": _pair_table(rows, left, right, "final_contract_ok")}
         tables[pair_name] = {
-            "neutral": raw,
-            "full_contract": _semantic_pair_table(
-                raw["final_contract_ok"],
-                true_true="BOTH_PASS",
-                true_false="LEFT_ONLY_PASS",
-                false_true="RIGHT_ONLY_PASS",
-                false_false="BOTH_FAIL",
-            ),
+            "neutral": {"final_contract_ok": raw["final_contract_ok"]},
+            "full_contract": _full_contract_pair_table(raw["final_contract_ok"]),
             "fragmentation": _semantic_pair_table(
-                raw["work_unit_fragmentation"],
+                rows,
+                left,
+                right,
+                "work_unit_fragmentation",
                 true_true="FRAGMENTED_TO_FRAGMENTED",
                 true_false="FRAGMENTED_TO_CORRECT",
                 false_true="CORRECT_TO_FRAGMENTED",
                 false_false="CORRECT_TO_CORRECT",
             ),
             "report_task": _semantic_pair_table(
-                raw["report_task_present"],
+                rows,
+                left,
+                right,
+                "report_task_present",
                 true_true="REPORT_PRESENT_TO_PRESENT",
                 true_false="REPORT_PRESENT_TO_ABSENT",
                 false_true="ABSENT_TO_PRESENT",
