@@ -7,8 +7,12 @@ micro-bisect against the completed CM-57P3 evidence checkpoint
 `ad870d94b62e297585c29867debd40f556489f05`. The purpose is to isolate the
 remaining `mixed_curve_raster_section` interaction without changing the
 production planner, planner schema, capability catalog, typed worker, or
-routing. Pre-live implementation is complete; live inference remains
-unauthorized.
+routing. CM-57P4-R1 hardens evidence and startup guards only; live inference
+remains unauthorized.
+
+The R1 rework baseline is the initial pre-live checkpoint
+`b98204ad0140fa12e62d5b4153b86eba41eb3091`. Experiment factors, prompt text,
+case corpus, controls, and decision labels are unchanged.
 
 CM-57P3's contemporaneous residual was:
 
@@ -100,8 +104,17 @@ The P4 harness uses the production `SemanticPlanner.plan()` for every arm. It
 does not invoke enrichment, typed workers, semantic compilation, program
 generation, graph orchestration, rendering, or routing. It records initial and
 final bounded plan facts, terminal outcomes, correction use, availability-aware
-semantic pair tables, six full-contract pair tables, repeatability, and the
-historical mixed-case/P3 recovery sentinels.
+semantic pair tables, six full-contract pair tables, closure-omission and
+capability-union transitions, repeatability, and the historical mixed-case/P3
+recovery sentinels.
+
+R1 verifies the frozen W/R/C instruction hashes and every composed R/WR/RW/RC
+prompt hash against explicit constants. The live path also compares the
+working P4 harness bytes against the authorized checkpoint before provider
+construction. Every completed row must carry the exact experiment, artifact,
+prompt, and execution-control provenance; population mismatches are
+inconclusive. Missing WR final facts do not manufacture wrong-selection
+negatives, and unavailable semantic pairs are labeled `UNAVAILABLE`.
 
 ## Decision Contract
 
@@ -133,7 +146,7 @@ development memory. CM-57P3, CM-57P2, the corpus, planner schema/catalog,
 typed-worker artifacts, and routing remain unchanged. Provider calls remain
 `0` during pre-live implementation, and live inference has not started.
 
-Validation completed before the pre-live checkpoint:
+Validation completed before the initial pre-live checkpoint:
 
 - Focused P4 tests: `15 passed`.
 - Adjacent planner/capability/workflow/CM-57C tests: `125 passed`.
@@ -153,6 +166,42 @@ repository-level baseline/worktree issues. They cover the known legacy MCP
 helper signature tests, the tool-budget threshold, the unavailable R6
 evidence artifact, and unrelated report/section fixture tests. No P4 test or
 P4 implementation file failed.
+
+## CM-57P4-R1
+
+R1 changes the experiment: `NO`. Prompt text and all frozen prompt hashes are
+unchanged. Production changes: `0`. Provider calls: `0`. Worker/program calls:
+`0`.
+
+The R1 executable guard now compares the P4 harness bytes against the
+authorized checkout before provider construction. Explicit W/R/C instruction
+hash constants and R/WR/RW/RC composed-prompt hash constants are checked
+before provider construction. Every evidence row carries exact experiment,
+artifact, corpus, planner, catalog, instruction, prompt, and execution-control
+provenance; population mismatch is inconclusive.
+
+Semantic pair tables now include availability-aware closure omission and
+capability-union transitions for all six required comparisons. Missing WR facts
+remain unavailable and cannot manufacture candidate wrong-selection negatives.
+
+R1 validation:
+
+- Focused R1 tests: `22 passed`.
+- Adjacent P3/P2/planner/capability/workflow/CM-57C tests: `125 passed`.
+- EXP-TW regression selection: `134 passed`.
+- Provider-free CLI: `PRELIVE_READY`.
+- Ruff: `PASS`.
+- Formatting: `PASS`.
+- Python compilation: `PASS`.
+- JSON validation: `PASS`.
+- Redaction/path scan: `PASS`.
+- `git diff --check`: `PASS`.
+- Full repository suite: `1823 passed, 12 failed, 3 skipped, 11 subtests
+  passed`.
+
+The full-suite failures remain outside the R1 file boundary and are the same
+known legacy MCP helper, tool-budget, unavailable R6 evidence, and unrelated
+report/section fixture failures. No R1 test or R1 implementation file failed.
 
 Hard stop: do not run Qwen, a smoke case, RW, RC, or any other provider call
 until separate live authorization. Do not begin CM-57D or typed-worker

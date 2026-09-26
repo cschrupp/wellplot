@@ -69,6 +69,13 @@ EXPECTED_P3_SUMMARY_SHA256 = "1d22cbfbf34072c9566effc141fe3b88fa0972ed27c71f0d2d
 EXPECTED_P3_CHECKPOINT = "2e4f26f94670b8fa43cd7bea1246cb414c87bc41"
 EXPECTED_P3_RAW_SHA256 = "84dd0a9b9a9b6288f7442211cc72b427512db39128d8b976c12e378888aca1a0"
 EXPECTED_SOURCE_MATRIX_SHA256 = "7be957d4bd3361457206bbce689c612727cec5c4a3d4cbf392c4dcca52203d8b"
+EXPECTED_W_INSTRUCTION_SHA256 = "e0ce6bf0fe598dc438a65ecb08a8a88a45f1aeda8e66e85158d90f1f46dac5c4"
+EXPECTED_R_INSTRUCTION_SHA256 = "12fd2c40e407cb7d5d0e21effd66493e20e99468e3a97b89ac0186b40648c5b5"
+EXPECTED_C_INSTRUCTION_SHA256 = "b69c47063b6da13e4f5857609708efe0becc901b989a1a65c503dd277cdc8205"
+EXPECTED_R_PROMPT_SHA256 = "fe8db9c9cba4cf7bf13d79c3e838eaa53e19770fbf6dd764cdcf93020008c563"
+EXPECTED_WR_PROMPT_SHA256 = "5a0e49f077e45587e19470f962b09528a4a485a0d05725eb285cef676de1035f"
+EXPECTED_RW_PROMPT_SHA256 = "d9043041fdc651d613c67a2a77a825be1d52b1940a2f82d0ff73e03d914116ca"
+EXPECTED_RC_PROMPT_SHA256 = "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
 CHECKPOINT_RE = re.compile(r"^[0-9a-f]{40}$")
 
 WORK_UNIT_INSTRUCTION = """Work-unit boundary:
@@ -133,6 +140,32 @@ def composed_prompt(arm: Arm) -> str:
 
 
 PROMPT_SHA256 = {arm: sha256_text(composed_prompt(arm)) for arm in ARMS}
+
+
+def frozen_population_provenance() -> dict[str, object]:
+    """Return the exact provenance values required on every live row."""
+    return {
+        "experiment_version": EXPERIMENT_VERSION,
+        "harness_sha256": artifact_sha256(Path(__file__)),
+        "corpus_sha256": EXPECTED_CORPUS_SHA256,
+        "planner_source_sha256": EXPECTED_PLANNER_SOURCE_SHA256,
+        "base_prompt_sha256": EXPECTED_PROMPT_SHA256,
+        "catalog_sha256": EXPECTED_CATALOG_SHA256,
+        "work_unit_instruction_sha256": EXPECTED_W_INSTRUCTION_SHA256,
+        "report_instruction_sha256": EXPECTED_R_INSTRUCTION_SHA256,
+        "section_composition_instruction_sha256": EXPECTED_C_INSTRUCTION_SHA256,
+        "R_prompt_sha256": EXPECTED_R_PROMPT_SHA256,
+        "WR_prompt_sha256": EXPECTED_WR_PROMPT_SHA256,
+        "RW_prompt_sha256": EXPECTED_RW_PROMPT_SHA256,
+        "RC_prompt_sha256": EXPECTED_RC_PROMPT_SHA256,
+        "execution_controls": {
+            "model": FROZEN_MODEL,
+            "planner_temperature": PLANNER_TEMPERATURE,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
+            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+            "timeout_seconds": TIMEOUT_SECONDS,
+        },
+    }
 
 
 @dataclass
@@ -435,30 +468,11 @@ async def run_shared_row(
         "source_summary": source_summary,
     }
     row: dict[str, object] = {
-        "experiment_version": EXPERIMENT_VERSION,
+        **frozen_population_provenance(),
         "design_baseline_sha": BASELINE_SHA,
         "authorized_checkpoint": authorized_checkpoint,
-        "harness_sha256": artifact_sha256(Path(__file__)),
-        "corpus_sha256": EXPECTED_CORPUS_SHA256,
-        "planner_source_sha256": EXPECTED_PLANNER_SOURCE_SHA256,
-        "base_prompt_sha256": EXPECTED_PROMPT_SHA256,
-        "catalog_sha256": EXPECTED_CATALOG_SHA256,
         "p2_historical_summary_sha256": EXPECTED_P2_SUMMARY_SHA256,
         "p2_historical_raw_sha256": EXPECTED_P2_RAW_SHA256,
-        "work_unit_instruction_sha256": sha256_text(WORK_UNIT_INSTRUCTION),
-        "report_instruction_sha256": sha256_text(REPORT_BOUNDARY_INSTRUCTION),
-        "section_composition_instruction_sha256": sha256_text(SECTION_COMPOSITION_INSTRUCTION),
-        "R_prompt_sha256": PROMPT_SHA256["R"],
-        "WR_prompt_sha256": PROMPT_SHA256["WR"],
-        "RW_prompt_sha256": PROMPT_SHA256["RW"],
-        "RC_prompt_sha256": PROMPT_SHA256["RC"],
-        "execution_controls": {
-            "model": FROZEN_MODEL,
-            "planner_temperature": PLANNER_TEMPERATURE,
-            "max_output_tokens": MAX_OUTPUT_TOKENS,
-            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
-            "timeout_seconds": TIMEOUT_SECONDS,
-        },
         "case_id": case["case_id"],
         "attempt_index": attempt_index,
         "request_sha256": sha256_text(shared_input["request"]),
@@ -613,6 +627,26 @@ def factor_tables(rows: list[dict[str, object]]) -> dict[str, object]:
                 false_true="ABSENT_TO_PRESENT",
                 false_false="ABSENT_TO_ABSENT",
             ),
+            "closure_omission": _semantic_pair_table(
+                rows,
+                left,
+                right,
+                "single_task_closure_omission",
+                true_true="OMISSION_TO_OMISSION",
+                true_false="OMISSION_TO_COMPLETE",
+                false_true="COMPLETE_TO_OMISSION",
+                false_false="COMPLETE_TO_COMPLETE",
+            ),
+            "capability_union": _semantic_pair_table(
+                rows,
+                left,
+                right,
+                "union_exact_expected",
+                true_true="EXACT_TO_EXACT",
+                true_false="EXACT_TO_INEXACT",
+                false_true="INEXACT_TO_EXACT",
+                false_false="INEXACT_TO_INEXACT",
+            ),
         }
     return tables
 
@@ -623,7 +657,7 @@ def population_integrity(
     *,
     expected_checkpoint: str | None = None,
 ) -> tuple[bool, list[str]]:
-    """Validate exact shared-row, arm, case, and checkpoint population shape."""
+    """Validate exact population shape and frozen experiment provenance."""
     expected_ids = {str(case["case_id"]) for case in cases}
     reasons: list[str] = []
     if len(rows) != len(cases) * ATTEMPTS:
@@ -645,6 +679,41 @@ def population_integrity(
         reasons.append("authorized_checkpoint_missing_or_mixed")
     elif expected_checkpoint is not None and checkpoints != {expected_checkpoint}:
         reasons.append("authorized_checkpoint_mismatch")
+
+    expected_provenance = frozen_population_provenance()
+    if any(
+        row.get("experiment_version") != expected_provenance["experiment_version"] for row in rows
+    ):
+        reasons.append("experiment_version_mismatch")
+    if any(row.get("design_baseline_sha") != BASELINE_SHA for row in rows):
+        reasons.append("design_baseline_mismatch")
+    if any(row.get("harness_sha256") != expected_provenance["harness_sha256"] for row in rows):
+        reasons.append("harness_hash_mismatch")
+    if any(row.get("corpus_sha256") != expected_provenance["corpus_sha256"] for row in rows):
+        reasons.append("corpus_hash_mismatch")
+    if any(
+        row.get("planner_source_sha256") != expected_provenance["planner_source_sha256"]
+        for row in rows
+    ):
+        reasons.append("planner_hash_mismatch")
+    if any(row.get("catalog_sha256") != expected_provenance["catalog_sha256"] for row in rows):
+        reasons.append("catalog_hash_mismatch")
+    instruction_fields = (
+        "work_unit_instruction_sha256",
+        "report_instruction_sha256",
+        "section_composition_instruction_sha256",
+    )
+    if any(
+        row.get(field) != expected_provenance[field] for row in rows for field in instruction_fields
+    ):
+        reasons.append("instruction_hash_mismatch")
+    prompt_fields = ("base_prompt_sha256", *[f"{arm}_prompt_sha256" for arm in ARMS])
+    if any(row.get(field) != expected_provenance[field] for row in rows for field in prompt_fields):
+        reasons.append("prompt_hash_mismatch")
+    if any(
+        row.get("execution_controls") != expected_provenance["execution_controls"] for row in rows
+    ):
+        reasons.append("execution_controls_mismatch")
     return not reasons, reasons
 
 
@@ -753,11 +822,16 @@ def _correction_metrics(rows: list[dict[str, object]], arm: str) -> dict[str, in
 
 def _new_wrong_selection(rows: list[dict[str, object]], arm: str) -> bool:
     """Return whether a candidate introduces wrong selection absent from WR."""
-    return any(
-        bool(_final_fact(_arm(row, arm), "wrong_capability_selection"))
-        and not bool(_final_fact(_arm(row, "WR"), "wrong_capability_selection"))
-        for row in rows
-    )
+    for row in rows:
+        candidate_facts = _arm(row, arm).get("final_facts")
+        control_facts = _arm(row, "WR").get("final_facts")
+        if not isinstance(candidate_facts, dict) or not isinstance(control_facts, dict):
+            continue
+        if bool(candidate_facts.get("wrong_capability_selection")) and not bool(
+            control_facts.get("wrong_capability_selection")
+        ):
+            return True
+    return False
 
 
 def decision(
@@ -941,19 +1015,34 @@ def verify_frozen_contract() -> dict[str, object]:
         raise RuntimeError("CM-57P4 corpus drifted.")
     if sha256_text(_PLANNER_SYSTEM_PROMPT) != EXPECTED_PROMPT_SHA256:
         raise RuntimeError("CM-57P4 base planner prompt drifted.")
-    expected = {
+    instruction_hashes = {
         "W": sha256_text(WORK_UNIT_INSTRUCTION),
         "R": sha256_text(REPORT_BOUNDARY_INSTRUCTION),
         "C": sha256_text(SECTION_COMPOSITION_INSTRUCTION),
     }
+    expected_instructions = {
+        "W": EXPECTED_W_INSTRUCTION_SHA256,
+        "R": EXPECTED_R_INSTRUCTION_SHA256,
+        "C": EXPECTED_C_INSTRUCTION_SHA256,
+    }
+    if instruction_hashes != expected_instructions:
+        raise RuntimeError("CM-57P4 factor instruction hash drifted.")
+    expected_prompts = {
+        "R": EXPECTED_R_PROMPT_SHA256,
+        "WR": EXPECTED_WR_PROMPT_SHA256,
+        "RW": EXPECTED_RW_PROMPT_SHA256,
+        "RC": EXPECTED_RC_PROMPT_SHA256,
+    }
+    if expected_prompts != PROMPT_SHA256:
+        raise RuntimeError("CM-57P4 composed prompt hash drifted.")
     return {
         **contract,
         "experiment_version": EXPERIMENT_VERSION,
         "base_prompt_sha256": EXPECTED_PROMPT_SHA256,
-        "work_unit_instruction_sha256": expected["W"],
-        "report_instruction_sha256": expected["R"],
-        "section_composition_instruction_sha256": expected["C"],
-        "prompt_sha256": dict(PROMPT_SHA256),
+        "work_unit_instruction_sha256": EXPECTED_W_INSTRUCTION_SHA256,
+        "report_instruction_sha256": EXPECTED_R_INSTRUCTION_SHA256,
+        "section_composition_instruction_sha256": EXPECTED_C_INSTRUCTION_SHA256,
+        "prompt_sha256": dict(expected_prompts),
         "p2_summary_sha256": p2_summary_sha,
         "p3_summary_sha256": EXPECTED_P3_SUMMARY_SHA256,
     }
@@ -987,6 +1076,8 @@ def _self_test_classification(cases: tuple[dict[str, object], ...]) -> None:
         for attempt in range(ATTEMPTS):
             rows.append(
                 {
+                    **frozen_population_provenance(),
+                    "design_baseline_sha": BASELINE_SHA,
                     "case_id": case_item["case_id"],
                     "attempt_index": attempt,
                     "authorized_checkpoint": BASELINE_SHA,
@@ -1073,6 +1164,7 @@ def verify_reviewed_checkout(checkpoint: str) -> None:
     if current_checkout_sha() != checkpoint:
         raise RuntimeError("CM-57P4 checkout does not match the authorized checkpoint.")
     guarded = (
+        "scripts/cm57p4_prompt_interaction_bisect.py",
         "scripts/cm57p2_planner_shadow.py",
         "scripts/cm57p3_work_unit_bisect.py",
         "src/wellplot/agent/code_mode/planner.py",
@@ -1113,6 +1205,8 @@ def _provider_configuration(args: argparse.Namespace) -> ModelBackendProtocol:
 
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     """Run the future 32-row matrix incrementally and stop after aggregation."""
+    if CHECKPOINT_RE.fullmatch(checkpoint) is None:
+        raise ValueError("CM-57P4 requires a full lowercase checkpoint SHA.")
     if OUTPUT_PATH.exists() and OUTPUT_PATH.stat().st_size:
         raise RuntimeError(f"Refusing to append to non-empty evidence path {OUTPUT_PATH}.")
     verify_reviewed_checkout(checkpoint)

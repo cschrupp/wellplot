@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
@@ -135,6 +137,9 @@ def test_prompt_composition_preserves_controls_and_hashes() -> None:
     assert p4.PROMPT_SHA256["RC"] == (
         "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
     )
+    assert p4.sha256_text(p4.WORK_UNIT_INSTRUCTION) == p4.EXPECTED_W_INSTRUCTION_SHA256
+    assert p4.sha256_text(p4.REPORT_BOUNDARY_INSTRUCTION) == p4.EXPECTED_R_INSTRUCTION_SHA256
+    assert p4.sha256_text(p4.SECTION_COMPOSITION_INSTRUCTION) == p4.EXPECTED_C_INSTRUCTION_SHA256
 
 
 @pytest.mark.parametrize("arm", p4.ARMS)
@@ -251,6 +256,8 @@ def _population() -> list[dict[str, object]]:
     cases = p4.p2.load_case_definitions()
     return [
         {
+            **p4.frozen_population_provenance(),
+            "design_baseline_sha": p4.BASELINE_SHA,
             "case_id": case["case_id"],
             "attempt_index": attempt,
             "authorized_checkpoint": p4.BASELINE_SHA,
@@ -264,6 +271,8 @@ def _population() -> list[dict[str, object]]:
                         "wrong_capability_selection": False,
                         "work_unit_fragmentation": False,
                         "report_task_present": False,
+                        "single_task_closure_omission": False,
+                        "union_exact_expected": True,
                     },
                 }
                 for arm in p4.ARMS
@@ -280,8 +289,58 @@ def test_factor_tables_cover_all_six_pairs_and_conserve_rows() -> None:
     assert set(tables) == {"R_to_WR", "WR_to_RW", "R_to_RW", "R_to_RC", "RW_to_RC", "WR_to_RC"}
     for pair in tables.values():
         assert sum(pair["full_contract"].values()) == 32
-        for metric in ("fragmentation", "report_task"):
+        for metric in (
+            "fragmentation",
+            "report_task",
+            "closure_omission",
+            "capability_union",
+        ):
             assert sum(pair[metric].values()) == 32
+
+
+def test_closure_and_union_pair_tables_preserve_availability() -> None:
+    """Closure and capability-union transitions use explicit unavailable rows."""
+    rows = _population()
+    left = "R"
+    right = "WR"
+    closure_transitions = [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ]
+    union_transitions = [
+        (True, True),
+        (True, False),
+        (False, True),
+        (False, False),
+    ]
+    for index, (left_value, right_value) in enumerate(closure_transitions):
+        rows[index]["arms"][left]["final_facts"]["single_task_closure_omission"] = left_value
+        rows[index]["arms"][right]["final_facts"]["single_task_closure_omission"] = right_value
+        rows[index]["arms"][left]["final_facts"]["union_exact_expected"] = union_transitions[index][
+            0
+        ]
+        rows[index]["arms"][right]["final_facts"]["union_exact_expected"] = union_transitions[
+            index
+        ][1]
+    rows[4]["arms"][left]["final_facts"] = None
+    closure = p4.factor_tables(rows)["R_to_WR"]["closure_omission"]
+    union = p4.factor_tables(rows)["R_to_WR"]["capability_union"]
+    assert closure == {
+        "OMISSION_TO_OMISSION": 1,
+        "OMISSION_TO_COMPLETE": 1,
+        "COMPLETE_TO_OMISSION": 1,
+        "COMPLETE_TO_COMPLETE": 28,
+        "UNAVAILABLE": 1,
+    }
+    assert union == {
+        "EXACT_TO_EXACT": 28,
+        "EXACT_TO_INEXACT": 1,
+        "INEXACT_TO_EXACT": 1,
+        "INEXACT_TO_INEXACT": 1,
+        "UNAVAILABLE": 1,
+    }
 
 
 def test_terminal_rows_are_unavailable_for_semantic_pairs() -> None:
@@ -303,6 +362,107 @@ def test_population_integrity_requires_all_p4_arms() -> None:
     complete, reasons = p4.population_integrity(rows, p4.p2.load_case_definitions())
     assert complete is False
     assert "arm_set_mismatch" in reasons
+
+
+def test_population_integrity_requires_exact_prompt_provenance() -> None:
+    """A complete population with one wrong prompt hash is inconclusive."""
+    rows = _population()
+    rows[0]["RW_prompt_sha256"] = "wrong"
+    complete, reasons = p4.population_integrity(rows, p4.p2.load_case_definitions())
+    assert complete is False
+    assert "prompt_hash_mismatch" in reasons
+
+
+def test_population_integrity_requires_exact_execution_controls() -> None:
+    """A control drift invalidates an otherwise complete population."""
+    rows = _population()
+    rows[0]["execution_controls"]["model"] = "wrong-model"
+    complete, reasons = p4.population_integrity(rows, p4.p2.load_case_definitions())
+    assert complete is False
+    assert "execution_controls_mismatch" in reasons
+
+
+def test_wrong_selection_requires_available_wr_facts() -> None:
+    """Missing WR facts cannot manufacture a candidate wrong-selection regression."""
+    rows = _population()
+    rows[0]["arms"]["WR"]["final_facts"] = None
+    rows[0]["arms"]["RW"]["final_facts"]["wrong_capability_selection"] = True
+    assert p4._new_wrong_selection(rows, "RW") is False
+    rows[1]["arms"]["WR"]["final_facts"]["wrong_capability_selection"] = False
+    rows[1]["arms"]["RW"]["final_facts"]["wrong_capability_selection"] = True
+    assert p4._new_wrong_selection(rows, "RW") is True
+
+
+def test_harness_drift_aborts_before_provider_construction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The live path rejects a modified executable harness before provider setup."""
+    checkpoint = p4.current_checkout_sha()
+    original_git_output = p4._git_output
+
+    def drifted_git_output(*arguments: str) -> bytes:
+        output = original_git_output(*arguments)
+        if arguments[0] == "show" and arguments[1].endswith(
+            ":scripts/cm57p4_prompt_interaction_bisect.py"
+        ):
+            return output + b"drift"
+        return output
+
+    provider_calls = 0
+
+    def unexpected_provider(_args: object) -> object:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider construction must not be reached")
+
+    monkeypatch.setattr(p4, "_git_output", drifted_git_output)
+    monkeypatch.setattr(p4, "_provider_configuration", unexpected_provider)
+    monkeypatch.setattr(p4, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    with pytest.raises(RuntimeError, match="guarded artifact drifted"):
+        asyncio.run(p4._run_live(SimpleNamespace(), checkpoint))
+    assert provider_calls == 0
+
+
+def test_instruction_hash_drift_aborts_before_provider_construction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A factor instruction mismatch fails before constructing the provider."""
+    provider_calls = 0
+
+    def unexpected_provider(_args: object) -> object:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider construction must not be reached")
+
+    monkeypatch.setattr(p4, "WORK_UNIT_INSTRUCTION", p4.WORK_UNIT_INSTRUCTION + " drift")
+    monkeypatch.setattr(p4, "verify_reviewed_checkout", lambda checkpoint: None)
+    monkeypatch.setattr(p4, "_provider_configuration", unexpected_provider)
+    monkeypatch.setattr(p4, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    with pytest.raises(RuntimeError, match="factor instruction hash drifted"):
+        asyncio.run(p4._run_live(SimpleNamespace(), p4.current_checkout_sha()))
+    assert provider_calls == 0
+
+
+def test_composed_prompt_hash_drift_aborts_before_provider_construction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A composed-factor hash mismatch fails before constructing the provider."""
+    provider_calls = 0
+
+    def unexpected_provider(_args: object) -> object:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider construction must not be reached")
+
+    drifted = dict(p4.PROMPT_SHA256)
+    drifted["RW"] = "wrong"
+    monkeypatch.setattr(p4, "PROMPT_SHA256", drifted)
+    monkeypatch.setattr(p4, "verify_reviewed_checkout", lambda checkpoint: None)
+    monkeypatch.setattr(p4, "_provider_configuration", unexpected_provider)
+    monkeypatch.setattr(p4, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    with pytest.raises(RuntimeError, match="composed prompt hash drifted"):
+        asyncio.run(p4._run_live(SimpleNamespace(), p4.current_checkout_sha()))
+    assert provider_calls == 0
 
 
 def test_decision_precedence_is_candidate_specific() -> None:
