@@ -1,0 +1,141 @@
+{
+  "experiment_version": "CM-57P2",
+  "p1_baseline": "474f6b014457e06e561db6e72ba3d6faa0605b8e",
+  "authorized_execution_checkpoint": "c378168720a677506d8548ec2acdd4bdabb6bcf2",
+  "bookkeeping_correction_checkpoint": "4d119c3",
+  "raw_evidence": {
+    "path": "/tmp/cm57p2-planner-qwen.jsonl",
+    "sha256": "33361e0ec2020b2215793fac87df52547a86d542fd6ed886def77871a5e79d38",
+    "rows": 32
+  },
+  "population": {
+    "expected_rows": 32,
+    "actual_rows": 32,
+    "cases": 16,
+    "attempts_per_case": 2,
+    "attempt_indexes": [0, 1],
+    "complete": true,
+    "reasons": []
+  },
+  "provider": {
+    "backend": "openai_compat",
+    "base_url": "http://192.168.2.142:8888/v1",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900,
+    "planner_provider_calls": 42,
+    "program_worker_calls": 0,
+    "provider_infrastructure_failures": 0
+  },
+  "frozen_artifacts": {
+    "corpus_sha256": "3acac04abbe8d20902bc1785d71cf3b8b0a9d7caf623ea79ed2eca8617842181",
+    "historical_summary_sha256": "97636abb8826d5039e2dd3878ce828126e9f6f6dbcb077d82aa9d45e673cdedf",
+    "historical_raw_sha256": "57df9720bc2eb7b05fcb815de84062815382b13c84f5878da8c948e08e41cba8",
+    "source_summary_matrix_sha256": "7be957d4bd3361457206bbce689c612727cec5c4a3d4cbf392c4dcca52203d8b",
+    "planner_prompt_sha256": "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18",
+    "planner_source_sha256": "0189b290ef4f76bdd776fe2612c454809ff77725379def7d8c5a98d9ae165413",
+    "planner_catalog_sha256": "b1b9c85db961cb8b97f1c8b6f914a6a75f5bf57cf49ca4413c64d35311b80d37",
+    "authorized_harness_sha256": "ba7498f79c610abc4c176213e9e2f89ba058d531396b18badf7a7356c11fda00"
+  },
+  "historical_baseline": {
+    "planner_pass": 11,
+    "planner_fail": 21,
+    "closure_omissions": 6,
+    "duplications": 2,
+    "wrong_selections": 0,
+    "exact_capability_other_gate": 13
+  },
+  "initial": {
+    "contract_ok": 6,
+    "contract_failures": 26,
+    "classifications": {
+      "INITIAL_CAPABILITY_CLOSURE_OMISSION": 2,
+      "INITIAL_CONTRACT_OK": 6,
+      "INITIAL_MULTIPLE_CONTRACT_GAPS": 16,
+      "INITIAL_UNEXPECTED_REPORT_TASK": 8
+    },
+    "independent_metrics": {
+      "closure_omissions": 10,
+      "duplicates": 2,
+      "parent_closure_failures": 10,
+      "wrong_selections": 0,
+      "unexpected_report_tasks": 20,
+      "unresolved_requirements": 0
+    }
+  },
+  "final": {
+    "contract_ok": 8,
+    "classifications": {
+      "CAPABILITY_CLOSURE_OMISSION": 10,
+      "PLANNER_CONTRACT_OK": 8,
+      "PLANNER_SEMANTIC_FAILURE": 2,
+      "UNEXPECTED_REPORT_TASK": 9,
+      "WORK_UNIT_COUNT_MISMATCH": 3
+    },
+    "independent_metrics": {
+      "closure_omissions": 12,
+      "duplicates": 1,
+      "parent_closure_failures": 0,
+      "wrong_selections": 0,
+      "unexpected_report_tasks": 18,
+      "unresolved_requirements": 0,
+      "report_and_unresolved": 0
+    },
+    "primary_gate_counts": {
+      "UNEXPECTED_REPORT_TASK": 9,
+      "UNRESOLVED_REQUIREMENTS": 0,
+      "REPORT_AND_UNRESOLVED": 0
+    }
+  },
+  "correction": {
+    "invalid_response_retries": 0,
+    "semantic_corrections": 10,
+    "semantic_corrections_recovered": 2,
+    "semantic_corrections_failed": 8,
+    "rows_without_semantic_correction": 22
+  },
+  "historical_transitions": {
+    "PASS_TO_PASS": 2,
+    "PASS_TO_FAIL": 9,
+    "FAIL_TO_PASS": 6,
+    "FAIL_TO_FAIL": 15,
+    "total": 32,
+    "consistent_with_recovery_and_regression_metrics": true
+  },
+  "repeatability": {
+    "stable_cases": 14,
+    "unstable_cases": 1,
+    "unavailable_cases": 1,
+    "stable_case_ids": [
+      "alternate_source_selection",
+      "curve_linear_new_values",
+      "curve_reverse_new_values",
+      "curve_tangential_new_values",
+      "generic_profile_paraphrase",
+      "independent_sample_bounds",
+      "multi_curve_order",
+      "multi_raster_binding_order",
+      "raster_profile_omitted_negative",
+      "reference_track_multi_curve",
+      "repeated_channel_new_values",
+      "sample_axis_unit_ticks_only",
+      "vdl_axis_new_values",
+      "waveform_profile_paraphrase"
+    ],
+    "unstable_case_ids": ["mixed_curve_raster_section"],
+    "unavailable_case_ids": ["curve_log_new_values"]
+  },
+  "decision": "PLANNER_CONTRACT_REGRESSION",
+  "integrity": {
+    "production_changes": 0,
+    "corpus_changed": false,
+    "planner_changed_after_authorization": false,
+    "provider_controls_changed": false,
+    "typed_worker_called": false,
+    "routing_changed": false,
+    "raw_evidence_modified_after_hash": false
+  },
+  "cm57d": "BLOCKED"
+}

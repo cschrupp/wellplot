@@ -180,13 +180,86 @@ the independent recovery and regression counters.
 Pre-live validation completed without provider calls:
 
 ```text
-focused CM-57P2/R1 tests: 20 passed
+focused CM-57P2/R1 tests: 21 passed
 pre-live CLI:           PRELIVE_READY
 provider calls:         0
 production changes:     0
-live inference:         NOT STARTED
+pre-live inference:     NOT STARTED
 ```
 
 The harness has not modified CM-57C, CM-57P1, the corpus, historical summary,
-or any file under `src/wellplot`. CM-57D remains blocked. Stop here for
-independent review and separate live authorization.
+or any file under `src/wellplot`.
+
+## Live Result
+
+The authorized planner-only live run executed at checkpoint
+`c378168720a677506d8548ec2acdd4bdabb6bcf2` against the configured local
+OpenAI-compatible Qwen endpoint. The raw JSONL remains outside Git at
+`/tmp/cm57p2-planner-qwen.jsonl` and is frozen by SHA-256
+`33361e0ec2020b2215793fac87df52547a86d542fd6ed886def77871a5e79d38`.
+
+```text
+rows:                         32 / 32
+planner provider calls:       42
+program/worker calls:          0
+provider infrastructure:      0
+initial contract OK:           6 / 32
+final contract OK:             8 / 32
+invalid-response retries:      0
+semantic corrections:         10
+corrections recovered:          2
+corrections failed:             8
+rows without correction:       22
+```
+
+Independent initial metrics were:
+
+```text
+closure omissions:            10
+duplicates:                     2
+parent-closure failures:       10
+wrong selections:               0
+unexpected report tasks:       20
+unresolved requirements:        0
+```
+
+Independent final metrics were:
+
+```text
+closure omissions:             12
+duplicates:                     1
+parent-closure failures:        0
+wrong selections:               0
+unexpected report tasks:       18
+unresolved requirements:        0
+report + unresolved:            0
+```
+
+The primary final classifications were:
+
+```text
+PLANNER_CONTRACT_OK:             8
+CAPABILITY_CLOSURE_OMISSION:    10
+PLANNER_SEMANTIC_FAILURE:        2
+UNEXPECTED_REPORT_TASK:          9
+WORK_UNIT_COUNT_MISMATCH:        3
+```
+
+Historical transitions were:
+
+```text
+PASS -> PASS:                    2
+PASS -> FAIL:                    9
+FAIL -> PASS:                    6
+FAIL -> FAIL:                   15
+total:                          32
+```
+
+The transition matrix is consistent with six historical recoveries and nine
+historical-success regressions. Final planner-contract repeatability was
+stable for 14 cases, unstable for 1 case, and unavailable for 1 case.
+
+The frozen decision is `PLANNER_CONTRACT_REGRESSION`, because nine historical
+passing rows became final planner failures. This result does not authorize
+typed-worker remediation, planner changes, end-to-end CM-57C reruns, or
+CM-57D. CM-57D remains blocked.
