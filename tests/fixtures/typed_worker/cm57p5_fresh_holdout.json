@@ -1,0 +1,216 @@
+{
+  "version": "cm57p5.holdout.v1",
+  "cases": [
+    {
+      "case_id": "p5-report-header-01",
+      "family": "REPORT_ONLY",
+      "request": "Set the report title to North Ridge Completion Review and add the prepared-by line for the operations team.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-report-page-02",
+      "family": "REPORT_ONLY",
+      "request": "Use a portrait page with a compact depth range and write the finished document to the requested output location.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-report-remarks-03",
+      "family": "REPORT_ONLY",
+      "request": "Add the following report remarks and finish the document with a short tail note for the drilling review.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-report-settings-04",
+      "family": "REPORT_ONLY",
+      "request": "Prepare a report cover with the Cedar Basin title, subtitle, page settings, and the standard delivery metadata.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-single-curve-05",
+      "family": "SINGLE_SECTION",
+      "request": "Make a log display for the gamma ray curve with one ordinary track labeled Reservoir Clues.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-single-reference-06",
+      "family": "SINGLE_SECTION",
+      "request": "Create one panel with a depth reference column and a regular resistivity curve beside it.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-single-waveform-07",
+      "family": "SINGLE_SECTION",
+      "request": "Build one waveform display with an array track for the acoustic image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-single-reference-image-08",
+      "family": "SINGLE_SECTION",
+      "request": "Show one depth reference column alongside an image track for the formation response.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-heterogeneous-overlay-09",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Create one panel combining a scalar porosity curve with an acoustic waveform track.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-heterogeneous-reference-10",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Put a depth reference, a density curve, and an image track together in the same log panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-heterogeneous-multi-curve-11",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Use one display for two scalar tracks, one for gamma ray and one for caliper, plus a waveform track in that display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-heterogeneous-reference-images-12",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Combine a reference depth column, an ordinary temperature curve, and two image contents in a single panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multi-curves-13",
+      "family": "MULTI_SECTION",
+      "request": "Make a gamma ray panel and a separate resistivity panel; keep the two displays independent.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.normal", "binding.curve"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multi-curve-image-14",
+      "family": "MULTI_SECTION",
+      "request": "Create one scalar log panel for the porosity curve and another independent panel for the acoustic image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multi-images-15",
+      "family": "MULTI_SECTION",
+      "request": "Show the density image and the borehole image in two separate displays rather than one combined panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.array", "binding.raster"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multi-three-panels-16",
+      "family": "MULTI_SECTION",
+      "request": "Prepare three independent views: a gamma curve view, an image view, and a combined curve-plus-image view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"],
+        ["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-mixed-summary-17",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Prepare the report cover and include a single panel showing the gamma ray curve.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-mixed-image-18",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Add the requested page metadata to the report, then include one formation image display.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-mixed-two-panels-19",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Set the report heading and produce two independent panels: one for the gamma curve and one for the acoustic image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-mixed-combined-20",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Write the report remarks and show one combined log panel with a scalar curve and a waveform image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multiplicity-curves-21",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Use one ordinary track to show both the gamma ray and caliper curves in the same panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multiplicity-images-22",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Put two image bindings on one array track so the density and borehole images share a display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multiplicity-tracks-23",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Create one panel with two ordinary tracks, one for gamma ray and one for spontaneous potential.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p5-multiplicity-independent-24",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Make two separate scalar panels, one for gamma ray and one for spontaneous potential, as independent displays.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.normal", "binding.curve"]
+      ],
+      "expected_unresolved_count": 0
+    }
+  ]
+}

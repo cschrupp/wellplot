@@ -1,0 +1,116 @@
+# CM-57P5 Development Memory
+
+## Status
+
+CM-57P5 is a provider-free pre-live implementation checkpoint for fresh
+holdout planner-contract generalization. Its frozen baseline is
+`f7ffdf1382c0a4f57ee05b11b5cc3af2943d5b4f`, which contains the completed
+CM-57P4 evidence and decision `INCONCLUSIVE_PROMPT_INTERACTION_BISECT`.
+
+The purpose is to test the already-selected P4 `RC` planner contract on a new
+corpus rather than tune the prompt again. P5 evaluates report work-unit
+presence, report capability selection, section count, section capability
+multisets, parent closure, duplicate capability types within one task, and
+unresolved requirements. It does not evaluate scientific values, source
+selection, typed-worker semantics, compilation, persistence, or routing.
+
+## Frozen Design
+
+The two arms are:
+
+- `P`: the unchanged production `SemanticPlanner` and production system prompt.
+- `RC`: the same planner and controls with only the exact P4 report-boundary
+  and section-composition instructions appended to the system prompt.
+
+The exact frozen instruction hashes are:
+
+- BASE prompt: `5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18`.
+- R instruction: `12fd2c40e407cb7d5d0e21effd66493e20e99468e3a97b89ac0186b40648c5b5`.
+- C instruction: `b69c47063b6da13e4f5857609708efe0becc901b989a1a65c503dd277cdc8205`.
+- RC prompt: `e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34`.
+
+The P5 holdout is version `cm57p5.holdout.v1` with 24 new cases, six
+families, four cases per family, two attempts per case, and 48 future shared
+rows. The future matrix has 96 planner executions and 96-192 provider calls.
+Requests do not contain capability IDs, planner/evaluator field names, paths,
+or reused CM-57C request hashes.
+
+The gold representation is an optional report work unit plus a multiset of
+independently compilable section signatures. Section order is irrelevant, but
+section count and duplicate identical signatures are significant. Capability
+types must remain unique within each work unit.
+
+The fixed production-safe source summary is the path-free
+`cm56r3.source-summary.v1` summary with a combined source label. Its SHA-256
+is:
+
+`ec6147a1b5e1ac6374e34ae3d66d11275542c6b340337cb26d3ae1d06240532e`
+
+The holdout corpus SHA-256 is:
+
+`5f1e44e0eb511c78160c596c982be5dd9b04efdfb58d0af176b4327286f15f76`
+
+## Evidence Guards
+
+The future live path requires an empty evidence file and an exact reviewed
+checkout before constructing a provider. It byte-guards the P5 harness and
+corpus, P4 harness and summary, planner and capability registry artifacts, the
+CM-57C corpus, the frozen source summary, prompt hashes, and execution
+controls. Rows carry the full provenance and population integrity rejects
+drift, missing arms, duplicate case/attempt pairs, or mixed checkpoints.
+
+P4 provenance remains frozen:
+
+- P4 summary SHA-256:
+  `571c1c98d4043ad174fe8000f2affc5dec93ec1d90a5fffa100d2cc98d51ae0d`.
+- P4 raw evidence SHA-256:
+  `84984fe9903e43396633c87682eb341342f8ac406d296d29dfb47b32b02cd001`.
+- P4 authorized checkpoint:
+  `c44f163ef605f8d892bf6d114c6a6a3258756ca5`.
+
+Provider result prose, hidden reasoning, full prompts, secrets, and host paths
+are not retained in future evidence rows. Each completed shared row is flushed
+immediately; a partial run is evidence and is not resumed by appending.
+
+## Decision Contract
+
+The future decision labels are:
+
+- `HOLDOUT_GENERALIZATION_VALIDATED` only for RC `48/48`, no infrastructure or
+  terminal failures, no wrong selections, and no P-only pass.
+- `HOLDOUT_GENERALIZATION_PARTIAL` when RC improves on P without any P-only
+  pass but remains below `48/48`.
+- `HOLDOUT_GENERALIZATION_NO_GAIN` when P and RC have equal final pass counts,
+  with no P-only pass and no inconclusive condition.
+- `HOLDOUT_GENERALIZATION_REGRESSION` whenever P passes and RC fails on any
+  paired row.
+- `INCONCLUSIVE_HOLDOUT_EVALUATION` for infrastructure failure, incomplete or
+  corrupted evidence, checkpoint/corpus/prompt/control drift, or wrapper
+  isolation failure.
+
+The regression and inconclusive conditions dominate aggregate gains. No result
+will authorize production prompt adoption automatically.
+
+## Pre-Live Boundary
+
+Production changes: `0`.
+
+Provider calls: `0`.
+
+Worker/program calls: `0`.
+
+Live inference: `NOT STARTED`.
+
+Production adoption: `NOT AUTHORIZED`.
+
+CM-57D: `BLOCKED`.
+
+The pre-live harness and tests are in:
+
+- `scripts/cm57p5_fresh_holdout.py`
+- `tests/fixtures/typed_worker/cm57p5_fresh_holdout.json`
+- `tests/test_cm57p5_fresh_holdout.py`
+
+Hard stop after the reviewed implementation checkpoint. Do not run Qwen, run a
+smoke case, edit the holdout after provider output, modify the production
+prompt, or begin CM-57D without separate live authorization.
