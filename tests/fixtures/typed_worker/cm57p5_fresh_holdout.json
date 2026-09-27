@@ -12,7 +12,7 @@
     {
       "case_id": "p5-report-page-02",
       "family": "REPORT_ONLY",
-      "request": "Use a portrait page with a compact depth range and write the finished document to the requested output location.",
+      "request": "Use a portrait page covering the depth interval from 2100 to 2450 m and name the finished output Cedar-Basin-Review.pdf.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [],
       "expected_unresolved_count": 0
@@ -20,7 +20,7 @@
     {
       "case_id": "p5-report-remarks-03",
       "family": "REPORT_ONLY",
-      "request": "Add the following report remarks and finish the document with a short tail note for the drilling review.",
+      "request": "Add the report remark \"QC completed before drilling review\" and finish the document with the tail note \"Prepared for drilling review\".",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [],
       "expected_unresolved_count": 0
@@ -28,7 +28,7 @@
     {
       "case_id": "p5-report-settings-04",
       "family": "REPORT_ONLY",
-      "request": "Prepare a report cover with the Cedar Basin title, subtitle, page settings, and the standard delivery metadata.",
+      "request": "Prepare a report cover titled Cedar Basin with the subtitle Completion Review, use landscape page settings, and name the output Cedar-Basin-Final.pdf.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [],
       "expected_unresolved_count": 0
@@ -145,7 +145,7 @@
     {
       "case_id": "p5-mixed-summary-17",
       "family": "MIXED_REPORT_SECTION",
-      "request": "Prepare the report cover and include a single panel showing the gamma ray curve.",
+      "request": "Prepare the report cover titled Gamma Review and include a single panel showing the gamma ray curve.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
       "expected_unresolved_count": 0
@@ -153,7 +153,7 @@
     {
       "case_id": "p5-mixed-image-18",
       "family": "MIXED_REPORT_SECTION",
-      "request": "Add the requested page metadata to the report, then include one formation image display.",
+      "request": "Set the report subtitle to Formation Image Review, use portrait page settings, and include one formation image display.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
       "expected_unresolved_count": 0
@@ -161,7 +161,7 @@
     {
       "case_id": "p5-mixed-two-panels-19",
       "family": "MIXED_REPORT_SECTION",
-      "request": "Set the report heading and produce two independent panels: one for the gamma curve and one for the acoustic image.",
+      "request": "Set the report heading to Acoustic Comparison and produce two independent panels: one for the gamma curve and one for the acoustic image.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [
         ["section.log_plot", "track.normal", "binding.curve"],
@@ -172,7 +172,7 @@
     {
       "case_id": "p5-mixed-combined-20",
       "family": "MIXED_REPORT_SECTION",
-      "request": "Write the report remarks and show one combined log panel with a scalar curve and a waveform image.",
+      "request": "Add the report remark \"Curve and waveform reviewed together\" and show one combined log panel with a scalar curve and a waveform image.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
       "expected_unresolved_count": 0

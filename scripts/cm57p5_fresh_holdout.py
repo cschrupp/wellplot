@@ -51,7 +51,8 @@ P4_SCRIPT_PATH = REPO_ROOT / "scripts/cm57p4_prompt_interaction_bisect.py"
 P4_SUMMARY_PATH = REPO_ROOT / "docs/evaluations/agent-code-mode/CM-57P4-live-summary.json"
 OUTPUT_PATH = Path("/tmp/cm57p5-fresh-holdout-qwen.jsonl")
 
-BASELINE_SHA = "f7ffdf1382c0a4f57ee05b11b5cc3af2943d5b4f"
+BASELINE_SHA = "c39068ccab1b470c7a325649d59f4e9a42114f52"
+PREVIOUS_BASELINE_SHA = "f7ffdf1382c0a4f57ee05b11b5cc3af2943d5b4f"
 EXPERIMENT_VERSION = "CM-57P5"
 CORPUS_VERSION = "cm57p5.holdout.v1"
 FROZEN_MODEL = "qwen3.6-35b-a3b"
@@ -71,7 +72,7 @@ FAMILIES: tuple[str, ...] = (
 )
 Arm = Literal["P", "RC"]
 
-EXPECTED_HOLDOUT_SHA256 = "5f1e44e0eb511c78160c596c982be5dd9b04efdfb58d0af176b4327286f15f76"
+EXPECTED_HOLDOUT_SHA256 = "29e85998481ce9bcc6eab9ecb7959d470cefbf3a84e5273309c6004aacae334d"
 EXPECTED_P4_SCRIPT_SHA256 = "fe7684ff610a14151784cd4272b65ba45e91b56c54b3eda2230e4fff6d2a9693"
 EXPECTED_P4_SUMMARY_SHA256 = "571c1c98d4043ad174fe8000f2affc5dec93ec1d90a5fffa100d2cc98d51ae0d"
 EXPECTED_P4_RAW_SHA256 = "84984fe9903e43396633c87682eb341342f8ac406d296d29dfb47b32b02cd001"
@@ -106,12 +107,13 @@ FIXED_SOURCE_SUMMARY: dict[str, object] = {
     ],
 }
 
-EXPECTED_SOURCE_SUMMARY = json.dumps(
-    FIXED_SOURCE_SUMMARY,
-    sort_keys=True,
-    separators=(",", ":"),
-    ensure_ascii=False,
-)
+FROZEN_EXECUTION_CONTROLS = {
+    "model": FROZEN_MODEL,
+    "planner_temperature": PLANNER_TEMPERATURE,
+    "max_output_tokens": MAX_OUTPUT_TOKENS,
+    "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+    "timeout_seconds": TIMEOUT_SECONDS,
+}
 
 FORBIDDEN_REQUEST_TERMS = (
     "SectionTask",
@@ -158,7 +160,7 @@ def current_checkout_sha() -> str:
 
 def _fixed_source_summary_sha() -> str:
     """Return the frozen hash for the one production-safe source summary."""
-    return sha256_text(EXPECTED_SOURCE_SUMMARY)
+    return sha256_text(canonical_json(FIXED_SOURCE_SUMMARY))
 
 
 def composed_prompt(arm: Arm) -> str:
@@ -184,13 +186,7 @@ def frozen_population_provenance() -> dict[str, object]:
         "section_composition_instruction_sha256": sha256_text(SECTION_COMPOSITION_INSTRUCTION),
         "RC_prompt_sha256": sha256_text(RC_PROMPT),
         "source_summary_sha256": _fixed_source_summary_sha(),
-        "execution_controls": {
-            "model": FROZEN_MODEL,
-            "planner_temperature": PLANNER_TEMPERATURE,
-            "max_output_tokens": MAX_OUTPUT_TOKENS,
-            "max_tokens_parameter": MAX_TOKENS_PARAMETER,
-            "timeout_seconds": TIMEOUT_SECONDS,
-        },
+        "execution_controls": dict(FROZEN_EXECUTION_CONTROLS),
     }
 
 
@@ -921,6 +917,15 @@ def verify_frozen_contract() -> dict[str, object]:
         raise RuntimeError("CM-57P5 holdout corpus bytes drifted.")
     if _fixed_source_summary_sha() != EXPECTED_SOURCE_SUMMARY_SHA256:
         raise RuntimeError("CM-57P5 source summary bytes drifted.")
+    actual_controls = {
+        "model": FROZEN_MODEL,
+        "planner_temperature": PLANNER_TEMPERATURE,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
+        "max_tokens_parameter": MAX_TOKENS_PARAMETER,
+        "timeout_seconds": TIMEOUT_SECONDS,
+    }
+    if actual_controls != FROZEN_EXECUTION_CONTROLS:
+        raise RuntimeError("CM-57P5 execution controls drifted.")
     if artifact_sha256(P4_SCRIPT_PATH) != EXPECTED_P4_SCRIPT_SHA256:
         raise RuntimeError("CM-57P4 harness bytes drifted.")
     if artifact_sha256(P4_SUMMARY_PATH) != EXPECTED_P4_SUMMARY_SHA256:
@@ -970,6 +975,7 @@ class _DeterministicBackend(ModelBackendProtocol):
     def __init__(self, *, invalid_first: bool = False) -> None:
         self.invalid_first = invalid_first
         self.calls: list[StructuredGenerationRequest] = []
+        self.response_models: list[type[BaseModel]] = []
 
     async def generate_structured(
         self,
@@ -977,8 +983,8 @@ class _DeterministicBackend(ModelBackendProtocol):
         *,
         response_model: type[BaseModel],
     ) -> StructuredGenerationResult[BaseModel]:
-        del response_model
         self.calls.append(request)
+        self.response_models.append(response_model)
         invalid = self.invalid_first and len(self.calls) == 1
         capability_ids = (
             ("unknown.capability",)
@@ -999,43 +1005,45 @@ class _DeterministicBackend(ModelBackendProtocol):
         raise AssertionError(f"CM-57P5 self-test reached program generation: {request!r}")
 
 
-async def _prompt_isolation_self_test(case: dict[str, object]) -> None:
-    """Prove P is unchanged and RC changes only system_prompt on both calls."""
+async def _production_path_equivalence_self_test(case: dict[str, object]) -> None:
+    """Prove the actual P path and RC differ only by RC's system prompt."""
     registry = create_builtin_registry()
-    forwarded: dict[str, list[StructuredGenerationRequest]] = {}
-    response_models: dict[str, list[type[BaseModel]]] = {}
-    for arm in ARMS:
-        delegate = _DeterministicBackend(invalid_first=True)
-        requests: list[StructuredGenerationRequest] = []
-        backend = PromptArmBackend(delegate=delegate, arm=arm, forwarded_requests=requests)
-        planner = SemanticPlanner(backend=backend, registry=registry)
-        try:
-            await planner.plan(
-                request=str(case["request"]),
-                mode="reconstruct",
-                current_document_summary={},
-                source_summary=FIXED_SOURCE_SUMMARY,
-                timeout_seconds=TIMEOUT_SECONDS,
-                temperature=PLANNER_TEMPERATURE,
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-            )
-        except PlannerSemanticFailure as error:
-            raise AssertionError(
-                "Deterministic correction self-test unexpectedly failed."
-            ) from error
-        forwarded[arm] = requests
-        response_models[arm] = backend.forwarded_response_models
-    assert len(forwarded["P"]) == 2
-    assert len(forwarded["RC"]) == 2
-    for production, candidate in zip(forwarded["P"], forwarded["RC"], strict=True):
+    planner_kwargs = {
+        "request": str(case["request"]),
+        "mode": "reconstruct",
+        "current_document_summary": {},
+        "source_summary": FIXED_SOURCE_SUMMARY,
+        "timeout_seconds": TIMEOUT_SECONDS,
+        "temperature": PLANNER_TEMPERATURE,
+        "max_output_tokens": MAX_OUTPUT_TOKENS,
+    }
+
+    direct_backend = _DeterministicBackend(invalid_first=True)
+    direct_planner = SemanticPlanner(backend=direct_backend, registry=registry)
+    try:
+        await direct_planner.plan(**planner_kwargs)
+    except PlannerSemanticFailure as error:
+        raise AssertionError("Direct production correction self-test failed.") from error
+
+    p_backend = _DeterministicBackend(invalid_first=True)
+    p_result = await run_arm(case, arm="P", delegate=p_backend, registry=registry)
+    assert p_result["final_planner_success"]
+    assert p_backend.calls == direct_backend.calls
+    assert p_backend.response_models == [SemanticPlan, SemanticPlan]
+    assert direct_backend.response_models == [SemanticPlan, SemanticPlan]
+    assert all(request.system_prompt == _PLANNER_SYSTEM_PROMPT for request in p_backend.calls)
+
+    rc_backend = _DeterministicBackend(invalid_first=True)
+    rc_result = await run_arm(case, arm="RC", delegate=rc_backend, registry=registry)
+    assert rc_result["final_planner_success"]
+    assert rc_backend.response_models == [SemanticPlan, SemanticPlan]
+    for production, candidate in zip(p_backend.calls, rc_backend.calls, strict=True):
         assert production.user_prompt == candidate.user_prompt
         assert production.timeout_seconds == candidate.timeout_seconds
         assert production.temperature == candidate.temperature
         assert production.max_output_tokens == candidate.max_output_tokens
-    assert response_models["P"] == [SemanticPlan, SemanticPlan]
-    assert response_models["RC"] == [SemanticPlan, SemanticPlan]
-    assert all(request.system_prompt == _PLANNER_SYSTEM_PROMPT for request in forwarded["P"])
-    assert all(request.system_prompt == RC_PROMPT for request in forwarded["RC"])
+        assert production.system_prompt == _PLANNER_SYSTEM_PROMPT
+        assert candidate.system_prompt == RC_PROMPT
 
 
 def _self_test_evaluator(cases: tuple[dict[str, object], ...]) -> None:
@@ -1163,7 +1171,7 @@ def prelive_report() -> dict[str, object]:
     contract = verify_frozen_contract()
     cases = load_case_definitions()
     _self_test_evaluator(cases)
-    asyncio.run(_prompt_isolation_self_test(cases[4]))
+    asyncio.run(_production_path_equivalence_self_test(cases[4]))
     return {
         "status": "PRELIVE_READY",
         "experiment_version": EXPERIMENT_VERSION,

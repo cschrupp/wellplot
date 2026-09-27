@@ -3,9 +3,11 @@
 ## Status
 
 CM-57P5 is a provider-free pre-live implementation checkpoint for fresh
-holdout planner-contract generalization. Its frozen baseline is
-`f7ffdf1382c0a4f57ee05b11b5cc3af2943d5b4f`, which contains the completed
-CM-57P4 evidence and decision `INCONCLUSIVE_PROMPT_INTERACTION_BISECT`.
+holdout planner-contract generalization. Its R1 review baseline is
+`c39068ccab1b470c7a325649d59f4e9a42114f52`, the initial CM-57P5 checkpoint.
+The preceding CM-57P4 evidence baseline remains
+`f7ffdf1382c0a4f57ee05b11b5cc3af2943d5b4f` and records
+`INCONCLUSIVE_PROMPT_INTERACTION_BISECT`.
 
 The purpose is to test the already-selected P4 `RC` planner contract on a new
 corpus rather than tune the prompt again. P5 evaluates report work-unit
@@ -46,9 +48,36 @@ is:
 
 `ec6147a1b5e1ac6374e34ae3d66d11275542c6b340337cb26d3ae1d06240532e`
 
-The holdout corpus SHA-256 is:
+The initial holdout corpus SHA-256 was:
 
 `5f1e44e0eb511c78160c596c982be5dd9b04efdfb58d0af176b4327286f15f76`
+
+## CM-57P5-R1 Corrections
+
+R1 corrects seven requests that were too generic to make their frozen report
+and section gold independently unambiguous. The revised corpus keeps every
+case ID, family, capability gold set, section topology, and zero-unresolved
+gold field unchanged. Its frozen SHA-256 is:
+
+`29e85998481ce9bcc6eab9ecb7959d470cefbf3a84e5273309c6004aacae334d`
+
+The seven requests now state the required page/depth/output, remarks/tail,
+report settings, report-plus-section, independent-panel, and combined-panel
+semantics directly. No prompt, model, timeout, token, temperature, source
+summary, capability, planner, or evaluator behavior changed.
+
+R1 also makes the provider-free evidence checks stricter. The runtime source
+summary hash is derived from the actual `FIXED_SOURCE_SUMMARY` object rather
+than a separately cached serialization. The live gate compares its actual
+model, temperature, output-token, token-parameter, and timeout constants to
+one frozen controls object before provider construction. The provider-free
+self-test compares a direct `SemanticPlanner` production invocation with the
+actual P arm on both initial and semantic-correction calls, then verifies that
+RC changes only the system prompt. Reviewed-checkout tests cover harness and
+corpus byte drift plus prompt, source-summary, and execution-control drift;
+all abort before provider construction. A fixture regression compares the
+complete gold projection with the initial CM-57P5 checkpoint, and an explicit
+test rejects merging two independently expected sections into one task.
 
 ## Evidence Guards
 

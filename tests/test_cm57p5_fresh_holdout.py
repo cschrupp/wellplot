@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from argparse import Namespace
 from pathlib import Path
 
@@ -47,9 +48,31 @@ def test_fresh_requests_are_path_free_and_do_not_leak_planner_vocabulary(
 
 def test_fixed_source_summary_is_path_free_and_frozen() -> None:
     """Verify the shared source summary is deterministic and redacted."""
+    source_summary = p5.canonical_json(p5.FIXED_SOURCE_SUMMARY)
     assert p5._fixed_source_summary_sha() == p5.EXPECTED_SOURCE_SUMMARY_SHA256
-    assert not p5.PATH_RE.search(p5.EXPECTED_SOURCE_SUMMARY)
-    assert "candidate_id" not in p5.EXPECTED_SOURCE_SUMMARY
+    assert not p5.PATH_RE.search(source_summary)
+    assert "candidate_id" not in source_summary
+
+
+def test_holdout_gold_is_unchanged_from_r1_review_baseline() -> None:
+    """Ensure R1 request wording changes did not alter any expected gold."""
+    baseline_path = f"{p5.BASELINE_SHA}:tests/fixtures/typed_worker/cm57p5_fresh_holdout.json"
+    baseline_payload = json.loads(p5._git_output("show", baseline_path))
+    current_payload = json.loads(p5.CASE_PATH.read_text(encoding="utf-8"))
+
+    def gold_projection(payload: dict[str, object]) -> list[tuple[object, ...]]:
+        return [
+            (
+                case["case_id"],
+                case["family"],
+                tuple(case["expected_report_capabilities"]),
+                tuple(tuple(section) for section in case["expected_sections"]),
+                case["expected_unresolved_count"],
+            )
+            for case in payload["cases"]
+        ]
+
+    assert gold_projection(current_payload) == gold_projection(baseline_payload)
 
 
 def test_section_multiset_is_order_independent_and_preserves_duplicates(
@@ -126,6 +149,32 @@ def test_mixed_report_and_section_gold_requires_all_work_units(
     assert not p5.final_contract_ok(p5._facts(empty_report, case, registry))
 
 
+def test_independent_sections_must_not_be_merged_into_one_task(
+    cases: tuple[dict[str, object], ...],
+) -> None:
+    """Reject one task that merges two independently expected sections."""
+    registry = create_builtin_registry()
+    case = cases[13]
+    merged = SemanticPlan(
+        summary="merged independent panels",
+        section_tasks=(
+            SectionTask(
+                goal="merged curve and image",
+                capability_ids=(
+                    "section.log_plot",
+                    "track.normal",
+                    "binding.curve",
+                    "track.array",
+                    "binding.raster",
+                ),
+            ),
+        ),
+    )
+    facts = p5._facts(merged, case, registry)
+    assert not p5.final_contract_ok(facts)
+    assert p5.classify_facts(facts) == "SECTION_COUNT_MISMATCH"
+
+
 def test_multiplicity_distinguishes_within_task_duplicates_from_independent_tasks(
     cases: tuple[dict[str, object], ...],
 ) -> None:
@@ -197,11 +246,11 @@ def test_decision_precedence_covers_validated_regression_partial_no_gain_and_inc
     )
 
 
-def test_prompt_isolation_self_test_is_provider_free(
+def test_production_path_equivalence_self_test_is_provider_free(
     cases: tuple[dict[str, object], ...],
 ) -> None:
-    """Run prompt isolation self-tests without constructing a provider."""
-    asyncio.run(p5._prompt_isolation_self_test(cases[4]))
+    """Run actual P and RC path checks without constructing a provider."""
+    asyncio.run(p5._production_path_equivalence_self_test(cases[4]))
     assert p5.sha256_text(p5.RC_PROMPT) == p5.EXPECTED_RC_PROMPT_SHA256
 
 
@@ -240,5 +289,92 @@ def test_nonempty_evidence_path_is_rejected_before_provider_construction(
     monkeypatch.setattr(p5, "_provider_configuration", fail_if_constructed)
     args = Namespace(base_url="http://example.invalid", api_key_file=None, api_key_env="KEY")
     with pytest.raises(RuntimeError, match="non-empty evidence path"):
+        asyncio.run(p5._run_live(args, p5.BASELINE_SHA))
+    assert not constructed
+
+
+def _patch_reviewed_checkout_bytes(
+    monkeypatch: pytest.MonkeyPatch,
+    checkpoint: str,
+    drifted_path: str,
+) -> None:
+    """Make the reviewed-checkout guard see one deliberately drifted file."""
+    monkeypatch.setattr(p5, "current_checkout_sha", lambda: checkpoint)
+
+    def fake_git_output(*arguments: str) -> bytes:
+        if len(arguments) == 2 and arguments[0] == "show":
+            _, relative_path = arguments[1].split(":", 1)
+            if relative_path == drifted_path:
+                return b"drift"
+            return (p5.REPO_ROOT / relative_path).read_bytes()
+        raise AssertionError(f"Unexpected Git command in guard test: {arguments!r}")
+
+    monkeypatch.setattr(p5, "_git_output", fake_git_output)
+
+
+@pytest.mark.parametrize(
+    "drifted_path",
+    [
+        "scripts/cm57p5_fresh_holdout.py",
+        "tests/fixtures/typed_worker/cm57p5_fresh_holdout.json",
+    ],
+)
+def test_live_gate_rejects_harness_or_corpus_drift_before_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drifted_path: str,
+) -> None:
+    """Abort before provider construction when a reviewed byte guard drifts."""
+    monkeypatch.setattr(p5, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    checkpoint = "a" * 40
+    _patch_reviewed_checkout_bytes(monkeypatch, checkpoint, drifted_path)
+    constructed = False
+
+    def fail_if_constructed(_args: Namespace) -> object:
+        nonlocal constructed
+        constructed = True
+        raise AssertionError("provider construction must not occur")
+
+    monkeypatch.setattr(p5, "_provider_configuration", fail_if_constructed)
+    args = Namespace(base_url="http://example.invalid", api_key_file=None, api_key_env="KEY")
+    with pytest.raises(RuntimeError, match="guarded artifact drifted"):
+        asyncio.run(p5._run_live(args, checkpoint))
+    assert not constructed
+
+
+@pytest.mark.parametrize(
+    ("drift_kind", "expected_message"),
+    [
+        ("prompt", "Production planner prompt drifted"),
+        ("source", "source summary bytes drifted"),
+        ("controls", "execution controls drifted"),
+    ],
+)
+def test_live_gate_rejects_prompt_source_or_control_drift_before_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    drift_kind: str,
+    expected_message: str,
+) -> None:
+    """Abort before provider construction when frozen contract values drift."""
+    monkeypatch.setattr(p5, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    monkeypatch.setattr(p5, "verify_reviewed_checkout", lambda _checkpoint: None)
+    if drift_kind == "prompt":
+        monkeypatch.setattr(p5, "EXPECTED_BASE_PROMPT_SHA256", "drift")
+    elif drift_kind == "source":
+        monkeypatch.setitem(p5.FIXED_SOURCE_SUMMARY, "version", "drift")
+    else:
+        monkeypatch.setattr(p5, "PLANNER_TEMPERATURE", 1.0)
+
+    constructed = False
+
+    def fail_if_constructed(_args: Namespace) -> object:
+        nonlocal constructed
+        constructed = True
+        raise AssertionError("provider construction must not occur")
+
+    monkeypatch.setattr(p5, "_provider_configuration", fail_if_constructed)
+    args = Namespace(base_url="http://example.invalid", api_key_file=None, api_key_env="KEY")
+    with pytest.raises(RuntimeError, match=expected_message):
         asyncio.run(p5._run_live(args, p5.BASELINE_SHA))
     assert not constructed
