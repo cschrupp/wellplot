@@ -95,8 +95,13 @@ before any future provider construction.
 
 Population integrity is fail-closed for row count, case/attempt coverage,
 arm set, checkpoint, provenance, prompt/schema hashes, P5 target reproduction,
-and infrastructure failures. Terminal planner results provide no semantic
-facts; pairwise semantic tables count them as `UNAVAILABLE`.
+and infrastructure failures. It also requires every contemporaneous RC attempt
+to reproduce the manifest's historical classification, report-task presence,
+and report capability IDs. A historical `PLANNER_CONTRACT_OK` row must retain
+`final_contract_ok`; otherwise the entire population is inconclusive rather
+than allowing a joint RC/candidate failure to disappear from regression
+counts. Terminal planner results provide no semantic facts; pairwise semantic
+tables count them as `UNAVAILABLE`.
 
 ## Frozen Decisions
 

@@ -395,6 +395,92 @@ def _decision_rows(
     return rows
 
 
+def _complete_population(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Add the frozen evidence envelope to synthetic decision rows."""
+    checkpoint = "a" * 40
+    manifest = {entry["case_id"]: entry for entry in p6.load_manifest()}
+    cases = p6._case_by_id()
+    provenance = p6.frozen_provenance()
+    for row in rows:
+        case_id = row["case_id"]
+        entry = manifest[case_id]
+        status = entry["historical_rc_status"]
+        row.update(
+            provenance,
+            authorized_checkpoint=checkpoint,
+            request_sha256=p6.sha256_text(str(cases[case_id]["request"])),
+            historical_rc_status=status,
+        )
+        rc_arm = row["arms"]["RC"]  # type: ignore[index]
+        rc_arm.update(
+            prompt_sha256=p6.EXPECTED_RC_PROMPT_SHA256,
+            response_schema_sha256=p6.EXPECTED_PRODUCTION_SCHEMA_SHA256,
+            semantic_correction_used=False,
+            final_classification=status["final_classification"],
+        )
+        rc_facts = rc_arm["final_work_unit_facts"]
+        rc_facts.update(
+            report_task_present=status["report_task_present"],
+            report_capability_ids=status["report_capability_ids"],
+        )
+        for arm in ("RCV", "RCS"):
+            candidate = row["arms"][arm]  # type: ignore[index]
+            candidate.update(
+                prompt_sha256=p6.EXPECTED_RC_PROMPT_SHA256,
+                response_schema_sha256=(
+                    p6.EXPECTED_NONEMPTY_SCHEMA_SHA256
+                    if arm == "RCS"
+                    else p6.EXPECTED_PRODUCTION_SCHEMA_SHA256
+                ),
+            )
+    return rows
+
+
+def test_report_control_rc_baseline_mismatch_is_inconclusive() -> None:
+    """A contemporaneous RC failure on a passing control invalidates P6."""
+    rows = _complete_population(_decision_rows(rcv_recoveries=6, rcs_recoveries=6))
+    control = next(row for row in rows if row["role"] == p6.ROLE_REPORT_CONTROL)
+    control["arms"]["RC"].update(  # type: ignore[index]
+        final_classification="REPORT_CAPABILITY_MISMATCH",
+        final_contract_ok=False,
+    )
+    control["arms"]["RC"]["final_work_unit_facts"].update(  # type: ignore[index]
+        report_task_present=True,
+        report_capability_ids=[],
+    )
+
+    complete, reasons = p6.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+    )
+
+    assert not complete
+    assert "rc_baseline_not_reproduced" in reasons
+    assert p6.decision(rows, expected_checkpoint="a" * 40) == (
+        "INCONCLUSIVE_REPORT_INVARIANT_BISECT"
+    )
+
+
+def test_joint_rc_and_candidate_control_failure_cannot_validate() -> None:
+    """RC and candidate loss of a passing control is not a zero-regression pass."""
+    rows = _complete_population(_decision_rows(rcv_recoveries=6, rcs_recoveries=6))
+    control = next(row for row in rows if row["role"] == p6.ROLE_REPORT_CONTROL)
+    control["arms"]["RC"]["final_contract_ok"] = False  # type: ignore[index]
+    control["arms"]["RCV"]["final_contract_ok"] = False  # type: ignore[index]
+    control["arms"]["RCS"]["final_contract_ok"] = False  # type: ignore[index]
+
+    complete, reasons = p6.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+    )
+
+    assert not complete
+    assert "rc_baseline_not_reproduced" in reasons
+    assert p6.decision(rows, expected_checkpoint="a" * 40) == (
+        "INCONCLUSIVE_REPORT_INVARIANT_BISECT"
+    )
+
+
 @pytest.mark.parametrize(
     ("kwargs", "expected"),
     [

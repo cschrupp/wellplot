@@ -647,6 +647,26 @@ def _historical_status(entry: dict[str, object]) -> dict[str, object]:
     return status if isinstance(status, dict) else {}
 
 
+def _rc_matches_historical_status(
+    row: dict[str, object], historical_status: dict[str, object]
+) -> bool:
+    """Require contemporaneous RC to reproduce its manifest baseline state."""
+    rc_arm = _arm(row, "RC")
+    facts = _facts(row, "RC")
+    if facts is None or not rc_arm.get("final_planner_success"):
+        return False
+    if rc_arm.get("final_classification") != historical_status.get("final_classification"):
+        return False
+    if facts.get("report_task_present") != historical_status.get("report_task_present"):
+        return False
+    if facts.get("report_capability_ids") != historical_status.get("report_capability_ids"):
+        return False
+    return not (
+        historical_status.get("final_classification") == "PLANNER_CONTRACT_OK"
+        and not rc_arm.get("final_contract_ok")
+    )
+
+
 async def run_shared_row(
     case: dict[str, object],
     entry: dict[str, object],
@@ -992,6 +1012,8 @@ def population_integrity(
                 ]
             ):
                 reasons.append(f"{arm}_schema_mismatch")
+        if not _rc_matches_historical_status(row, entry["historical_rc_status"]):
+            reasons.append("rc_baseline_not_reproduced")
     target_rows = [row for row in rows if row.get("role") == ROLE_TARGET]
     for row in target_rows:
         rc_facts = _facts(row, "RC")
