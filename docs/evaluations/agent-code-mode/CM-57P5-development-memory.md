@@ -120,15 +120,39 @@ The future decision labels are:
 The regression and inconclusive conditions dominate aggregate gains. No result
 will authorize production prompt adoption automatically.
 
+## Live Evidence
+
+The authorized live matrix ran once at checkpoint
+`aea88a0611804b88bf1694448283cd5818977c55` using the frozen local Qwen
+controls. The raw JSONL is preserved outside the repository at
+`/tmp/cm57p5-fresh-holdout-qwen.jsonl`; it contains 48 rows, is 309413 bytes,
+and has SHA-256
+`b9ce5e164d98ff18586d01ee561d83e43da023afca2f63b95de0170f8fb97cb2`.
+
+The population is complete with zero terminal failures, zero provider
+infrastructure failures, and zero worker/program calls. P produced 4 initial
+and 6 final passes from 56 provider calls, with 8 corrections. RC produced 36
+initial and 38 final passes from 50 provider calls, with 2 corrections. The
+paired full-contract outcomes were BOTH_PASS 2, P_ONLY_PASS 4, RC_ONLY_PASS
+36, and BOTH_FAIL 6. All 24 cases were stable across their two attempts for
+both arms.
+
+RC improved substantially across the fresh holdout, including single-section,
+heterogeneous-section, multi-section, mixed-report-section, and
+capability-multiplicity families. However, the frozen promotion rule treats
+any P-only pass as a regression. Because four P-only passes occurred, the
+final decision is `HOLDOUT_GENERALIZATION_REGRESSION`, not a promotion result.
+The raw evidence is summarized in `CM-57P5-live-summary.json`.
+
 ## Pre-Live Boundary
 
 Production changes: `0`.
 
-Provider calls: `0`.
+Provider calls: `106` (`P=56`, `RC=50`).
 
 Worker/program calls: `0`.
 
-Live inference: `NOT STARTED`.
+Live inference: `COMPLETED; HOLDOUT_GENERALIZATION_REGRESSION`.
 
 Production adoption: `NOT AUTHORIZED`.
 
@@ -140,6 +164,6 @@ The pre-live harness and tests are in:
 - `tests/fixtures/typed_worker/cm57p5_fresh_holdout.json`
 - `tests/test_cm57p5_fresh_holdout.py`
 
-Hard stop after the reviewed implementation checkpoint. Do not run Qwen, run a
-smoke case, edit the holdout after provider output, modify the production
-prompt, or begin CM-57D without separate live authorization.
+Hard stop after the completed live evidence. Do not edit the raw JSONL, rerun
+individual cases, modify the production prompt, or begin CM-57D without
+separate authorization.

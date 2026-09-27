@@ -1,0 +1,128 @@
+{
+  "experiment_version": "CM-57P5",
+  "authorized_checkpoint": "aea88a0611804b88bf1694448283cd5818977c55",
+  "decision": "HOLDOUT_GENERALIZATION_REGRESSION",
+  "raw_evidence": {
+    "path": "/tmp/cm57p5-fresh-holdout-qwen.jsonl",
+    "sha256": "b9ce5e164d98ff18586d01ee561d83e43da023afca2f63b95de0170f8fb97cb2",
+    "rows": 48,
+    "bytes": 309413
+  },
+  "population": {
+    "complete": true,
+    "cases": 24,
+    "attempts_per_case": 2,
+    "arms_per_row": 2,
+    "expected_rows": 48,
+    "actual_rows": 48,
+    "terminal_failures": 0,
+    "provider_infrastructure_failures": 0,
+    "worker_program_calls": 0
+  },
+  "controls": {
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900.0
+  },
+  "arm_metrics": {
+    "P": {
+      "initial_passes": 4,
+      "final_passes": 6,
+      "corrections": 8,
+      "correction_recoveries": 2,
+      "correction_failures": 6,
+      "provider_calls": 56,
+      "terminal_failures": 0,
+      "program_calls": 0
+    },
+    "RC": {
+      "initial_passes": 36,
+      "final_passes": 38,
+      "corrections": 2,
+      "correction_recoveries": 2,
+      "correction_failures": 0,
+      "provider_calls": 50,
+      "terminal_failures": 0,
+      "program_calls": 0
+    }
+  },
+  "provider_calls_total": 106,
+  "paired_full_contract": {
+    "BOTH_PASS": 2,
+    "P_ONLY_PASS": 4,
+    "RC_ONLY_PASS": 36,
+    "BOTH_FAIL": 6
+  },
+  "family_metrics": {
+    "REPORT_ONLY": {
+      "P_final": 4,
+      "RC_final": 4,
+      "P_initial": 4,
+      "RC_initial": 4,
+      "P_corrections": 0,
+      "RC_corrections": 0,
+      "paired": {"BOTH_PASS": 0, "P_ONLY_PASS": 4, "RC_ONLY_PASS": 4, "BOTH_FAIL": 0}
+    },
+    "SINGLE_SECTION": {
+      "P_final": 0,
+      "RC_final": 8,
+      "P_initial": 0,
+      "RC_initial": 8,
+      "P_corrections": 0,
+      "RC_corrections": 0,
+      "paired": {"BOTH_PASS": 0, "P_ONLY_PASS": 0, "RC_ONLY_PASS": 8, "BOTH_FAIL": 0}
+    },
+    "HETEROGENEOUS_SECTION": {
+      "P_final": 2,
+      "RC_final": 8,
+      "P_initial": 0,
+      "RC_initial": 8,
+      "P_corrections": 4,
+      "RC_corrections": 0,
+      "paired": {"BOTH_PASS": 2, "P_ONLY_PASS": 0, "RC_ONLY_PASS": 6, "BOTH_FAIL": 0}
+    },
+    "MULTI_SECTION": {
+      "P_final": 0,
+      "RC_final": 6,
+      "P_initial": 0,
+      "RC_initial": 6,
+      "P_corrections": 2,
+      "RC_corrections": 0,
+      "paired": {"BOTH_PASS": 0, "P_ONLY_PASS": 0, "RC_ONLY_PASS": 6, "BOTH_FAIL": 2}
+    },
+    "MIXED_REPORT_SECTION": {
+      "P_final": 0,
+      "RC_final": 6,
+      "P_initial": 0,
+      "RC_initial": 0,
+      "P_corrections": 0,
+      "RC_corrections": 0,
+      "paired": {"BOTH_PASS": 0, "P_ONLY_PASS": 0, "RC_ONLY_PASS": 6, "BOTH_FAIL": 2}
+    },
+    "CAPABILITY_MULTIPLICITY": {
+      "P_final": 0,
+      "RC_final": 6,
+      "P_initial": 0,
+      "RC_initial": 4,
+      "P_corrections": 2,
+      "RC_corrections": 2,
+      "paired": {"BOTH_PASS": 0, "P_ONLY_PASS": 0, "RC_ONLY_PASS": 6, "BOTH_FAIL": 2}
+    }
+  },
+  "repeatability": {
+    "P_stable_cases": 24,
+    "RC_stable_cases": 24,
+    "unstable_cases": 0,
+    "unavailable_cases": 0
+  },
+  "promotion_target": {
+    "RC_final": "48/48",
+    "P_ONLY_PASS": 0,
+    "met": false
+  },
+  "production_changes": 0,
+  "production_adoption": "NOT_AUTHORIZED",
+  "CM57D": "BLOCKED"
+}
