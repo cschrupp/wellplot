@@ -1,0 +1,146 @@
+{
+  "experiment_version": "CM-57P7",
+  "authorized_checkpoint": "f952c64f735b6c3bc7519677c2d36ca80e980609",
+  "decision": "INCONCLUSIVE_PROMOTION_EVALUATION",
+  "raw_evidence": {
+    "path": "/tmp/cm57p7-fresh-promotion-qwen.jsonl",
+    "sha256": "b4cb75aaf6a5ffe8c7f88c6e730d32247d973ea974269132a76b814633ff4d2f",
+    "rows": 48,
+    "bytes": 592016
+  },
+  "population": {
+    "complete": true,
+    "cases": 24,
+    "attempts_per_case": 2,
+    "arms_per_row": 4,
+    "expected_rows": 48,
+    "actual_rows": 48,
+    "planner_executions": 192,
+    "provider_infrastructure_failures": 0,
+    "worker_program_calls": 0,
+    "reasons": []
+  },
+  "controls": {
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900.0
+  },
+  "arm_metrics": {
+    "P": {
+      "initial_passes": 6,
+      "final_passes": 6,
+      "semantic_corrections": 6,
+      "invalid_response_retries": 4,
+      "provider_calls": 58,
+      "terminal_failures": 4,
+      "infrastructure_failures": 0,
+      "program_calls": 0
+    },
+    "RC": {
+      "initial_passes": 28,
+      "final_passes": 32,
+      "semantic_corrections": 4,
+      "invalid_response_retries": 0,
+      "provider_calls": 52,
+      "terminal_failures": 0,
+      "infrastructure_failures": 0,
+      "program_calls": 0
+    },
+    "RCV": {
+      "initial_passes": 28,
+      "final_passes": 38,
+      "semantic_corrections": 14,
+      "invalid_response_retries": 0,
+      "provider_calls": 62,
+      "terminal_failures": 0,
+      "infrastructure_failures": 0,
+      "program_calls": 0
+    },
+    "RCS": {
+      "initial_passes": 32,
+      "final_passes": 36,
+      "semantic_corrections": 4,
+      "invalid_response_retries": 0,
+      "provider_calls": 52,
+      "terminal_failures": 0,
+      "infrastructure_failures": 0,
+      "program_calls": 0
+    }
+  },
+  "paired_full_contract": {
+    "P_to_RCV": {
+      "BOTH_PASS": 6,
+      "P_ONLY_PASS": 0,
+      "CANDIDATE_ONLY_PASS": 32,
+      "BOTH_FAIL": 10
+    },
+    "P_to_RCS": {
+      "BOTH_PASS": 6,
+      "P_ONLY_PASS": 0,
+      "CANDIDATE_ONLY_PASS": 30,
+      "BOTH_FAIL": 12
+    }
+  },
+  "candidate_summary": {
+    "RCV": {
+      "viable": false,
+      "field_regressions": 2,
+      "activation_recovered": true,
+      "stable_gains": 16,
+      "stable_gain_families": 6,
+      "repeatability": {
+        "stable": 24,
+        "unstable": 0,
+        "unavailable": 0
+      }
+    },
+    "RCS": {
+      "viable": false,
+      "field_regressions": 2,
+      "activation_recovered": true,
+      "stable_gains": 15,
+      "stable_gain_families": 6,
+      "repeatability": {
+        "stable": 24,
+        "unstable": 0,
+        "unavailable": 0
+      }
+    }
+  },
+  "repeatability": {
+    "P": {
+      "stable": 22,
+      "unstable": 0,
+      "unavailable": 2
+    },
+    "RC": {
+      "stable": 24,
+      "unstable": 0,
+      "unavailable": 0
+    },
+    "RCV": {
+      "stable": 24,
+      "unstable": 0,
+      "unavailable": 0
+    },
+    "RCS": {
+      "stable": 24,
+      "unstable": 0,
+      "unavailable": 0
+    }
+  },
+  "activation": {
+    "case_count": 5,
+    "reasons": []
+  },
+  "efficiency": {
+    "RCV_vs_RCS": "NOT_APPLICABLE"
+  },
+  "provider_calls_total": 224,
+  "worker_program_calls": 0,
+  "production_changes": 0,
+  "production_adoption": "NOT_AUTHORIZED",
+  "CM57D": "BLOCKED"
+}

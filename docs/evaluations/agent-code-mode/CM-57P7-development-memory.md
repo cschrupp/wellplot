@@ -77,6 +77,24 @@ The future labels are:
 Efficiency is secondary and compares candidate provider-call totals only
 after viability. No live summary is created during this pre-live slice.
 
+## Live Result
+
+The authorized live matrix ran once at checkpoint
+`f952c64f735b6c3bc7519677c2d36ca80e980609` using the frozen local Qwen
+controls. The raw evidence remains unchanged at
+`/tmp/cm57p7-fresh-promotion-qwen.jsonl` with SHA-256
+`b4cb75aaf6a5ffe8c7f88c6e730d32247d973ea974269132a76b814633ff4d2f`.
+
+The population is complete: 48/48 rows, 192 planner executions, 224 provider
+calls, zero infrastructure failures, and zero worker/program calls. The P arm
+had 4 terminal failures and 2 unavailable repeatability pairs, so the frozen
+decision is `INCONCLUSIVE_PROMOTION_EVALUATION`. RCV and RCS each recovered
+stable candidate gains, but each also had 2 protected field regressions against
+P; neither candidate is promotion-validated. Efficiency is `NOT_APPLICABLE`.
+
+The bounded aggregate is recorded in `CM-57P7-live-summary.json`. Production
+adoption remains unauthorized and CM-57D remains blocked.
+
 ## Hard Stop
 
 Provider calls are `0` for this implementation checkpoint. There are no
