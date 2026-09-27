@@ -1,0 +1,125 @@
+{
+  "version": "cm57p6.report-invariant.v1",
+  "cases": [
+    {
+      "case_id": "p5-report-header-01",
+      "role": "TARGET_EMPTY_REPORT",
+      "historical_rc_status": {
+        "final_classification": "REPORT_CAPABILITY_MISMATCH",
+        "report_task_present": true,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-report-settings-04",
+      "role": "TARGET_EMPTY_REPORT",
+      "historical_rc_status": {
+        "final_classification": "REPORT_CAPABILITY_MISMATCH",
+        "report_task_present": true,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-mixed-two-panels-19",
+      "role": "TARGET_EMPTY_REPORT",
+      "historical_rc_status": {
+        "final_classification": "REPORT_CAPABILITY_MISMATCH",
+        "report_task_present": true,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-report-page-02",
+      "role": "REPORT_PASS_CONTROL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": true,
+        "report_capability_ids": ["report.standard"],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-report-remarks-03",
+      "role": "REPORT_PASS_CONTROL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": true,
+        "report_capability_ids": ["report.standard"],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-mixed-summary-17",
+      "role": "REPORT_PASS_CONTROL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": true,
+        "report_capability_ids": ["report.standard"],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-mixed-image-18",
+      "role": "REPORT_PASS_CONTROL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": true,
+        "report_capability_ids": ["report.standard"],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-mixed-combined-20",
+      "role": "REPORT_PASS_CONTROL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": true,
+        "report_capability_ids": ["report.standard"],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-single-curve-05",
+      "role": "SECTION_SENTINEL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": false,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-heterogeneous-overlay-09",
+      "role": "SECTION_SENTINEL",
+      "historical_rc_status": {
+        "final_classification": "PLANNER_CONTRACT_OK",
+        "report_task_present": false,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-multi-curve-image-14",
+      "role": "SECTION_SENTINEL",
+      "historical_rc_status": {
+        "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+        "report_task_present": false,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    },
+    {
+      "case_id": "p5-multiplicity-independent-24",
+      "role": "SECTION_SENTINEL",
+      "historical_rc_status": {
+        "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+        "report_task_present": false,
+        "report_capability_ids": [],
+        "attempts": 2
+      }
+    }
+  ]
+}
