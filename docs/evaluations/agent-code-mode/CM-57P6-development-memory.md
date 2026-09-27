@@ -135,3 +135,36 @@ precedence, unavailable transitions, and JSON-safe reporting.
 Hard stop: do not run live inference, modify production planner behavior, add
 prompt instructions, select a production mechanism, or begin CM-57D without a
 separate live authorization.
+
+## Live Result
+
+Live execution was authorized only at checkpoint
+`439bdfafa39c5cd0d3d478f20eecd6c722d907ec` and completed once with 24/24
+rows. The raw JSONL is preserved outside the repository with 24 rows and SHA
+`98ba7fe6937a9653ed77f729c71f1f2539ddf8224a931eae5869ae88c6fe4c0f`.
+
+```yaml
+decision: REPORT_INVARIANT_BOTH_VALIDATED
+RCV_target_recoveries: 6/6
+RCS_target_recoveries: 6/6
+RCV_control_regressions: 0
+RCS_control_regressions: 0
+RCV_final_passes: 20/24
+RCS_final_passes: 20/24
+total_provider_calls: 78
+worker_program_calls: 0
+terminal_failures: 0
+infrastructure_failures: 0
+repeatability: 12/12 stable per arm
+```
+
+RC reproduced all six target empty-report failures and all ten report-pass
+control rows. RCV used six bounded semantic corrections, one per target
+attempt, and recovered every target. RCS recovered every target on its initial
+structured response; it had no invalid-response retries or schema failures.
+The four section sentinels retained their contemporaneous RC outcomes in both
+candidate arms, including the two intentionally unrelated residual failures.
+
+This is mechanism evidence only. It does not authorize changing the
+production planner, adopting either invariant mechanism, beginning CM-57D, or
+reusing the exposed P5 corpus as a promotion holdout.
