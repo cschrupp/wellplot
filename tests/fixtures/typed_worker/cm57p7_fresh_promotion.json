@@ -1,0 +1,197 @@
+{
+  "version": "cm57p7.fresh-promotion.v1",
+  "cases": [
+    {
+      "case_id": "p7-report-operations-01",
+      "family": "REPORT_ONLY",
+      "request": "Prepare an operations review titled West Delta Completion Note and add a prepared-by line for the interpretation team.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-report-landscape-02",
+      "family": "REPORT_ONLY",
+      "request": "Create a landscape review package for the North Shelf interval and name the finished output Delta Operations Review.pdf.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-report-remarks-03",
+      "family": "REPORT_ONLY",
+      "request": "Add the report note \"Interval review complete\" and finish the document with a closing statement for the interpretation team.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-report-cover-04",
+      "family": "REPORT_ONLY",
+      "request": "Create a cover for the East Basin surveillance review with subtitle Monthly Interpretation Summary.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-single-density-05",
+      "family": "SINGLE_SECTION",
+      "request": "Display a density curve in one ordinary track for the completion handoff.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-single-reference-06",
+      "family": "SINGLE_SECTION",
+      "request": "Show one panel with a depth reference beside a conductivity curve.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-single-waveform-07",
+      "family": "SINGLE_SECTION",
+      "request": "Create a single image panel for a waveform-style measurement.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-single-log-08",
+      "family": "SINGLE_SECTION",
+      "request": "Build one standard log panel for a porosity trace.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-heterogeneous-overlay-09",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Combine a scalar porosity curve with an acoustic waveform in one panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-heterogeneous-reference-10",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Put a depth reference, a density curve, and an image track together in one log panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-heterogeneous-multiple-11",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Use one display for two scalar tracks, one for gamma ray and one for caliper, plus a waveform track.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-heterogeneous-reference-images-12",
+      "family": "HETEROGENEOUS_SECTION",
+      "request": "Combine a reference depth column, an ordinary temperature curve, and two image contents in one panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multi-curves-13",
+      "family": "MULTI_SECTION",
+      "request": "Arrange a gamma ray view and a separate resistivity view as two independent displays.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multi-curve-image-14",
+      "family": "MULTI_SECTION",
+      "request": "Create one scalar log panel for porosity and another independent panel for an acoustic image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multi-images-15",
+      "family": "MULTI_SECTION",
+      "request": "Show a density image and a borehole image in two separate displays rather than one combined panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multi-three-16",
+      "family": "MULTI_SECTION",
+      "request": "Prepare three independent views: a gamma curve view, an image view, and a combined curve and image view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"], ["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-mixed-cover-17",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Prepare the report cover titled Gamma Review and include one panel showing the gamma ray curve.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-mixed-image-18",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Give the review the subtitle Formation Image Summary, use portrait page settings, and include one formation image display.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-mixed-two-panels-19",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Set the report heading to Acoustic Comparison and produce two independent panels: one for gamma and one for the acoustic image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-mixed-combined-20",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Add the report remark \"Curve and waveform checked together\" and show one combined log panel with a scalar curve and a waveform image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multiplicity-curves-21",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Place the gamma ray and caliper curves together on one ordinary track in the same panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multiplicity-images-22",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Place density and borehole images together on one array track in a shared display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multiplicity-tracks-23",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Build one panel containing two ordinary tracks for gamma ray and spontaneous potential.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p7-multiplicity-independent-24",
+      "family": "CAPABILITY_MULTIPLICITY",
+      "request": "Arrange independent scalar panels for gamma ray and spontaneous potential.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    }
+  ]
+}
