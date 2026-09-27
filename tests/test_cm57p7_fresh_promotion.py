@@ -323,6 +323,40 @@ def test_activation_requires_both_report_families() -> None:
     assert reasons == ["insufficient_rc_activation"]
 
 
+def test_activation_recovery_ignores_unrelated_section_failure() -> None:
+    """Score the report invariant even when section work remains wrong."""
+    case = _cases()[0]
+    row = _synthetic_row(case)
+    row["arms"]["RCV"]["final_contract_ok"] = False
+    row["arms"]["RCV"]["final_classification"] = "SECTION_WORK_UNIT_MISMATCH"
+    assert p7._activation_report_recovered(row, "RCV")
+    row["arms"]["RCV"]["final_work_unit_facts"]["report_capabilities_exact"] = False
+    assert not p7._activation_report_recovered(row, "RCV")
+
+
+@pytest.mark.parametrize(
+    "label",
+    ["INCONCLUSIVE_PROMOTION_EVALUATION", "PROMOTION_NO_CANDIDATE_VALIDATED"],
+)
+def test_efficiency_is_not_applicable_before_candidate_viability(
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+) -> None:
+    """Do not report call efficiency for inconclusive/no-candidate outcomes."""
+    cases = _cases()
+    rows = [_synthetic_row(case) for case in cases]
+    monkeypatch.setattr(p7, "decision", lambda *args, **kwargs: label)
+    summary = p7.summarize_population(rows, cases)
+    assert summary["efficiency"]["RCV_vs_RCS"] == "NOT_APPLICABLE"
+
+
+def test_provider_base_is_a_frozen_live_guard() -> None:
+    """Require the provider request contract artifact in P7 provenance."""
+    provenance = p7.frozen_provenance()
+    assert provenance["provider_base_sha256"] == p7.EXPECTED_PROVIDER_BASE_SHA256
+    assert len(provenance["provider_base_sha256"]) == 64
+
+
 def test_prelive_report_is_provider_free() -> None:
     """Require the pre-live report to declare zero provider and worker calls."""
     report = p7.prelive_report()

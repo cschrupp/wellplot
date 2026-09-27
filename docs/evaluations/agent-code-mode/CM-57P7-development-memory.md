@@ -25,7 +25,10 @@ The fresh corpus has 24 cases, four per family:
 
 Requests are new relative to the complete P5/P6 request corpus, contain no
 internal planner/evaluator vocabulary, and contain no paths or capability IDs.
-The gold is validated with the existing P5 registry and parent-closure checks.
+The cases were independently authored and human-reviewed for semantic
+freshness: they are not sentence-level paraphrases or copied case templates
+from P5/P6. The family-level topology remains comparable by design. The gold
+is validated with the existing P5 registry and parent-closure checks.
 
 ## Frozen Boundary
 
@@ -38,8 +41,9 @@ zero.
 The P arm uses the unchanged `SemanticPlanner` and production schema. RC uses
 the exact P5 RC system prompt and production schema. RCV changes only the P6
 validator invariant. RCS changes only the P6 structured response schema and
-converts the result back to the production `SemanticPlan`. The P6 mechanism
-and artifact hashes are guarded rather than copied or modified.
+converts the result back to the production `SemanticPlan`. The P6 mechanism,
+provider base interface, and artifact hashes are guarded rather than copied or
+modified.
 
 ## Promotion Gates
 
@@ -55,6 +59,12 @@ unresolved correctness, and the no-duplicate property without any P-pass to
 candidate-fail transition. It must recover both attempts on at least four
 cases spanning at least two families, remain stable across all 24 case pairs,
 and produce no terminal, infrastructure, or worker failures.
+
+Activation recovery checks only the repaired report invariant on the required
+RC activation rows; unrelated section failures shared by P and a candidate do
+not invalidate that specific activation claim. Efficiency is reported only
+after a validated or partial candidate decision; inconclusive and no-candidate
+populations report `NOT_APPLICABLE`.
 
 The future labels are:
 

@@ -65,13 +65,14 @@ FAMILIES: tuple[str, ...] = (
     "CAPABILITY_MULTIPLICITY",
 )
 
-EXPECTED_CORPUS_SHA256 = "51cdce804da5737cbea00bfdf06003fbfb43378096abfe119e35a12c44ba390d"
+EXPECTED_CORPUS_SHA256 = "4aebee0d2734cb272c6ae002aec277e58427dd5dce44e38e5fdf1a14a4dccd12"
 EXPECTED_P5_SCRIPT_SHA256 = "3170c970d2ad4298f87c09cb106237d015356e4a5854095e3f889ba139bc600e"
 EXPECTED_P5_SUMMARY_SHA256 = "16bda565e0687b6d7e9d3e9c2b6e053111355fb85ee97bfc6f34ffffbac0810d"
 EXPECTED_P6_SCRIPT_SHA256 = "701380c0e21c71acadd4f1db1167d75ac24937f799693e1062a7b98785873768"
 EXPECTED_P6_SUMMARY_SHA256 = "28d8a235192b7d7743b98c5138ea2e00aff0e144a2cd7982a72945620a802a55"
 EXPECTED_P6_MANIFEST_SHA256 = "123af939d720cc7b7480445d9d421773b91c85b2615d8103e0d943ece1b4d10f"
 EXPECTED_PLANNER_SOURCE_SHA256 = "0189b290ef4f76bdd776fe2612c454809ff77725379def7d8c5a98d9ae165413"
+EXPECTED_PROVIDER_BASE_SHA256 = "4c14afc1e6e53faef1ef99266059b7b88b6c4dec4bfb5a4768ca5b36efc3f049"
 EXPECTED_CATALOG_SHA256 = "b1b9c85db961cb8b97f1c8b6f914a6a75f5bf57cf49ca4413c64d35311b80d37"
 EXPECTED_BASE_PROMPT_SHA256 = "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18"
 EXPECTED_RC_PROMPT_SHA256 = "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
@@ -244,6 +245,7 @@ def frozen_provenance() -> dict[str, object]:
         "p6_summary_sha256": EXPECTED_P6_SUMMARY_SHA256,
         "p6_manifest_sha256": EXPECTED_P6_MANIFEST_SHA256,
         "planner_source_sha256": EXPECTED_PLANNER_SOURCE_SHA256,
+        "provider_base_sha256": EXPECTED_PROVIDER_BASE_SHA256,
         "catalog_sha256": EXPECTED_CATALOG_SHA256,
         "base_prompt_sha256": EXPECTED_BASE_PROMPT_SHA256,
         "RC_prompt_sha256": EXPECTED_RC_PROMPT_SHA256,
@@ -598,8 +600,7 @@ def _candidate_viability(
         for row in rows
     )
     activation_recovered = all(
-        bool(_arm_result(row, candidate).get("final_contract_ok"))
-        and bool((_facts(row, candidate) or {}).get("report_capabilities_exact"))
+        _activation_report_recovered(row, candidate)
         for row in rows
         if str(row.get("case_id")) in activations
     )
@@ -696,6 +697,24 @@ def _efficiency(rows: list[dict[str, object]], left: str, right: str) -> str:
     return "TIE"
 
 
+def _activation_report_recovered(row: dict[str, object], arm: str) -> bool:
+    """Check only the repaired report invariant for an activation row."""
+    result = _arm_result(row, arm)
+    facts = _facts(row, arm)
+    return bool(
+        result.get("final_planner_success")
+        and facts
+        and facts.get("report_task_present")
+        and facts.get("report_capabilities_exact")
+        and facts.get("report_presence_correct")
+        and result.get("final_classification")
+        not in {
+            "REPORT_PRESENCE_MISMATCH",
+            "REPORT_CAPABILITY_MISMATCH",
+        }
+    )
+
+
 def summarize_population(
     rows: list[dict[str, object]],
     cases: tuple[dict[str, object], ...],
@@ -708,9 +727,20 @@ def summarize_population(
     viability = {
         arm: _candidate_viability(rows, cases, arm, activation_cases) for arm in ("RCV", "RCS")
     }
+    final_decision = decision(rows, cases, expected_checkpoint=authorized_checkpoint)
+    efficiency = (
+        _efficiency(rows, "RCV", "RCS")
+        if final_decision
+        in {
+            "PROMOTION_BOTH_VALIDATED",
+            "PROMOTION_SCHEMA_ONLY_VALIDATED",
+            "PROMOTION_VALIDATOR_ONLY_VALIDATED",
+        }
+        else "NOT_APPLICABLE"
+    )
     return {
         "experiment_version": EXPERIMENT_VERSION,
-        "decision": decision(rows, cases, expected_checkpoint=authorized_checkpoint),
+        "decision": final_decision,
         "population": {
             "expected_rows": len(cases) * ATTEMPTS,
             "actual_rows": len(rows),
@@ -735,9 +765,7 @@ def summarize_population(
             for arm in ("RCV", "RCS")
         },
         "repeatability": {arm: _repeatability(rows, arm) for arm in ARMS},
-        "efficiency": {
-            "RCV_vs_RCS": _efficiency(rows, "RCV", "RCS") if complete else "NOT_APPLICABLE"
-        },
+        "efficiency": {"RCV_vs_RCS": efficiency},
         "controls": dict(FIXED_EXECUTION_CONTROLS),
         "provider_calls": sum(
             int(_arm_result(row, arm).get("provider_calls", 0)) for row in rows for arm in ARMS
@@ -760,6 +788,7 @@ def verify_reviewed_checkout(checkpoint: str) -> None:
         "docs/evaluations/agent-code-mode/CM-57P5-live-summary.json",
         "docs/evaluations/agent-code-mode/CM-57P6-live-summary.json",
         "src/wellplot/agent/code_mode/planner.py",
+        "src/wellplot/agent/providers/base.py",
         "src/wellplot/capabilities/base.py",
         "src/wellplot/capabilities/registry.py",
         "src/wellplot/capabilities/builtins.py",
@@ -783,6 +812,7 @@ def verify_frozen_contract() -> dict[str, object]:
         (P6_SUMMARY_PATH, EXPECTED_P6_SUMMARY_SHA256),
         (P6_MANIFEST_PATH, EXPECTED_P6_MANIFEST_SHA256),
         (REPO_ROOT / "src/wellplot/agent/code_mode/planner.py", EXPECTED_PLANNER_SOURCE_SHA256),
+        (REPO_ROOT / "src/wellplot/agent/providers/base.py", EXPECTED_PROVIDER_BASE_SHA256),
     )
     for path, expected in checks:
         if artifact_sha256(path) != expected:
@@ -805,6 +835,7 @@ def verify_frozen_contract() -> dict[str, object]:
         "p5_script_sha256": EXPECTED_P5_SCRIPT_SHA256,
         "p6_script_sha256": EXPECTED_P6_SCRIPT_SHA256,
         "p6_summary_sha256": EXPECTED_P6_SUMMARY_SHA256,
+        "provider_base_sha256": EXPECTED_PROVIDER_BASE_SHA256,
         "production_schema_sha256": EXPECTED_PRODUCTION_SCHEMA_SHA256,
         "nonempty_schema_sha256": EXPECTED_NONEMPTY_SCHEMA_SHA256,
     }
