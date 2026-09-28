@@ -536,18 +536,30 @@ def _historical_anchor_matches(result: dict[str, object], anchor: dict[str, obje
 def historical_anchor_reproduction(
     rows: list[dict[str, object]], cases: tuple[dict[str, object], ...]
 ) -> dict[str, object]:
-    """Check every selected P/RC result against its frozen P7 anchor."""
-    mismatches: list[str] = []
-    checked = 0
+    """Check all selected anchors and the two independent localization axes."""
     by_case = {str(case["case_id"]): case for case in cases}
-    for row in rows:
-        case = by_case[str(row["case_id"])]
-        historical = case["historical"][str(row["attempt_index"])]
-        for arm in ("P", "RC"):
-            checked += 1
-            if not _historical_anchor_matches(_arm(row, arm), historical[arm]):
-                mismatches.append(f"{row['case_id']}/attempt_{row['attempt_index']}/{arm}")
-    return {"checked": checked, "mismatches": mismatches, "reproduced": not mismatches}
+
+    def check(case_ids: set[str]) -> dict[str, object]:
+        mismatches: list[str] = []
+        checked = 0
+        for row in rows:
+            case_id = str(row["case_id"])
+            if case_id not in case_ids:
+                continue
+            case = by_case[case_id]
+            historical = case["historical"][str(row["attempt_index"])]
+            for arm in ("P", "RC"):
+                checked += 1
+                if not _historical_anchor_matches(_arm(row, arm), historical[arm]):
+                    mismatches.append(f"{case_id}/attempt_{row['attempt_index']}/{arm}")
+        return {"checked": checked, "mismatches": mismatches, "reproduced": not mismatches}
+
+    all_case_ids = set(by_case)
+    return {
+        "all": check(all_case_ids),
+        "reference": check({PROTECTED_REFERENCE_TARGET}),
+        "schema": check(set(SCHEMA_TARGETS)),
+    }
 
 
 def _reference_localization(
@@ -556,7 +568,7 @@ def _reference_localization(
     anchors: dict[str, object],
 ) -> dict[str, object]:
     """Classify the protected reference target and report bounded matrices."""
-    if not anchors["reproduced"]:
+    if not anchors["reference"]["reproduced"]:
         return {"classification": "INCONCLUSIVE_REFERENCE_LOCALIZATION", "stable": False}
     target = [row for row in rows if row["case_id"] == PROTECTED_REFERENCE_TARGET]
     values: dict[str, list[bool | None]] = {arm: [] for arm in ARMS}
@@ -590,7 +602,7 @@ def _schema_localization(
     rows: list[dict[str, object]], anchors: dict[str, object]
 ) -> dict[str, object]:
     """Classify structured-plan availability on the two schema targets."""
-    if not anchors["reproduced"]:
+    if not anchors["schema"]["reproduced"]:
         return {"classification": "INCONCLUSIVE_SCHEMA_LOCALIZATION", "stable": False}
     by_case: dict[str, dict[str, list[bool]]] = {}
     for case_id in SCHEMA_TARGETS:
@@ -617,7 +629,7 @@ def _schema_localization(
         classification = labels.get(patterns[0], "SCHEMA_STABILIZATION_CASE_DEPENDENT")
     return {
         "classification": classification,
-        "stable": classification not in {"SCHEMA_STABILIZATION_CASE_DEPENDENT"},
+        "stable": classification != "SCHEMA_FACTOR_UNSTABLE",
         "targets": by_case,
     }
 
@@ -769,9 +781,8 @@ def decision(
     valid_schema = schema["classification"] not in {
         "INCONCLUSIVE_SCHEMA_LOCALIZATION",
         "SCHEMA_FACTOR_UNSTABLE",
-        "SCHEMA_STABILIZATION_CASE_DEPENDENT",
     }
-    if not complete or infra or workers or not anchors["reproduced"]:
+    if not complete or infra or workers:
         top = "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION"
     elif valid_reference and valid_schema:
         top = "PROMPT_FACTOR_LOCALIZATION_COMPLETE"

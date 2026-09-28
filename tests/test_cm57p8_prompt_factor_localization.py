@@ -6,6 +6,7 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import BaseModel
@@ -85,6 +86,90 @@ def _synthetic_rows(
             {"case_id": p8.PROTECTED_REFERENCE_TARGET, "attempt_index": attempt, "arms": arms}
         )
     return rows
+
+
+def _schema_rows(
+    patterns: dict[str, tuple[bool, bool, bool]],
+) -> list[dict[str, object]]:
+    """Build two stable attempts for the schema localization targets."""
+    rows = []
+    for case_id in sorted(p8.SCHEMA_TARGETS):
+        pattern = patterns[case_id]
+        for attempt in range(2):
+            available = {
+                "P": False,
+                "R": pattern[0],
+                "C": pattern[1],
+                "RC": pattern[2],
+            }
+            arms = {
+                arm: {
+                    "final_plan_available": available[arm],
+                    "final_classification": "PLANNER_CONTRACT_OK"
+                    if available[arm]
+                    else "PLANNER_SCHEMA_FAILURE",
+                    "reference": {
+                        "expected_reference_required": True,
+                        "final_plan_available": available[arm],
+                        "actual_reference_present": None,
+                        "unexpected_reference": None,
+                        "missing_required_reference": None,
+                    },
+                }
+                for arm in p8.ARMS
+            }
+            rows.append({"case_id": case_id, "attempt_index": attempt, "arms": arms})
+    return rows
+
+
+def _decision_row(*, infrastructure_failure: bool = False, program_calls: int = 0) -> dict:
+    """Build one minimal row for top-level decision tests."""
+    return {
+        "arms": {
+            arm: {
+                "provider_infrastructure_failure": infrastructure_failure,
+                "program_call_count": program_calls,
+            }
+            for arm in p8.ARMS
+        }
+    }
+
+
+def _patch_decision_inputs(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    reference_classification: str,
+    schema_classification: str,
+    reference_reproduced: bool = True,
+    schema_reproduced: bool = True,
+    population_complete: bool = True,
+    population_reasons: list[str] | None = None,
+) -> None:
+    """Patch only deterministic decision inputs for top-level label tests."""
+    monkeypatch.setattr(
+        p8,
+        "population_integrity",
+        lambda *args, **kwargs: (population_complete, population_reasons or []),
+    )
+    monkeypatch.setattr(
+        p8,
+        "historical_anchor_reproduction",
+        lambda *args, **kwargs: {
+            "all": {"checked": 0, "mismatches": [], "reproduced": True},
+            "reference": {"checked": 0, "mismatches": [], "reproduced": reference_reproduced},
+            "schema": {"checked": 0, "mismatches": [], "reproduced": schema_reproduced},
+        },
+    )
+    monkeypatch.setattr(
+        p8,
+        "_reference_localization",
+        lambda *args, **kwargs: {"classification": reference_classification},
+    )
+    monkeypatch.setattr(
+        p8,
+        "_schema_localization",
+        lambda *args, **kwargs: {"classification": schema_classification},
+    )
 
 
 def test_manifest_resolves_exactly_twelve_p7_cases_without_request_text() -> None:
@@ -171,37 +256,107 @@ def test_reference_projection_is_unavailable_without_a_plan() -> None:
     assert projection["missing_required_reference"] is None
 
 
-def test_reference_localization_classifies_section_factor_pattern() -> None:
-    """The protected target uses the frozen A-D reference labels."""
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ((False, True, True), "REFERENCE_SECTION_COMPOSITION_SUFFICIENT"),
+        ((True, False, True), "REFERENCE_REPORT_BOUNDARY_SUFFICIENT"),
+        ((False, False, True), "REFERENCE_RC_INTERACTION_REQUIRED"),
+        ((True, True, True), "REFERENCE_MULTIPLE_FACTORS_SUFFICIENT"),
+    ],
+)
+def test_reference_localization_classifies_all_stable_patterns(
+    pattern: tuple[bool, bool, bool], expected: str
+) -> None:
+    """The protected target supports all four frozen reference labels."""
+    rows = _synthetic_rows({"P": False, "R": pattern[0], "C": pattern[1], "RC": pattern[2]})
+    result = p8._reference_localization(
+        rows,
+        (),
+        {"reference": {"reproduced": True}},
+    )
+    assert result["classification"] == expected
+    assert result["stable"] is True
+
+
+def test_reference_localization_rejects_unstable_factor() -> None:
+    """Attempt disagreement is not interpreted as a stable reference effect."""
     rows = _synthetic_rows({"P": False, "R": False, "C": True, "RC": True})
-    result = p8._reference_localization(rows, (), {"reproduced": True})
-    assert result["classification"] == "REFERENCE_SECTION_COMPOSITION_SUFFICIENT"
+    rows[1]["arms"]["C"]["reference"]["unexpected_reference"] = False
+    result = p8._reference_localization(
+        rows,
+        (),
+        {"reference": {"reproduced": True}},
+    )
+    assert result["classification"] == "REFERENCE_FACTOR_UNSTABLE"
 
 
-def test_schema_localization_classifies_section_factor_pattern() -> None:
-    """The two schema targets classify structured availability independently."""
-    rows = []
-    for case_id in sorted(p8.SCHEMA_TARGETS):
-        for attempt in range(2):
-            arms = {
-                arm: {
-                    "final_plan_available": arm in {"C", "RC"},
-                    "final_classification": "PLANNER_CONTRACT_OK"
-                    if arm in {"C", "RC"}
-                    else "PLANNER_SCHEMA_FAILURE",
-                    "reference": {
-                        "expected_reference_required": True,
-                        "final_plan_available": arm in {"C", "RC"},
-                        "actual_reference_present": None,
-                        "unexpected_reference": None,
-                        "missing_required_reference": None,
-                    },
-                }
-                for arm in p8.ARMS
-            }
-            rows.append({"case_id": case_id, "attempt_index": attempt, "arms": arms})
-    result = p8._schema_localization(rows, {"reproduced": True})
-    assert result["classification"] == "SCHEMA_SECTION_COMPOSITION_SUFFICIENT"
+def test_reference_localization_is_inconclusive_when_its_anchors_drift() -> None:
+    """Reference localization is gated only by its own historical anchors."""
+    rows = _synthetic_rows({"P": False, "R": False, "C": True, "RC": True})
+    result = p8._reference_localization(
+        rows,
+        (),
+        {"reference": {"reproduced": False}},
+    )
+    assert result["classification"] == "INCONCLUSIVE_REFERENCE_LOCALIZATION"
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ((False, True, True), "SCHEMA_SECTION_COMPOSITION_SUFFICIENT"),
+        ((True, False, True), "SCHEMA_REPORT_BOUNDARY_SUFFICIENT"),
+        ((False, False, True), "SCHEMA_RC_INTERACTION_REQUIRED"),
+        ((True, True, True), "SCHEMA_MULTIPLE_FACTORS_SUFFICIENT"),
+    ],
+)
+def test_schema_localization_classifies_all_stable_patterns(
+    pattern: tuple[bool, bool, bool], expected: str
+) -> None:
+    """The schema targets support all four frozen factor labels."""
+    patterns = dict.fromkeys(p8.SCHEMA_TARGETS, pattern)
+    result = p8._schema_localization(
+        _schema_rows(patterns),
+        {"schema": {"reproduced": True}},
+    )
+    assert result["classification"] == expected
+    assert result["stable"] is True
+
+
+def test_schema_localization_accepts_case_dependent_stabilization() -> None:
+    """Different stable patterns are valid case-dependent evidence."""
+    case_ids = sorted(p8.SCHEMA_TARGETS)
+    patterns = {
+        case_ids[0]: (False, True, True),
+        case_ids[1]: (True, False, True),
+    }
+    result = p8._schema_localization(
+        _schema_rows(patterns),
+        {"schema": {"reproduced": True}},
+    )
+    assert result["classification"] == "SCHEMA_STABILIZATION_CASE_DEPENDENT"
+    assert result["stable"] is True
+
+
+def test_schema_localization_rejects_unstable_factor() -> None:
+    """Attempt disagreement is not interpreted as stable schema evidence."""
+    patterns = dict.fromkeys(p8.SCHEMA_TARGETS, (False, True, True))
+    rows = _schema_rows(patterns)
+    rows[1]["arms"]["C"]["final_plan_available"] = False
+    result = p8._schema_localization(rows, {"schema": {"reproduced": True}})
+    assert result["classification"] == "SCHEMA_FACTOR_UNSTABLE"
+    assert result["stable"] is False
+
+
+def test_schema_localization_is_inconclusive_when_its_anchors_drift() -> None:
+    """Schema localization is gated only by its own historical anchors."""
+    patterns = dict.fromkeys(p8.SCHEMA_TARGETS, (False, True, True))
+    result = p8._schema_localization(
+        _schema_rows(patterns),
+        {"schema": {"reproduced": False}},
+    )
+    assert result["classification"] == "INCONCLUSIVE_SCHEMA_LOCALIZATION"
 
 
 def test_positive_reference_controls_mark_missing_required_tracks() -> None:
@@ -218,6 +373,149 @@ def test_positive_reference_controls_mark_missing_required_tracks() -> None:
     assert (
         controls["p7-depth-conductivity-06"]["P"]["reference_positive_control_regression"] is False
     )
+
+
+def test_decision_accepts_case_dependent_schema_localization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Case-dependent schema evidence remains interpretable and complete."""
+    _patch_decision_inputs(
+        monkeypatch,
+        reference_classification="REFERENCE_MULTIPLE_FACTORS_SUFFICIENT",
+        schema_classification="SCHEMA_STABILIZATION_CASE_DEPENDENT",
+    )
+    result = p8.decision([_decision_row()], ())
+    assert result["decision"] == "PROMPT_FACTOR_LOCALIZATION_COMPLETE"
+
+
+@pytest.mark.parametrize(
+    ("reference_reproduced", "schema_reproduced", "expected"),
+    [
+        (False, True, "PROMPT_FACTOR_LOCALIZATION_PARTIAL"),
+        (True, False, "PROMPT_FACTOR_LOCALIZATION_PARTIAL"),
+    ],
+)
+def test_decision_allows_one_localized_axis_when_the_other_anchor_drifts(
+    monkeypatch: pytest.MonkeyPatch,
+    reference_reproduced: bool,
+    schema_reproduced: bool,
+    expected: str,
+) -> None:
+    """One valid mechanism axis is sufficient for a partial result."""
+    reference_classification = (
+        "REFERENCE_MULTIPLE_FACTORS_SUFFICIENT"
+        if reference_reproduced
+        else "INCONCLUSIVE_REFERENCE_LOCALIZATION"
+    )
+    schema_classification = (
+        "SCHEMA_MULTIPLE_FACTORS_SUFFICIENT"
+        if schema_reproduced
+        else "INCONCLUSIVE_SCHEMA_LOCALIZATION"
+    )
+    _patch_decision_inputs(
+        monkeypatch,
+        reference_classification=reference_classification,
+        schema_classification=schema_classification,
+        reference_reproduced=reference_reproduced,
+        schema_reproduced=schema_reproduced,
+    )
+    result = p8.decision([_decision_row()], ())
+    assert result["decision"] == expected
+
+
+@pytest.mark.parametrize(
+    ("row", "population_complete", "expected"),
+    [
+        (
+            _decision_row(),
+            False,
+            "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION",
+        ),
+        (
+            _decision_row(infrastructure_failure=True),
+            True,
+            "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION",
+        ),
+        (
+            _decision_row(program_calls=1),
+            True,
+            "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION",
+        ),
+    ],
+)
+def test_decision_fails_closed_for_population_infrastructure_or_worker_corruption(
+    monkeypatch: pytest.MonkeyPatch,
+    row: dict[str, object],
+    population_complete: bool,
+    expected: str,
+) -> None:
+    """Global integrity failures cannot yield a localization decision."""
+    _patch_decision_inputs(
+        monkeypatch,
+        reference_classification="REFERENCE_MULTIPLE_FACTORS_SUFFICIENT",
+        schema_classification="SCHEMA_MULTIPLE_FACTORS_SUFFICIENT",
+        population_complete=population_complete,
+        population_reasons=["synthetic_corruption"] if not population_complete else [],
+    )
+    result = p8.decision([row], ())
+    assert result["decision"] == expected
+
+
+def test_population_integrity_rejects_worker_program_calls() -> None:
+    """The P8 population cannot contain worker/program execution."""
+    case = p8.load_manifest()[0]
+    row = {
+        "case_id": case["case_id"],
+        "attempt_index": 0,
+        "arms": {
+            arm: {
+                "program_call_count": 1,
+                "prompt_sha256": p8.PROMPT_SHA256[arm],
+                "response_schema_sha256": p8.EXPECTED_SCHEMA_SHA256,
+            }
+            for arm in p8.ARMS
+        },
+    }
+    complete, reasons = p8.population_integrity([row], (case,))
+    assert complete is False
+    assert "worker_program_call" in reasons
+
+
+def test_live_rejects_nonempty_output_before_provider_construction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """A pre-existing evidence file aborts before checkout/provider work."""
+    output = tmp_path / "evidence.jsonl"
+    output.write_text("existing\n", encoding="utf-8")
+    monkeypatch.setattr(p8, "OUTPUT_PATH", output)
+    monkeypatch.setattr(
+        p8,
+        "_provider_configuration",
+        lambda args: pytest.fail("provider constructed before output guard"),
+    )
+    args = SimpleNamespace(base_url="http://example.invalid", api_key_file=None, api_key_env="KEY")
+    with pytest.raises(RuntimeError, match="non-empty evidence path"):
+        asyncio.run(p8._run_live(args, p8.BASELINE_SHA))
+
+
+def test_live_rejects_checkout_drift_before_provider_construction(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reviewed-checkout failure aborts before provider construction."""
+    monkeypatch.setattr(p8, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
+    monkeypatch.setattr(
+        p8,
+        "verify_reviewed_checkout",
+        lambda checkpoint: (_ for _ in ()).throw(RuntimeError("synthetic checkout drift")),
+    )
+    monkeypatch.setattr(
+        p8,
+        "_provider_configuration",
+        lambda args: pytest.fail("provider constructed before checkout guard"),
+    )
+    args = SimpleNamespace(base_url="http://example.invalid", api_key_file=None, api_key_env="KEY")
+    with pytest.raises(RuntimeError, match="synthetic checkout drift"):
+        asyncio.run(p8._run_live(args, p8.BASELINE_SHA))
 
 
 def test_terminal_schema_failure_is_not_infrastructure_failure() -> None:

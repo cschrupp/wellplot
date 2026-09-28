@@ -84,8 +84,10 @@ provider calls. Worker/program calls must remain zero.
 
 ## Interpretation
 
-The protected reference target is classified only after P/RC historical
-anchors reproduce on both attempts. The bounded labels are:
+The protected reference target is classified only after its own P/RC
+historical anchors reproduce on both attempts. The schema targets have an
+independent P/RC anchor gate; an unrelated selected-case mismatch must not
+erase evidence from the other mechanism axis. The bounded labels are:
 
 - `REFERENCE_SECTION_COMPOSITION_SUFFICIENT`
 - `REFERENCE_REPORT_BOUNDARY_SUFFICIENT`
@@ -107,13 +109,20 @@ labels are:
 - `SCHEMA_FACTOR_UNSTABLE`
 - `INCONCLUSIVE_SCHEMA_LOCALIZATION`
 
+`SCHEMA_STABILIZATION_CASE_DEPENDENT` is stable and interpretable evidence,
+not an inconclusive outcome: it records different stable factor patterns on
+the two schema targets. Only `SCHEMA_FACTOR_UNSTABLE` and
+`INCONCLUSIVE_SCHEMA_LOCALIZATION` make the schema axis unavailable.
+
 The top-level labels are `PROMPT_FACTOR_LOCALIZATION_COMPLETE`,
 `PROMPT_FACTOR_LOCALIZATION_PARTIAL`, and
-`INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION`. Population drift, historical-anchor
-failure, infrastructure failure, worker calls, or evidence corruption fail
-closed. Positive reference controls are reported separately so an apparent
-factor effect cannot be treated as a remediation if it removes legitimate
-reference tracks.
+`INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION`. Population drift, infrastructure
+failure, worker calls, or evidence corruption fail closed. Historical-anchor
+failure is axis-specific: one localized axis can produce
+`PROMPT_FACTOR_LOCALIZATION_PARTIAL` while the other axis is inconclusive.
+Positive reference controls are reported separately so an apparent factor
+effect cannot be treated as a remediation if it removes legitimate reference
+tracks.
 
 ## Evidence Safety and Hard Stop
 
