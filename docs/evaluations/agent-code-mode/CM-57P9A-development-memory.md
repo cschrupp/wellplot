@@ -1,4 +1,4 @@
-# CM-57P9A Same-Process Reproducibility Characterization
+# CM-57P9A Endpoint-Session Reproducibility Characterization
 
 ## Status
 
@@ -16,11 +16,10 @@ P9B: blocked
 
 The post-checkpoint correction preserves the same experiment and controls
 while tightening evidence validity: finalized rows must bind to the PRE
-fingerprint and authorized checkout, critical runtime identity fields must be
-available, terminal failures receive stable structural fact hashes, and
-continuous batching is recorded as unknown unless explicitly enabled or
-disabled. The reference diagnostic is also populated from the bounded
-production result. Live inference remains unauthorized pending review of this
+fingerprint and authorized checkout, terminal failures receive stable
+structural fact hashes, and the reference diagnostic is populated from the
+bounded production result. Host PID, binary, and GGUF access are intentionally
+not required. Live inference remains unauthorized pending review of this
 correction.
 
 Initial structured-success diagnostics are derived specifically from the
@@ -34,9 +33,11 @@ production routing change is part of this checkpoint.
 ## Question
 
 The future live experiment will characterize whether repeated executions in
-one unchanged process reproduce the same result under the production planner.
-It compares the production prompt (`P`) with the frozen RC prompt (`RC`) while
-keeping planner, schema, provider, model, and execution controls unchanged.
+one endpoint/model session reproduce the same result under the production
+planner. It compares the production prompt (`P`) with the frozen RC prompt
+(`RC`) while keeping planner, schema, provider, model, and execution controls
+unchanged. It does not prove that a single remote llama.cpp process remained
+unchanged because the host is outside this execution environment.
 
 The population is six hash-bound P7 cases, eight sequential repetitions per
 case and arm, for 96 planner executions. The case manifest retains request and
@@ -60,11 +61,12 @@ Provider response text, request payloads, exception text, document paths, and
 raw provider responses are not retained in the evidence rows. Accidental
 program generation is fail-closed and invalidates the population.
 
-The runtime fingerprint helper is provider-free. It captures bounded local
-identity and llama-server settings, including model/binary hashes, process
-identity, selected launch flags, GPU metadata when available, and a launch
-argument hash. PRE and POST fingerprints are compared descriptively and are a
-population-integrity gate for future finalization.
+The runtime fingerprint helper supports endpoint/model provenance through a
+non-inference `/v1/models` request. The PRE and POST records contain the
+endpoint, configured model label, available model identifiers, and a hash of
+the returned model catalog. They are compared descriptively and are a
+population-integrity gate for future finalization. The older host-local
+fingerprint helper remains available, but is not required by this P9A mode.
 
 ## Frozen Controls
 
@@ -89,10 +91,10 @@ provider construction. The default CLI path is provider-free.
 The future completed population is classified hierarchically:
 
 ```text
-SAME_PROCESS_EXACT_REPRODUCIBLE
-SAME_PROCESS_PLAN_REPRODUCIBLE
-SAME_PROCESS_CONTRACT_REPRODUCIBLE
-SAME_PROCESS_NOT_REPRODUCIBLE
+ENDPOINT_SESSION_EXACT_REPRODUCIBLE
+ENDPOINT_SESSION_PLAN_REPRODUCIBLE
+ENDPOINT_SESSION_CONTRACT_REPRODUCIBLE
+ENDPOINT_SESSION_NOT_REPRODUCIBLE
 INCONCLUSIVE_REPRODUCIBILITY_EVALUATION
 ```
 
@@ -102,8 +104,7 @@ diagnostics only; they are not decision gates for P9A.
 
 ## Hard Stop
 
-This checkpoint does not authorize model calls. Do not run the runtime
-fingerprint helper against a live process, start the P9A matrix, modify
-production code, begin P9B, or start typed-worker/routing work. A separate
-review and explicit live authorization are required after the provider-free
-tests and artifact checks pass.
+This checkpoint does not authorize model calls. Do not run the endpoint probe,
+start the P9A matrix, modify production code, begin P9B, or start
+typed-worker/routing work. A separate review and explicit live authorization
+are required after the provider-free tests and artifact checks pass.

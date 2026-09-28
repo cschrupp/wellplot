@@ -1,4 +1,4 @@
-"""CM-57P9A same-process inference reproducibility characterization.
+"""CM-57P9A endpoint-session inference reproducibility characterization.
 
 The default command is provider-free. Live execution and finalization are
 separate, explicitly gated operations so a partial population can never be
@@ -51,7 +51,7 @@ P7_SCRIPT_PATH = REPO_ROOT / "scripts/cm57p7_fresh_promotion.py"
 P7_SUMMARY_PATH = REPO_ROOT / "docs/evaluations/agent-code-mode/CM-57P7-live-summary.json"
 P8_SCRIPT_PATH = REPO_ROOT / "scripts/cm57p8_prompt_factor_localization.py"
 P8_SUMMARY_PATH = REPO_ROOT / "docs/evaluations/agent-code-mode/CM-57P8-live-summary.json"
-OUTPUT_PATH = Path("/tmp/cm57p9a-same-process-qwen.jsonl")
+OUTPUT_PATH = Path("/tmp/cm57p9a-endpoint-session-qwen.jsonl")
 
 BASELINE_SHA = "e8f19141e6dd349d44ddd9cb97305a856216a6fa"
 EXPERIMENT_VERSION = "CM-57P9A"
@@ -867,7 +867,7 @@ def _decision(
     *,
     fingerprint_mismatches: list[str] | None = None,
 ) -> str:
-    """Apply the frozen P9A precedence."""
+    """Apply endpoint-session reproducibility precedence."""
     if (
         not complete
         or fingerprint_mismatches
@@ -876,12 +876,12 @@ def _decision(
         return "INCONCLUSIVE_REPRODUCIBILITY_EVALUATION"
     classifications = {str(group["classification"]) for group in groups}
     if "NOT_REPRODUCIBLE" in classifications:
-        return "SAME_PROCESS_NOT_REPRODUCIBLE"
+        return "ENDPOINT_SESSION_NOT_REPRODUCIBLE"
     if "CONTRACT_REPRODUCIBLE_WITH_SEMANTIC_TEXT_VARIATION" in classifications:
-        return "SAME_PROCESS_CONTRACT_REPRODUCIBLE"
+        return "ENDPOINT_SESSION_CONTRACT_REPRODUCIBLE"
     if "PLAN_REPRODUCIBLE_WITH_TEXT_VARIATION" in classifications:
-        return "SAME_PROCESS_PLAN_REPRODUCIBLE"
-    return "SAME_PROCESS_EXACT_REPRODUCIBLE"
+        return "ENDPOINT_SESSION_PLAN_REPRODUCIBLE"
+    return "ENDPOINT_SESSION_EXACT_REPRODUCIBLE"
 
 
 def summarize_population(
@@ -893,10 +893,10 @@ def summarize_population(
     authorized_checkpoint: str | None = None,
 ) -> dict[str, object]:
     """Build a provider-free reproducibility summary."""
-    pre_valid, pre_reasons = fingerprint.validate_fingerprint(pre_fingerprint)
-    post_valid, post_reasons = fingerprint.validate_fingerprint(post_fingerprint)
+    pre_valid, pre_reasons = fingerprint.validate_endpoint_fingerprint(pre_fingerprint)
+    post_valid, post_reasons = fingerprint.validate_endpoint_fingerprint(post_fingerprint)
     fingerprint_mismatches = (
-        fingerprint.compare_fingerprints(pre_fingerprint, post_fingerprint)
+        fingerprint.compare_endpoint_fingerprints(pre_fingerprint, post_fingerprint)
         if pre_valid and post_valid
         else [*pre_reasons, *post_reasons]
     )
@@ -928,6 +928,7 @@ def summarize_population(
         "groups": groups,
         "special_diagnostics": _special_diagnostics(rows),
         "runtime_fingerprint": {
+            "scope": "ENDPOINT_MODEL",
             "pre_sha256": sha256_text(canonical_json(pre_fingerprint)) if pre_fingerprint else None,
             "post_sha256": sha256_text(canonical_json(post_fingerprint))
             if post_fingerprint
@@ -943,6 +944,7 @@ def summarize_population(
         "controls": dict(FIXED_EXECUTION_CONTROLS),
         "prompt_hashes": dict(PROMPT_SHA256),
         "response_schema_sha256": EXPECTED_SCHEMA_SHA256,
+        "provenance_scope": "ENDPOINT_MODEL",
         "production_adoption": "NOT_AUTHORIZED",
         "CM57D": "BLOCKED",
     }
@@ -1018,24 +1020,16 @@ def verify_frozen_contract() -> dict[str, object]:
 
 
 def _load_fingerprint(path: Path) -> dict[str, object]:
-    """Load and validate one externally captured runtime fingerprint."""
+    """Load and validate one endpoint/model fingerprint."""
     value = json.loads(path.read_text(encoding="utf-8"))
-    valid, reasons = fingerprint.validate_fingerprint(value)
+    valid, reasons = fingerprint.validate_endpoint_fingerprint(value)
     if not valid:
         raise RuntimeError(f"Invalid runtime fingerprint: {', '.join(reasons)}")
     return value
 
 
-def _provider_configuration(
-    args: argparse.Namespace, observer: ResponseObserver
-) -> ModelBackendProtocol:
-    """Construct production provider only after all live guards pass."""
-    from openai import AsyncOpenAI  # noqa: I001
-
-    from wellplot.agent.providers.openai_compat_v2 import (  # noqa: I001
-        OpenAICompatibleBackendV2,
-    )
-
+def _api_key(args: argparse.Namespace) -> str:
+    """Resolve the configured API key without exposing it in evidence."""
     api_key = os.getenv(args.api_key_env, "").strip()
     if args.api_key_file:
         path = Path(args.api_key_file)
@@ -1044,6 +1038,22 @@ def _provider_configuration(
         api_key = api_key or path.read_text(encoding="utf-8").strip()
     if not api_key:
         raise RuntimeError("No CM-57P9A API key configured.")
+    return api_key
+
+
+def _provider_configuration(
+    args: argparse.Namespace,
+    observer: ResponseObserver,
+    *,
+    api_key: str,
+) -> ModelBackendProtocol:
+    """Construct production provider only after all live guards pass."""
+    from openai import AsyncOpenAI  # noqa: I001
+
+    from wellplot.agent.providers.openai_compat_v2 import (  # noqa: I001
+        OpenAICompatibleBackendV2,
+    )
+
     client = AsyncOpenAI(api_key=api_key, base_url=args.base_url, timeout=TIMEOUT_SECONDS)
     return OpenAICompatibleBackendV2(
         model=FROZEN_MODEL,
@@ -1054,18 +1064,23 @@ def _provider_configuration(
 
 
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
-    """Run the exact 96-execution matrix sequentially and flush every row."""
+    """Run the exact 96-execution matrix with endpoint-level provenance."""
     if OUTPUT_PATH.exists() and OUTPUT_PATH.stat().st_size:
         raise RuntimeError(f"Refusing to append to non-empty evidence path {OUTPUT_PATH}.")
     verify_reviewed_checkout(checkpoint)
     contract = verify_frozen_contract()
-    pre = _load_fingerprint(Path(args.runtime_fingerprint_pre))
-    if pre["endpoint"] != args.base_url:
-        raise RuntimeError("Runtime fingerprint endpoint does not match --base-url.")
+    api_key = _api_key(args)
+    pre = fingerprint.capture_endpoint_fingerprint(
+        endpoint=args.base_url,
+        model_api_label=FROZEN_MODEL,
+        api_key=api_key,
+    )
+    pre_path = Path(args.runtime_fingerprint_pre)
+    pre_path.write_text(json.dumps(pre, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     cases = load_manifest()
     registry = create_builtin_registry()
     observer = ResponseObserver(events=[])
-    backend = _provider_configuration(args, observer)
+    backend = _provider_configuration(args, observer, api_key=api_key)
     runtime_sha = sha256_text(canonical_json(pre))
     rows: list[dict[str, object]] = []
     with OUTPUT_PATH.open("a", encoding="utf-8") as handle:
@@ -1083,6 +1098,13 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
                 rows.append(row)
                 handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
+    post = fingerprint.capture_endpoint_fingerprint(
+        endpoint=args.base_url,
+        model_api_label=FROZEN_MODEL,
+        api_key=api_key,
+    )
+    post_path = Path(args.runtime_fingerprint_post)
+    post_path.write_text(json.dumps(post, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({"status": "MATRIX_COMPLETE", **contract}, indent=2, sort_keys=True))
 
 
@@ -1121,6 +1143,7 @@ def prelive_report() -> dict[str, object]:
         "worker_program_calls": 0,
         "production_changes": 0,
         "live_inference": "NOT_STARTED",
+        "provenance_scope": "ENDPOINT_MODEL",
         "production_adoption": "NOT_AUTHORIZED",
         "CM57D": "BLOCKED",
         "cases": len(CASE_IDS),
@@ -1142,8 +1165,14 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--base-url")
     parser.add_argument("--api-key-file")
     parser.add_argument("--api-key-env", default="LLAMA_CPP_API_KEY")
-    parser.add_argument("--runtime-fingerprint-pre")
-    parser.add_argument("--runtime-fingerprint-post")
+    parser.add_argument(
+        "--runtime-fingerprint-pre",
+        default="/tmp/cm57p9a-endpoint-pre.json",
+    )
+    parser.add_argument(
+        "--runtime-fingerprint-post",
+        default="/tmp/cm57p9a-endpoint-post.json",
+    )
     parser.add_argument("--evidence", default=str(OUTPUT_PATH))
     return parser
 
@@ -1152,12 +1181,8 @@ def main(argv: list[str] | None = None) -> int:
     """Run provider-free validation unless an explicit future mode is selected."""
     args = _parser().parse_args(argv)
     if args.finalize:
-        if (
-            not args.authorized_checkpoint
-            or not args.runtime_fingerprint_pre
-            or not args.runtime_fingerprint_post
-        ):
-            raise SystemExit("CM-57P9A finalization requires checkpoint and PRE/POST fingerprints.")
+        if not args.authorized_checkpoint:
+            raise SystemExit("CM-57P9A finalization requires an authorized checkpoint.")
         print(
             json.dumps(
                 finalize(
@@ -1174,9 +1199,9 @@ def main(argv: list[str] | None = None) -> int:
     if not args.live_authorized:
         print(json.dumps(prelive_report(), indent=2, sort_keys=True))
         return 0
-    required = (args.authorized_checkpoint, args.base_url, args.runtime_fingerprint_pre)
+    required = (args.authorized_checkpoint, args.base_url)
     if not all(required):
-        raise SystemExit("CM-57P9A live mode requires checkpoint, base URL, and PRE fingerprint.")
+        raise SystemExit("CM-57P9A live mode requires checkpoint and base URL.")
     asyncio.run(_run_live(args, args.authorized_checkpoint))
     return 0
 

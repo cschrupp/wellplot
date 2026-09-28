@@ -319,13 +319,13 @@ def test_terminal_response_text_variation_uses_a_lower_exactness_tier() -> None:
 def test_decision_precedence_prioritizes_nonreproducibility() -> None:
     """The frozen top-level decision prefers lower reproducibility levels."""
     groups = [{"classification": "EXACT_REPRODUCIBLE"}]
-    assert p9._decision(True, [], groups) == "SAME_PROCESS_EXACT_REPRODUCIBLE"
+    assert p9._decision(True, [], groups) == "ENDPOINT_SESSION_EXACT_REPRODUCIBLE"
     groups.append({"classification": "PLAN_REPRODUCIBLE_WITH_TEXT_VARIATION"})
-    assert p9._decision(True, [], groups) == "SAME_PROCESS_PLAN_REPRODUCIBLE"
+    assert p9._decision(True, [], groups) == "ENDPOINT_SESSION_PLAN_REPRODUCIBLE"
     groups.append({"classification": "CONTRACT_REPRODUCIBLE_WITH_SEMANTIC_TEXT_VARIATION"})
-    assert p9._decision(True, [], groups) == "SAME_PROCESS_CONTRACT_REPRODUCIBLE"
+    assert p9._decision(True, [], groups) == "ENDPOINT_SESSION_CONTRACT_REPRODUCIBLE"
     groups.append({"classification": "NOT_REPRODUCIBLE"})
-    assert p9._decision(True, [], groups) == "SAME_PROCESS_NOT_REPRODUCIBLE"
+    assert p9._decision(True, [], groups) == "ENDPOINT_SESSION_NOT_REPRODUCIBLE"
     assert p9._decision(False, ["wrong_row_count"], groups) == (
         "INCONCLUSIVE_REPRODUCIBILITY_EVALUATION"
     )
@@ -392,6 +392,69 @@ def test_runtime_fingerprint_validation_and_comparison_are_provider_free(tmp_pat
     valid, reasons = fingerprint.validate_fingerprint(invalid)
     assert not valid
     assert "model_sha256_invalid" in reasons
+
+
+def test_endpoint_fingerprint_uses_model_catalog_without_host_identity() -> None:
+    """Endpoint provenance needs only the non-inference model catalog."""
+    payload = {
+        "data": [
+            {"id": "qwen3.6-35b-a3b", "model": "qwen3.6-35b-a3b"},
+        ]
+    }
+    value = fingerprint.build_endpoint_fingerprint(
+        endpoint="http://192.168.2.140:8888/v1",
+        model_api_label="qwen3.6-35b-a3b",
+        models_payload=payload,
+    )
+    valid, reasons = fingerprint.validate_endpoint_fingerprint(value)
+    assert valid, reasons
+    assert value["provenance_scope"] == "ENDPOINT_MODEL"
+    changed = dict(value, model_catalog_sha256="0" * 64)
+    assert "model_catalog_sha256" in fingerprint.compare_endpoint_fingerprints(value, changed)
+
+
+def test_endpoint_fingerprint_rejects_missing_configured_model() -> None:
+    """The endpoint probe must identify the configured model before inference."""
+    with pytest.raises(ValueError, match="absent from endpoint"):
+        fingerprint.build_endpoint_fingerprint(
+            endpoint="http://192.168.2.140:8888/v1",
+            model_api_label="wrong-model",
+            models_payload={"data": [{"id": "qwen3.6-35b-a3b"}]},
+        )
+
+
+def test_endpoint_fingerprint_capture_uses_only_the_models_get(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Endpoint capture performs a model-list GET and never a completion call."""
+
+    class Response:
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def read(self) -> bytes:
+            return b'{"data": [{"id": "qwen3.6-35b-a3b"}]}'
+
+    requests: list[object] = []
+
+    def urlopen(request: object, *, timeout: float) -> Response:
+        requests.append((request, timeout))
+        return Response()
+
+    monkeypatch.setattr(fingerprint.urllib.request, "urlopen", urlopen)
+    value = fingerprint.capture_endpoint_fingerprint(
+        endpoint="http://192.168.2.140:8888/v1",
+        model_api_label="qwen3.6-35b-a3b",
+        api_key="redacted-test-key",
+    )
+    assert value["provenance_scope"] == "ENDPOINT_MODEL"
+    assert len(requests) == 1
+    request, timeout = requests[0]
+    assert request.full_url.endswith("/v1/models")
+    assert timeout == 20.0
 
 
 def test_continuous_batching_requires_an_explicit_flag() -> None:
