@@ -1,0 +1,26 @@
+{
+  "experiment_version": "CM-57P9C",
+  "baseline": "5244db6fc169c78201c1ffcd751c01c0d045b5fd",
+  "decision": "ENDPOINT_PROVENANCE_NORMALIZED_STABLE",
+  "probe_count": 5,
+  "probe_method": "GET /v1/models only",
+  "endpoint": "http://192.168.2.140:8888/v1",
+  "model_api_label": "qwen3.6-35b-a3b",
+  "available_model_ids": ["qwen3.6-35b-a3b"],
+  "normalized_identity_sha256": [
+    "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980"
+  ],
+  "raw_model_catalog_sha256": [
+    "881772e8f41e3ba60e1930f9ffa3193667942b9d9d20da7b44c9ade621ad494e"
+  ],
+  "normalized_identity_fields": [
+    "endpoint",
+    "model_api_label",
+    "sorted_unique_available_model_ids"
+  ],
+  "raw_catalog_hash_role": "descriptive_only",
+  "reasons": [],
+  "provider_calls": 0,
+  "worker_program_calls": 0,
+  "p10_live_inference": "NOT_AUTHORIZED"
+}

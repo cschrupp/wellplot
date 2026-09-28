@@ -19,6 +19,7 @@ from pathlib import Path
 
 FINGERPRINT_VERSION = "cm57p9.runtime-fingerprint.v1"
 ENDPOINT_FINGERPRINT_VERSION = "cm57p9.endpoint-fingerprint.v1"
+ENDPOINT_FINGERPRINT_V2_VERSION = "cm57p9.endpoint-fingerprint.v2"
 UNKNOWN = None
 _FLAG_ALIASES = {
     "context_size": ("--ctx-size", "-c"),
@@ -69,6 +70,14 @@ _ENDPOINT_REQUIRED_KEYS = (
     "model_api_label",
     "available_model_ids",
     "model_catalog_sha256",
+)
+_ENDPOINT_V2_REQUIRED_KEYS = (
+    "fingerprint_version",
+    "endpoint",
+    "model_api_label",
+    "available_model_ids",
+    "normalized_identity_sha256",
+    "raw_model_catalog_sha256",
 )
 
 
@@ -376,6 +385,153 @@ def compare_endpoint_fingerprints(pre: dict[str, object], post: dict[str, object
     """Return endpoint/model fields changed between PRE and POST."""
     keys = ("endpoint", "model_api_label", "available_model_ids", "model_catalog_sha256")
     return [key for key in keys if pre.get(key) != post.get(key)]
+
+
+def normalize_endpoint(endpoint: str) -> str:
+    """Normalize only trailing slashes in an endpoint URL."""
+    normalized = endpoint.strip().rstrip("/")
+    if not normalized:
+        raise ValueError("Endpoint must not be empty.")
+    return normalized
+
+
+def normalized_endpoint_identity(
+    *, endpoint: str, model_api_label: str, available_model_ids: list[str]
+) -> dict[str, object]:
+    """Return the decision-bearing endpoint/model identity projection."""
+    if not model_api_label.strip():
+        raise ValueError("Configured model label must not be empty.")
+    identifiers = sorted(set(available_model_ids))
+    if not identifiers or any(not value.strip() for value in identifiers):
+        raise ValueError("Available model IDs must be non-empty strings.")
+    return {
+        "endpoint": normalize_endpoint(endpoint),
+        "model_api_label": model_api_label.strip(),
+        "available_model_ids": identifiers,
+    }
+
+
+def build_endpoint_fingerprint_v2(
+    *,
+    endpoint: str,
+    model_api_label: str,
+    models_payload: object,
+) -> dict[str, object]:
+    """Build normalized endpoint/model provenance with raw hash diagnostics."""
+    identifiers = _model_ids(models_payload)
+    if model_api_label not in identifiers:
+        raise ValueError(f"Configured model is absent from endpoint: {model_api_label!r}.")
+    identity = normalized_endpoint_identity(
+        endpoint=endpoint,
+        model_api_label=model_api_label,
+        available_model_ids=identifiers,
+    )
+    canonical_payload = _canonical_json(models_payload)
+    return {
+        "fingerprint_version": ENDPOINT_FINGERPRINT_V2_VERSION,
+        "captured_at": datetime.now(UTC).isoformat(),
+        **identity,
+        "normalized_identity_sha256": hashlib.sha256(
+            _canonical_json(identity).encode("utf-8")
+        ).hexdigest(),
+        "raw_model_catalog_sha256": hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest(),
+        "provenance_scope": "ENDPOINT_MODEL_NORMALIZED",
+    }
+
+
+def capture_endpoint_fingerprint_v2(
+    *,
+    endpoint: str,
+    model_api_label: str,
+    api_key: str,
+    timeout_seconds: float = 20.0,
+) -> dict[str, object]:
+    """Capture normalized provenance using only a non-inference model-list GET."""
+    request = urllib.request.Request(
+        f"{normalize_endpoint(endpoint)}/models",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as error:
+        raise RuntimeError("Endpoint model-list fingerprint request failed.") from error
+    return build_endpoint_fingerprint_v2(
+        endpoint=endpoint,
+        model_api_label=model_api_label,
+        models_payload=payload,
+    )
+
+
+def validate_endpoint_fingerprint_v2(value: object) -> tuple[bool, list[str]]:
+    """Validate normalized endpoint/model provenance without host identity."""
+    if not isinstance(value, dict):
+        return False, ["fingerprint_not_object"]
+    reasons = [f"missing_{key}" for key in _ENDPOINT_V2_REQUIRED_KEYS if key not in value]
+    if value.get("fingerprint_version") != ENDPOINT_FINGERPRINT_V2_VERSION:
+        reasons.append("fingerprint_version_mismatch")
+    try:
+        normalized = normalized_endpoint_identity(
+            endpoint=str(value.get("endpoint", "")),
+            model_api_label=str(value.get("model_api_label", "")),
+            available_model_ids=value.get("available_model_ids", []),
+        )
+    except (AttributeError, TypeError, ValueError):
+        reasons.append("identity_invalid")
+    else:
+        if value.get("endpoint") != normalized["endpoint"]:
+            reasons.append("endpoint_not_normalized")
+        if value.get("available_model_ids") != normalized["available_model_ids"]:
+            reasons.append("available_model_ids_not_normalized")
+        expected_identity = hashlib.sha256(_canonical_json(normalized).encode("utf-8")).hexdigest()
+        if value.get("normalized_identity_sha256") != expected_identity:
+            reasons.append("normalized_identity_sha256_invalid")
+    for key in ("normalized_identity_sha256", "raw_model_catalog_sha256"):
+        if not isinstance(value.get(key), str) or re.fullmatch(r"[0-9a-f]{64}", value[key]) is None:
+            reasons.append(f"{key}_invalid")
+    if value.get("provenance_scope") != "ENDPOINT_MODEL_NORMALIZED":
+        reasons.append("provenance_scope_mismatch")
+    return not reasons, sorted(set(reasons))
+
+
+def compare_endpoint_fingerprints_v2(pre: dict[str, object], post: dict[str, object]) -> list[str]:
+    """Return only decision-bearing normalized identity changes."""
+    keys = ("endpoint", "model_api_label", "available_model_ids", "normalized_identity_sha256")
+    return [key for key in keys if pre.get(key) != post.get(key)]
+
+
+def summarize_endpoint_probes(
+    probes: list[dict[str, object]],
+    *,
+    model_api_label: str,
+    expected_probe_count: int = 5,
+) -> dict[str, object]:
+    """Classify a bounded set of normalized, non-inference endpoint probes."""
+    reasons: list[str] = []
+    if len(probes) != expected_probe_count:
+        reasons.append("incomplete_probe_set")
+    for index, probe in enumerate(probes):
+        valid, probe_reasons = validate_endpoint_fingerprint_v2(probe)
+        reasons.extend(f"probe_{index}_{reason}" for reason in probe_reasons)
+        identifiers = probe.get("available_model_ids")
+        if valid and model_api_label not in identifiers:
+            reasons.append(f"probe_{index}_configured_model_absent")
+    normalized_hashes = sorted({str(probe.get("normalized_identity_sha256")) for probe in probes})
+    raw_hashes = sorted({str(probe.get("raw_model_catalog_sha256")) for probe in probes})
+    if reasons:
+        decision = "INCONCLUSIVE_ENDPOINT_PROVENANCE_CHECK"
+    elif len(normalized_hashes) == 1:
+        decision = "ENDPOINT_PROVENANCE_NORMALIZED_STABLE"
+    else:
+        decision = "ENDPOINT_PROVENANCE_NORMALIZED_UNSTABLE"
+    return {
+        "decision": decision,
+        "probe_count": len(probes),
+        "configured_model": model_api_label,
+        "normalized_identity_sha256": normalized_hashes,
+        "raw_model_catalog_sha256": raw_hashes,
+        "reasons": sorted(set(reasons)),
+    }
 
 
 def _parser() -> argparse.ArgumentParser:

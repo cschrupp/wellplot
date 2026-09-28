@@ -1,0 +1,213 @@
+{
+  "version": "cm57p10.final-promotion.v1",
+  "cases": [
+    {
+      "case_id": "p10-report-aurora-01",
+      "family": "REPORT_ONLY",
+      "request": "Prepare the Aurora Basin handover brief with the heading Completion Integrity Memo and credit the night shift as preparer.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-report-ember-02",
+      "family": "REPORT_ONLY",
+      "request": "Assemble a field-review packet named Ember Ridge Closeout and add the operations unit to its prepared-by line.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-report-cobalt-03",
+      "family": "REPORT_ONLY",
+      "request": "Set up a report cover titled Cobalt Shelf Assessment with the subtitle Final Interpretation.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-report-mariner-04",
+      "family": "REPORT_ONLY",
+      "request": "Write a completion summary for the Mariner South review and include the note Quality signoff recorded.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-single-sable-05",
+      "family": "SINGLE_SECTION_NO_REFERENCE",
+      "request": "Show the shale-quality curve in one ordinary log view labeled Sable Interval.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-single-orbit-06",
+      "family": "SINGLE_SECTION_NO_REFERENCE",
+      "request": "Build a solitary acoustic image view using an array track for the Orbit appraisal.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-single-helium-07",
+      "family": "SINGLE_SECTION_NO_REFERENCE",
+      "request": "Make one regular-track display for the helium response curve in the western interval.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-single-lantern-08",
+      "family": "SINGLE_SECTION_NO_REFERENCE",
+      "request": "Present the Lantern borehole image as a single raster log panel without a reference column.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-reference-cairn-09",
+      "family": "REFERENCE_REQUIRED",
+      "request": "Place a depth reference beside the Cairn density curve in one aligned log view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-reference-summit-10",
+      "family": "REFERENCE_REQUIRED",
+      "request": "Align a depth column with the Summit formation image in the same display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-reference-fjord-11",
+      "family": "REFERENCE_REQUIRED",
+      "request": "Use a depth marker and a scalar conductivity curve together for the Fjord interval.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-reference-prairie-12",
+      "family": "REFERENCE_REQUIRED",
+      "request": "Keep the Prairie waveform image synchronized with an explicit depth reference track.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-track-cedar-13",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "request": "In one shared panel, combine the Cedar porosity curve with its acoustic waveform.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-track-reef-14",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "request": "Build a single Reef view containing a depth reference, a scalar pressure curve, and an image track.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-track-ash-15",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "request": "Keep the Ash interpretation curves in one panel as two ordinary tracks.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-track-tundra-16",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "request": "Show both Tundra image measurements together on one array-track display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-section-mesa-17",
+      "family": "MULTI_SECTION",
+      "request": "Create an independent Mesa panel for the gamma response and another for the resistivity response.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.normal", "binding.curve"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-section-delta-18",
+      "family": "MULTI_SECTION",
+      "request": "Keep the Delta scalar diagnostic and the Delta borehole image in separate log displays.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-section-vale-19",
+      "family": "MULTI_SECTION",
+      "request": "Give the Vale density image and the Vale acoustic image their own panels rather than sharing one.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.array", "binding.raster"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-multi-section-lichen-20",
+      "family": "MULTI_SECTION",
+      "request": "Prepare three separate Lichen views: a scalar curve, a depth-referenced curve, and an image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.reference", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-mixed-report-sierra-21",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Title the Sierra interpretation packet Reservoir Summary and include one panel for the neutron curve.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-mixed-report-boreal-22",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Prepare a Boreal image memo with the note Reviewed by completion engineering and add one waveform display.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-mixed-report-kestrel-23",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Set the Kestrel packet heading to Crossplot Brief and provide two independent panels, one scalar and one image-based.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [
+        ["section.log_plot", "track.normal", "binding.curve"],
+        ["section.log_plot", "track.array", "binding.raster"]
+      ],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "p10-mixed-report-alpine-24",
+      "family": "MIXED_REPORT_SECTION",
+      "request": "Add the Alpine review note Dual response check and make one combined panel with a scalar curve and an acoustic image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    }
+  ]
+}
