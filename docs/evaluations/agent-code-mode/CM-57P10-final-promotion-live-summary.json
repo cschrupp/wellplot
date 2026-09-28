@@ -1,0 +1,241 @@
+{
+  "CM57D": "BLOCKED",
+  "CM57P_closed_after_valid_result": true,
+  "additional_prompt_experiments_authorized": false,
+  "arm_metrics": {
+    "P": {
+      "final_contract_passes": 8,
+      "invalid_response_retries": 0,
+      "planner_executions": 48,
+      "program_calls": 0,
+      "provider_calls": 54,
+      "provider_infrastructure_failures": 0,
+      "semantic_corrections": 6,
+      "terminal_failures": 0
+    },
+    "RC": {
+      "final_contract_passes": 32,
+      "invalid_response_retries": 2,
+      "planner_executions": 48,
+      "program_calls": 0,
+      "provider_calls": 52,
+      "provider_infrastructure_failures": 0,
+      "semantic_corrections": 2,
+      "terminal_failures": 2
+    }
+  },
+  "authorized_checkpoint": "fd3448487cbd3418bbcb33a89ce5e5b809198e42",
+  "case_arm_statuses": {
+    "p10-mixed-report-alpine-24": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-mixed-report-boreal-22": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-mixed-report-kestrel-23": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-mixed-report-sierra-21": {
+      "P": "STABLE_PASS",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-section-delta-18": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-section-lichen-20": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-multi-section-mesa-17": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-section-vale-19": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-track-ash-15": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-track-cedar-13": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-multi-track-reef-14": {
+      "P": "STABLE_PASS",
+      "RC": "STABLE_PASS"
+    },
+    "p10-multi-track-tundra-16": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-reference-cairn-09": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-reference-fjord-11": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-reference-prairie-12": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-reference-summit-10": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-report-aurora-01": {
+      "P": "STABLE_PASS",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-report-cobalt-03": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-report-ember-02": {
+      "P": "STABLE_PASS",
+      "RC": "STABLE_PASS"
+    },
+    "p10-report-mariner-04": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_FAIL"
+    },
+    "p10-single-helium-07": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-single-lantern-08": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-single-orbit-06": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    },
+    "p10-single-sable-05": {
+      "P": "STABLE_FAIL",
+      "RC": "STABLE_PASS"
+    }
+  },
+  "controls": {
+    "concurrency": 1,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "timeout_seconds": 900.0
+  },
+  "decision": "FINAL_PROMOTION_RC_REJECTED",
+  "endpoint_provenance": {
+    "post_normalized_identity_sha256": "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980",
+    "post_raw_model_catalog_sha256": "6aabc5354052bf572f3647b9330ce24599736f17c71c323b963907310903209d",
+    "pre_normalized_identity_sha256": "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980",
+    "pre_raw_model_catalog_sha256": "eaac31a470706d6e0cfcb3c2a67877a16392edc123bb80de00250beb0881cd23",
+    "reasons": [],
+    "valid_and_equal": true
+  },
+  "experiment_version": "CM-57P10",
+  "family_results": {
+    "MIXED_REPORT_SECTION": {
+      "P": {
+        "STABLE_FAIL": 3,
+        "STABLE_PASS": 1
+      },
+      "RC": {
+        "STABLE_FAIL": 3,
+        "STABLE_PASS": 1
+      }
+    },
+    "MULTITRACK_SINGLE_SECTION": {
+      "P": {
+        "STABLE_FAIL": 3,
+        "STABLE_PASS": 1
+      },
+      "RC": {
+        "STABLE_FAIL": 1,
+        "STABLE_PASS": 3
+      }
+    },
+    "MULTI_SECTION": {
+      "P": {
+        "STABLE_FAIL": 4
+      },
+      "RC": {
+        "STABLE_FAIL": 1,
+        "STABLE_PASS": 3
+      }
+    },
+    "REFERENCE_REQUIRED": {
+      "P": {
+        "STABLE_FAIL": 4
+      },
+      "RC": {
+        "STABLE_FAIL": 1,
+        "STABLE_PASS": 3
+      }
+    },
+    "REPORT_ONLY": {
+      "P": {
+        "STABLE_FAIL": 2,
+        "STABLE_PASS": 2
+      },
+      "RC": {
+        "STABLE_FAIL": 2,
+        "STABLE_PASS": 2
+      }
+    },
+    "SINGLE_SECTION_NO_REFERENCE": {
+      "P": {
+        "STABLE_FAIL": 4
+      },
+      "RC": {
+        "STABLE_PASS": 4
+      }
+    }
+  },
+  "fresh_promotion_holdouts_remaining": 0,
+  "p9c": {
+    "decision_bearing": "ENDPOINT_PROVENANCE_NORMALIZED_STABLE",
+    "summary_sha256": "862e51e688405089640b9e77105b33c7ba29e196be4743ca98ccf443dc371a31"
+  },
+  "population": {
+    "actual_rows": 48,
+    "attempts_per_case": 2,
+    "cases": 24,
+    "complete": true,
+    "expected_rows": 48,
+    "families": 6,
+    "planner_executions": 96,
+    "provider_calls": 106,
+    "reasons": [],
+    "worker_program_calls": 0
+  },
+  "production_adoption": "NOT_AUTHORIZED",
+  "promotion_metrics": {
+    "P_stable_passes": 4,
+    "RC_stable_passes": 16,
+    "RC_unstable_cases": 0,
+    "candidate_gains": 13,
+    "protected_regressions": 1
+  },
+  "prompt_hashes": {
+    "P": "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18",
+    "RC": "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
+  },
+  "prompt_revisions_remaining": 0,
+  "reference_safety": {
+    "missing_required_reference": 0,
+    "unexpected_reference": 6
+  },
+  "response_schema_sha256": "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3",
+  "structural_safety": {
+    "duplicate_capability_type": 0,
+    "parent_closure_invalid": 0
+  }
+}

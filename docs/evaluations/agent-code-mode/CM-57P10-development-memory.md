@@ -2,17 +2,19 @@
 
 ## Status
 
-CM-57P10 is prepared as a fresh, provider-controlled final promotion gate.
-The implementation checkpoint is provider-free and does not authorize live
-inference.
+CM-57P10 was prepared as a fresh, provider-controlled final promotion gate.
+The authorized live population has now completed and produced a valid terminal
+decision.
 
 ```text
 baseline: 5244db6fc169c78201c1ffcd751c01c0d045b5fd
+authorized checkpoint: fd3448487cbd3418bbcb33a89ce5e5b809198e42
 experiment: CM-57P10
-provider calls in this slice: 0
+decision: FINAL_PROMOTION_RC_REJECTED
+provider calls: 106
 worker/program calls: 0
 production changes: 0
-P10 live inference: NOT AUTHORIZED
+CM-57P closed after valid result: true
 CM-57D: blocked
 ```
 
@@ -43,6 +45,49 @@ descriptive evidence only and is not used as a failure condition for the
 normalized P9C result. No completion or other inference request was made by
 P9C. The bounded summary is recorded in
 `CM-57P9C-endpoint-provenance-summary.json`.
+
+## Live Result
+
+The authorized P10 matrix completed once at the reviewed checkpoint. The
+population is complete and endpoint provenance is valid: the normalized PRE
+and POST endpoint identities matched, while their raw catalog hashes differed
+and remained descriptive only.
+
+```text
+cases: 24
+attempts per case: 2
+shared rows: 48
+planner executions: 96
+provider calls: 106
+worker/program calls: 0
+P stable passes: 4
+RC stable passes: 16
+candidate gains: 13
+protected regressions: 1
+RC unstable cases: 0
+RC terminal failures: 2
+unexpected references: 6
+missing required references: 0
+decision: FINAL_PROMOTION_RC_REJECTED
+```
+
+The raw JSONL is preserved outside the repository:
+
+```text
+/tmp/cm57p10-final-promotion-qwen.jsonl
+sha256: e38f7054443301e56a7d9c7d17fdff9bc5a41d404768b970759421fcda460d5d
+```
+
+The bounded provider-free finalization summary is committed as
+`CM-57P10-final-promotion-live-summary.json` with SHA-256
+`8e23ff688fdca200caabab212dbd34c042fa7195f45d615af99a326c728f7cb4`.
+
+The result is a valid terminal rejection, not an infrastructure or provenance
+inconclusive result. The candidate improved many section cases but violated a
+protected P-pass case and the reference-safety gate; the frozen promotion
+contract therefore rejects RC. The P-series is closed after this valid result:
+no P11, new prompt candidate, new holdout, threshold adjustment, or additional
+reproducibility experiment is authorized.
 
 ## P10 Question
 
@@ -186,7 +231,7 @@ There is no smoke request, selective rerun, or partial-population recovery.
 If execution is interrupted, the partial raw evidence is preserved separately
 and the population is not resumed or merged.
 
-P10 live inference remains **NOT AUTHORIZED** after this checkpoint. Do not
-start P10, P11, CM-57D, routing adoption, prompt revision, or production
-integration from this slice. A separate review and explicit live authorization
-are required.
+P10 live inference is complete. The valid terminal rejection closes CM-57P;
+CM-57D remains blocked and no production adoption is authorized by this
+evidence-only result. Further work must be separately scoped outside the
+closed P-series.
