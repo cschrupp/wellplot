@@ -1,0 +1,303 @@
+{
+  "CM57D": "BLOCKED",
+  "arm_metrics": {
+    "C": {
+      "final_plan_available": 24,
+      "infrastructure_failures": 0,
+      "initial_structured_successes": 24,
+      "invalid_response_retries": 0,
+      "planner_executions": 24,
+      "program_calls": 0,
+      "provider_calls": 24,
+      "semantic_corrections": 0,
+      "terminal_schema_failures": 0,
+      "terminal_semantic_failures": 0
+    },
+    "P": {
+      "final_plan_available": 24,
+      "infrastructure_failures": 0,
+      "initial_structured_successes": 24,
+      "invalid_response_retries": 0,
+      "planner_executions": 24,
+      "program_calls": 0,
+      "provider_calls": 26,
+      "semantic_corrections": 2,
+      "terminal_schema_failures": 0,
+      "terminal_semantic_failures": 0
+    },
+    "R": {
+      "final_plan_available": 24,
+      "infrastructure_failures": 0,
+      "initial_structured_successes": 24,
+      "invalid_response_retries": 0,
+      "planner_executions": 24,
+      "program_calls": 0,
+      "provider_calls": 26,
+      "semantic_corrections": 2,
+      "terminal_schema_failures": 0,
+      "terminal_semantic_failures": 0
+    },
+    "RC": {
+      "final_plan_available": 24,
+      "infrastructure_failures": 0,
+      "initial_structured_successes": 24,
+      "invalid_response_retries": 0,
+      "planner_executions": 24,
+      "program_calls": 0,
+      "provider_calls": 26,
+      "semantic_corrections": 2,
+      "terminal_schema_failures": 0,
+      "terminal_semantic_failures": 0
+    }
+  },
+  "authorized_checkpoint": "d224a015cbd77c6477665daefa5542336416c422",
+  "controls": {
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "timeout_seconds": 900.0
+  },
+  "decision": "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION",
+  "experiment_version": "CM-57P8",
+  "historical_anchor_reproduction": {
+    "all": {
+      "checked": 48,
+      "mismatches": [
+        "p7-dossier-gamma-17/attempt_0/RC",
+        "p7-dossier-gamma-17/attempt_1/RC",
+        "p7-separated-curves-13/attempt_0/P",
+        "p7-separated-curves-13/attempt_0/RC",
+        "p7-separated-curves-13/attempt_1/P",
+        "p7-separated-curves-13/attempt_1/RC",
+        "p7-acoustic-comparison-19/attempt_0/P",
+        "p7-acoustic-comparison-19/attempt_0/RC",
+        "p7-acoustic-comparison-19/attempt_1/P",
+        "p7-acoustic-comparison-19/attempt_1/RC",
+        "p7-asset-pages-02/attempt_0/P",
+        "p7-asset-pages-02/attempt_0/RC",
+        "p7-asset-pages-02/attempt_1/P",
+        "p7-asset-pages-02/attempt_1/RC",
+        "p7-reference-density-image-10/attempt_0/P",
+        "p7-reference-density-image-10/attempt_1/P",
+        "p7-temperature-image-pair-12/attempt_0/P",
+        "p7-temperature-image-pair-12/attempt_1/P",
+        "p7-lone-porosity-05/attempt_0/P",
+        "p7-lone-porosity-05/attempt_1/P",
+        "p7-overlaid-measurements-21/attempt_0/P",
+        "p7-overlaid-measurements-21/attempt_1/P",
+        "p7-caliper-trend-08/attempt_0/P",
+        "p7-caliper-trend-08/attempt_1/P",
+        "p7-three-interpretation-views-16/attempt_0/P",
+        "p7-three-interpretation-views-16/attempt_0/RC",
+        "p7-three-interpretation-views-16/attempt_1/P",
+        "p7-three-interpretation-views-16/attempt_1/RC",
+        "p7-joint-waveform-note-20/attempt_0/P",
+        "p7-joint-waveform-note-20/attempt_1/P"
+      ],
+      "reproduced": false
+    },
+    "reference": {
+      "checked": 4,
+      "mismatches": [
+        "p7-dossier-gamma-17/attempt_0/RC",
+        "p7-dossier-gamma-17/attempt_1/RC"
+      ],
+      "reproduced": false
+    },
+    "schema": {
+      "checked": 8,
+      "mismatches": [
+        "p7-separated-curves-13/attempt_0/P",
+        "p7-separated-curves-13/attempt_0/RC",
+        "p7-separated-curves-13/attempt_1/P",
+        "p7-separated-curves-13/attempt_1/RC",
+        "p7-temperature-image-pair-12/attempt_0/P",
+        "p7-temperature-image-pair-12/attempt_1/P"
+      ],
+      "reproduced": false
+    }
+  },
+  "interrupted_populations": [
+    {
+      "included_in_decision": false,
+      "path": "/tmp/cm57p8-prompt-factor-qwen-interrupted-network.jsonl",
+      "sha256": "df7a8dc53310c765bfc14e763319558e5b5b37375a8ae2903ebcc9363752b4ec"
+    },
+    {
+      "included_in_decision": false,
+      "path": "/tmp/cm57p8-prompt-factor-qwen-interrupted-142.jsonl",
+      "sha256": "934ec0c77757e020fd6172b0f98e260916813857892179a115a35ee343724ec2"
+    }
+  ],
+  "population": {
+    "actual_rows": 24,
+    "arms_per_row": 4,
+    "attempts_per_case": 2,
+    "cases": 12,
+    "complete": true,
+    "expected_rows": 24,
+    "planner_executions": 96,
+    "reasons": []
+  },
+  "positive_reference_controls": {
+    "p7-depth-conductivity-06": {
+      "C": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "P": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "R": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "RC": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      }
+    },
+    "p7-reference-density-image-10": {
+      "C": {
+        "missing_required_reference_attempts": [
+          0
+        ],
+        "reference_positive_control_regression": true
+      },
+      "P": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "R": {
+        "missing_required_reference_attempts": [
+          0
+        ],
+        "reference_positive_control_regression": true
+      },
+      "RC": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      }
+    },
+    "p7-temperature-image-pair-12": {
+      "C": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "P": {
+        "missing_required_reference_attempts": [
+          1
+        ],
+        "reference_positive_control_regression": true
+      },
+      "R": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      },
+      "RC": {
+        "missing_required_reference_attempts": [],
+        "reference_positive_control_regression": false
+      }
+    }
+  },
+  "production_adoption": "NOT_AUTHORIZED",
+  "prompt_hashes": {
+    "C": "b140a019889502f247335e34aee6283e0b06848957d9f89f5755170967e4a85e",
+    "P": "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18",
+    "R": "fe8db9c9cba4cf7bf13d79c3e838eaa53e19770fbf6dd764cdcf93020008c563",
+    "RC": "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
+  },
+  "provider_calls_total": 102,
+  "provider_endpoint": "http://192.168.2.140:8888/v1",
+  "raw_evidence_rows": 24,
+  "raw_evidence_sha256": "0c9bb86c11a229ea387c2e597a374af80cfa9af4204f1da2054865cff6f8b451",
+  "reference_localization": {
+    "classification": "INCONCLUSIVE_REFERENCE_LOCALIZATION",
+    "stable": false
+  },
+  "repeatability": {
+    "C": {
+      "stable": [
+        "p7-acoustic-comparison-19",
+        "p7-asset-pages-02",
+        "p7-caliper-trend-08",
+        "p7-depth-conductivity-06",
+        "p7-dossier-gamma-17",
+        "p7-joint-waveform-note-20",
+        "p7-lone-porosity-05",
+        "p7-overlaid-measurements-21",
+        "p7-separated-curves-13",
+        "p7-temperature-image-pair-12",
+        "p7-three-interpretation-views-16"
+      ],
+      "unavailable": [],
+      "unstable": [
+        "p7-reference-density-image-10"
+      ]
+    },
+    "P": {
+      "stable": [
+        "p7-acoustic-comparison-19",
+        "p7-asset-pages-02",
+        "p7-caliper-trend-08",
+        "p7-depth-conductivity-06",
+        "p7-dossier-gamma-17",
+        "p7-joint-waveform-note-20",
+        "p7-lone-porosity-05",
+        "p7-overlaid-measurements-21",
+        "p7-reference-density-image-10",
+        "p7-separated-curves-13",
+        "p7-three-interpretation-views-16"
+      ],
+      "unavailable": [],
+      "unstable": [
+        "p7-temperature-image-pair-12"
+      ]
+    },
+    "R": {
+      "stable": [
+        "p7-acoustic-comparison-19",
+        "p7-asset-pages-02",
+        "p7-caliper-trend-08",
+        "p7-depth-conductivity-06",
+        "p7-dossier-gamma-17",
+        "p7-joint-waveform-note-20",
+        "p7-lone-porosity-05",
+        "p7-overlaid-measurements-21",
+        "p7-separated-curves-13",
+        "p7-temperature-image-pair-12",
+        "p7-three-interpretation-views-16"
+      ],
+      "unavailable": [],
+      "unstable": [
+        "p7-reference-density-image-10"
+      ]
+    },
+    "RC": {
+      "stable": [
+        "p7-acoustic-comparison-19",
+        "p7-asset-pages-02",
+        "p7-caliper-trend-08",
+        "p7-depth-conductivity-06",
+        "p7-dossier-gamma-17",
+        "p7-joint-waveform-note-20",
+        "p7-lone-porosity-05",
+        "p7-overlaid-measurements-21",
+        "p7-reference-density-image-10",
+        "p7-separated-curves-13",
+        "p7-temperature-image-pair-12",
+        "p7-three-interpretation-views-16"
+      ],
+      "unavailable": [],
+      "unstable": []
+    }
+  },
+  "response_schema_sha256": "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3",
+  "schema_localization": {
+    "classification": "INCONCLUSIVE_SCHEMA_LOCALIZATION",
+    "stable": false
+  },
+  "worker_program_calls": 0
+}

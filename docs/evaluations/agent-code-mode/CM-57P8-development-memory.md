@@ -2,9 +2,11 @@
 
 ## Status
 
-CM-57P8 is complete only through the provider-free implementation checkpoint.
-The implementation baseline is `ac68fcdc5ec527aa0be4007e4188bdfda1e1c3ac`.
-Live inference is not started or authorized by this slice.
+CM-57P8 provider-free implementation was frozen at
+`ac68fcdc5ec527aa0be4007e4188bdfda1e1c3ac`, with the reviewed evaluator
+correction at `d224a015cbd77c6477665daefa5542336416c422`. The authorized live
+matrix is complete and recorded below; production adoption remains
+unauthorized.
 
 P7 remains accepted as diagnostic evidence with decision
 `INCONCLUSIVE_PROMOTION_EVALUATION`. Its exposed raw evidence is frozen at
@@ -134,10 +136,36 @@ data, or arbitrary filesystem paths. The future JSONL path is
 provider construction, and partial evidence must never be resumed or
 appended.
 
-Provider calls are `0` for this implementation checkpoint. Production changes
-are `0`; production adoption is `NOT_AUTHORIZED`; CM-57D remains `BLOCKED`.
-No remediation instruction, capability-catalogue change, validator, schema
-change, routing change, typed-worker work, or CM-57D work begins in P8.
+The pre-live implementation checkpoint had provider calls `0`. No remediation
+instruction, capability-catalogue change, validator, schema change, routing
+change, typed-worker work, or CM-57D work began in P8. Production changes
+remain `0`; production adoption is `NOT_AUTHORIZED`; CM-57D remains
+`BLOCKED`.
 
-Stop after the provider-free checkpoint and independent review. A separate
-authorization is required before live inference.
+## Live Evaluation
+
+Live inference was authorized only at checkpoint
+`d224a015cbd77c6477665daefa5542336416c422`. The complete fresh matrix ran
+against the controlled local OpenAI-compatible endpoint at
+`http://192.168.2.140:8888/v1` with the frozen Qwen controls. It produced 24
+of 24 rows, 96 planner executions, 102 provider calls, and zero worker/program
+calls. The raw JSONL remains outside the repository at
+`/tmp/cm57p8-prompt-factor-qwen.jsonl` with SHA-256
+`0c9bb86c11a229ea387c2e597a374af80cfa9af4204f1da2054865cff6f8b451`.
+
+The result is `INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION`. Population integrity
+passed and all arms produced plans, but the protected reference anchor and
+schema-target historical anchors did not reproduce, so neither localization
+axis was interpretable under the frozen decision contract. This is not a
+production failure and does not authorize prompt adoption or CM-57D.
+
+Two interrupted populations were preserved separately and excluded from the
+decision. The first, created while the server network was misconfigured, has
+SHA-256 `df7a8dc53310c765bfc14e763319558e5b5b37375a8ae2903ebcc9363752b4ec`.
+The second stopped after the endpoint address changed from `.142` and has
+SHA-256 `934ec0c77757e020fd6172b0f98e260916813857892179a115a35ee343724ec2`.
+Neither artifact was appended to or resumed.
+
+The bounded aggregate is recorded in `CM-57P8-live-summary.json`. Production
+changes remain `0`, production adoption remains `NOT_AUTHORIZED`, and CM-57D
+remains `BLOCKED`.
