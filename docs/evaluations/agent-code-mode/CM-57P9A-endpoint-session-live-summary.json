@@ -1,0 +1,67 @@
+{
+  "experiment_version": "CM-57P9A",
+  "authorized_checkpoint": "00d0b54a96369ecb5c05230596e4bb517885d974",
+  "decision": "INCONCLUSIVE_REPRODUCIBILITY_EVALUATION",
+  "provenance_scope": "ENDPOINT_MODEL",
+  "provider_endpoint": "http://192.168.2.140:8888/v1",
+  "controls": {
+    "model": "qwen3.6-35b-a3b",
+    "planner_temperature": 0.0,
+    "max_output_tokens": 16384,
+    "max_tokens_parameter": "max_tokens",
+    "timeout_seconds": 900.0,
+    "concurrency": 1
+  },
+  "population": {
+    "cases": 6,
+    "repetitions_per_case_arm": 8,
+    "expected_rows": 48,
+    "actual_rows": 48,
+    "planner_executions": 96,
+    "provider_calls": 112,
+    "worker_program_calls": 0,
+    "complete": true
+  },
+  "raw_evidence": {
+    "path": "/tmp/cm57p9a-endpoint-session-qwen.jsonl",
+    "sha256": "2e13a0c4f973f2ba36fa3bd2c460d49b83591746fb626b1c0d2702f692c661a2"
+  },
+  "endpoint_fingerprints": {
+    "pre_path": "/tmp/cm57p9a-endpoint-pre.json",
+    "post_path": "/tmp/cm57p9a-endpoint-post.json",
+    "pre_sha256": "3189edbdd637868751469a2cc73464454264ad9e70a55f09b71df9c33ee122b5",
+    "post_sha256": "c53a7358880db7a5d56a0b0af4ceae1b293658fe2d1aadb19dea9e4fa3115435",
+    "pre_model_catalog_sha256": "36713c693e1fd85fb4256c6e1487b84e950b5cdbc07b99481c519769527e4799",
+    "post_model_catalog_sha256": "7a67f06e432591694fdb427f0db81f8d4dab53433b0eab5dd1fedea9fa6ba357",
+    "available_model_ids": ["qwen3.6-35b-a3b"],
+    "mismatches": ["model_catalog_sha256"]
+  },
+  "arm_case_results": [
+    {"arm": "P", "case_id": "p7-dossier-gamma-17", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-dossier-gamma-17", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "P", "case_id": "p7-separated-curves-13", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-separated-curves-13", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "P", "case_id": "p7-temperature-image-pair-12", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-temperature-image-pair-12", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "P", "case_id": "p7-reference-density-image-10", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-reference-density-image-10", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "P", "case_id": "p7-depth-conductivity-06", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-depth-conductivity-06", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_ABSENT_STABLE"},
+    {"arm": "P", "case_id": "p7-lone-porosity-05", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"},
+    {"arm": "RC", "case_id": "p7-lone-porosity-05", "classification": "EXACT_REPRODUCIBLE", "semantic_plan": "SEMANTIC_PLAN_STABLE"}
+  ],
+  "special_diagnostics": {
+    "p7-separated-curves-13": {"P": {"initial_structured_success": 8, "invalid_response_retry": 0, "final_plan_available": 8}, "RC": {"initial_structured_success": 8, "invalid_response_retry": 0, "final_plan_available": 8}},
+    "p7-temperature-image-pair-12": {"P": {"initial_structured_success": 8, "invalid_response_retry": 0, "final_plan_available": 8}, "RC": {"initial_structured_success": 8, "invalid_response_retry": 0, "final_plan_available": 8}},
+    "p7-dossier-gamma-17": {"P": {"absent": 8, "present": 0}, "RC": {"absent": 8, "present": 0}},
+    "p7-reference-density-image-10": {"P": {"required_reference_omissions": 0}, "RC": {"required_reference_omissions": 0}}
+  },
+  "prompt_hashes": {
+    "P": "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18",
+    "RC": "e1710cb516a96c47ec1d0593752e83aacc1bb4502c3026b2b6a9a676c90e4d34"
+  },
+  "response_schema_sha256": "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3",
+  "production_adoption": "NOT_AUTHORIZED",
+  "P9B": "BLOCKED",
+  "CM57D": "BLOCKED"
+}
