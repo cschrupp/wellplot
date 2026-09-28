@@ -133,6 +133,11 @@ provenance evidence only. Provider response text, request payloads, document
 paths, and raw provider responses are not persisted. Each future row is bound
 to the authorized checkpoint and current P10 provenance.
 
+The live row also carries `endpoint_pre_fingerprint_sha256`, computed as the
+SHA-256 of the complete canonical PRE v2 fingerprint. Finalization requires
+every row to match the supplied PRE fingerprint hash, so evidence from one
+endpoint session cannot be combined with PRE/POST files from another session.
+
 The runner classifies case/arm outcomes as `STABLE_PASS`, `STABLE_FAIL`, or
 `UNSTABLE`. Finalization is fail-closed for incomplete populations, provenance
 drift, endpoint instability, infrastructure failures, protected regressions,
@@ -152,6 +157,19 @@ regressions, at least three RC-only gains, net gain of at least three, at least
 18 stable RC passes, reference safety, and structural closure/multiplicity
 invariants. A valid P10 result remains evidence for review; it does not itself
 authorize production adoption or CM-57D.
+
+For either valid terminal decision (`FINAL_PROMOTION_RC_ACCEPTED` or
+`FINAL_PROMOTION_RC_REJECTED`), the summary records the P-series hard stop:
+
+```text
+CM57P_closed_after_valid_result: true
+prompt_revisions_remaining: 0
+fresh_promotion_holdouts_remaining: 0
+additional_prompt_experiments_authorized: false
+```
+
+An inconclusive result keeps the closure flag false and leaves the remaining
+promotion counts unavailable for any permitted infrastructure replacement.
 
 ## Future Evidence Paths and Hard Stop
 

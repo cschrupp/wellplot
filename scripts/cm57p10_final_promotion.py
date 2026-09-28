@@ -112,6 +112,11 @@ def sha256_text(value: str) -> str:
     return sha256_bytes(value.encode("utf-8"))
 
 
+def endpoint_fingerprint_sha256(value: dict[str, object]) -> str:
+    """Hash one complete canonical v2 endpoint fingerprint."""
+    return sha256_text(canonical_json(value))
+
+
 def artifact_sha256(path: Path) -> str:
     """Hash one repository artifact."""
     return sha256_bytes(path.read_bytes())
@@ -353,6 +358,7 @@ def population_integrity(
     cases: tuple[dict[str, object], ...],
     *,
     expected_checkpoint: str | None = None,
+    pre_fingerprint: dict[str, object] | None = None,
 ) -> tuple[bool, list[str]]:
     """Fail closed on exact rows, provenance, prompts, schema, and controls."""
     reasons: set[str] = set()
@@ -374,6 +380,12 @@ def population_integrity(
         reasons.add("checkpoint_missing_or_mixed")
     elif expected_checkpoint is not None and checkpoints != {expected_checkpoint}:
         reasons.add("checkpoint_mismatch")
+    if pre_fingerprint is None:
+        reasons.add("pre_fingerprint_missing")
+    else:
+        expected_pre_sha256 = endpoint_fingerprint_sha256(pre_fingerprint)
+        if any(row.get("endpoint_pre_fingerprint_sha256") != expected_pre_sha256 for row in rows):
+            reasons.add("pre_fingerprint_mismatch")
     expected = {str(case["case_id"]): case for case in cases}
     provenance = frozen_provenance()
     for row in rows:
@@ -432,7 +444,12 @@ def decision(
     p9c_stable: bool = False,
 ) -> str:
     """Apply the final promotion decision without interpreting bad output as infra."""
-    complete, _ = population_integrity(rows, cases, expected_checkpoint=expected_checkpoint)
+    complete, _ = population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=expected_checkpoint,
+        pre_fingerprint=pre_fingerprint,
+    )
     endpoint_ok, _ = _endpoint_provenance_status(pre_fingerprint, post_fingerprint)
     if not complete or not endpoint_ok or not p9c_stable:
         return "INCONCLUSIVE_FINAL_PROMOTION_EVALUATION"
@@ -510,7 +527,12 @@ def summarize_population(
     post_fingerprint: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Build bounded final evidence without retaining provider responses."""
-    complete, reasons = population_integrity(rows, cases, expected_checkpoint=authorized_checkpoint)
+    complete, reasons = population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=authorized_checkpoint,
+        pre_fingerprint=pre_fingerprint,
+    )
     p9c = _p9c_summary()
     p9c_stable = bool(p9c and p9c.get("decision") == "ENDPOINT_PROVENANCE_NORMALIZED_STABLE")
     statuses = case_arm_statuses(rows, cases)
@@ -525,6 +547,10 @@ def summarize_population(
         post_fingerprint=post_fingerprint,
         p9c_stable=p9c_stable,
     )
+    terminal_valid = final_decision in {
+        "FINAL_PROMOTION_RC_ACCEPTED",
+        "FINAL_PROMOTION_RC_REJECTED",
+    }
     p_passes = sum(status["P"] == "STABLE_PASS" for status in statuses.values())
     rc_passes = sum(status["RC"] == "STABLE_PASS" for status in statuses.values())
     gains = sum(
@@ -602,7 +628,10 @@ def summarize_population(
         "prompt_hashes": {arm: _prompt_sha256(arm) for arm in ARMS},
         "response_schema_sha256": _schema_sha256(),
         "production_adoption": "NOT_AUTHORIZED",
-        "CM57P_closed_after_valid_result": False,
+        "CM57P_closed_after_valid_result": terminal_valid,
+        "prompt_revisions_remaining": 0 if terminal_valid else None,
+        "fresh_promotion_holdouts_remaining": 0 if terminal_valid else None,
+        "additional_prompt_experiments_authorized": False,
         "CM57D": "BLOCKED",
     }
 
@@ -736,11 +765,13 @@ async def run_shared_row(
     delegate: ModelBackendProtocol,
     registry: CapabilityRegistry,
     authorized_checkpoint: str | None,
+    pre_fingerprint_sha256: str,
 ) -> dict[str, object]:
     """Run one P then RC pair against the same case and backend."""
     row = {
         **frozen_provenance(),
         "authorized_checkpoint": authorized_checkpoint,
+        "endpoint_pre_fingerprint_sha256": pre_fingerprint_sha256,
         "case_id": case["case_id"],
         "family": case["family"],
         "attempt_index": attempt_index,
@@ -779,6 +810,7 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
         model_api_label=FROZEN_MODEL,
         api_key=api_key,
     )
+    pre_fingerprint_sha256 = endpoint_fingerprint_sha256(pre)
     Path(args.endpoint_fingerprint_pre).write_text(
         json.dumps(pre, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -795,6 +827,7 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
                     delegate=backend,
                     registry=registry,
                     authorized_checkpoint=checkpoint,
+                    pre_fingerprint_sha256=pre_fingerprint_sha256,
                 )
                 rows.append(row)
                 handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")

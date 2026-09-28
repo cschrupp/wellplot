@@ -27,18 +27,19 @@ def _endpoint_pair(*, raw_difference: bool = False) -> tuple[dict[str, object], 
     """Build valid normalized PRE/POST fingerprints for gate tests."""
     pre_payload = {"data": [{"id": "qwen3.6-35b-a3b", "created": 1}]}
     post_payload = {"data": [{"id": "qwen3.6-35b-a3b", "created": 2 if raw_difference else 1}]}
-    return (
-        fingerprint.build_endpoint_fingerprint_v2(
-            endpoint="http://host:8888/v1",
-            model_api_label="qwen3.6-35b-a3b",
-            models_payload=pre_payload,
-        ),
-        fingerprint.build_endpoint_fingerprint_v2(
-            endpoint="http://host:8888/v1",
-            model_api_label="qwen3.6-35b-a3b",
-            models_payload=post_payload,
-        ),
+    pre = fingerprint.build_endpoint_fingerprint_v2(
+        endpoint="http://host:8888/v1",
+        model_api_label="qwen3.6-35b-a3b",
+        models_payload=pre_payload,
     )
+    post = fingerprint.build_endpoint_fingerprint_v2(
+        endpoint="http://host:8888/v1",
+        model_api_label="qwen3.6-35b-a3b",
+        models_payload=post_payload,
+    )
+    for value in (pre, post):
+        value["captured_at"] = "2026-01-01T00:00:00+00:00"
+    return pre, post
 
 
 def _facts(case: dict[str, object], *, valid: bool = True) -> dict[str, object]:
@@ -93,6 +94,8 @@ def _rows(
 ) -> list[dict[str, object]]:
     """Build complete synthetic rows for decision and integrity tests."""
     rc_unstable = rc_unstable or set()
+    pre_fingerprint, _ = _endpoint_pair()
+    pre_fingerprint_sha256 = p10.endpoint_fingerprint_sha256(pre_fingerprint)
     rows: list[dict[str, object]] = []
     for case in cases:
         case_id = str(case["case_id"])
@@ -100,6 +103,7 @@ def _rows(
             row = {
                 **p10.frozen_provenance(),
                 "authorized_checkpoint": CHECKPOINT,
+                "endpoint_pre_fingerprint_sha256": pre_fingerprint_sha256,
                 "case_id": case_id,
                 "family": case["family"],
                 "attempt_index": attempt,
@@ -185,6 +189,7 @@ def test_pre_live_report_is_provider_free_and_exactly_sized() -> None:
 def test_shared_row_preserves_p_then_rc_order_without_workers() -> None:
     case = _cases()[0]
     backend = p10.p5._DeterministicBackend(invalid_first=True)
+    pre_fingerprint, _ = _endpoint_pair()
     row = asyncio.run(
         p10.run_shared_row(
             case,
@@ -192,6 +197,7 @@ def test_shared_row_preserves_p_then_rc_order_without_workers() -> None:
             delegate=backend,
             registry=p10.create_builtin_registry(),
             authorized_checkpoint=CHECKPOINT,
+            pre_fingerprint_sha256=p10.endpoint_fingerprint_sha256(pre_fingerprint),
         )
     )
     assert list(row["arms"]) == ["P", "RC"]
@@ -405,18 +411,115 @@ def test_endpoint_identity_change_is_inconclusive_but_raw_catalog_change_is_not(
     )
 
 
+def test_population_integrity_accepts_exact_pre_fingerprint_binding() -> None:
+    cases = _cases()
+    rows = _rows(cases, p_pass=set(), rc_pass=set())
+    pre, _ = _endpoint_pair()
+    complete, reasons = p10.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
+    assert complete
+    assert reasons == []
+
+
+def test_population_integrity_rejects_wrong_pre_fingerprint_binding() -> None:
+    cases = _cases()
+    rows = _rows(cases, p_pass=set(), rc_pass=set())
+    rows[0]["endpoint_pre_fingerprint_sha256"] = "f" * 64
+    pre, _ = _endpoint_pair()
+    complete, reasons = p10.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
+    assert not complete
+    assert "pre_fingerprint_mismatch" in reasons
+
+
+def test_population_integrity_rejects_mixed_pre_fingerprint_hashes() -> None:
+    cases = _cases()
+    rows = _rows(cases, p_pass=set(), rc_pass=set())
+    _, alternate = _endpoint_pair(raw_difference=True)
+    rows[-1]["endpoint_pre_fingerprint_sha256"] = p10.endpoint_fingerprint_sha256(alternate)
+    pre, _ = _endpoint_pair()
+    complete, reasons = p10.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
+    assert not complete
+    assert "pre_fingerprint_mismatch" in reasons
+
+
 def test_population_integrity_rejects_workers_and_wrong_checkpoint() -> None:
     cases = _cases()
     rows = _rows(cases, p_pass=set(), rc_pass=set())
+    pre, _ = _endpoint_pair()
     rows[0]["arms"]["RC"]["program_calls"] = 1
-    complete, reasons = p10.population_integrity(rows, cases, expected_checkpoint=CHECKPOINT)
+    complete, reasons = p10.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
     assert not complete
     assert "worker_program_call" in reasons
     assert "checkpoint_mismatch" not in reasons
     rows[0]["authorized_checkpoint"] = "b" * 40
-    complete, reasons = p10.population_integrity(rows, cases, expected_checkpoint=CHECKPOINT)
+    complete, reasons = p10.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
     assert not complete
     assert "checkpoint_missing_or_mixed" in reasons
+
+
+@pytest.mark.parametrize(
+    "scenario",
+    ["accepted", "rejected", "inconclusive"],
+)
+def test_summary_records_p_series_closure_for_terminal_decisions(scenario) -> None:
+    cases = _cases()
+    all_case_ids = {str(case["case_id"]) for case in cases}
+    if scenario == "accepted":
+        p_pass = {str(case["case_id"]) for case in cases[3:]}
+        rc_pass = all_case_ids
+        infrastructure = False
+        expected_decision = "FINAL_PROMOTION_RC_ACCEPTED"
+        expected_closed = True
+    elif scenario == "rejected":
+        p_pass = set()
+        rc_pass = set()
+        infrastructure = False
+        expected_decision = "FINAL_PROMOTION_RC_REJECTED"
+        expected_closed = True
+    else:
+        p_pass = set()
+        rc_pass = set()
+        infrastructure = True
+        expected_decision = "INCONCLUSIVE_FINAL_PROMOTION_EVALUATION"
+        expected_closed = False
+    rows = _rows(cases, p_pass=p_pass, rc_pass=rc_pass, infrastructure=infrastructure)
+    pre, post = _endpoint_pair()
+    summary = p10.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+    )
+    assert summary["decision"] == expected_decision
+    assert summary["CM57P_closed_after_valid_result"] is expected_closed
+    assert summary["prompt_revisions_remaining"] == (0 if expected_closed else None)
+    assert summary["fresh_promotion_holdouts_remaining"] == (0 if expected_closed else None)
+    assert summary["additional_prompt_experiments_authorized"] is False
 
 
 def test_non_empty_evidence_is_rejected_before_live_setup(tmp_path: Path) -> None:
