@@ -1,0 +1,1171 @@
+{
+  "cases": [
+    {
+      "case_id": "p7-dossier-gamma-17",
+      "gold_sha256": "75a5a92641dfb96a78dedc4eb5953fa650d45790475d98b3065b8835a018f568",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "d66950a39120cfdf0e2850587ffc811d54c258710dadd4a16eae09c8266f8f91",
+      "role": "PROTECTED_REFERENCE_TARGET"
+    },
+    {
+      "case_id": "p7-separated-curves-13",
+      "gold_sha256": "60ac9aeed0eb50724b7f42a8ca84d709d28191be79cbc11e7c05e89c8c62c984",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "INVALID_RESPONSE_RETRY"
+            ],
+            "final_classification": "PLANNER_SCHEMA_FAILURE",
+            "final_contract_ok": false,
+            "final_planner_success": false,
+            "provider_calls": 2,
+            "provider_failure_category": "invalid_response",
+            "report_capability_ids": null,
+            "report_task_present": null,
+            "section_capability_signatures": null
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "INVALID_RESPONSE_RETRY"
+            ],
+            "final_classification": "PLANNER_SCHEMA_FAILURE",
+            "final_contract_ok": false,
+            "final_planner_success": false,
+            "provider_calls": 2,
+            "provider_failure_category": "invalid_response",
+            "report_capability_ids": null,
+            "report_task_present": null,
+            "section_capability_signatures": null
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "1c3cc3f71020c06a89eddada8febb00a214bd11e9184c940b9692122409f37ae",
+      "role": "REFERENCE_PROBE_SCHEMA_FAILURE_TARGET"
+    },
+    {
+      "case_id": "p7-acoustic-comparison-19",
+      "gold_sha256": "296358d8c56888dad181f52071747133d09c7e47d6e2dad6f6044763ae43355e",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [
+              "report.standard"
+            ],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [
+              "report.standard"
+            ],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ],
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "882f0f7ca142e8366e21c8ffaec795424d35d8d693d5302e07d36492ef0b66a3",
+      "role": "REFERENCE_PROBE"
+    },
+    {
+      "case_id": "p7-asset-pages-02",
+      "gold_sha256": "d5ac738ccf9b6c4e5299f8fad08de58051579249e862007a136aac139e59b114",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "ff26083b43d6755ba89380e867069f50e535133bfe3fe672bd9cdf18ac2dab86",
+      "role": "REFERENCE_PROBE_REPORT_ONLY"
+    },
+    {
+      "case_id": "p7-depth-conductivity-06",
+      "gold_sha256": "36b36629aaacd78883a807077f1eb724ab6998900505c8ddb60c601e5ab93ecb",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "db96064f5477dade04d122bd958b7a5e8be8ff8ff4711a315eb76c1c4b410800",
+      "role": "POSITIVE_REFERENCE_CONTROL"
+    },
+    {
+      "case_id": "p7-reference-density-image-10",
+      "gold_sha256": "361b461de2e2f9cf83f10cd05ad5a3d38d8ed44cc5b6791ff582ed04e81f9cce",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "eb25919fe2e3503fdaaa28f2ccf502708e5592ee5e31d4f14aab59e2a373d076",
+      "role": "POSITIVE_REFERENCE_CONTROL"
+    },
+    {
+      "case_id": "p7-temperature-image-pair-12",
+      "gold_sha256": "361b461de2e2f9cf83f10cd05ad5a3d38d8ed44cc5b6791ff582ed04e81f9cce",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "INVALID_RESPONSE_RETRY"
+            ],
+            "final_classification": "PLANNER_SCHEMA_FAILURE",
+            "final_contract_ok": false,
+            "final_planner_success": false,
+            "provider_calls": 2,
+            "provider_failure_category": "invalid_response",
+            "report_capability_ids": null,
+            "report_task_present": null,
+            "section_capability_signatures": null
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "INVALID_RESPONSE_RETRY"
+            ],
+            "final_classification": "PLANNER_SCHEMA_FAILURE",
+            "final_contract_ok": false,
+            "final_planner_success": false,
+            "provider_calls": 2,
+            "provider_failure_category": "invalid_response",
+            "report_capability_ids": null,
+            "report_task_present": null,
+            "section_capability_signatures": null
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal",
+                "track.reference"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "bd84f1c9ba7fd7dd0c4f37947bc5b424ed3131b67a4f50c902e15487d3b58547",
+      "role": "POSITIVE_REFERENCE_CONTROL_SCHEMA_FAILURE_TARGET"
+    },
+    {
+      "case_id": "p7-lone-porosity-05",
+      "gold_sha256": "23d11d880e77c2ed8d5b5185af3c82ac866bc4e2c5c10c023d8bfaa5e7a6143a",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "SEMANTIC_CORRECTION"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 2,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "section.log_plot"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "SEMANTIC_CORRECTION"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 2,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "section.log_plot"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "d782b9ebf5e43f762514911300a6fbf04151fff0b34a4b9fa3d80d3b8b73ded5",
+      "role": "NEGATIVE_REFERENCE_CONTROL"
+    },
+    {
+      "case_id": "p7-overlaid-measurements-21",
+      "gold_sha256": "e51b1bdb77d1e91cf33460a2e249f092101f90410b9b98c41f89d30421f7a2c9",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "SEMANTIC_CORRECTION"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 2,
+            "provider_failure_category": null,
+            "report_capability_ids": [
+              "report.standard"
+            ],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL",
+              "SEMANTIC_CORRECTION"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 2,
+            "provider_failure_category": null,
+            "report_capability_ids": [
+              "report.standard"
+            ],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "01405891cdc31857d05d030c70c51b18903f77510cc2330a6dcd7530033185a3",
+      "role": "NEGATIVE_REFERENCE_CONTROL"
+    },
+    {
+      "case_id": "p7-caliper-trend-08",
+      "gold_sha256": "23d11d880e77c2ed8d5b5185af3c82ac866bc4e2c5c10c023d8bfaa5e7a6143a",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "section.log_plot"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "section.log_plot"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "cdde4c6cb2ec9705f54872062bad5fbae45b7b4849673a3e6fe33b0cf0b2ee29",
+      "role": "NEGATIVE_REFERENCE_CONTROL"
+    },
+    {
+      "case_id": "p7-three-interpretation-views-16",
+      "gold_sha256": "956461d58c57b0fa698a246ce2fed781521ff57ca048fef134d7c5a22e7cc24e",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ],
+              [
+                "binding.raster",
+                "section.log_plot",
+                "track.array"
+              ],
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ],
+              [
+                "binding.raster",
+                "section.log_plot",
+                "track.array"
+              ],
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_PRESENCE_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ],
+              [
+                "binding.raster",
+                "section.log_plot",
+                "track.array"
+              ],
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "PLANNER_CONTRACT_OK",
+            "final_contract_ok": true,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": false,
+            "section_capability_signatures": [
+              [
+                "binding.curve",
+                "section.log_plot",
+                "track.normal"
+              ],
+              [
+                "binding.raster",
+                "section.log_plot",
+                "track.array"
+              ],
+              [
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "a5660b866241b803a2c4255e11b21f2a69d70993f78ba624b31df80829207298",
+      "role": "SCHEMA_COMPLEXITY_CONTROL"
+    },
+    {
+      "case_id": "p7-joint-waveform-note-20",
+      "gold_sha256": "848af3c30c7224718ecedd8a09717da0b5ccb4e8c0efc0b9e2c605f70e298126",
+      "historical": {
+        "0": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "annotation.typed",
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.annotation",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          }
+        },
+        "1": {
+          "P": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "annotation.typed",
+                "binding.curve",
+                "binding.raster",
+                "section.log_plot",
+                "track.annotation",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          },
+          "RC": {
+            "call_kinds": [
+              "INITIAL"
+            ],
+            "final_classification": "REPORT_CAPABILITY_MISMATCH",
+            "final_contract_ok": false,
+            "final_planner_success": true,
+            "provider_calls": 1,
+            "provider_failure_category": null,
+            "report_capability_ids": [],
+            "report_task_present": true,
+            "section_capability_signatures": [
+              [
+                "section.log_plot",
+                "track.array",
+                "track.normal"
+              ]
+            ]
+          }
+        }
+      },
+      "request_sha256": "a17340c788a9211ef2639b65a8bf0348dc80f7f71cd7a51bd6df0d70a0e122d9",
+      "role": "SCHEMA_COMPLEXITY_CONTROL_MIXED_REPORT"
+    }
+  ],
+  "p7_corpus_sha256": "4aebee0d2734cb272c6ae002aec277e58427dd5dce44e38e5fdf1a14a4dccd12",
+  "p7_raw_sha256": "b4cb75aaf6a5ffe8c7f88c6e730d32247d973ea974269132a76b814633ff4d2f",
+  "version": "cm57p8.prompt-factor.v1"
+}
