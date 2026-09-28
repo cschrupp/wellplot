@@ -18,6 +18,10 @@ from ...authoring_program.models import (
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ProviderRequestError
+from .capability_safety import (
+    CapabilitySafetyEvidence,
+    CapabilitySafetyFailure,
+)
 from .enrichment import (
     EnrichedSemanticContext,
     EnrichmentWarning,
@@ -153,6 +157,8 @@ class CodeModeCompileFacade:
             return _failure_result((_provider_diagnostic(error),))
         except PlannerSemanticFailure as error:
             return _failure_result((_planner_diagnostic(error),))
+        except CapabilitySafetyFailure as error:
+            return _failure_result((_capability_safety_failure_diagnostic(error),))
         except SemanticEnrichmentError as error:
             return _failure_result((_enrichment_diagnostic(error),))
         return _project_graph_result(result)
@@ -171,7 +177,8 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
         _worker_evidence(outcome) for outcome in sorted(outcomes, key=lambda item: item.plan_order)
     )
     metrics = _aggregate_metrics(workers)
-    diagnostics = tuple(
+    diagnostics = _capability_safety_warning_diagnostics(state)
+    diagnostics += tuple(
         _enrichment_warning_diagnostic(warning) for warning in enriched_context.warnings
     )
     diagnostics += tuple(diagnostic for worker in workers for diagnostic in worker.diagnostics)
@@ -277,6 +284,51 @@ def _planner_diagnostic(error: PlannerSemanticFailure) -> CompileDiagnostic:
         message=error.safe_message,
         retryable=False,
     )
+
+
+def _capability_safety_failure_diagnostic(error: CapabilitySafetyFailure) -> CompileDiagnostic:
+    """Project a deterministic safety rejection into the host contract."""
+    return CompileDiagnostic(
+        stage="capability_safety",
+        code=f"capability_safety.{error.code}",
+        message=error.safe_message,
+        retryable=False,
+    )
+
+
+def _capability_safety_warning_diagnostics(
+    state: dict[str, object],
+) -> tuple[CompileDiagnostic, ...]:
+    """Project one bounded warning for each deterministic safety action."""
+    payload = state.get("capability_safety")
+    if not isinstance(payload, dict):
+        return ()
+    evidence = CapabilitySafetyEvidence.model_validate(payload)
+    diagnostics: list[CompileDiagnostic] = []
+    for action in evidence.actions:
+        if action.kind.value == "remove_reference":
+            code = "capability_safety.reference_removed"
+            message = (
+                "An unrequested reference-track capability was removed before semantic enrichment."
+            )
+        else:
+            code = "capability_safety.reference_replaced_with_normal"
+            message = (
+                "A reference-track capability was replaced with a normal track before "
+                "semantic enrichment."
+            )
+        diagnostics.append(
+            CompileDiagnostic(
+                stage="capability_safety",
+                code=code,
+                message=message,
+                severity=CompileDiagnosticSeverity.WARNING,
+                retryable=False,
+                worker_kind="section",
+                plan_order=action.section_index + 1,
+            )
+        )
+    return tuple(diagnostics)
 
 
 def _failure_result(diagnostics: tuple[CompileDiagnostic, ...]) -> CodeModeCompileResult:

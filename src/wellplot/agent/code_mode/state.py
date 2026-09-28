@@ -59,6 +59,7 @@ class CodeModeGraphState(TypedDict, total=False):
     temperature: float | None
     max_output_tokens: int | None
     plan: dict[str, Any]
+    capability_safety: dict[str, Any]
     enriched_context: dict[str, Any]
     worker_outcomes: Annotated[list[str], operator.add]
     diagnostics: Annotated[list[str], operator.add]

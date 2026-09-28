@@ -13,9 +13,11 @@ from langgraph.types import Send
 
 from ...authoring_program.inspection import AuthoringInspectionFacade
 from ...authoring_program.models import ProgramDiagnostic, ProgramMetrics
+from ...capabilities import create_builtin_registry
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ProviderRequestError
+from .capability_safety import enforce_capability_safety
 from .enrichment import (
     EnrichedSemanticContext,
     ReportContext,
@@ -45,7 +47,7 @@ class CodeModeGraphDependencies:
 
 
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
-    """Build plan -> enrich -> fan-out -> deterministic merge workflow."""
+    """Build plan -> safety -> enrich -> fan-out -> deterministic merge workflow."""
 
     async def plan_node(state: CodeModeGraphState) -> dict[str, object]:
         """Plan from a bounded document summary, never the full document."""
@@ -61,6 +63,22 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             max_output_tokens=state.get("max_output_tokens"),
         )
         return {"plan": plan.model_dump(mode="json")}
+
+    async def capability_safety_node(state: CodeModeGraphState) -> dict[str, object]:
+        """Apply provider-free admissibility rules before enrichment."""
+        plan = SemanticPlan.model_validate(state["plan"])
+        registry = getattr(dependencies.planner, "registry", None)
+        if registry is None:
+            registry = create_builtin_registry()
+        result = enforce_capability_safety(
+            request=state["request"],
+            plan=plan,
+            registry=registry,
+        )
+        return {
+            "plan": result.safe_plan.model_dump(mode="json"),
+            "capability_safety": result.evidence().model_dump(mode="json"),
+        }
 
     async def enrich_node(state: CodeModeGraphState) -> dict[str, object]:
         """Resolve host-provided source candidates into bounded context."""
@@ -192,11 +210,13 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
 
     builder = StateGraph(CodeModeGraphState)
     builder.add_node("plan_v2", plan_node)
+    builder.add_node("capability_safety", capability_safety_node)
     builder.add_node("enrich_context", enrich_node)
     builder.add_node("compile_worker", compile_worker_node)
     builder.add_node("merge_intent", merge_node)
     builder.add_edge(START, "plan_v2")
-    builder.add_edge("plan_v2", "enrich_context")
+    builder.add_edge("plan_v2", "capability_safety")
+    builder.add_edge("capability_safety", "enrich_context")
     builder.add_conditional_edges(
         "enrich_context",
         dispatch_workers,
