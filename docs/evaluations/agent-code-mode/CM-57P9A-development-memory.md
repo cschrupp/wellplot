@@ -23,6 +23,11 @@ disabled. The reference diagnostic is also populated from the bounded
 production result. Live inference remains unauthorized pending review of this
 correction.
 
+Initial structured-success diagnostics are derived specifically from the
+`INITIAL` call trace entry. A retry-recovered plan therefore remains an initial
+failure, while a semantic correction after an initial plan preserves initial
+success.
+
 No live inference, runtime fingerprint capture, provider construction, or
 production routing change is part of this checkpoint.
 

@@ -212,6 +212,28 @@ def test_observed_client_records_transport_failure_without_exception_text() -> N
     assert "secret endpoint detail" not in json.dumps(observer.events)
 
 
+def test_initial_structured_success_tracks_initial_success() -> None:
+    """An initial structured response is counted independently of later calls."""
+    calls = [_call(outcome="structured_success")]
+    assert p9._initial_structured_success(calls) is True
+
+
+def test_initial_structured_success_excludes_retry_recovery() -> None:
+    """A retry can recover the final plan without making the initial call succeed."""
+    retry = _call(outcome="structured_success")
+    retry["call_kind"] = "INVALID_RESPONSE_RETRY"
+    calls = [_call(outcome="provider_failure"), retry]
+    assert p9._initial_structured_success(calls) is False
+
+
+def test_initial_structured_success_survives_semantic_correction() -> None:
+    """A semantic correction after an initial plan preserves initial success."""
+    correction = _call(outcome="structured_success")
+    correction["call_kind"] = "SEMANTIC_CORRECTION"
+    calls = [_call(outcome="structured_success"), correction]
+    assert p9._initial_structured_success(calls) is True
+
+
 def test_group_classification_allows_provider_text_variation_for_plan_reproducibility() -> None:
     """Stable facts and call structure classify differing response text as plan-stable."""
     rows = _group_rows(content_hashes=tuple(f"content-{index}" for index in range(p9.ATTEMPTS)))

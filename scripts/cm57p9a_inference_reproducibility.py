@@ -451,6 +451,15 @@ def _call_path_structure_hash(calls: list[dict[str, object]]) -> str:
     return sha256_text(canonical_json(path))
 
 
+def _initial_structured_success(calls: list[dict[str, object]]) -> bool:
+    """Report whether the INITIAL planner call returned a structured plan."""
+    initial = next(
+        (call for call in calls if call.get("call_kind") == "INITIAL"),
+        None,
+    )
+    return bool(initial and initial.get("outcome") == "structured_success")
+
+
 async def run_arm(
     case: dict[str, object],
     *,
@@ -503,6 +512,7 @@ async def run_arm(
         facts = None
     if final_classification is None:
         raise AssertionError("CM-57P9A arm ended without a terminal classification.")
+    initial_structured_success = _initial_structured_success(calls)
     return {
         "arm": arm,
         "prompt_sha256": PROMPT_SHA256[arm],
@@ -510,8 +520,8 @@ async def run_arm(
         "planner_call_count": len(calls),
         "program_call_count": recorder.program_calls,
         "call_trace": calls,
-        "initial_structured_success": bool(plans),
-        "initial_plan_available": bool(plans),
+        "initial_structured_success": initial_structured_success,
+        "initial_plan_available": initial_structured_success,
         "final_plan_available": final_plan is not None,
         "final_planner_success": final_plan is not None,
         "final_classification": final_classification,
