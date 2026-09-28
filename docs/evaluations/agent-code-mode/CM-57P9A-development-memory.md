@@ -8,11 +8,20 @@ accepted P8 evidence checkpoint:
 ```text
 baseline: e8f19141e6dd349d44ddd9cb97305a856216a6fa
 experiment: CM-57P9A
-implementation status: PRE-LIVE READY
+implementation status: PRE-LIVE CORRECTION READY
 provider calls: 0
 production changes: 0
 P9B: blocked
 ```
+
+The post-checkpoint correction preserves the same experiment and controls
+while tightening evidence validity: finalized rows must bind to the PRE
+fingerprint and authorized checkout, critical runtime identity fields must be
+available, terminal failures receive stable structural fact hashes, and
+continuous batching is recorded as unknown unless explicitly enabled or
+disabled. The reference diagnostic is also populated from the bounded
+production result. Live inference remains unauthorized pending review of this
+correction.
 
 No live inference, runtime fingerprint capture, provider construction, or
 production routing change is part of this checkpoint.

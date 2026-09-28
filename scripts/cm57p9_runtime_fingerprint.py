@@ -130,9 +130,16 @@ def _runtime_settings(arguments: list[str] | None) -> dict[str, object]:
     settings: dict[str, object] = {}
     for field_name, names in _FLAG_ALIASES.items():
         settings[field_name] = _flag_value(arguments, names)
-    settings["continuous_batching"] = (
-        "--cont-batching" in arguments if arguments is not None else UNKNOWN
-    )
+    if arguments is None:
+        settings["continuous_batching"] = UNKNOWN
+    else:
+        batching_state: bool | None = UNKNOWN
+        for argument in arguments:
+            if argument in {"--cont-batching", "-cb"}:
+                batching_state = True
+            elif argument in {"--no-cont-batching", "-nocb"}:
+                batching_state = False
+        settings["continuous_batching"] = batching_state
     return settings
 
 
@@ -229,9 +236,29 @@ def validate_fingerprint(value: object) -> tuple[bool, list[str]]:
     endpoint = value.get("endpoint")
     if not isinstance(endpoint, str) or not endpoint.strip():
         reasons.append("endpoint_invalid")
+    model_api_label = value.get("model_api_label")
+    if not isinstance(model_api_label, str) or not model_api_label.strip():
+        reasons.append("model_api_label_invalid")
+    for key in ("model_sha256", "llama_binary_sha256", "launch_arguments_sha256"):
+        value_for_key = value.get(key)
+        if (
+            not isinstance(value_for_key, str)
+            or re.fullmatch(r"[0-9a-f]{64}", value_for_key) is None
+        ):
+            reasons.append(f"{key}_invalid")
+    model_file_bytes = value.get("model_file_bytes")
+    if (
+        isinstance(model_file_bytes, bool)
+        or not isinstance(model_file_bytes, int)
+        or model_file_bytes < 0
+    ):
+        reasons.append("model_file_bytes_invalid")
     process_id = value.get("server_process_id")
-    if process_id is not None and (isinstance(process_id, bool) or not isinstance(process_id, int)):
+    if isinstance(process_id, bool) or not isinstance(process_id, int) or process_id <= 0:
         reasons.append("process_id_invalid")
+    start_time = value.get("server_process_start_time")
+    if isinstance(start_time, bool) or not isinstance(start_time, int) or start_time <= 0:
+        reasons.append("process_start_time_invalid")
     return not reasons, sorted(set(reasons))
 
 

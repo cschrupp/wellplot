@@ -242,6 +242,58 @@ def test_group_classification_distinguishes_contract_and_nonreproducible_variati
     assert p9._classify_group(path_variants, case, "P")["classification"] == "NOT_REPRODUCIBLE"
 
 
+def test_identical_terminal_failures_are_reproducible() -> None:
+    """A repeated terminal schema failure is still a stable inference outcome."""
+    case = p9.load_manifest()[0]
+    failures = _group_rows(
+        plan_hashes=(None,) * p9.ATTEMPTS,
+        facts_hashes=("terminal-failure",) * p9.ATTEMPTS,
+    )
+    group = p9._classify_group(failures, case, "P")
+    assert group["classification"] == "EXACT_REPRODUCIBLE"
+    assert group["levels"]["semantic_plan"] == "SEMANTIC_PLAN_ABSENT_STABLE"
+
+
+def test_mixed_terminal_success_and_failure_is_not_reproducible() -> None:
+    """A single success among repeated terminal failures breaks plan stability."""
+    plan_hashes = (None,) * (p9.ATTEMPTS - 1) + ("plan",)
+    facts_hashes = ("terminal-failure",) * (p9.ATTEMPTS - 1) + ("success",)
+    rows = _group_rows(plan_hashes=plan_hashes, facts_hashes=facts_hashes)
+    assert p9._classify_group(rows, p9.load_manifest()[0], "P")["classification"] == (
+        "NOT_REPRODUCIBLE"
+    )
+
+
+def test_terminal_category_variation_is_not_reproducible() -> None:
+    """Different terminal classifications produce different planner-facts hashes."""
+    rows = _group_rows(
+        plan_hashes=(None,) * p9.ATTEMPTS,
+        facts_hashes=("terminal-failure",) * p9.ATTEMPTS,
+    )
+    result = rows[-1]["arms"]["P"]
+    result["final_classification"] = "PROVIDER_INFRA_FAILURE"
+    result["planner_facts_sha256"] = p9._planner_facts_hash(
+        None,
+        "PROVIDER_INFRA_FAILURE",
+        final_plan_available=False,
+    )
+    assert p9._classify_group(rows, p9.load_manifest()[0], "P")["classification"] == (
+        "NOT_REPRODUCIBLE"
+    )
+
+
+def test_terminal_response_text_variation_uses_a_lower_exactness_tier() -> None:
+    """Terminal state can remain reproducible when only provider text varies."""
+    rows = _group_rows(
+        plan_hashes=(None,) * p9.ATTEMPTS,
+        facts_hashes=("terminal-failure",) * p9.ATTEMPTS,
+        content_hashes=tuple(f"terminal-{index}" for index in range(p9.ATTEMPTS)),
+    )
+    assert p9._classify_group(rows, p9.load_manifest()[0], "P")["classification"] == (
+        "PLAN_REPRODUCIBLE_WITH_TEXT_VARIATION"
+    )
+
+
 def test_decision_precedence_prioritizes_nonreproducibility() -> None:
     """The frozen top-level decision prefers lower reproducibility levels."""
     groups = [{"classification": "EXACT_REPRODUCIBLE"}]
@@ -276,15 +328,25 @@ def test_population_integrity_rejects_infrastructure_and_worker_calls() -> None:
                             "response_schema_sha256": p9.EXPECTED_SCHEMA_SHA256,
                             "program_call_count": 1 if arm == "RC" else 0,
                             "provider_infrastructure_failure": arm == "P",
+                            "final_facts": None,
                         }
                         for arm in p9.ARMS
                     },
+                    "authorized_checkpoint": "wrong-checkpoint",
+                    "runtime_fingerprint_sha256": "wrong-fingerprint",
                 }
             )
-    complete, reasons = p9.population_integrity(rows, cases)
+    complete, reasons = p9.population_integrity(
+        rows,
+        cases,
+        runtime_fingerprint_sha256="expected-fingerprint",
+        expected_checkpoint="expected-checkpoint",
+    )
     assert not complete
     assert "provider_infrastructure_failure" in reasons
     assert "worker_program_call" in reasons
+    assert "runtime_fingerprint_mismatch" in reasons
+    assert "authorized_checkpoint_mismatch" in reasons
 
 
 def test_runtime_fingerprint_validation_and_comparison_are_provider_free(tmp_path: Path) -> None:
@@ -304,6 +366,20 @@ def test_runtime_fingerprint_validation_and_comparison_are_provider_free(tmp_pat
     assert valid, reasons
     changed = dict(value, endpoint="http://127.0.0.1:9999/v1")
     assert "endpoint" in fingerprint.compare_fingerprints(value, changed)
+    invalid = dict(value, model_sha256=None)
+    valid, reasons = fingerprint.validate_fingerprint(invalid)
+    assert not valid
+    assert "model_sha256_invalid" in reasons
+
+
+def test_continuous_batching_requires_an_explicit_flag() -> None:
+    """The helper does not mistake llama.cpp's implicit default for a fact."""
+    assert fingerprint._runtime_settings(None)["continuous_batching"] is None
+    assert fingerprint._runtime_settings([])["continuous_batching"] is None
+    assert fingerprint._runtime_settings(["--cont-batching"])["continuous_batching"] is True
+    assert fingerprint._runtime_settings(["-cb"])["continuous_batching"] is True
+    assert fingerprint._runtime_settings(["--no-cont-batching"])["continuous_batching"] is False
+    assert fingerprint._runtime_settings(["-nocb"])["continuous_batching"] is False
 
 
 def test_live_mode_rejects_nonempty_evidence_before_provider_construction(
@@ -334,6 +410,9 @@ def test_special_diagnostics_accepts_terminal_provider_failures() -> None:
                     "final_plan_available": False,
                     "final_classification": "PROVIDER_INFRA_FAILURE",
                     "invalid_response_retry_used": False,
+                    "reference": {
+                        "missing_required_reference": None,
+                    },
                 }
                 for arm in p9.ARMS
             },

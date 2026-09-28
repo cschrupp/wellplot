@@ -404,23 +404,23 @@ def _plan_facts(
 
 
 def _planner_facts_hash(
-    facts: dict[str, object] | None, final_classification: str | None
-) -> str | None:
-    """Hash only structural planner facts, excluding semantic prose."""
-    if not isinstance(facts, dict):
-        return None
-    selected = {
-        key: facts.get(key)
-        for key in (
-            "report_task_present",
-            "report_capability_ids",
-            "section_capability_signatures",
-            "section_task_count",
-            "unresolved_requirements_count",
-            "parent_closure_valid",
-            "duplicate_capability_type",
-        )
-    }
+    facts: dict[str, object] | None,
+    final_classification: str | None,
+    *,
+    final_plan_available: bool,
+) -> str:
+    """Hash structural planner facts, including stable terminal outcomes."""
+    fact_keys = (
+        "report_task_present",
+        "report_capability_ids",
+        "section_capability_signatures",
+        "section_task_count",
+        "unresolved_requirements_count",
+        "parent_closure_valid",
+        "duplicate_capability_type",
+    )
+    selected = {key: facts.get(key) if isinstance(facts, dict) else None for key in fact_keys}
+    selected["final_plan_available"] = final_plan_available
     selected["final_classification"] = final_classification
     return sha256_text(canonical_json(selected))
 
@@ -529,10 +529,15 @@ async def run_arm(
             if final_plan is not None
             else None
         ),
-        "planner_facts_sha256": _planner_facts_hash(facts, final_classification),
+        "planner_facts_sha256": _planner_facts_hash(
+            facts,
+            final_classification,
+            final_plan_available=final_plan is not None,
+        ),
         "call_path_sha256": _call_path_hash(calls),
         "call_path_structure_sha256": _call_path_structure_hash(calls),
         "plan_projection": p7.p5._plan_projection(final_plan) if final_plan is not None else None,
+        "reference": p8._reference_projection(facts, case),
         "final_facts": facts,
     }
 
@@ -582,6 +587,7 @@ def population_integrity(
     cases: tuple[dict[str, object], ...],
     *,
     runtime_fingerprint_sha256: str | None = None,
+    expected_checkpoint: str | None = None,
 ) -> tuple[bool, list[str]]:
     """Fail closed on population, provenance, and worker-call drift."""
     reasons: list[str] = []
@@ -615,6 +621,11 @@ def population_integrity(
             and row.get("runtime_fingerprint_sha256") != runtime_fingerprint_sha256
         ):
             reasons.append("runtime_fingerprint_mismatch")
+        if (
+            expected_checkpoint is not None
+            and row.get("authorized_checkpoint") != expected_checkpoint
+        ):
+            reasons.append("authorized_checkpoint_mismatch")
         if row.get("request_sha256") != sha256_text(str(case["request"])):
             reasons.append("request_hash_mismatch")
         if row.get("gold_sha256") != _gold_sha(case):
@@ -700,7 +711,7 @@ def _classify_group(
     outcomes = [_repetition_outcome(result) for result in results]
     call_paths = [result.get("call_path_structure_sha256") for result in results]
     provider_exact = len(set(provider_signatures)) == 1
-    plan_stable = len(set(plan_hashes)) == 1 and plan_hashes[0] is not None
+    plan_stable = len(set(plan_hashes)) == 1
     facts_stable = len(set(facts_hashes)) == 1 and facts_hashes[0] is not None
     outcome_stable = len(set(outcomes)) == 1
     call_path_stable = len(set(call_paths)) == 1
@@ -734,7 +745,13 @@ def _classify_group(
         "classification": classification,
         "levels": {
             "provider": "EXACT_PROVIDER_STABLE" if provider_exact else "PROVIDER_TEXT_VARIANT",
-            "semantic_plan": "SEMANTIC_PLAN_STABLE" if plan_stable else "SEMANTIC_PLAN_VARIANT",
+            "semantic_plan": (
+                "SEMANTIC_PLAN_STABLE"
+                if plan_stable and plan_hashes[0] is not None
+                else "SEMANTIC_PLAN_ABSENT_STABLE"
+                if plan_stable
+                else "SEMANTIC_PLAN_VARIANT"
+            ),
             "contract_facts": "CONTRACT_FACTS_STABLE" if facts_stable else "CONTRACT_FACTS_VARIANT",
             "outcome": "OUTCOME_STABLE" if outcome_stable else "OUTCOME_VARIANT",
         },
@@ -863,6 +880,7 @@ def summarize_population(
     *,
     pre_fingerprint: dict[str, object] | None = None,
     post_fingerprint: dict[str, object] | None = None,
+    authorized_checkpoint: str | None = None,
 ) -> dict[str, object]:
     """Build a provider-free reproducibility summary."""
     pre_valid, pre_reasons = fingerprint.validate_fingerprint(pre_fingerprint)
@@ -872,7 +890,13 @@ def summarize_population(
         if pre_valid and post_valid
         else [*pre_reasons, *post_reasons]
     )
-    complete, reasons = population_integrity(rows, cases)
+    pre_sha = sha256_text(canonical_json(pre_fingerprint)) if pre_fingerprint else None
+    complete, reasons = population_integrity(
+        rows,
+        cases,
+        runtime_fingerprint_sha256=pre_sha,
+        expected_checkpoint=authorized_checkpoint,
+    )
     groups = [
         _classify_group([row for row in rows if row.get("case_id") == case["case_id"]], case, arm)
         for case in cases
@@ -1068,7 +1092,13 @@ def finalize(
     rows = [
         json.loads(line) for line in evidence_path.read_text(encoding="utf-8").splitlines() if line
     ]
-    return summarize_population(rows, cases, pre_fingerprint=pre, post_fingerprint=post)
+    return summarize_population(
+        rows,
+        cases,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+        authorized_checkpoint=checkpoint,
+    )
 
 
 def prelive_report() -> dict[str, object]:
