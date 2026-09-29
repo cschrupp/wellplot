@@ -54,3 +54,16 @@ reason taxonomy, and production-anchor bytes.
 
 Live inference is not authorized by this slice. `CM-59A-R2B`, `CM-59A-E2`, and
 `CM-57D` remain blocked pending independent review and separate authorization.
+
+## R1 Verification Hardening
+
+Baseline: `47843e62466fde9a4813a8fc53f5601993a07c9d`.
+
+R1 adds provider-free verification coverage without changing the diagnostic
+harness or production code. The tests cover one-call transport failures,
+artifact collision guards, exact checkpoint validation, incomplete CLI
+authorization, population tampering, partial populations, diagnostic-gap
+classification, provider-free finalization, and bounded summary redaction.
+
+The harness remains unchanged from the baseline, and live inference remains
+unauthorized. No provider, endpoint, worker, or program calls are made by R1.

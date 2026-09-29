@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from types import SimpleNamespace
+from typing import NoReturn
 
 import pytest
 from scripts import cm59a_r2a_l1_xenon_diagnostic as l1
 
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.providers.base import (
+    ProviderFailureCategory,
     ProviderMetrics,
+    ProviderRequestError,
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
@@ -85,6 +91,74 @@ def _attempt(
         "final_response_reason": reason,
         "terminal_signature": signature or reason or classification,
     }
+
+
+def _valid_evidence_attempt() -> dict[str, object]:
+    """Build one complete successful attempt projection."""
+    return {
+        "attempt_index": 0,
+        "planner_call_count": 1,
+        "invalid_response_retry_used": False,
+        "semantic_correction_used": False,
+        "final_plan_available": True,
+        "final_provider_category": None,
+        "final_response_reason": None,
+        "provider_infrastructure_failure": False,
+        "raw_plan_projection": {"section_capability_signatures": []},
+        "raw_work_unit_facts": {},
+        "raw_contract_ok": False,
+        "attempt_classification": "PLANNER_SUCCESS",
+        "terminal_signature": None,
+        "call_trace": [
+            {
+                "call_kind": "INITIAL",
+                "outcome": "structured_success",
+                "provider_category": None,
+                "response_reason": None,
+                "metrics": {},
+            }
+        ],
+        "program_calls": 0,
+    }
+
+
+def _valid_rows(
+    *,
+    checkpoint: str = "a" * 40,
+    pre: dict[str, object] | None = None,
+) -> list[dict[str, object]]:
+    """Build two complete synthetic rows for provider-free finalization tests."""
+    pre = pre or _fingerprint()
+    pre_sha = l1.sha256_text(l1.canonical_json(pre))
+    rows: list[dict[str, object]] = []
+    for attempt_index in range(l1.ATTEMPTS):
+        attempt = _valid_evidence_attempt()
+        attempt["attempt_index"] = attempt_index
+        rows.append(
+            {
+                **l1.frozen_provenance(),
+                "authorized_harness_checkpoint": checkpoint,
+                "pre_endpoint_fingerprint_sha256": pre_sha,
+                "case_id": l1.TARGET_CASE_ID,
+                "request_sha256": l1.TARGET_REQUEST_SHA256,
+                "attempt_index": attempt_index,
+                "attempt": attempt,
+            }
+        )
+    return rows
+
+
+def _live_args(tmp_path: Path) -> SimpleNamespace:
+    """Build guarded live arguments with isolated temporary artifacts."""
+    return SimpleNamespace(
+        base_url="http://example.test/v1",
+        api_key_env="L1_UNUSED_KEY",
+        api_key_file=None,
+        evidence_path=str(tmp_path / "evidence.jsonl"),
+        endpoint_fingerprint_pre=str(tmp_path / "pre.json"),
+        endpoint_fingerprint_post=str(tmp_path / "post.json"),
+        summary_path=str(tmp_path / "summary.json"),
+    )
 
 
 def _fingerprint(*, created: int = 1) -> dict[str, object]:
@@ -169,6 +243,26 @@ def test_production_planner_call_budget_is_bounded(
     assert backend.calls == expected_calls
     assert result["planner_call_count"] == expected_calls
     assert result["attempt_classification"] == expected_classification
+
+
+def test_transport_failure_is_one_call_infrastructure_failure() -> None:
+    """Transport failures do not enter the invalid-response retry path."""
+    backend = _SequenceBackend(
+        responses=[ProviderRequestError(ProviderFailureCategory.TRANSPORT, "secret transport")]
+    )
+    result = asyncio.run(
+        l1.run_attempt(
+            l1._load_target_case(),
+            delegate=backend,
+            registry=l1.create_builtin_registry(),
+            attempt_index=0,
+        )
+    )
+
+    assert backend.calls == 1
+    assert result["attempt_classification"] == "INFRA_FAILURE"
+    assert result["provider_infrastructure_failure"] is True
+    assert result["invalid_response_retry_used"] is False
 
 
 def test_terminal_reason_uses_second_invalid_response() -> None:
@@ -292,6 +386,298 @@ def test_population_integrity_rejects_partial_and_worker_calls() -> None:
 
     assert not valid
     assert {"wrong_row_count", "provider_call_count", "program_calls"}.issubset(reasons)
+
+
+@pytest.mark.parametrize(
+    ("name", "mutate", "reason"),
+    [
+        (
+            "duplicate attempt",
+            lambda rows: rows.__setitem__(1, copy.deepcopy(rows[0])),
+            "duplicate_attempt",
+        ),
+        (
+            "out of range attempt",
+            lambda rows: rows[0].__setitem__("attempt_index", 2),
+            "attempt_index_mismatch",
+        ),
+        ("wrong case", lambda rows: rows[0].__setitem__("case_id", "other"), "case_id_mismatch"),
+        (
+            "wrong request",
+            lambda rows: rows[0].__setitem__("request_sha256", "0" * 64),
+            "request_hash_mismatch",
+        ),
+        (
+            "wrong prompt",
+            lambda rows: rows[0].__setitem__("prompt_sha256", "0" * 64),
+            "prompt_sha256_mismatch",
+        ),
+        (
+            "wrong schema",
+            lambda rows: rows[0].__setitem__("response_schema_sha256", "0" * 64),
+            "response_schema_sha256_mismatch",
+        ),
+        (
+            "wrong source summary",
+            lambda rows: rows[0].__setitem__("source_summary_sha256", "0" * 64),
+            "source_summary_sha256_mismatch",
+        ),
+        (
+            "wrong anchor",
+            lambda rows: rows[0].__setitem__("production_anchor_sha", "0" * 40),
+            "production_anchor_sha_mismatch",
+        ),
+        (
+            "wrong checkpoint",
+            lambda rows: rows[0].__setitem__("authorized_harness_checkpoint", "0" * 40),
+            "checkpoint_mismatch",
+        ),
+        (
+            "wrong PRE binding",
+            lambda rows: rows[0].__setitem__("pre_endpoint_fingerprint_sha256", "0" * 64),
+            "pre_fingerprint_mismatch",
+        ),
+        (
+            "too many calls",
+            lambda rows: rows[0]["attempt"].__setitem__(
+                "call_trace", rows[0]["attempt"]["call_trace"] * 3
+            ),
+            "provider_call_count",
+        ),
+        (
+            "program call",
+            lambda rows: rows[0]["attempt"].__setitem__("program_calls", 1),
+            "program_calls",
+        ),
+        (
+            "invalid call kind",
+            lambda rows: rows[0]["attempt"]["call_trace"][0].__setitem__("call_kind", "OTHER"),
+            "call_kind_invalid",
+        ),
+        (
+            "invalid call outcome",
+            lambda rows: rows[0]["attempt"]["call_trace"][0].__setitem__("outcome", "other"),
+            "call_outcome_invalid",
+        ),
+        (
+            "missing invalid reason",
+            lambda rows: rows[0]["attempt"]["call_trace"][0].update(
+                {"outcome": "structured_output_failure", "provider_category": "invalid_response"}
+            ),
+            "invalid_response_reason_missing",
+        ),
+        (
+            "unknown reason",
+            lambda rows: rows[0]["attempt"]["call_trace"][0].update(
+                {
+                    "outcome": "structured_output_failure",
+                    "provider_category": "invalid_response",
+                    "response_reason": "unknown",
+                }
+            ),
+            "response_reason_invalid",
+        ),
+    ],
+)
+def test_population_integrity_tamper_matrix(
+    name: str, mutate: Callable[[list[dict[str, object]]], None], reason: str
+) -> None:
+    """Every decision-bearing population mutation fails with a bounded reason."""
+    del name
+    pre = _fingerprint()
+    rows = _valid_rows(pre=pre)
+    mutate(rows)
+
+    valid, reasons = l1.population_integrity(
+        rows, expected_checkpoint="a" * 40, pre_fingerprint=pre
+    )
+
+    assert not valid
+    assert reason in reasons
+
+
+def test_partial_population_finalization_is_inconclusive() -> None:
+    """The finalizer, not only the integrity helper, rejects one-row evidence."""
+    pre = _fingerprint()
+    post = _fingerprint(created=2)
+    summary = l1.summarize_population(
+        _valid_rows(pre=pre)[:1],
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+        expected_checkpoint="a" * 40,
+        evidence_bytes=b"partial",
+    )
+
+    assert summary["decision"] == "INCONCLUSIVE_DIAGNOSTIC"
+    assert summary["population_integrity"] is False
+    assert "wrong_row_count" in summary["population_integrity_reasons"]
+
+
+def test_diagnostic_gap_is_not_stable_invalid_response() -> None:
+    """A final invalid response without a reason becomes an instrumentation gap."""
+    pre = _fingerprint()
+    rows = _valid_rows(pre=pre)
+    for row in rows:
+        row["attempt"].update(
+            {
+                "attempt_classification": "TERMINAL_INVALID_RESPONSE",
+                "final_provider_category": "invalid_response",
+                "final_response_reason": None,
+            }
+        )
+        row["attempt"]["call_trace"][0].update(
+            {
+                "outcome": "structured_output_failure",
+                "provider_category": "invalid_response",
+                "response_reason": "invalid_json",
+            }
+        )
+    summary = l1.summarize_population(
+        rows,
+        pre_fingerprint=pre,
+        post_fingerprint=_fingerprint(created=2),
+        expected_checkpoint="a" * 40,
+        evidence_bytes=b"gap",
+    )
+
+    assert summary["decision"] == "DIAGNOSTIC_INSTRUMENTATION_GAP"
+
+
+def test_finalization_is_provider_and_endpoint_free(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finalization reads preserved artifacts without constructing live objects."""
+    pre = _fingerprint()
+    post = _fingerprint(created=2)
+    rows = _valid_rows(checkpoint=l1.current_checkout_sha(), pre=pre)
+    evidence = tmp_path / "evidence.jsonl"
+    pre_path = tmp_path / "pre.json"
+    post_path = tmp_path / "post.json"
+    evidence.write_text("\n".join(l1.canonical_json(row) for row in rows) + "\n", encoding="utf-8")
+    pre_path.write_text(l1.canonical_json(pre), encoding="utf-8")
+    post_path.write_text(l1.canonical_json(post), encoding="utf-8")
+    monkeypatch.setattr(
+        l1.fingerprint,
+        "capture_endpoint_fingerprint_v2",
+        lambda **kwargs: pytest.fail("endpoint capture during finalization"),
+    )
+    monkeypatch.setattr(
+        l1,
+        "_provider_configuration",
+        lambda args: pytest.fail("provider construction during finalization"),
+    )
+    monkeypatch.setattr(l1, "_verify_reviewed_checkout", lambda checkpoint: None)
+
+    summary = l1.finalize(
+        evidence_path=evidence,
+        pre_path=pre_path,
+        post_path=post_path,
+        authorized_checkpoint=l1.current_checkout_sha(),
+    )
+
+    assert summary["decision"] == "HISTORICAL_FAILURE_NOT_REPRODUCED"
+    assert summary["provider_call_count"] == 2
+
+
+def test_final_summary_does_not_retain_provider_error_text() -> None:
+    """Final summary serialization contains only bounded reason data."""
+    secret = "SECRET_PROVIDER_PAYLOAD"
+    pre = _fingerprint()
+    backend = _SequenceBackend(
+        [
+            _invalid(ProviderResponseFailureReason.INVALID_JSON),
+            _invalid(ProviderResponseFailureReason.INVALID_JSON),
+        ]
+    )
+    attempt = asyncio.run(
+        l1.run_attempt(
+            l1._load_target_case(),
+            delegate=backend,
+            registry=l1.create_builtin_registry(),
+            attempt_index=0,
+        )
+    )
+    assert secret not in json.dumps(attempt)
+    rows = _valid_rows(pre=pre)
+    rows[0]["attempt"] = attempt
+    summary = l1.summarize_population(
+        rows,
+        pre_fingerprint=pre,
+        post_fingerprint=_fingerprint(created=2),
+        expected_checkpoint="a" * 40,
+        evidence_bytes=json.dumps(rows).encode(),
+    )
+
+    assert secret not in json.dumps(summary)
+
+
+@pytest.mark.parametrize(
+    "path_name",
+    ["evidence_path", "endpoint_fingerprint_pre", "endpoint_fingerprint_post", "summary_path"],
+)
+def test_live_collision_guard_runs_before_endpoint_or_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path_name: str
+) -> None:
+    """Every populated live artifact path aborts before any live activity."""
+    args = _live_args(tmp_path)
+    Path(getattr(args, path_name)).write_text("existing", encoding="utf-8")
+    endpoint_calls = 0
+    provider_calls = 0
+
+    def endpoint_failure(**kwargs: object) -> NoReturn:
+        nonlocal endpoint_calls
+        endpoint_calls += 1
+        raise AssertionError("endpoint capture should not run")
+
+    def provider_failure(namespace: object) -> NoReturn:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider construction should not run")
+
+    monkeypatch.setattr(l1.fingerprint, "capture_endpoint_fingerprint_v2", endpoint_failure)
+    monkeypatch.setattr(l1, "_provider_configuration", provider_failure)
+    monkeypatch.setattr(l1, "_verify_reviewed_checkout", lambda checkpoint: None)
+    with pytest.raises(RuntimeError, match="non-empty"):
+        asyncio.run(l1._run_live(args, l1.current_checkout_sha()))
+
+    assert endpoint_calls == 0
+    assert provider_calls == 0
+
+
+@pytest.mark.parametrize("checkpoint", ["a" * 39, "a" * 40])
+def test_live_requires_exact_full_checkpoint_before_activity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checkpoint: str
+) -> None:
+    """Wrong or abbreviated checkpoints fail before endpoint/provider access."""
+    args = _live_args(tmp_path)
+    monkeypatch.setattr(
+        l1.fingerprint,
+        "capture_endpoint_fingerprint_v2",
+        lambda **kwargs: pytest.fail("endpoint capture after checkpoint rejection"),
+    )
+    monkeypatch.setattr(
+        l1,
+        "_provider_configuration",
+        lambda namespace: pytest.fail("provider construction after checkpoint rejection"),
+    )
+
+    with pytest.raises(RuntimeError, match="checkpoint"):
+        asyncio.run(l1._run_live(args, checkpoint))
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--base-url", "http://example.test/v1"],
+        ["--authorized-checkpoint", "a" * 40],
+        ["--live-authorized", "--authorized-checkpoint", "a" * 40],
+        ["--live-authorized", "--base-url", "http://example.test/v1"],
+    ],
+)
+def test_cli_authorization_guards_stop_before_live_activity(argv: list[str]) -> None:
+    """Incomplete live CLI authorization cannot reach endpoint construction."""
+    with pytest.raises(SystemExit):
+        l1.main(argv)
 
 
 def test_no_raw_provider_text_enters_attempt_or_summary() -> None:
