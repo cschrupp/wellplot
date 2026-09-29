@@ -5,7 +5,7 @@
       "case_id": "cm59-report-cascade-01",
       "family": "REPORT_ONLY",
       "residual_class": "MARINER_CLASS",
-      "request": "Prepare a closeout summary for the Cascade handover and include the review note Approval recorded.",
+      "request": "The Cascade handover brief should preserve this disposition: Approval recorded.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [],
       "expected_unresolved_count": 0
@@ -14,7 +14,7 @@
       "case_id": "cm59-report-elm-02",
       "family": "REPORT_ONLY",
       "residual_class": "MARINER_CLASS",
-      "request": "Write a completion summary for Elm Crossing and add the remark Final checks accepted by operations.",
+      "request": "In the Elm Crossing report, preserve this exact statement: Final checks accepted by operations.",
       "expected_report_capabilities": ["report.standard"],
       "expected_sections": [],
       "expected_unresolved_count": 0
@@ -149,7 +149,7 @@
       "case_id": "cm59-alloc-tamarind-17",
       "family": "MULTI_SECTION_ALLOCATION",
       "residual_class": "LICHEN_CLASS",
-      "request": "Create three separate views for Tamarind: an ordinary response, a depth-guided scalar response, and a formation image.",
+      "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, a depth-indexed scalar measurement, and a formation image.",
       "expected_report_capabilities": [],
       "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.reference", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
       "expected_unresolved_count": 0
@@ -158,7 +158,7 @@
       "case_id": "cm59-alloc-umber-18",
       "family": "MULTI_SECTION_ALLOCATION",
       "residual_class": "LICHEN_CLASS",
-      "request": "Give Umber three independent displays: a scalar trend, a reference-aligned scalar trend, and an acoustic image.",
+      "request": "The Umber interpretation should resolve three separate findings in order: a scalar trend, a depth-aligned scalar trend, and an acoustic image.",
       "expected_report_capabilities": [],
       "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.reference", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
       "expected_unresolved_count": 0

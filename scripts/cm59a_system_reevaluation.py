@@ -126,6 +126,7 @@ POLICY_VERSIONS = {
     "report_boundary_safety": REPORT_BOUNDARY_POLICY_VERSION,
     "section_leaf_safety": SECTION_LEAF_POLICY_VERSION,
 }
+SAFETY_LAYER_KEYS = ("cm58_1", "cm58_2", "cm58_3")
 PRODUCTION_ARTIFACTS = (
     "src/wellplot/agent/code_mode/planner.py",
     "src/wellplot/agent/code_mode/capability_safety.py",
@@ -740,7 +741,7 @@ def population_integrity(
             reasons.add("worker_program_call")
         if int(planner.get("provider_calls", -1)) != len(planner.get("call_trace", [])):
             reasons.add("provider_call_trace_mismatch")
-        if set(row.get("safety", {})) != set(POLICY_VERSIONS):
+        if set(row.get("safety", {})) != set(SAFETY_LAYER_KEYS):
             reasons.add("safety_layer_set_mismatch")
     return not reasons, sorted(reasons)
 
@@ -1109,7 +1110,7 @@ def historical_anchor_diagnostics() -> dict[str, object]:
     """Verify old Lichen and Mariner shapes remain diagnostic-only anchors."""
     registry = create_builtin_registry()
     lichen_expected = {
-        "expected_report_capabilities": ["report.standard"],
+        "expected_report_capabilities": [],
         "expected_sections": [
             ["section.log_plot", "track.normal", "binding.curve"],
             ["section.log_plot", "track.reference", "track.normal", "binding.curve"],
@@ -1169,13 +1170,16 @@ def historical_anchor_diagnostics() -> dict[str, object]:
     )
     return {
         "historical_lichen_p_shape": _historical_plan_diagnostic(
-            request="Prepare a report and three separate views including a depth reference.",
+            request=(
+                "Arrange three analysis panels: a scalar measurement, a depth reference "
+                "with its scalar measurement, and an image."
+            ),
             plan=lichen_p,
             expected=lichen_expected,
             registry=registry,
         ),
         "historical_lichen_rc_shape": _historical_plan_diagnostic(
-            request="Create three views including a depth-referenced scalar response.",
+            request="Arrange three analysis panels including a depth-indexed scalar measurement.",
             plan=lichen_rc,
             expected=lichen_expected,
             registry=registry,
@@ -1331,12 +1335,25 @@ def _ensure_empty_evidence(path: Path) -> None:
         raise RuntimeError(f"CM-59A evidence path is non-empty: {path}")
 
 
+def _ensure_fresh_live_artifacts(paths: tuple[Path, ...]) -> None:
+    """Reject any previously populated live artifact before endpoint access."""
+    for path in paths:
+        _ensure_empty_evidence(path)
+
+
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     """Run the one authorized sequential planner-only population."""
     verify_reviewed_checkout(checkpoint)
     verify_frozen_contract()
     output = Path(args.evidence_path)
-    _ensure_empty_evidence(output)
+    _ensure_fresh_live_artifacts(
+        (
+            output,
+            Path(args.endpoint_fingerprint_pre),
+            Path(args.endpoint_fingerprint_post),
+            Path(args.summary_path),
+        )
+    )
     cases = load_case_definitions()
     pre = fingerprint.capture_endpoint_fingerprint_v2(
         endpoint=args.base_url,

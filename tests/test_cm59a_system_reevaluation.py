@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
@@ -63,7 +65,7 @@ def _safety() -> dict[str, object]:
             "evidence": {"actions": []},
             "failure_code": None,
         }
-        for name in cm59.POLICY_VERSIONS
+        for name in cm59.SAFETY_LAYER_KEYS
     }
 
 
@@ -150,6 +152,106 @@ def _plan_for_case(case: dict[str, object]) -> SemanticPlan:
             for section in case["expected_sections"]
         ),
     )
+
+
+def _rows_for_case(rows: list[dict[str, object]], case_id: str) -> list[dict[str, object]]:
+    """Return both attempts for one synthetic case."""
+    return [row for row in rows if row["case_id"] == case_id]
+
+
+def _set_safe_rejection(rows: list[dict[str, object]], case_ids: set[str]) -> None:
+    """Mark cases as stable deterministic safety rejections."""
+    for case_id in case_ids:
+        for row in _rows_for_case(rows, case_id):
+            planner = row["planner"]
+            planner.update(
+                {
+                    "raw_contract_ok": False,
+                    "raw_classification": "SECTION_COUNT_MISMATCH",
+                    "final_contract_ok": False,
+                    "final_plan_available": False,
+                    "final_classification": "SAFE_REJECTION",
+                    "terminal_stage": "section_leaf_safety",
+                    "terminal_failure_code": "synthetic_safe_rejection",
+                }
+            )
+            row["final_system"].update(
+                {
+                    "final_plan_available": False,
+                    "final_work_unit_facts": None,
+                    "final_classification": "SAFE_REJECTION",
+                    "final_contract_ok": False,
+                    "terminal_stage": "section_leaf_safety",
+                    "terminal_failure_code": "synthetic_safe_rejection",
+                }
+            )
+            row["safety"]["cm58_3"] = {
+                "status": "FAILED",
+                "changed": False,
+                "evidence": None,
+                "failure_code": "synthetic_safe_rejection",
+            }
+
+
+def _set_planner_failure(
+    rows: list[dict[str, object]], case_id: str, *, infrastructure: bool = False
+) -> None:
+    """Mark both attempts as a stable planner or infrastructure failure."""
+    for row in _rows_for_case(rows, case_id):
+        planner = row["planner"]
+        planner.update(
+            {
+                "final_planner_success": False,
+                "final_error_type": "ProviderRequestError",
+                "final_error_code": "timeout" if infrastructure else "invalid_response",
+                "provider_infrastructure_failure": infrastructure,
+                "raw_contract_ok": False,
+                "final_contract_ok": False,
+                "final_plan_available": False,
+                "final_classification": "INFRA_FAILURE" if infrastructure else "PLANNER_FAILURE",
+                "terminal_stage": "planner",
+                "terminal_failure_code": "timeout" if infrastructure else "invalid_response",
+            }
+        )
+        row["final_system"].update(
+            {
+                "final_plan_available": False,
+                "final_work_unit_facts": None,
+                "final_classification": "INFRA_FAILURE" if infrastructure else "PLANNER_FAILURE",
+                "final_contract_ok": False,
+                "terminal_stage": "planner",
+                "terminal_failure_code": "timeout" if infrastructure else "invalid_response",
+            }
+        )
+
+
+def _set_safety_regression(rows: list[dict[str, object]], case_id: str) -> None:
+    """Mark a raw-pass case as a final semantic regression."""
+    for row in _rows_for_case(rows, case_id):
+        invalid_facts = copy.deepcopy(row["planner"]["raw_work_unit_facts"])
+        invalid_facts["section_multiset_exact"] = False
+        row["planner"].update(
+            {
+                "final_work_unit_facts": invalid_facts,
+                "final_contract_ok": False,
+                "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+                "final_plan_available": True,
+            }
+        )
+        row["final_system"].update(
+            {
+                "final_work_unit_facts": invalid_facts,
+                "final_contract_ok": False,
+                "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+                "final_plan_available": True,
+            }
+        )
+
+
+def _set_unnecessary_action(rows: list[dict[str, object]], case_id: str) -> None:
+    """Mark a raw-pass case as changed by an unnecessary safety action."""
+    for row in _rows_for_case(rows, case_id):
+        row["planner"]["safety_action_count"] = 1
 
 
 @dataclass
@@ -288,3 +390,257 @@ def test_worker_calls_invalidate_population() -> None:
     )
     assert complete is False
     assert "worker_program_call" in reasons
+
+
+@pytest.mark.parametrize(
+    ("safe_rejection_count", "expected"),
+    [(2, "SYSTEM_REEVALUATION_ACCEPTED"), (3, "SYSTEM_REEVALUATION_REJECTED")],
+)
+def test_stable_pass_floor_is_exact(safe_rejection_count: int, expected: str) -> None:
+    """The 22/24 stable-pass floor is enforced without threshold drift."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    rejection_indices = (2, 4) if safe_rejection_count == 2 else (2, 4, 5)
+    rejected_ids = {str(cases[index]["case_id"]) for index in rejection_indices}
+    _set_safe_rejection(rows, rejected_ids)
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == expected
+    )
+
+
+def test_family_floor_rejects_two_of_four() -> None:
+    """An adequate aggregate cannot hide a family below its 3/4 floor."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_safe_rejection(rows, {str(cases[4]["case_id"]), str(cases[5]["case_id"])})
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+@pytest.mark.parametrize("residual_index", [0, 16])
+def test_residual_class_floor_requires_both_cases(residual_index: int) -> None:
+    """Both Lichen and Mariner residual classes are mandatory 2/2 gates."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_safe_rejection(rows, {str(cases[residual_index]["case_id"])})
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+def test_terminal_invalid_response_is_rejected() -> None:
+    """A stable valid-model invalid-response terminal is not infrastructure."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_planner_failure(rows, str(cases[0]["case_id"]))
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+def test_provider_infrastructure_failure_is_inconclusive() -> None:
+    """A timeout is an operational gap and must not become model rejection."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_planner_failure(rows, str(cases[0]["case_id"]), infrastructure=True)
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+
+def test_wrong_escape_and_safety_regression_are_rejected() -> None:
+    """A final plan escape and a raw-pass regression are both hard failures."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_safety_regression(rows, str(cases[0]["case_id"]))
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+    rows, pre, post = _rows(cases, invalid_case_ids={str(cases[1]["case_id"])})
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+def test_unnecessary_raw_pass_action_is_rejected() -> None:
+    """A safety mutation on a raw-pass plan violates the no-op invariant."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    _set_unnecessary_action(rows, str(cases[0]["case_id"]))
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+def test_unstable_final_attempt_is_rejected() -> None:
+    """Different final facts across attempts are unstable, not accepted."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    second = _rows_for_case(rows, str(cases[0]["case_id"]))[1]
+    second["final_system"]["final_contract_ok"] = False
+    second["final_system"]["final_classification"] = "SECTION_WORK_UNIT_MISMATCH"
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "SYSTEM_REEVALUATION_REJECTED"
+    )
+
+
+def test_endpoint_identity_mismatch_is_inconclusive() -> None:
+    """PRE/POST normalized endpoint identity drift invalidates the run."""
+    cases = cm59.load_case_definitions()
+    rows, pre, _ = _rows(cases)
+    post = fingerprint.build_endpoint_fingerprint_v2(
+        endpoint="http://endpoint.example/v1",
+        model_api_label=cm59.FROZEN_MODEL,
+        models_payload={"data": [{"id": cm59.FROZEN_MODEL}, {"id": "other-model"}]},
+    )
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda row: row.__setitem__("P_prompt_sha256", "0" * 64),
+        lambda row: row.__setitem__("response_schema_sha256", "0" * 64),
+        lambda row: row.__setitem__("source_summary_sha256", "0" * 64),
+        lambda row: row.__setitem__("policy_versions", {"drifted": "v0"}),
+    ],
+)
+def test_frozen_provenance_drift_is_inconclusive(mutation: object) -> None:
+    """Prompt, schema, source, and policy drift all fail population integrity."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    mutation(rows[0])  # type: ignore[operator]
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+
+def test_population_shape_corruption_is_inconclusive() -> None:
+    """Missing, duplicate, and wrong case-attempt populations fail closed."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    rows.pop()
+    for corrupted in (rows,):
+        complete, reasons = cm59.population_integrity(
+            corrupted,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+        )
+        assert complete is False
+        assert "wrong_row_count" in reasons
+
+    rows, pre, post = _rows(cases)
+    rows.append(copy.deepcopy(rows[0]))
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+    rows, pre, post = _rows(cases)
+    rows[0]["attempt_index"] = 9
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+
+def test_live_artifacts_reject_stale_data_before_endpoint_access(tmp_path: Path) -> None:
+    """A prior POST or summary cannot survive into a new live population."""
+    stale_post = tmp_path / "post.json"
+    stale_post.write_text("{}", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="non-empty"):
+        cm59._ensure_fresh_live_artifacts((tmp_path / "evidence.jsonl", stale_post))

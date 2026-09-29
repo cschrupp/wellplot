@@ -3,7 +3,7 @@
 ## Status
 
 - Baseline: `d8a49996125b48a7fd1c8385059ddaae97978069`
-- Implementation checkpoint: the commit containing this pre-live slice
+- Implementation checkpoint: the commit containing this corrected pre-live slice
 - Provider/endpoint calls: `0`
 - Production changes: `0`
 - Live inference: not authorized in this slice
@@ -69,6 +69,28 @@ closure violations, duplicate capability types, and unstable cases.
 The historical Lichen and Mariner shapes in the pre-live report are
 diagnostic-only anchors. They do not contribute to the future population or
 decision.
+
+## Pre-Live Review Corrections
+
+The Lichen P anchor is section-only with a spurious empty report task. Its
+gold contains no report capability, CM-58.2 removes the report task, and the
+three original section signatures then pass unchanged. The Lichen RC anchor
+remains a mismatch because it lacks the normal track in its reference section.
+
+The two Lichen and two Mariner population requests were independently
+re-authored for semantic freshness while retaining their exact capability gold
+and residual classes. The corrected corpus SHA is:
+
+`cfd44dc6177d06756c430a31e1fce58411e94a32732997813f78d96ee786d646`
+
+Decision tests cover the stable-pass and family floors, both residual floors,
+terminal model and infrastructure failures, wrong escapes, safety regressions,
+unnecessary raw-pass actions, instability, endpoint drift, population shape
+corruption, and frozen prompt/schema/source/policy provenance drift.
+
+Before the first PRE endpoint request, the live runner rejects populated
+evidence, PRE, POST, or summary paths. It never deletes or overwrites prior
+live artifacts.
 
 ## Hard Boundaries
 
