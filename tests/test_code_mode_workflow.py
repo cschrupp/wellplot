@@ -217,7 +217,7 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
     """Reversed asynchronous completion does not change canonical merge order."""
     plan = SemanticPlan(
         summary="multi-section plan",
-        report_task=ReportTask(goal="Report title"),
+        report_task=ReportTask(goal="Report title", capability_ids=("report.standard",)),
         section_tasks=(
             SectionTask(goal="first section", capability_ids=("section.log_plot",)),
             SectionTask(goal="second section", capability_ids=("section.log_plot",)),
@@ -239,7 +239,7 @@ def test_graph_supports_report_only_and_section_only_plans() -> None:
     """Both valid planner topologies dispatch only their real work units."""
     report_plan = SemanticPlan(
         summary="report only",
-        report_task=ReportTask(goal="Report title"),
+        report_task=ReportTask(goal="Report title", capability_ids=("report.standard",)),
     )
     report_result = _invoke(report_plan, _Workers())
     assert report_result["merged_intent"]["title"] == "Report title"

@@ -267,7 +267,9 @@ def _plan(*, report: bool, sections: int) -> SemanticPlan:
     """Build one of the frozen parity plan shapes."""
     return SemanticPlan(
         summary="first section fixture" if sections else "report fixture",
-        report_task=ReportTask(goal="Report title") if report else None,
+        report_task=(
+            ReportTask(goal="Report title", capability_ids=("report.standard",)) if report else None
+        ),
         section_tasks=tuple(
             SectionTask(
                 goal="first section" if index == 0 else "second section",
@@ -282,7 +284,11 @@ def _revision_plan(*, report: bool, sections: int) -> SemanticPlan:
     """Build deterministic report, existing-section, and mixed revision plans."""
     return SemanticPlan(
         summary="revision fixture",
-        report_task=ReportTask(goal="Updated report") if report else None,
+        report_task=(
+            ReportTask(goal="Updated report", capability_ids=("report.standard",))
+            if report
+            else None
+        ),
         section_tasks=tuple(
             SectionTask(
                 goal="Existing section revised",

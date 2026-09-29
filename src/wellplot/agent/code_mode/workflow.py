@@ -32,6 +32,7 @@ from .planner import (
     SemanticPlanner,
 )
 from .program_worker import ProgramSectionCompiler
+from .report_boundary_safety import enforce_report_boundary_safety
 from .report_worker import ReportProgramCompiler
 from .state import CodeModeGraphState, CodeModeWorkerState, WorkerOutcome
 
@@ -47,7 +48,7 @@ class CodeModeGraphDependencies:
 
 
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
-    """Build plan -> safety -> enrich -> fan-out -> deterministic merge workflow."""
+    """Build plan -> safety layers -> enrich -> fan-out -> deterministic merge."""
 
     async def plan_node(state: CodeModeGraphState) -> dict[str, object]:
         """Plan from a bounded document summary, never the full document."""
@@ -93,6 +94,22 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             ),
         )
         return {"enriched_context": context.model_dump(mode="json")}
+
+    async def report_boundary_safety_node(state: CodeModeGraphState) -> dict[str, object]:
+        """Apply provider-free report-boundary rules after reference safety."""
+        plan = SemanticPlan.model_validate(state["plan"])
+        registry = getattr(dependencies.planner, "registry", None)
+        if registry is None:
+            registry = create_builtin_registry()
+        result = enforce_report_boundary_safety(
+            request=state["request"],
+            plan=plan,
+            registry=registry,
+        )
+        return {
+            "plan": result.safe_plan.model_dump(mode="json"),
+            "report_boundary_safety": result.evidence().model_dump(mode="json"),
+        }
 
     async def dispatch_workers(state: CodeModeGraphState) -> list[Send]:
         """Dispatch only the task-local context required by each worker."""
@@ -211,12 +228,14 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     builder = StateGraph(CodeModeGraphState)
     builder.add_node("plan_v2", plan_node)
     builder.add_node("capability_safety", capability_safety_node)
+    builder.add_node("report_boundary_safety", report_boundary_safety_node)
     builder.add_node("enrich_context", enrich_node)
     builder.add_node("compile_worker", compile_worker_node)
     builder.add_node("merge_intent", merge_node)
     builder.add_edge(START, "plan_v2")
     builder.add_edge("plan_v2", "capability_safety")
-    builder.add_edge("capability_safety", "enrich_context")
+    builder.add_edge("capability_safety", "report_boundary_safety")
+    builder.add_edge("report_boundary_safety", "enrich_context")
     builder.add_conditional_edges(
         "enrich_context",
         dispatch_workers,

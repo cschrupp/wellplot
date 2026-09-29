@@ -29,6 +29,10 @@ from .enrichment import (
     SourceCandidate,
 )
 from .planner import CompilationMode, PlannerSemanticFailure, SemanticPlan
+from .report_boundary_safety import (
+    ReportBoundarySafetyEvidence,
+    ReportBoundarySafetyFailure,
+)
 from .state import CodeModeGraphState, WorkerOutcome
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
@@ -159,6 +163,8 @@ class CodeModeCompileFacade:
             return _failure_result((_planner_diagnostic(error),))
         except CapabilitySafetyFailure as error:
             return _failure_result((_capability_safety_failure_diagnostic(error),))
+        except ReportBoundarySafetyFailure as error:
+            return _failure_result((_report_boundary_safety_failure_diagnostic(error),))
         except SemanticEnrichmentError as error:
             return _failure_result((_enrichment_diagnostic(error),))
         return _project_graph_result(result)
@@ -178,6 +184,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
     )
     metrics = _aggregate_metrics(workers)
     diagnostics = _capability_safety_warning_diagnostics(state)
+    diagnostics += _report_boundary_safety_warning_diagnostics(state)
     diagnostics += tuple(
         _enrichment_warning_diagnostic(warning) for warning in enriched_context.warnings
     )
@@ -326,6 +333,51 @@ def _capability_safety_warning_diagnostics(
                 retryable=False,
                 worker_kind="section",
                 plan_order=action.section_index + 1,
+            )
+        )
+    return tuple(diagnostics)
+
+
+def _report_boundary_safety_failure_diagnostic(
+    error: ReportBoundarySafetyFailure,
+) -> CompileDiagnostic:
+    """Project a deterministic report-boundary rejection into the host contract."""
+    return CompileDiagnostic(
+        stage="report_boundary_safety",
+        code=f"report_boundary_safety.{error.code}",
+        message=error.safe_message,
+        retryable=False,
+    )
+
+
+def _report_boundary_safety_warning_diagnostics(
+    state: dict[str, object],
+) -> tuple[CompileDiagnostic, ...]:
+    """Project one bounded warning for each report-boundary safety action."""
+    payload = state.get("report_boundary_safety")
+    if not isinstance(payload, dict):
+        return ()
+    evidence = ReportBoundarySafetyEvidence.model_validate(payload)
+    diagnostics: list[CompileDiagnostic] = []
+    for action in evidence.actions:
+        if action.kind.value == "add_report_standard":
+            code = "report_boundary_safety.report_standard_added"
+            message = (
+                "A missing report capability was added to an explicitly requested report "
+                "task before semantic enrichment."
+            )
+        else:
+            code = "report_boundary_safety.unrequested_report_task_removed"
+            message = "An unrequested report task was removed before semantic enrichment."
+        diagnostics.append(
+            CompileDiagnostic(
+                stage="report_boundary_safety",
+                code=code,
+                message=message,
+                severity=CompileDiagnosticSeverity.WARNING,
+                retryable=False,
+                worker_kind="report" if action.kind.value == "add_report_standard" else None,
+                plan_order=0 if action.kind.value == "add_report_standard" else None,
             )
         )
     return tuple(diagnostics)

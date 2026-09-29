@@ -134,7 +134,10 @@ class _DeterministicPlanner:
         """Return one report-only semantic task without a provider call."""
         return SemanticPlan(
             summary="deterministic notebook report",
-            report_task=ReportTask(goal="Deterministic notebook report"),
+            report_task=ReportTask(
+                goal="Deterministic notebook report",
+                capability_ids=("report.standard",),
+            ),
         )
 
 
