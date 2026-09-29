@@ -133,6 +133,38 @@ validation are zero. A replacement population must use distinct evidence
 paths and execute all 48 rows from the beginning only after independent
 reauthorization.
 
+## Replacement Live Population
+
+The single authorized replacement population completed from the beginning at
+the corrected checkpoint. The raw JSONL remains outside the repository at
+`/tmp/cm59a-system-reevaluation-qwen-replacement1.jsonl`; it is preserved
+unchanged and is not merged with the first population:
+
+```text
+checkpoint: 61cef63841c56dd48ba4368efbd4479b9748ba30
+rows: 48 / 48
+planner executions: 48
+provider calls: 56
+provider infrastructure failures: 0
+program/worker calls: 0
+raw evidence SHA-256: 22eef83b8fedb23a8532aa7aa443aff36d99c505ed05d9ff463da38891a6c277
+summary: CM-59A-replacement1-live-summary.json
+summary SHA-256: aa88075b5bf4d7301030bdff6cb086b5bca07324cfafb42d50b1081e2e0ec9f9
+PRE endpoint SHA-256: 28456086d89fb69d4bd0bbc77ada67672dc0a85d4549d623ca0164a717d8a4e1
+POST endpoint SHA-256: d6478d9bea0bb242a3ec1d2ea960db8d8f23d9c89dfe0588680b4c70fa21c7ed
+endpoint identity: valid and equal
+raw repeatability: 24 / 24 stable cases
+```
+
+Provider-free finalization produced `SYSTEM_REEVALUATION_REJECTED`. There
+were 21 stable passes, below the required 22, with two stable planner
+failures and one stable wrong final-plan escape. Family floors and both
+Lichen/Mariner residual floors passed; safety regressions, reference
+violations, structural violations, unstable cases, and provider
+infrastructure failures were zero. Production adoption and CM-57D remain
+blocked. This is a valid model/system rejection, not an operationally
+inconclusive result.
+
 ## Hard Boundaries
 
 This slice does not modify `src/wellplot`, prompts, schemas, capability
