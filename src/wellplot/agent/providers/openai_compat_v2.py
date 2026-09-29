@@ -21,6 +21,7 @@ from .base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from .response_diagnostics import ProviderResponseFailureReason, StructuredResponseProviderError
 
 TModel = TypeVar("TModel", bound=BaseModel)
 StructuredOutputCapability = Literal["json_schema"]
@@ -97,11 +98,18 @@ class OpenAICompatibleBackendV2:
         message, usage = _extract_message(response)
         content = _message_content(message)
         try:
-            value = response_model.model_validate(json.loads(content))
-        except (TypeError, ValueError, ValidationError):
-            raise ProviderRequestError(
-                ProviderFailureCategory.INVALID_RESPONSE,
+            payload = json.loads(content)
+        except (TypeError, ValueError):
+            raise StructuredResponseProviderError(
                 "OpenAI-compatible returned invalid structured JSON.",
+                response_reason=ProviderResponseFailureReason.INVALID_JSON,
+            ) from None
+        try:
+            value = response_model.model_validate(payload)
+        except (TypeError, ValueError, ValidationError):
+            raise StructuredResponseProviderError(
+                "OpenAI-compatible returned invalid structured JSON.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
             ) from None
         return StructuredGenerationResult(
             value=value,
@@ -169,22 +177,22 @@ def _extract_message(response: object) -> tuple[object, object]:
     """Validate one assistant choice and return its message and usage."""
     choices = _field(response, "choices")
     if not isinstance(choices, (list, tuple)) or len(choices) != 1:
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned an unusable completion choice.",
+            response_reason=ProviderResponseFailureReason.UNUSABLE_CHOICE,
         )
     choice = choices[0]
     message = _field(choice, "message")
     if message is None:
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned no completion message.",
+            response_reason=ProviderResponseFailureReason.MISSING_MESSAGE,
         )
     role = _field(message, "role")
     if role is not None and role != "assistant":
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned a non-assistant completion message.",
+            response_reason=ProviderResponseFailureReason.NON_ASSISTANT_MESSAGE,
         )
     finish_reason = _field(choice, "finish_reason")
     if finish_reason in _REFUSAL_FINISH_REASONS or _message_refusal(message):
@@ -192,17 +200,20 @@ def _extract_message(response: object) -> tuple[object, object]:
             ProviderFailureCategory.PROVIDER_REJECTED,
             "OpenAI-compatible rejected the request.",
         )
-    if finish_reason in _INCOMPLETE_FINISH_REASONS or (
-        finish_reason is not None and finish_reason != _NORMAL_FINISH_REASON
-    ):
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+    if finish_reason in _INCOMPLETE_FINISH_REASONS:
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned incomplete output.",
+            response_reason=ProviderResponseFailureReason.INCOMPLETE_OUTPUT,
+        )
+    if finish_reason is not None and finish_reason != _NORMAL_FINISH_REASON:
+        raise StructuredResponseProviderError(
+            "OpenAI-compatible returned incomplete output.",
+            response_reason=ProviderResponseFailureReason.UNEXPECTED_FINISH_REASON,
         )
     if _field(message, "tool_calls"):
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned a tool call instead of output.",
+            response_reason=ProviderResponseFailureReason.TOOL_CALL,
         )
     return message, _field(response, "usage")
 
@@ -211,9 +222,9 @@ def _message_content(message: object) -> str:
     """Return one string message body without accepting tool payloads."""
     content = _field(message, "content")
     if not isinstance(content, str):
-        raise ProviderRequestError(
-            ProviderFailureCategory.INVALID_RESPONSE,
+        raise StructuredResponseProviderError(
             "OpenAI-compatible returned no usable completion content.",
+            response_reason=ProviderResponseFailureReason.MISSING_CONTENT,
         )
     return content
 

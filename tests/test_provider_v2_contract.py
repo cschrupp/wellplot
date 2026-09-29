@@ -19,6 +19,10 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.agent.providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
 
 
 class _SemanticPlan(BaseModel):
@@ -160,6 +164,44 @@ def test_provider_errors_are_redacted_and_retryability_is_deterministic() -> Non
         "retryable": True,
         "status_code": 504,
     }
+
+
+@pytest.mark.parametrize("reason", list(ProviderResponseFailureReason))
+def test_invalid_response_reason_is_bounded_and_serializable(
+    reason: ProviderResponseFailureReason,
+) -> None:
+    """Invalid-response reasons remain bounded provider-neutral metadata."""
+    error = StructuredResponseProviderError(
+        "The provider returned invalid structured output.",
+        response_reason=reason,
+    )
+
+    assert error.response_reason is reason
+    assert (
+        error.public_metadata()
+        == ProviderRequestError(
+            ProviderFailureCategory.INVALID_RESPONSE,
+            "The provider returned invalid structured output.",
+        ).public_metadata()
+    )
+    assert error.diagnostic_metadata() == {"response_reason": reason.value}
+    assert json.dumps(error.public_metadata())
+    assert repr(error) == repr(
+        ProviderRequestError(
+            ProviderFailureCategory.INVALID_RESPONSE,
+            "The provider returned invalid structured output.",
+        )
+    )
+    assert str(error) == "invalid_response: The provider returned invalid structured output."
+
+
+def test_response_reason_rejects_unknown_values() -> None:
+    """Diagnostic reasons cannot escape the bounded enum."""
+    with pytest.raises(ValueError):
+        StructuredResponseProviderError(
+            "Invalid response.",
+            response_reason="not-a-real-reason",  # type: ignore[arg-type]
+        )
 
 
 def test_provider_request_models_reject_invalid_limits() -> None:

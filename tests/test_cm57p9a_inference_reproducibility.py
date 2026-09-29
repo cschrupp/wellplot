@@ -113,7 +113,20 @@ def test_manifest_is_hash_only_and_has_frozen_case_order() -> None:
 
 def test_frozen_controls_and_future_population_are_provider_free() -> None:
     """The pre-live report declares the full population without provider work."""
-    report = p9.prelive_report()
+    real_artifact_sha256 = p9.artifact_sha256
+    provider_path = (p9.REPO_ROOT / "src/wellplot/agent/providers/openai_compat_v2.py").resolve()
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == provider_path:
+            return p9.EXPECTED_OPENAI_COMPAT_SHA256
+        return real_artifact_sha256(path)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(p9, "artifact_sha256", historical_artifact_sha256)
+    try:
+        report = p9.prelive_report()
+    finally:
+        monkeypatch.undo()
     assert report["provider_calls"] == 0
     assert report["worker_program_calls"] == 0
     assert report["cases"] == 6
@@ -123,6 +136,25 @@ def test_frozen_controls_and_future_population_are_provider_free() -> None:
     assert report["provider_calls_min"] == 96
     assert report["provider_calls_max"] == 192
     assert report["live_inference"] == "NOT_STARTED"
+
+
+def test_historical_provider_drift_still_fails_closed() -> None:
+    """The frozen harness rejects a changed current adapter during execution."""
+    real_artifact_sha256 = p9.artifact_sha256
+    provider_path = (p9.REPO_ROOT / "src/wellplot/agent/providers/openai_compat_v2.py").resolve()
+
+    def drifted_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == provider_path:
+            return "0" * 64
+        return real_artifact_sha256(path)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(p9, "artifact_sha256", drifted_artifact_sha256)
+    try:
+        with pytest.raises(RuntimeError, match="CM-57P9A frozen artifact drifted"):
+            p9.prelive_report()
+    finally:
+        monkeypatch.undo()
 
 
 def test_prompt_backend_changes_only_the_frozen_system_prompt() -> None:

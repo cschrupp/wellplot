@@ -16,6 +16,10 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
 )
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+from wellplot.agent.providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
 from wellplot.authoring_program.grammar import DEFAULT_PROGRAM_POLICY_LIMITS
 
 
@@ -82,6 +86,7 @@ def _response(
     content: object,
     *,
     finish_reason: str | None = "stop",
+    role: object = "assistant",
     refusal: object = None,
     tool_calls: object = None,
     usage: object = None,
@@ -91,7 +96,7 @@ def _response(
         choices=[
             SimpleNamespace(
                 message=SimpleNamespace(
-                    role="assistant",
+                    role=role,
                     content=content,
                     refusal=refusal,
                     tool_calls=tool_calls or [],
@@ -240,6 +245,101 @@ def test_completion_and_content_failures_are_classified_without_dispatch(
     assert caught.value.category is category
 
 
+def test_structured_response_failure_reasons_cover_each_adapter_boundary() -> None:
+    """Classify each bounded completion-envelope failure without raw payloads."""
+    missing_message = _response("{}")
+    missing_message.choices[0].message = None
+    cases = [
+        (SimpleNamespace(choices=[]), ProviderResponseFailureReason.UNUSABLE_CHOICE),
+        (missing_message, ProviderResponseFailureReason.MISSING_MESSAGE),
+        (
+            _response("{}", role="user"),
+            ProviderResponseFailureReason.NON_ASSISTANT_MESSAGE,
+        ),
+        (
+            _response("{}", finish_reason="length"),
+            ProviderResponseFailureReason.INCOMPLETE_OUTPUT,
+        ),
+        (
+            _response("{}", finish_reason="provider_specific_stop"),
+            ProviderResponseFailureReason.UNEXPECTED_FINISH_REASON,
+        ),
+        (
+            _response("{}", tool_calls=[SimpleNamespace(name="secret-tool")]),
+            ProviderResponseFailureReason.TOOL_CALL,
+        ),
+        (_response(None), ProviderResponseFailureReason.MISSING_CONTENT),
+    ]
+
+    for response, reason in cases:
+        completions = _FakeCompletions(response=response)
+        backend = OpenAICompatibleBackendV2(model="local-test", client=_FakeClient(completions))
+
+        with pytest.raises(ProviderRequestError) as caught:
+            _run(backend.generate_program(_program_request()))
+
+        assert caught.value.category is ProviderFailureCategory.INVALID_RESPONSE
+        assert isinstance(caught.value, StructuredResponseProviderError)
+        assert caught.value.response_reason is reason
+        assert "secret" not in repr(caught.value)
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        ("{bad", ProviderResponseFailureReason.INVALID_JSON),
+        ("{}", ProviderResponseFailureReason.SCHEMA_VALIDATION),
+    ],
+)
+def test_structured_json_and_schema_failures_are_distinguished(
+    content: str,
+    reason: ProviderResponseFailureReason,
+) -> None:
+    """Separate JSON parsing failure from response-model validation failure."""
+    completions = _FakeCompletions(response=_response(content))
+    backend = OpenAICompatibleBackendV2(
+        model="local-test",
+        client=_FakeClient(completions),
+        structured_output="json_schema",
+    )
+
+    with pytest.raises(ProviderRequestError) as caught:
+        _run(backend.generate_structured(_structured_request(), response_model=_Plan))
+
+    assert caught.value.category is ProviderFailureCategory.INVALID_RESPONSE
+    assert isinstance(caught.value, StructuredResponseProviderError)
+    assert caught.value.response_reason is reason
+    assert content not in repr(caught.value)
+
+
+def test_incomplete_finish_reason_precedes_tool_call_reason() -> None:
+    """An incomplete finish reason dominates later tool-call inspection."""
+    response = _response("{}", finish_reason="tool_calls", tool_calls=[{"name": "secret"}])
+    backend = OpenAICompatibleBackendV2(
+        model="local-test",
+        client=_FakeClient(_FakeCompletions(response=response)),
+    )
+
+    with pytest.raises(ProviderRequestError) as caught:
+        _run(backend.generate_program(_program_request()))
+
+    assert caught.value.response_reason is ProviderResponseFailureReason.INCOMPLETE_OUTPUT
+
+
+def test_stop_finish_reason_with_tool_call_is_tool_call_reason() -> None:
+    """A completed response containing a tool call is classified separately."""
+    response = _response("{}", finish_reason="stop", tool_calls=[{"name": "secret"}])
+    backend = OpenAICompatibleBackendV2(
+        model="local-test",
+        client=_FakeClient(_FakeCompletions(response=response)),
+    )
+
+    with pytest.raises(ProviderRequestError) as caught:
+        _run(backend.generate_program(_program_request()))
+
+    assert caught.value.response_reason is ProviderResponseFailureReason.TOOL_CALL
+
+
 def test_tool_calls_are_rejected_and_never_executed() -> None:
     """Treat returned tool calls as invalid output rather than dispatching them."""
     response = _response("wp.report()", tool_calls=[SimpleNamespace(name="secret_tool")])
@@ -262,7 +362,20 @@ def test_refusal_is_provider_rejected_without_exposing_content() -> None:
         _run(backend.generate_program(_program_request()))
 
     assert caught.value.category is ProviderFailureCategory.PROVIDER_REJECTED
+    assert not hasattr(caught.value, "response_reason")
     assert "secret" not in str(caught.value)
+
+
+def test_content_filter_finish_reason_is_provider_rejected_without_reason() -> None:
+    """A refusal finish reason remains outside invalid-response diagnostics."""
+    completions = _FakeCompletions(response=_response("{}", finish_reason="content_filter"))
+    backend = OpenAICompatibleBackendV2(model="local-test", client=_FakeClient(completions))
+
+    with pytest.raises(ProviderRequestError) as caught:
+        _run(backend.generate_program(_program_request()))
+
+    assert caught.value.category is ProviderFailureCategory.PROVIDER_REJECTED
+    assert not hasattr(caught.value, "response_reason")
 
 
 def test_oversized_program_uses_the_canonical_cm11_limit() -> None:
@@ -309,11 +422,19 @@ class RateLimitError(Exception):
     status_code = 429
 
 
+class AuthenticationError(Exception):
+    """Fake authentication exception with a safe status code."""
+
+    status_code = 401
+
+
 @pytest.mark.parametrize(
     ("error", "category"),
     [
         (APITimeoutError("secret timeout"), ProviderFailureCategory.TIMEOUT),
         (RateLimitError("secret rate"), ProviderFailureCategory.RATE_LIMIT),
+        (AuthenticationError("secret auth"), ProviderFailureCategory.AUTHENTICATION),
+        (ConnectionError("secret connection"), ProviderFailureCategory.TRANSPORT),
     ],
 )
 def test_provider_failures_are_redacted_and_stable(
@@ -328,6 +449,7 @@ def test_provider_failures_are_redacted_and_stable(
         _run(backend.generate_program(_program_request()))
 
     assert caught.value.category is category
+    assert not hasattr(caught.value, "response_reason")
     assert "secret" not in str(caught.value)
     assert "secret" not in repr(caught.value)
 

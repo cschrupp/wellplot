@@ -27,6 +27,10 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.agent.providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
 from wellplot.capabilities import CapabilityRegistry, CapabilitySpec, create_builtin_registry
 
 
@@ -588,6 +592,55 @@ def test_planner_stops_after_two_invalid_structured_responses() -> None:
             )
         )
 
+    assert len(backend.requests) == 2
+
+
+def test_planner_preserves_terminal_invalid_response_reason() -> None:
+    """The bounded retry exposes only the terminal structured failure reason."""
+    backend = _SequenceBackend(
+        responses=[
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.INVALID_JSON,
+            ),
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+            ),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(ProviderRequestError) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0
+            )
+        )
+
+    assert isinstance(caught.value, StructuredResponseProviderError)
+    assert caught.value.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
+    assert len(backend.requests) == 2
+
+
+def test_planner_recovers_after_invalid_json_reason() -> None:
+    """A reason-bearing invalid response still uses the existing one retry."""
+    backend = _SequenceBackend(
+        responses=[
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.INVALID_JSON,
+            ),
+            _plan_payload(),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0)
+    )
+
+    assert result == SemanticPlan.model_validate(_plan_payload())
     assert len(backend.requests) == 2
 
 
