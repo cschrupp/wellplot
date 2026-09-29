@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from ...capabilities import CapabilityRegistry
 from .planner import PlannerSemanticError, SemanticPlan, validate_semantic_plan
 
-REPORT_BOUNDARY_POLICY_VERSION = "cm58.report-boundary.v1"
+REPORT_BOUNDARY_POLICY_VERSION = "cm58.report-boundary.v2"
 _REPORT_CAPABILITY = "report.standard"
 
 
@@ -136,6 +136,12 @@ _SECTION_SIGNALS = (
     "log display",
     "log displays",
 )
+_SECTION_DISPLAY_SIGNALS = (
+    "scalar display",
+    "scalar displays",
+    "shared display",
+    "shared displays",
+)
 
 
 def _normalize_request(request: str) -> str:
@@ -159,7 +165,9 @@ def classify_report_boundary_intent(request: str) -> ReportBoundaryIntent:
         raise TypeError("Report-boundary classification requires text.")
     text = _normalize_request(request)
     report_requested = any(_contains_signal(text, signal) for signal in _REPORT_SIGNALS)
-    section_requested = any(_contains_signal(text, signal) for signal in _SECTION_SIGNALS)
+    section_requested = any(
+        _contains_signal(text, signal) for signal in (*_SECTION_SIGNALS, *_SECTION_DISPLAY_SIGNALS)
+    )
     if report_requested and section_requested:
         return ReportBoundaryIntent.MIXED
     if report_requested:
@@ -264,7 +272,7 @@ def enforce_report_boundary_safety(
     plan: SemanticPlan,
     registry: CapabilityRegistry,
 ) -> ReportBoundarySafetyResult:
-    """Enforce v1 report-boundary admissibility before semantic enrichment."""
+    """Enforce v2 report-boundary admissibility before semantic enrichment."""
     intent = classify_report_boundary_intent(request)
     report_task = plan.report_task
 

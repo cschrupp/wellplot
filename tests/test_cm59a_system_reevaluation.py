@@ -369,6 +369,19 @@ def test_prelive_report_is_provider_and_endpoint_free(monkeypatch: pytest.Monkey
 
     monkeypatch.setattr(cm59, "_provider_configuration", fail)
     monkeypatch.setattr(cm59.fingerprint, "capture_endpoint_fingerprint_v2", fail)
+    # CM-59A is frozen against report-boundary v1; CM-59A-R1 intentionally
+    # changes the current production policy to v2. This test isolates its
+    # provider/endpoint-free property without rewriting historical hashes.
+    monkeypatch.setattr(cm59, "_verify_production_matches_baseline", lambda: None)
+    monkeypatch.setattr(
+        cm59,
+        "POLICY_VERSIONS",
+        {
+            "capability_safety": "cm58.reference-admissibility.v1",
+            "report_boundary_safety": "cm58.report-boundary.v1",
+            "section_leaf_safety": "cm58.section-leaf-admissibility.v1",
+        },
+    )
     report = cm59.prelive_report()
     assert report["status"] == "PRELIVE_READY"
     assert report["provider_calls"] == 0

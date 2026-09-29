@@ -121,11 +121,61 @@ def _successful_result(title: str, *, section: bool = False) -> ProgramExecution
         ("Set the summary.", "unspecified"),
         ("PREPARE A MEMO, THEN ADD A PANEL!", "mixed"),
         ("Prepare a handover-brief with a report-header.", "report_only"),
+        (
+            "Show the Fig interval permeability response as one scalar display.",
+            "section_only",
+        ),
+        (
+            "Keep a depth marker alongside the Linden resistivity trace in a shared display.",
+            "section_only",
+        ),
     ],
 )
 def test_report_boundary_classifier(text: str, expected: str) -> None:
     """Classify bounded report and section signals deterministically."""
     assert classify_report_boundary_intent(text) is ReportBoundaryIntent(expected)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Display the report title Pressure Review.",
+        "Display the preparer name on the report cover.",
+        "Display the report heading Completion Review.",
+        "Use the display name Final Interpretation for the report title.",
+    ],
+)
+def test_bare_display_does_not_create_section_intent(text: str) -> None:
+    """Generic display language remains report-only when report signals exist."""
+    assert classify_report_boundary_intent(text) is ReportBoundaryIntent.REPORT_ONLY
+
+
+def test_bare_response_does_not_create_section_intent() -> None:
+    """Response is not an independent section signal."""
+    assert (
+        classify_report_boundary_intent(
+            "Summarize the permeability response in the completion report."
+        )
+        is ReportBoundaryIntent.REPORT_ONLY
+    )
+
+
+def test_bare_trace_does_not_create_section_intent() -> None:
+    """Trace is not an independent section signal."""
+    assert (
+        classify_report_boundary_intent("Review the resistivity trace for the completion summary.")
+        is ReportBoundaryIntent.REPORT_ONLY
+    )
+
+
+def test_scalar_display_mixed_intent_preserves_both_domains() -> None:
+    """A report note plus scalar display remains mixed intent."""
+    assert (
+        classify_report_boundary_intent(
+            "Add the review note Accepted and show the permeability response as one scalar display."
+        )
+        is ReportBoundaryIntent.MIXED
+    )
 
 
 def test_report_boundary_evidence_is_normalized_and_path_free() -> None:
@@ -292,6 +342,77 @@ def test_section_only_spurious_report_task_is_removed(capability_ids: tuple[str,
     assert result.safe_plan.report_task is None
     assert result.safe_plan.section_tasks == (section,)
     assert result.actions[0].kind is ReportBoundaryActionKind.REMOVE_REPORT_TASK
+
+
+@pytest.mark.parametrize(
+    ("request_text", "section"),
+    [
+        (
+            "Show the Fig interval permeability response as one scalar display.",
+            ("section.log_plot", "track.normal", "binding.curve"),
+        ),
+        (
+            "Keep a depth marker alongside the Linden resistivity trace in a shared display.",
+            ("section.log_plot", "track.reference", "track.normal", "binding.curve"),
+        ),
+    ],
+)
+def test_cm59a_spurious_report_task_is_removed_for_new_display_phrases(
+    request_text: str,
+    section: tuple[str, ...],
+) -> None:
+    """The demonstrated Fig/Linden residual plans lose only report work."""
+    section_task = _section_task(*section)
+    plan = _plan(
+        report_task=ReportTask(goal="spurious report", capability_ids=("report.standard",)),
+        section_tasks=(section_task,),
+    )
+    result = enforce_report_boundary_safety(request=request_text, plan=plan, registry=REGISTRY)
+    assert result.intent is ReportBoundaryIntent.SECTION_ONLY
+    assert result.actions[0].kind is ReportBoundaryActionKind.REMOVE_REPORT_TASK
+    assert result.safe_plan.report_task is None
+    assert result.safe_plan.section_tasks == (section_task,)
+    assert result.safe_plan.model_dump(mode="json")["section_tasks"] == [
+        section_task.model_dump(mode="json")
+    ]
+
+
+@pytest.mark.parametrize(
+    ("request_text", "section"),
+    [
+        (
+            "Show the Fig interval permeability response as one scalar display.",
+            ("section.log_plot", "track.normal", "binding.curve"),
+        ),
+        (
+            "Keep a depth marker alongside the Linden resistivity trace in a shared display.",
+            ("section.log_plot", "track.reference", "track.normal", "binding.curve"),
+        ),
+    ],
+)
+def test_cm59a_correct_display_plans_are_no_ops(
+    request_text: str,
+    section: tuple[str, ...],
+) -> None:
+    """Correct section-only plans remain semantically identical under v2."""
+    plan = _plan(section_tasks=(_section_task(*section),))
+    result = enforce_report_boundary_safety(request=request_text, plan=plan, registry=REGISTRY)
+    assert result.intent is ReportBoundaryIntent.SECTION_ONLY
+    assert result.changed is False
+    assert result.actions == ()
+    assert result.safe_plan == plan
+
+
+def test_report_boundary_policy_is_v2() -> None:
+    """New report-boundary evidence identifies the revised policy."""
+    plan = _plan(section_tasks=(_section_task("section.log_plot", "track.normal"),))
+    result = enforce_report_boundary_safety(
+        request="Show one scalar display.",
+        plan=plan,
+        registry=REGISTRY,
+    )
+    assert result.policy_version == "cm58.report-boundary.v2"
+    assert result.evidence().policy_version == "cm58.report-boundary.v2"
 
 
 def test_section_only_report_removal_would_empty_plan_fails() -> None:
