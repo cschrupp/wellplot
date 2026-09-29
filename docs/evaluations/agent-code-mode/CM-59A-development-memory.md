@@ -81,12 +81,18 @@ The two Lichen and two Mariner population requests were independently
 re-authored for semantic freshness while retaining their exact capability gold
 and residual classes. The corrected corpus SHA is:
 
-`cfd44dc6177d06756c430a31e1fce58411e94a32732997813f78d96ee786d646`
+`b6a605158e667e5250df99a53cb4ba521473f8146fad2022aed2dff77d5f551b`
 
 Decision tests cover the stable-pass and family floors, both residual floors,
 terminal model and infrastructure failures, wrong escapes, safety regressions,
 unnecessary raw-pass actions, instability, endpoint drift, population shape
 corruption, and frozen prompt/schema/source/policy provenance drift.
+
+The provider-free corpus audit runs each gold plan through all three safety
+layers and requires no layer to change it while the final facts remain
+contract-correct. Finalization reconciles stored raw/final facts,
+classifications, plan-terminal state, safety-layer evidence, and action counts;
+contradictory redundant fields are inconclusive rather than decision-bearing.
 
 Before the first PRE endpoint request, the live runner rejects populated
 evidence, PRE, POST, or summary paths. It never deletes or overwrites prior

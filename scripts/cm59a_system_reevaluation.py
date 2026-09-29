@@ -39,6 +39,7 @@ from wellplot.agent.code_mode.planner import (  # noqa: E402
     PlannerSemanticFailure,
     SemanticPlan,
     SemanticPlanner,
+    validate_semantic_plan,
 )
 from wellplot.agent.code_mode.report_boundary_safety import (  # noqa: E402
     REPORT_BOUNDARY_POLICY_VERSION,
@@ -127,6 +128,14 @@ POLICY_VERSIONS = {
     "section_leaf_safety": SECTION_LEAF_POLICY_VERSION,
 }
 SAFETY_LAYER_KEYS = ("cm58_1", "cm58_2", "cm58_3")
+SAFETY_ACTION_KINDS = {
+    "remove_reference",
+    "replace_reference_with_normal",
+    "add_report_standard",
+    "remove_report_task",
+    "remove_raster_only_curve_binding",
+    "remove_report_note_annotation_leakage",
+}
 PRODUCTION_ARTIFACTS = (
     "src/wellplot/agent/code_mode/planner.py",
     "src/wellplot/agent/code_mode/capability_safety.py",
@@ -333,6 +342,26 @@ def _facts(
 ) -> dict[str, object] | None:
     """Score one transient plan through the established P-series evaluator."""
     return p5._facts(plan, case, registry) if plan is not None else None
+
+
+def _gold_plan(case: dict[str, object]) -> SemanticPlan:
+    """Build one provider-free semantic plan from corpus gold for pre-live checks."""
+    report_capabilities = tuple(str(value) for value in case["expected_report_capabilities"])
+    return SemanticPlan(
+        summary="CM-59A provider-free gold plan",
+        report_task=(
+            p5.ReportTask(goal="gold report", capability_ids=report_capabilities)
+            if report_capabilities
+            else None
+        ),
+        section_tasks=tuple(
+            p5.SectionTask(
+                goal="gold section",
+                capability_ids=tuple(str(value) for value in section),
+            )
+            for section in case["expected_sections"]
+        ),
+    )
 
 
 @dataclass
@@ -679,6 +708,183 @@ def _final_facts(row: dict[str, object]) -> dict[str, object] | None:
     return value if isinstance(value, dict) else None
 
 
+def _facts_integrity(
+    facts: object,
+    *,
+    contract_value: object,
+    classification: object,
+    label: str,
+) -> list[str]:
+    """Reconcile stored evaluator facts with their stored derived fields."""
+    if not isinstance(facts, dict):
+        return [f"{label}_facts_missing"]
+    reasons: list[str] = []
+    try:
+        expected_contract = p5.final_contract_ok(facts)
+        expected_classification = p5.classify_facts(facts)
+    except (KeyError, TypeError):
+        return [f"{label}_facts_malformed"]
+    if not isinstance(contract_value, bool) or contract_value != expected_contract:
+        reasons.append(f"{label}_contract_mismatch")
+    if classification != expected_classification:
+        reasons.append(f"{label}_classification_mismatch")
+    return reasons
+
+
+def _safety_integrity(safety: object) -> tuple[int, list[str]]:
+    """Validate safety evidence shape and count its actual bounded actions."""
+    if not isinstance(safety, dict) or set(safety) != set(SAFETY_LAYER_KEYS):
+        return 0, ["safety_layer_set_mismatch"]
+    action_count = 0
+    reasons: list[str] = []
+    policy_by_layer = {
+        "cm58_1": POLICY_VERSIONS["capability_safety"],
+        "cm58_2": POLICY_VERSIONS["report_boundary_safety"],
+        "cm58_3": POLICY_VERSIONS["section_leaf_safety"],
+    }
+    for layer_name in SAFETY_LAYER_KEYS:
+        layer = safety.get(layer_name)
+        if not isinstance(layer, dict):
+            reasons.append(f"{layer_name}_malformed")
+            continue
+        status = layer.get("status")
+        changed = layer.get("changed")
+        evidence = layer.get("evidence")
+        failure_code = layer.get("failure_code")
+        if status not in {"PASSED", "REPAIRED", "FAILED", "NOT_RUN"}:
+            reasons.append(f"{layer_name}_status_invalid")
+            continue
+        if not isinstance(changed, bool):
+            reasons.append(f"{layer_name}_changed_invalid")
+        expected_changed = status == "REPAIRED"
+        if isinstance(changed, bool) and changed != expected_changed:
+            reasons.append(f"{layer_name}_changed_status_mismatch")
+        if status in {"FAILED", "NOT_RUN"}:
+            if evidence is not None:
+                reasons.append(f"{layer_name}_unexpected_evidence")
+            if status == "FAILED" and not isinstance(failure_code, str):
+                reasons.append(f"{layer_name}_failure_code_missing")
+            if status == "NOT_RUN" and failure_code is not None:
+                reasons.append(f"{layer_name}_not_run_failure_code")
+            continue
+        if failure_code is not None or not isinstance(evidence, dict):
+            reasons.append(f"{layer_name}_evidence_missing")
+            continue
+        if evidence.get("policy_version") != policy_by_layer[layer_name]:
+            reasons.append(f"{layer_name}_policy_version_mismatch")
+        if evidence.get("changed") != changed:
+            reasons.append(f"{layer_name}_evidence_changed_mismatch")
+        actions = evidence.get("actions")
+        if not isinstance(actions, list):
+            reasons.append(f"{layer_name}_actions_malformed")
+            continue
+        if status == "PASSED" and actions:
+            reasons.append(f"{layer_name}_unexpected_actions")
+        if status == "REPAIRED" and not actions:
+            reasons.append(f"{layer_name}_missing_actions")
+        for action in actions:
+            if not isinstance(action, dict) or action.get("kind") not in SAFETY_ACTION_KINDS:
+                reasons.append(f"{layer_name}_action_malformed")
+            else:
+                action_count += 1
+    return action_count, sorted(set(reasons))
+
+
+def _row_integrity_reasons(row: dict[str, object]) -> list[str]:
+    """Reconcile redundant planner, safety, and final-system evidence fields."""
+    reasons: list[str] = []
+    planner = _row_planner(row)
+    final = _row_final(row)
+    raw_facts = planner.get("raw_work_unit_facts")
+    final_facts = planner.get("final_work_unit_facts")
+    if isinstance(raw_facts, dict):
+        reasons.extend(
+            _facts_integrity(
+                raw_facts,
+                contract_value=planner.get("raw_contract_ok"),
+                classification=planner.get("raw_classification"),
+                label="raw",
+            )
+        )
+    elif planner.get("raw_contract_ok") is not False:
+        reasons.append("raw_plan_coherence_mismatch")
+    if isinstance(final_facts, dict):
+        reasons.extend(
+            _facts_integrity(
+                final_facts,
+                contract_value=planner.get("final_contract_ok"),
+                classification=planner.get("final_classification"),
+                label="final",
+            )
+        )
+    elif planner.get("final_plan_available"):
+        reasons.append("final_plan_facts_missing")
+    if planner.get("final_contract_ok") != final.get("final_contract_ok"):
+        reasons.append("final_contract_duplicate_mismatch")
+    if planner.get("final_plan_available") != final.get("final_plan_available"):
+        reasons.append("final_plan_availability_mismatch")
+    if planner.get("final_classification") != final.get("final_classification"):
+        reasons.append("final_classification_duplicate_mismatch")
+    if final.get("final_work_unit_facts") != final_facts:
+        reasons.append("final_facts_duplicate_mismatch")
+    if planner.get("terminal_stage") != final.get("terminal_stage"):
+        reasons.append("terminal_stage_mismatch")
+    if planner.get("terminal_failure_code") != final.get("terminal_failure_code"):
+        reasons.append("terminal_failure_duplicate_mismatch")
+    final_available = planner.get("final_plan_available")
+    if not isinstance(final_available, bool):
+        reasons.append("final_plan_availability_invalid")
+    elif final_available and (
+        planner.get("terminal_stage") is not None
+        or planner.get("terminal_failure_code") is not None
+        or not isinstance(final_facts, dict)
+    ):
+        reasons.append("final_plan_coherence_mismatch")
+    elif not final_available and (planner.get("terminal_stage") is None or final_facts is not None):
+        reasons.append("terminal_plan_coherence_mismatch")
+    planner_success = planner.get("final_planner_success")
+    if not isinstance(planner_success, bool):
+        reasons.append("planner_success_invalid")
+    elif planner_success and not isinstance(raw_facts, dict):
+        reasons.append("raw_plan_coherence_mismatch")
+    elif not planner_success and raw_facts is not None:
+        reasons.append("raw_plan_failure_coherence_mismatch")
+    action_count, action_reasons = _safety_integrity(row.get("safety"))
+    reasons.extend(action_reasons)
+    stored_action_count = planner.get("safety_action_count")
+    if (
+        not isinstance(stored_action_count, int)
+        or isinstance(stored_action_count, bool)
+        or stored_action_count < 0
+        or stored_action_count != action_count
+    ):
+        reasons.append("safety_action_count_mismatch")
+    return sorted(set(reasons))
+
+
+def _validate_gold_plans_against_safety(
+    cases: tuple[dict[str, object], ...],
+) -> None:
+    """Prove corpus gold survives all deterministic safety layers unchanged."""
+    registry = create_builtin_registry()
+    for case in cases:
+        plan = _gold_plan(case)
+        validate_semantic_plan(plan, registry)
+        original = plan.model_dump(mode="json")
+        for layer_name, function in (
+            ("cm58_1", enforce_capability_safety),
+            ("cm58_2", enforce_report_boundary_safety),
+            ("cm58_3", enforce_section_leaf_safety),
+        ):
+            result = function(request=str(case["request"]), plan=plan, registry=registry)
+            if result.changed or result.safe_plan.model_dump(mode="json") != original:
+                raise ValueError(f"CM-59A gold case {case['case_id']!r} changes in {layer_name}.")
+            plan = result.safe_plan
+        facts = _facts(plan, case, registry)
+        if facts is None or not p5.final_contract_ok(facts):
+            raise ValueError(f"CM-59A gold case {case['case_id']!r} is not contract-correct.")
+
+
 def population_integrity(
     rows: list[dict[str, object]],
     cases: tuple[dict[str, object], ...],
@@ -743,6 +949,7 @@ def population_integrity(
             reasons.add("provider_call_trace_mismatch")
         if set(row.get("safety", {})) != set(SAFETY_LAYER_KEYS):
             reasons.add("safety_layer_set_mismatch")
+        reasons.update(_row_integrity_reasons(row))
     return not reasons, sorted(reasons)
 
 
@@ -1199,6 +1406,7 @@ def verify_frozen_contract() -> dict[str, object]:
     """Run all provider-free pre-live artifact and corpus checks."""
     cases = load_case_definitions()
     _verify_production_matches_baseline()
+    _validate_gold_plans_against_safety(cases)
     prompt_sha = sha256_text(_PLANNER_SYSTEM_PROMPT)
     schema_sha = _schema_sha256()
     source_sha = _source_summary_sha256()

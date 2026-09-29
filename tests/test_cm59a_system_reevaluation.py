@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
+from scripts import cm57p5_fresh_holdout as p5
 from scripts import cm57p9_runtime_fingerprint as fingerprint
 from scripts import cm59a_system_reevaluation as cm59
 
@@ -58,11 +59,20 @@ def _facts(case: dict[str, object], *, valid: bool = True) -> dict[str, object]:
 
 def _safety() -> dict[str, object]:
     """Build a no-op three-layer safety result."""
+    policy_by_layer = {
+        "cm58_1": cm59.POLICY_VERSIONS["capability_safety"],
+        "cm58_2": cm59.POLICY_VERSIONS["report_boundary_safety"],
+        "cm58_3": cm59.POLICY_VERSIONS["section_leaf_safety"],
+    }
     return {
         name: {
             "status": "PASSED",
             "changed": False,
-            "evidence": {"actions": []},
+            "evidence": {
+                "policy_version": policy_by_layer[name],
+                "changed": False,
+                "actions": [],
+            },
             "failure_code": None,
         }
         for name in cm59.SAFETY_LAYER_KEYS
@@ -84,6 +94,7 @@ def _rows(
         case_id = str(case["case_id"])
         valid = case_id not in invalid_case_ids
         facts = _facts(case, valid=valid)
+        classification = p5.classify_facts(facts)
         for attempt_index in range(cm59.ATTEMPTS):
             planner = {
                 "provider_calls": 1,
@@ -98,11 +109,11 @@ def _rows(
                 "final_error_code": None,
                 "provider_infrastructure_failure": False,
                 "raw_work_unit_facts": facts,
-                "raw_classification": "PLANNER_CONTRACT_OK" if valid else "MISMATCH",
+                "raw_classification": classification,
                 "raw_contract_ok": valid,
                 "final_plan_projection": None,
                 "final_work_unit_facts": facts,
-                "final_classification": "PLANNER_CONTRACT_OK" if valid else "MISMATCH",
+                "final_classification": classification,
                 "final_contract_ok": valid,
                 "final_plan_available": True,
                 "terminal_stage": None,
@@ -163,13 +174,18 @@ def _set_safe_rejection(rows: list[dict[str, object]], case_ids: set[str]) -> No
     """Mark cases as stable deterministic safety rejections."""
     for case_id in case_ids:
         for row in _rows_for_case(rows, case_id):
+            raw_facts = copy.deepcopy(row["planner"]["raw_work_unit_facts"])
+            raw_facts["section_count_correct"] = False
+            raw_facts["section_multiset_exact"] = False
             planner = row["planner"]
             planner.update(
                 {
+                    "raw_work_unit_facts": raw_facts,
                     "raw_contract_ok": False,
-                    "raw_classification": "SECTION_COUNT_MISMATCH",
+                    "raw_classification": p5.classify_facts(raw_facts),
                     "final_contract_ok": False,
                     "final_plan_available": False,
+                    "final_work_unit_facts": None,
                     "final_classification": "SAFE_REJECTION",
                     "terminal_stage": "section_leaf_safety",
                     "terminal_failure_code": "synthetic_safe_rejection",
@@ -201,11 +217,15 @@ def _set_planner_failure(
         planner = row["planner"]
         planner.update(
             {
+                "raw_work_unit_facts": None,
+                "raw_plan_projection": None,
                 "final_planner_success": False,
                 "final_error_type": "ProviderRequestError",
                 "final_error_code": "timeout" if infrastructure else "invalid_response",
                 "provider_infrastructure_failure": infrastructure,
                 "raw_contract_ok": False,
+                "raw_classification": "INFRA_FAILURE" if infrastructure else "PLANNER_FAILURE",
+                "final_work_unit_facts": None,
                 "final_contract_ok": False,
                 "final_plan_available": False,
                 "final_classification": "INFRA_FAILURE" if infrastructure else "PLANNER_FAILURE",
@@ -252,6 +272,21 @@ def _set_unnecessary_action(rows: list[dict[str, object]], case_id: str) -> None
     """Mark a raw-pass case as changed by an unnecessary safety action."""
     for row in _rows_for_case(rows, case_id):
         row["planner"]["safety_action_count"] = 1
+        row["safety"]["cm58_2"] = {
+            "status": "REPAIRED",
+            "changed": True,
+            "evidence": {
+                "policy_version": cm59.POLICY_VERSIONS["report_boundary_safety"],
+                "changed": True,
+                "actions": [
+                    {
+                        "kind": "add_report_standard",
+                        "reason": "explicit_report_intent_missing_capability",
+                    }
+                ],
+            },
+            "failure_code": None,
+        }
 
 
 @dataclass
@@ -535,8 +570,22 @@ def test_unstable_final_attempt_is_rejected() -> None:
     cases = cm59.load_case_definitions()
     rows, pre, post = _rows(cases)
     second = _rows_for_case(rows, str(cases[0]["case_id"]))[1]
-    second["final_system"]["final_contract_ok"] = False
-    second["final_system"]["final_classification"] = "SECTION_WORK_UNIT_MISMATCH"
+    invalid_facts = copy.deepcopy(second["planner"]["final_work_unit_facts"])
+    invalid_facts["section_multiset_exact"] = False
+    second["planner"].update(
+        {
+            "final_work_unit_facts": invalid_facts,
+            "final_contract_ok": False,
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+        }
+    )
+    second["final_system"].update(
+        {
+            "final_work_unit_facts": invalid_facts,
+            "final_contract_ok": False,
+            "final_classification": "SECTION_WORK_UNIT_MISMATCH",
+        }
+    )
     assert (
         cm59.decision(
             rows,
@@ -644,3 +693,54 @@ def test_live_artifacts_reject_stale_data_before_endpoint_access(tmp_path: Path)
     stale_post.write_text("{}", encoding="utf-8")
     with pytest.raises(RuntimeError, match="non-empty"):
         cm59._ensure_fresh_live_artifacts((tmp_path / "evidence.jsonl", stale_post))
+
+
+def test_gold_plans_survive_all_safety_layers_unchanged() -> None:
+    """Every corpus gold plan is safe before any provider result exists."""
+    cm59._validate_gold_plans_against_safety(cm59.load_case_definitions())
+
+
+def test_tampered_derived_evidence_is_inconclusive() -> None:
+    """Contradictory facts or safety counts invalidate the whole population."""
+    cases = cm59.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    row = rows[0]
+    row["planner"]["final_contract_ok"] = False
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+    rows, pre, post = _rows(cases)
+    row = rows[0]
+    row["planner"]["raw_work_unit_facts"]["section_multiset_exact"] = False
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
+
+    rows, pre, post = _rows(cases)
+    row = rows[0]
+    row["safety"]["cm58_1"]["evidence"]["actions"] = [{"kind": "remove_reference"}]
+    assert (
+        cm59.decision(
+            rows,
+            cases,
+            expected_checkpoint=CHECKPOINT,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "INCONCLUSIVE_SYSTEM_REEVALUATION"
+    )
