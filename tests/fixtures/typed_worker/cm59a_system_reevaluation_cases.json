@@ -1,0 +1,221 @@
+{
+  "version": "cm59a.system-reevaluation.v1",
+  "cases": [
+    {
+      "case_id": "cm59-report-cascade-01",
+      "family": "REPORT_ONLY",
+      "residual_class": "MARINER_CLASS",
+      "request": "Prepare a closeout summary for the Cascade handover and include the review note Approval recorded.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "family": "REPORT_ONLY",
+      "residual_class": "MARINER_CLASS",
+      "request": "Write a completion summary for Elm Crossing and add the remark Final checks accepted by operations.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "family": "REPORT_ONLY",
+      "residual_class": null,
+      "request": "Give the Harbor East interpretation packet the title Pressure Review and the subtitle Interval Findings.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "family": "REPORT_ONLY",
+      "residual_class": null,
+      "request": "Prepare the Kestrel closeout packet with a completion heading and list the overnight interpretation group as preparer.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "family": "SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Show the Fig interval permeability response as one scalar display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "family": "SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "family": "SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Create one array display for the Hazel formation image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "family": "SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.annotation", "annotation.typed"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "family": "REFERENCE_REQUIRED",
+      "residual_class": null,
+      "request": "Place a depth lane beside the Juniper density response in one aligned view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "family": "REFERENCE_REQUIRED",
+      "residual_class": null,
+      "request": "Keep a depth marker alongside the Linden resistivity trace in a shared display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "family": "REFERENCE_REQUIRED",
+      "residual_class": null,
+      "request": "Align a reference column with the Mica acoustic image within one interpretation panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "family": "REFERENCE_REQUIRED",
+      "residual_class": null,
+      "request": "Use a depth ruler next to the Nova formation image in the same log view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Combine the Opal porosity response with its acoustic waveform in one shared panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Keep the Quartz depth guide, scalar density response, and image feed together in one view.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.reference", "track.normal", "binding.curve", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "residual_class": null,
+      "request": "Place the Slate caliper image and formation image together on one array-track display.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "residual_class": "LICHEN_CLASS",
+      "request": "Create three separate views for Tamarind: an ordinary response, a depth-guided scalar response, and a formation image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.reference", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "residual_class": "LICHEN_CLASS",
+      "request": "Give Umber three independent displays: a scalar trend, a reference-aligned scalar trend, and an acoustic image.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.reference", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "residual_class": null,
+      "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "residual_class": null,
+      "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+      "expected_report_capabilities": [],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"], ["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "family": "MIXED_REPORT_SECTION",
+      "residual_class": null,
+      "request": "Add the Xenon review note Accepted for handover and include one panel with an acoustic image.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.array", "binding.raster"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "family": "MIXED_REPORT_SECTION",
+      "residual_class": null,
+      "request": "Include the Yarrow completion remark in the packet and show a scalar response in one panel.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "family": "MIXED_REPORT_SECTION",
+      "residual_class": null,
+      "request": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve"]],
+      "expected_unresolved_count": 0
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "family": "MIXED_REPORT_SECTION",
+      "residual_class": null,
+      "request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+      "expected_report_capabilities": ["report.standard"],
+      "expected_sections": [["section.log_plot", "track.normal", "binding.curve", "track.annotation", "annotation.typed"]],
+      "expected_unresolved_count": 0
+    }
+  ]
+}
