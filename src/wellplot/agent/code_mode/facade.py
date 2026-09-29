@@ -33,6 +33,10 @@ from .report_boundary_safety import (
     ReportBoundarySafetyEvidence,
     ReportBoundarySafetyFailure,
 )
+from .section_leaf_safety import (
+    SectionLeafSafetyEvidence,
+    SectionLeafSafetyFailure,
+)
 from .state import CodeModeGraphState, WorkerOutcome
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
@@ -165,6 +169,8 @@ class CodeModeCompileFacade:
             return _failure_result((_capability_safety_failure_diagnostic(error),))
         except ReportBoundarySafetyFailure as error:
             return _failure_result((_report_boundary_safety_failure_diagnostic(error),))
+        except SectionLeafSafetyFailure as error:
+            return _failure_result((_section_leaf_safety_failure_diagnostic(error),))
         except SemanticEnrichmentError as error:
             return _failure_result((_enrichment_diagnostic(error),))
         return _project_graph_result(result)
@@ -185,6 +191,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
     metrics = _aggregate_metrics(workers)
     diagnostics = _capability_safety_warning_diagnostics(state)
     diagnostics += _report_boundary_safety_warning_diagnostics(state)
+    diagnostics += _section_leaf_safety_warning_diagnostics(state)
     diagnostics += tuple(
         _enrichment_warning_diagnostic(warning) for warning in enriched_context.warnings
     )
@@ -378,6 +385,54 @@ def _report_boundary_safety_warning_diagnostics(
                 retryable=False,
                 worker_kind="report" if action.kind.value == "add_report_standard" else None,
                 plan_order=0 if action.kind.value == "add_report_standard" else None,
+            )
+        )
+    return tuple(diagnostics)
+
+
+def _section_leaf_safety_failure_diagnostic(
+    error: SectionLeafSafetyFailure,
+) -> CompileDiagnostic:
+    """Project a deterministic section-leaf rejection into the host contract."""
+    return CompileDiagnostic(
+        stage="section_leaf_safety",
+        code=f"section_leaf_safety.{error.code}",
+        message=error.safe_message,
+        retryable=False,
+    )
+
+
+def _section_leaf_safety_warning_diagnostics(
+    state: dict[str, object],
+) -> tuple[CompileDiagnostic, ...]:
+    """Project one bounded warning for each section-leaf safety action."""
+    payload = state.get("section_leaf_safety")
+    if not isinstance(payload, dict):
+        return ()
+    evidence = SectionLeafSafetyEvidence.model_validate(payload)
+    diagnostics: list[CompileDiagnostic] = []
+    for action in evidence.actions:
+        if action.kind.value == "remove_raster_only_curve_binding":
+            code = "section_leaf_safety.raster_only_curve_binding_removed"
+            message = (
+                "An unsupported curve-binding capability was removed from an explicitly "
+                "raster-only section request before semantic enrichment."
+            )
+        else:
+            code = "section_leaf_safety.report_note_annotation_removed"
+            message = (
+                "Section annotation capabilities derived from report-note semantics were "
+                "removed before semantic enrichment."
+            )
+        diagnostics.append(
+            CompileDiagnostic(
+                stage="section_leaf_safety",
+                code=code,
+                message=message,
+                severity=CompileDiagnosticSeverity.WARNING,
+                retryable=False,
+                worker_kind="section",
+                plan_order=action.section_index + 1,
             )
         )
     return tuple(diagnostics)
