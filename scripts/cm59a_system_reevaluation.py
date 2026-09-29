@@ -548,13 +548,23 @@ async def run_execution(
         terminal_stage = None
         terminal_failure_code = None
 
-    final_facts = _facts(final_plan, case, registry) if terminal_stage is None else None
-    final_contract = final_plan is not None and p5.final_contract_ok(final_facts or {})
-    final_classification = (
-        p5.classify_facts(final_facts or {})
-        if final_plan is not None
-        else ("SAFE_REJECTION" if terminal_stage != "planner" else planner_classification)
-    )
+    if raw_plan is None:
+        final_plan = None
+        final_facts = None
+        final_contract = False
+        final_classification = planner_classification
+    elif terminal_stage is not None:
+        # A safety rejection leaves no executable final plan to score.
+        final_plan = None
+        final_facts = None
+        final_contract = False
+        final_classification = "SAFE_REJECTION"
+    else:
+        final_facts = _facts(final_plan, case, registry)
+        if final_facts is None:
+            raise RuntimeError("CM-59A final facts unavailable for an accepted final plan.")
+        final_contract = p5.final_contract_ok(final_facts)
+        final_classification = p5.classify_facts(final_facts)
     safety_actions = sum(
         len((layer.get("evidence") or {}).get("actions", []))
         for layer in safety.values()

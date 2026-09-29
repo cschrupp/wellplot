@@ -98,6 +98,40 @@ Before the first PRE endpoint request, the live runner rejects populated
 evidence, PRE, POST, or summary paths. It never deletes or overwrites prior
 live artifacts.
 
+## First Live Population and Bounded Harness Correction
+
+The first authorized live population stopped after 8 of 48 rows because the
+harness attempted to score a transient planner result after a deterministic
+safety rejection. The population is operationally inconclusive and is not
+decision-bearing:
+
+```text
+checkpoint: aabf651957d603549b34ef10173c71bae5061e58
+completed rows: 8 / 48
+provider infrastructure failures: 0
+partial evidence SHA-256: b4d41b874a5ddfafee5f67ab4c4fcab46b6f6247fbb7bdea74d9ccbb5468367e
+partial evidence: preserved / non-decision-bearing
+resume: forbidden
+append: forbidden
+replacement: requires independent reauthorization
+```
+
+The bounded correction establishes that a deterministic CM-58.1, CM-58.2, or
+CM-58.3 rejection has no final executable plan. The rejected intermediate
+plan is cleared before final facts or semantic contract scoring, the final
+projection is `None`, final facts are absent, final contract status is false,
+and classification is `SAFE_REJECTION`. Planner-terminal failures retain
+their separate planner classification, while accepted plans continue through
+the normal facts scorer.
+
+The correction is evaluation-only. The corpus remains frozen at
+`b6a605158e667e5250df99a53cb4ba521473f8146fad2022aed2dff77d5f551b`, and
+production, prompts, schema, CM-58 policies, thresholds, and execution
+controls remain unchanged. Provider and endpoint calls during correction
+validation are zero. A replacement population must use distinct evidence
+paths and execute all 48 rows from the beginning only after independent
+reauthorization.
+
 ## Hard Boundaries
 
 This slice does not modify `src/wellplot`, prompts, schemas, capability

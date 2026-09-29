@@ -16,9 +16,11 @@ from scripts import cm59a_system_reevaluation as cm59
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.providers.base import (
     ProviderMetrics,
+    ProviderRequestError,
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.capabilities import CapabilityRegistry
 
 CHECKPOINT = "a" * 40
 
@@ -309,6 +311,44 @@ class _FakeBackend:
         )
 
 
+class _PlannerFailureBackend:
+    """Raise one stable provider error without contacting a provider."""
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[BaseModel],
+    ) -> StructuredGenerationResult[BaseModel]:
+        """Return the provider-neutral invalid-response failure used by the test."""
+        raise ProviderRequestError(
+            cm59.ProviderFailureCategory.INVALID_RESPONSE,
+            "synthetic invalid response",
+        )
+
+
+def _assert_safe_rejection(
+    result: dict[str, object],
+    *,
+    terminal_stage: str,
+    failure_code: str,
+) -> None:
+    """Assert that a safety terminal cannot be scored as a final plan."""
+    assert result["final_plan_available"] is False
+    assert result["final_plan_projection"] is None
+    assert result["final_work_unit_facts"] is None
+    assert result["final_contract_ok"] is False
+    assert result["final_classification"] == "SAFE_REJECTION"
+    assert result["terminal_stage"] == terminal_stage
+    assert result["terminal_failure_code"] == failure_code
+
+
+def _safety_test_case() -> tuple[dict[str, object], SemanticPlan, CapabilityRegistry]:
+    """Return a corpus gold plan suitable for provider-free safety tests."""
+    case = cm59.load_case_definitions()[0]
+    return case, _plan_for_case(case), cm59.create_builtin_registry()
+
+
 def test_corpus_is_fresh_balanced_and_provider_safe() -> None:
     """The reevaluation corpus has the required topology and no leaked IDs."""
     cases = cm59.load_case_definitions()
@@ -352,6 +392,140 @@ def test_run_execution_uses_production_planner_and_three_safety_layers() -> None
     assert result["program_calls"] == 0
     assert result["response_schema_sha256"] == cm59._schema_sha256()
     assert list(result["safety"]) == ["cm58_1", "cm58_2", "cm58_3"]
+    assert result["final_plan_available"] is True
+    assert isinstance(result["final_work_unit_facts"], dict)
+    assert result["terminal_stage"] is None
+
+
+def test_cm581_terminal_clears_transient_final_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CM-58.1 rejection is recorded without scoring its rejected plan."""
+    case, plan, registry = _safety_test_case()
+
+    def fail(**kwargs: object) -> object:
+        raise cm59.CapabilitySafetyFailure("synthetic_cm581", "synthetic failure")
+
+    monkeypatch.setattr(cm59, "enforce_capability_safety", fail)
+    result = asyncio.run(cm59.run_execution(case, delegate=_FakeBackend(plan), registry=registry))
+
+    _assert_safe_rejection(
+        result,
+        terminal_stage="capability_safety",
+        failure_code="synthetic_cm581",
+    )
+    assert result["safety"]["cm58_1"]["status"] == "FAILED"
+    assert result["safety"]["cm58_2"]["status"] == "NOT_RUN"
+    assert result["safety"]["cm58_3"]["status"] == "NOT_RUN"
+
+
+def test_cm582_terminal_clears_transient_final_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CM-58.2 rejection preserves completed-layer evidence and fails closed."""
+    case, plan, registry = _safety_test_case()
+    real_capability_safety = cm59.enforce_capability_safety
+
+    def capability_pass(
+        *, request: str, plan: SemanticPlan, registry: CapabilityRegistry
+    ) -> object:
+        return real_capability_safety(request=request, plan=plan, registry=registry)
+
+    def fail(**kwargs: object) -> object:
+        raise cm59.ReportBoundarySafetyFailure("synthetic_cm582", "synthetic failure")
+
+    monkeypatch.setattr(cm59, "enforce_capability_safety", capability_pass)
+    monkeypatch.setattr(cm59, "enforce_report_boundary_safety", fail)
+    result = asyncio.run(cm59.run_execution(case, delegate=_FakeBackend(plan), registry=registry))
+
+    _assert_safe_rejection(
+        result,
+        terminal_stage="report_boundary_safety",
+        failure_code="synthetic_cm582",
+    )
+    assert result["safety"]["cm58_1"]["status"] == "PASSED"
+    assert result["safety"]["cm58_2"]["status"] == "FAILED"
+    assert result["safety"]["cm58_3"]["status"] == "NOT_RUN"
+
+
+def test_cm583_terminal_clears_transient_final_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CM-58.3 rejection preserves both earlier layer results and fails closed."""
+    case, plan, registry = _safety_test_case()
+    real_capability_safety = cm59.enforce_capability_safety
+    real_report_safety = cm59.enforce_report_boundary_safety
+
+    def capability_pass(
+        *, request: str, plan: SemanticPlan, registry: CapabilityRegistry
+    ) -> object:
+        return real_capability_safety(request=request, plan=plan, registry=registry)
+
+    def report_pass(*, request: str, plan: SemanticPlan, registry: CapabilityRegistry) -> object:
+        return real_report_safety(request=request, plan=plan, registry=registry)
+
+    def fail(**kwargs: object) -> object:
+        raise cm59.SectionLeafSafetyFailure("synthetic_cm583", "synthetic failure")
+
+    monkeypatch.setattr(cm59, "enforce_capability_safety", capability_pass)
+    monkeypatch.setattr(cm59, "enforce_report_boundary_safety", report_pass)
+    monkeypatch.setattr(cm59, "enforce_section_leaf_safety", fail)
+    result = asyncio.run(cm59.run_execution(case, delegate=_FakeBackend(plan), registry=registry))
+
+    _assert_safe_rejection(
+        result,
+        terminal_stage="section_leaf_safety",
+        failure_code="synthetic_cm583",
+    )
+    assert result["safety"]["cm58_1"]["status"] == "PASSED"
+    assert result["safety"]["cm58_2"]["status"] == "PASSED"
+    assert result["safety"]["cm58_3"]["status"] == "FAILED"
+
+
+def test_safety_terminal_row_is_integrity_valid_and_stable_safe_reject(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A deterministic safety rejection serializes and classifies stably."""
+    cases = cm59.load_case_definitions()
+    case = cases[0]
+    pre, _ = _endpoint_pair()
+    pre_hash = cm59.sha256_text(cm59.canonical_json(pre))
+
+    def fail(**kwargs: object) -> object:
+        raise cm59.CapabilitySafetyFailure("synthetic_cm581", "synthetic failure")
+
+    monkeypatch.setattr(cm59, "enforce_capability_safety", fail)
+    rows, _, _ = _rows(cases)
+    for attempt_index in range(cm59.ATTEMPTS):
+        replacement = asyncio.run(
+            cm59.run_row(
+                case,
+                attempt_index=attempt_index,
+                delegate=_FakeBackend(_plan_for_case(case)),
+                registry=cm59.create_builtin_registry(),
+                authorized_checkpoint=CHECKPOINT,
+                endpoint_pre_fingerprint_sha256=pre_hash,
+            )
+        )
+        assert cm59._row_integrity_reasons(replacement) == []
+        rows[attempt_index] = replacement
+
+    assert cm59.case_statuses(rows, cases)[str(case["case_id"])] == "STABLE_SAFE_REJECT"
+
+
+def test_planner_terminal_remains_distinct_from_safe_rejection() -> None:
+    """A planner failure has no plan but retains its planner classification."""
+    case, _, registry = _safety_test_case()
+    result = asyncio.run(
+        cm59.run_execution(case, delegate=_PlannerFailureBackend(), registry=registry)
+    )
+
+    assert result["final_plan_available"] is False
+    assert result["final_plan_projection"] is None
+    assert result["final_work_unit_facts"] is None
+    assert result["final_contract_ok"] is False
+    assert result["final_classification"] == "PLANNER_FAILURE"
+    assert result["terminal_stage"] == "planner"
 
 
 def test_historical_anchors_are_diagnostic_only() -> None:
