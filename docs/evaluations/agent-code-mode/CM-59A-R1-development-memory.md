@@ -5,7 +5,7 @@
 - Slice: `CM-59A-R1`
 - Baseline: `c7ee15a1a19b400fa4462ca387af5940d016fe2a`
 - Origin: `CM-59A SYSTEM_REEVALUATION_REJECTED`
-- Result SHA: recorded after the bounded implementation commit
+- Result SHA: 233ba0c
 - Provider calls: `0`
 - Endpoint calls: `0`
 - Worker/program calls: `0`
