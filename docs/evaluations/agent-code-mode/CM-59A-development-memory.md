@@ -110,6 +110,7 @@ checkpoint: aabf651957d603549b34ef10173c71bae5061e58
 completed rows: 8 / 48
 provider infrastructure failures: 0
 partial evidence SHA-256: b4d41b874a5ddfafee5f67ab4c4fcab46b6f6247fbb7bdea74d9ccbb5468367e
+failed-run PRE fingerprint SHA-256: 2edeff0211c07e0b88b7bdfe67545b1b2bca0769da8e3ed1e53d98711210827b
 partial evidence: preserved / non-decision-bearing
 resume: forbidden
 append: forbidden
