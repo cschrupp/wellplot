@@ -105,6 +105,7 @@ PROTECTED_ARTIFACTS = (
     "src/wellplot/capabilities/builtins.py",
     "src/wellplot/agent/providers/base.py",
     "scripts/cm57p9_runtime_fingerprint.py",
+    "scripts/cm59a_system_reevaluation.py",
 )
 CHECKPOINT_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_LOCATION_SEGMENTS = {"$root", "*", "<unknown_field>", "<unknown_segment>", "<truncated>"}
@@ -773,14 +774,56 @@ def _summary_shapes(
     call_kind: str,
 ) -> list[object]:
     """Return shape projections only after population integrity has passed."""
-    return [
-        call["validation_shape"]
-        for row in grouped.get(case_id, [])
-        for call in row.get("planner", {}).get("call_trace", [])
-        if isinstance(call, dict)
-        and call.get("call_kind") == call_kind
-        and call.get("response_reason") == ProviderResponseFailureReason.SCHEMA_VALIDATION.value
-    ]
+    projected: list[object] = []
+    for row in grouped.get(case_id, []):
+        for call in row.get("planner", {}).get("call_trace", []):
+            if not isinstance(call, dict):
+                continue
+            if (
+                call.get("call_kind") != call_kind
+                or call.get("response_reason")
+                != ProviderResponseFailureReason.SCHEMA_VALIDATION.value
+            ):
+                continue
+            shape = _safe_shape_projection(call.get("validation_shape"))
+            if shape is not None:
+                projected.append(shape)
+    return projected
+
+
+def _safe_shape_projection(shape: object) -> dict[str, object] | None:
+    """Rebuild one validated shape without retaining evidence object aliases."""
+    if not isinstance(shape, dict) or set(shape) != {"issue_count", "issues", "truncated"}:
+        return None
+    issues = shape.get("issues")
+    if (
+        not isinstance(shape.get("issue_count"), int)
+        or isinstance(shape.get("issue_count"), bool)
+        or not isinstance(issues, list)
+        or not isinstance(shape.get("truncated"), bool)
+    ):
+        return None
+    projected_issues: list[dict[str, object]] = []
+    for issue in issues:
+        if not isinstance(issue, dict) or set(issue) != {"error_type", "location"}:
+            return None
+        error_type = issue.get("error_type")
+        location = issue.get("location")
+        if not isinstance(error_type, str) or not isinstance(location, list):
+            return None
+        if any(not isinstance(segment, str) for segment in location):
+            return None
+        projected_issues.append(
+            {
+                "error_type": error_type,
+                "location": list(location),
+            }
+        )
+    return {
+        "issue_count": shape["issue_count"],
+        "issues": projected_issues,
+        "truncated": shape["truncated"],
+    }
 
 
 def summarize_population(

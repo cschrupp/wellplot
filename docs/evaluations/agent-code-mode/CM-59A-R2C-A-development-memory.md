@@ -176,6 +176,42 @@ Worker/program calls: 0
 R2C-A-R1 remains pre-live only. Do not contact the endpoint or run Kestrel or
 Xenon until an independent review authorizes the future population.
 
+## R2C-A-R2 Final Pre-Live Closure
+
+R2C-A-R2 is a harness/test/documentation-only correction on top of
+`98f5135a939ad73cd8a0fbb8ef3041f2bf3277ff`. The imported historical helper
+`scripts/cm59a_system_reevaluation.py` is now protected against byte drift
+against the frozen behavioral baseline. The helper itself remains unmodified.
+
+Summary validation shapes are rebuilt through a fresh bounded projection with
+new issue dictionaries and location lists. The finalizer never returns raw
+shape dictionaries by reference, and malformed populations continue to omit
+all shape-derived summary output and remain inconclusive.
+
+R2 verification:
+
+```text
+Focused/provider/planner tests: 128 passed
+Adjacent E2/R2A tests: 112 passed
+Historical-helper drift regression: PASS
+Summary projection aliasing regression: PASS
+Full repository suite: 2307 passed, 13 accepted baseline failures, 3 skipped
+Full-suite failure identities: MATCH ACCEPTED BASELINE
+New R2C-A-attributable failures: 0
+Ruff: passed
+Formatting: passed
+Python compilation: passed
+JSON validation: passed
+git diff --check: passed
+Provider calls: 0
+Endpoint calls: 0
+Worker/program calls: 0
+```
+
+The full repository suite is mandatory before the R2 checkpoint is frozen.
+The accepted baseline remains the exact established 13 failure identities and
+3 skipped tests; no R2C-A live population is authorized by this slice.
+
 ## Hard Stop
 
 After the implementation checkpoint is committed and pushed, stop for

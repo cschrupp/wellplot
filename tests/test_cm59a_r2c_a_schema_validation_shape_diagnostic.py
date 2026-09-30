@@ -653,6 +653,43 @@ def test_summary_omits_shapes_when_population_integrity_fails() -> None:
     assert "TOP_SECRET_MODEL_VALUE" not in serialized
 
 
+def test_historical_helper_drift_is_rejected_before_live_activity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The imported historical helper is protected by the frozen contract."""
+    real_baseline = r2c._baseline_blob
+
+    def drift(path: str) -> bytes:
+        if path == "scripts/cm59a_system_reevaluation.py":
+            return b"historical-helper-drift"
+        return real_baseline(path)
+
+    monkeypatch.setattr(r2c, "_baseline_blob", drift)
+    with pytest.raises(RuntimeError, match="scripts/cm59a_system_reevaluation"):
+        r2c.verify_frozen_contract()
+
+
+def test_summary_shape_projection_does_not_alias_evidence() -> None:
+    """Projected shape summaries remain independent of raw evidence objects."""
+    shape = _shape("summary")
+    projected = r2c._safe_shape_projection(shape)
+
+    assert projected == shape
+    assert projected is not shape
+    assert projected["issues"] is not shape["issues"]
+    assert projected["issues"][0] is not shape["issues"][0]
+    assert projected["issues"][0]["location"] is not shape["issues"][0]["location"]
+
+    shape["issues"][0]["location"][0] = "goal"
+    shape["issues"].append({"error_type": "missing", "location": ["summary"]})
+
+    assert projected == {
+        "issue_count": 1,
+        "issues": [{"error_type": "missing", "location": ["summary"]}],
+        "truncated": False,
+    }
+
+
 def test_artifact_collision_guard_is_fail_closed(tmp_path: Path) -> None:
     """A populated future output path is rejected without deletion."""
     path = tmp_path / "evidence.jsonl"
