@@ -309,6 +309,10 @@ def test_structured_json_and_schema_failures_are_distinguished(
     assert caught.value.category is ProviderFailureCategory.INVALID_RESPONSE
     assert isinstance(caught.value, StructuredResponseProviderError)
     assert caught.value.response_reason is reason
+    if reason is ProviderResponseFailureReason.SCHEMA_VALIDATION:
+        assert caught.value.validation_shape is not None
+    else:
+        assert caught.value.validation_shape is None
     assert content not in repr(caught.value)
 
 

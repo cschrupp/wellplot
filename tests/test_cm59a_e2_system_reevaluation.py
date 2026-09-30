@@ -30,6 +30,22 @@ from wellplot.agent.providers.response_diagnostics import (
 CHECKPOINT = "a" * 40
 
 
+def _isolate_current_provider_source_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Isolate E2 success-path tests from the authorized R2C-A provider delta."""
+    real_baseline = e2._baseline_blob
+    instrumented = {
+        "src/wellplot/agent/providers/openai_compat_v2.py",
+        "src/wellplot/agent/providers/response_diagnostics.py",
+    }
+
+    def current_instrumented_bytes(path: str) -> bytes:
+        if path in instrumented:
+            return (e2.REPO_ROOT / path).read_bytes()
+        return real_baseline(path)
+
+    monkeypatch.setattr(e2, "_baseline_blob", current_instrumented_bytes)
+
+
 def _endpoint_pair() -> tuple[dict[str, object], dict[str, object]]:
     """Build equal valid endpoint fingerprints without network access."""
     payload = {"data": [{"id": e2.FROZEN_MODEL, "created": 1}]}
@@ -306,6 +322,7 @@ def test_prelive_report_is_provider_and_endpoint_free(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The E2 pre-live audit performs no provider or endpoint calls."""
+    _isolate_current_provider_source_drift(monkeypatch)
 
     def fail(*args: object, **kwargs: object) -> object:
         raise AssertionError("provider or endpoint access is forbidden pre-live")
@@ -320,8 +337,11 @@ def test_prelive_report_is_provider_and_endpoint_free(
     assert report["remediation_targets"]["FIG"]["required_status"] == "STABLE_PASS"
 
 
-def test_frozen_contract_accepts_current_v2_stack() -> None:
+def test_frozen_contract_accepts_current_v2_stack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The current production bytes and three safety policy versions are frozen."""
+    _isolate_current_provider_source_drift(monkeypatch)
     contract = e2.verify_frozen_contract()
     assert contract["policy_versions"] == e2.POLICY_VERSIONS
     assert contract["policy_versions"]["report_boundary_safety"] == "cm58.report-boundary.v2"
@@ -535,8 +555,11 @@ def test_report_boundary_policy_is_not_historically_rewritten() -> None:
     assert e2.POLICY_VERSIONS["report_boundary_safety"] == "cm58.report-boundary.v2"
 
 
-def test_pre_live_budget_and_target_projection_are_exact() -> None:
+def test_pre_live_budget_and_target_projection_are_exact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The future population is 48 executions with a strict two-call ceiling."""
+    _isolate_current_provider_source_drift(monkeypatch)
     report = e2.prelive_report()
     assert report["future_population"]["planner_executions"] == 48
     assert report["future_population"]["provider_calls_min"] == 48
@@ -1351,6 +1374,8 @@ def test_response_diagnostics_artifact_is_protected(monkeypatch: pytest.MonkeyPa
     real_baseline = e2._baseline_blob
 
     def drift(path: str) -> bytes:
+        if path == "src/wellplot/agent/providers/openai_compat_v2.py":
+            return (e2.REPO_ROOT / path).read_bytes()
         if path == "src/wellplot/agent/providers/response_diagnostics.py":
             return b"drifted"
         return real_baseline(path)

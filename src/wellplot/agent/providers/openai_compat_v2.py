@@ -21,7 +21,11 @@ from .base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
-from .response_diagnostics import ProviderResponseFailureReason, StructuredResponseProviderError
+from .response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+    schema_validation_shape,
+)
 
 TModel = TypeVar("TModel", bound=BaseModel)
 StructuredOutputCapability = Literal["json_schema"]
@@ -106,7 +110,17 @@ class OpenAICompatibleBackendV2:
             ) from None
         try:
             value = response_model.model_validate(payload)
-        except (TypeError, ValueError, ValidationError):
+        except ValidationError as error:
+            try:
+                shape = schema_validation_shape(error, schema)
+            except Exception:
+                shape = None
+            raise StructuredResponseProviderError(
+                "OpenAI-compatible returned invalid structured JSON.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+                validation_shape=shape,
+            ) from None
+        except (TypeError, ValueError):
             raise StructuredResponseProviderError(
                 "OpenAI-compatible returned invalid structured JSON.",
                 response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
