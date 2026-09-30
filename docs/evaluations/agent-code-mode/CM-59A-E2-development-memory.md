@@ -87,9 +87,9 @@ change, or production routing change is implemented or authorized here.
 
 ## Verification
 
-- E2 focused suite: `58 passed`
-- Adjacent planner/provider/safety suites: `243 passed`
-- Full repository suite: `2274 passed, 13 accepted pre-existing failures, 3 skipped`
+- E2 focused suite: `61 passed`
+- Adjacent planner/provider/safety suites: `304 passed` including E2
+- Full repository suite: `2277 passed, 13 accepted pre-existing failures, 3 skipped`
 - Ruff lint: passed
 - Ruff formatting: passed
 - Python compilation: passed
@@ -102,6 +102,29 @@ MCP helper signature drift, the tool-budget threshold, missing historical R6
 evidence, the stale P7 artifact expectation, and unrelated graph-worker test
 fixtures/contracts. No E2 test failed and no new E2-attributable failure was
 observed.
+
+## R2 Hardening
+
+CM-59A-E2-R2 is a harness-only correction on top of `f152fa6`. Schema metrics
+are calculated per row. A failed schema-correction call contributes to
+`schema_correction_terminal_failures`, but contributes to
+`terminal_schema_validation_failures` only when its bounded terminal reason is
+`schema_validation`. An initial schema-validation failure without a
+`SCHEMA_CORRECTION` is an integrity failure, not a terminal schema metric.
+
+The E2 recording backend now rejects a third structured request before calling
+its delegate. Evidence-time call-trace validation remains in place as a
+separate integrity check. Final summaries expose both the existing nested
+integrity projections and the explicit top-level fields:
+
+- `population_integrity`
+- `population_integrity_reasons`
+- `endpoint_integrity`
+- `endpoint_integrity_reasons`
+- `expected_normalized_endpoint_identity`
+
+The R2 focused suite and full-suite counts above supersede the earlier R1
+counts after verification.
 
 ## Hard Stop
 

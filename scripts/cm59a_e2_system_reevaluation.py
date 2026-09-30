@@ -372,6 +372,10 @@ class RecordingBackend(ModelBackendProtocol):
         response_model: type[BaseModel],
     ) -> StructuredGenerationResult[BaseModel]:
         """Record bounded diagnostics and delegate structured generation."""
+        if len(self.calls) >= 2:
+            raise RuntimeError(
+                "CM-59A-E2 provider call budget exceeded before provider invocation."
+            )
         call_kind = self._call_kind(request, self.calls)
         record: dict[str, object] = {"call_kind": call_kind}
         try:
@@ -668,6 +672,8 @@ def _call_trace_reasons(planner: dict[str, object]) -> list[str]:
         if isinstance(call, dict) and call.get("response_reason") not in (None, *allowed_reasons):
             reasons.append("response_reason_invalid")
     if len(trace) == 1:
+        if first.get("response_reason") == ProviderResponseFailureReason.SCHEMA_VALIDATION.value:
+            reasons.append("schema_correction_missing")
         return sorted(set(reasons))
     second = trace[1]
     if not isinstance(second, dict):
@@ -903,12 +909,16 @@ def _schema_metrics(
         correction_successes += sum(
             call.get("outcome") == "structured_success" for call in corrections
         )
-        correction_failures += sum(
+        row_correction_failures = sum(
             call.get("outcome") != "structured_success" for call in corrections
         )
+        correction_failures += row_correction_failures
         if initial_schema and not corrections:
-            terminal_failures += 1
-        if correction_failures and corrections:
+            continue
+        if row_correction_failures and any(
+            call.get("response_reason") == ProviderResponseFailureReason.SCHEMA_VALIDATION.value
+            for call in corrections
+        ):
             terminal_failures += 1
     return {
         "initial_schema_validation_events": initial_events,
@@ -972,6 +982,11 @@ def summarize_population(
         "evaluation_contract_version": EVALUATION_CONTRACT_VERSION,
         "authorized_checkpoint": authorized_checkpoint,
         "decision": final_decision,
+        "population_integrity": complete,
+        "population_integrity_reasons": reasons,
+        "endpoint_integrity": endpoint_ok,
+        "endpoint_integrity_reasons": endpoint_reasons,
+        "expected_normalized_endpoint_identity": EXPECTED_NORMALIZED_ENDPOINT_IDENTITY,
         "population": {
             "expected_rows": len(cases) * ATTEMPTS,
             "actual_rows": len(rows),

@@ -388,6 +388,20 @@ def test_complete_population_is_accepted_with_target_passes() -> None:
         )
         == "SYSTEM_REEVALUATION_ACCEPTED"
     )
+    summary = e2.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+    )
+    assert summary["population_integrity"] is True
+    assert summary["population_integrity_reasons"] == []
+    assert summary["endpoint_integrity"] is True
+    assert summary["endpoint_integrity_reasons"] == []
+    assert summary["expected_normalized_endpoint_identity"] == (
+        e2.EXPECTED_NORMALIZED_ENDPOINT_IDENTITY
+    )
 
 
 def test_target_safe_rejection_rejects_even_within_general_allowance() -> None:
@@ -578,6 +592,75 @@ def test_schema_correction_is_recorded_without_response_leakage() -> None:
     assert all("response_text" not in call for call in trace)
 
 
+def test_recording_backend_blocks_third_call_before_delegate() -> None:
+    """The E2 recorder enforces its two-call ceiling before provider dispatch."""
+    case = e2.load_case_definitions()[0]
+    delegate = _FakeBackend(_plan_for_case(case))
+    recorder = e2.RecordingBackend(delegate=delegate, calls=[], plans=[])
+    request = StructuredGenerationRequest(
+        system_prompt="system",
+        user_prompt="user",
+        timeout_seconds=1.0,
+    )
+
+    async def exercise() -> None:
+        for _ in range(2):
+            await recorder.generate_structured(request, response_model=SemanticPlan)
+        with pytest.raises(RuntimeError, match="before provider invocation"):
+            await recorder.generate_structured(request, response_model=SemanticPlan)
+
+    asyncio.run(exercise())
+    assert len(delegate.calls) == 2
+    assert len(recorder.calls) == 2
+
+
+def test_schema_metrics_are_row_local_and_reason_specific() -> None:
+    """Schema terminal metrics do not leak across rows or response reasons."""
+    cases = e2.load_case_definitions()
+    rows, _, _ = _rows(cases)
+    case_id = str(cases[0]["case_id"])
+    selected = _rows_for_case(rows, case_id)
+    terminal_trace = [
+        {
+            "call_kind": "INITIAL",
+            "outcome": "provider_failure",
+            "response_reason": "schema_validation",
+        },
+        {
+            "call_kind": "SCHEMA_CORRECTION",
+            "outcome": "provider_failure",
+            "response_reason": "schema_validation",
+        },
+    ]
+    success_trace = [
+        {
+            "call_kind": "INITIAL",
+            "outcome": "provider_failure",
+            "response_reason": "schema_validation",
+        },
+        {
+            "call_kind": "SCHEMA_CORRECTION",
+            "outcome": "structured_success",
+            "response_reason": None,
+        },
+    ]
+    selected[0]["planner"]["call_trace"] = terminal_trace
+    selected[1]["planner"]["call_trace"] = success_trace
+    metrics = e2._schema_metrics(rows, case_id=case_id)
+    assert metrics == {
+        "initial_schema_validation_events": 2,
+        "schema_correction_calls": 2,
+        "schema_correction_structured_successes": 1,
+        "schema_correction_terminal_failures": 1,
+        "terminal_schema_validation_failures": 1,
+    }
+
+    selected[0]["planner"]["call_trace"][1]["response_reason"] = "invalid_json"
+    metrics = e2._schema_metrics(rows, case_id=case_id)
+    assert metrics["schema_correction_terminal_failures"] == 1
+    assert metrics["terminal_schema_validation_failures"] == 0
+
+
 def test_schema_correction_trigger_and_non_schema_retry_rules() -> None:
     """Schema failures require schema correction; invalid JSON uses generic retry."""
     cases = e2.load_case_definitions()
@@ -620,6 +703,25 @@ def test_schema_correction_trigger_and_non_schema_retry_rules() -> None:
     )
     assert complete is False
     assert "schema_correction_trigger_reason_invalid" in reasons
+
+    rows, pre, _ = _rows(cases)
+    rows[0]["planner"]["call_trace"] = [
+        {
+            "call_kind": "INITIAL",
+            "outcome": "provider_failure",
+            "provider_category": "invalid_response",
+            "response_reason": "schema_validation",
+        }
+    ]
+    rows[0]["planner"]["provider_calls"] = 1
+    complete, reasons = e2.population_integrity(
+        rows,
+        cases,
+        expected_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+    )
+    assert complete is False
+    assert "schema_correction_missing" in reasons
 
 
 def test_semantic_correction_call_kind_is_accepted() -> None:
@@ -673,6 +775,30 @@ def test_endpoint_identity_expected_pair_is_eligible() -> None:
     """The authorized endpoint identity passes provider-free endpoint validation."""
     pre, post = _endpoint_pair()
     assert e2._endpoint_status(pre, post) == (True, [])
+
+
+def test_summary_endpoint_integrity_is_explicit_and_fail_closed() -> None:
+    """Endpoint integrity is explicit in the summary and gates the decision."""
+    cases = e2.load_case_definitions()
+    rows, pre, post = _rows(cases)
+    post = fingerprint.build_endpoint_fingerprint_v2(
+        endpoint="http://192.168.2.141:8888/v1",
+        model_api_label=e2.FROZEN_MODEL,
+        models_payload={"data": [{"id": e2.FROZEN_MODEL}]},
+    )
+    summary = e2.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+    )
+    assert summary["endpoint_integrity"] is False
+    assert summary["endpoint_integrity_reasons"]
+    assert summary["expected_normalized_endpoint_identity"] == (
+        e2.EXPECTED_NORMALIZED_ENDPOINT_IDENTITY
+    )
+    assert summary["decision"] == "INCONCLUSIVE_SYSTEM_REEVALUATION"
 
 
 @pytest.mark.parametrize("label", ["FIG", "LINDEN", "XENON"])
@@ -916,6 +1042,58 @@ def test_xenon_schema_recovery_metrics_and_terminal_guard() -> None:
     assert summary["decision"] == "SYSTEM_REEVALUATION_REJECTED"
     assert summary["xenon_metrics"]["terminal_schema_validation_count"] == 2
 
+    rows, pre, post = _rows(cases)
+    _set_schema_recovery_trace(rows, e2.TARGET_CASES["XENON"], terminal=True)
+    success_row = _rows_for_case(rows, e2.TARGET_CASES["XENON"])[1]
+    success_row["planner"]["call_trace"][1].update(
+        {
+            "outcome": "structured_success",
+            "provider_category": None,
+            "response_reason": None,
+        }
+    )
+    facts = _facts(next(case for case in cases if case["case_id"] == e2.TARGET_CASES["XENON"]))
+    classification = p5.classify_facts(facts)
+    success_row["planner"].update(
+        {
+            "final_planner_success": True,
+            "final_error_type": None,
+            "final_error_code": None,
+            "provider_infrastructure_failure": False,
+            "raw_work_unit_facts": facts,
+            "raw_classification": classification,
+            "raw_contract_ok": True,
+            "final_work_unit_facts": facts,
+            "final_classification": classification,
+            "final_contract_ok": True,
+            "final_plan_available": True,
+            "terminal_stage": None,
+            "terminal_failure_code": None,
+        }
+    )
+    success_row["final_system"].update(
+        {
+            "final_work_unit_facts": facts,
+            "final_classification": classification,
+            "final_contract_ok": True,
+            "final_plan_available": True,
+            "terminal_stage": None,
+            "terminal_failure_code": None,
+        }
+    )
+    summary = e2.summarize_population(
+        rows,
+        cases,
+        authorized_checkpoint=CHECKPOINT,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+    )
+    assert summary["xenon_metrics"]["initial_schema_validation_count"] == 2
+    assert summary["xenon_metrics"]["schema_correction_call_count"] == 2
+    assert summary["xenon_metrics"]["schema_correction_structured_success_count"] == 1
+    assert summary["xenon_metrics"]["terminal_schema_validation_count"] == 1
+    assert summary["xenon_metrics"]["final_pass_attempt_count"] == 1
+
 
 @pytest.mark.parametrize("target", ["FIG", "LINDEN"])
 def test_r1_target_report_shapes_are_provider_free(target: str) -> None:
@@ -1131,6 +1309,8 @@ def test_partial_population_is_inconclusive() -> None:
     )
     assert summary["decision"] == "INCONCLUSIVE_SYSTEM_REEVALUATION"
     assert "wrong_row_count" in summary["population"]["integrity_reasons"]
+    assert summary["population_integrity"] is False
+    assert "wrong_row_count" in summary["population_integrity_reasons"]
 
 
 def test_finalize_is_network_free_and_records_exact_file_hashes(
