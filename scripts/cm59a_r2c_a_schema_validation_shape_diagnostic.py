@@ -108,7 +108,29 @@ PROTECTED_ARTIFACTS = (
 )
 CHECKPOINT_RE = re.compile(r"^[0-9a-f]{40}$")
 ALLOWED_LOCATION_SEGMENTS = {"$root", "*", "<unknown_field>", "<unknown_segment>", "<truncated>"}
-ALLOWED_LOCATION = re.compile(r"^[A-Za-z0-9_.<>$*-]{1,80}$")
+ERROR_TYPE_PATTERN = re.compile(r"^[a-z0-9_.-]{1,64}$")
+
+
+def _declared_schema_fields(schema: object) -> frozenset[str]:
+    """Collect every JSON Schema property name exposed by the response model."""
+    fields: set[str] = set()
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            properties = value.get("properties")
+            if isinstance(properties, dict):
+                fields.update(key for key in properties if isinstance(key, str))
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(schema)
+    return frozenset(fields)
+
+
+DECLARED_SCHEMA_FIELDS = _declared_schema_fields(SemanticPlan.model_json_schema())
 
 
 def canonical_json(value: object) -> str:
@@ -460,20 +482,30 @@ def _shape_integrity_reasons(call: dict[str, object]) -> list[str]:
         return []
     if not isinstance(shape, dict):
         return ["validation_shape_malformed"]
+    if set(shape) != {"issue_count", "issues", "truncated"}:
+        return ["validation_shape_fields_invalid"]
     issues = shape.get("issues")
     issue_count = shape.get("issue_count")
     if not isinstance(issue_count, int) or isinstance(issue_count, bool) or issue_count < 0:
         return ["validation_issue_count_invalid"]
     if not isinstance(issues, list) or len(issues) > MAX_SCHEMA_VALIDATION_ISSUES:
         return ["validation_issue_bound_invalid"]
-    if issue_count < len(issues) or not isinstance(shape.get("truncated"), bool):
+    truncated = shape.get("truncated")
+    if not isinstance(truncated, bool):
+        return ["validation_shape_count_invalid"]
+    if not truncated and issue_count != len(issues):
+        return ["validation_shape_count_invalid"]
+    if truncated and (issue_count <= len(issues) or len(issues) != MAX_SCHEMA_VALIDATION_ISSUES):
         return ["validation_shape_count_invalid"]
     reasons: list[str] = []
     for issue in issues:
         if not isinstance(issue, dict) or set(issue) != {"error_type", "location"}:
             reasons.append("validation_issue_fields_invalid")
             continue
-        if not isinstance(issue["error_type"], str) or len(issue["error_type"]) > 64:
+        error_type = issue["error_type"]
+        if not isinstance(error_type, str) or (
+            not ERROR_TYPE_PATTERN.fullmatch(error_type) and error_type != "<unknown_error_type>"
+        ):
             reasons.append("validation_issue_type_invalid")
         location = issue["location"]
         if (
@@ -482,12 +514,18 @@ def _shape_integrity_reasons(call: dict[str, object]) -> list[str]:
             or len(location) > MAX_SCHEMA_VALIDATION_LOCATION_DEPTH
             or any(
                 not isinstance(segment, str)
-                or not ALLOWED_LOCATION.fullmatch(segment)
-                or (segment not in ALLOWED_LOCATION_SEGMENTS and segment.startswith("<"))
+                or (
+                    segment not in DECLARED_SCHEMA_FIELDS
+                    and segment not in ALLOWED_LOCATION_SEGMENTS
+                )
                 for segment in location
             )
         ):
             reasons.append("validation_location_invalid")
+        elif "<truncated>" in location and (
+            location[-1] != "<truncated>" or len(location) != MAX_SCHEMA_VALIDATION_LOCATION_DEPTH
+        ):
+            reasons.append("validation_location_truncation_invalid")
     return sorted(set(reasons))
 
 
@@ -503,10 +541,12 @@ def _call_trace_reasons(planner: dict[str, object]) -> list[str]:
     if not isinstance(first, dict) or first.get("call_kind") != "INITIAL":
         reasons.append("initial_call_invalid")
         return reasons
-    for call in trace:
+    for expected_index, call in enumerate(trace):
         if not isinstance(call, dict) or call.get("call_kind") not in CALL_KINDS:
             reasons.append("call_kind_invalid")
             continue
+        if call.get("call_index") != expected_index:
+            reasons.append("call_index_invalid")
         response_reason = call.get("response_reason")
         if response_reason not in {None, *RESPONSE_REASONS}:
             reasons.append("response_reason_invalid")
@@ -517,10 +557,21 @@ def _call_trace_reasons(planner: dict[str, object]) -> list[str]:
             return sorted(set(reasons + ["second_call_invalid"]))
         first_reason = first.get("response_reason")
         second_kind = second.get("call_kind")
-        if second_kind == "SCHEMA_CORRECTION" and first_reason != "schema_validation":
+        if second_kind == "SCHEMA_CORRECTION" and not (
+            first.get("outcome") == "provider_failure"
+            and first.get("provider_category") == ProviderFailureCategory.INVALID_RESPONSE.value
+            and first_reason == ProviderResponseFailureReason.SCHEMA_VALIDATION.value
+        ):
             reasons.append("schema_correction_trigger_invalid")
-        if second_kind == "INVALID_RESPONSE_RETRY" and first_reason == "schema_validation":
-            reasons.append("schema_used_generic_retry")
+        if second_kind == "INVALID_RESPONSE_RETRY":
+            if first_reason == ProviderResponseFailureReason.SCHEMA_VALIDATION.value:
+                reasons.append("schema_used_generic_retry")
+            if not (
+                first.get("outcome") == "provider_failure"
+                and first.get("provider_category") == ProviderFailureCategory.INVALID_RESPONSE.value
+                and first_reason != ProviderResponseFailureReason.SCHEMA_VALIDATION.value
+            ):
+                reasons.append("invalid_response_retry_trigger_invalid")
         if second_kind == "SEMANTIC_CORRECTION" and first.get("outcome") != "structured_success":
             reasons.append("semantic_correction_trigger_invalid")
         if second_kind not in {
@@ -529,6 +580,8 @@ def _call_trace_reasons(planner: dict[str, object]) -> list[str]:
             "SEMANTIC_CORRECTION",
         }:
             reasons.append("second_call_invalid")
+    elif first.get("response_reason") == ProviderResponseFailureReason.SCHEMA_VALIDATION.value:
+        reasons.append("schema_correction_missing")
     return sorted(set(reasons))
 
 
@@ -624,6 +677,17 @@ def _case_signature_status(case_rows: list[dict[str, object]]) -> str:
     return "NO_SCHEMA_VALIDATION"
 
 
+def _planner_execution_succeeded(row: dict[str, object]) -> bool:
+    """Return whether one integrity-checked planner execution truly succeeded."""
+    planner = row.get("planner")
+    return (
+        isinstance(planner, dict)
+        and planner.get("final_plan_available") is True
+        and planner.get("final_error_type") is None
+        and planner.get("provider_infrastructure_failure") is False
+    )
+
+
 def _has_instrumentation_gap(rows: list[dict[str, object]]) -> tuple[int, int]:
     """Count missing and truncated schema shapes in decision-bearing calls."""
     gaps = truncated = 0
@@ -665,7 +729,9 @@ def decision(
         return "DIAGNOSTIC_INSTRUMENTATION_GAP"
     signatures = [validation_signature(row) for row in rows]
     if not any(signatures):
-        return "FAILURES_NOT_REPRODUCED"
+        if all(_planner_execution_succeeded(row) for row in rows):
+            return "FAILURES_NOT_REPRODUCED"
+        return "MIXED_DIAGNOSTIC_OUTCOME"
     grouped = _rows_by_case(rows)
     statuses = [_case_signature_status(grouped.get(case_id, [])) for case_id in TARGET_CASES]
     if "VARIABLE_VALIDATION_SIGNATURE" in statuses:
@@ -677,7 +743,9 @@ def decision(
             return "STABLE_SHARED_VALIDATION_SIGNATURE"
         return "STABLE_DISTINCT_VALIDATION_SIGNATURES"
     if statuses == ["NO_SCHEMA_VALIDATION", "NO_SCHEMA_VALIDATION"]:
-        return "FAILURES_NOT_REPRODUCED"
+        if all(_planner_execution_succeeded(row) for row in rows):
+            return "FAILURES_NOT_REPRODUCED"
+        return "MIXED_DIAGNOSTIC_OUTCOME"
     return "MIXED_DIAGNOSTIC_OUTCOME"
 
 
@@ -699,6 +767,22 @@ def _signature_json(signature: tuple[tuple[object, ...], ...]) -> list[dict[str,
     ]
 
 
+def _summary_shapes(
+    grouped: dict[str, list[dict[str, object]]],
+    case_id: str,
+    call_kind: str,
+) -> list[object]:
+    """Return shape projections only after population integrity has passed."""
+    return [
+        call["validation_shape"]
+        for row in grouped.get(case_id, [])
+        for call in row.get("planner", {}).get("call_trace", [])
+        if isinstance(call, dict)
+        and call.get("call_kind") == call_kind
+        and call.get("response_reason") == ProviderResponseFailureReason.SCHEMA_VALIDATION.value
+    ]
+
+
 def summarize_population(
     rows: list[dict[str, object]],
     *,
@@ -717,28 +801,57 @@ def summarize_population(
     )
     endpoint_ok, endpoint_reasons = _endpoint_status(pre_fingerprint, post_fingerprint)
     grouped = _rows_by_case(rows)
-    case_statuses = {
-        case_id: _case_signature_status(grouped.get(case_id, [])) for case_id in TARGET_CASES
-    }
-    gaps, truncated = _has_instrumentation_gap(rows)
-    type_counts, location_counts = _shape_counts(rows)
-    signatures = {
-        case_id: [_signature_json(validation_signature(row)) for row in grouped.get(case_id, [])]
-        for case_id in TARGET_CASES
-    }
-    stable_signatures = {
-        case_id: signatures[case_id][0]
-        if len(signatures[case_id]) == 2 and signatures[case_id][0] == signatures[case_id][1]
-        else None
-        for case_id in TARGET_CASES
-    }
-    shared_relation = None
-    if all(stable_signatures[case_id] is not None for case_id in TARGET_CASES):
-        shared_relation = (
-            "shared"
-            if stable_signatures[TARGET_CASES[0]] == stable_signatures[TARGET_CASES[1]]
-            else "distinct"
-        )
+    if population_ok:
+        case_statuses = {
+            case_id: _case_signature_status(grouped.get(case_id, [])) for case_id in TARGET_CASES
+        }
+        gaps, truncated = _has_instrumentation_gap(rows)
+        type_counts, location_counts = _shape_counts(rows)
+        signatures = {
+            case_id: [
+                _signature_json(validation_signature(row)) for row in grouped.get(case_id, [])
+            ]
+            for case_id in TARGET_CASES
+        }
+        stable_signatures = {
+            case_id: signatures[case_id][0]
+            if len(signatures[case_id]) == 2 and signatures[case_id][0] == signatures[case_id][1]
+            else None
+            for case_id in TARGET_CASES
+        }
+        shared_relation = None
+        if all(stable_signatures[case_id] is not None for case_id in TARGET_CASES):
+            shared_relation = (
+                "shared"
+                if stable_signatures[TARGET_CASES[0]] == stable_signatures[TARGET_CASES[1]]
+                else "distinct"
+            )
+        shape_outputs = {
+            "Kestrel_initial_validation_shapes": _summary_shapes(
+                grouped, TARGET_CASES[0], "INITIAL"
+            ),
+            "Kestrel_correction_validation_shapes": _summary_shapes(
+                grouped, TARGET_CASES[0], "SCHEMA_CORRECTION"
+            ),
+            "Xenon_initial_validation_shapes": _summary_shapes(grouped, TARGET_CASES[1], "INITIAL"),
+            "Xenon_correction_validation_shapes": _summary_shapes(
+                grouped, TARGET_CASES[1], "SCHEMA_CORRECTION"
+            ),
+        }
+    else:
+        case_statuses = dict.fromkeys(TARGET_CASES, "UNAVAILABLE")
+        gaps = truncated = 0
+        type_counts = Counter()
+        location_counts = Counter()
+        signatures = {case_id: [] for case_id in TARGET_CASES}
+        stable_signatures = dict.fromkeys(TARGET_CASES)
+        shared_relation = None
+        shape_outputs = {
+            "Kestrel_initial_validation_shapes": [],
+            "Kestrel_correction_validation_shapes": [],
+            "Xenon_initial_validation_shapes": [],
+            "Xenon_correction_validation_shapes": [],
+        }
     final_decision = decision(
         rows,
         expected_checkpoint=authorized_checkpoint,
@@ -760,38 +873,7 @@ def summarize_population(
         "endpoint_integrity": endpoint_ok,
         "endpoint_integrity_reasons": endpoint_reasons,
         "case_statuses": case_statuses,
-        "Kestrel_initial_validation_shapes": [
-            call.get("validation_shape")
-            for row in grouped.get(TARGET_CASES[0], [])
-            for call in row.get("planner", {}).get("call_trace", [])
-            if isinstance(call, dict)
-            and call.get("call_kind") == "INITIAL"
-            and call.get("response_reason") == "schema_validation"
-        ],
-        "Kestrel_correction_validation_shapes": [
-            call.get("validation_shape")
-            for row in grouped.get(TARGET_CASES[0], [])
-            for call in row.get("planner", {}).get("call_trace", [])
-            if isinstance(call, dict)
-            and call.get("call_kind") == "SCHEMA_CORRECTION"
-            and call.get("response_reason") == "schema_validation"
-        ],
-        "Xenon_initial_validation_shapes": [
-            call.get("validation_shape")
-            for row in grouped.get(TARGET_CASES[1], [])
-            for call in row.get("planner", {}).get("call_trace", [])
-            if isinstance(call, dict)
-            and call.get("call_kind") == "INITIAL"
-            and call.get("response_reason") == "schema_validation"
-        ],
-        "Xenon_correction_validation_shapes": [
-            call.get("validation_shape")
-            for row in grouped.get(TARGET_CASES[1], [])
-            for call in row.get("planner", {}).get("call_trace", [])
-            if isinstance(call, dict)
-            and call.get("call_kind") == "SCHEMA_CORRECTION"
-            and call.get("response_reason") == "schema_validation"
-        ],
+        **shape_outputs,
         "validation_signatures": signatures,
         "stable_validation_signatures": stable_signatures,
         "shared_signature_relation": shared_relation,

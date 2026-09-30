@@ -132,6 +132,50 @@ The accepted baseline failures remain the unrelated MCP helper signature,
 tool-budget, historical R6 evidence, stale P7 artifact, graph-worker, and
 graph-section categories. No R2C-A live population was run.
 
+## R2C-A-R1 Pre-Live Hardening
+
+R2C-A-R1 is a harness-only correction on top of `c5ae4966ba2eeb2d8027627efb893a0ca4ff41a8`.
+The provider instrumentation remains byte-frozen; no provider, planner, schema,
+workflow, safety, capability, or worker source changed. Provider calls remain
+zero.
+
+The finalizer now treats `FAILURES_NOT_REPRODUCED` as conclusive only when all
+four integrity-checked planner executions have a final plan, no final error,
+and no infrastructure failure. Non-schema terminal outcomes such as invalid
+JSON, provider rejection, and planner semantic failure produce
+`MIXED_DIAGNOSTIC_OUTCOME` rather than success.
+
+Evidence call traces now require contiguous indexes and the exact production
+transitions: schema failures must use `SCHEMA_CORRECTION`, non-schema invalid
+responses must use `INVALID_RESPONSE_RETRY`, and semantic correction must
+follow initial structured success. A schema failure without correction is
+`schema_correction_missing`.
+
+Shape integrity now matches the provider producer: exact top-level and issue
+fields, the bounded error-type vocabulary, declared `SemanticPlan` property
+locations or fixed sentinels only, coherent truncated counts, and exact
+location truncation representation. If population integrity fails, summary
+shape projections and shape-derived counters are omitted rather than copying
+tampered evidence into the final artifact.
+
+R1 verification:
+
+```text
+R2C-A-R1 focused/provider/planner tests: 126 passed
+E2 and R2A adjacent tests: 112 passed
+Provider-free PRELIVE_READY audit: passed
+Ruff: passed
+Formatting: passed
+Python compilation: passed
+git diff --check: passed
+Provider calls: 0
+Endpoint calls: 0
+Worker/program calls: 0
+```
+
+R2C-A-R1 remains pre-live only. Do not contact the endpoint or run Kestrel or
+Xenon until an independent review authorizes the future population.
+
 ## Hard Stop
 
 After the implementation checkpoint is committed and pushed, stop for

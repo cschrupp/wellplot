@@ -206,6 +206,7 @@ def _population(
     all_success: bool = False,
     infrastructure: bool = False,
     truncated: bool = False,
+    terminal: str | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object], dict[str, object]]:
     """Build a complete provider-free four-row diagnostic population."""
     pre, post = _endpoint_pair()
@@ -214,8 +215,8 @@ def _population(
     rows: list[dict[str, object]] = []
     for case_id in r2c.TARGET_CASES:
         shapes = (kestrel_shapes if case_id == r2c.TARGET_CASES[0] else xenon_shapes) or (
-            _shape("title"),
-            _shape("title"),
+            _shape("summary"),
+            _shape("summary"),
         )
         for attempt_index in range(2):
             if all_success:
@@ -228,6 +229,55 @@ def _population(
                         "response_reason": None,
                         "validation_shape": None,
                     }
+                ]
+            elif terminal == "invalid_json":
+                trace = [
+                    {
+                        "call_index": 0,
+                        "call_kind": "INITIAL",
+                        "outcome": "provider_failure",
+                        "provider_category": "invalid_response",
+                        "response_reason": "invalid_json",
+                        "validation_shape": None,
+                    },
+                    {
+                        "call_index": 1,
+                        "call_kind": "INVALID_RESPONSE_RETRY",
+                        "outcome": "provider_failure",
+                        "provider_category": "invalid_response",
+                        "response_reason": "invalid_json",
+                        "validation_shape": None,
+                    },
+                ]
+            elif terminal == "provider_rejected":
+                trace = [
+                    {
+                        "call_index": 0,
+                        "call_kind": "INITIAL",
+                        "outcome": "provider_failure",
+                        "provider_category": "provider_rejected",
+                        "response_reason": None,
+                        "validation_shape": None,
+                    }
+                ]
+            elif terminal == "semantic_failure":
+                trace = [
+                    {
+                        "call_index": 0,
+                        "call_kind": "INITIAL",
+                        "outcome": "structured_success",
+                        "provider_category": None,
+                        "response_reason": None,
+                        "validation_shape": None,
+                    },
+                    {
+                        "call_index": 1,
+                        "call_kind": "SEMANTIC_CORRECTION",
+                        "outcome": "structured_success",
+                        "provider_category": None,
+                        "response_reason": None,
+                        "validation_shape": None,
+                    },
                 ]
             elif infrastructure:
                 trace = [
@@ -243,7 +293,14 @@ def _population(
             else:
                 current_shape = shapes[attempt_index]
                 if truncated:
-                    current_shape = {**current_shape, "truncated": True}
+                    current_shape = {
+                        "issue_count": r2c.MAX_SCHEMA_VALIDATION_ISSUES + 1,
+                        "issues": [
+                            {"error_type": "missing", "location": ["summary"]}
+                            for _ in range(r2c.MAX_SCHEMA_VALIDATION_ISSUES)
+                        ],
+                        "truncated": True,
+                    }
                 trace = [
                     {
                         "call_index": 0,
@@ -268,6 +325,15 @@ def _population(
                 "call_trace": trace,
                 "provider_infrastructure_failure": infrastructure,
                 "final_plan_available": all_success,
+                "final_error_type": (
+                    None
+                    if all_success
+                    else "ProviderRequestError"
+                    if terminal in {"invalid_json", "provider_rejected"}
+                    else "PlannerSemanticFailure"
+                    if terminal == "semantic_failure"
+                    else "ProviderRequestError"
+                ),
                 "final_plan_projection": None,
             }
             rows.append(
@@ -301,12 +367,12 @@ def _decision(
 def test_shared_and_distinct_signature_decisions() -> None:
     """Stable equal and unequal target signatures are distinguished."""
     shared = _population(
-        kestrel_shapes=(_shape("title"), _shape("title")),
-        xenon_shapes=(_shape("title"), _shape("title")),
+        kestrel_shapes=(_shape("summary"), _shape("summary")),
+        xenon_shapes=(_shape("summary"), _shape("summary")),
     )
     distinct = _population(
-        kestrel_shapes=(_shape("title"), _shape("title")),
-        xenon_shapes=(_shape("summary"), _shape("summary")),
+        kestrel_shapes=(_shape("summary"), _shape("summary")),
+        xenon_shapes=(_shape("goal"), _shape("goal")),
     )
 
     assert _decision(shared) == "STABLE_SHARED_VALIDATION_SIGNATURE"
@@ -315,7 +381,7 @@ def test_shared_and_distinct_signature_decisions() -> None:
 
 def test_variable_signature_decision() -> None:
     """One target varying between attempts is not treated as stable."""
-    population = _population(kestrel_shapes=(_shape("title"), _shape("summary")))
+    population = _population(kestrel_shapes=(_shape("summary"), _shape("goal")))
 
     assert _decision(population) == "VARIABLE_VALIDATION_SIGNATURE"
 
@@ -323,6 +389,89 @@ def test_variable_signature_decision() -> None:
 def test_failures_not_reproduced_decision() -> None:
     """Four successful planner executions are reported as not reproduced."""
     assert _decision(_population(all_success=True)) == "FAILURES_NOT_REPRODUCED"
+
+
+@pytest.mark.parametrize("terminal", ["invalid_json", "provider_rejected", "semantic_failure"])
+def test_non_schema_terminal_outcomes_are_not_success(
+    terminal: str,
+) -> None:
+    """Non-schema terminal outcomes are mixed evidence, not success."""
+    assert _decision(_population(terminal=terminal)) == "MIXED_DIAGNOSTIC_OUTCOME"
+
+
+def test_mixed_success_and_non_schema_terminal_is_not_success() -> None:
+    """A successful execution cannot hide a non-schema terminal outcome."""
+    rows, pre, post = _population(all_success=True)
+    terminal_rows, _, _ = _population(terminal="invalid_json")
+    for row, terminal_row in zip(rows[:2], terminal_rows[:2], strict=True):
+        row["planner"] = terminal_row["planner"]
+    assert (
+        r2c.decision(
+            rows,
+            expected_checkpoint="a" * 40,
+            pre_fingerprint=pre,
+            post_fingerprint=post,
+        )
+        == "MIXED_DIAGNOSTIC_OUTCOME"
+    )
+
+
+def _trace_reasons(trace: list[dict[str, object]]) -> list[str]:
+    """Validate one synthetic trace without rebuilding a full population."""
+    return r2c._call_trace_reasons(
+        {
+            "provider_calls": len(trace),
+            "call_trace": trace,
+        }
+    )
+
+
+def test_schema_validation_requires_schema_correction() -> None:
+    """A schema failure without its correction call is invalid evidence."""
+    trace = _population()[0][0]["planner"]["call_trace"][:1]
+    assert "schema_correction_missing" in _trace_reasons(trace)
+
+
+def test_schema_correction_requires_schema_validation_trigger() -> None:
+    """Non-schema initial failures cannot be labeled schema corrections."""
+    trace = _population(terminal="invalid_json")[0][0]["planner"]["call_trace"]
+    trace[1]["call_kind"] = "SCHEMA_CORRECTION"
+    assert "schema_correction_trigger_invalid" in _trace_reasons(trace)
+
+
+def test_invalid_response_retry_requires_non_schema_invalid_response() -> None:
+    """Generic invalid-response retry cannot follow schema validation or transport."""
+    schema_trace = _population()[0][0]["planner"]["call_trace"]
+    schema_trace[1]["call_kind"] = "INVALID_RESPONSE_RETRY"
+    reasons = _trace_reasons(schema_trace)
+    assert "schema_used_generic_retry" in reasons
+
+    transport_trace = _population(infrastructure=True)[0][0]["planner"]["call_trace"]
+    transport_trace.append(
+        {
+            "call_index": 1,
+            "call_kind": "INVALID_RESPONSE_RETRY",
+            "outcome": "provider_failure",
+            "provider_category": "invalid_response",
+            "response_reason": "invalid_json",
+            "validation_shape": None,
+        }
+    )
+    assert "invalid_response_retry_trigger_invalid" in _trace_reasons(transport_trace)
+
+
+def test_semantic_correction_requires_initial_structured_success() -> None:
+    """Semantic correction is legal only after an initial structured result."""
+    trace = _population()[0][0]["planner"]["call_trace"]
+    trace[1]["call_kind"] = "SEMANTIC_CORRECTION"
+    assert "semantic_correction_trigger_invalid" in _trace_reasons(trace)
+
+
+def test_call_indexes_are_contiguous() -> None:
+    """Evidence call indexes must match their bounded trace positions."""
+    trace = _population()[0][0]["planner"]["call_trace"]
+    trace[1]["call_index"] = 3
+    assert "call_index_invalid" in _trace_reasons(trace)
 
 
 def test_mixed_outcome_decision() -> None:
@@ -389,6 +538,119 @@ def test_infrastructure_and_endpoint_integrity_are_inconclusive() -> None:
         )
         == "INCONCLUSIVE_DIAGNOSTIC"
     )
+
+
+def test_shape_integrity_matches_producer_vocabulary_and_bounds() -> None:
+    """Tampered shape fields, types, locations, and counts fail closed."""
+    rows, pre, _ = _population()
+    shape = rows[0]["planner"]["call_trace"][0]["validation_shape"]
+    shape["SECRET"] = "do-not-retain"
+    valid, reasons = r2c.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+        pre_fingerprint=pre,
+    )
+    assert not valid
+    assert "validation_shape_fields_invalid" in reasons
+
+    for invalid_type in ("SECRET_ERROR_TYPE", "Missing Field", "<model_generated_error>"):
+        rows, pre, _ = _population()
+        rows[0]["planner"]["call_trace"][0]["validation_shape"]["issues"][0]["error_type"] = (
+            invalid_type
+        )
+        valid, reasons = r2c.population_integrity(
+            rows,
+            expected_checkpoint="a" * 40,
+            pre_fingerprint=pre,
+        )
+        assert not valid
+        assert "validation_issue_type_invalid" in reasons
+
+    rows, pre, _ = _population()
+    rows[0]["planner"]["call_trace"][0]["validation_shape"]["issues"][0]["location"] = [
+        "TOP_SECRET_MODEL_FIELD_7F91"
+    ]
+    valid, reasons = r2c.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+        pre_fingerprint=pre,
+    )
+    assert not valid
+    assert "validation_location_invalid" in reasons
+
+    for shape in (
+        {
+            "issue_count": 2,
+            "issues": [{"error_type": "missing", "location": ["summary"]}],
+            "truncated": False,
+        },
+        {
+            "issue_count": 2,
+            "issues": [{"error_type": "missing", "location": ["summary"]}],
+            "truncated": True,
+        },
+        {
+            "issue_count": r2c.MAX_SCHEMA_VALIDATION_ISSUES,
+            "issues": [
+                {"error_type": "missing", "location": ["summary"]}
+                for _ in range(r2c.MAX_SCHEMA_VALIDATION_ISSUES)
+            ],
+            "truncated": True,
+        },
+    ):
+        rows, pre, _ = _population()
+        rows[0]["planner"]["call_trace"][0]["validation_shape"] = shape
+        valid, reasons = r2c.population_integrity(
+            rows,
+            expected_checkpoint="a" * 40,
+            pre_fingerprint=pre,
+        )
+        assert not valid
+        assert "validation_shape_count_invalid" in reasons
+
+
+def test_truncated_location_requires_final_max_depth_sentinel() -> None:
+    """Location truncation is valid only in the producer's exact representation."""
+    rows, pre, _ = _population()
+    rows[0]["planner"]["call_trace"][0]["validation_shape"]["issues"][0]["location"] = [
+        "summary",
+        "<truncated>",
+    ]
+    valid, reasons = r2c.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+        pre_fingerprint=pre,
+    )
+    assert not valid
+    assert "validation_location_truncation_invalid" in reasons
+
+    rows, pre, _ = _population()
+    rows[0]["planner"]["call_trace"][0]["validation_shape"]["issues"][0]["location"] = [
+        "summary"
+    ] * (r2c.MAX_SCHEMA_VALIDATION_LOCATION_DEPTH - 1) + ["<truncated>"]
+    valid, reasons = r2c.population_integrity(
+        rows,
+        expected_checkpoint="a" * 40,
+        pre_fingerprint=pre,
+    )
+    assert valid
+    assert "validation_location_truncation_invalid" not in reasons
+
+
+def test_summary_omits_shapes_when_population_integrity_fails() -> None:
+    """Malformed evidence cannot be copied into a fail-closed summary."""
+    rows, pre, post = _population()
+    rows[0]["planner"]["call_trace"][0]["validation_shape"]["SECRET"] = "TOP_SECRET_MODEL_VALUE"
+    summary = r2c.summarize_population(
+        rows,
+        authorized_checkpoint="a" * 40,
+        pre_fingerprint=pre,
+        post_fingerprint=post,
+    )
+    serialized = json.dumps(summary, sort_keys=True)
+    assert summary["population_integrity"] is False
+    assert summary["Kestrel_initial_validation_shapes"] == []
+    assert "TOP_SECRET_MODEL_VALUE" not in serialized
 
 
 def test_artifact_collision_guard_is_fail_closed(tmp_path: Path) -> None:
