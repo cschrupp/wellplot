@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 from dataclasses import dataclass, field
 
@@ -18,6 +19,7 @@ from wellplot.agent.code_mode.planner import (
     SemanticPlanner,
     _correction_request,
     _safe_task_for_correction,
+    _schema_correction_request,
     validate_semantic_plan,
 )
 from wellplot.agent.providers.base import (
@@ -67,6 +69,7 @@ class _SequenceBackend:
 
     responses: list[object]
     requests: list[StructuredGenerationRequest] = field(default_factory=list)
+    response_models: list[type[BaseModel]] = field(default_factory=list)
 
     async def generate_structured(
         self,
@@ -76,6 +79,7 @@ class _SequenceBackend:
     ) -> StructuredGenerationResult[BaseModel]:
         """Return the next response or raise its configured exception."""
         self.requests.append(request)
+        self.response_models.append(response_model)
         response = self.responses.pop(0)
         if isinstance(response, BaseException):
             raise response
@@ -642,6 +646,167 @@ def test_planner_recovers_after_invalid_json_reason() -> None:
 
     assert result == SemanticPlan.model_validate(_plan_payload())
     assert len(backend.requests) == 2
+    assert backend.requests[0].user_prompt == backend.requests[1].user_prompt
+
+
+def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
+    """Schema validation gets one distinct retry with the original context."""
+    backend = _SequenceBackend(
+        responses=[
+            StructuredResponseProviderError(
+                "SECRET_SCHEMA_VALIDATION_DETAILS",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+            ),
+            _plan_payload(),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="revise",
+            current_document_summary={"sections": ["existing"]},
+            source_summary={"sources": [{"labels": ["main pass"], "channels": []}]},
+            timeout_seconds=7.0,
+            temperature=0.0,
+            max_output_tokens=2048,
+        )
+    )
+
+    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert len(backend.requests) == 2
+    initial, retry = backend.requests
+    assert initial.user_prompt != retry.user_prompt
+    assert "Schema correction context:\n" in retry.user_prompt
+    assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.user_prompt
+    assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.system_prompt
+    assert initial.system_prompt == retry.system_prompt
+    assert initial.timeout_seconds == retry.timeout_seconds == 7.0
+    assert initial.temperature == retry.temperature == 0.0
+    assert initial.max_output_tokens == retry.max_output_tokens == 2048
+    initial_context = json.loads(initial.user_prompt.split("Context:\n", 1)[1])
+    retry_context = json.loads(retry.user_prompt.split("Schema correction context:\n", 1)[1])
+    assert retry_context == initial_context
+    assert backend.response_models == [SemanticPlan, SemanticPlan]
+
+
+def test_schema_correction_helper_has_no_previous_response_arguments() -> None:
+    """The schema retry helper accepts only the original context and controls."""
+    parameters = set(inspect.signature(_schema_correction_request).parameters)
+
+    assert parameters == {
+        "context",
+        "timeout_seconds",
+        "temperature",
+        "max_output_tokens",
+    }
+
+
+def test_schema_validation_failure_stops_after_two_calls() -> None:
+    """A repeated schema failure remains terminal without a third request."""
+    failure = StructuredResponseProviderError(
+        "Planner returned invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+    )
+    backend = _SequenceBackend(responses=[failure, failure])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(StructuredResponseProviderError) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
+    assert len(backend.requests) == 2
+    assert "Schema correction context:\n" in backend.requests[1].user_prompt
+
+
+def test_schema_validation_then_invalid_json_is_terminal_after_two_calls() -> None:
+    """A different second failure is terminal and does not open another retry."""
+    backend = _SequenceBackend(
+        responses=[
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+            ),
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.INVALID_JSON,
+            ),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(StructuredResponseProviderError) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.response_reason is ProviderResponseFailureReason.INVALID_JSON
+    assert len(backend.requests) == 2
+
+
+def test_schema_correction_then_semantic_failure_stays_bounded() -> None:
+    """A valid but semantically invalid correction cannot open semantic repair."""
+    backend = _SequenceBackend(
+        responses=[
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+            ),
+            _invalid_plan_payload("unknown_capability"),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "unknown_capability"
+    assert len(backend.requests) == 2
+
+
+def test_semantic_correction_then_schema_failure_stays_on_existing_path() -> None:
+    """A schema failure during semantic correction remains terminal and unchanged."""
+    backend = _SequenceBackend(
+        responses=[
+            _invalid_plan_payload("unknown_capability"),
+            StructuredResponseProviderError(
+                "Planner returned invalid structured output.",
+                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+            ),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(StructuredResponseProviderError) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Build the CBL quicklook.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
+    assert len(backend.requests) == 2
+    assert "Correction context:\n" in backend.requests[1].user_prompt
+    assert "Schema correction context:\n" not in backend.requests[1].user_prompt
 
 
 def test_planner_invalid_response_then_semantic_failure_stays_bounded() -> None:

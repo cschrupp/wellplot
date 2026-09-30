@@ -17,8 +17,20 @@ from ..providers.base import (
     ProviderRequestError,
     StructuredGenerationRequest,
 )
+from ..providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
 
 CompilationMode = Literal["reconstruct", "revise"]
+
+_SCHEMA_CORRECTION_INSTRUCTION = (
+    "Retry the SemanticPlan because the previous response was valid JSON but did not "
+    "conform to the supplied structured response model. Return exactly one object "
+    "matching the supplied response schema. Do not add undeclared fields. Use the "
+    "required field types and satisfy all required non-empty fields. Do not describe "
+    "the correction or include prose outside the structured response."
+)
 
 
 class _SemanticModel(BaseModel):
@@ -152,13 +164,25 @@ class SemanticPlanner:
             if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
                 raise
             invalid_response_retry_used = True
-            generated = await self.backend.generate_structured(
-                _planning_request(
+            if (
+                isinstance(error, StructuredResponseProviderError)
+                and error.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
+            ):
+                retry_request = _schema_correction_request(
                     context=context,
                     timeout_seconds=timeout_seconds,
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
-                ),
+                )
+            else:
+                retry_request = _planning_request(
+                    context=context,
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                )
+            generated = await self.backend.generate_structured(
+                retry_request,
                 response_model=SemanticPlan,
             )
         plan = SemanticPlan.model_validate(generated.value)
@@ -314,6 +338,27 @@ def _planning_request(
         user_prompt=(
             "Create one SemanticPlan for this request. Return only the supplied "
             "structured response model.\n\nContext:\n"
+            + json.dumps(context, sort_keys=True, separators=(",", ":"))
+        ),
+        timeout_seconds=timeout_seconds,
+        temperature=temperature,
+        max_output_tokens=max_output_tokens,
+    )
+
+
+def _schema_correction_request(
+    *,
+    context: Mapping[str, object],
+    timeout_seconds: float,
+    temperature: float | None,
+    max_output_tokens: int | None,
+) -> StructuredGenerationRequest:
+    """Build one bounded retry for a schema-validation response failure."""
+    return StructuredGenerationRequest(
+        system_prompt=_PLANNER_SYSTEM_PROMPT,
+        user_prompt=(
+            _SCHEMA_CORRECTION_INSTRUCTION
+            + "\n\nSchema correction context:\n"
             + json.dumps(context, sort_keys=True, separators=(",", ":"))
         ),
         timeout_seconds=timeout_seconds,

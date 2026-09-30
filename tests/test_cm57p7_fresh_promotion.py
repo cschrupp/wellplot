@@ -17,6 +17,23 @@ def _cases() -> tuple[dict[str, object], ...]:
     return p7.load_case_definitions()
 
 
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P7 evaluation."""
+    real_artifact_sha256 = p7.artifact_sha256
+    planner_path = (p7.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p7.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p7, "artifact_sha256", historical_artifact_sha256)
+
+
 def _synthetic_row(
     case: dict[str, object], *, checkpoint: str = p7.BASELINE_SHA
 ) -> dict[str, object]:
@@ -357,8 +374,9 @@ def test_provider_base_is_a_frozen_live_guard() -> None:
     assert len(provenance["provider_base_sha256"]) == 64
 
 
-def test_prelive_report_is_provider_free() -> None:
+def test_prelive_report_is_provider_free(monkeypatch: pytest.MonkeyPatch) -> None:
     """Require the pre-live report to declare zero provider and worker calls."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p7.prelive_report()
     assert report["status"] == "PRELIVE_READY"
     assert report["provider_calls"] == 0
@@ -376,12 +394,23 @@ def test_no_live_summary_or_provider_object_is_created_by_default() -> None:
 
 def test_prelive_does_not_construct_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep provider construction outside the provider-free pre-live path."""
+    _patch_historical_planner_hash(monkeypatch)
     monkeypatch.setattr(
         p7.p5,
         "_provider_configuration",
         lambda args: pytest.fail("provider construction occurred during pre-live checks"),
     )
     assert p7.prelive_report()["provider_calls"] == 0
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P7 rejects an incorrect historical planner hash."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="CM-57P7 frozen artifact drifted"):
+        p7.prelive_report()
 
 
 def test_live_path_rejects_nonempty_output_before_provider_construction(

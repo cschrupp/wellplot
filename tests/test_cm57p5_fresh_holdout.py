@@ -20,6 +20,23 @@ def cases() -> tuple[dict[str, object], ...]:
     return p5.load_case_definitions()
 
 
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P5 evaluation."""
+    real_artifact_sha256 = p5.artifact_sha256
+    planner_path = (p5.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p5.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p5, "artifact_sha256", historical_artifact_sha256)
+
+
 def test_fresh_corpus_has_exact_family_distribution_and_frozen_hash(
     cases: tuple[dict[str, object], ...],
 ) -> None:
@@ -357,6 +374,7 @@ def test_live_gate_rejects_prompt_source_or_control_drift_before_provider(
     expected_message: str,
 ) -> None:
     """Abort before provider construction when frozen contract values drift."""
+    _patch_historical_planner_hash(monkeypatch)
     monkeypatch.setattr(p5, "OUTPUT_PATH", tmp_path / "evidence.jsonl")
     monkeypatch.setattr(p5, "verify_reviewed_checkout", lambda _checkpoint: None)
     if drift_kind == "prompt":
@@ -378,3 +396,13 @@ def test_live_gate_rejects_prompt_source_or_control_drift_before_provider(
     with pytest.raises(RuntimeError, match=expected_message):
         asyncio.run(p5._run_live(args, p5.BASELINE_SHA))
     assert not constructed
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P5 rejects an incorrect historical planner hash."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="Production planner bytes drifted"):
+        p5.prelive_report()

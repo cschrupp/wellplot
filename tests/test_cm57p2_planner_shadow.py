@@ -53,6 +53,23 @@ def _cases() -> tuple[dict[str, object], ...]:
     return p2.load_case_definitions()
 
 
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P2 evaluation."""
+    real_artifact_sha256 = p2.artifact_sha256
+    planner_path = (p2.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p2.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p2, "artifact_sha256", historical_artifact_sha256)
+
+
 def _valid_plan(case: dict[str, object]) -> SemanticPlan:
     return SemanticPlan(
         summary="one section",
@@ -92,8 +109,11 @@ def _run(case: dict[str, object], backend: QueueBackend, attempt: int = 0) -> di
     )
 
 
-def test_prelive_report_is_provider_free_and_guarded() -> None:
+def test_prelive_report_is_provider_free_and_guarded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The default report performs only deterministic guards."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p2.prelive_report()
 
     assert report["status"] == "PRELIVE_READY"
@@ -101,6 +121,16 @@ def test_prelive_report_is_provider_free_and_guarded() -> None:
     assert report["live_inference"] == "NOT_STARTED"
     assert report["future_population"] == {"cases": 16, "rows": 32}
     assert report["source_summary_matrix_sha256"] == p2.EXPECTED_SOURCE_MATRIX_SHA256
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P2 rejects a deliberately incorrect historical planner hash."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="CM-57P1 planner source drifted"):
+        p2.prelive_report()
 
 
 def test_frozen_corpus_and_source_summary_are_path_free() -> None:

@@ -122,6 +122,23 @@ def _schema_rows(
     return rows
 
 
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P8 evaluation."""
+    real_artifact_sha256 = p8.artifact_sha256
+    planner_path = (p8.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p8.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p8, "artifact_sha256", historical_artifact_sha256)
+
+
 def _decision_row(*, infrastructure_failure: bool = False, program_calls: int = 0) -> dict:
     """Build one minimal row for top-level decision tests."""
     return {
@@ -182,8 +199,11 @@ def test_manifest_resolves_exactly_twelve_p7_cases_without_request_text() -> Non
     assert {case["case_id"] for case in cases} == {item["case_id"] for item in payload["cases"]}
 
 
-def test_manifest_and_frozen_contract_hashes_pass() -> None:
+def test_manifest_and_frozen_contract_hashes_pass(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """P7 corpus, raw evidence, prompts, schema, and production bytes are frozen."""
+    _patch_historical_planner_hash(monkeypatch)
     contract = p8.verify_frozen_contract()
     assert contract["manifest_version"] == p8.MANIFEST_VERSION
     assert contract["p7_raw_sha256"] == p8.EXPECTED_P7_RAW_SHA256
@@ -538,10 +558,23 @@ def test_population_and_decision_fail_closed_on_empty_or_wrong_checkpoint() -> N
     assert result["decision"] == "INCONCLUSIVE_PROMPT_FACTOR_LOCALIZATION"
 
 
-def test_prelive_report_constructs_no_provider() -> None:
+def test_prelive_report_constructs_no_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The default CLI contract is provider-free and bounded."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p8.prelive_report()
     assert report["provider_calls"] == 0
     assert report["worker_program_calls"] == 0
     assert report["live_inference"] == "NOT_STARTED"
     assert report["shared_rows"] == 24
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P8 rejects an incorrect historical planner hash."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="CM-57P8 frozen artifact drifted"):
+        p8.prelive_report()

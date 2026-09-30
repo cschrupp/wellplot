@@ -175,10 +175,13 @@ def test_gold_is_checked_against_builtin_registry() -> None:
 def test_pre_live_report_is_provider_free_and_exactly_sized() -> None:
     real_artifact_sha256 = p10.artifact_sha256
     provider_path = (p10.REPO_ROOT / "src/wellplot/agent/providers/openai_compat_v2.py").resolve()
+    planner_path = (p10.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
 
     def historical_artifact_sha256(path: Path) -> str:
         if Path(path).resolve() == provider_path:
             return p10.EXPECTED_PROVIDER_OPENAI_COMPAT_SHA256
+        if Path(path).resolve() == planner_path:
+            return p10.EXPECTED_PLANNER_SOURCE_SHA256
         return real_artifact_sha256(path)
 
     monkeypatch = pytest.MonkeyPatch()
@@ -197,6 +200,25 @@ def test_pre_live_report_is_provider_free_and_exactly_sized() -> None:
         "provider_calls_min": 96,
         "provider_calls_max": 192,
     }
+
+
+def test_historical_planner_drift_still_fails_closed() -> None:
+    """P10 rejects an incorrect historical planner hash."""
+    real_artifact_sha256 = p10.artifact_sha256
+    planner_path = (p10.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+
+    def drifted_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return "0" * 64
+        return real_artifact_sha256(path)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(p10, "artifact_sha256", drifted_artifact_sha256)
+    try:
+        with pytest.raises(RuntimeError, match="CM-57P10 frozen artifact drifted"):
+            p10.prelive_report()
+    finally:
+        monkeypatch.undo()
 
 
 def test_historical_provider_drift_still_fails_closed() -> None:

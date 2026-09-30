@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -25,6 +26,23 @@ from wellplot.agent.providers.base import (
     StructuredGenerationResult,
 )
 from wellplot.capabilities import create_builtin_registry
+
+
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P6 evaluation."""
+    real_artifact_sha256 = p6.artifact_sha256
+    planner_path = (p6.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p6.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p6, "artifact_sha256", historical_artifact_sha256)
 
 
 @dataclass
@@ -532,11 +550,24 @@ def test_transition_tables_preserve_unavailable_terminal_outcomes() -> None:
     assert sum(table.values()) == len(rows)
 
 
-def test_prelive_report_runs_provider_free_and_is_json_serializable() -> None:
+def test_prelive_report_runs_provider_free_and_is_json_serializable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The default P6 entry point performs no provider construction."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p6.prelive_report()
 
     assert report["status"] == "PRELIVE_READY"
     assert report["provider_calls"] == 0
     assert report["live_inference"] == "NOT_STARTED"
     assert json.dumps(report, sort_keys=True)
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P6 rejects an incorrect historical planner hash."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="Production planner bytes drifted"):
+        p6.prelive_report()

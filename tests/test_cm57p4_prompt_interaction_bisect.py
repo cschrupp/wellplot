@@ -73,6 +73,24 @@ def _case() -> dict[str, object]:
     return p4.p2.load_case_definitions()[0]
 
 
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P2 dependency."""
+    historical_p2 = p4.p2
+    real_artifact_sha256 = historical_p2.artifact_sha256
+    planner_path = (historical_p2.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or historical_p2.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(historical_p2, "artifact_sha256", historical_artifact_sha256)
+
+
 def _valid_plan() -> SemanticPlan:
     case = _case()
     return SemanticPlan(
@@ -427,6 +445,7 @@ def test_instruction_hash_drift_aborts_before_provider_construction(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """A factor instruction mismatch fails before constructing the provider."""
+    _patch_historical_planner_hash(monkeypatch)
     provider_calls = 0
 
     def unexpected_provider(_args: object) -> object:
@@ -447,6 +466,7 @@ def test_composed_prompt_hash_drift_aborts_before_provider_construction(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """A composed-factor hash mismatch fails before constructing the provider."""
+    _patch_historical_planner_hash(monkeypatch)
     provider_calls = 0
 
     def unexpected_provider(_args: object) -> object:
@@ -502,8 +522,11 @@ def test_decision_labels_no_recovery_and_inconclusive() -> None:
     )
 
 
-def test_prelive_report_is_provider_free_and_frozen() -> None:
+def test_prelive_report_is_provider_free_and_frozen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The default CLI path verifies the future matrix without provider calls."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p4.prelive_report()
     assert report["status"] == "PRELIVE_READY"
     assert report["provider_calls"] == 0
@@ -516,3 +539,13 @@ def test_prelive_report_is_provider_free_and_frozen() -> None:
         "provider_calls_min": 128,
         "provider_calls_max": 256,
     }
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P4 rejects an incorrect planner hash through its P2 dependency."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="CM-57P1 planner source drifted"):
+        p4.prelive_report()

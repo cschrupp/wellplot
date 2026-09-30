@@ -115,10 +115,13 @@ def test_frozen_controls_and_future_population_are_provider_free() -> None:
     """The pre-live report declares the full population without provider work."""
     real_artifact_sha256 = p9.artifact_sha256
     provider_path = (p9.REPO_ROOT / "src/wellplot/agent/providers/openai_compat_v2.py").resolve()
+    planner_path = (p9.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
 
     def historical_artifact_sha256(path: Path) -> str:
         if Path(path).resolve() == provider_path:
             return p9.EXPECTED_OPENAI_COMPAT_SHA256
+        if Path(path).resolve() == planner_path:
+            return p9.EXPECTED_PLANNER_SOURCE_SHA256
         return real_artifact_sha256(path)
 
     monkeypatch = pytest.MonkeyPatch()
@@ -136,6 +139,25 @@ def test_frozen_controls_and_future_population_are_provider_free() -> None:
     assert report["provider_calls_min"] == 96
     assert report["provider_calls_max"] == 192
     assert report["live_inference"] == "NOT_STARTED"
+
+
+def test_historical_planner_drift_still_fails_closed() -> None:
+    """P9A rejects an incorrect historical planner hash."""
+    real_artifact_sha256 = p9.artifact_sha256
+    planner_path = (p9.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+
+    def drifted_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return "0" * 64
+        return real_artifact_sha256(path)
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(p9, "artifact_sha256", drifted_artifact_sha256)
+    try:
+        with pytest.raises(RuntimeError, match="CM-57P9A frozen artifact drifted"):
+            p9.prelive_report()
+    finally:
+        monkeypatch.undo()
 
 
 def test_historical_provider_drift_still_fails_closed() -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
@@ -52,6 +53,23 @@ class Backend:
 
 def _case() -> dict[str, object]:
     return p3.p2.load_case_definitions()[0]
+
+
+def _patch_historical_planner_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    planner_hash: str | None = None,
+) -> None:
+    """Simulate only the planner bytes used by the closed P2 dependency."""
+    real_artifact_sha256 = p3.p2.artifact_sha256
+    planner_path = (p3.p2.REPO_ROOT / "src/wellplot/agent/code_mode/planner.py").resolve()
+    expected = planner_hash or p3.p2.EXPECTED_PLANNER_SOURCE_SHA256
+
+    def historical_artifact_sha256(path: Path) -> str:
+        if Path(path).resolve() == planner_path:
+            return expected
+        return real_artifact_sha256(path)
+
+    monkeypatch.setattr(p3.p2, "artifact_sha256", historical_artifact_sha256)
 
 
 def _valid_plan() -> SemanticPlan:
@@ -459,11 +477,24 @@ def test_summary_exposes_initial_final_and_terminal_arm_metrics() -> None:
     assert expected_keys <= set(metrics)
 
 
-def test_prelive_report_makes_no_provider_calls() -> None:
+def test_prelive_report_makes_no_provider_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The provider-free report describes the gated future matrix."""
+    _patch_historical_planner_hash(monkeypatch)
     report = p3.prelive_report()
     assert report["status"] == "PRELIVE_READY"
     assert report["provider_calls"] == 0
     assert report["worker_calls"] == 0
     assert report["future_population"]["shared_rows"] == 32
     assert report["future_population"]["planner_executions"] == 128
+
+
+def test_historical_planner_drift_still_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """P3 rejects an incorrect planner hash through its P2 dependency."""
+    _patch_historical_planner_hash(monkeypatch, "0" * 64)
+
+    with pytest.raises(RuntimeError, match="CM-57P1 planner source drifted"):
+        p3.prelive_report()
