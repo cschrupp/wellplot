@@ -4,9 +4,11 @@
 
 - Parent baseline: `e1791dce60f789673a1a301c948d079a90af4915`
 - Provider calls during implementation and verification: `0`
-- Endpoint calls during implementation and verification: `0`
+- Live provider calls: `56`
+- Live endpoint calls: `2` (`PRE` and `POST` `/v1/models` only)
 - Production changes: `0`
-- Live inference: not run; requires separate authorization and reviewed checkpoint
+- Live inference: completed at the separately authorized checkpoint
+  `038a68a4f582215b11648e2c659d130adba948e8`
 - CM-57D: blocked
 
 CM-59A-E2 is the fresh evaluation harness for the complete remediated planner
@@ -85,6 +87,38 @@ evidence, PRE fingerprint file, and POST fingerprint file. No append, resume,
 smoke request, selective rerun, worker/program call, prompt change, schema
 change, or production routing change is implemented or authorized here.
 
+## Live Result
+
+The single authorized population completed from the beginning at checkpoint
+`038a68a4f582215b11648e2c659d130adba948e8`. The raw JSONL remains preserved
+unchanged at `/tmp/cm59a-e2-system-reevaluation-qwen.jsonl`; the committed
+provider-free aggregate is `CM-59A-E2-live-summary.json`.
+
+```text
+rows: 48 / 48
+planner executions: 48
+provider calls: 56
+provider infrastructure failures: 0
+program/worker calls: 0
+PRE endpoint fingerprint SHA-256: 5e3acae77c5731b6307db804a11d156d2f5ded15fca23b215a67fe04b25aaaf5
+POST endpoint fingerprint SHA-256: 9e9206ca6caaa548840cbc01aa48df26d309a77bf421bc1cc69110a33156c661
+raw evidence SHA-256: 2bb81a185c64700e6f283ad67fc985fa77b5329ba785af344347f5a5b56158af
+summary SHA-256: 28ffd977ac4d0274082b180c503874486f2b1b8f6cfe53bac9e1490e8557c622
+endpoint identity: valid and equal
+stable passes: 22 / 24
+stable planner failures: 2 / 24
+decision: SYSTEM_REEVALUATION_REJECTED
+```
+
+The rejected result is decision-bearing, not operationally inconclusive. The
+two stable planner failures are `cm59-mixed-xenon-21` and
+`cm59-report-kestrel-04`, each failing on both attempts. The four terminal
+schema-correction failures are included in those stable planner failures;
+there were no provider infrastructure failures, safety regressions, wrong
+final-plan escapes, unstable cases, reference violations, or worker calls.
+The endpoint normalized identity matched before and after the population and
+matched the expected frozen identity.
+
 ## Verification
 
 - E2 focused suite: `61 passed`
@@ -95,7 +129,10 @@ change, or production routing change is implemented or authorized here.
 - Python compilation: passed
 - `git diff --check`: passed
 - Provider-free pre-live CLI: `PRELIVE_READY`
-- Provider, endpoint, worker, and program calls: `0`
+- Provider-free finalization: completed
+- Live provider calls: `56`
+- Live endpoint calls: `2` (`PRE` and `POST` `/v1/models`)
+- Live worker and program calls: `0`
 
 The full-suite failures are the established unrelated baseline categories:
 MCP helper signature drift, the tool-budget threshold, missing historical R6
@@ -128,6 +165,6 @@ counts after verification.
 
 ## Hard Stop
 
-This slice stops at the provider-free implementation checkpoint. Do not run the
-E2 live population, Xenon-only retest, production adoption, CM-58.4, P11, or
-CM-57D without separate authorization and independent review.
+This slice stops after the single authorized E2 population and provider-free
+finalization. Do not run a Xenon-only retest, production adoption, CM-58.4,
+P11, or CM-57D without separate authorization and independent review.
