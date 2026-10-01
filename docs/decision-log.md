@@ -1,10 +1,27 @@
 # wellplot Decision Log
 
-Last updated: 2026-08-14
+Last updated: 2026-09-30
 
 ## Purpose
 
 This file records project decisions that should remain stable unless explicitly revised.
+
+### Project Decision Protocol
+
+WellPlot has adopted
+[docs/project-decision-protocol.md](project-decision-protocol.md) as a standing
+project-governance rule for humans, Codex, and other autonomous contributors.
+
+- Material decisions require both a scope check and an external-evidence check.
+- Primary sources, comparable mature projects, papers, benchmarks, and upstream
+  implementation evidence should be consulted before novel design.
+- Decisions should distinguish established/adapted approaches from
+  WellPlot-specific novel choices.
+- Experiments must be bounded and decision-bearing.
+- Repeated experiments that no longer change decisions trigger architecture
+  review instead of another experiment.
+- Autonomous agents must follow the protocol and may not silently broaden
+  scope.
 
 ## Product and Scope Decisions
 
