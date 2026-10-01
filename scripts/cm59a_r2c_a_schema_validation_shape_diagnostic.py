@@ -1020,6 +1020,8 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     pre = fingerprint.capture_endpoint_fingerprint_v2(
         endpoint=args.base_url,
         model_api_label=FROZEN_MODEL,
+        api_key=_api_key(args),
+        timeout_seconds=20.0,
     )
     if not _endpoint_is_expected(pre):
         raise RuntimeError("R2C-A PRE endpoint identity is not authorized.")
@@ -1048,6 +1050,8 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     post = fingerprint.capture_endpoint_fingerprint_v2(
         endpoint=args.base_url,
         model_api_label=FROZEN_MODEL,
+        api_key=_api_key(args),
+        timeout_seconds=20.0,
     )
     post_path.write_text(canonical_json(post) + "\n", encoding="utf-8")
 

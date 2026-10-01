@@ -212,6 +212,37 @@ The full repository suite is mandatory before the R2 checkpoint is frozen.
 The accepted baseline remains the exact established 13 failure identities and
 3 skipped tests; no R2C-A live population is authorized by this slice.
 
+## R2C-A-O1 Endpoint Fingerprint Credential Wiring
+
+The first authorized live start was operationally inconclusive before network
+activity: the harness called `capture_endpoint_fingerprint_v2()` without its
+required `api_key` argument. No PRE request, provider call, planner execution,
+or evidence row occurred, and no population was consumed.
+
+O1 corrects only that wiring. PRE and POST now resolve the existing configured
+credential through `_api_key(args)` and pass it with `timeout_seconds=20.0`.
+The fingerprint helper, provider instrumentation, planner, diagnostic
+semantics, population, and endpoint identity gate remain unchanged. Tests use
+only mocked endpoint/provider/planner objects and verify that credentials are
+not serialized into fingerprints, evidence, or summaries.
+
+O1 verification:
+
+```text
+Provider-free O1 diagnostic tests: 34 passed
+Ruff: passed
+Formatting: passed
+Python compilation: passed
+git diff --check: passed
+Provider calls: 0
+Endpoint calls: 0
+Worker/program calls: 0
+```
+
+The failed pre-network start remains preserved as operational evidence. No
+live retry was performed by O1; a new live population requires independent
+review and authorization.
+
 ## Hard Stop
 
 After the implementation checkpoint is committed and pushed, stop for

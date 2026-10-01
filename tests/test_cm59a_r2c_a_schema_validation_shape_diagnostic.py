@@ -711,6 +711,216 @@ def test_pre_live_report_is_provider_free() -> None:
     assert report["worker_program_calls"] == 0
 
 
+def _live_args(tmp_path: Path) -> SimpleNamespace:
+    """Build live arguments with isolated temporary artifact paths."""
+    return SimpleNamespace(
+        base_url="http://192.168.2.140:8888/v1",
+        evidence_path=str(tmp_path / "evidence.jsonl"),
+        endpoint_fingerprint_pre=str(tmp_path / "pre.json"),
+        endpoint_fingerprint_post=str(tmp_path / "post.json"),
+        summary_path=str(tmp_path / "summary.json"),
+        api_key_env="TEST_API_KEY",
+        api_key_file="unused.key",
+    )
+
+
+def _successful_live_result() -> dict[str, object]:
+    """Build one bounded provider-free planner result for orchestration tests."""
+    return {
+        "provider_calls": 1,
+        "program_calls": 0,
+        "call_trace": [
+            {
+                "call_index": 0,
+                "call_kind": "INITIAL",
+                "outcome": "structured_success",
+                "provider_category": None,
+                "response_reason": None,
+                "validation_shape": None,
+            }
+        ],
+        "initial_plan_available": True,
+        "final_plan_available": True,
+        "final_plan_projection": None,
+        "final_error_type": None,
+        "final_error_code": None,
+        "provider_infrastructure_failure": False,
+    }
+
+
+def test_live_wiring_passes_credentials_to_pre_and_post_in_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The mocked live path wires credentials without contacting a provider."""
+    args = _live_args(tmp_path)
+    sentinel = "SECRET_R2CA_KEY_91AC"
+    pre, post = _endpoint_pair()
+    captures: list[dict[str, object]] = []
+    events: list[str] = []
+    planner_cases: list[str] = []
+
+    monkeypatch.setattr(r2c, "verify_reviewed_checkout", lambda _checkpoint: None)
+    monkeypatch.setattr(r2c, "verify_frozen_contract", lambda: {})
+    monkeypatch.setattr(r2c, "_api_key", lambda _args: sentinel)
+
+    def fake_capture(
+        *,
+        endpoint: str,
+        model_api_label: str,
+        api_key: str,
+        timeout_seconds: float,
+    ) -> dict[str, object]:
+        assert endpoint == args.base_url
+        assert model_api_label == r2c.FROZEN_MODEL
+        assert api_key == sentinel
+        assert timeout_seconds == 20.0
+        captures.append(
+            {
+                "endpoint": endpoint,
+                "model_api_label": model_api_label,
+                "api_key": api_key,
+                "timeout_seconds": timeout_seconds,
+            }
+        )
+        events.append("PRE" if len(captures) == 1 else "POST")
+        return pre if len(captures) == 1 else post
+
+    async def fake_run_execution(
+        case: dict[str, object],
+        *,
+        delegate: object,
+        registry: object,
+    ) -> dict[str, object]:
+        del delegate, registry
+        planner_cases.append(str(case["case_id"]))
+        events.append(f"planner:{case['case_id']}")
+        return _successful_live_result()
+
+    def fake_provider(_args: object) -> object:
+        events.append("provider")
+        return object()
+
+    monkeypatch.setattr(r2c.fingerprint, "capture_endpoint_fingerprint_v2", fake_capture)
+    monkeypatch.setattr(r2c, "_provider_configuration", fake_provider)
+    monkeypatch.setattr(r2c, "run_execution", fake_run_execution)
+
+    asyncio.run(r2c._run_live(args, "a" * 40))
+
+    assert len(captures) == 2
+    assert events[0] == "PRE"
+    assert events[1] == "provider"
+    assert events[2:] == [
+        "planner:cm59-report-kestrel-04",
+        "planner:cm59-report-kestrel-04",
+        "planner:cm59-mixed-xenon-21",
+        "planner:cm59-mixed-xenon-21",
+        "POST",
+    ]
+    assert planner_cases == [
+        "cm59-report-kestrel-04",
+        "cm59-report-kestrel-04",
+        "cm59-mixed-xenon-21",
+        "cm59-mixed-xenon-21",
+    ]
+    evidence = Path(args.evidence_path).read_text(encoding="utf-8")
+    assert len(evidence.splitlines()) == 4
+    assert sentinel not in evidence
+    assert sentinel not in Path(args.endpoint_fingerprint_pre).read_text(encoding="utf-8")
+    assert sentinel not in Path(args.endpoint_fingerprint_post).read_text(encoding="utf-8")
+    assert not Path(args.summary_path).exists()
+
+
+def test_pre_failure_stops_before_provider_or_planner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed PRE fingerprint cannot construct a provider or run a planner."""
+    args = _live_args(tmp_path)
+    counts = {"capture": 0, "provider": 0, "planner": 0}
+    monkeypatch.setattr(r2c, "verify_reviewed_checkout", lambda _checkpoint: None)
+    monkeypatch.setattr(r2c, "verify_frozen_contract", lambda: {})
+    monkeypatch.setattr(r2c, "_api_key", lambda _args: "secret")
+
+    def fail_capture(**_kwargs: object) -> dict[str, object]:
+        counts["capture"] += 1
+        raise RuntimeError("preflight failed")
+
+    def unexpected_provider(_args: object) -> object:
+        counts["provider"] += 1
+        raise AssertionError("provider construction must not occur")
+
+    async def unexpected_planner(*_args: object, **_kwargs: object) -> dict[str, object]:
+        counts["planner"] += 1
+        raise AssertionError("planner execution must not occur")
+
+    monkeypatch.setattr(r2c.fingerprint, "capture_endpoint_fingerprint_v2", fail_capture)
+    monkeypatch.setattr(r2c, "_provider_configuration", unexpected_provider)
+    monkeypatch.setattr(r2c, "run_execution", unexpected_planner)
+
+    with pytest.raises(RuntimeError, match="preflight failed"):
+        asyncio.run(r2c._run_live(args, "a" * 40))
+
+    assert counts == {"capture": 1, "provider": 0, "planner": 0}
+    assert not Path(args.evidence_path).exists()
+
+
+def test_credential_failure_stops_before_endpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Missing credentials fail before the PRE endpoint helper is invoked."""
+    args = _live_args(tmp_path)
+    captures = 0
+    monkeypatch.setattr(r2c, "verify_reviewed_checkout", lambda _checkpoint: None)
+    monkeypatch.setattr(r2c, "verify_frozen_contract", lambda: {})
+
+    def fail_key(_args: object) -> str:
+        raise RuntimeError("credential missing")
+
+    def unexpected_capture(**_kwargs: object) -> dict[str, object]:
+        nonlocal captures
+        captures += 1
+        raise AssertionError("endpoint capture must not occur")
+
+    monkeypatch.setattr(r2c, "_api_key", fail_key)
+    monkeypatch.setattr(r2c.fingerprint, "capture_endpoint_fingerprint_v2", unexpected_capture)
+
+    with pytest.raises(RuntimeError, match="credential missing"):
+        asyncio.run(r2c._run_live(args, "a" * 40))
+
+    assert captures == 0
+
+
+def test_live_collision_guard_precedes_credential_and_endpoint(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A populated artifact path rejects the run before any external activity."""
+    args = _live_args(tmp_path)
+    Path(args.evidence_path).write_text("existing", encoding="utf-8")
+    activity = {"key": 0, "capture": 0}
+    monkeypatch.setattr(r2c, "verify_reviewed_checkout", lambda _checkpoint: None)
+    monkeypatch.setattr(r2c, "verify_frozen_contract", lambda: {})
+
+    def unexpected_key(_args: object) -> str:
+        activity["key"] += 1
+        raise AssertionError("credential resolution must not occur")
+
+    def unexpected_capture(**_kwargs: object) -> dict[str, object]:
+        activity["capture"] += 1
+        raise AssertionError("endpoint capture must not occur")
+
+    monkeypatch.setattr(r2c, "_api_key", unexpected_key)
+    monkeypatch.setattr(r2c.fingerprint, "capture_endpoint_fingerprint_v2", unexpected_capture)
+
+    with pytest.raises(RuntimeError, match="non-empty"):
+        asyncio.run(r2c._run_live(args, "a" * 40))
+
+    assert activity == {"key": 0, "capture": 0}
+    assert Path(args.evidence_path).read_text(encoding="utf-8") == "existing"
+
+
 def test_evidence_serialization_contains_no_raw_provider_values() -> None:
     """Bounded evidence cannot retain model content or exception prose."""
     population = _population()
