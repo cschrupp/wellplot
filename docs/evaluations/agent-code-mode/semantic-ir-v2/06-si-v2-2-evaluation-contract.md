@@ -79,13 +79,34 @@ final escape, or a safety regression; these are reported independently.
 `--prelive` validates the 24-case corpus, 24 gold fixtures, exact SI-V2.1
 artifacts, prompt restrictions, and gold compilation without constructing a
 provider. `--live` requires the exact reviewed checkout, fresh evidence paths,
-PRE endpoint fingerprint, then performs 48 sequential attempts and captures
-POST immediately. `--finalize` performs no provider or endpoint calls.
+and a PRE endpoint fingerprint whose normalized identity matches the frozen
+qualified endpoint. The PRE fingerprint is validated and identity-checked
+before the provider is constructed; a failed PRE check preserves the PRE
+artifact and stops before inference. A valid PRE then permits 48 sequential
+attempts, followed by POST capture immediately after the final attempt.
+`--finalize` performs no provider or endpoint calls.
 
 The finalizer rejects missing/duplicate/reordered rows, hash drift, checkpoint
 drift, provider-call budget violations, worker calls, invalid or changed
-endpoint identity, and partial populations. It never resumes or reruns a
-population.
+endpoint identity, the frozen endpoint identity, and partial populations.
+Finalized summaries include the raw JSONL SHA-256 and count provider calls
+from readable evidence rows even when integrity fails. It never resumes or
+reruns a population.
+
+Terminal decision precedence is fail-closed by layer:
+
+```text
+infrastructure/integrity
+  -> terminal structural failure
+  -> any hard compiler failure
+  -> semantic gate failure
+  -> safety regression or wrong final escape
+  -> qualified
+```
+
+Hard compiler failure includes compiler invariant failures, compile failures
+for semantically passing rows, and compiled-signature mismatches for
+semantically passing rows.
 
 ## Stop Rule
 

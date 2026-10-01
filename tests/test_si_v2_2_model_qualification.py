@@ -289,6 +289,18 @@ def test_decision_hierarchy_distinguishes_provider_semantic_compiler_and_safety(
     assert qualification._decision({**base, "compiler_invariant_failures": 1}) == (
         "SI_V2_COMPILER_REJECTED"
     )
+    assert (
+        qualification._decision(
+            {**base, "semantic_pass_signature_mismatches": 1, "safety_regressions": 1}
+        )
+        == "SI_V2_COMPILER_REJECTED"
+    )
+    assert (
+        qualification._decision(
+            {**base, "semantic_pass_compile_failures": 1, "stable_semantic_passes": 21}
+        )
+        == "SI_V2_COMPILER_REJECTED"
+    )
     assert qualification._decision({**base, "safety_regressions": 1}) == ("SI_V2_SAFETY_REJECTED")
     assert qualification._decision({**base, "stable_semantic_passes": 21}) == (
         "SI_V2_MODEL_SEMANTIC_REJECTED"
@@ -340,6 +352,124 @@ def test_population_requires_exact_two_attempts_and_worker_zero():
     assert "worker_program_calls" in reasons
 
 
+def test_population_rejects_endpoint_identity_drift_from_frozen_identity():
+    cases = qualification._load_requests()
+    endpoint = {"normalized_identity_sha256": "0" * 64}
+    reasons = qualification._population_reasons(
+        [], cases, endpoint, endpoint, qualification.BASELINE_SHA
+    )
+
+    assert "pre_expected_endpoint_identity" in reasons
+    assert "post_expected_endpoint_identity" in reasons
+
+
+def test_provider_call_count_uses_readable_evidence_rows():
+    rows = [
+        {"provider": {"provider_call_count": 2}},
+        {"provider": {"provider_call_count": 1}},
+        {"provider": {"provider_call_count": "not-a-count"}},
+        {"provider": None},
+    ]
+
+    assert qualification._provider_call_count(rows) == 3
+
+
+def test_integrity_summary_records_raw_evidence_hash_and_provider_calls(monkeypatch, tmp_path):
+    evidence = tmp_path / "evidence.jsonl"
+    pre_path = tmp_path / "pre.json"
+    post_path = tmp_path / "post.json"
+    evidence.write_text('{"provider":{"provider_call_count":2}}\n', encoding="utf-8")
+    pre_path.write_text("{}", encoding="utf-8")
+    post_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(qualification, "_verify_live_checkout", lambda checkpoint: None)
+
+    summary = qualification.finalize(
+        evidence_path=evidence,
+        pre_path=pre_path,
+        post_path=post_path,
+        authorized_checkpoint="a" * 40,
+    )
+
+    assert summary["provider_calls"] == 2
+    assert summary["raw_evidence_sha256"] == qualification.artifact_sha256(evidence)
+
+
+def _live_args(tmp_path):
+    return SimpleNamespace(
+        base_url="http://example.test/v1",
+        api_key_env="TEST_KEY",
+        api_key_file=None,
+        evidence_path=str(tmp_path / "evidence.jsonl"),
+        endpoint_fingerprint_pre=str(tmp_path / "pre.json"),
+        endpoint_fingerprint_post=str(tmp_path / "post.json"),
+        summary_path=str(tmp_path / "summary.json"),
+    )
+
+
+def test_live_rejects_invalid_pre_before_provider_construction(monkeypatch, tmp_path):
+    provider_setups: list[str] = []
+    endpoint_payload = {
+        "normalized_identity_sha256": qualification.EXPECTED_ENDPOINT_IDENTITY_SHA256
+    }
+
+    monkeypatch.setattr(qualification, "_verify_live_checkout", lambda checkpoint: None)
+    monkeypatch.setattr(qualification, "_api_key", lambda args: "sentinel")
+    monkeypatch.setattr(
+        qualification.fingerprint,
+        "capture_endpoint_fingerprint_v2",
+        lambda **kwargs: endpoint_payload,
+    )
+    monkeypatch.setattr(
+        qualification.fingerprint,
+        "validate_endpoint_fingerprint_v2",
+        lambda value: (False, ["test_invalid"]),
+    )
+    monkeypatch.setattr(
+        qualification,
+        "_provider_configuration",
+        lambda args: provider_setups.append("constructed"),
+    )
+
+    with pytest.raises(RuntimeError, match="PRE endpoint fingerprint is invalid"):
+        asyncio.run(qualification._run_live(_live_args(tmp_path), "a" * 40))
+
+    assert provider_setups == []
+    assert Path(tmp_path / "pre.json").exists()
+    assert not Path(tmp_path / "post.json").exists()
+    assert not Path(tmp_path / "evidence.jsonl").exists()
+
+
+def test_live_rejects_wrong_pre_identity_before_provider_construction(monkeypatch, tmp_path):
+    provider_setups: list[str] = []
+    endpoint_payload = {"normalized_identity_sha256": "0" * 64}
+
+    monkeypatch.setattr(qualification, "_verify_live_checkout", lambda checkpoint: None)
+    monkeypatch.setattr(qualification, "_api_key", lambda args: "sentinel")
+    monkeypatch.setattr(
+        qualification.fingerprint,
+        "capture_endpoint_fingerprint_v2",
+        lambda **kwargs: endpoint_payload,
+    )
+    monkeypatch.setattr(
+        qualification.fingerprint,
+        "validate_endpoint_fingerprint_v2",
+        lambda value: (True, []),
+    )
+    monkeypatch.setattr(
+        qualification,
+        "_provider_configuration",
+        lambda args: provider_setups.append("constructed"),
+    )
+
+    with pytest.raises(RuntimeError, match="PRE endpoint identity"):
+        asyncio.run(qualification._run_live(_live_args(tmp_path), "a" * 40))
+
+    assert provider_setups == []
+    assert Path(tmp_path / "pre.json").exists()
+    assert not Path(tmp_path / "post.json").exists()
+    assert not Path(tmp_path / "evidence.jsonl").exists()
+
+
 def test_mocked_live_sequence_is_pre_then_48_rows_then_post(monkeypatch, tmp_path):
     events: list[str] = []
     backend = _CorpusBackend(events)
@@ -348,7 +478,7 @@ def test_mocked_live_sequence_is_pre_then_48_rows_then_post(monkeypatch, tmp_pat
         "endpoint": "http://example.test/v1",
         "model_api_label": qualification.FROZEN_MODEL,
         "available_model_ids": [qualification.FROZEN_MODEL],
-        "normalized_identity_sha256": "identity",
+        "normalized_identity_sha256": qualification.EXPECTED_ENDPOINT_IDENTITY_SHA256,
         "raw_model_catalog_sha256": "catalog",
         "provenance_scope": "ENDPOINT_MODEL_NORMALIZED",
     }
@@ -368,20 +498,17 @@ def test_mocked_live_sequence_is_pre_then_48_rows_then_post(monkeypatch, tmp_pat
         fake_fingerprint,
     )
     monkeypatch.setattr(
+        qualification.fingerprint,
+        "validate_endpoint_fingerprint_v2",
+        lambda value: (True, []),
+    )
+    monkeypatch.setattr(
         qualification,
         "_provider_configuration",
         lambda args: events.append("provider_setup") or backend,
     )
 
-    args = SimpleNamespace(
-        base_url="http://example.test/v1",
-        api_key_env="TEST_KEY",
-        api_key_file=None,
-        evidence_path=str(tmp_path / "evidence.jsonl"),
-        endpoint_fingerprint_pre=str(tmp_path / "pre.json"),
-        endpoint_fingerprint_post=str(tmp_path / "post.json"),
-        summary_path=str(tmp_path / "summary.json"),
-    )
+    args = _live_args(tmp_path)
     asyncio.run(qualification._run_live(args, "a" * 40))
 
     assert len(events) == 51

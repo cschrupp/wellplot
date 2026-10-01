@@ -73,6 +73,9 @@ TIMEOUT_SECONDS = 900.0
 ATTEMPTS = 2
 EXPECTED_CASE_COUNT = 24
 EXPECTED_ROW_COUNT = EXPECTED_CASE_COUNT * ATTEMPTS
+EXPECTED_ENDPOINT_IDENTITY_SHA256 = (
+    "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980"
+)
 FAMILIES = (
     "REPORT_ONLY",
     "SINGLE_SECTION",
@@ -676,6 +679,7 @@ def _provenance() -> dict[str, object]:
         },
         "execution_controls": dict(FROZEN_CONTROLS),
         "policy_versions": dict(POLICY_VERSIONS),
+        "expected_endpoint_identity_sha256": EXPECTED_ENDPOINT_IDENTITY_SHA256,
     }
 
 
@@ -804,6 +808,20 @@ def _verify_live_checkout(checkpoint: str) -> None:
     verify_frozen_contract()
 
 
+def _validate_expected_endpoint_fingerprint(
+    value: dict[str, object],
+    *,
+    label: str,
+) -> None:
+    """Require a valid fingerprint for the frozen endpoint identity."""
+    valid, reasons = fingerprint.validate_endpoint_fingerprint_v2(value)
+    if not valid:
+        reason_text = ", ".join(reasons) or "unknown"
+        raise RuntimeError(f"{label} endpoint fingerprint is invalid: {reason_text}")
+    if value.get("normalized_identity_sha256") != EXPECTED_ENDPOINT_IDENTITY_SHA256:
+        raise RuntimeError(f"{label} endpoint identity does not match the frozen endpoint.")
+
+
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     """Run the complete sequential population once."""
     _verify_live_checkout(checkpoint)
@@ -826,6 +844,7 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     pre_text = canonical_json(pre)
     Path(args.endpoint_fingerprint_pre).write_text(pre_text + "\n", encoding="utf-8")
     pre_sha = sha256_text(pre_text)
+    _validate_expected_endpoint_fingerprint(pre, label="PRE")
     provider = _provider_configuration(args)
     with Path(args.evidence_path).open("w", encoding="utf-8") as handle:
         for case in cases:
@@ -891,6 +910,10 @@ def _population_reasons(
     reasons.extend(f"pre_{reason}" for reason in pre_reasons)
     reasons.extend(f"post_{reason}" for reason in post_reasons)
     reasons.extend(fingerprint.compare_endpoint_fingerprints_v2(pre, post))
+    if pre.get("normalized_identity_sha256") != EXPECTED_ENDPOINT_IDENTITY_SHA256:
+        reasons.append("pre_expected_endpoint_identity")
+    if post.get("normalized_identity_sha256") != EXPECTED_ENDPOINT_IDENTITY_SHA256:
+        reasons.append("post_expected_endpoint_identity")
     if len(rows) != EXPECTED_ROW_COUNT:
         reasons.append("row_count")
     expected_ids = [str(case["case_id"]) for case in cases]
@@ -918,6 +941,20 @@ def _population_reasons(
     if not valid_pre or not valid_post:
         reasons.append("endpoint_fingerprint_invalid")
     return sorted(set(reasons))
+
+
+def _provider_call_count(rows: list[dict[str, object]]) -> int:
+    """Count provider calls represented by readable evidence rows."""
+    total = 0
+    for row in rows:
+        provider = row.get("provider")
+        if not isinstance(provider, dict):
+            continue
+        try:
+            total += int(provider.get("provider_call_count", 0))
+        except (TypeError, ValueError):
+            continue
+    return total
 
 
 def _stable_case_results(rows: list[dict[str, object]]) -> dict[str, dict[str, object]]:
@@ -954,7 +991,11 @@ def _decision(summary: dict[str, object]) -> str:
         return "SI_V2_2_INCONCLUSIVE_INFRASTRUCTURE"
     if summary["terminal_structural_failures"]:
         return "SI_V2_PROVIDER_BOUNDARY_REJECTED"
-    if summary["compiler_invariant_failures"]:
+    if (
+        summary["compiler_invariant_failures"]
+        or summary["semantic_pass_compile_failures"]
+        or summary["semantic_pass_signature_mismatches"]
+    ):
         return "SI_V2_COMPILER_REJECTED"
     semantic_gate = (
         summary["unstable_cases"] == 0
@@ -966,8 +1007,6 @@ def _decision(summary: dict[str, object]) -> str:
         return "SI_V2_SAFETY_REJECTED"
     if not semantic_gate:
         return "SI_V2_MODEL_SEMANTIC_REJECTED"
-    if summary["semantic_pass_compile_failures"] or summary["semantic_pass_signature_mismatches"]:
-        return "SI_V2_COMPILER_REJECTED"
     return "SI_V2_MODEL_QUALIFIED"
 
 
@@ -985,13 +1024,14 @@ def finalize(
     pre = _load_fingerprint(pre_path)
     post = _load_fingerprint(post_path)
     reasons = _population_reasons(rows, cases, pre, post, authorized_checkpoint)
+    raw_evidence_sha = artifact_sha256(evidence_path)
     if reasons:
         return {
             "experiment_version": EXPERIMENT_VERSION,
             "baseline_sha": BASELINE_SHA,
             "authorized_checkpoint": authorized_checkpoint,
             "rows": len(rows),
-            "provider_calls": 0,
+            "provider_calls": _provider_call_count(rows),
             "worker_program_calls": 0,
             "integrity_reasons": reasons,
             "endpoint_drift": fingerprint.compare_endpoint_fingerprints_v2(pre, post),
@@ -999,6 +1039,7 @@ def finalize(
             "decision": "SI_V2_2_INCONCLUSIVE_INFRASTRUCTURE",
             "pre_fingerprint_sha256": sha256_text(canonical_json(pre)),
             "post_fingerprint_sha256": sha256_text(canonical_json(post)),
+            "raw_evidence_sha256": raw_evidence_sha,
         }
     stable = _stable_case_results(rows)
     case_map = {str(case["case_id"]): case for case in cases}
@@ -1017,7 +1058,7 @@ def finalize(
         "baseline_sha": BASELINE_SHA,
         "authorized_checkpoint": authorized_checkpoint,
         "rows": len(rows),
-        "provider_calls": sum(int(item.get("provider_call_count", 0)) for item in providers),
+        "provider_calls": _provider_call_count(rows),
         "worker_program_calls": sum(int(row.get("worker_program_calls", 0)) for row in rows),
         "integrity_reasons": reasons,
         "endpoint_drift": fingerprint.compare_endpoint_fingerprints_v2(pre, post),
@@ -1100,6 +1141,7 @@ def finalize(
         "semantic_pass_rows": len(semantic_pass_rows),
         "pre_fingerprint_sha256": sha256_text(canonical_json(pre)),
         "post_fingerprint_sha256": sha256_text(canonical_json(post)),
+        "raw_evidence_sha256": raw_evidence_sha,
     }
     summary["decision"] = _decision(summary)
     return summary
