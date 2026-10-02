@@ -3,8 +3,9 @@
 ## STATUS
 
 ```yaml
-decision: SI_V2R_REWORK_REQUIRED
+decision: SI_V2R_ACCEPTED_FOR_LIVE_QUALIFICATION
 baseline_sha: 6249557de70f6f3b740e9ea17a96d600c6acf3f0
+correction_checkpoint: 7dc5833cb800300cc9c3b45930745c84337f0b79
 branch: research/semantic-ir-v2-reconciliation
 provider_calls: 0
 endpoint_calls: 0
@@ -12,9 +13,9 @@ worker_program_calls: 0
 historical_si_v2_result_changed: false
 ```
 
-This decision authorizes only a future qualification design. It does not
-authorize live inference, production integration, ADR-CM57 changes, CM58
-changes, or routing changes.
+This decision records provider-free acceptance of the V2R lowering boundary
+for a future qualification design. It does not authorize live inference,
+production integration, ADR-CM57 changes, CM58 changes, or routing changes.
 
 ## FROZEN SI-V2.2
 
@@ -82,17 +83,18 @@ ambiguous_parent_fail_closed: PASS
 immutable_deterministic_lowering: PASS
 capability_type_equivalence: PASS
 authenticated_48_row_taxonomy: PASS
-reference_semantic_preservation: REWORK REQUIRED
+reference_semantic_preservation: PASS
 production_imports_of_v2r: 0
 production_route_changed: 0
 ```
 
 The V2R compiler lowers every fresh gold intent through the existing
 `SemanticPlan` validator and `validate_semantic_plan`. It does not normalize,
-repair, or infer missing semantic content. The rework finding is that a bare
-`SemanticPlan` projection collapses `companion_depth_lane` and
-`reference_track(target=...)`; the corrected compiler must retain those
-section-aligned intents in `CompiledSemanticPlanV2R` for downstream consumers.
+repair, or infer missing semantic content. Independent review accepted the
+`CompiledSemanticPlanV2R` boundary: the validated legacy `SemanticPlan` is
+returned together with one section-aligned reference-intent slot per lowered
+section, so `companion_depth_lane` and `reference_track(target=...)` remain
+distinct for downstream consumers.
 
 ## SAME-ENVIRONMENT VERIFICATION
 
@@ -112,23 +114,23 @@ full suite: 2319 passed, 23 known baseline failures, 3 skipped,
             11 subtests passed
 ```
 
-The 23 full-suite failure node IDs are identical to the recovered baseline
-failure IDs. The 13 additional passes are the V2R tests; there are zero new
-attributable failures. Ruff check, Ruff format check, Python compilation,
-JSON validation, and `git diff --check` all pass.
+The post-correction full-suite failure node IDs are identical to the recovered
+baseline failure IDs. There are zero new attributable failures. The adjacent
+regression set retains only the six known CM-59A Xenon failures. Ruff check,
+Ruff format check, Python compilation, JSON validation, and `git diff --check`
+all pass after the correction.
 
-## REWORK REQUIRED
+## QUALIFICATION STATUS
 
-The 24/24 capability-type representability result is insufficient while a
-meaningful reference distinction is lost at the lowering boundary. The
-provider-free correction preserves the distinction in a typed wrapper without
-changing production `SemanticPlan`, routing, or frozen SI-V2 evidence.
+The 24/24 capability-type representability result and the corrected
+reference-preservation boundary are accepted for future SI-V2R live model
+qualification. The correction changes no production `SemanticPlan`, routing,
+or frozen SI-V2 evidence.
 
 ## NEXT STEP
 
-Independent review of this provider-free correction. A separate SI-V2R live
-qualification remains blocked until reference semantic preservation is
-accepted. Until then:
+The next substantive slice is the separately authorized SI-V2R live model
+qualification. Until that authorization:
 
 ```yaml
 production_adoption: NOT_AUTHORIZED
