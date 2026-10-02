@@ -13,7 +13,7 @@ gold_fixture_sha256: eb4803c1b0265f72e2b7f3f97176afe585698473f108d60768e792e4ecf
 semantic_ir_v2r_schema_sha256: d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8
 prompt_sha256: 5ebdd3da9bc3cdf78442a97ba0a2ef9fc1c0d5e8b1ca641f18a30fe1b0cb50e3
 structural_retry_prompt_sha256: 27c6a43c7f611a79401914b6732dbcec946493bba51058c1eb1d1245f47990f0
-qualification_harness_sha256: 6224d77256b045711ad3b1989367fc036dc97afe853c8a1c4343da1b2719d931
+qualification_harness_sha256: 1c9410dc070590f01b547fbb917dd143eddc5c146123edd6351f4b03f8a2d039
 ```
 
 ## V2R Semantic Projection
@@ -26,6 +26,11 @@ reference meaning. Arbitrary `semantic_id` spelling is removed. A
 
 Report-work goal, requirements, constraints, section context, feature context,
 and unresolved requirements are recorded separately as normalized diagnostics.
+Semantic success requires both topology equality and ownership-preserving
+context retention. Non-empty report requirements/constraints must remain in
+report-owned fields; section requirements/constraints must remain on the same
+section; and feature requirements/constraints must remain on the corresponding
+feature. CM58 output cannot improve this provider-semantic score.
 
 ## Compilation and Safety
 
@@ -60,6 +65,10 @@ at least 22/24 stable semantic passes, at least 3/4 stable passes in every
 family, 2/2 for Fig, Linden, Kestrel, and Xenon, 4/4 for the
 `REFERENCE_REQUIRED` family, successful compilation and reference preservation
 for every semantic pass, and no CM58 safety failure.
+Named-anchor thresholds are counted over the two evidence attempts for each
+anchor, not once per aggregated stable case. Duplicate capability IDs are
+never erased when computing type equivalence; a duplicate makes the type
+check fail closed.
 
 ## Provider Contract
 
@@ -88,3 +97,8 @@ guards -> PRE -> provider construction -> 48 sequential executions -> POST
 
 Partial evidence is preserved and is inconclusive. It is never resumed,
 appended, or automatically replaced.
+Rows are flushed immediately. An infrastructure terminal stops the population
+after its recorded row, and POST fingerprint capture still occurs in the
+cleanup path. Provider-free finalization reports the completed-row count and
+infrastructure-failure count without treating the partial prefix as a model
+decision.

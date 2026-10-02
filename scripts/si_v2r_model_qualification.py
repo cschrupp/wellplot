@@ -362,6 +362,81 @@ def context_projection(intent: SemanticIRV2R) -> dict[str, object]:
     }
 
 
+def _contains_required_context(required: str, generated_values: list[str]) -> bool:
+    """Check a normalized required phrase within one owned semantic scope."""
+    return any(required in value for value in generated_values)
+
+
+def _required_context_preservation(
+    generated: SemanticIRV2R, gold: SemanticIRV2R
+) -> tuple[bool, list[str]]:
+    """Verify non-empty gold context remains in its original semantic owner."""
+    misses: list[str] = []
+    if gold.report_work is not None:
+        if generated.report_work is None:
+            if any(_normalize_text(value) for value in gold.report_work.requirements):
+                misses.append("report_work.requirements")
+            if any(_normalize_text(value) for value in gold.report_work.constraints):
+                misses.append("report_work.constraints")
+        else:
+            generated_report = [
+                _normalize_text(generated.report_work.goal),
+                *(_normalize_text(value) for value in generated.report_work.requirements),
+                *(_normalize_text(value) for value in generated.report_work.constraints),
+            ]
+            for field_name, values in (
+                ("requirements", gold.report_work.requirements),
+                ("constraints", gold.report_work.constraints),
+            ):
+                for index, value in enumerate(values):
+                    normalized = _normalize_text(value)
+                    if normalized and not _contains_required_context(normalized, generated_report):
+                        misses.append(f"report_work.{field_name}[{index}]")
+
+    for section_index, gold_section in enumerate(gold.sections):
+        if section_index >= len(generated.sections):
+            misses.append(f"sections[{section_index}]")
+            continue
+        generated_section = generated.sections[section_index]
+        generated_section_values = [
+            _normalize_text(generated_section.goal),
+            *(_normalize_text(value) for value in generated_section.requirements),
+            *(_normalize_text(value) for value in generated_section.constraints),
+        ]
+        for field_name, values in (
+            ("requirements", gold_section.requirements),
+            ("constraints", gold_section.constraints),
+        ):
+            for index, value in enumerate(values):
+                normalized = _normalize_text(value)
+                if normalized and not _contains_required_context(
+                    normalized, generated_section_values
+                ):
+                    misses.append(f"sections[{section_index}].{field_name}[{index}]")
+        for feature_index, gold_feature in enumerate(gold_section.features):
+            if feature_index >= len(generated_section.features):
+                misses.append(f"sections[{section_index}].features[{feature_index}]")
+                continue
+            generated_feature = generated_section.features[feature_index]
+            generated_feature_values = [
+                _normalize_text(value) for value in generated_feature.requirements
+            ] + [_normalize_text(value) for value in generated_feature.constraints]
+            for field_name, values in (
+                ("requirements", gold_feature.requirements),
+                ("constraints", gold_feature.constraints),
+            ):
+                for index, value in enumerate(values):
+                    normalized = _normalize_text(value)
+                    if normalized and not _contains_required_context(
+                        normalized, generated_feature_values
+                    ):
+                        misses.append(
+                            f"sections[{section_index}].features[{feature_index}]"
+                            f".{field_name}[{index}]"
+                        )
+    return not misses, misses[:32]
+
+
 def _reference_projection(intent: SemanticIRV2R) -> list[dict[str, object] | None]:
     """Return one section-aligned reference projection."""
     result: list[dict[str, object] | None] = []
@@ -388,11 +463,17 @@ def _plan_signature(plan: SemanticPlan) -> dict[str, object]:
     }
 
 
-def _type_signature(plan: SemanticPlan) -> dict[str, object]:
-    """Return capability-type equivalence while ignoring internal ordering."""
+def _type_signature(plan: SemanticPlan) -> dict[str, object] | None:
+    """Return capability types, or ``None`` when duplicates make it invalid."""
+    report_ids = list(plan.report_task.capability_ids) if plan.report_task else []
+    section_ids = [list(task.capability_ids) for task in plan.section_tasks]
+    if len(report_ids) != len(set(report_ids)) or any(
+        len(ids) != len(set(ids)) for ids in section_ids
+    ):
+        return None
     return {
-        "report": sorted(set(plan.report_task.capability_ids)) if plan.report_task else [],
-        "sections": [sorted(set(task.capability_ids)) for task in plan.section_tasks],
+        "report": sorted(report_ids),
+        "sections": [sorted(ids) for ids in section_ids],
     }
 
 
@@ -404,12 +485,19 @@ def _gold_signature(case: dict[str, object]) -> dict[str, object]:
     }
 
 
-def _gold_type_signature(case: dict[str, object]) -> dict[str, object]:
+def _gold_type_signature(case: dict[str, object]) -> dict[str, object] | None:
     """Project the frozen CM-59A type-equivalent signature."""
-    return {
-        "report": sorted(set(case["expected_report_capabilities"])),
-        "sections": [sorted(set(section)) for section in case["expected_sections"]],
-    }
+    report = list(case["expected_report_capabilities"])
+    sections = [list(section) for section in case["expected_sections"]]
+    if len(report) != len(set(report)) or any(len(ids) != len(set(ids)) for ids in sections):
+        return None
+    return {"report": sorted(report), "sections": [sorted(ids) for ids in sections]}
+
+
+def _capability_type_equivalent(plan: SemanticPlan, expected: dict[str, object] | None) -> bool:
+    """Compare capability types without erasing duplicate-capability errors."""
+    actual = _type_signature(plan)
+    return expected is not None and actual is not None and actual == expected
 
 
 def _semantic_differences(actual: object, expected: object, path: str = "$") -> list[str]:
@@ -542,6 +630,9 @@ async def run_execution(
         "semantic_status": "NOT_RUN",
         "semantic_projection": None,
         "expected_semantic_projection": expected_projection,
+        "semantic_topology_match": False,
+        "required_context_preserved": False,
+        "required_context_misses": [],
         "semantic_differences": [],
         "context_projection": None,
         "expected_context_projection": context_projection(gold_intent),
@@ -577,7 +668,14 @@ async def run_execution(
     result["semantic_projection"] = actual_projection
     result["context_projection"] = context_projection(generated)
     result["semantic_differences"] = _semantic_differences(actual_projection, expected_projection)
-    semantic_pass = actual_projection == expected_projection
+    topology_match = actual_projection == expected_projection
+    required_context_preserved, required_context_misses = _required_context_preservation(
+        generated, gold_intent
+    )
+    result["semantic_topology_match"] = topology_match
+    result["required_context_preserved"] = required_context_preserved
+    result["required_context_misses"] = required_context_misses
+    semantic_pass = topology_match and required_context_preserved
     result["semantic_status"] = "SEMANTIC_PASS" if semantic_pass else "SEMANTIC_FAIL"
 
     try:
@@ -612,9 +710,9 @@ async def run_execution(
     result["exact_compiled_signature_match"] = result["raw_compiled_signature"] == _gold_signature(
         case
     )
-    result["capability_type_compiled_match"] = _type_signature(
-        compiled.semantic_plan
-    ) == _gold_type_signature(case)
+    result["capability_type_compiled_match"] = _capability_type_equivalent(
+        compiled.semantic_plan, _gold_type_signature(case)
+    )
     if not reference_preserved:
         return result
 
@@ -658,8 +756,8 @@ async def run_execution(
 
     result["final_signature"] = _plan_signature(final_plan)
     result["exact_final_signature_match"] = result["final_signature"] == _gold_signature(case)
-    result["capability_type_final_match"] = _type_signature(final_plan) == _gold_type_signature(
-        case
+    result["capability_type_final_match"] = _capability_type_equivalent(
+        final_plan, _gold_type_signature(case)
     )
     result["final_capability_status"] = (
         "FINAL_CAPABILITY_PASS"
@@ -783,7 +881,7 @@ def _validate_gold_compilation(cases: tuple[dict[str, object], ...]) -> dict[str
         compiled = compile_semantic_ir_v2r(
             gold[case_id], registry=registry, lowering_registry=lowering
         )
-        if _type_signature(compiled.semantic_plan) != _gold_type_signature(case):
+        if not _capability_type_equivalent(compiled.semantic_plan, _gold_type_signature(case)):
             topology_mismatches.append(case_id)
         if _reference_projection_from_compiled(gold[case_id], compiled) != _reference_projection(
             gold[case_id]
@@ -942,34 +1040,40 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     Path(args.endpoint_fingerprint_pre).write_text(pre_text + "\n", encoding="utf-8")
     _validate_expected_endpoint_fingerprint(pre, label="PRE")
     pre_sha = sha256_text(pre_text)
-    provider = _provider_configuration(args)
-    with Path(args.evidence_path).open("w", encoding="utf-8") as handle:
-        for case in cases:
-            for attempt in range(ATTEMPTS):
-                result = await run_execution(
-                    case=case, gold_intent=gold[str(case["case_id"])], provider=provider
-                )
-                row = {
-                    **_provenance(),
-                    "authorized_checkpoint": checkpoint,
-                    "endpoint_pre_identity": pre.get("normalized_identity_sha256"),
-                    "endpoint_pre_fingerprint_sha256": pre_sha,
-                    "case_id": case["case_id"],
-                    "family": case["family"],
-                    "attempt": attempt,
-                    "request_sha256": sha256_text(str(case["request"])),
-                    "provider": result,
-                    "worker_program_calls": 0,
-                }
-                handle.write(canonical_json(row) + "\n")
-                handle.flush()
-    post = fingerprint.capture_endpoint_fingerprint_v2(
-        endpoint=args.base_url,
-        model_api_label=FROZEN_MODEL,
-        api_key=_api_key(args),
-        timeout_seconds=20.0,
-    )
-    Path(args.endpoint_fingerprint_post).write_text(canonical_json(post) + "\n", encoding="utf-8")
+    try:
+        provider = _provider_configuration(args)
+        with Path(args.evidence_path).open("w", encoding="utf-8") as handle:
+            for case in cases:
+                for attempt in range(ATTEMPTS):
+                    result = await run_execution(
+                        case=case, gold_intent=gold[str(case["case_id"])], provider=provider
+                    )
+                    row = {
+                        **_provenance(),
+                        "authorized_checkpoint": checkpoint,
+                        "endpoint_pre_identity": pre.get("normalized_identity_sha256"),
+                        "endpoint_pre_fingerprint_sha256": pre_sha,
+                        "case_id": case["case_id"],
+                        "family": case["family"],
+                        "attempt": attempt,
+                        "request_sha256": sha256_text(str(case["request"])),
+                        "provider": result,
+                        "worker_program_calls": 0,
+                    }
+                    handle.write(canonical_json(row) + "\n")
+                    handle.flush()
+                    if result.get("infrastructure_status") is not None:
+                        return
+    finally:
+        post = fingerprint.capture_endpoint_fingerprint_v2(
+            endpoint=args.base_url,
+            model_api_label=FROZEN_MODEL,
+            api_key=_api_key(args),
+            timeout_seconds=20.0,
+        )
+        Path(args.endpoint_fingerprint_post).write_text(
+            canonical_json(post) + "\n", encoding="utf-8"
+        )
 
 
 def _load_jsonl(path: Path) -> list[dict[str, object]]:
@@ -1009,13 +1113,19 @@ def _population_reasons(
         reasons.append("pre_expected_endpoint_identity")
     if post.get("normalized_identity_sha256") != EXPECTED_ENDPOINT_IDENTITY_SHA256:
         reasons.append("post_expected_endpoint_identity")
-    if len(rows) != EXPECTED_ROW_COUNT:
-        reasons.append("row_count")
     expected_keys = [
         (str(case["case_id"]), attempt) for case in cases for attempt in range(ATTEMPTS)
     ]
     actual_keys = [(str(row.get("case_id")), row.get("attempt")) for row in rows]
-    if actual_keys != expected_keys:
+    infrastructure_terminal = any(
+        isinstance(row.get("provider"), dict)
+        and row["provider"].get("infrastructure_status") is not None
+        for row in rows
+    )
+    if infrastructure_terminal:
+        if actual_keys != expected_keys[: len(actual_keys)]:
+            reasons.append("partial_case_order_or_attempt_population")
+    elif len(rows) != EXPECTED_ROW_COUNT or actual_keys != expected_keys:
         reasons.append("case_order_or_attempt_population")
     expected_provenance = _provenance()
     pre_sha = sha256_text(canonical_json(pre))
@@ -1099,7 +1209,10 @@ def _decision(summary: dict[str, object]) -> str:
         and summary["stable_semantic_passes"] >= 22
         and all(value >= 3 for value in summary["family_stable_passes"].values())
         and summary["reference_family_stable_passes"] == 4
-        and all(summary["named_anchor_passes"].get(anchor) == 2 for anchor in NAMED_ANCHORS)
+        and all(
+            summary["named_anchor_attempt_passes"].get(anchor) == ATTEMPTS
+            for anchor in NAMED_ANCHORS
+        )
     )
     if not semantic_gate:
         return "SI_V2R_MODEL_SEMANTIC_REJECTED"
@@ -1122,11 +1235,17 @@ def finalize(
     pre = _load_fingerprint(pre_path)
     post = _load_fingerprint(post_path)
     reasons = _population_reasons(rows, cases, pre, post, authorized_checkpoint)
+    infrastructure_failures = sum(
+        isinstance(row.get("provider"), dict)
+        and row["provider"].get("infrastructure_status") is not None
+        for row in rows
+    )
     base = {
         "experiment_version": EXPERIMENT_VERSION,
         "baseline_sha": BASELINE_SHA,
         "authorized_checkpoint": authorized_checkpoint,
         "rows": len(rows),
+        "rows_completed": len(rows),
         "provider_calls": _provider_call_count(rows),
         "worker_program_calls": 0,
         "integrity_reasons": reasons,
@@ -1138,7 +1257,7 @@ def finalize(
     if reasons:
         return {
             **base,
-            "infrastructure_failures": 0,
+            "infrastructure_failures": infrastructure_failures,
             "decision": "SI_V2R_LIVE_INCONCLUSIVE_INFRASTRUCTURE",
         }
 
@@ -1147,17 +1266,26 @@ def finalize(
     case_map = {str(case["case_id"]): case for case in cases}
     family_passes = Counter()
     named_passes = dict.fromkeys(NAMED_ANCHORS, 0)
+    named_anchor_attempt_passes = dict.fromkeys(NAMED_ANCHORS, 0)
     for case_id, value in stable.items():
         if value["status"] == "STABLE_SEMANTIC_PASS":
             family_passes[str(case_map[case_id]["family"])] += 1
             for anchor in NAMED_ANCHORS:
                 if anchor in case_id.casefold():
                     named_passes[anchor] += 1
+    for row in rows:
+        provider = row["provider"]
+        if (
+            provider.get("structural_status") == "STRUCTURAL_PASS"
+            and provider.get("semantic_status") == "SEMANTIC_PASS"
+        ):
+            case_id = str(row["case_id"])
+            for anchor in NAMED_ANCHORS:
+                if anchor in case_id.casefold():
+                    named_anchor_attempt_passes[anchor] += 1
     summary: dict[str, object] = {
         **base,
-        "infrastructure_failures": sum(
-            bool(item.get("infrastructure_status")) for item in providers
-        ),
+        "infrastructure_failures": infrastructure_failures,
         "initial_structural_successes": sum(
             bool(item.get("initial_structural_success")) for item in providers
         ),
@@ -1199,6 +1327,7 @@ def finalize(
             if case_map[case_id]["family"] == "REFERENCE_REQUIRED"
         ),
         "named_anchor_passes": named_passes,
+        "named_anchor_attempt_passes": named_anchor_attempt_passes,
         "compiler_invariant_failures": sum(
             item.get("compiler_status") == "COMPILER_INVARIANT_FAILURE" for item in providers
         ),
