@@ -1,0 +1,416 @@
+{
+  "$defs": {
+    "AnnotationSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Semantic annotation inside the section visualization domain.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "kind": {
+          "const": "annotation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "semantic_id": {
+          "minLength": 1,
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "semantic_id"
+      ],
+      "title": "AnnotationSemanticIntentV2R",
+      "type": "object"
+    },
+    "CurveSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Semantic intent for one ordinary scalar presentation.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "kind": {
+          "const": "curve",
+          "title": "Kind",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "semantic_id": {
+          "minLength": 1,
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "semantic_id"
+      ],
+      "title": "CurveSemanticIntentV2R",
+      "type": "object"
+    },
+    "ExtensionSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Provider-neutral hook for a registered semantic extension.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "kind": {
+          "const": "extension",
+          "title": "Kind",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "semantic_id": {
+          "minLength": 1,
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "semantic_key": {
+          "minLength": 1,
+          "title": "Semantic Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "semantic_id",
+        "semantic_key"
+      ],
+      "title": "ExtensionSemanticIntentV2R",
+      "type": "object"
+    },
+    "FillSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Semantic fill attached to one scalar feature.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "kind": {
+          "const": "fill",
+          "title": "Kind",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "semantic_id": {
+          "minLength": 1,
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "target_semantic_id": {
+          "minLength": 1,
+          "title": "Target Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "semantic_id",
+        "target_semantic_id"
+      ],
+      "title": "FillSemanticIntentV2R",
+      "type": "object"
+    },
+    "RasterSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Semantic intent for one ordinary raster presentation.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "kind": {
+          "const": "raster",
+          "title": "Kind",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "semantic_id": {
+          "minLength": 1,
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "semantic_id"
+      ],
+      "title": "RasterSemanticIntentV2R",
+      "type": "object"
+    },
+    "ReferenceSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "Section-owned reference meaning, separate from data feature kind.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "companion_depth_lane",
+            "reference_track"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "target_semantic_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Semantic Id"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ReferenceSemanticIntentV2R",
+      "type": "object"
+    },
+    "ReportWorkIntentV2R": {
+      "additionalProperties": false,
+      "description": "Coarse report work; report construction remains report-worker-owned.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "goal": {
+          "minLength": 1,
+          "title": "Goal",
+          "type": "string"
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "goal"
+      ],
+      "title": "ReportWorkIntentV2R",
+      "type": "object"
+    },
+    "SectionSemanticIntentV2R": {
+      "additionalProperties": false,
+      "description": "One ordered semantic log section.",
+      "properties": {
+        "constraints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "existing_section_hint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Existing Section Hint"
+        },
+        "features": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "annotation": "#/$defs/AnnotationSemanticIntentV2R",
+                "curve": "#/$defs/CurveSemanticIntentV2R",
+                "extension": "#/$defs/ExtensionSemanticIntentV2R",
+                "fill": "#/$defs/FillSemanticIntentV2R",
+                "raster": "#/$defs/RasterSemanticIntentV2R"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CurveSemanticIntentV2R"
+              },
+              {
+                "$ref": "#/$defs/RasterSemanticIntentV2R"
+              },
+              {
+                "$ref": "#/$defs/FillSemanticIntentV2R"
+              },
+              {
+                "$ref": "#/$defs/AnnotationSemanticIntentV2R"
+              },
+              {
+                "$ref": "#/$defs/ExtensionSemanticIntentV2R"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Features",
+          "type": "array"
+        },
+        "goal": {
+          "minLength": 1,
+          "title": "Goal",
+          "type": "string"
+        },
+        "kind": {
+          "const": "log_plot",
+          "title": "Kind",
+          "type": "string"
+        },
+        "reference_intent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReferenceSemanticIntentV2R"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "requirements": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Requirements",
+          "type": "array"
+        },
+        "source_hints": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Hints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "goal",
+        "features"
+      ],
+      "title": "SectionSemanticIntentV2R",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Provider-neutral reconciled semantic intent.",
+  "properties": {
+    "report_work": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReportWorkIntentV2R"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "sections": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SectionSemanticIntentV2R"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "summary": {
+      "minLength": 1,
+      "title": "Summary",
+      "type": "string"
+    },
+    "unresolved_requirements": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Unresolved Requirements",
+      "type": "array"
+    }
+  },
+  "required": [
+    "summary"
+  ],
+  "title": "SemanticIRV2R",
+  "type": "object"
+}

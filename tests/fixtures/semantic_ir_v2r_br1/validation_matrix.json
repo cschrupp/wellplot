@@ -1,0 +1,85 @@
+{
+  "rows": [
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "reference_track_without_target",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "companion_with_target",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "reference_target_missing_feature",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "duplicate_semantic_id",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "fill_target_missing",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "fill_target_raster",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "no_report_or_sections",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "unknown_feature_kind",
+      "json_schema_accepts": false
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "blank_required_string",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
+      "fixture": "extra_field",
+      "json_schema_accepts": false
+    }
+  ],
+  "version": "si-v2r-br1.validation-matrix.v1"
+}

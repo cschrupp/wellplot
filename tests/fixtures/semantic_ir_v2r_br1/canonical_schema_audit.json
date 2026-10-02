@@ -1,0 +1,190 @@
+{
+  "invariants": [
+    {
+      "classification": "SCHEMA_EXPLICIT",
+      "evidence": "minLength",
+      "invariant_id": "non_empty_strings"
+    },
+    {
+      "classification": "SCHEMA_EXPLICIT",
+      "evidence": [
+        "AnnotationSemanticIntentV2R",
+        "CurveSemanticIntentV2R",
+        "ExtensionSemanticIntentV2R",
+        "FillSemanticIntentV2R",
+        "RasterSemanticIntentV2R"
+      ],
+      "invariant_id": "allowed_feature_kinds"
+    },
+    {
+      "classification": "SCHEMA_EXPLICIT",
+      "evidence": "oneOf/const kind",
+      "invariant_id": "feature_discriminator"
+    },
+    {
+      "classification": "SCHEMA_EXPLICIT",
+      "evidence": "features.minItems",
+      "invariant_id": "minimum_one_section_feature"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "unique_semantic_ids_in_section"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "reference_track_requires_target"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "companion_depth_lane_forbids_target"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "reference_target_identifies_feature"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "fill_target_identifies_curve"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "model_validator",
+      "invariant_id": "report_or_sections_required"
+    },
+    {
+      "classification": "SCHEMA_EXPLICIT",
+      "evidence": "additionalProperties=false",
+      "invariant_id": "extra_fields_forbidden"
+    }
+  ],
+  "metrics": {
+    "additional_properties_false": 9,
+    "any_of": 4,
+    "array_nodes": 18,
+    "bytes": 5774,
+    "defs": 8,
+    "discriminators": 1,
+    "keywords": [
+      "$defs",
+      "$ref",
+      "additionalProperties",
+      "annotation",
+      "anyOf",
+      "const",
+      "curve",
+      "default",
+      "description",
+      "discriminator",
+      "enum",
+      "extension",
+      "fill",
+      "items",
+      "mapping",
+      "minItems",
+      "minLength",
+      "oneOf",
+      "properties",
+      "propertyName",
+      "raster",
+      "required",
+      "title",
+      "type"
+    ],
+    "maximum_nesting_depth": 6,
+    "object_nodes": 9,
+    "one_of": 1,
+    "refs": 8,
+    "required_fields": 18
+  },
+  "sha256": "d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8",
+  "validation_matrix": {
+    "rows": [
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "reference_track_without_target",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "companion_with_target",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "reference_target_missing_feature",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "duplicate_semantic_id",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "fill_target_missing",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "fill_target_raster",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "no_report_or_sections",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "unknown_feature_kind",
+        "json_schema_accepts": false
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "blank_required_string",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "extra_field",
+        "json_schema_accepts": false
+      }
+    ],
+    "version": "si-v2r-br1.validation-matrix.v1"
+  }
+}
