@@ -1,0 +1,2011 @@
+{
+  "capability_equivalence": {
+    "capability_type_equivalent_final_outcomes": 6,
+    "exact_order_final_matches": 28,
+    "order_only_final_mismatches": 6
+  },
+  "cases": [
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-alloc-tamarind-17",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-alloc-tamarind-17",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-alloc-tamarind-17",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 0,
+          "case_id": "cm59-alloc-umber-18",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 1,
+          "case_id": "cm59-alloc-umber-18",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-alloc-umber-18",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Reference intent must remain explicit and fail closed when absent.",
+          "attempt": 0,
+          "case_id": "cm59-alloc-verde-19",
+          "cm58_effect": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            },
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 1
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REFERENCE_OVERREACH",
+          "secondary_failure_classes": [
+            "REFERENCE_OVERREACH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Reference intent must remain explicit and fail closed when absent.",
+          "attempt": 1,
+          "case_id": "cm59-alloc-verde-19",
+          "cm58_effect": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            },
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 1
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REFERENCE_OVERREACH",
+          "secondary_failure_classes": [
+            "REFERENCE_OVERREACH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-alloc-verde-19",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "primary_failure_class": "REFERENCE_OVERREACH",
+      "secondary_failure_classes": [
+        "REFERENCE_OVERREACH"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-alloc-willow-20",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-alloc-willow-20",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTI_SECTION_ALLOCATION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-alloc-willow-20",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 0,
+          "case_id": "cm59-mixed-amber-24",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_NEGATIVE",
+            "REPORT_NOTE_SECTION_DUPLICATION"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 1,
+          "case_id": "cm59-mixed-amber-24",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_NEGATIVE",
+            "REPORT_NOTE_SECTION_DUPLICATION"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-mixed-amber-24",
+      "family": "MIXED_REPORT_SECTION",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "REPORT_SCOPE_FALSE_NEGATIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 0,
+          "case_id": "cm59-mixed-xenon-21",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_note_annotation_leakage",
+              "reason": "report_note_not_section_annotation",
+              "section_index": 0
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 1,
+          "case_id": "cm59-mixed-xenon-21",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_note_annotation_leakage",
+              "reason": "report_note_not_section_annotation",
+              "section_index": 0
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-mixed-xenon-21",
+      "family": "MIXED_REPORT_SECTION",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REPORT_NOTE_SECTION_DUPLICATION"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Mixed requests need an explicit coarse report-work branch.",
+          "attempt": 0,
+          "case_id": "cm59-mixed-yarrow-22",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_NEGATIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_NEGATIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Mixed requests need an explicit coarse report-work branch.",
+          "attempt": 1,
+          "case_id": "cm59-mixed-yarrow-22",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_NEGATIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_NEGATIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-mixed-yarrow-22",
+      "family": "MIXED_REPORT_SECTION",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_NEGATIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_NEGATIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-mixed-zephyr-23",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-mixed-zephyr-23",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MIXED_REPORT_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-mixed-zephyr-23",
+      "family": "MIXED_REPORT_SECTION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-multi-opal-13",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-multi-opal-13",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-multi-opal-13",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 0,
+          "case_id": "cm59-multi-quartz-14",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE",
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 1,
+          "case_id": "cm59-multi-quartz-14",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE",
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-multi-quartz-14",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH",
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 0,
+          "case_id": "cm59-multi-ruby-15",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 1,
+          "case_id": "cm59-multi-ruby-15",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-multi-ruby-15",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 0,
+          "case_id": "cm59-multi-slate-16",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 1,
+          "case_id": "cm59-multi-slate-16",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "MULTITRACK_SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-multi-slate-16",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 0,
+          "case_id": "cm59-reference-juniper-09",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 1,
+          "case_id": "cm59-reference-juniper-09",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-reference-juniper-09",
+      "family": "REFERENCE_REQUIRED",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 0,
+          "case_id": "cm59-reference-linden-10",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 1,
+          "case_id": "cm59-reference-linden-10",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_MULTIPLICITY_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-reference-linden-10",
+      "family": "REFERENCE_REQUIRED",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 0,
+          "case_id": "cm59-reference-mica-11",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE",
+            "FEATURE_KIND_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 1,
+          "case_id": "cm59-reference-mica-11",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE",
+            "FEATURE_KIND_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-reference-mica-11",
+      "family": "REFERENCE_REQUIRED",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH",
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 0,
+          "case_id": "cm59-reference-nova-12",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_KIND_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Reference meaning needs section-level ownership.",
+          "attempt": 1,
+          "case_id": "cm59-reference-nova-12",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REFERENCE_REQUIRED",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+          "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+          "secondary_failure_classes": [
+            "FEATURE_KIND_ERROR",
+            "REFERENCE_REPRESENTATION_MISMATCH"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-reference-nova-12",
+      "family": "REFERENCE_REQUIRED",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 0,
+          "case_id": "cm59-report-cascade-01",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 1,
+          "case_id": "cm59-report-cascade-01",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-report-cascade-01",
+      "family": "REPORT_ONLY",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 0,
+          "case_id": "cm59-report-elm-02",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 1,
+          "case_id": "cm59-report-elm-02",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-report-elm-02",
+      "family": "REPORT_ONLY",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-report-harbor-03",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-report-harbor-03",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-report-harbor-03",
+      "family": "REPORT_ONLY",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 0,
+          "case_id": "cm59-report-kestrel-04",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report note and section annotation require separate ownership.",
+          "attempt": 1,
+          "case_id": "cm59-report-kestrel-04",
+          "cm58_effect": [],
+          "cm58_status": "SAFE_REJECTION",
+          "family": "REPORT_ONLY",
+          "final_capability_type_equivalent": false,
+          "final_exact_order_match": false,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+          "secondary_failure_classes": [
+            "REPORT_NOTE_SECTION_DUPLICATION",
+            "SECTION_ALLOCATION_ERROR",
+            "FEATURE_KIND_ERROR"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-report-kestrel-04",
+      "family": "REPORT_ONLY",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-single-fig-05",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-single-fig-05",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-single-fig-05",
+      "family": "SINGLE_SECTION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-single-garnet-06",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-single-garnet-06",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-single-garnet-06",
+      "family": "SINGLE_SECTION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 0,
+          "case_id": "cm59-single-hazel-07",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        },
+        {
+          "architecture_implication": "Report work must not be inferred from section prose.",
+          "attempt": 1,
+          "case_id": "cm59-single-hazel-07",
+          "cm58_effect": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "cm58_status": "SAFE_REPAIR",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+          "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+          "secondary_failure_classes": [
+            "REPORT_SCOPE_FALSE_POSITIVE"
+          ],
+          "semantic_status": "SEMANTIC_FAIL"
+        }
+      ],
+      "case_id": "cm59-single-hazel-07",
+      "family": "SINGLE_SECTION",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "stable": true
+    },
+    {
+      "attempts": [
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 0,
+          "case_id": "cm59-single-iris-08",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        },
+        {
+          "architecture_implication": "Current semantic encoding is sufficient for this row.",
+          "attempt": 1,
+          "case_id": "cm59-single-iris-08",
+          "cm58_effect": [],
+          "cm58_status": "NO_ACTION",
+          "family": "SINGLE_SECTION",
+          "final_capability_type_equivalent": true,
+          "final_exact_order_match": true,
+          "offline_v2r_adjudication": "V2_EXACT_PASS",
+          "primary_failure_class": "EXACT_V2_PASS",
+          "secondary_failure_classes": [],
+          "semantic_status": "SEMANTIC_PASS"
+        }
+      ],
+      "case_id": "cm59-single-iris-08",
+      "family": "SINGLE_SECTION",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "stable": true
+    }
+  ],
+  "evidence": {
+    "cases": 24,
+    "path": "/tmp/si-v2-2-live.jsonl",
+    "rows": 48,
+    "sha256": "1b95ebe42ed5227dd134e122c739ca6c6ec90aa72520fc745ffbb622c5527fd7"
+  },
+  "frozen_si_v2_2": {
+    "historical_result_changed": false,
+    "stable_semantic_passes": "8/24"
+  },
+  "offline_adjudication_counts": {
+    "TRUE_MODEL_SEMANTIC_ERROR": 24,
+    "V2R_CONTRACT_EQUIVALENT": 8,
+    "V2_EXACT_PASS": 16
+  },
+  "row_category_counts": {
+    "EXACT_V2_PASS": 16,
+    "REFERENCE_OVERREACH": 2,
+    "REFERENCE_REPRESENTATION_MISMATCH": 8,
+    "REPORT_NOTE_SECTION_DUPLICATION": 10,
+    "REPORT_SCOPE_FALSE_NEGATIVE": 2,
+    "REPORT_SCOPE_FALSE_POSITIVE": 10
+  },
+  "rows": [
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 0,
+      "case_id": "cm59-report-cascade-01",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 1,
+      "case_id": "cm59-report-cascade-01",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 0,
+      "case_id": "cm59-report-elm-02",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 1,
+      "case_id": "cm59-report-elm-02",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-report-harbor-03",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-report-harbor-03",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 0,
+      "case_id": "cm59-report-kestrel-04",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 1,
+      "case_id": "cm59-report-kestrel-04",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REPORT_ONLY",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "SECTION_ALLOCATION_ERROR",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-single-fig-05",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-single-fig-05",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-single-garnet-06",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-single-garnet-06",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 0,
+      "case_id": "cm59-single-hazel-07",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 1,
+      "case_id": "cm59-single-hazel-07",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-single-iris-08",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-single-iris-08",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 0,
+      "case_id": "cm59-reference-juniper-09",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 1,
+      "case_id": "cm59-reference-juniper-09",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 0,
+      "case_id": "cm59-reference-linden-10",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 1,
+      "case_id": "cm59-reference-linden-10",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 0,
+      "case_id": "cm59-reference-mica-11",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE",
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 1,
+      "case_id": "cm59-reference-mica-11",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE",
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 0,
+      "case_id": "cm59-reference-nova-12",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 1,
+      "case_id": "cm59-reference-nova-12",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "REFERENCE_REQUIRED",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_KIND_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-multi-opal-13",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-multi-opal-13",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 0,
+      "case_id": "cm59-multi-quartz-14",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE",
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 1,
+      "case_id": "cm59-multi-quartz-14",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE",
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 0,
+      "case_id": "cm59-multi-ruby-15",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 1,
+      "case_id": "cm59-multi-ruby-15",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 0,
+      "case_id": "cm59-multi-slate-16",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report work must not be inferred from section prose.",
+      "attempt": 1,
+      "case_id": "cm59-multi-slate-16",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_task",
+          "reason": "explicit_section_only_intent"
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_POSITIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_POSITIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-alloc-tamarind-17",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-alloc-tamarind-17",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 0,
+      "case_id": "cm59-alloc-umber-18",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference meaning needs section-level ownership.",
+      "attempt": 1,
+      "case_id": "cm59-alloc-umber-18",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "V2R_CONTRACT_EQUIVALENT",
+      "primary_failure_class": "REFERENCE_REPRESENTATION_MISMATCH",
+      "secondary_failure_classes": [
+        "FEATURE_MULTIPLICITY_ERROR",
+        "REFERENCE_REPRESENTATION_MISMATCH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference intent must remain explicit and fail closed when absent.",
+      "attempt": 0,
+      "case_id": "cm59-alloc-verde-19",
+      "cm58_effect": [
+        {
+          "kind": "remove_reference",
+          "reason": "reference_not_requested",
+          "section_index": 0
+        },
+        {
+          "kind": "remove_reference",
+          "reason": "reference_not_requested",
+          "section_index": 1
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REFERENCE_OVERREACH",
+      "secondary_failure_classes": [
+        "REFERENCE_OVERREACH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Reference intent must remain explicit and fail closed when absent.",
+      "attempt": 1,
+      "case_id": "cm59-alloc-verde-19",
+      "cm58_effect": [
+        {
+          "kind": "remove_reference",
+          "reason": "reference_not_requested",
+          "section_index": 0
+        },
+        {
+          "kind": "remove_reference",
+          "reason": "reference_not_requested",
+          "section_index": 1
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REFERENCE_OVERREACH",
+      "secondary_failure_classes": [
+        "REFERENCE_OVERREACH"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-alloc-willow-20",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-alloc-willow-20",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 0,
+      "case_id": "cm59-mixed-xenon-21",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_note_annotation_leakage",
+          "reason": "report_note_not_section_annotation",
+          "section_index": 0
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 1,
+      "case_id": "cm59-mixed-xenon-21",
+      "cm58_effect": [
+        {
+          "kind": "remove_report_note_annotation_leakage",
+          "reason": "report_note_not_section_annotation",
+          "section_index": 0
+        }
+      ],
+      "cm58_status": "SAFE_REPAIR",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_NOTE_SECTION_DUPLICATION",
+        "FEATURE_KIND_ERROR"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Mixed requests need an explicit coarse report-work branch.",
+      "attempt": 0,
+      "case_id": "cm59-mixed-yarrow-22",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_NEGATIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_NEGATIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Mixed requests need an explicit coarse report-work branch.",
+      "attempt": 1,
+      "case_id": "cm59-mixed-yarrow-22",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_SCOPE_FALSE_NEGATIVE",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_NEGATIVE"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 0,
+      "case_id": "cm59-mixed-zephyr-23",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Current semantic encoding is sufficient for this row.",
+      "attempt": 1,
+      "case_id": "cm59-mixed-zephyr-23",
+      "cm58_effect": [],
+      "cm58_status": "NO_ACTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": true,
+      "final_exact_order_match": true,
+      "offline_v2r_adjudication": "V2_EXACT_PASS",
+      "primary_failure_class": "EXACT_V2_PASS",
+      "secondary_failure_classes": [],
+      "semantic_status": "SEMANTIC_PASS"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 0,
+      "case_id": "cm59-mixed-amber-24",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_NEGATIVE",
+        "REPORT_NOTE_SECTION_DUPLICATION"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    },
+    {
+      "architecture_implication": "Report note and section annotation require separate ownership.",
+      "attempt": 1,
+      "case_id": "cm59-mixed-amber-24",
+      "cm58_effect": [],
+      "cm58_status": "SAFE_REJECTION",
+      "family": "MIXED_REPORT_SECTION",
+      "final_capability_type_equivalent": false,
+      "final_exact_order_match": false,
+      "offline_v2r_adjudication": "TRUE_MODEL_SEMANTIC_ERROR",
+      "primary_failure_class": "REPORT_NOTE_SECTION_DUPLICATION",
+      "secondary_failure_classes": [
+        "REPORT_SCOPE_FALSE_NEGATIVE",
+        "REPORT_NOTE_SECTION_DUPLICATION"
+      ],
+      "semantic_status": "SEMANTIC_FAIL"
+    }
+  ],
+  "stable_case_category_counts": {
+    "EXACT_V2_PASS": 8,
+    "REFERENCE_OVERREACH": 1,
+    "REFERENCE_REPRESENTATION_MISMATCH": 4,
+    "REPORT_NOTE_SECTION_DUPLICATION": 5,
+    "REPORT_SCOPE_FALSE_NEGATIVE": 1,
+    "REPORT_SCOPE_FALSE_POSITIVE": 5
+  },
+  "version": "si-v2r.failure-taxonomy.v1"
+}

@@ -1,0 +1,187 @@
+{
+  "version": "si-v2r.cm59a.semantic-intents.v1",
+  "cases": [
+    {
+      "case_id": "cm59-report-cascade-01",
+      "summary": "Preserve the Cascade handover brief disposition.",
+      "report_work": {"goal": "Preserve the requested handover disposition.", "requirements": ["Approval recorded."], "constraints": []},
+      "sections": [],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "summary": "Preserve the Elm Crossing operations statement.",
+      "report_work": {"goal": "Preserve the requested operations statement.", "requirements": ["Final checks accepted by operations."], "constraints": []},
+      "sections": [],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "summary": "Set the Harbor East interpretation packet title and subtitle.",
+      "report_work": {"goal": "Set the requested report title and subtitle.", "requirements": ["Pressure Review", "Interval Findings"], "constraints": []},
+      "sections": [],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "summary": "Prepare the Kestrel closeout packet.",
+      "report_work": {"goal": "Prepare the requested closeout packet.", "requirements": ["Completion heading", "Overnight interpretation group as preparer"], "constraints": []},
+      "sections": [],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "summary": "Show the Fig interval permeability response.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Show one scalar permeability display.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "fig-permeability", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "summary": "Present the Garnet borehole waveform.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Present one waveform raster.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "garnet-waveform", "requirements": [], "constraints": ["Omit any depth column."]}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "summary": "Create the Hazel formation image display.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Create one formation image display.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "hazel-formation-image", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "summary": "Plot the Iris scalar response and interval annotation.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Plot the scalar response and annotate the interval top.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "iris-response", "requirements": [], "constraints": []}, {"kind": "annotation", "semantic_id": "iris-interval-top", "requirements": ["Annotate the interval top with a marker."], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "summary": "Place the Juniper depth lane beside the density response.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Place a depth lane beside the density response.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "juniper-density", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "summary": "Keep the Linden depth marker beside the resistivity trace.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Keep a depth marker beside the resistivity trace.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "linden-resistivity", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "summary": "Align the Mica reference column with the acoustic image.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Align a reference column with the acoustic image.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "mica-acoustic-image", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "summary": "Use the Nova depth ruler next to the formation image.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Use a depth ruler next to the formation image.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "nova-formation-image", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "summary": "Combine the Opal porosity curve with its acoustic waveform.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Combine a scalar curve and an acoustic waveform.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "opal-porosity", "requirements": [], "constraints": []}, {"kind": "raster", "semantic_id": "opal-waveform", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "summary": "Keep the Quartz density curve, depth ruler, and image feed together.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Keep a scalar curve, companion depth lane, and image feed together.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "quartz-density", "requirements": [], "constraints": []}, {"kind": "raster", "semantic_id": "quartz-image", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "summary": "Show two scalar responses together.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Show two scalar responses together.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "ruby-gamma", "requirements": [], "constraints": []}, {"kind": "curve", "semantic_id": "ruby-spontaneous-potential", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "summary": "Place two array images together.",
+      "report_work": null,
+      "sections": [{"kind": "log_plot", "goal": "Place two array images together.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "slate-caliper", "requirements": [], "constraints": []}, {"kind": "raster", "semantic_id": "slate-formation", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "summary": "Keep three Tamarind analysis panels distinct.",
+      "report_work": null,
+      "sections": [
+        {"kind": "log_plot", "goal": "Show an ordinary scalar measurement.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "tamarind-ordinary", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show a scalar measurement with a dedicated depth lane.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "tamarind-reference", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show a formation image.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "tamarind-image", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}
+      ],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "summary": "Resolve three Umber findings in order.",
+      "report_work": null,
+      "sections": [
+        {"kind": "log_plot", "goal": "Show a scalar trend.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "umber-ordinary", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show a scalar trend beside a reference column.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "umber-reference", "requirements": [], "constraints": []}], "reference_intent": {"kind": "companion_depth_lane"}, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show an acoustic image.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "umber-image", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}
+      ],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "summary": "Keep the Verde response and image in separate panels.",
+      "report_work": null,
+      "sections": [
+        {"kind": "log_plot", "goal": "Show the Verde porosity response.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "verde-porosity", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show the Verde borehole image.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "verde-image", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}
+      ],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "summary": "Place two Willow scalar views in independent displays.",
+      "report_work": null,
+      "sections": [
+        {"kind": "log_plot", "goal": "Show the Willow gamma view.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "willow-gamma", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []},
+        {"kind": "log_plot", "goal": "Show the Willow resistivity view.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "willow-resistivity", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}
+      ],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "summary": "Add a Xenon review note and an acoustic-image panel.",
+      "report_work": {"goal": "Preserve the review note.", "requirements": ["Accepted for handover"], "constraints": []},
+      "sections": [{"kind": "log_plot", "goal": "Show one acoustic image panel.", "source_hints": [], "features": [{"kind": "raster", "semantic_id": "xenon-acoustic", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "summary": "Include the Yarrow completion remark and a scalar panel.",
+      "report_work": {"goal": "Preserve the completion remark.", "requirements": ["Yarrow completion remark"], "constraints": []},
+      "sections": [{"kind": "log_plot", "goal": "Show one scalar response panel.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "yarrow-response", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "summary": "Title the Zephyr brief and add a neutron panel.",
+      "report_work": {"goal": "Preserve the requested brief title.", "requirements": ["Interval Overview"], "constraints": []},
+      "sections": [{"kind": "log_plot", "goal": "Show one neutron response panel.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "zephyr-neutron", "requirements": [], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "summary": "Add the Amber review note, scalar response, and marker.",
+      "report_work": {"goal": "Preserve the review note.", "requirements": ["Ready for signoff"], "constraints": []},
+      "sections": [{"kind": "log_plot", "goal": "Show a scalar response and annotate the interval top.", "source_hints": [], "features": [{"kind": "curve", "semantic_id": "amber-response", "requirements": [], "constraints": []}, {"kind": "annotation", "semantic_id": "amber-interval-top", "requirements": ["Annotate the interval top with a marker."], "constraints": []}], "reference_intent": null, "requirements": [], "constraints": []}],
+      "unresolved_requirements": []
+    }
+  ]
+}
