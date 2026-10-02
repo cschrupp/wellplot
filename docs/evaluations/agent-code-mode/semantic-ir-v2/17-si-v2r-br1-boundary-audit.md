@@ -8,11 +8,14 @@ The canonical V2R schema was generated provider-free from
 - SHA-256: `d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8`
 - Canonical schema metrics are frozen in
   `tests/fixtures/semantic_ir_v2r_br1/canonical_schema_audit.json`.
-- The corresponding SI-V2 metrics are recorded beside them for descriptive
-  comparison only; metric reduction is not treated as a reliability result.
+- The corresponding SI-V2 metrics are persisted beside them in the same audit
+  artifact for descriptive comparison only; metric reduction is not treated as
+  a reliability result.
 
-The schema explicitly represents non-empty strings, feature kinds and their
+The schema explicitly represents string length, feature kinds and their
 required discriminators, minimum feature count, and forbidden extra fields.
+Canonical field validators additionally reject whitespace-only collection
+items; `minLength` alone does not establish that nonblank semantic rule.
 The following remain canonical-runtime rules: unique feature IDs, reference
 target requirements, companion-target exclusion, reference target membership,
 fill-to-curve membership, and the requirement that report or sections exist.

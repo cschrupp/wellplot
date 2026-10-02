@@ -77,6 +77,14 @@
       "canonical_model_accepts": false,
       "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
       "expected_canonical_accepts": false,
+      "fixture": "blank_collection_item",
+      "json_schema_accepts": true
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+      "expected_canonical_accepts": false,
       "fixture": "extra_field",
       "json_schema_accepts": false
     }

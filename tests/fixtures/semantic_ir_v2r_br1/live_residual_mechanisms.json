@@ -1406,68 +1406,6 @@
     "stable_semantic_passes": "14/24",
     "terminal_structural_failures": 6
   },
-  "garnet_audit": {
-    "attempts": [
-      {
-        "annotation_correct": true,
-        "attempt": 0,
-        "case_id": "cm59-single-garnet-06",
-        "family": "SINGLE_SECTION",
-        "feature_kinds_correct": true,
-        "feature_multiplicity_correct": true,
-        "overall_frozen_semantic_status": "SEMANTIC_FAIL",
-        "primary_failure_mechanism": "REPORT_FALSE_POSITIVE",
-        "reference_kind_correct": true,
-        "reference_presence_correct": true,
-        "reference_target_correct": true,
-        "report_scope_correct": false,
-        "required_context_correct": false,
-        "secondary_failure_mechanisms": [
-          "REPORT_FALSE_POSITIVE",
-          "REQUIRED_CONTEXT_OWNER_ERROR"
-        ],
-        "section_count_correct": true,
-        "section_order_correct": true,
-        "structural_available": true,
-        "structural_failure_reason": null,
-        "unresolved_requirement_correct": true,
-        "validation_mechanism": null
-      },
-      {
-        "annotation_correct": true,
-        "attempt": 1,
-        "case_id": "cm59-single-garnet-06",
-        "family": "SINGLE_SECTION",
-        "feature_kinds_correct": true,
-        "feature_multiplicity_correct": true,
-        "overall_frozen_semantic_status": "SEMANTIC_FAIL",
-        "primary_failure_mechanism": "REPORT_FALSE_POSITIVE",
-        "reference_kind_correct": true,
-        "reference_presence_correct": true,
-        "reference_target_correct": true,
-        "report_scope_correct": false,
-        "required_context_correct": false,
-        "secondary_failure_mechanisms": [
-          "REPORT_FALSE_POSITIVE",
-          "REQUIRED_CONTEXT_OWNER_ERROR"
-        ],
-        "section_count_correct": true,
-        "section_order_correct": true,
-        "structural_available": true,
-        "structural_failure_reason": null,
-        "unresolved_requirement_correct": true,
-        "validation_mechanism": null
-      }
-    ],
-    "case_id": "cm59-single-garnet-06",
-    "family": "SINGLE_SECTION",
-    "primary_failure_mechanism": "REPORT_FALSE_POSITIVE",
-    "secondary_failure_mechanisms": [
-      "REPORT_FALSE_POSITIVE",
-      "REQUIRED_CONTEXT_OWNER_ERROR"
-    ],
-    "stable": true
-  },
   "qwen_intrinsic_incapability": "NOT_ESTABLISHED",
   "row_mechanism_counts": {
     "ANNOTATION_ERROR": 4,

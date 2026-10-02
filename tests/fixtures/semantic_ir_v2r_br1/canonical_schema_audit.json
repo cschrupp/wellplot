@@ -3,7 +3,12 @@
     {
       "classification": "SCHEMA_EXPLICIT",
       "evidence": "minLength",
-      "invariant_id": "non_empty_strings"
+      "invariant_id": "non_empty_string_length"
+    },
+    {
+      "classification": "CANONICAL_VALIDATION_ONLY",
+      "evidence": "field_validator strips/checks collection items",
+      "invariant_id": "non_blank_string_values"
     },
     {
       "classification": "SCHEMA_EXPLICIT",
@@ -102,6 +107,44 @@
     "required_fields": 18
   },
   "sha256": "d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8",
+  "si_v2_metrics": {
+    "additional_properties_false": 8,
+    "any_of": 2,
+    "array_nodes": 18,
+    "bytes": 5344,
+    "defs": 7,
+    "discriminators": 1,
+    "keywords": [
+      "$defs",
+      "$ref",
+      "additionalProperties",
+      "annotation",
+      "anyOf",
+      "const",
+      "curve",
+      "default",
+      "description",
+      "discriminator",
+      "extension",
+      "fill",
+      "items",
+      "mapping",
+      "minItems",
+      "minLength",
+      "oneOf",
+      "properties",
+      "propertyName",
+      "raster",
+      "required",
+      "title",
+      "type"
+    ],
+    "maximum_nesting_depth": 6,
+    "object_nodes": 8,
+    "one_of": 1,
+    "refs": 7,
+    "required_fields": 17
+  },
   "validation_matrix": {
     "rows": [
       {
@@ -174,6 +217,14 @@
         "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
         "expected_canonical_accepts": false,
         "fixture": "blank_required_string",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_error_type": "ValidationError",
+        "canonical_model_accepts": false,
+        "deployed_converter": "DEPLOYED_SUPPORT_UNKNOWN",
+        "expected_canonical_accepts": false,
+        "fixture": "blank_collection_item",
         "json_schema_accepts": true
       },
       {

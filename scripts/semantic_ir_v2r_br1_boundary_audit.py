@@ -496,9 +496,14 @@ def invariant_inventory(schema: dict[str, Any]) -> list[dict[str, Any]]:
     }
     return [
         {
-            "invariant_id": "non_empty_strings",
+            "invariant_id": "non_empty_string_length",
             "classification": "SCHEMA_EXPLICIT",
             "evidence": "minLength",
+        },
+        {
+            "invariant_id": "non_blank_string_values",
+            "classification": "CANONICAL_VALIDATION_ONLY",
+            "evidence": "field_validator strips/checks collection items",
         },
         {
             "invariant_id": "allowed_feature_kinds",
@@ -607,6 +612,9 @@ def malformed_fixtures() -> dict[str, dict[str, Any]]:
     value["summary"] = " "
     fixtures["blank_required_string"] = value
     value = _base_intent()
+    value["sections"][0]["requirements"] = [" "]
+    fixtures["blank_collection_item"] = value
+    value = _base_intent()
     value["unexpected"] = True
     fixtures["extra_field"] = value
     return fixtures
@@ -684,12 +692,17 @@ def write_outputs(output_dir: Path, evidence_path: Path = DEFAULT_EVIDENCE) -> d
     """Write deterministic machine-readable BR1 artifacts."""
     audit = build_audit(evidence_path)
     canonical_schema = SemanticIRV2R.model_json_schema()
+    canonical_schema_audit = {
+        **audit["canonical_schema"],
+        "si_v2_metrics": audit["legacy_schema_metrics"],
+    }
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "live_residual_mechanisms.json").write_text(
         json.dumps(audit["taxonomy"], indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
     (output_dir / "canonical_schema_audit.json").write_text(
-        json.dumps(audit["canonical_schema"], indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        json.dumps(canonical_schema_audit, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
     (output_dir / "validation_matrix.json").write_text(
         json.dumps(audit["canonical_schema"]["validation_matrix"], indent=2, sort_keys=True) + "\n",

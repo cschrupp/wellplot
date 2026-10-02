@@ -91,6 +91,8 @@ def test_canonical_invariant_inventory_separates_schema_and_runtime_rules() -> N
     """Relational model validators are not falsely reported as JSON Schema rules."""
     inventory = invariant_inventory(SemanticIRV2R.model_json_schema())
     by_id = {item["invariant_id"]: item for item in inventory}
+    assert by_id["non_empty_string_length"]["classification"] == "SCHEMA_EXPLICIT"
+    assert by_id["non_blank_string_values"]["classification"] == ("CANONICAL_VALIDATION_ONLY")
     assert by_id["feature_discriminator"]["classification"] == "SCHEMA_EXPLICIT"
     assert by_id["reference_target_identifies_feature"]["classification"] == (
         "CANONICAL_VALIDATION_ONLY"
@@ -112,11 +114,20 @@ def test_malformed_matrix_exposes_schema_to_canonical_validation_gap() -> None:
         "fill_target_raster",
         "no_report_or_sections",
         "blank_required_string",
+        "blank_collection_item",
     ):
         assert by_name[name]["json_schema_accepts"] is True
         assert by_name[name]["canonical_model_accepts"] is False
     assert by_name["unknown_feature_kind"]["json_schema_accepts"] is False
     assert by_name["extra_field"]["json_schema_accepts"] is False
+
+
+def test_persisted_schema_audit_contains_si_v2_comparison_metrics() -> None:
+    """The committed schema audit preserves both V2R and SI-V2 metrics."""
+    artifact = json.loads((FIXTURE_DIR / "canonical_schema_audit.json").read_text(encoding="utf-8"))
+    assert artifact["metrics"]["defs"] == 8
+    assert artifact["si_v2_metrics"]["defs"] >= 1
+    assert artifact["si_v2_metrics"] != artifact["metrics"]
 
 
 def test_exact_deployed_converter_is_not_invented() -> None:
