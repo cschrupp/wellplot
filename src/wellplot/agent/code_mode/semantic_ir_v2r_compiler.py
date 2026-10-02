@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 from enum import StrEnum
 
 from ...capabilities import CapabilityRegistry
@@ -24,6 +25,7 @@ from .semantic_ir_v2r import (
     ExtensionSemanticIntentV2R,
     FillSemanticIntentV2R,
     RasterSemanticIntentV2R,
+    ReferenceSemanticIntentV2R,
     SectionSemanticIntentV2R,
     SemanticFeatureV2R,
     SemanticIRV2R,
@@ -50,13 +52,40 @@ class SemanticIRV2RCompilationError(ValueError):
         super().__init__(message)
 
 
+@dataclass(frozen=True, slots=True)
+class CompiledSemanticPlanV2R:
+    """Validated plan plus section-aligned semantics retained for downstream use."""
+
+    semantic_plan: SemanticPlan
+    reference_intents: tuple[ReferenceSemanticIntentV2R | None, ...]
+
+    def __post_init__(self) -> None:
+        """Require one preserved semantic slot per lowered section."""
+        if len(self.reference_intents) != len(self.semantic_plan.section_tasks):
+            raise ValueError("V2R reference semantics must align with section tasks.")
+
+    @property
+    def report_task(self) -> ReportTask | None:
+        """Expose the validated report task for review projections."""
+        return self.semantic_plan.report_task
+
+    @property
+    def section_tasks(self) -> tuple[SectionTask, ...]:
+        """Expose validated section tasks without discarding V2R metadata."""
+        return self.semantic_plan.section_tasks
+
+    def to_semantic_plan(self) -> SemanticPlan:
+        """Return the validated legacy projection for comparison only."""
+        return self.semantic_plan
+
+
 def compile_semantic_ir_v2r(
     intent: SemanticIRV2R | dict[str, object],
     *,
     registry: CapabilityRegistry,
     lowering_registry: SemanticLoweringRegistry | None = None,
-) -> SemanticPlan:
-    """Lower immutable semantic intent into a validated ``SemanticPlan``."""
+) -> CompiledSemanticPlanV2R:
+    """Lower intent into a validated plan without losing reference meaning."""
     validated = SemanticIRV2R.model_validate(intent)
     semantic_registry = (
         lowering_registry
@@ -75,10 +104,11 @@ def compile_semantic_ir_v2r(
             constraints=validated.report_work.constraints,
         )
 
-    section_tasks = tuple(
+    compiled_sections = tuple(
         _compile_section(section, registry=registry, lowering_registry=semantic_registry)
         for section in validated.sections
     )
+    section_tasks = tuple(compiled.task for compiled in compiled_sections)
     plan = SemanticPlan(
         summary=validated.summary,
         report_task=report_task,
@@ -86,7 +116,11 @@ def compile_semantic_ir_v2r(
         unresolved_requirements=validated.unresolved_requirements,
     )
     try:
-        return validate_semantic_plan(SemanticPlan.model_validate(plan), registry)
+        validated_plan = validate_semantic_plan(SemanticPlan.model_validate(plan), registry)
+        return CompiledSemanticPlanV2R(
+            semantic_plan=validated_plan,
+            reference_intents=tuple(compiled.reference_intent for compiled in compiled_sections),
+        )
     except PlannerSemanticError as error:
         raise SemanticIRV2RCompilationError(
             SemanticIRV2RCompilationErrorCode.PLAN_VALIDATION_FAILED,
@@ -99,7 +133,7 @@ def _compile_section(
     *,
     registry: CapabilityRegistry,
     lowering_registry: SemanticLoweringRegistry,
-) -> SectionTask:
+) -> _CompiledSection:
     """Compile one section while preserving feature and section order."""
     section_rule = _resolve_rule(lowering_registry, "section.log_plot")
     capability_ids = list(_close_capabilities(section_rule.capability_ids, section_rule, registry))
@@ -135,14 +169,25 @@ def _compile_section(
     feature_constraints = tuple(
         constraint for feature in section.features for constraint in feature.constraints
     )
-    return SectionTask(
-        goal=section.goal,
-        capability_ids=tuple(capability_ids),
-        existing_section_hint=section.existing_section_hint,
-        source_hints=section.source_hints,
-        requirements=section.requirements + feature_requirements,
-        constraints=section.constraints + feature_constraints,
+    return _CompiledSection(
+        task=SectionTask(
+            goal=section.goal,
+            capability_ids=tuple(capability_ids),
+            existing_section_hint=section.existing_section_hint,
+            source_hints=section.source_hints,
+            requirements=section.requirements + feature_requirements,
+            constraints=section.constraints + feature_constraints,
+        ),
+        reference_intent=section.reference_intent,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _CompiledSection:
+    """Internal pair preserving one section task and its semantic ownership."""
+
+    task: SectionTask
+    reference_intent: ReferenceSemanticIntentV2R | None
 
 
 def _feature_semantic_key(
@@ -239,6 +284,7 @@ def _has_curve_target(target_semantic_id: str, features: tuple[SemanticFeatureV2
 
 
 __all__ = [
+    "CompiledSemanticPlanV2R",
     "SemanticIRV2RCompilationError",
     "SemanticIRV2RCompilationErrorCode",
     "compile_semantic_ir_v2r",

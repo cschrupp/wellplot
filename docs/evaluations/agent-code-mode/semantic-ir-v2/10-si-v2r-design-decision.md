@@ -92,7 +92,9 @@ V2R uses:
 - coarse `report_work` with goal, requirements, and constraints;
 - registry-driven feature lowering and unique parent closure;
 - explicit failure when parent selection is ambiguous;
-- deterministic `SemanticPlan` validation after lowering.
+- deterministic `SemanticPlan` validation after lowering;
+- a frozen `CompiledSemanticPlanV2R` wrapper whose section-aligned reference
+  intents survive beside the validated `SemanticPlan` projection.
 
 No provider-specific or worker-specific field is present. A fresh 24-case
 fixture and additional domain fixture cover ordinary scalar/raster,
@@ -114,10 +116,11 @@ qualification contract.
 ## RISKS
 
 The old model did not emit V2R, so offline adjudication cannot establish live
-model capability. The selected reference semantics may still need clearer
-provider wording. Report/section allocation remains a genuine model decision.
-The V2R schema is a new contract and must not be activated without live
-qualification.
+model capability. The selected reference semantics must remain available to a
+future downstream consumer; a bare `SemanticPlan` is not sufficient because
+it collapses companion and reference-track intent to the same capability
+tuple. Report/section allocation remains a genuine model decision. The V2R
+schema is a new contract and must not be activated without live qualification.
 
 ## REVERSIBLE
 

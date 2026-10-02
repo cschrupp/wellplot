@@ -94,12 +94,37 @@ def test_reference_intent_is_section_owned_not_a_feature_boolean() -> None:
         ],
     }
     registry = create_builtin_registry()
-    assert _signature(compile_semantic_ir_v2r(companion, registry=registry))["sections"] == [
+    companion_plan = compile_semantic_ir_v2r(companion, registry=registry)
+    reference_track_plan = compile_semantic_ir_v2r(reference_track, registry=registry)
+    assert _signature(companion_plan)["sections"] == [
         ["section.log_plot", "track.reference", "track.normal", "binding.curve"]
     ]
-    assert _signature(compile_semantic_ir_v2r(reference_track, registry=registry))["sections"] == [
+    assert _signature(reference_track_plan)["sections"] == [
         ["section.log_plot", "track.reference", "track.array", "binding.raster"]
     ]
+
+    same_curve_companion = companion_plan
+    same_curve_reference = compile_semantic_ir_v2r(
+        {
+            "summary": "reference data",
+            "sections": [
+                {
+                    "kind": "log_plot",
+                    "goal": "density with depth lane",
+                    "features": [{"kind": "curve", "semantic_id": "density"}],
+                    "reference_intent": {
+                        "kind": "reference_track",
+                        "target_semantic_id": "density",
+                    },
+                }
+            ],
+        },
+        registry=registry,
+    )
+    assert same_curve_companion.section_tasks == same_curve_reference.section_tasks
+    assert same_curve_companion.reference_intents != same_curve_reference.reference_intents
+    assert same_curve_companion.reference_intents[0].kind == "companion_depth_lane"
+    assert same_curve_reference.reference_intents[0].kind == "reference_track"
 
 
 def test_reference_track_requires_an_existing_feature_target() -> None:

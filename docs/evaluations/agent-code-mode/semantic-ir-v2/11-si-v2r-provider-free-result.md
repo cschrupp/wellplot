@@ -3,7 +3,7 @@
 ## STATUS
 
 ```yaml
-decision: SI_V2R_ACCEPTED_FOR_LIVE_QUALIFICATION
+decision: SI_V2R_REWORK_REQUIRED
 baseline_sha: 6249557de70f6f3b740e9ea17a96d600c6acf3f0
 branch: research/semantic-ir-v2-reconciliation
 provider_calls: 0
@@ -82,13 +82,17 @@ ambiguous_parent_fail_closed: PASS
 immutable_deterministic_lowering: PASS
 capability_type_equivalence: PASS
 authenticated_48_row_taxonomy: PASS
+reference_semantic_preservation: REWORK REQUIRED
 production_imports_of_v2r: 0
 production_route_changed: 0
 ```
 
 The V2R compiler lowers every fresh gold intent through the existing
 `SemanticPlan` validator and `validate_semantic_plan`. It does not normalize,
-repair, or infer missing semantic content.
+repair, or infer missing semantic content. The rework finding is that a bare
+`SemanticPlan` projection collapses `companion_depth_lane` and
+`reference_track(target=...)`; the corrected compiler must retain those
+section-aligned intents in `CompiledSemanticPlanV2R` for downstream consumers.
 
 ## SAME-ENVIRONMENT VERIFICATION
 
@@ -113,12 +117,18 @@ failure IDs. The 13 additional passes are the V2R tests; there are zero new
 attributable failures. Ruff check, Ruff format check, Python compilation,
 JSON validation, and `git diff --check` all pass.
 
+## REWORK REQUIRED
+
+The 24/24 capability-type representability result is insufficient while a
+meaningful reference distinction is lost at the lowering boundary. The
+provider-free correction preserves the distinction in a typed wrapper without
+changing production `SemanticPlan`, routing, or frozen SI-V2 evidence.
+
 ## NEXT STEP
 
-Independent review of this provider-free checkpoint. If accepted, a separate
-SI-V2R live qualification may be scoped with the same 24 requests, explicit
-structural/semantic/compiler/CM58 layers, and no retroactive use of the old
-V2 result. Until then:
+Independent review of this provider-free correction. A separate SI-V2R live
+qualification remains blocked until reference semantic preservation is
+accepted. Until then:
 
 ```yaml
 production_adoption: NOT_AUTHORIZED
