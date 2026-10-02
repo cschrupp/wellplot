@@ -66,7 +66,9 @@ def test_allocation_family_does_not_imply_allocation_mechanism_failure() -> None
 @pytest.mark.skipif(not DEFAULT_EVIDENCE.exists(), reason="frozen live evidence is external")
 def test_garnet_does_not_establish_negative_reference_misunderstanding() -> None:
     """Garnet's evidence separates report and context ownership from negation."""
-    garnet = analyze_evidence()["garnet_audit"]
+    garnet = next(
+        case for case in analyze_evidence()["cases"] if case["case_id"] == "cm59-single-garnet-06"
+    )
     assert garnet["primary_failure_mechanism"] == "REPORT_FALSE_POSITIVE"
     assert "REQUIRED_CONTEXT_OWNER_ERROR" in garnet["secondary_failure_mechanisms"]
     assert "REFERENCE_FALSE_POSITIVE" not in garnet["secondary_failure_mechanisms"]

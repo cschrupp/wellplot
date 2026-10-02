@@ -400,7 +400,6 @@ def analyze_evidence(
         and len(allocation_available) == 8
         else "PARTIAL"
     )
-    garnet = next(case for case in case_records if case["case_id"].endswith("garnet-06"))
     return {
         "version": TAXONOMY_VERSION,
         "baseline": FROZEN_CHECKPOINT,
@@ -417,7 +416,6 @@ def analyze_evidence(
         "stable_case_mechanism_counts": dict(sorted(stable_mechanism_counts.items())),
         "allocation_mechanism_status": allocation_status,
         "allocation_audit": allocation_audit,
-        "garnet_audit": garnet,
         "rows": row_records,
         "cases": case_records,
         "qwen_intrinsic_incapability": "NOT_ESTABLISHED",
