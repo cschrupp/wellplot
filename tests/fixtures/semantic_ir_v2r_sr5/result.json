@@ -1,0 +1,23 @@
+{
+  "adr_cm57": "UNCHANGED",
+  "applicability_map": "COMPLETE",
+  "baseline": "eb9736ddda9feb9e5e601760822da7e0e3933286",
+  "counterfactual_repairs": 0,
+  "decision": "SI_V2R_SR5_APPLICABILITY_MAP_COMPLETE",
+  "endpoint_calls": 0,
+  "historical_scores_recalculated": false,
+  "next": "A separately authorized historical regrade may apply only the eligible SR4 dimensions and must preserve all blocked/model-owned states.",
+  "population": {
+    "attempts_per_case": 2,
+    "cases": 24,
+    "rows": 48
+  },
+  "production_behavior_changed": false,
+  "provider_inference_calls": 0,
+  "raw_evidence_sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08",
+  "regrade_readiness": "RE_GRADE_PARTIALLY_READY",
+  "schema_version": "si-v2r.sr5.result.v1",
+  "scoring_changed": false,
+  "structural_not_evaluable_attempts": 6,
+  "worker_program_calls": 0
+}

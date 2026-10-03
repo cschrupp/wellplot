@@ -1,0 +1,836 @@
+[
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-alloc-tamarind-17",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_EVALUABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_kind": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_target": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_content": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_presence": {
+        "NOT_EVALUABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_EVALUABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-alloc-umber-18",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 0
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "BLOCKED_BY_REPRESENTATION_CONFLICT": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "case_id": "cm59-alloc-verde-19",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "sr3_root_mechanisms": [
+      "UNREQUESTED_REFERENCE_INFERENCE"
+    ],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-alloc-willow-20",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "MODEL_OWNED": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-mixed-amber-24",
+    "family": "MIXED_REPORT_SECTION",
+    "sr3_root_mechanisms": [
+      "ANNOTATION_WRONG_OWNER"
+    ],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-mixed-xenon-21",
+    "family": "MIXED_REPORT_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-mixed-yarrow-22",
+    "family": "MIXED_REPORT_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-mixed-zephyr-23",
+    "family": "MIXED_REPORT_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-multi-opal-13",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_EVALUABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_kind": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_target": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_content": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_presence": {
+        "NOT_EVALUABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_EVALUABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-multi-quartz-14",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 0
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-multi-ruby-15",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-multi-slate-16",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-reference-juniper-09",
+    "family": "REFERENCE_REQUIRED",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_EVALUABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_kind": {
+        "NOT_EVALUABLE": 2
+      },
+      "reference_target": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_content": {
+        "NOT_EVALUABLE": 2
+      },
+      "report_presence": {
+        "NOT_EVALUABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_EVALUABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-reference-linden-10",
+    "family": "REFERENCE_REQUIRED",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 0
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-reference-mica-11",
+    "family": "REFERENCE_REQUIRED",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-reference-nova-12",
+    "family": "REFERENCE_REQUIRED",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-report-cascade-01",
+    "family": "REPORT_ONLY",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-report-elm-02",
+    "family": "REPORT_ONLY",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-report-harbor-03",
+    "family": "REPORT_ONLY",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "MODEL_OWNED": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-report-kestrel-04",
+    "family": "REPORT_ONLY",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-single-fig-05",
+    "family": "SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "BLOCKED_BY_UNRESOLVED_CONTRACT": 2
+      },
+      "reference_admissibility": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [
+      "DEPTH_COLUMN_SCOPE_UNRESOLVED"
+    ],
+    "case_id": "cm59-single-garnet-06",
+    "family": "SINGLE_SECTION",
+    "sr3_root_mechanisms": [
+      "CONSTRAINT_OWNER_MISPLACEMENT"
+    ],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "NOT_APPLICABLE": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_kind": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_target": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "NOT_APPLICABLE": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [],
+    "case_id": "cm59-single-hazel-07",
+    "family": "SINGLE_SECTION",
+    "sr3_root_mechanisms": [],
+    "structurally_evaluable_attempts": 2
+  },
+  {
+    "applicability_by_dimension": {
+      "annotation_semantics": {
+        "MODEL_OWNED": 2
+      },
+      "constraint_scope": {
+        "NOT_APPLICABLE": 2
+      },
+      "reference_admissibility": {
+        "BLOCKED_BY_REPRESENTATION_CONFLICT": 2
+      },
+      "reference_kind": {
+        "MODEL_OWNED": 2
+      },
+      "reference_target": {
+        "MODEL_OWNED": 2
+      },
+      "report_content": {
+        "NOT_APPLICABLE": 2
+      },
+      "report_presence": {
+        "CONTRACT_APPLICABLE": 2
+      },
+      "unresolved_requirements": {
+        "MODEL_OWNED": 2
+      }
+    },
+    "attempts": 2,
+    "blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "case_id": "cm59-single-iris-08",
+    "family": "SINGLE_SECTION",
+    "sr3_root_mechanisms": [
+      "ANNOTATION_WRONG_OWNER",
+      "UNREQUESTED_REFERENCE_INFERENCE",
+      "UNRESOLVED_PROMOTION"
+    ],
+    "structurally_evaluable_attempts": 2
+  }
+]
