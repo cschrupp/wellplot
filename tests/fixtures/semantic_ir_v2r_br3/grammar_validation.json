@@ -1,0 +1,380 @@
+{
+  "conversions": {
+    "si_v2": {
+      "errors": [],
+      "grammar_bytes": 12761,
+      "grammar_parser": "NOT_EVALUABLE",
+      "grammar_rule_count": 109,
+      "grammar_sha256": "544d1b06933aba424006fcf1c734f0da21f47fb304e06ddb4d0434449f37b285",
+      "return_code": 0,
+      "status": "PASS",
+      "warning_count": 0,
+      "warnings": []
+    },
+    "si_v2r": {
+      "errors": [],
+      "grammar_bytes": 13907,
+      "grammar_parser": "NOT_EVALUABLE",
+      "grammar_rule_count": 114,
+      "grammar_sha256": "4323fc61570c0c1a42ff73e7e23e95641b4cf4d9600669c0e03ceb720b055db2",
+      "return_code": 0,
+      "status": "PASS",
+      "warning_count": 0,
+      "warnings": []
+    }
+  },
+  "gold": {
+    "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+    "canonical_model_accepts": 24,
+    "case_count": 24,
+    "grammar_accepts": "NOT_EVALUABLE",
+    "json_schema_accepts": 24,
+    "rows": [
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 1
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 2
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 3
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 4
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 5
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 6
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 7
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 8
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 9
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 10
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 11
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 12
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 13
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 14
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 15
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 16
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 17
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 18
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 19
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 20
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 21
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 22
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 23
+      },
+      {
+        "alternate_order_grammar_accepts": "NOT_EVALUABLE",
+        "canonical_model_accepts": true,
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true,
+        "ordinal": 24
+      }
+    ],
+    "serialization_order_restriction": "NOT_EVALUABLE"
+  },
+  "malformed": {
+    "row_count": 11,
+    "rows": [
+      {
+        "canonical_model_accepts": false,
+        "fixture": "reference_track_without_target",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "companion_with_target",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "reference_target_missing_feature",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "duplicate_semantic_id",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "fill_target_missing",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "fill_target_raster",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "no_report_or_sections",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "unknown_feature_kind",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": false
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "blank_required_string",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "blank_collection_item",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": false,
+        "fixture": "extra_field",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": false
+      }
+    ]
+  },
+  "schemas": {
+    "si_v2": {
+      "metrics": {
+        "additional_properties_false": 8,
+        "any_of": 2,
+        "array_nodes": 18,
+        "bytes": 5344,
+        "defs": 7,
+        "max_depth": 8,
+        "object_nodes": 8,
+        "one_of": 1,
+        "refs": 7,
+        "required_fields": 17
+      },
+      "sha256": "c8ab95d880153c1b214056e437e1f3090ea91f7c449989194379abe7305bb6ab"
+    },
+    "si_v2r": {
+      "metrics": {
+        "additional_properties_false": 9,
+        "any_of": 4,
+        "array_nodes": 18,
+        "bytes": 5774,
+        "defs": 8,
+        "max_depth": 8,
+        "object_nodes": 9,
+        "one_of": 1,
+        "refs": 8,
+        "required_fields": 18
+      },
+      "sha256": "d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8"
+    }
+  },
+  "valid_domain_fixtures": {
+    "accepted": 11,
+    "fixture_count": 11,
+    "grammar_accepted": "NOT_EVALUABLE",
+    "rows": [
+      {
+        "canonical_model_accepts": true,
+        "fixture": "report_only",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "single_scalar",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "single_raster",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "multiple_scalar",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "scalar_annotation",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "fill",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "companion_depth_lane",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "reference_track_target",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "multiple_sections",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "mixed_report_section",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      },
+      {
+        "canonical_model_accepts": true,
+        "fixture": "unresolved_requirements",
+        "grammar_accepts": "NOT_EVALUABLE",
+        "json_schema_accepts": true
+      }
+    ]
+  }
+}

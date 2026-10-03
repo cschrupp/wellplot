@@ -1,0 +1,87 @@
+{
+  "canonical_runtime_only_count": 6,
+  "grammar_enforced_count": "NOT_EVALUABLE",
+  "malformed_row_count": 11,
+  "relevant_weakened_count": 0,
+  "rows": [
+    {
+      "canonical_runtime": "ALSO_VALIDATED",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "feature_discriminator",
+      "json_schema": "JSON_SCHEMA_ENFORCED"
+    },
+    {
+      "canonical_runtime": "ALSO_VALIDATED",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "required_fields",
+      "json_schema": "JSON_SCHEMA_ENFORCED"
+    },
+    {
+      "canonical_runtime": "ALSO_VALIDATED",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "non_empty_string_length",
+      "json_schema": "JSON_SCHEMA_ENFORCED"
+    },
+    {
+      "canonical_runtime": "ALSO_VALIDATED",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "collection_min_items",
+      "json_schema": "JSON_SCHEMA_ENFORCED"
+    },
+    {
+      "canonical_runtime": "ALSO_VALIDATED",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "additional_properties_forbidden",
+      "json_schema": "JSON_SCHEMA_ENFORCED"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "fill_target_is_curve",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "non_blank_collection_items",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "reference_target_membership",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "reference_target_required",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "report_or_section_required",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    },
+    {
+      "canonical_runtime": "CANONICAL_RUNTIME_ONLY",
+      "grammar": "NOT_EVALUABLE",
+      "invariant": "semantic_feature_ids_unique",
+      "json_schema": "CANONICAL_RUNTIME_ONLY"
+    }
+  ],
+  "schema_keyword_metrics": {
+    "additional_properties_false": 9,
+    "any_of": 4,
+    "array_nodes": 18,
+    "bytes": 5774,
+    "defs": 8,
+    "max_depth": 8,
+    "object_nodes": 9,
+    "one_of": 1,
+    "refs": 8,
+    "required_fields": 18
+  },
+  "schema_level_count": 5
+}

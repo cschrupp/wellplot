@@ -1,0 +1,14 @@
+{
+  "adapter_justified": "NONE",
+  "baseline": "95033de99285db85d5c818e733805b102f08b328",
+  "decision": "SI_V2R_BR3_DEPLOYMENT_TOOLCHAIN_UNRESOLVED",
+  "endpoint_metadata_calls": 2,
+  "experiment": "SI-V2R-BR3",
+  "host_inspection_operations": [
+    "GET /props",
+    "GET /v1/models"
+  ],
+  "production_changes": 0,
+  "provider_inference_calls": 0,
+  "worker_program_calls": 0
+}

@@ -1,0 +1,60 @@
+{
+  "build_definition": {
+    "classification": "UNRESOLVED",
+    "digest": null
+  },
+  "compiler_toolchain": {
+    "classification": "UNRESOLVED",
+    "digest": null
+  },
+  "current_endpoint_observation": {
+    "available_model_ids": [
+      "qwen3.6-35b-a3b"
+    ],
+    "classification": "CURRENT_ONLY",
+    "deployment_artifact_identity": "UNRESOLVED",
+    "metadata_calls": 2,
+    "model_alias": "qwen3.6-35b-a3b",
+    "model_path_persisted": false,
+    "model_path_present": true,
+    "provider_inference_calls": 0,
+    "reported_build_info": "b11160-a3c12db9d",
+    "request_classes": [
+      "GET /props",
+      "GET /v1/models"
+    ],
+    "structured_output_backend": "UNRESOLVED"
+  },
+  "deployment_artifact": {
+    "classification": "UNRESOLVED",
+    "immutable_image_digest": null,
+    "kind": "remote_llama_server",
+    "sha256": null
+  },
+  "grammar_parser_validator": {
+    "classification": "UNRESOLVED",
+    "identity": null
+  },
+  "json_schema_converter": {
+    "classification": "UNRESOLVED",
+    "identity": null
+  },
+  "llama_server_binary": {
+    "classification": "UNRESOLVED",
+    "path_persisted": false,
+    "sha256": null
+  },
+  "reported_endpoint_build": {
+    "classification": "REPORTED_ONLY",
+    "value": "b11160-a3c12db9d"
+  },
+  "source_commit": {
+    "classification": "UNRESOLVED",
+    "value": null
+  },
+  "status": "UNRESOLVED",
+  "structured_output_backend": {
+    "classification": "UNRESOLVED",
+    "identity": null
+  }
+}
