@@ -1,0 +1,188 @@
+{
+  "adr_cm57": "UNCHANGED",
+  "anchor_metrics": {
+    "Fig": {
+      "case_id": "cm59-single-fig-05",
+      "model_status": "STABLE_PASS",
+      "remaining_system_residuals": [],
+      "sr2_status": "STABLE_PASS",
+      "sr6_system_status": "STABLE_PASS"
+    },
+    "Kestrel": {
+      "case_id": "cm59-report-kestrel-04",
+      "model_status": "STABLE_PASS",
+      "remaining_system_residuals": [],
+      "sr2_status": "STABLE_PASS",
+      "sr6_system_status": "STABLE_PASS"
+    },
+    "Linden": {
+      "case_id": "cm59-reference-linden-10",
+      "model_status": "STRUCTURAL_UNAVAILABLE",
+      "remaining_system_residuals": [],
+      "sr2_status": "STRUCTURAL_UNAVAILABLE",
+      "sr6_system_status": "STRUCTURAL_UNAVAILABLE"
+    },
+    "Xenon": {
+      "case_id": "cm59-mixed-xenon-21",
+      "model_status": "STABLE_PASS",
+      "remaining_system_residuals": [],
+      "sr2_status": "STABLE_PASS",
+      "sr6_system_status": "STABLE_PASS"
+    }
+  },
+  "baseline": "d46b280bbe1326fa1664778c66377067beb2a557",
+  "decision": "SI_V2R_SR6_NO_ADDITIONAL_SYSTEM_RECOVERY",
+  "endpoint_calls": 0,
+  "evidence": {
+    "attempts": 2,
+    "cases": 24,
+    "rows": 48,
+    "sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08"
+  },
+  "family_metrics": {
+    "MIXED_REPORT_SECTION": {
+      "case_count": 4,
+      "evaluable_attempts": 8,
+      "not_evaluable_attempts": 0,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 1,
+      "stable_pass_cases": 3,
+      "structural_unavailable_cases": 0,
+      "system_failures": 2,
+      "system_passes": 6,
+      "unstable_cases": 0
+    },
+    "MULTITRACK_SINGLE_SECTION": {
+      "case_count": 4,
+      "evaluable_attempts": 6,
+      "not_evaluable_attempts": 2,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 0,
+      "stable_pass_cases": 3,
+      "structural_unavailable_cases": 1,
+      "system_failures": 0,
+      "system_passes": 6,
+      "unstable_cases": 0
+    },
+    "MULTI_SECTION_ALLOCATION": {
+      "case_count": 4,
+      "evaluable_attempts": 6,
+      "not_evaluable_attempts": 2,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 1,
+      "stable_pass_cases": 2,
+      "structural_unavailable_cases": 1,
+      "system_failures": 2,
+      "system_passes": 4,
+      "unstable_cases": 0
+    },
+    "REFERENCE_REQUIRED": {
+      "case_count": 4,
+      "evaluable_attempts": 6,
+      "not_evaluable_attempts": 2,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 0,
+      "stable_pass_cases": 3,
+      "structural_unavailable_cases": 1,
+      "system_failures": 0,
+      "system_passes": 6,
+      "unstable_cases": 0
+    },
+    "REPORT_ONLY": {
+      "case_count": 4,
+      "evaluable_attempts": 8,
+      "not_evaluable_attempts": 0,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 0,
+      "stable_pass_cases": 4,
+      "structural_unavailable_cases": 0,
+      "system_failures": 0,
+      "system_passes": 8,
+      "unstable_cases": 0
+    },
+    "SINGLE_SECTION": {
+      "case_count": 4,
+      "evaluable_attempts": 8,
+      "not_evaluable_attempts": 0,
+      "partially_evaluable_cases": 0,
+      "stable_fail_cases": 2,
+      "stable_pass_cases": 2,
+      "structural_unavailable_cases": 0,
+      "system_failures": 4,
+      "system_passes": 4,
+      "unstable_cases": 0
+    }
+  },
+  "frozen_historical_facts": {
+    "decision": "SI_V2R_PROVIDER_BOUNDARY_REJECTED",
+    "semantic_passes": 28,
+    "stable_semantic_passes": 14,
+    "terminal_structural_failures": 6
+  },
+  "historical_provider_decision": "SI_V2R_PROVIDER_BOUNDARY_REJECTED",
+  "metrics": {
+    "additional_sr6_changes_vs_sr2": 0,
+    "model_semantic_passes": 28,
+    "model_stable_passes": 14,
+    "newly_system_recovered_attempts_vs_model": 6,
+    "newly_system_recovered_cases_vs_model": 3,
+    "sr2_adjusted_semantic_passes": 34,
+    "sr2_stable_passes": 17,
+    "sr6_system_semantic_passes": 34,
+    "sr6_system_stable_passes": 17,
+    "structural_not_evaluable_attempts": 6
+  },
+  "production_behavior_changed": false,
+  "provider_inference_calls": 0,
+  "regrade_completeness": "PARTIALLY_REGRADABLE",
+  "residual_summary": {
+    "blocked_opportunity_counts": {
+      "ANNOTATION_ERROR": 4,
+      "CONSTRAINT_SCOPE_UNRESOLVED": 2,
+      "FEATURE_KIND_ERROR": 4,
+      "FEATURE_MULTIPLICITY_ERROR": 4,
+      "REFERENCE_REPRESENTATION_CONFLICT": 4,
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK": 4,
+      "REQUIRED_CONTEXT_OWNER_ERROR": 4,
+      "SECTION_ORDER_ERROR": 4,
+      "STRUCTURAL_FAILURE": 6,
+      "UNRESOLVED_REQUIREMENT_ERROR": 2
+    },
+    "remaining_system_residual_counts": {
+      "ANNOTATION_ERROR": 4,
+      "CONSTRAINT_SCOPE_UNRESOLVED": 2,
+      "FEATURE_KIND_ERROR": 4,
+      "FEATURE_MULTIPLICITY_ERROR": 4,
+      "REFERENCE_REPRESENTATION_CONFLICT": 4,
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK": 4,
+      "REQUIRED_CONTEXT_OWNER_ERROR": 4,
+      "SECTION_ORDER_ERROR": 4,
+      "UNRESOLVED_REQUIREMENT_ERROR": 2
+    },
+    "schema_version": "si-v2r.sr6.residual-summary.v1",
+    "stable_system_case_status_counts": {
+      "STABLE_FAIL": 4,
+      "STABLE_PASS": 17,
+      "STRUCTURAL_UNAVAILABLE": 3
+    },
+    "transitions": {
+      "NOT_RUN -> NOT_EVALUABLE": 6,
+      "SEMANTIC_FAIL -> FAIL": 8,
+      "SEMANTIC_FAIL -> PASS": 6,
+      "SEMANTIC_PASS -> PASS": 28
+    }
+  },
+  "schema_version": "si-v2r.sr6.result.v1",
+  "sr2_historical_facts": {
+    "adjusted_semantic_passes": 34,
+    "adjusted_stable_passes": 17,
+    "decision": "SI_V2R_SR2_REPORT_PRESENCE_RESOLVED"
+  },
+  "sr5_historical_facts": {
+    "checkpoint": "d46b280bbe1326fa1664778c66377067beb2a557",
+    "decision": "SI_V2R_SR5_APPLICABILITY_MAP_COMPLETE",
+    "policy_baseline": "eb9736ddda9feb9e5e601760822da7e0e3933286",
+    "regrade_readiness": "RE_GRADE_PARTIALLY_READY"
+  },
+  "worker_program_calls": 0
+}

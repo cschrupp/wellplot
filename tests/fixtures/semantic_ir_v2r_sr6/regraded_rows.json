@@ -1,0 +1,1762 @@
+[
+  {
+    "attempt": 0,
+    "case_id": "cm59-alloc-tamarind-17",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-alloc-tamarind-17",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-alloc-umber-18",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-alloc-umber-18",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-alloc-verde-19",
+    "contract_bounded_system_status": "FAIL",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REFERENCE_FALSE_POSITIVE",
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "BLOCKED_BY_REPRESENTATION_CONFLICT",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-alloc-verde-19",
+    "contract_bounded_system_status": "FAIL",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REFERENCE_FALSE_POSITIVE",
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "BLOCKED_BY_REPRESENTATION_CONFLICT",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-alloc-willow-20",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-alloc-willow-20",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-mixed-amber-24",
+    "contract_bounded_system_status": "FAIL",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "MODEL_OWNED",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-mixed-amber-24",
+    "contract_bounded_system_status": "FAIL",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "MODEL_OWNED",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-mixed-xenon-21",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-mixed-xenon-21",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-mixed-yarrow-22",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-mixed-yarrow-22",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-mixed-zephyr-23",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-mixed-zephyr-23",
+    "contract_bounded_system_status": "PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-multi-opal-13",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-multi-opal-13",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-multi-quartz-14",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-multi-quartz-14",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-multi-ruby-15",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-multi-ruby-15",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-multi-slate-16",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-multi-slate-16",
+    "contract_bounded_system_status": "PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-reference-juniper-09",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-reference-juniper-09",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-reference-linden-10",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-reference-linden-10",
+    "contract_bounded_system_status": "NOT_EVALUABLE",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "NOT_RUN",
+    "frozen_structural_status": "STRUCTURAL_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_status": "NOT_EVALUABLE",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_EVALUABLE",
+      "constraint_scope": "NOT_EVALUABLE",
+      "reference_admissibility": "NOT_EVALUABLE",
+      "reference_kind": "NOT_EVALUABLE",
+      "reference_target": "NOT_EVALUABLE",
+      "report_content": "NOT_EVALUABLE",
+      "report_presence": "NOT_EVALUABLE",
+      "unresolved_requirements": "NOT_EVALUABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": false,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": false,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-reference-mica-11",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-reference-mica-11",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-reference-nova-12",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-reference-nova-12",
+    "contract_bounded_system_status": "PASS",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-report-cascade-01",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-report-cascade-01",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-report-elm-02",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-report-elm-02",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-report-harbor-03",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-report-harbor-03",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-report-kestrel-04",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-report-kestrel-04",
+    "contract_bounded_system_status": "PASS",
+    "family": "REPORT_ONLY",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "MODEL_OWNED",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-single-fig-05",
+    "contract_bounded_system_status": "PASS",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-single-fig-05",
+    "contract_bounded_system_status": "PASS",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-single-garnet-06",
+    "contract_bounded_system_status": "FAIL",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE",
+      "REQUIRED_CONTEXT_OWNER_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "CONSTRAINT_SCOPE_UNRESOLVED"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "BLOCKED_BY_UNRESOLVED_CONTRACT",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [
+      "DEPTH_COLUMN_SCOPE_UNRESOLVED"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-single-garnet-06",
+    "contract_bounded_system_status": "FAIL",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "REPORT_FALSE_POSITIVE",
+      "REQUIRED_CONTEXT_OWNER_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "CONSTRAINT_SCOPE_UNRESOLVED"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "BLOCKED_BY_UNRESOLVED_CONTRACT",
+      "reference_admissibility": "CONTRACT_APPLICABLE",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [
+      "DEPTH_COLUMN_SCOPE_UNRESOLVED"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": true,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": [
+      "report_presence"
+    ]
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-single-hazel-07",
+    "contract_bounded_system_status": "PASS",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-single-hazel-07",
+    "contract_bounded_system_status": "PASS",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [],
+    "frozen_model_semantic_status": "SEMANTIC_PASS",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [],
+    "sr2_status": "PASS",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "NOT_APPLICABLE",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "NOT_APPLICABLE",
+      "reference_kind": "NOT_APPLICABLE",
+      "reference_target": "NOT_APPLICABLE",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "NOT_APPLICABLE"
+    },
+    "sr5_blockers": [],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 0,
+    "case_id": "cm59-single-iris-08",
+    "contract_bounded_system_status": "FAIL",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REFERENCE_FALSE_POSITIVE",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR",
+      "UNRESOLVED_REQUIREMENT_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR",
+      "UNRESOLVED_REQUIREMENT_ERROR"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "MODEL_OWNED",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "BLOCKED_BY_REPRESENTATION_CONFLICT",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "MODEL_OWNED"
+    },
+    "sr5_blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  },
+  {
+    "attempt": 1,
+    "case_id": "cm59-single-iris-08",
+    "contract_bounded_system_status": "FAIL",
+    "family": "SINGLE_SECTION",
+    "frozen_model_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REFERENCE_FALSE_POSITIVE",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR",
+      "UNRESOLVED_REQUIREMENT_ERROR"
+    ],
+    "frozen_model_semantic_status": "SEMANTIC_FAIL",
+    "frozen_structural_status": "STRUCTURAL_PASS",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR",
+      "UNRESOLVED_REQUIREMENT_ERROR"
+    ],
+    "sr2_status": "FAIL",
+    "sr5_applicability_dimensions": {
+      "annotation_semantics": "MODEL_OWNED",
+      "constraint_scope": "NOT_APPLICABLE",
+      "reference_admissibility": "BLOCKED_BY_REPRESENTATION_CONFLICT",
+      "reference_kind": "MODEL_OWNED",
+      "reference_target": "MODEL_OWNED",
+      "report_content": "NOT_APPLICABLE",
+      "report_presence": "CONTRACT_APPLICABLE",
+      "unresolved_requirements": "MODEL_OWNED"
+    },
+    "sr5_blockers": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "UNSPECIFIED_REFERENCE_POLICY"
+    ],
+    "sr5_system_credit_eligibility": {
+      "annotation_semantics": false,
+      "constraint_scope": false,
+      "reference_admissibility": false,
+      "reference_kind": false,
+      "reference_target": false,
+      "report_content": false,
+      "report_presence": true,
+      "unresolved_requirements": false
+    },
+    "structurally_evaluable": true,
+    "system_credit_applied_dimensions": []
+  }
+]

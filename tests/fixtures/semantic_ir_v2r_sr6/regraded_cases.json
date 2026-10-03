@@ -1,0 +1,662 @@
+[
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-alloc-tamarind-17",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-alloc-umber-18",
+    "contract_bounded_case_status": "STRUCTURAL_UNAVAILABLE",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "model_case_status": "STRUCTURAL_UNAVAILABLE",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STRUCTURAL_UNAVAILABLE"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "REFERENCE_REPRESENTATION_CONFLICT",
+          "REFERENCE_UNSPECIFIED_POLICY_BLOCK"
+        ],
+        "sr2_status": "FAIL"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "REFERENCE_REPRESENTATION_CONFLICT",
+          "REFERENCE_UNSPECIFIED_POLICY_BLOCK"
+        ],
+        "sr2_status": "FAIL"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-alloc-verde-19",
+    "contract_bounded_case_status": "STABLE_FAIL",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK"
+    ],
+    "sr2_case_status": "STABLE_FAIL"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-alloc-willow-20",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "ANNOTATION_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR",
+          "SECTION_ORDER_ERROR"
+        ],
+        "sr2_status": "FAIL"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "ANNOTATION_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR",
+          "SECTION_ORDER_ERROR"
+        ],
+        "sr2_status": "FAIL"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-mixed-amber-24",
+    "contract_bounded_case_status": "STABLE_FAIL",
+    "family": "MIXED_REPORT_SECTION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "sr2_case_status": "STABLE_FAIL"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-mixed-xenon-21",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-mixed-yarrow-22",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-mixed-zephyr-23",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MIXED_REPORT_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-multi-opal-13",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-multi-quartz-14",
+    "contract_bounded_case_status": "STRUCTURAL_UNAVAILABLE",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "model_case_status": "STRUCTURAL_UNAVAILABLE",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STRUCTURAL_UNAVAILABLE"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-multi-ruby-15",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-multi-slate-16",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-reference-juniper-09",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REFERENCE_REQUIRED",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "NOT_EVALUABLE",
+        "model_status": "NOT_EVALUABLE",
+        "remaining_system_residuals": [],
+        "sr2_status": "NOT_EVALUABLE"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-reference-linden-10",
+    "contract_bounded_case_status": "STRUCTURAL_UNAVAILABLE",
+    "family": "REFERENCE_REQUIRED",
+    "model_case_status": "STRUCTURAL_UNAVAILABLE",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STRUCTURAL_UNAVAILABLE"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-reference-mica-11",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REFERENCE_REQUIRED",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-reference-nova-12",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REFERENCE_REQUIRED",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-report-cascade-01",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REPORT_ONLY",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-report-elm-02",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REPORT_ONLY",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-report-harbor-03",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REPORT_ONLY",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-report-kestrel-04",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "REPORT_ONLY",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-single-fig-05",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "SINGLE_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "CONSTRAINT_SCOPE_UNRESOLVED"
+        ],
+        "sr2_status": "FAIL"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "CONSTRAINT_SCOPE_UNRESOLVED"
+        ],
+        "sr2_status": "FAIL"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-single-garnet-06",
+    "contract_bounded_case_status": "STABLE_FAIL",
+    "family": "SINGLE_SECTION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [
+      "CONSTRAINT_SCOPE_UNRESOLVED"
+    ],
+    "sr2_case_status": "STABLE_FAIL"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "PASS",
+        "model_status": "PASS",
+        "remaining_system_residuals": [],
+        "sr2_status": "PASS"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-single-hazel-07",
+    "contract_bounded_case_status": "STABLE_PASS",
+    "family": "SINGLE_SECTION",
+    "model_case_status": "STABLE_PASS",
+    "remaining_system_residuals": [],
+    "sr2_case_status": "STABLE_PASS"
+  },
+  {
+    "attempt_statuses": [
+      {
+        "attempt": 0,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "ANNOTATION_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "REFERENCE_REPRESENTATION_CONFLICT",
+          "REFERENCE_UNSPECIFIED_POLICY_BLOCK",
+          "REQUIRED_CONTEXT_OWNER_ERROR",
+          "SECTION_ORDER_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR"
+        ],
+        "sr2_status": "FAIL"
+      },
+      {
+        "attempt": 1,
+        "contract_bounded_system_status": "FAIL",
+        "model_status": "FAIL",
+        "remaining_system_residuals": [
+          "ANNOTATION_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "REFERENCE_REPRESENTATION_CONFLICT",
+          "REFERENCE_UNSPECIFIED_POLICY_BLOCK",
+          "REQUIRED_CONTEXT_OWNER_ERROR",
+          "SECTION_ORDER_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR"
+        ],
+        "sr2_status": "FAIL"
+      }
+    ],
+    "attempts": 2,
+    "case_id": "cm59-single-iris-08",
+    "contract_bounded_case_status": "STABLE_FAIL",
+    "family": "SINGLE_SECTION",
+    "model_case_status": "STABLE_FAIL",
+    "remaining_system_residuals": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "REFERENCE_REPRESENTATION_CONFLICT",
+      "REFERENCE_UNSPECIFIED_POLICY_BLOCK",
+      "REQUIRED_CONTEXT_OWNER_ERROR",
+      "SECTION_ORDER_ERROR",
+      "UNRESOLVED_REQUIREMENT_ERROR"
+    ],
+    "sr2_case_status": "STABLE_FAIL"
+  }
+]
