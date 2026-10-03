@@ -1,0 +1,69 @@
+{
+  "schema_version": "si-v2r.sr4.ambiguity.v1",
+  "baseline": "e14c8814fd3b8f7cb8faae745cba907e537be3b3",
+  "policies": [
+    {
+      "dimension": "report_presence",
+      "explicit_positive": "DETERMINISTIC_BOUNDARY",
+      "explicit_negative": "DETERMINISTIC_BOUNDARY",
+      "unspecified": "DETERMINISTIC_BOUNDARY_DEFAULT",
+      "ambiguous": "FAIL_CLOSED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "FAIL_CLOSED"
+    },
+    {
+      "dimension": "reference_admissibility",
+      "explicit_positive": "PRESERVE_AND_LEAVE_KIND_TARGET_TO_MODEL",
+      "explicit_negative": "DETERMINISTIC_REMOVE_ALLOWED",
+      "unspecified": "CONTRACT_REQUIRED_BEFORE_REMOVAL",
+      "ambiguous": "FAIL_CLOSED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "FAIL_CLOSED"
+    },
+    {
+      "dimension": "reference_kind",
+      "explicit_positive": "MODEL_OWNED",
+      "explicit_negative": "MODEL_OWNED",
+      "unspecified": "MODEL_SEMANTIC_ERROR",
+      "ambiguous": "FAIL_CLOSED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "MODEL_SEMANTIC_ERROR"
+    },
+    {
+      "dimension": "reference_target",
+      "explicit_positive": "MODEL_OWNED_AND_PRESERVE_IDENTITY",
+      "explicit_negative": "MODEL_OWNED",
+      "unspecified": "MODEL_SEMANTIC_ERROR",
+      "ambiguous": "FAIL_CLOSED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "FAIL_CLOSED"
+    },
+    {
+      "dimension": "annotation_semantics",
+      "explicit_positive": "MODEL_OWNED_EXPLICIT_FEATURE",
+      "explicit_negative": "MODEL_OWNED",
+      "unspecified": "NO_SYNTHESIS",
+      "ambiguous": "MODEL_SEMANTIC_ERROR",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "MODEL_SEMANTIC_ERROR"
+    },
+    {
+      "dimension": "constraint_scope",
+      "explicit_positive": "PRESERVE_EMITTED_SCOPE",
+      "explicit_negative": "PRESERVE_EMITTED_SCOPE",
+      "unspecified": "FAIL_CLOSED",
+      "ambiguous": "FAIL_CLOSED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "MODEL_SEMANTIC_ERROR"
+    },
+    {
+      "dimension": "unresolved_requirements",
+      "explicit_positive": "STRUCTURED_SEMANTICS_REQUIRED",
+      "explicit_negative": "MODEL_OWNED",
+      "unspecified": "MODEL_OWNED",
+      "ambiguous": "MAY_REMAIN_UNRESOLVED",
+      "conflicting": "FAIL_CLOSED",
+      "unsupported": "MAY_REMAIN_UNRESOLVED"
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema_version": "si-v2r.sr4.representation.v1",
+  "baseline": "e14c8814fd3b8f7cb8faae745cba907e537be3b3",
+  "selected_model": "EXPLICIT_PRE_POST_WRAPPERS",
+  "rows": [
+    {
+      "representation": "SemanticIRV2R",
+      "lifecycle": "PRE_SAFETY",
+      "authority": "MODEL",
+      "authoritative_now": false,
+      "consumers": ["semantic_ir_v2r_compiler"],
+      "must_remain_synchronized_with": ["model_semantics wrapper"],
+      "allowed_to_diverge_from": ["safe_semantics wrapper after an authorized safety action"]
+    },
+    {
+      "representation": "CompiledSemanticPlanV2R.reference_intents",
+      "lifecycle": "PRE_SAFETY",
+      "authority": "DIAGNOSTIC_MODEL_SEMANTICS",
+      "authoritative_now": false,
+      "consumers": ["si_v2r_model_qualification", "provider_free diagnostics"],
+      "must_remain_synchronized_with": ["model_semantics.reference_intents"],
+      "allowed_to_diverge_from": ["safe_semantics.reference_intents only through an explicit safety action"]
+    },
+    {
+      "representation": "SemanticPlan.section_tasks.capability_ids",
+      "lifecycle": "PRE_SAFETY_LEGACY_PROJECTION",
+      "authority": "DIAGNOSTIC_UNTIL_SAFETY",
+      "authoritative_now": false,
+      "consumers": ["CM58 safety functions", "current dormant V2R qualification"],
+      "must_remain_synchronized_with": ["model_semantics capability projection"],
+      "allowed_to_diverge_from": ["safe_semantics after validated deterministic policy"]
+    },
+    {
+      "representation": "post_cm58_safe_semantics",
+      "lifecycle": "POST_SAFETY",
+      "authority": "SYSTEM",
+      "authoritative_now": false,
+      "consumers": ["future downstream semantic consumers"],
+      "must_remain_synchronized_with": ["safe plan", "safe reference_intents"],
+      "allowed_to_diverge_from": ["model_semantics only where a recorded safety action authorizes it"]
+    },
+    {
+      "representation": "worker_visible_semantic_metadata",
+      "lifecycle": "POST_SAFETY",
+      "authority": "UNRESOLVED",
+      "authoritative_now": false,
+      "consumers": ["current production worker consumption is not established"],
+      "must_remain_synchronized_with": ["post_cm58_safe_semantics when activated"],
+      "allowed_to_diverge_from": []
+    }
+  ],
+  "conflict_rule": {
+    "code": "REFERENCE_REPRESENTATION_CONFLICT",
+    "action": "FAIL_CLOSED",
+    "system_semantic_credit": false,
+    "examples": [
+      "reference capability removed while sidecar reference intent remains",
+      "reference intent removed while reference capability remains",
+      "reference kind or target differs between authoritative representations"
+    ]
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "schema_version": "si-v2r.sr4.ownership.v1",
+  "baseline": "e14c8814fd3b8f7cb8faae745cba907e537be3b3",
+  "decision": "SI_V2R_SR4_OWNERSHIP_CONTRACT_RESOLVED",
+  "rows": [
+    {
+      "dimension": "report_presence",
+      "owner": "DETERMINISTIC_BOUNDARY",
+      "deterministic_action": "apply accepted CM58.2 report-presence boundary",
+      "ambiguous_behavior": "FAIL_CLOSED",
+      "representation_invariant": "final report presence must agree with the accepted safe plan",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "report_content",
+      "owner": "MODEL",
+      "deterministic_action": "do not synthesize report content",
+      "ambiguous_behavior": "MODEL_SEMANTIC_ERROR",
+      "representation_invariant": "report content remains in report-owned semantics",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "reference_admissibility",
+      "owner": "SHARED_WITH_EXPLICIT_BOUNDARY",
+      "deterministic_action": "remove only explicit-forbidden references; unspecified requires an opt-in contract",
+      "ambiguous_behavior": "FAIL_CLOSED",
+      "representation_invariant": "safe plan and reference sidecar agree before system credit",
+      "evidence_class": "ADAPTED"
+    },
+    {
+      "dimension": "reference_presence",
+      "owner": "SHARED_WITH_EXPLICIT_BOUNDARY",
+      "deterministic_action": "preserve explicit requests; reject only contract-authorized inadmissible presence",
+      "ambiguous_behavior": "FAIL_CLOSED",
+      "representation_invariant": "presence state matches across all authoritative post-safety representations",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "reference_kind",
+      "owner": "MODEL",
+      "deterministic_action": "do not convert companion_depth_lane and reference_track",
+      "ambiguous_behavior": "MODEL_SEMANTIC_ERROR",
+      "representation_invariant": "kind is retained unchanged in model and safe semantic wrappers",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "reference_target",
+      "owner": "MODEL",
+      "deterministic_action": "do not invent or retarget the referenced feature",
+      "ambiguous_behavior": "FAIL_CLOSED",
+      "representation_invariant": "target identity is identical in every authoritative representation",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "annotation_semantics",
+      "owner": "MODEL",
+      "deterministic_action": "do not manufacture an annotation feature from prose",
+      "ambiguous_behavior": "MODEL_SEMANTIC_ERROR",
+      "representation_invariant": "annotation intent must be represented by an explicit annotation feature",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    },
+    {
+      "dimension": "constraint_scope",
+      "owner": "SHARED_WITH_EXPLICIT_BOUNDARY",
+      "deterministic_action": "preserve emitted feature/section ownership; apply only explicit inheritance",
+      "ambiguous_behavior": "FAIL_CLOSED",
+      "representation_invariant": "scope and propagation semantics remain explicit and equivalent downstream",
+      "evidence_class": "NOVEL"
+    },
+    {
+      "dimension": "unresolved_requirements",
+      "owner": "MODEL",
+      "deterministic_action": "do not use unresolved as a general uncertainty bucket",
+      "ambiguous_behavior": "MODEL_SEMANTIC_ERROR",
+      "representation_invariant": "supported structured intent cannot simultaneously be unresolved without justification",
+      "evidence_class": "EMPIRICALLY_SUPPORTED"
+    }
+  ]
+}
