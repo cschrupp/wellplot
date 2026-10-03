@@ -1,6 +1,6 @@
 {
   "schema_version": "si-v2r.sr4.result.v1",
-  "decision": "SI_V2R_SR4_OWNERSHIP_CONTRACT_RESOLVED",
+  "decision": "SI_V2R_SR4_OWNERSHIP_CONTRACT_PARTIAL",
   "baseline": "e14c8814fd3b8f7cb8faae745cba907e537be3b3",
   "upstream_result": "SI_V2R_SR3_ROOT_MECHANISMS_RESOLVED",
   "representation_lifecycle_resolved": "YES",
@@ -13,5 +13,6 @@
   "production_behavior_changed": false,
   "prompt_changed": false,
   "adr_cm57": "UNCHANGED",
-  "production_implementation_authorized": false
+  "production_implementation_authorized": false,
+  "depth_column_prohibition_scope": "UNRESOLVED"
 }

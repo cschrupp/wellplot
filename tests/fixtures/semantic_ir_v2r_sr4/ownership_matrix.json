@@ -1,7 +1,7 @@
 {
   "schema_version": "si-v2r.sr4.ownership.v1",
   "baseline": "e14c8814fd3b8f7cb8faae745cba907e537be3b3",
-  "decision": "SI_V2R_SR4_OWNERSHIP_CONTRACT_RESOLVED",
+  "decision": "SI_V2R_SR4_OWNERSHIP_CONTRACT_PARTIAL",
   "rows": [
     {
       "dimension": "report_presence",
@@ -61,11 +61,11 @@
     },
     {
       "dimension": "constraint_scope",
-      "owner": "SHARED_WITH_EXPLICIT_BOUNDARY",
-      "deterministic_action": "preserve emitted feature/section ownership; apply only explicit inheritance",
+      "owner": "UNRESOLVED",
+      "deterministic_action": "preserve emitted feature/section ownership and fail closed until scope is defined",
       "ambiguous_behavior": "FAIL_CLOSED",
-      "representation_invariant": "scope and propagation semantics remain explicit and equivalent downstream",
-      "evidence_class": "NOVEL"
+      "representation_invariant": "scope and propagation semantics must be explicit before downstream equivalence can be claimed",
+      "evidence_class": "UNRESOLVED"
     },
     {
       "dimension": "unresolved_requirements",
@@ -74,6 +74,15 @@
       "ambiguous_behavior": "MODEL_SEMANTIC_ERROR",
       "representation_invariant": "supported structured intent cannot simultaneously be unresolved without justification",
       "evidence_class": "EMPIRICALLY_SUPPORTED"
+    }
+  ],
+  "concrete_wellplot_scope_decisions": [
+    {
+      "constraint": "depth_column_prohibition",
+      "scope": "UNRESOLVED",
+      "reason": "The current compiler flattens section and feature constraints and no downstream inheritance or override contract is established.",
+      "system_semantic_credit": false,
+      "ambiguous_behavior": "FAIL_CLOSED"
     }
   ]
 }

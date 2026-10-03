@@ -76,6 +76,22 @@ downstream interpretation, multi-feature behavior, propagation, overrides, and
 observable output all agree. Otherwise it is distinct, context-only, or
 unresolved. Ambiguous scope fails closed.
 
+### Current WellPlot decision
+
+The concrete `omit any depth column` constraint remains `UNRESOLVED`.
+`SemanticIRV2R` exposes both section and feature constraint collections, but
+the current V2R compiler concatenates them into the legacy
+`SectionTask.constraints`. The repository does not define a downstream depth-
+column consumer, inheritance rule, compatible-child set, or override behavior.
+Consequently, the current lowered representation cannot establish whether the
+restriction is feature-local, section-wide, or explicitly inherited. SR4-R1
+must not infer an owner from the current flattened representation.
+
+Until a future contract defines that scope, a safety layer must preserve the
+emitted placement and fail closed on ambiguous or conflicting depth-column
+scope. No system-semantic credit is available for moving the text between
+owners.
+
 ## Annotation and unresolved requirements
 
 Annotation semantics remain `MODEL` owned. Prose mentioning a marker or

@@ -125,9 +125,22 @@ def test_constraint_equivalence_requires_scope_and_inheritance() -> None:
         for item in load_json("ownership_matrix.json")["rows"]
         if item["dimension"] == "constraint_scope"
     )
-    assert row["owner"] == "SHARED_WITH_EXPLICIT_BOUNDARY"
+    assert row["owner"] == "UNRESOLVED"
     assert "scope" in row["representation_invariant"]
     assert row["ambiguous_behavior"] == "FAIL_CLOSED"
+    decisions = load_json("ownership_matrix.json")["concrete_wellplot_scope_decisions"]
+    assert decisions == [
+        {
+            "constraint": "depth_column_prohibition",
+            "scope": "UNRESOLVED",
+            "reason": (
+                "The current compiler flattens section and feature constraints "
+                "and no downstream inheritance or override contract is established."
+            ),
+            "system_semantic_credit": False,
+            "ambiguous_behavior": "FAIL_CLOSED",
+        }
+    ]
     contract_path = (
         REPO_ROOT
         / "docs/evaluations/agent-code-mode/semantic-ir-v2/41-si-v2r-sr4-ownership-contract.md"
@@ -166,4 +179,5 @@ def test_sr4_is_provider_free_and_production_inactive() -> None:
     assert result["worker_program_calls"] == 0
     assert result["production_behavior_changed"] is False
     assert result["production_implementation_authorized"] is False
-    assert result["decision"] == "SI_V2R_SR4_OWNERSHIP_CONTRACT_RESOLVED"
+    assert result["decision"] == "SI_V2R_SR4_OWNERSHIP_CONTRACT_PARTIAL"
+    assert result["depth_column_prohibition_scope"] == "UNRESOLVED"
