@@ -7,6 +7,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from scripts.semantic_ir_v2r_sr5_contract_applicability import build_artifacts
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARTIFACT_DIR = REPO_ROOT / "tests/fixtures/semantic_ir_v2r_sr5"
 BASELINE_SHA = "eb9736ddda9feb9e5e601760822da7e0e3933286"
@@ -54,9 +56,16 @@ def test_authenticated_population_and_raw_evidence() -> None:
     result = load_json("result.json")
     assert result["raw_evidence_sha256"] == RAW_EVIDENCE_SHA256
     assert result["population"] == {"rows": 48, "cases": 24, "attempts_per_case": 2}
-    if RAW_EVIDENCE.exists():
-        assert hashlib.sha256(RAW_EVIDENCE.read_bytes()).hexdigest() == RAW_EVIDENCE_SHA256
-        assert len([line for line in RAW_EVIDENCE.read_text().splitlines() if line]) == 48
+    assert RAW_EVIDENCE.is_file()
+    assert hashlib.sha256(RAW_EVIDENCE.read_bytes()).hexdigest() == RAW_EVIDENCE_SHA256
+    assert len([line for line in RAW_EVIDENCE.read_text().splitlines() if line]) == 48
+
+
+def test_committed_artifacts_reproduce_from_authenticated_inputs() -> None:
+    """Every committed artifact is derived from the frozen raw inputs."""
+    generated = build_artifacts(RAW_EVIDENCE, REPO_ROOT)
+    for filename, expected in generated.items():
+        assert load_json(filename) == expected
 
 
 def test_rows_are_complete_and_states_are_bounded() -> None:
