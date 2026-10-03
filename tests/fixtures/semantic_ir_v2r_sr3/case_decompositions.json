@@ -1,0 +1,1908 @@
+[
+  {
+    "case_id": "cm59-single-garnet-06",
+    "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+    "attempts": [
+      {
+        "case_id": "cm59-single-garnet-06",
+        "attempt": 0,
+        "original_request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+        "gold_v2r": {
+          "case_id": "cm59-single-garnet-06",
+          "summary": "Present the Garnet borehole waveform.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Present one waveform raster.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "raster",
+                  "semantic_id": "garnet-waveform",
+                  "requirements": [],
+                  "constraints": [
+                    "Omit any depth column."
+                  ]
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [],
+            "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+            "requirements": []
+          },
+          "sections": [
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "raster",
+                  "requirements": [
+                    "Garnet borehole waveform"
+                  ],
+                  "semantic_id": "f1"
+                }
+              ],
+              "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+              "kind": "log_plot",
+              "reference_intent": null,
+              "requirements": [],
+              "source_hints": []
+            }
+          ],
+          "summary": "Request to present the Garnet borehole waveform as a single image view without a depth column.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "CONSTRAINT_OWNER_MISPLACEMENT",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "A required feature constraint is represented in generated text but not under feature.constraints.",
+            "owner_classification": "IR_CONTRACT_CANDIDATE"
+          }
+        ],
+        "leaf_classification": {
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "CONSTRAINT_OWNER_MISPLACEMENT"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "explicitly_requested"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_2": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_report_task",
+                  "reason": "explicit_section_only_intent"
+                }
+              ],
+              "changed": true,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": false,
+                "raster_explicit": true,
+                "report_note_explicit": false,
+                "section_annotation_explicit": false
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      },
+      {
+        "case_id": "cm59-single-garnet-06",
+        "attempt": 1,
+        "original_request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+        "gold_v2r": {
+          "case_id": "cm59-single-garnet-06",
+          "summary": "Present the Garnet borehole waveform.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Present one waveform raster.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "raster",
+                  "semantic_id": "garnet-waveform",
+                  "requirements": [],
+                  "constraints": [
+                    "Omit any depth column."
+                  ]
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [],
+            "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+            "requirements": []
+          },
+          "sections": [
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "raster",
+                  "requirements": [
+                    "Garnet borehole waveform"
+                  ],
+                  "semantic_id": "f1"
+                }
+              ],
+              "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+              "kind": "log_plot",
+              "reference_intent": null,
+              "requirements": [],
+              "source_hints": []
+            }
+          ],
+          "summary": "Request to present the Garnet borehole waveform as a single image view without a depth column.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "CONSTRAINT_OWNER_MISPLACEMENT",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "A required feature constraint is represented in generated text but not under feature.constraints.",
+            "owner_classification": "IR_CONTRACT_CANDIDATE"
+          }
+        ],
+        "leaf_classification": {
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "CONSTRAINT_OWNER_MISPLACEMENT"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "explicitly_requested"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_2": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_report_task",
+                  "reason": "explicit_section_only_intent"
+                }
+              ],
+              "changed": true,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": false,
+                "raster_explicit": true,
+                "report_note_explicit": false,
+                "section_annotation_explicit": false
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      }
+    ],
+    "root_set": [
+      "CONSTRAINT_OWNER_MISPLACEMENT"
+    ],
+    "root_stability": "ROOT_STABLE",
+    "leaf_residual_counts": {
+      "REQUIRED_CONTEXT_OWNER_ERROR": 2
+    },
+    "leaf_classification": {
+      "REQUIRED_CONTEXT_OWNER_ERROR": {
+        "classification": "ROOT",
+        "mechanism": "CONSTRAINT_OWNER_MISPLACEMENT"
+      }
+    },
+    "leaf_residual_count": 2,
+    "leaves_explained_by_roots": 2,
+    "leaves_unexplained": 0,
+    "safety_interaction": {
+      "cm58_1": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "explicitly_requested"
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "explicitly_requested"
+          },
+          "status": "NO_ACTION"
+        }
+      ],
+      "cm58_2": [
+        {
+          "actions": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "SAFE_REPAIR"
+        },
+        {
+          "actions": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "SAFE_REPAIR"
+        }
+      ],
+      "cm58_3": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": false,
+              "raster_explicit": true,
+              "report_note_explicit": false,
+              "section_annotation_explicit": false
+            }
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": false,
+              "raster_explicit": true,
+              "report_note_explicit": false,
+              "section_annotation_explicit": false
+            }
+          },
+          "status": "NO_ACTION"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+    "attempts": [
+      {
+        "case_id": "cm59-alloc-verde-19",
+        "attempt": 0,
+        "original_request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+        "gold_v2r": {
+          "case_id": "cm59-alloc-verde-19",
+          "summary": "Keep the Verde response and image in separate panels.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Show the Verde porosity response.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "verde-porosity",
+                  "requirements": [],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            },
+            {
+              "kind": "log_plot",
+              "goal": "Show the Verde borehole image.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "raster",
+                  "semantic_id": "verde-image",
+                  "requirements": [],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [
+              "Verde porosity response must be in its own log panel.",
+              "Verde borehole image must be in its own log panel."
+            ],
+            "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+            "requirements": []
+          },
+          "sections": [
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [
+                    "Must represent the Verde porosity response."
+                  ],
+                  "kind": "curve",
+                  "requirements": [],
+                  "semantic_id": "verde_porosity_curve"
+                }
+              ],
+              "goal": "Display Verde porosity response in a log panel.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [],
+              "source_hints": []
+            },
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [
+                    "Must represent the Verde borehole image."
+                  ],
+                  "kind": "raster",
+                  "requirements": [],
+                  "semantic_id": "verde_borehole_image_raster"
+                }
+              ],
+              "goal": "Display Verde borehole image in a log panel.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [],
+              "source_hints": []
+            }
+          ],
+          "summary": "Reconstruct document to place Verde porosity response and Verde borehole image in separate log panels.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "REFERENCE_FALSE_POSITIVE"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Generated reference_intent is present where the request and gold contain none.",
+            "owner_classification": "DETERMINISTIC_SAFETY_CANDIDATE"
+          }
+        ],
+        "leaf_classification": {
+          "REFERENCE_FALSE_POSITIVE": {
+            "classification": "ROOT",
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              },
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 1
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 0
+                },
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 1
+                }
+              ],
+              "changed": true,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_2": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_report_task",
+                  "reason": "explicit_section_only_intent"
+                }
+              ],
+              "changed": true,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": false,
+                "raster_explicit": true,
+                "report_note_explicit": false,
+                "section_annotation_explicit": false
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      },
+      {
+        "case_id": "cm59-alloc-verde-19",
+        "attempt": 1,
+        "original_request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+        "gold_v2r": {
+          "case_id": "cm59-alloc-verde-19",
+          "summary": "Keep the Verde response and image in separate panels.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Show the Verde porosity response.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "verde-porosity",
+                  "requirements": [],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            },
+            {
+              "kind": "log_plot",
+              "goal": "Show the Verde borehole image.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "raster",
+                  "semantic_id": "verde-image",
+                  "requirements": [],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [
+              "Verde porosity response must be in its own log panel.",
+              "Verde borehole image must be in its own log panel."
+            ],
+            "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+            "requirements": []
+          },
+          "sections": [
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [
+                    "Must represent the Verde porosity response."
+                  ],
+                  "kind": "curve",
+                  "requirements": [],
+                  "semantic_id": "verde_porosity_curve"
+                }
+              ],
+              "goal": "Display Verde porosity response in a log panel.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [],
+              "source_hints": []
+            },
+            {
+              "constraints": [],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [
+                    "Must represent the Verde borehole image."
+                  ],
+                  "kind": "raster",
+                  "requirements": [],
+                  "semantic_id": "verde_borehole_image_raster"
+                }
+              ],
+              "goal": "Display Verde borehole image in a log panel.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [],
+              "source_hints": []
+            }
+          ],
+          "summary": "Reconstruct document to place Verde porosity response and Verde borehole image in separate log panels.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "REFERENCE_FALSE_POSITIVE"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Generated reference_intent is present where the request and gold contain none.",
+            "owner_classification": "DETERMINISTIC_SAFETY_CANDIDATE"
+          }
+        ],
+        "leaf_classification": {
+          "REFERENCE_FALSE_POSITIVE": {
+            "classification": "ROOT",
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              },
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 1
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 0
+                },
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 1
+                }
+              ],
+              "changed": true,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_2": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_report_task",
+                  "reason": "explicit_section_only_intent"
+                }
+              ],
+              "changed": true,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": false,
+                "raster_explicit": true,
+                "report_note_explicit": false,
+                "section_annotation_explicit": false
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      }
+    ],
+    "root_set": [
+      "UNREQUESTED_REFERENCE_INFERENCE"
+    ],
+    "root_stability": "ROOT_STABLE",
+    "leaf_residual_counts": {
+      "REFERENCE_FALSE_POSITIVE": 2
+    },
+    "leaf_classification": {
+      "REFERENCE_FALSE_POSITIVE": {
+        "classification": "ROOT",
+        "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+      }
+    },
+    "leaf_residual_count": 2,
+    "leaves_explained_by_roots": 2,
+    "leaves_unexplained": 0,
+    "safety_interaction": {
+      "cm58_1": [
+        {
+          "actions": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            },
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 1
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              },
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 1
+              }
+            ],
+            "changed": true,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "SAFE_REPAIR"
+        },
+        {
+          "actions": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            },
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 1
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              },
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 1
+              }
+            ],
+            "changed": true,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "SAFE_REPAIR"
+        }
+      ],
+      "cm58_2": [
+        {
+          "actions": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "SAFE_REPAIR"
+        },
+        {
+          "actions": [
+            {
+              "kind": "remove_report_task",
+              "reason": "explicit_section_only_intent"
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_report_task",
+                "reason": "explicit_section_only_intent"
+              }
+            ],
+            "changed": true,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "SAFE_REPAIR"
+        }
+      ],
+      "cm58_3": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": false,
+              "raster_explicit": true,
+              "report_note_explicit": false,
+              "section_annotation_explicit": false
+            }
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": false,
+              "raster_explicit": true,
+              "report_note_explicit": false,
+              "section_annotation_explicit": false
+            }
+          },
+          "status": "NO_ACTION"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+    "attempts": [
+      {
+        "case_id": "cm59-mixed-amber-24",
+        "attempt": 0,
+        "original_request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+        "gold_v2r": {
+          "case_id": "cm59-mixed-amber-24",
+          "summary": "Add the Amber review note, scalar response, and marker.",
+          "report_work": {
+            "goal": "Preserve the review note.",
+            "requirements": [
+              "Ready for signoff"
+            ],
+            "constraints": []
+          },
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Show a scalar response and annotate the interval top.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "amber-response",
+                  "requirements": [],
+                  "constraints": []
+                },
+                {
+                  "kind": "annotation",
+                  "semantic_id": "amber-interval-top",
+                  "requirements": [
+                    "Annotate the interval top with a marker."
+                  ],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [
+              "Add Amber review note Ready for signoff"
+            ],
+            "goal": "Add Amber review note Ready for signoff",
+            "requirements": [
+              "Add Amber review note Ready for signoff"
+            ]
+          },
+          "sections": [
+            {
+              "constraints": [
+                "annotate the panel with a marker at the interval top"
+              ],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "curve",
+                  "requirements": [
+                    "show a scalar response"
+                  ],
+                  "semantic_id": "scalar_response_curve"
+                }
+              ],
+              "goal": "Show scalar response and annotate panel with marker at interval top",
+              "kind": "log_plot",
+              "reference_intent": null,
+              "requirements": [
+                "annotate the panel with a marker at the interval top"
+              ],
+              "source_hints": []
+            }
+          ],
+          "summary": "Add Amber review note, show scalar response curve, and annotate panel with interval top marker.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "ANNOTATION_WRONG_OWNER",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Annotation meaning is present in generated prose/requirements but no annotation feature is emitted.",
+            "owner_classification": "MODEL_SEMANTIC"
+          }
+        ],
+        "leaf_classification": {
+          "SECTION_ORDER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_KIND_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_MULTIPLICITY_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "ANNOTATION_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_2": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "intent": "mixed",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": true,
+                "raster_explicit": false,
+                "report_note_explicit": true,
+                "section_annotation_explicit": true
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      },
+      {
+        "case_id": "cm59-mixed-amber-24",
+        "attempt": 1,
+        "original_request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+        "gold_v2r": {
+          "case_id": "cm59-mixed-amber-24",
+          "summary": "Add the Amber review note, scalar response, and marker.",
+          "report_work": {
+            "goal": "Preserve the review note.",
+            "requirements": [
+              "Ready for signoff"
+            ],
+            "constraints": []
+          },
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Show a scalar response and annotate the interval top.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "amber-response",
+                  "requirements": [],
+                  "constraints": []
+                },
+                {
+                  "kind": "annotation",
+                  "semantic_id": "amber-interval-top",
+                  "requirements": [
+                    "Annotate the interval top with a marker."
+                  ],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": {
+            "constraints": [
+              "Add Amber review note Ready for signoff"
+            ],
+            "goal": "Add Amber review note Ready for signoff",
+            "requirements": [
+              "Add Amber review note Ready for signoff"
+            ]
+          },
+          "sections": [
+            {
+              "constraints": [
+                "annotate the panel with a marker at the interval top"
+              ],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "curve",
+                  "requirements": [
+                    "show a scalar response"
+                  ],
+                  "semantic_id": "scalar_response_curve"
+                }
+              ],
+              "goal": "Show scalar response and annotate panel with marker at interval top",
+              "kind": "log_plot",
+              "reference_intent": null,
+              "requirements": [
+                "annotate the panel with a marker at the interval top"
+              ],
+              "source_hints": []
+            }
+          ],
+          "summary": "Add Amber review note, show scalar response curve, and annotate panel with interval top marker.",
+          "unresolved_requirements": []
+        },
+        "sr2_leaf_failures": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "ANNOTATION_WRONG_OWNER",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Annotation meaning is present in generated prose/requirements but no annotation feature is emitted.",
+            "owner_classification": "MODEL_SEMANTIC"
+          }
+        ],
+        "leaf_classification": {
+          "SECTION_ORDER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_KIND_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_MULTIPLICITY_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "ANNOTATION_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_2": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "intent": "mixed",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": true,
+                "raster_explicit": false,
+                "report_note_explicit": true,
+                "section_annotation_explicit": true
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      }
+    ],
+    "root_set": [
+      "ANNOTATION_WRONG_OWNER"
+    ],
+    "root_stability": "ROOT_STABLE",
+    "leaf_residual_counts": {
+      "ANNOTATION_ERROR": 2,
+      "FEATURE_KIND_ERROR": 2,
+      "FEATURE_MULTIPLICITY_ERROR": 2,
+      "REQUIRED_CONTEXT_OWNER_ERROR": 2,
+      "SECTION_ORDER_ERROR": 2
+    },
+    "leaf_classification": {
+      "SECTION_ORDER_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "FEATURE_KIND_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "FEATURE_MULTIPLICITY_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "ANNOTATION_ERROR": {
+        "classification": "ROOT",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "REQUIRED_CONTEXT_OWNER_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      }
+    },
+    "leaf_residual_count": 10,
+    "leaves_explained_by_roots": 10,
+    "leaves_unexplained": 0,
+    "safety_interaction": {
+      "cm58_1": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "NO_ACTION"
+        }
+      ],
+      "cm58_2": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "intent": "mixed",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "intent": "mixed",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "NO_ACTION"
+        }
+      ],
+      "cm58_3": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": true,
+              "raster_explicit": false,
+              "report_note_explicit": true,
+              "section_annotation_explicit": true
+            }
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": true,
+              "raster_explicit": false,
+              "report_note_explicit": true,
+              "section_annotation_explicit": true
+            }
+          },
+          "status": "NO_ACTION"
+        }
+      ]
+    }
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+    "attempts": [
+      {
+        "case_id": "cm59-single-iris-08",
+        "attempt": 0,
+        "original_request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+        "gold_v2r": {
+          "case_id": "cm59-single-iris-08",
+          "summary": "Plot the Iris scalar response and interval annotation.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Plot the scalar response and annotate the interval top.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "iris-response",
+                  "requirements": [],
+                  "constraints": []
+                },
+                {
+                  "kind": "annotation",
+                  "semantic_id": "iris-interval-top",
+                  "requirements": [
+                    "Annotate the interval top with a marker."
+                  ],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": null,
+          "sections": [
+            {
+              "constraints": [
+                "one scalar track"
+              ],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "curve",
+                  "requirements": [
+                    "Plot the Iris response as one scalar track"
+                  ],
+                  "semantic_id": "iris_response_curve"
+                }
+              ],
+              "goal": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [
+                "Plot the Iris response as one scalar track"
+              ],
+              "source_hints": []
+            }
+          ],
+          "summary": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+          "unresolved_requirements": [
+            "Plot the Iris response as one scalar track and annotate the interval top with a marker."
+          ]
+        },
+        "sr2_leaf_failures": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Generated reference_intent is present where the request and gold contain none.",
+            "owner_classification": "DETERMINISTIC_SAFETY_CANDIDATE"
+          },
+          {
+            "mechanism": "ANNOTATION_WRONG_OWNER",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Annotation meaning is present in generated prose/requirements but no annotation feature is emitted.",
+            "owner_classification": "MODEL_SEMANTIC"
+          },
+          {
+            "mechanism": "UNRESOLVED_PROMOTION",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "The provider leaves a request-level unresolved requirement despite emitting partial structured semantics.",
+            "owner_classification": "MODEL_SEMANTIC"
+          }
+        ],
+        "leaf_classification": {
+          "REFERENCE_FALSE_POSITIVE": {
+            "classification": "ROOT",
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+          },
+          "SECTION_ORDER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_KIND_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_MULTIPLICITY_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "ANNOTATION_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "UNRESOLVED_REQUIREMENT_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "UNRESOLVED_PROMOTION"
+          },
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 0
+                }
+              ],
+              "changed": true,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_2": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": true,
+                "raster_explicit": false,
+                "report_note_explicit": false,
+                "section_annotation_explicit": true
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      },
+      {
+        "case_id": "cm59-single-iris-08",
+        "attempt": 1,
+        "original_request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+        "gold_v2r": {
+          "case_id": "cm59-single-iris-08",
+          "summary": "Plot the Iris scalar response and interval annotation.",
+          "report_work": null,
+          "sections": [
+            {
+              "kind": "log_plot",
+              "goal": "Plot the scalar response and annotate the interval top.",
+              "source_hints": [],
+              "features": [
+                {
+                  "kind": "curve",
+                  "semantic_id": "iris-response",
+                  "requirements": [],
+                  "constraints": []
+                },
+                {
+                  "kind": "annotation",
+                  "semantic_id": "iris-interval-top",
+                  "requirements": [
+                    "Annotate the interval top with a marker."
+                  ],
+                  "constraints": []
+                }
+              ],
+              "reference_intent": null,
+              "requirements": [],
+              "constraints": []
+            }
+          ],
+          "unresolved_requirements": []
+        },
+        "generated_v2r": {
+          "report_work": null,
+          "sections": [
+            {
+              "constraints": [
+                "one scalar track"
+              ],
+              "existing_section_hint": null,
+              "features": [
+                {
+                  "constraints": [],
+                  "kind": "curve",
+                  "requirements": [
+                    "Plot the Iris response as one scalar track"
+                  ],
+                  "semantic_id": "iris_response_curve"
+                }
+              ],
+              "goal": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+              "kind": "log_plot",
+              "reference_intent": {
+                "kind": "companion_depth_lane",
+                "target_semantic_id": null
+              },
+              "requirements": [
+                "Plot the Iris response as one scalar track"
+              ],
+              "source_hints": []
+            }
+          ],
+          "summary": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+          "unresolved_requirements": [
+            "Plot the Iris response as one scalar track and annotate the interval top with a marker."
+          ]
+        },
+        "sr2_leaf_failures": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "root_mechanisms": [
+          {
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Generated reference_intent is present where the request and gold contain none.",
+            "owner_classification": "DETERMINISTIC_SAFETY_CANDIDATE"
+          },
+          {
+            "mechanism": "ANNOTATION_WRONG_OWNER",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "Annotation meaning is present in generated prose/requirements but no annotation feature is emitted.",
+            "owner_classification": "MODEL_SEMANTIC"
+          },
+          {
+            "mechanism": "UNRESOLVED_PROMOTION",
+            "evidence_class": "EMPIRICALLY_SUPPORTED",
+            "support": "The provider leaves a request-level unresolved requirement despite emitting partial structured semantics.",
+            "owner_classification": "MODEL_SEMANTIC"
+          }
+        ],
+        "leaf_classification": {
+          "REFERENCE_FALSE_POSITIVE": {
+            "classification": "ROOT",
+            "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+          },
+          "SECTION_ORDER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_KIND_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "FEATURE_MULTIPLICITY_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "ANNOTATION_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          },
+          "UNRESOLVED_REQUIREMENT_ERROR": {
+            "classification": "ROOT",
+            "mechanism": "UNRESOLVED_PROMOTION"
+          },
+          "REQUIRED_CONTEXT_OWNER_ERROR": {
+            "classification": "CONSEQUENCE",
+            "mechanism": "ANNOTATION_WRONG_OWNER"
+          }
+        },
+        "cm58": {
+          "cm58_1": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              }
+            ],
+            "changed": true,
+            "evidence": {
+              "actions": [
+                {
+                  "kind": "remove_reference",
+                  "reason": "reference_not_requested",
+                  "section_index": 0
+                }
+              ],
+              "changed": true,
+              "policy_version": "cm58.reference-admissibility.v1",
+              "reference_intent": "unspecified"
+            },
+            "status": "SAFE_REPAIR"
+          },
+          "cm58_2": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "intent": "section_only",
+              "policy_version": "cm58.report-boundary.v2"
+            },
+            "status": "NO_ACTION"
+          },
+          "cm58_3": {
+            "actions": [],
+            "changed": false,
+            "evidence": {
+              "actions": [],
+              "changed": false,
+              "policy_version": "cm58.section-leaf-admissibility.v1",
+              "request_evidence": {
+                "curve_explicit": true,
+                "raster_explicit": false,
+                "report_note_explicit": false,
+                "section_annotation_explicit": true
+              }
+            },
+            "status": "NO_ACTION"
+          }
+        }
+      }
+    ],
+    "root_set": [
+      "ANNOTATION_WRONG_OWNER",
+      "UNREQUESTED_REFERENCE_INFERENCE",
+      "UNRESOLVED_PROMOTION"
+    ],
+    "root_stability": "ROOT_STABLE",
+    "leaf_residual_counts": {
+      "ANNOTATION_ERROR": 2,
+      "FEATURE_KIND_ERROR": 2,
+      "FEATURE_MULTIPLICITY_ERROR": 2,
+      "REFERENCE_FALSE_POSITIVE": 2,
+      "REQUIRED_CONTEXT_OWNER_ERROR": 2,
+      "SECTION_ORDER_ERROR": 2,
+      "UNRESOLVED_REQUIREMENT_ERROR": 2
+    },
+    "leaf_classification": {
+      "REFERENCE_FALSE_POSITIVE": {
+        "classification": "ROOT",
+        "mechanism": "UNREQUESTED_REFERENCE_INFERENCE"
+      },
+      "SECTION_ORDER_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "FEATURE_KIND_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "FEATURE_MULTIPLICITY_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "ANNOTATION_ERROR": {
+        "classification": "ROOT",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      },
+      "UNRESOLVED_REQUIREMENT_ERROR": {
+        "classification": "ROOT",
+        "mechanism": "UNRESOLVED_PROMOTION"
+      },
+      "REQUIRED_CONTEXT_OWNER_ERROR": {
+        "classification": "CONSEQUENCE",
+        "mechanism": "ANNOTATION_WRONG_OWNER"
+      }
+    },
+    "leaf_residual_count": 14,
+    "leaves_explained_by_roots": 14,
+    "leaves_unexplained": 0,
+    "safety_interaction": {
+      "cm58_1": [
+        {
+          "actions": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              }
+            ],
+            "changed": true,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "SAFE_REPAIR"
+        },
+        {
+          "actions": [
+            {
+              "kind": "remove_reference",
+              "reason": "reference_not_requested",
+              "section_index": 0
+            }
+          ],
+          "changed": true,
+          "evidence": {
+            "actions": [
+              {
+                "kind": "remove_reference",
+                "reason": "reference_not_requested",
+                "section_index": 0
+              }
+            ],
+            "changed": true,
+            "policy_version": "cm58.reference-admissibility.v1",
+            "reference_intent": "unspecified"
+          },
+          "status": "SAFE_REPAIR"
+        }
+      ],
+      "cm58_2": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "intent": "section_only",
+            "policy_version": "cm58.report-boundary.v2"
+          },
+          "status": "NO_ACTION"
+        }
+      ],
+      "cm58_3": [
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": true,
+              "raster_explicit": false,
+              "report_note_explicit": false,
+              "section_annotation_explicit": true
+            }
+          },
+          "status": "NO_ACTION"
+        },
+        {
+          "actions": [],
+          "changed": false,
+          "evidence": {
+            "actions": [],
+            "changed": false,
+            "policy_version": "cm58.section-leaf-admissibility.v1",
+            "request_evidence": {
+              "curve_explicit": true,
+              "raster_explicit": false,
+              "report_note_explicit": false,
+              "section_annotation_explicit": true
+            }
+          },
+          "status": "NO_ACTION"
+        }
+      ]
+    }
+  }
+]

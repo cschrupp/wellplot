@@ -1,0 +1,42 @@
+{
+  "version": "si-v2r-sr3.root-mechanisms.v1",
+  "root_mechanisms": {
+    "CONSTRAINT_OWNER_MISPLACEMENT": {
+      "attempt_count": 2,
+      "case_ids": [
+        "cm59-single-garnet-06"
+      ],
+      "cases": 1
+    },
+    "UNREQUESTED_REFERENCE_INFERENCE": {
+      "attempt_count": 4,
+      "case_ids": [
+        "cm59-alloc-verde-19",
+        "cm59-single-iris-08"
+      ],
+      "cases": 2
+    },
+    "ANNOTATION_WRONG_OWNER": {
+      "attempt_count": 4,
+      "case_ids": [
+        "cm59-mixed-amber-24",
+        "cm59-single-iris-08"
+      ],
+      "cases": 2
+    },
+    "UNRESOLVED_PROMOTION": {
+      "attempt_count": 2,
+      "case_ids": [
+        "cm59-single-iris-08"
+      ],
+      "cases": 1
+    }
+  },
+  "root_ownership": {
+    "CONSTRAINT_OWNER_MISPLACEMENT": "IR_CONTRACT_CANDIDATE",
+    "UNREQUESTED_REFERENCE_INFERENCE": "DETERMINISTIC_SAFETY_CANDIDATE",
+    "ANNOTATION_WRONG_OWNER": "MODEL_SEMANTIC",
+    "UNRESOLVED_PROMOTION": "MODEL_SEMANTIC"
+  },
+  "dominant_root_mechanism": "TIED:ANNOTATION_WRONG_OWNER,UNREQUESTED_REFERENCE_INFERENCE"
+}

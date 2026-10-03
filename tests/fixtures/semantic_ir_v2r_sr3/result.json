@@ -1,0 +1,90 @@
+{
+  "decision": "SI_V2R_SR3_ROOT_MECHANISMS_RESOLVED",
+  "version": "si-v2r-sr3.root-mechanisms.v1",
+  "baseline": "6d79a9f0cea757b97509dbd42fb50cc309bbae77",
+  "evidence": {
+    "sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08",
+    "rows": 48,
+    "cases": 24,
+    "attempts_per_case": 2
+  },
+  "target_cases": 4,
+  "target_attempts": 8,
+  "frozen_historical_facts": {
+    "decision": "SI_V2R_PROVIDER_BOUNDARY_REJECTED",
+    "semantic_passes": 28,
+    "stable_semantic_passes": 14,
+    "terminal_structural_failures": 6
+  },
+  "sr2_adjusted_facts": {
+    "semantic_passes": 34,
+    "stable_semantic_passes": 17,
+    "adjusted_failures": 8
+  },
+  "leaf_residual_counts": {
+    "ANNOTATION_ERROR": 4,
+    "FEATURE_KIND_ERROR": 4,
+    "FEATURE_MULTIPLICITY_ERROR": 4,
+    "REFERENCE_FALSE_POSITIVE": 4,
+    "REQUIRED_CONTEXT_OWNER_ERROR": 6,
+    "SECTION_ORDER_ERROR": 4,
+    "UNRESOLVED_REQUIREMENT_ERROR": 2
+  },
+  "root_mechanisms": {
+    "CONSTRAINT_OWNER_MISPLACEMENT": {
+      "attempt_count": 2,
+      "case_ids": [
+        "cm59-single-garnet-06"
+      ],
+      "cases": 1
+    },
+    "UNREQUESTED_REFERENCE_INFERENCE": {
+      "attempt_count": 4,
+      "case_ids": [
+        "cm59-alloc-verde-19",
+        "cm59-single-iris-08"
+      ],
+      "cases": 2
+    },
+    "ANNOTATION_WRONG_OWNER": {
+      "attempt_count": 4,
+      "case_ids": [
+        "cm59-mixed-amber-24",
+        "cm59-single-iris-08"
+      ],
+      "cases": 2
+    },
+    "UNRESOLVED_PROMOTION": {
+      "attempt_count": 2,
+      "case_ids": [
+        "cm59-single-iris-08"
+      ],
+      "cases": 1
+    }
+  },
+  "dominant_root_mechanism": "TIED:ANNOTATION_WRONG_OWNER,UNREQUESTED_REFERENCE_INFERENCE",
+  "dominant_root_cases": 2,
+  "root_ownership": {
+    "CONSTRAINT_OWNER_MISPLACEMENT": "IR_CONTRACT_CANDIDATE",
+    "UNREQUESTED_REFERENCE_INFERENCE": "DETERMINISTIC_SAFETY_CANDIDATE",
+    "ANNOTATION_WRONG_OWNER": "MODEL_SEMANTIC",
+    "UNRESOLVED_PROMOTION": "MODEL_SEMANTIC"
+  },
+  "classification_summary": {
+    "root_mechanisms": 6,
+    "consequences": 8,
+    "co_roots": 0,
+    "independent": 0,
+    "unexplained": 0
+  },
+  "safety_layer_interaction": {
+    "cm58_1": "removes unrequested references in Verde and Iris; remains diagnostic evidence in SR3",
+    "cm58_2": "report presence remains resolved under the unchanged SR2 contract",
+    "cm58_3": "no action on the four target rows"
+  },
+  "provider_inference_calls": 0,
+  "endpoint_calls": 0,
+  "worker_program_calls": 0,
+  "production_behavior_changed": false,
+  "adr_cm57": "UNCHANGED"
+}

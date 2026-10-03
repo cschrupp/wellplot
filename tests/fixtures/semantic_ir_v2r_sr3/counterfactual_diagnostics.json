@@ -1,0 +1,130 @@
+[
+  {
+    "case_id": "cm59-single-garnet-06",
+    "attempt": 0,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "move_existing_textual_constraint",
+    "source_owner": "section.goal_or_summary",
+    "target_owner": "feature.constraints",
+    "matched_text": "Omit any depth column.",
+    "predicted_leaf_collapse": [
+      "REQUIRED_CONTEXT_OWNER_ERROR"
+    ],
+    "source_content_present": true,
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-single-garnet-06",
+    "attempt": 1,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "move_existing_textual_constraint",
+    "source_owner": "section.goal_or_summary",
+    "target_owner": "feature.constraints",
+    "matched_text": "Omit any depth column.",
+    "predicted_leaf_collapse": [
+      "REQUIRED_CONTEXT_OWNER_ERROR"
+    ],
+    "source_content_present": true,
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "attempt": 0,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "remove_unrequested_references",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "REFERENCE_FALSE_POSITIVE"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "attempt": 1,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "remove_unrequested_references",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "REFERENCE_FALSE_POSITIVE"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "attempt": 0,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "reclassify_existing_annotation_text",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "attempt": 1,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "reclassify_existing_annotation_text",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "attempt": 0,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "remove_unrequested_references",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "REFERENCE_FALSE_POSITIVE"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "attempt": 0,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "reclassify_existing_annotation_text",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "attempt": 1,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "remove_unrequested_references",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "REFERENCE_FALSE_POSITIVE"
+    ],
+    "uses_gold_replacement": false
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "attempt": 1,
+    "label": "DIAGNOSTIC_COUNTERFACTUAL",
+    "operation": "reclassify_existing_annotation_text",
+    "applicable": true,
+    "predicted_leaf_collapse": [
+      "ANNOTATION_ERROR",
+      "FEATURE_KIND_ERROR",
+      "FEATURE_MULTIPLICITY_ERROR",
+      "SECTION_ORDER_ERROR"
+    ],
+    "uses_gold_replacement": false
+  }
+]
