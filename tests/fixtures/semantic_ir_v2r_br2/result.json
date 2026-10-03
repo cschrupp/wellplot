@@ -1,0 +1,19 @@
+{
+  "adapter_justified": "NONE",
+  "baseline": "d441b84068a06457ded8651cac67708ee17c2cd0",
+  "decision": "SI_V2R_BR2_PINNED_TOOLCHAIN_UNRESOLVED",
+  "endpoint_metadata_calls": 2,
+  "experiment": "SI-V2R-BR2",
+  "future_target_converter_pinned": false,
+  "gold_representability": {
+    "canonical_model_accepts": "24/24",
+    "case_count": 24,
+    "grammar_parser": "NOT_AVAILABLE",
+    "grammar_representability": "NOT_EVALUABLE",
+    "json_schema_accepts": "24/24"
+  },
+  "historical_lq0_converter_provenance": "UNRESOLVED",
+  "provider_inference_calls": 0,
+  "reference_converter_conversion": "PASS",
+  "worker_program_calls": 0
+}

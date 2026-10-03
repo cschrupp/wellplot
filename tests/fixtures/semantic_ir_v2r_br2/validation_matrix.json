@@ -1,0 +1,93 @@
+{
+  "rows": [
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "reference_track_without_target",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "companion_with_target",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "reference_target_missing_feature",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "duplicate_semantic_id",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "fill_target_missing",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "fill_target_raster",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "no_report_or_sections",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "unknown_feature_kind",
+      "json_schema_accepts": false,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "blank_required_string",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "blank_collection_item",
+      "json_schema_accepts": true,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    },
+    {
+      "canonical_error_type": "ValidationError",
+      "canonical_model_accepts": false,
+      "expected_canonical_accepts": false,
+      "fixture": "extra_field",
+      "json_schema_accepts": false,
+      "pinned_grammar_gate": "NOT_EVALUABLE"
+    }
+  ],
+  "version": "si-v2r-br2.validation-matrix.v1"
+}

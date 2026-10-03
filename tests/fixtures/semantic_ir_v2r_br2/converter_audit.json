@@ -1,0 +1,171 @@
+{
+  "constructs": {
+    "si_v2": {
+      "canonical_runtime_only": [
+        "companion_target_forbidden",
+        "fill_target_is_curve",
+        "non_blank_string_values",
+        "reference_target_membership",
+        "reference_target_required",
+        "report_or_section_required",
+        "semantic_feature_ids_unique"
+      ],
+      "converter_ignored_or_weakened": [
+        "default",
+        "description",
+        "discriminator",
+        "title"
+      ],
+      "converter_supported": [
+        "$defs",
+        "$ref",
+        "additionalProperties",
+        "anyOf",
+        "const",
+        "items",
+        "minItems",
+        "minLength",
+        "oneOf",
+        "properties",
+        "required",
+        "type"
+      ],
+      "unknown": [
+        "AnnotationSemanticIntent",
+        "CurveSemanticIntent",
+        "ExtensionSemanticIntent",
+        "FillSemanticIntent",
+        "RasterSemanticIntent",
+        "ReportSemanticIntent",
+        "SectionSemanticIntentV2",
+        "annotation",
+        "constraints",
+        "curve",
+        "existing_section_hint",
+        "extension",
+        "features",
+        "fill",
+        "goal",
+        "kind",
+        "mapping",
+        "propertyName",
+        "raster",
+        "reference",
+        "report",
+        "requirements",
+        "sections",
+        "semantic_id",
+        "semantic_key",
+        "source_hints",
+        "summary",
+        "target_semantic_id",
+        "unresolved_requirements"
+      ]
+    },
+    "si_v2r": {
+      "canonical_runtime_only": [
+        "companion_target_forbidden",
+        "fill_target_is_curve",
+        "non_blank_string_values",
+        "reference_target_membership",
+        "reference_target_required",
+        "report_or_section_required",
+        "semantic_feature_ids_unique"
+      ],
+      "converter_ignored_or_weakened": [
+        "default",
+        "description",
+        "discriminator",
+        "title"
+      ],
+      "converter_supported": [
+        "$defs",
+        "$ref",
+        "additionalProperties",
+        "anyOf",
+        "const",
+        "enum",
+        "items",
+        "minItems",
+        "minLength",
+        "oneOf",
+        "properties",
+        "required",
+        "type"
+      ],
+      "unknown": [
+        "AnnotationSemanticIntentV2R",
+        "CurveSemanticIntentV2R",
+        "ExtensionSemanticIntentV2R",
+        "FillSemanticIntentV2R",
+        "RasterSemanticIntentV2R",
+        "ReferenceSemanticIntentV2R",
+        "ReportWorkIntentV2R",
+        "SectionSemanticIntentV2R",
+        "annotation",
+        "constraints",
+        "curve",
+        "existing_section_hint",
+        "extension",
+        "features",
+        "fill",
+        "goal",
+        "kind",
+        "mapping",
+        "propertyName",
+        "raster",
+        "reference_intent",
+        "report_work",
+        "requirements",
+        "sections",
+        "semantic_id",
+        "semantic_key",
+        "source_hints",
+        "summary",
+        "target_semantic_id",
+        "unresolved_requirements"
+      ]
+    }
+  },
+  "conversions": {
+    "si_v2": {
+      "errors": [],
+      "gold_grammar_representability": "NOT_EVALUABLE",
+      "grammar_bytes": 12761,
+      "grammar_parser": "NOT_AVAILABLE",
+      "grammar_rule_count": 109,
+      "grammar_sha256": "544d1b06933aba424006fcf1c734f0da21f47fb304e06ddb4d0434449f37b285",
+      "return_code": 0,
+      "status": "PASS",
+      "warning_count": 0,
+      "warnings": []
+    },
+    "si_v2r": {
+      "errors": [],
+      "gold_grammar_representability": "NOT_EVALUABLE",
+      "grammar_bytes": 13907,
+      "grammar_parser": "NOT_AVAILABLE",
+      "grammar_rule_count": 114,
+      "grammar_sha256": "4323fc61570c0c1a42ff73e7e23e95641b4cf4d9600669c0e03ceb720b055db2",
+      "return_code": 0,
+      "status": "PASS",
+      "warning_count": 0,
+      "warnings": []
+    }
+  },
+  "reference_toolchain": {
+    "compiler": {
+      "executable": "g++",
+      "sha256": "1353e9bdd29a7295c7226bf6c63abccce056d8cac31f112e5cdbecc3f28c2769",
+      "version": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0"
+    },
+    "converter_binary_sha256": "20c006aaa82cc88ca0e6ab2cd23b7c799c76020407991c301cfec77e9d67ee7b",
+    "invocation": [
+      "<converter>",
+      "<schema.json>"
+    ],
+    "source_archive_sha256": "0984123c33b7e959f8003f9169e9109897112d9448b681737813911083eca4cc",
+    "source_commit": "bed0a856606ee4a24a164066f73d2379447033f5",
+    "source_matches_historical_server": false
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "gold_representability": {
+    "canonical_model_accepts": "24/24",
+    "case_count": 24,
+    "grammar_parser": "NOT_AVAILABLE",
+    "grammar_representability": "NOT_EVALUABLE",
+    "json_schema_accepts": "24/24"
+  },
+  "reference_converter_conversion": "PASS",
+  "schemas": {
+    "si_v2": {
+      "metrics": {
+        "additional_properties_false": 8,
+        "any_of": 2,
+        "array_nodes": 18,
+        "bytes": 5344,
+        "defs": 7,
+        "max_depth": 8,
+        "object_nodes": 8,
+        "one_of": 1,
+        "refs": 7,
+        "required_fields": 17
+      },
+      "sha256": "c8ab95d880153c1b214056e437e1f3090ea91f7c449989194379abe7305bb6ab"
+    },
+    "si_v2r": {
+      "metrics": {
+        "additional_properties_false": 9,
+        "any_of": 4,
+        "array_nodes": 18,
+        "bytes": 5774,
+        "defs": 8,
+        "max_depth": 8,
+        "object_nodes": 9,
+        "one_of": 1,
+        "refs": 8,
+        "required_fields": 18
+      },
+      "sha256": "d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8"
+    }
+  }
+}

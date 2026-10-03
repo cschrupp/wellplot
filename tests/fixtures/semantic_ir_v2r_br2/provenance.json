@@ -1,0 +1,58 @@
+{
+  "baseline": "d441b84068a06457ded8651cac67708ee17c2cd0",
+  "current_endpoint": {
+    "available_model_ids": [
+      "qwen3.6-35b-a3b"
+    ],
+    "binary_sha256": null,
+    "classification": "CURRENT_ONLY",
+    "converter_source_identity": null,
+    "metadata_calls": 2,
+    "model_alias": "qwen3.6-35b-a3b",
+    "model_path_persisted": false,
+    "model_path_present": true,
+    "provider_inference_calls": 0,
+    "reported_build_info": "b11160-a3c12db9d",
+    "request_classes": [
+      "GET /props",
+      "GET /v1/models"
+    ]
+  },
+  "endpoint_metadata_calls": 2,
+  "experiment": "SI-V2R-BR2",
+  "historical": {
+    "endpoint_identity_sha256": "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980",
+    "facts": [
+      {
+        "classification": "REPORTED_NOT_AUTHENTICATED",
+        "evidence": "retained /props build label",
+        "fact": "llama_cpp_build",
+        "value": "b11160-a3c12db9d"
+      },
+      {
+        "classification": "UNAVAILABLE",
+        "evidence": "reported suffix does not resolve to authenticated upstream source",
+        "fact": "llama_cpp_source_commit",
+        "value": "a3c12db9d"
+      },
+      {
+        "classification": "UNAVAILABLE",
+        "evidence": "remote host binary was not retained",
+        "fact": "llama_server_binary_sha256",
+        "value": null
+      },
+      {
+        "classification": "UNAVAILABLE",
+        "evidence": "historical warning/converter artifact was not retained",
+        "fact": "schema_converter_identity",
+        "value": null
+      }
+    ],
+    "lq0_checkpoint": "4f37ef8d6fa441d138f399dd3ac1c45da331fb86",
+    "raw_evidence_sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08",
+    "same_endpoint_is_not_same_converter": true,
+    "status": "UNRESOLVED"
+  },
+  "provider_inference_calls": 0,
+  "worker_program_calls": 0
+}
