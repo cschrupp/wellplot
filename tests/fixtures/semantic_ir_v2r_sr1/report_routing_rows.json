@@ -1,0 +1,938 @@
+[
+  {
+    "case_id": "cm59-alloc-tamarind-17",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 0,
+    "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, one scalar measurement with a dedicated depth lane, and a formation image.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Tamarind interval review",
+      "requirements": [
+        "Keep three analysis panels distinct."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 3,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-tamarind-17",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 1,
+    "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, one scalar measurement with a dedicated depth lane, and a formation image.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Tamarind interval review",
+      "requirements": [
+        "Keep three analysis panels distinct."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 3,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 0,
+    "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+      "requirements": [],
+      "constraints": [
+        "Verde porosity response must be in its own log panel.",
+        "Verde borehole image must be in its own log panel."
+      ]
+    },
+    "generated_section_count": 2,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present",
+      "$.sections[0].reference_intent",
+      "$.sections[1].reference_intent"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 1,
+    "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+      "requirements": [],
+      "constraints": [
+        "Verde porosity response must be in its own log panel.",
+        "Verde borehole image must be in its own log panel."
+      ]
+    },
+    "generated_section_count": 2,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present",
+      "$.sections[0].reference_intent",
+      "$.sections[1].reference_intent"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-willow-20",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 0,
+    "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Display Willow gamma and resistivity data in separate scalar displays.",
+      "requirements": [],
+      "constraints": []
+    },
+    "generated_section_count": 2,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-willow-20",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "attempt": 1,
+    "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Display Willow gamma and resistivity data in separate scalar displays.",
+      "requirements": [],
+      "constraints": []
+    },
+    "generated_section_count": 2,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 0,
+    "request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Add Amber review note Ready for signoff",
+      "requirements": [
+        "Add Amber review note Ready for signoff"
+      ],
+      "constraints": [
+        "Add Amber review note Ready for signoff"
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": [
+      "$.sections[0].features[1]"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 1,
+    "request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Add Amber review note Ready for signoff",
+      "requirements": [
+        "Add Amber review note Ready for signoff"
+      ],
+      "constraints": [
+        "Add Amber review note Ready for signoff"
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": [
+      "$.sections[0].features[1]"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-xenon-21",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 0,
+    "request": "Add the Xenon review note Accepted for handover and include one panel with an acoustic image.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Add Xenon review note and include acoustic image panel.",
+      "requirements": [],
+      "constraints": [
+        "Add the Xenon review note Accepted for handover and include one panel with an acoustic image."
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-mixed-xenon-21",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 1,
+    "request": "Add the Xenon review note Accepted for handover and include one panel with an acoustic image.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Add Xenon review note and include acoustic image panel.",
+      "requirements": [],
+      "constraints": [
+        "Add the Xenon review note Accepted for handover and include one panel with an acoustic image."
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-mixed-yarrow-22",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 0,
+    "request": "Include the Yarrow completion remark in the packet and show a scalar response in one panel.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Include Yarrow completion remark in the packet and display a scalar response.",
+      "requirements": [
+        "Include Yarrow completion remark in the packet.",
+        "Show a scalar response in one panel."
+      ],
+      "constraints": [
+        "Include the Yarrow completion remark in the packet."
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-mixed-yarrow-22",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 1,
+    "request": "Include the Yarrow completion remark in the packet and show a scalar response in one panel.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Include Yarrow completion remark in the packet and display a scalar response.",
+      "requirements": [
+        "Include Yarrow completion remark in the packet.",
+        "Show a scalar response in one panel."
+      ],
+      "constraints": [
+        "Include the Yarrow completion remark in the packet."
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-mixed-zephyr-23",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 0,
+    "request": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+      "requirements": [
+        "Title the Zephyr interpretation brief Interval Overview"
+      ],
+      "constraints": [
+        "Add a panel for the neutron response"
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-mixed-zephyr-23",
+    "family": "MIXED_REPORT_SECTION",
+    "attempt": 1,
+    "request": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+      "requirements": [
+        "Title the Zephyr interpretation brief Interval Overview"
+      ],
+      "constraints": [
+        "Add a panel for the neutron response"
+      ]
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "mixed",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-multi-opal-13",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Combine the Opal porosity curve with its acoustic waveform in one shared panel.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-multi-opal-13",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Combine the Opal porosity curve with its acoustic waveform in one shared panel.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-multi-ruby-15",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Display Ruby gamma and spontaneous potential responses together.",
+      "requirements": [
+        "Panel must contain Ruby gamma response and spontaneous potential response."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-ruby-15",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Display Ruby gamma and spontaneous potential responses together.",
+      "requirements": [
+        "Panel must contain Ruby gamma response and spontaneous potential response."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-slate-16",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Place the Slate caliper image and formation image together on one array-track display.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-multi-slate-16",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Place the Slate caliper image and formation image together on one array-track display.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-juniper-09",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 0,
+    "request": "Place a depth lane beside the Juniper density response in one aligned view.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-juniper-09",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 1,
+    "request": "Place a depth lane beside the Juniper density response in one aligned view.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-mica-11",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 0,
+    "request": "Align a reference column with the Mica acoustic image within one interpretation panel.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-mica-11",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 1,
+    "request": "Align a reference column with the Mica acoustic image within one interpretation panel.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-nova-12",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 0,
+    "request": "Use a depth ruler next to the Nova formation image in the same log view.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-reference-nova-12",
+    "family": "REFERENCE_REQUIRED",
+    "attempt": 1,
+    "request": "Use a depth ruler next to the Nova formation image in the same log view.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-cascade-01",
+    "family": "REPORT_ONLY",
+    "attempt": 0,
+    "request": "The Cascade handover brief should preserve this disposition: Approval recorded.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Cascade handover brief",
+      "requirements": [
+        "Preserve disposition: Approval recorded."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-cascade-01",
+    "family": "REPORT_ONLY",
+    "attempt": 1,
+    "request": "The Cascade handover brief should preserve this disposition: Approval recorded.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Cascade handover brief",
+      "requirements": [
+        "Preserve disposition: Approval recorded."
+      ],
+      "constraints": []
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-elm-02",
+    "family": "REPORT_ONLY",
+    "attempt": 0,
+    "request": "In the Elm Crossing report, preserve this exact statement: Final checks accepted by operations.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report.",
+      "requirements": [
+        "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report."
+      ],
+      "constraints": [
+        "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report."
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-elm-02",
+    "family": "REPORT_ONLY",
+    "attempt": 1,
+    "request": "In the Elm Crossing report, preserve this exact statement: Final checks accepted by operations.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report.",
+      "requirements": [
+        "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report."
+      ],
+      "constraints": [
+        "Preserve the statement 'Final checks accepted by operations.' in the Elm Crossing report."
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-harbor-03",
+    "family": "REPORT_ONLY",
+    "attempt": 0,
+    "request": "Give the Harbor East interpretation packet the title Pressure Review and the subtitle Interval Findings.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Set title and subtitle for the Harbor East interpretation packet.",
+      "requirements": [
+        "Title: Pressure Review",
+        "Subtitle: Interval Findings"
+      ],
+      "constraints": [
+        "Document: Harbor East interpretation packet"
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-harbor-03",
+    "family": "REPORT_ONLY",
+    "attempt": 1,
+    "request": "Give the Harbor East interpretation packet the title Pressure Review and the subtitle Interval Findings.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Set title and subtitle for the Harbor East interpretation packet.",
+      "requirements": [
+        "Title: Pressure Review",
+        "Subtitle: Interval Findings"
+      ],
+      "constraints": [
+        "Document: Harbor East interpretation packet"
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-kestrel-04",
+    "family": "REPORT_ONLY",
+    "attempt": 0,
+    "request": "Prepare the Kestrel closeout packet with a completion heading and list the overnight interpretation group as preparer.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Prepare the Kestrel closeout packet",
+      "requirements": [
+        "Include a completion heading",
+        "List the overnight interpretation group as preparer"
+      ],
+      "constraints": [
+        "Packet metadata and headings belong in report_work"
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-report-kestrel-04",
+    "family": "REPORT_ONLY",
+    "attempt": 1,
+    "request": "Prepare the Kestrel closeout packet with a completion heading and list the overnight interpretation group as preparer.",
+    "gold_report_present": true,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Prepare the Kestrel closeout packet",
+      "requirements": [
+        "Include a completion heading",
+        "List the overnight interpretation group as preparer"
+      ],
+      "constraints": [
+        "Packet metadata and headings belong in report_work"
+      ]
+    },
+    "generated_section_count": 0,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "report_only",
+    "cm58_report_action": [],
+    "final_report_present": true,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-single-fig-05",
+    "family": "SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Show the Fig interval permeability response as one scalar display.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-single-fig-05",
+    "family": "SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Show the Fig interval permeability response as one scalar display.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-single-garnet-06",
+    "family": "SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+      "requirements": [],
+      "constraints": []
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-single-garnet-06",
+    "family": "SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+    "gold_report_present": false,
+    "generated_report_present": true,
+    "generated_report_work": {
+      "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+      "requirements": [],
+      "constraints": []
+    },
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [
+      {
+        "kind": "remove_report_task",
+        "reason": "explicit_section_only_intent"
+      }
+    ],
+    "final_report_present": false,
+    "primary_br1_mechanism": "REPORT_FALSE_POSITIVE",
+    "secondary_br1_mechanisms": [
+      "$.report_work_present"
+    ]
+  },
+  {
+    "case_id": "cm59-single-hazel-07",
+    "family": "SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Create one array display for the Hazel formation image.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-single-hazel-07",
+    "family": "SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Create one array display for the Hazel formation image.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_PASS",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": []
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "family": "SINGLE_SECTION",
+    "attempt": 0,
+    "request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": [
+      "$.sections[0].features[1]",
+      "$.sections[0].reference_intent"
+    ]
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "family": "SINGLE_SECTION",
+    "attempt": 1,
+    "request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+    "gold_report_present": false,
+    "generated_report_present": false,
+    "generated_report_work": null,
+    "generated_section_count": 1,
+    "semantic_status": "SEMANTIC_FAIL",
+    "report_boundary_intent": "section_only",
+    "cm58_report_action": [],
+    "final_report_present": false,
+    "primary_br1_mechanism": "NONE",
+    "secondary_br1_mechanisms": [
+      "$.sections[0].features[1]",
+      "$.sections[0].reference_intent"
+    ]
+  }
+]

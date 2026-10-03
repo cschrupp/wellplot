@@ -1,0 +1,314 @@
+[
+  {
+    "case_id": "cm59-alloc-tamarind-17",
+    "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, one scalar measurement with a dedicated depth lane, and a formation image.",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 3,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-umber-18",
+    "request": "The Umber interpretation should resolve three separate findings in order: a scalar trend, a scalar trend beside a reference column, and an acoustic image.",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 3,
+    "stable_semantic_status": [
+      "NOT_RUN",
+      "NOT_RUN"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 2,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-willow-20",
+    "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 2,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "request": "Add the Amber review note Ready for signoff, show a scalar response, and annotate the panel with a marker at the interval top.",
+    "family": "MIXED_REPORT_SECTION",
+    "gold_report_scope": "MIXED",
+    "deterministic_boundary_intent": "MIXED",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-xenon-21",
+    "request": "Add the Xenon review note Accepted for handover and include one panel with an acoustic image.",
+    "family": "MIXED_REPORT_SECTION",
+    "gold_report_scope": "MIXED",
+    "deterministic_boundary_intent": "MIXED",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-yarrow-22",
+    "request": "Include the Yarrow completion remark in the packet and show a scalar response in one panel.",
+    "family": "MIXED_REPORT_SECTION",
+    "gold_report_scope": "MIXED",
+    "deterministic_boundary_intent": "MIXED",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-zephyr-23",
+    "request": "Title the Zephyr interpretation brief Interval Overview and add a panel for the neutron response.",
+    "family": "MIXED_REPORT_SECTION",
+    "gold_report_scope": "MIXED",
+    "deterministic_boundary_intent": "MIXED",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-opal-13",
+    "request": "Combine the Opal porosity curve with its acoustic waveform in one shared panel.",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-quartz-14",
+    "request": "Keep the Quartz density curve, depth ruler, and image feed together in one view.",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "NOT_RUN",
+      "NOT_RUN"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-ruby-15",
+    "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-multi-slate-16",
+    "request": "Place the Slate caliper image and formation image together on one array-track display.",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-reference-juniper-09",
+    "request": "Place a depth lane beside the Juniper density response in one aligned view.",
+    "family": "REFERENCE_REQUIRED",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-reference-linden-10",
+    "request": "Keep a depth marker alongside the Linden resistivity trace in a shared display.",
+    "family": "REFERENCE_REQUIRED",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "NOT_RUN",
+      "NOT_RUN"
+    ]
+  },
+  {
+    "case_id": "cm59-reference-mica-11",
+    "request": "Align a reference column with the Mica acoustic image within one interpretation panel.",
+    "family": "REFERENCE_REQUIRED",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-reference-nova-12",
+    "request": "Use a depth ruler next to the Nova formation image in the same log view.",
+    "family": "REFERENCE_REQUIRED",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-report-cascade-01",
+    "request": "The Cascade handover brief should preserve this disposition: Approval recorded.",
+    "family": "REPORT_ONLY",
+    "gold_report_scope": "REPORT_ONLY",
+    "deterministic_boundary_intent": "REPORT_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 0,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-report-elm-02",
+    "request": "In the Elm Crossing report, preserve this exact statement: Final checks accepted by operations.",
+    "family": "REPORT_ONLY",
+    "gold_report_scope": "REPORT_ONLY",
+    "deterministic_boundary_intent": "REPORT_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 0,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-report-harbor-03",
+    "request": "Give the Harbor East interpretation packet the title Pressure Review and the subtitle Interval Findings.",
+    "family": "REPORT_ONLY",
+    "gold_report_scope": "REPORT_ONLY",
+    "deterministic_boundary_intent": "REPORT_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 0,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-report-kestrel-04",
+    "request": "Prepare the Kestrel closeout packet with a completion heading and list the overnight interpretation group as preparer.",
+    "family": "REPORT_ONLY",
+    "gold_report_scope": "REPORT_ONLY",
+    "deterministic_boundary_intent": "REPORT_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 0,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-single-fig-05",
+    "request": "Show the Fig interval permeability response as one scalar display.",
+    "family": "SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-single-garnet-06",
+    "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+    "family": "SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  },
+  {
+    "case_id": "cm59-single-hazel-07",
+    "request": "Create one array display for the Hazel formation image.",
+    "family": "SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_PASS",
+      "SEMANTIC_PASS"
+    ]
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "request": "Plot the Iris response as one scalar track and annotate the interval top with a marker.",
+    "family": "SINGLE_SECTION",
+    "gold_report_scope": "SECTION_ONLY",
+    "deterministic_boundary_intent": "SECTION_ONLY",
+    "matches_gold_report_scope": "YES",
+    "section_count_gold": 1,
+    "stable_semantic_status": [
+      "SEMANTIC_FAIL",
+      "SEMANTIC_FAIL"
+    ]
+  }
+]

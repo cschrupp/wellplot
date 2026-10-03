@@ -1,0 +1,196 @@
+{
+  "version": "si-v2r-sr1.report-routing.v1",
+  "baseline": "7a660d6f4efff7a6b3e54a09fa81a3e08e271de4",
+  "evidence": {
+    "sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08",
+    "rows": 48,
+    "cases": 24,
+    "attempts": 2
+  },
+  "mechanism_summary": {
+    "false_positive_rows": 10,
+    "stable_false_positive_cases": [
+      "cm59-alloc-tamarind-17",
+      "cm59-alloc-verde-19",
+      "cm59-alloc-willow-20",
+      "cm59-multi-ruby-15",
+      "cm59-single-garnet-06"
+    ],
+    "primary_counts": {
+      "REQUEST_SUMMARY_PROMOTION": 10
+    },
+    "label_counts": {
+      "CONSTRAINT_PROMOTION": 10,
+      "CONTEXT_PROMOTION": 2,
+      "REQUEST_SUMMARY_PROMOTION": 10,
+      "SECTION_CONTENT_DUPLICATION": 8,
+      "TOP_LEVEL_COORDINATION_PROMOTION": 8
+    },
+    "matched_controls": {
+      "cm59-alloc-tamarind-17": [
+        "cm59-multi-opal-13",
+        "cm59-reference-mica-11",
+        "cm59-reference-nova-12"
+      ],
+      "cm59-alloc-verde-19": [
+        "cm59-multi-opal-13",
+        "cm59-multi-slate-16",
+        "cm59-single-hazel-07"
+      ],
+      "cm59-alloc-willow-20": [
+        "cm59-multi-opal-13",
+        "cm59-single-fig-05",
+        "cm59-single-iris-08"
+      ],
+      "cm59-multi-ruby-15": [
+        "cm59-single-fig-05",
+        "cm59-single-iris-08",
+        "cm59-multi-slate-16"
+      ],
+      "cm59-single-garnet-06": [
+        "cm59-multi-slate-16",
+        "cm59-single-hazel-07",
+        "cm59-reference-mica-11"
+      ]
+    }
+  },
+  "report_scope_matrix": {
+    "REPORT_ONLY": {
+      "correct": 4,
+      "total": 4
+    },
+    "SECTION_ONLY": {
+      "correct": 16,
+      "total": 16
+    },
+    "MIXED": {
+      "correct": 4,
+      "total": 4
+    },
+    "total_correct": 24,
+    "total": 24,
+    "false_positive_rows_section_only": 10,
+    "genuine_report_rows_report_or_mixed": 16
+  },
+  "cm58_reconciliation": {
+    "comparable_rows": 42,
+    "matching_rows": 42,
+    "mismatches": 0
+  },
+  "lexical_cues": {
+    "panel": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 4
+    },
+    "panels": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "view": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 0
+    },
+    "views": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "display": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 3,
+      "report_bearing_cases": 0
+    },
+    "displays": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "review": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 3
+    },
+    "interpretation": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 1,
+      "report_bearing_cases": 3
+    },
+    "analysis": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "present": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "show": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 1,
+      "report_bearing_cases": 2
+    },
+    "place": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 0
+    },
+    "keep": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    }
+  },
+  "complexity": {
+    "one_section": {
+      "false_positive_cases": 2,
+      "evaluable_section_only_cases": 10
+    },
+    "multiple_sections": {
+      "false_positive_cases": 3,
+      "evaluable_section_only_cases": 3
+    },
+    "one_feature": {
+      "false_positive_cases": 2,
+      "evaluable_section_only_cases": 9
+    },
+    "multiple_features": {
+      "false_positive_cases": 3,
+      "evaluable_section_only_cases": 4
+    }
+  },
+  "prompt_audit": {
+    "prompt_source": "scripts/si_v2r_model_qualification.py",
+    "prompt_source_sha256": "1c9410dc070590f01b547fbb917dd143eddc5c146123edd6351f4b03f8a2d039",
+    "report_creation_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT",
+    "visualization_not_report_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT",
+    "invent_report_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT"
+  },
+  "report_content": {
+    "REPORT_ONLY": {
+      "rows": 8,
+      "content_passes": 8
+    },
+    "MIXED": {
+      "rows": 8,
+      "content_passes": 8
+    }
+  },
+  "hypotheses": {
+    "H1_SINGLE_LEXICAL_TRIGGER": "NOT_SUPPORTED",
+    "H2_PROMPT_AMBIGUITY": "NOT_SUPPORTED",
+    "H3_REQUEST_AMBIGUITY": "NOT_SUPPORTED",
+    "H4_COMPLEXITY_COORDINATION_PROMOTION": "PARTIAL",
+    "H5_OPTIONAL_REPORT_FIELD_PRIOR": "NOT_EVALUABLE",
+    "H6_MODEL_REPORT_ROUTING_RESIDUAL": "PARTIAL",
+    "H7_DETERMINISTIC_REPORT_PRESENCE_OWNERSHIP": "SUPPORTED"
+  },
+  "decision": "SI_V2R_SR1_DETERMINISTIC_REPORT_OWNERSHIP_SUPPORTED",
+  "recommended_owner_of_report_presence": "DETERMINISTIC_BOUNDARY",
+  "provider_calls": 0,
+  "endpoint_calls": 0,
+  "worker_program_calls": 0
+}

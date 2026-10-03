@@ -1,0 +1,355 @@
+{
+  "version": "si-v2r-sr1.report-routing.v1",
+  "mechanism_summary": {
+    "false_positive_rows": 10,
+    "stable_false_positive_cases": [
+      "cm59-alloc-tamarind-17",
+      "cm59-alloc-verde-19",
+      "cm59-alloc-willow-20",
+      "cm59-multi-ruby-15",
+      "cm59-single-garnet-06"
+    ],
+    "primary_counts": {
+      "REQUEST_SUMMARY_PROMOTION": 10
+    },
+    "label_counts": {
+      "CONSTRAINT_PROMOTION": 10,
+      "CONTEXT_PROMOTION": 2,
+      "REQUEST_SUMMARY_PROMOTION": 10,
+      "SECTION_CONTENT_DUPLICATION": 8,
+      "TOP_LEVEL_COORDINATION_PROMOTION": 8
+    },
+    "matched_controls": {
+      "cm59-alloc-tamarind-17": [
+        "cm59-multi-opal-13",
+        "cm59-reference-mica-11",
+        "cm59-reference-nova-12"
+      ],
+      "cm59-alloc-verde-19": [
+        "cm59-multi-opal-13",
+        "cm59-multi-slate-16",
+        "cm59-single-hazel-07"
+      ],
+      "cm59-alloc-willow-20": [
+        "cm59-multi-opal-13",
+        "cm59-single-fig-05",
+        "cm59-single-iris-08"
+      ],
+      "cm59-multi-ruby-15": [
+        "cm59-single-fig-05",
+        "cm59-single-iris-08",
+        "cm59-multi-slate-16"
+      ],
+      "cm59-single-garnet-06": [
+        "cm59-multi-slate-16",
+        "cm59-single-hazel-07",
+        "cm59-reference-mica-11"
+      ]
+    }
+  },
+  "mechanism_rows": [
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 0,
+      "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, one scalar measurement with a dedicated depth lane, and a formation image.",
+      "generated_report_work": {
+        "goal": "Tamarind interval review",
+        "requirements": [
+          "Keep three analysis panels distinct."
+        ],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONTEXT_PROMOTION",
+        "CONSTRAINT_PROMOTION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 1,
+      "request": "For the Tamarind interval review, keep three analysis panels distinct: an ordinary scalar measurement, one scalar measurement with a dedicated depth lane, and a formation image.",
+      "generated_report_work": {
+        "goal": "Tamarind interval review",
+        "requirements": [
+          "Keep three analysis panels distinct."
+        ],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONTEXT_PROMOTION",
+        "CONSTRAINT_PROMOTION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 0,
+      "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+      "generated_report_work": {
+        "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+        "requirements": [],
+        "constraints": [
+          "Verde porosity response must be in its own log panel.",
+          "Verde borehole image must be in its own log panel."
+        ]
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 1,
+      "request": "Keep the Verde porosity response and the Verde borehole image in separate log panels.",
+      "generated_report_work": {
+        "goal": "Separate Verde porosity response and Verde borehole image into distinct log panels.",
+        "requirements": [],
+        "constraints": [
+          "Verde porosity response must be in its own log panel.",
+          "Verde borehole image must be in its own log panel."
+        ]
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 0,
+      "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+      "generated_report_work": {
+        "goal": "Display Willow gamma and resistivity data in separate scalar displays.",
+        "requirements": [],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "family": "MULTI_SECTION_ALLOCATION",
+      "attempt": 1,
+      "request": "Place the Willow gamma view and resistivity view in two independent scalar displays.",
+      "generated_report_work": {
+        "goal": "Display Willow gamma and resistivity data in separate scalar displays.",
+        "requirements": [],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "attempt": 0,
+      "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+      "generated_report_work": {
+        "goal": "Display Ruby gamma and spontaneous potential responses together.",
+        "requirements": [
+          "Panel must contain Ruby gamma response and spontaneous potential response."
+        ],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "family": "MULTITRACK_SINGLE_SECTION",
+      "attempt": 1,
+      "request": "Show the Ruby gamma response and spontaneous-potential response together in one scalar panel.",
+      "generated_report_work": {
+        "goal": "Display Ruby gamma and spontaneous potential responses together.",
+        "requirements": [
+          "Panel must contain Ruby gamma response and spontaneous potential response."
+        ],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "TOP_LEVEL_COORDINATION_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "family": "SINGLE_SECTION",
+      "attempt": 0,
+      "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+      "generated_report_work": {
+        "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+        "requirements": [],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "family": "SINGLE_SECTION",
+      "attempt": 1,
+      "request": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+      "generated_report_work": {
+        "goal": "Present the Garnet borehole waveform as one image view and omit any depth column.",
+        "requirements": [],
+        "constraints": []
+      },
+      "labels": [
+        "REQUEST_SUMMARY_PROMOTION",
+        "CONSTRAINT_PROMOTION",
+        "SECTION_CONTENT_DUPLICATION"
+      ],
+      "primary": "REQUEST_SUMMARY_PROMOTION"
+    }
+  ],
+  "lexical_cues": {
+    "panel": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 4
+    },
+    "panels": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "view": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 0
+    },
+    "views": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "display": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 3,
+      "report_bearing_cases": 0
+    },
+    "displays": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "review": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 3
+    },
+    "interpretation": {
+      "false_positive_cases": 0,
+      "successful_section_only_cases": 1,
+      "report_bearing_cases": 3
+    },
+    "analysis": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "present": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    },
+    "show": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 1,
+      "report_bearing_cases": 2
+    },
+    "place": {
+      "false_positive_cases": 1,
+      "successful_section_only_cases": 2,
+      "report_bearing_cases": 0
+    },
+    "keep": {
+      "false_positive_cases": 2,
+      "successful_section_only_cases": 0,
+      "report_bearing_cases": 0
+    }
+  },
+  "complexity": {
+    "one_section": {
+      "false_positive_cases": 2,
+      "evaluable_section_only_cases": 10
+    },
+    "multiple_sections": {
+      "false_positive_cases": 3,
+      "evaluable_section_only_cases": 3
+    },
+    "one_feature": {
+      "false_positive_cases": 2,
+      "evaluable_section_only_cases": 9
+    },
+    "multiple_features": {
+      "false_positive_cases": 3,
+      "evaluable_section_only_cases": 4
+    }
+  },
+  "prompt_audit": {
+    "prompt_source": "scripts/si_v2r_model_qualification.py",
+    "prompt_source_sha256": "1c9410dc070590f01b547fbb917dd143eddc5c146123edd6351f4b03f8a2d039",
+    "report_creation_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT",
+    "visualization_not_report_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT",
+    "invent_report_rule": "EXPLICITLY_PROHIBITED_BY_CURRENT_PROMPT"
+  },
+  "report_content": {
+    "REPORT_ONLY": {
+      "rows": 8,
+      "content_passes": 8
+    },
+    "MIXED": {
+      "rows": 8,
+      "content_passes": 8
+    }
+  },
+  "hypotheses": {
+    "H1_SINGLE_LEXICAL_TRIGGER": "NOT_SUPPORTED",
+    "H2_PROMPT_AMBIGUITY": "NOT_SUPPORTED",
+    "H3_REQUEST_AMBIGUITY": "NOT_SUPPORTED",
+    "H4_COMPLEXITY_COORDINATION_PROMOTION": "PARTIAL",
+    "H5_OPTIONAL_REPORT_FIELD_PRIOR": "NOT_EVALUABLE",
+    "H6_MODEL_REPORT_ROUTING_RESIDUAL": "PARTIAL",
+    "H7_DETERMINISTIC_REPORT_PRESENCE_OWNERSHIP": "SUPPORTED"
+  }
+}
