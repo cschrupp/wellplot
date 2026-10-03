@@ -1,0 +1,197 @@
+{
+  "version": "si-v2r-sr2.ownership-regrade.v1",
+  "baseline": "e97ae4d53ed82c724a014d7fc5b52598f9ca201d",
+  "evidence": {
+    "sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08",
+    "rows": 48,
+    "cases": 24,
+    "attempts": 2
+  },
+  "frozen_historical_facts": {
+    "decision": "SI_V2R_PROVIDER_BOUNDARY_REJECTED",
+    "semantic_passes": 28,
+    "stable_semantic_passes": 14,
+    "terminal_structural_failures": 6,
+    "raw_evidence_sha256": "9d175c3b80c2cb6a5d5f62195861d4c0070643a37ab4f99dd02559d018011f08"
+  },
+  "scope_reproduction": {
+    "REPORT_ONLY": true,
+    "SECTION_ONLY": true,
+    "MIXED": true,
+    "total": true
+  },
+  "cm58_reconciliation": {
+    "comparable_rows": 42,
+    "matching_rows": 42,
+    "mismatches": 0
+  },
+  "metrics": {
+    "raw_rows": 48,
+    "structurally_evaluable_rows": 42,
+    "frozen_semantic_passes": 28,
+    "ownership_adjusted_semantic_passes": 34,
+    "frozen_stable_semantic_passes": 14,
+    "ownership_adjusted_stable_passes": 17,
+    "newly_recovered_attempt_passes": 6,
+    "newly_recovered_stable_cases": 3,
+    "model_report_overreach_rows": 10,
+    "cm58_reconciled_overreach_rows": 10,
+    "rows_only_report_presence_failure": 6,
+    "rows_report_presence_plus_additional_errors": 4,
+    "remaining_system_report_scope_failures": 0,
+    "report_content_failures": 0,
+    "remaining_adjusted_semantic_failures": 8
+  },
+  "transitions": {
+    "FROZEN_FAIL → ADJUSTED_FAIL": 8,
+    "FROZEN_FAIL → ADJUSTED_PASS": 6,
+    "FROZEN_PASS → ADJUSTED_PASS": 28,
+    "NOT_EVALUABLE → NOT_EVALUABLE": 6
+  },
+  "stable_case_status_counts": {
+    "STABLE_FAIL": 4,
+    "STABLE_PASS": 17,
+    "STRUCTURAL_UNAVAILABLE": 3
+  },
+  "model_residual_counts": {
+    "ANNOTATION_ERROR": 4,
+    "FEATURE_KIND_ERROR": 4,
+    "FEATURE_MULTIPLICITY_ERROR": 4,
+    "REFERENCE_FALSE_POSITIVE": 4,
+    "REPORT_FALSE_POSITIVE": 10,
+    "REQUIRED_CONTEXT_OWNER_ERROR": 6,
+    "SECTION_ORDER_ERROR": 4,
+    "UNRESOLVED_REQUIREMENT_ERROR": 2
+  },
+  "ownership_adjusted_system_residual_counts": {
+    "ANNOTATION_ERROR": 4,
+    "FEATURE_KIND_ERROR": 4,
+    "FEATURE_MULTIPLICITY_ERROR": 4,
+    "REFERENCE_FALSE_POSITIVE": 4,
+    "REQUIRED_CONTEXT_OWNER_ERROR": 6,
+    "SECTION_ORDER_ERROR": 4,
+    "UNRESOLVED_REQUIREMENT_ERROR": 2
+  },
+  "report_safety_accounting": {
+    "report_removals": 10,
+    "report_additions": 0,
+    "report_boundary_rejections": 6,
+    "unchanged_report_scopes": 32
+  },
+  "family_metrics": {
+    "REPORT_ONLY": {
+      "adjusted_attempt_passes": 8,
+      "adjusted_structurally_evaluable_attempts": 8,
+      "frozen_attempt_passes": 8,
+      "adjusted_stable_passes": 4,
+      "adjusted_stable_failures": 0,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 0,
+      "case_count": 4
+    },
+    "SINGLE_SECTION": {
+      "adjusted_attempt_passes": 4,
+      "adjusted_structurally_evaluable_attempts": 8,
+      "frozen_attempt_passes": 4,
+      "adjusted_stable_passes": 2,
+      "adjusted_stable_failures": 2,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 0,
+      "case_count": 4
+    },
+    "REFERENCE_REQUIRED": {
+      "adjusted_attempt_passes": 6,
+      "adjusted_structurally_evaluable_attempts": 6,
+      "frozen_attempt_passes": 6,
+      "adjusted_stable_passes": 3,
+      "adjusted_stable_failures": 0,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 1,
+      "case_count": 4
+    },
+    "MULTITRACK_SINGLE_SECTION": {
+      "adjusted_attempt_passes": 6,
+      "adjusted_structurally_evaluable_attempts": 6,
+      "frozen_attempt_passes": 4,
+      "adjusted_stable_passes": 3,
+      "adjusted_stable_failures": 0,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 1,
+      "case_count": 4
+    },
+    "MULTI_SECTION_ALLOCATION": {
+      "adjusted_attempt_passes": 4,
+      "adjusted_structurally_evaluable_attempts": 6,
+      "frozen_attempt_passes": 0,
+      "adjusted_stable_passes": 2,
+      "adjusted_stable_failures": 1,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 1,
+      "case_count": 4
+    },
+    "MIXED_REPORT_SECTION": {
+      "adjusted_attempt_passes": 6,
+      "adjusted_structurally_evaluable_attempts": 8,
+      "frozen_attempt_passes": 6,
+      "adjusted_stable_passes": 3,
+      "adjusted_stable_failures": 1,
+      "unstable_cases": 0,
+      "structural_unavailable_cases": 0,
+      "case_count": 4
+    }
+  },
+  "anchor_metrics": {
+    "Fig": {
+      "case_id": "cm59-single-fig-05",
+      "frozen_attempt_statuses": [
+        "SEMANTIC_PASS",
+        "SEMANTIC_PASS"
+      ],
+      "adjusted_attempt_statuses": [
+        "PASS",
+        "PASS"
+      ],
+      "adjusted_case_status": "STABLE_PASS"
+    },
+    "Linden": {
+      "case_id": "cm59-reference-linden-10",
+      "frozen_attempt_statuses": [
+        "NOT_RUN",
+        "NOT_RUN"
+      ],
+      "adjusted_attempt_statuses": [
+        "NOT_EVALUABLE",
+        "NOT_EVALUABLE"
+      ],
+      "adjusted_case_status": "STRUCTURAL_UNAVAILABLE"
+    },
+    "Kestrel": {
+      "case_id": "cm59-report-kestrel-04",
+      "frozen_attempt_statuses": [
+        "SEMANTIC_PASS",
+        "SEMANTIC_PASS"
+      ],
+      "adjusted_attempt_statuses": [
+        "PASS",
+        "PASS"
+      ],
+      "adjusted_case_status": "STABLE_PASS"
+    },
+    "Xenon": {
+      "case_id": "cm59-mixed-xenon-21",
+      "frozen_attempt_statuses": [
+        "SEMANTIC_PASS",
+        "SEMANTIC_PASS"
+      ],
+      "adjusted_attempt_statuses": [
+        "PASS",
+        "PASS"
+      ],
+      "adjusted_case_status": "STABLE_PASS"
+    }
+  },
+  "decision": "SI_V2R_SR2_REPORT_PRESENCE_RESOLVED",
+  "provider_inference_calls": 0,
+  "endpoint_calls": 0,
+  "worker_program_calls": 0
+}

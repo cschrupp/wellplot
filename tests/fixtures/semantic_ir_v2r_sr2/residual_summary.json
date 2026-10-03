@@ -1,0 +1,56 @@
+{
+  "version": "si-v2r-sr2.ownership-regrade.v1",
+  "transitions": {
+    "FROZEN_FAIL → ADJUSTED_FAIL": 8,
+    "FROZEN_FAIL → ADJUSTED_PASS": 6,
+    "FROZEN_PASS → ADJUSTED_PASS": 28,
+    "NOT_EVALUABLE → NOT_EVALUABLE": 6
+  },
+  "model_residual_counts": {
+    "ANNOTATION_ERROR": 4,
+    "FEATURE_KIND_ERROR": 4,
+    "FEATURE_MULTIPLICITY_ERROR": 4,
+    "REFERENCE_FALSE_POSITIVE": 4,
+    "REPORT_FALSE_POSITIVE": 10,
+    "REQUIRED_CONTEXT_OWNER_ERROR": 6,
+    "SECTION_ORDER_ERROR": 4,
+    "UNRESOLVED_REQUIREMENT_ERROR": 2
+  },
+  "ownership_adjusted_system_residual_counts": {
+    "ANNOTATION_ERROR": 4,
+    "FEATURE_KIND_ERROR": 4,
+    "FEATURE_MULTIPLICITY_ERROR": 4,
+    "REFERENCE_FALSE_POSITIVE": 4,
+    "REQUIRED_CONTEXT_OWNER_ERROR": 6,
+    "SECTION_ORDER_ERROR": 4,
+    "UNRESOLVED_REQUIREMENT_ERROR": 2
+  },
+  "report_safety_accounting": {
+    "report_removals": 10,
+    "report_additions": 0,
+    "report_boundary_rejections": 6,
+    "unchanged_report_scopes": 32
+  },
+  "metrics": {
+    "raw_rows": 48,
+    "structurally_evaluable_rows": 42,
+    "frozen_semantic_passes": 28,
+    "ownership_adjusted_semantic_passes": 34,
+    "frozen_stable_semantic_passes": 14,
+    "ownership_adjusted_stable_passes": 17,
+    "newly_recovered_attempt_passes": 6,
+    "newly_recovered_stable_cases": 3,
+    "model_report_overreach_rows": 10,
+    "cm58_reconciled_overreach_rows": 10,
+    "rows_only_report_presence_failure": 6,
+    "rows_report_presence_plus_additional_errors": 4,
+    "remaining_system_report_scope_failures": 0,
+    "report_content_failures": 0,
+    "remaining_adjusted_semantic_failures": 8
+  },
+  "stable_case_status_counts": {
+    "STABLE_FAIL": 4,
+    "STABLE_PASS": 17,
+    "STRUCTURAL_UNAVAILABLE": 3
+  }
+}

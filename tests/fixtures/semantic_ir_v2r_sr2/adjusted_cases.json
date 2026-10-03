@@ -1,0 +1,1276 @@
+[
+  {
+    "case_id": "cm59-alloc-tamarind-17",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-alloc-tamarind-17",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-alloc-tamarind-17",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-umber-18",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STRUCTURAL_UNAVAILABLE",
+    "attempts": [
+      {
+        "case_id": "cm59-alloc-umber-18",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 0,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-alloc-umber-18",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 1,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-verde-19",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_FAIL",
+    "attempts": [
+      {
+        "case_id": "cm59-alloc-verde-19",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REFERENCE_FALSE_POSITIVE"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REFERENCE_FALSE_POSITIVE"
+        ]
+      },
+      {
+        "case_id": "cm59-alloc-verde-19",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REFERENCE_FALSE_POSITIVE"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REFERENCE_FALSE_POSITIVE"
+        ]
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-alloc-willow-20",
+    "family": "MULTI_SECTION_ALLOCATION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-alloc-willow-20",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-alloc-willow-20",
+        "family": "MULTI_SECTION_ALLOCATION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-amber-24",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_FAIL",
+    "attempts": [
+      {
+        "case_id": "cm59-mixed-amber-24",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      },
+      {
+        "case_id": "cm59-mixed-amber-24",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-xenon-21",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-mixed-xenon-21",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-mixed-xenon-21",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-yarrow-22",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-mixed-yarrow-22",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-mixed-yarrow-22",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-mixed-zephyr-23",
+    "family": "MIXED_REPORT_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-mixed-zephyr-23",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-mixed-zephyr-23",
+        "family": "MIXED_REPORT_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-multi-opal-13",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-multi-opal-13",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-multi-opal-13",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-multi-quartz-14",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STRUCTURAL_UNAVAILABLE",
+    "attempts": [
+      {
+        "case_id": "cm59-multi-quartz-14",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-multi-quartz-14",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-multi-ruby-15",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-multi-ruby-15",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-multi-ruby-15",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-multi-slate-16",
+    "family": "MULTITRACK_SINGLE_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-multi-slate-16",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-multi-slate-16",
+        "family": "MULTITRACK_SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-reference-juniper-09",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-reference-juniper-09",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-reference-juniper-09",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-reference-linden-10",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STRUCTURAL_UNAVAILABLE",
+    "attempts": [
+      {
+        "case_id": "cm59-reference-linden-10",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 0,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-reference-linden-10",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 1,
+        "frozen_semantic_status": "NOT_RUN",
+        "ownership_adjusted_semantic_status": "NOT_EVALUABLE",
+        "structurally_evaluable": false,
+        "model_report_presence_correct": "NOT_EVALUABLE",
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_EVALUABLE",
+        "system_report_scope_correct": "NOT_EVALUABLE",
+        "system_report_present": "NOT_EVALUABLE",
+        "cm58_2_changed": "NOT_EVALUABLE",
+        "cm58_2_action": [],
+        "cm58_2_failure": "schema_validation",
+        "cm58_2_reconciled": "NOT_EVALUABLE",
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-reference-mica-11",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-reference-mica-11",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-reference-mica-11",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-reference-nova-12",
+    "family": "REFERENCE_REQUIRED",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-reference-nova-12",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-reference-nova-12",
+        "family": "REFERENCE_REQUIRED",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-report-cascade-01",
+    "family": "REPORT_ONLY",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-report-cascade-01",
+        "family": "REPORT_ONLY",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-report-cascade-01",
+        "family": "REPORT_ONLY",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-report-elm-02",
+    "family": "REPORT_ONLY",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-report-elm-02",
+        "family": "REPORT_ONLY",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-report-elm-02",
+        "family": "REPORT_ONLY",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-report-harbor-03",
+    "family": "REPORT_ONLY",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-report-harbor-03",
+        "family": "REPORT_ONLY",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-report-harbor-03",
+        "family": "REPORT_ONLY",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-report-kestrel-04",
+    "family": "REPORT_ONLY",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-report-kestrel-04",
+        "family": "REPORT_ONLY",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-report-kestrel-04",
+        "family": "REPORT_ONLY",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": true,
+        "system_report_scope_correct": true,
+        "system_report_present": true,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-single-fig-05",
+    "family": "SINGLE_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-single-fig-05",
+        "family": "SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-single-fig-05",
+        "family": "SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-single-garnet-06",
+    "family": "SINGLE_SECTION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_FAIL",
+    "attempts": [
+      {
+        "case_id": "cm59-single-garnet-06",
+        "family": "SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      },
+      {
+        "case_id": "cm59-single-garnet-06",
+        "family": "SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": false,
+        "model_report_routing_overreach": true,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": true,
+        "cm58_2_action": [
+          {
+            "kind": "remove_report_task",
+            "reason": "explicit_section_only_intent"
+          }
+        ],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-single-hazel-07",
+    "family": "SINGLE_SECTION",
+    "frozen_stable_pass": true,
+    "adjusted_case_status": "STABLE_PASS",
+    "attempts": [
+      {
+        "case_id": "cm59-single-hazel-07",
+        "family": "SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      },
+      {
+        "case_id": "cm59-single-hazel-07",
+        "family": "SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_PASS",
+        "ownership_adjusted_semantic_status": "PASS",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [],
+        "adjusted_residual_mechanisms": []
+      }
+    ]
+  },
+  {
+    "case_id": "cm59-single-iris-08",
+    "family": "SINGLE_SECTION",
+    "frozen_stable_pass": false,
+    "adjusted_case_status": "STABLE_FAIL",
+    "attempts": [
+      {
+        "case_id": "cm59-single-iris-08",
+        "family": "SINGLE_SECTION",
+        "attempt": 0,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      },
+      {
+        "case_id": "cm59-single-iris-08",
+        "family": "SINGLE_SECTION",
+        "attempt": 1,
+        "frozen_semantic_status": "SEMANTIC_FAIL",
+        "ownership_adjusted_semantic_status": "FAIL",
+        "structurally_evaluable": true,
+        "model_report_presence_correct": true,
+        "model_report_routing_overreach": false,
+        "model_report_missing": false,
+        "model_report_content_correct": "NOT_APPLICABLE",
+        "system_report_scope_correct": true,
+        "system_report_present": false,
+        "cm58_2_changed": false,
+        "cm58_2_action": [],
+        "cm58_2_failure": null,
+        "cm58_2_reconciled": true,
+        "non_report_failures": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ],
+        "adjusted_residual_mechanisms": [
+          "REFERENCE_FALSE_POSITIVE",
+          "SECTION_ORDER_ERROR",
+          "FEATURE_KIND_ERROR",
+          "FEATURE_MULTIPLICITY_ERROR",
+          "ANNOTATION_ERROR",
+          "UNRESOLVED_REQUIREMENT_ERROR",
+          "REQUIRED_CONTEXT_OWNER_ERROR"
+        ]
+      }
+    ]
+  }
+]
