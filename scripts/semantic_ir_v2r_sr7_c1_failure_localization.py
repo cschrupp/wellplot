@@ -517,8 +517,6 @@ def build_artifacts(evidence: dict[str, object], preflight: dict[str, object]) -
             for key, value in evidence.items()
             if key
             not in {
-                "pydantic_errors",
-                "json_schema_errors",
                 "structural_projection",
             }
         },

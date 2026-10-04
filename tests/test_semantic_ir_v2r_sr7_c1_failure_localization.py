@@ -205,8 +205,10 @@ def test_unlocalized_failure_remains_unresolved() -> None:
 @pytest.mark.skipif(not C1_ARTIFACT_DIR.exists(), reason="live C1 artifacts not generated yet")
 def test_live_artifacts_are_reproducible_from_sanitized_fixture() -> None:
     """Derived diagnostics reproduce exactly from sanitized evidence."""
-    evidence = _artifact("probe_summary.json")["probe"]
-    preflight = _artifact("probe_summary.json")["preflight"]
+    summary = _artifact("probe_summary.json")
+    evidence = dict(summary["probe"])
+    evidence["structural_projection"] = summary["structural_projection"]
+    preflight = summary["preflight"]
     generated = build_artifacts(evidence, preflight)
     for name, value in generated.items():
         assert value == _artifact(name)

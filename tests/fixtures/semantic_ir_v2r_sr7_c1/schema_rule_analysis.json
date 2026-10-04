@@ -1,0 +1,51 @@
+{
+  "expressibility_for_observed_failure": "NO_PYTHON_ONLY",
+  "failed_rule_ids": [
+    "work_required"
+  ],
+  "local_validator": "jsonschema.Draft202012Validator",
+  "rules": [
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "reference_track_target_required"
+    },
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "companion_target_forbidden"
+    },
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "reference_target_existing_feature"
+    },
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "fill_target_curve"
+    },
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "feature_ids_unique"
+    },
+    {
+      "implementation": "PYDANTIC_MODEL_VALIDATOR",
+      "json_schema_explicit": "NO_PYTHON_ONLY",
+      "rule_id": "work_required"
+    },
+    {
+      "implementation": "PYDANTIC_FIELD_VALIDATOR",
+      "json_schema_explicit": "YES_EXPLICIT",
+      "rule_id": "semantic_id_nonempty"
+    },
+    {
+      "implementation": "JSON_SCHEMA_EXPLICIT",
+      "json_schema_explicit": "YES_EXPLICIT",
+      "rule_id": "kind_enum"
+    }
+  ],
+  "schema_sha256": "d84cdef165ba6d060addd3ed73b018a1f10a3e70ef4a674b5d1a06352c0d58d8",
+  "schema_version": "si-v2r.sr7-c1.schema-analysis.v1"
+}

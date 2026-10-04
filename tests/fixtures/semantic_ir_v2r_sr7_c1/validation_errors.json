@@ -1,0 +1,16 @@
+{
+  "json_schema_errors": [],
+  "primary_failed_path": [],
+  "pydantic_errors": [
+    {
+      "ctx_keys": [
+        "error"
+      ],
+      "loc": [],
+      "msg_category": "work_required",
+      "type": "value_error"
+    }
+  ],
+  "schema_version": "si-v2r.sr7-c1.validation-errors.v1",
+  "validation_error_count": 1
+}
