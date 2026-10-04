@@ -237,7 +237,7 @@ def test_normalized_owned_text_does_not_create_false_failures() -> None:
     varied = deepcopy(gold)
     varied["report_work"]["requirements"] = ["READY FOR SIGNOFF!"]
     varied["sections"][0]["features"][1]["requirements"] = [
-        "ANNOTATE THE INTERVAL TOP WITH A MARKER"
+        "Please annotate the interval top with a marker!"
     ]
     mask = _fixture("case_dimension_mask.json")
     graded = grade_semantics(gold, gold, varied, mask)
@@ -271,6 +271,7 @@ def test_required_context_moved_to_wrong_owner_fails() -> None:
     mask = _fixture("case_dimension_mask.json")
     graded = grade_semantics(gold, gold, moved, mask)
     assert graded["REQUIRED_CONTEXT"]["status"] == "INCORRECT"
+    assert graded["ANNOTATION"]["status"] == "CORRECT"
 
 
 def test_annotation_id_rename_passes_but_annotation_omission_fails() -> None:
@@ -295,6 +296,15 @@ def test_reordered_semantically_distinguishable_sections_fails_section_order() -
     assert not _dimension_equivalent(
         _semantic_model(reordered), _semantic_model(gold), "SECTION_ORDER"
     )
+
+
+def test_section_goal_wording_does_not_change_section_order() -> None:
+    """Section order is topology-only; owned wording remains context-scored."""
+    gold = _gold_case("cm59-alloc-verde-19")
+    expanded = deepcopy(gold)
+    expanded["sections"][0]["goal"] = "Please show the Verde porosity response clearly."
+    expanded["sections"][1]["goal"] = "Please show the Verde borehole image clearly."
+    assert _dimension_equivalent(_semantic_model(expanded), _semantic_model(gold), "SECTION_ORDER")
 
 
 def test_reference_target_uses_feature_position_not_target_id_spelling() -> None:
@@ -355,6 +365,49 @@ def test_constraint_scope_is_model_owned_except_for_garnet_mask() -> None:
             "reason": "SR4 leaves Garnet depth-column ownership unresolved.",
         }
     ]
+
+
+def test_evidence_binds_dimension_contract_and_grader_identity() -> None:
+    """A future row is invalid when either scoring identity hash drifts."""
+    prelive = _fixture("prelive_result.json")
+    expected_dimension_hash = prelive["artifact_hashes"]["semantic_dimension_contract_sha256"]
+    expected_grader_hash = prelive["artifact_hashes"]["semantic_grader_sha256"]
+    schedule = build_execution_schedule(REPO_ROOT)
+    rows = [
+        {
+            **item,
+            "mask_sha256": "mask",
+            "comparison_contract_sha256": "contract",
+            "semantic_dimension_contract_sha256": expected_dimension_hash,
+            "semantic_grader_sha256": expected_grader_hash,
+            "infrastructure_retry_count": 0,
+            "structural_retry_count": 0,
+        }
+        for item in schedule["rows"]
+    ]
+    assert (
+        validate_evidence_rows(
+            rows,
+            schedule,
+            expected_mask_sha256="mask",
+            expected_contract_sha256="contract",
+            expected_semantic_dimension_contract_sha256=expected_dimension_hash,
+            expected_semantic_grader_sha256=expected_grader_hash,
+        )
+        == []
+    )
+    rows[0]["semantic_dimension_contract_sha256"] = "wrong-dimension-contract"
+    rows[1]["semantic_grader_sha256"] = "wrong-grader"
+    errors = validate_evidence_rows(
+        rows,
+        schedule,
+        expected_mask_sha256="mask",
+        expected_contract_sha256="contract",
+        expected_semantic_dimension_contract_sha256=expected_dimension_hash,
+        expected_semantic_grader_sha256=expected_grader_hash,
+    )
+    assert "SEMANTIC_DIMENSION_CONTRACT_HASH" in errors
+    assert "SEMANTIC_GRADER_HASH" in errors
 
 
 def test_deterministic_repair_does_not_create_model_or_blocked_system_credit() -> None:
@@ -445,6 +498,8 @@ def test_runtime_attestation_and_evidence_drift_fail_closed() -> None:
         schedule,
         expected_mask_sha256="mask",
         expected_contract_sha256="contract",
+        expected_semantic_dimension_contract_sha256="dimension",
+        expected_semantic_grader_sha256="grader",
     )
     assert "ROW_COUNT" in errors
     assert "SCHEDULE_POPULATION_MISMATCH" in errors

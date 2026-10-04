@@ -22,7 +22,8 @@ evidence, and synthetic-fixture hashes are recorded in
 This checkpoint is an implementation checkpoint only, not an independently
 accepted freeze. The previous raw-equality grader was representation-sensitive;
 the current correction replaces it with explicit semantic-equivalence
-predicates and adversarial invariance coverage. No live A/B comparison is
-authorized by P0. A later P1 must use the repaired hashes without modifying the
-scoring mask, retry policy, drift rules, schedule, or evidence schema after
+predicates and adversarial invariance coverage. Future rows also bind the
+semantic-dimension-contract hash and scorer-source hash. No live A/B comparison
+is authorized by P0. A later P1 must use the repaired hashes without modifying
+the scoring mask, retry policy, drift rules, schedule, or evidence schema after
 outputs are observed.

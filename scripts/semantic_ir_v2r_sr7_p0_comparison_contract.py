@@ -232,7 +232,8 @@ def build_dimension_contract() -> dict[str, Any]:
             "identity": "semantic_ids_are_local_handles_not_semantic_values",
             "relationship_targets": "compare_target_feature_position_within_section",
             "text": "compare_normalized_owned_context_using_lq0_preservation_rules",
-            "section_order": "ordered_id_invariant_semantic_and_owned_context_signatures",
+            "section_order": "ordered_id_invariant_hard_semantic_signatures",
+            "annotation": "ordered_annotation_feature_positions; text_is_context",
             "CONSTRAINT_SCOPE": "MODEL_EXCEPT_GARNET_CASE_SPECIFIC_MASK",
         },
         "case_specific_overrides": [
@@ -451,6 +452,8 @@ def build_evidence_schema() -> dict[str, Any]:
     required = [
         "experiment_version",
         "comparison_contract_sha256",
+        "semantic_dimension_contract_sha256",
+        "semantic_grader_sha256",
         "configuration_id",
         "configuration_fingerprint",
         "case_id",
@@ -490,7 +493,7 @@ def build_evidence_schema() -> dict[str, Any]:
         "terminal_row_status",
     ]
     return {
-        "schema_version": "si-v2r.sr7-p0.evidence-schema.v1",
+        "schema_version": "si-v2r.sr7-p0.evidence-schema.v2",
         "baseline": BASELINE_SHA,
         "required_fields": required,
         "forbidden_fields": [
@@ -534,13 +537,8 @@ def _report_content_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R) ->
 
 
 def _section_order_projection(intent: SemanticIRV2R) -> list[dict[str, object]]:
-    """Build ordered section signatures without using local semantic IDs."""
-    hard_sections = semantic_projection(intent)["sections"]
-    context_sections = context_projection(intent)["sections"]
-    return [
-        {"semantic": hard_section, "context": context_section}
-        for hard_section, context_section in zip(hard_sections, context_sections, strict=True)
-    ]
+    """Build ordered hard section signatures without local semantic IDs."""
+    return semantic_projection(intent)["sections"]
 
 
 def _owned_context_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R) -> bool:
@@ -565,20 +563,17 @@ def _owned_context_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R) -> 
     return True
 
 
-def _annotation_projection(intent: SemanticIRV2R) -> list[list[dict[str, object]]]:
-    """Project annotation meaning and owned context while omitting annotation IDs."""
+def _annotation_projection(intent: SemanticIRV2R) -> list[list[int]]:
+    """Project annotation placement while leaving text to context grading."""
     hard_sections = semantic_projection(intent)["sections"]
-    context_sections = context_projection(intent)["sections"]
-    result: list[list[dict[str, object]]] = []
-    for hard_section, context_section in zip(hard_sections, context_sections, strict=True):
-        annotations = []
-        for feature, feature_context in zip(
-            hard_section["features"], context_section["feature_context"], strict=True
-        ):
-            if feature["kind"] == "annotation":
-                annotations.append(feature_context)
-        result.append(annotations)
-    return result
+    return [
+        [
+            index
+            for index, feature in enumerate(section["features"])
+            if feature["kind"] == "annotation"
+        ]
+        for section in hard_sections
+    ]
 
 
 def _constraint_projection(intent: SemanticIRV2R) -> list[dict[str, object]]:
@@ -881,6 +876,8 @@ def validate_evidence_rows(
     *,
     expected_mask_sha256: str,
     expected_contract_sha256: str,
+    expected_semantic_dimension_contract_sha256: str,
+    expected_semantic_grader_sha256: str,
 ) -> list[str]:
     """Return integrity errors for a future 96-row evidence population."""
     errors: list[str] = []
@@ -911,6 +908,13 @@ def validate_evidence_rows(
             errors.append("MASK_HASH")
         if row.get("comparison_contract_sha256") != expected_contract_sha256:
             errors.append("CONTRACT_HASH")
+        if (
+            row.get("semantic_dimension_contract_sha256")
+            != expected_semantic_dimension_contract_sha256
+        ):
+            errors.append("SEMANTIC_DIMENSION_CONTRACT_HASH")
+        if row.get("semantic_grader_sha256") != expected_semantic_grader_sha256:
+            errors.append("SEMANTIC_GRADER_HASH")
         if row.get("infrastructure_retry_count", 0) > 1:
             errors.append("INFRASTRUCTURE_RETRY_LIMIT")
         if row.get("structural_retry_count", 0) > 1:
@@ -1102,6 +1106,7 @@ def _prelive_result(
     evidence: dict[str, Any],
     synthetic: dict[str, Any],
 ) -> dict[str, Any]:
+    semantic_grader_hash = sha256_bytes(Path(__file__).read_bytes())
     contract_hashes = {
         "configuration_contract_sha256": sha256_text(canonical_json(configs)),
         "runtime_attestation_contract_sha256": sha256_text(canonical_json(runtime)),
@@ -1110,9 +1115,10 @@ def _prelive_result(
         "comparison_contract_sha256": sha256_text(canonical_json(comparison)),
         "execution_schedule_sha256": sha256_text(canonical_json(schedule)),
         "evidence_schema_sha256": sha256_text(canonical_json(evidence)),
+        "semantic_grader_sha256": semantic_grader_hash,
     }
     return {
-        "schema_version": "si-v2r.sr7-p0.prelive-result.v2",
+        "schema_version": "si-v2r.sr7-p0.prelive-result.v3",
         "baseline": BASELINE_SHA,
         "decision": "SI_V2R_SR7_P0_REWORK_REQUIRED",
         "configuration_a_fingerprint": CONFIGURATION_A_FINGERPRINT,
@@ -1124,6 +1130,8 @@ def _prelive_result(
         "provider_calls": 0,
         "endpoint_calls": 0,
         "worker_program_calls": 0,
+        "semantic_dimension_contract_sha256": contract_hashes["semantic_dimension_contract_sha256"],
+        "semantic_grader_sha256": semantic_grader_hash,
         "production_changes": 0,
         "prompt_changed": False,
         "schema_changed": False,

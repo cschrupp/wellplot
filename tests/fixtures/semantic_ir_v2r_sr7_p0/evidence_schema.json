@@ -19,6 +19,8 @@
   "required_fields": [
     "experiment_version",
     "comparison_contract_sha256",
+    "semantic_dimension_contract_sha256",
+    "semantic_grader_sha256",
     "configuration_id",
     "configuration_fingerprint",
     "case_id",
@@ -61,5 +63,5 @@
     "infrastructure": 1,
     "structural": 1
   },
-  "schema_version": "si-v2r.sr7-p0.evidence-schema.v1"
+  "schema_version": "si-v2r.sr7-p0.evidence-schema.v2"
 }

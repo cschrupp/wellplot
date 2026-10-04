@@ -2,8 +2,9 @@
 
 The future evidence population contains exactly one bounded row for each of
 the 96 scheduled logical attempts. Each row binds the configuration fingerprint,
-case/request, prompts, schema, gold, mask, comparison contract, and runtime
-material attestation. It preserves initial and retry statuses, usage/latency,
+case/request, prompts, schema, gold, mask, comparison contract, semantic
+dimension contract, semantic grader source identity, and runtime material
+attestation. It preserves initial and retry statuses, usage/latency,
 canonical V2R semantics, dimension results, compiler outcome, safety actions,
 and separate system results.
 

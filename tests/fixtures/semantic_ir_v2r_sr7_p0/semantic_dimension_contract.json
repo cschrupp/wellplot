@@ -94,9 +94,10 @@
   ],
   "equivalence": {
     "CONSTRAINT_SCOPE": "MODEL_EXCEPT_GARNET_CASE_SPECIFIC_MASK",
+    "annotation": "ordered_annotation_feature_positions; text_is_context",
     "identity": "semantic_ids_are_local_handles_not_semantic_values",
     "relationship_targets": "compare_target_feature_position_within_section",
-    "section_order": "ordered_id_invariant_semantic_and_owned_context_signatures",
+    "section_order": "ordered_id_invariant_hard_semantic_signatures",
     "text": "compare_normalized_owned_context_using_lq0_preservation_rules"
   },
   "historical_outcomes_used_to_construct_mask": false,

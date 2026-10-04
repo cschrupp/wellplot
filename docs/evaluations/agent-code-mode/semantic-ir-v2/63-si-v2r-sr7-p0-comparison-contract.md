@@ -22,9 +22,10 @@ Semantic grading uses dimension-level equivalence rather than raw object
 equality. Semantic IDs are local correlation handles and are ignored as spelling;
 relationship targets are compared by feature position; owned report, section,
 feature, annotation, constraint, and unresolved text is normalized using the
-accepted LQ0 preservation rules. Section order uses ordered ID-invariant semantic
-and owned-context signatures. Context moved to a different semantic owner still
-fails `REQUIRED_CONTEXT`.
+accepted LQ0 preservation rules. Section order uses only ordered ID-invariant
+hard semantic signatures, and annotation uses ordered annotation feature
+positions. Context moved to a different semantic owner still fails
+`REQUIRED_CONTEXT`.
 
 ## Retry and Ordering Rules
 
