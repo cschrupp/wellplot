@@ -1,0 +1,23 @@
+{
+  "a_frozen": true,
+  "adr_cm57": "UNCHANGED",
+  "b_frozen": false,
+  "baseline": "fef690452c00dcaea6fa41df0e0af779269372ba",
+  "cm58_changed": false,
+  "cm59a_requests_sent": 0,
+  "configuration_a_fingerprint_sha256": "154513f15bba419aae7ce87c8a0e26a601f45829281e385c599d597fc810711a",
+  "configuration_b_fingerprint_sha256": "a473cc25db1415373b81d7775c263170d7c6388fa45caa5572b11308e8b7d980",
+  "decision": "SI_V2R_SR7_C0_CONFIGURATION_UNRESOLVED",
+  "gold_changed": false,
+  "infrastructure_retries": 0,
+  "live_paired_comparison_authorized": false,
+  "production_changes": 0,
+  "prompt_changed": false,
+  "provider_inference_used_for_model_evaluation": 0,
+  "schema_changed": false,
+  "schema_version": "si-v2r.sr7-c0.result.v1",
+  "sr7_p0_authorized": false,
+  "structured_calls_a": 1,
+  "structured_calls_b": 2,
+  "v2r_changed": false
+}
