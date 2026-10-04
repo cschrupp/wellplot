@@ -426,7 +426,7 @@ def _configuration_record(
         "endpoint_identity_sha256": sha256_text(canonical_json(identity)),
         "historical_lq0_endpoint_identity_sha256": HISTORICAL_A_ENDPOINT_SHA256,
         "historical_identity_match": (
-            identity.get("normalized_identity_sha256") == HISTORICAL_A_ENDPOINT_SHA256
+            sha256_text(canonical_json(identity)) == HISTORICAL_A_ENDPOINT_SHA256
             if configuration_id == "A"
             else None
         ),

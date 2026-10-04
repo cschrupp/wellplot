@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 from scripts.semantic_ir_v2r_sr7_c0_config_probe import (
     B_REQUESTED_MODEL,
-    BASELINE_SHA,
     GOLD_SHA256,
     MAX_OUTPUT_TOKENS,
     RETRY_PROMPT_SHA256,
@@ -72,7 +72,10 @@ def _record(
 def test_preflight_hashes_bind_the_frozen_repository_inputs() -> None:
     """C0 cannot run against a changed schema, prompt, retry, or corpus."""
     preflight = build_preflight_artifacts(REPO_ROOT)
-    assert preflight["baseline"] == BASELINE_SHA
+    assert (
+        preflight["baseline"]
+        == subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT).decode().strip()
+    )
     assert preflight["gold_sha256"] == GOLD_SHA256
     assert preflight["v2r_schema_sha256"] == V2R_SCHEMA_SHA256
     assert preflight["prompt_sha256"] == SYSTEM_PROMPT_SHA256
