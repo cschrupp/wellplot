@@ -12,6 +12,14 @@
     "SYSTEM_NOT_APPLICABLE"
   ],
   "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "case_specific_overrides": [
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "CONSTRAINT_SCOPE",
+      "owner": "UNRESOLVED_CONTRACT",
+      "reason": "SR4 leaves Garnet depth-column ownership unresolved."
+    }
+  ],
   "dimensions": [
     {
       "dimension": "REPORT_PRESENCE",
@@ -76,7 +84,7 @@
     {
       "dimension": "CONSTRAINT_SCOPE",
       "meaning": "semantic obligation defined by the frozen V2R contract",
-      "owner": "UNRESOLVED_CONTRACT"
+      "owner": "MODEL"
     },
     {
       "dimension": "UNRESOLVED_REQUIREMENT",
@@ -84,6 +92,13 @@
       "owner": "MODEL"
     }
   ],
+  "equivalence": {
+    "CONSTRAINT_SCOPE": "MODEL_EXCEPT_GARNET_CASE_SPECIFIC_MASK",
+    "identity": "semantic_ids_are_local_handles_not_semantic_values",
+    "relationship_targets": "compare_target_feature_position_within_section",
+    "section_order": "ordered_id_invariant_semantic_and_owned_context_signatures",
+    "text": "compare_normalized_owned_context_using_lq0_preservation_rules"
+  },
   "historical_outcomes_used_to_construct_mask": false,
-  "schema_version": "si-v2r.sr7-p0.semantic-dimension-contract.v1"
+  "schema_version": "si-v2r.sr7-p0.semantic-dimension-contract.v2"
 }

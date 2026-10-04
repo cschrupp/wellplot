@@ -2,9 +2,10 @@
 
 ## Status
 
-Provider-free harness freeze accepted for independent review. The authorized
-baseline is `9c0dfd2fa0a060195199f21655ccdffd2cc68c9c`. This slice defines the
-future A/B comparison; it does not execute either configuration.
+Provider-free harness implementation requires semantic-equivalence rework before
+acceptance. The authorized baseline is
+`9c0dfd2fa0a060195199f21655ccdffd2cc68c9c`. This slice defines the future A/B
+comparison; it does not execute either configuration.
 
 The comparison is explicitly a model-plus-serving-configuration study on the
 repeatedly inspected CM59A diagnostic set. It is not a generalization claim,
@@ -28,6 +29,8 @@ The future live runner is a separate P1 authorization.
 
 ## Terminal State
 
-`SI_V2R_SR7_P0_HARNESS_FROZEN` is valid only when the machine-readable
-configuration, dimension contract, mask, schedule, evidence schema, scoring
-rules, synthetic branches, and artifact hashes all reproduce provider-free.
+`SI_V2R_SR7_P0_HARNESS_FROZEN` is not currently claimed. The repaired
+dimension-level semantic-equivalence predicates, adversarial invariance tests,
+and regenerated artifact hashes must independently pass before that terminal
+state can be considered. Until then the result is
+`SI_V2R_SR7_P0_REWORK_REQUIRED` and P1 remains unauthorized.

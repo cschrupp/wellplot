@@ -18,6 +18,14 @@ not imputed. Case relations use dominance: mixed A/B dimension wins are
 `UNCHANGED` with reason `MIXED_TRADEOFF`, and equal wins are `UNCHANGED` with
 reason `EQUAL`.
 
+Semantic grading uses dimension-level equivalence rather than raw object
+equality. Semantic IDs are local correlation handles and are ignored as spelling;
+relationship targets are compared by feature position; owned report, section,
+feature, annotation, constraint, and unresolved text is normalized using the
+accepted LQ0 preservation rules. Section order uses ordered ID-invariant semantic
+and owned-context signatures. Context moved to a different semantic owner still
+fails `REQUIRED_CONTEXT`.
+
 ## Retry and Ordering Rules
 
 Each logical attempt permits at most one structural retry and one transient

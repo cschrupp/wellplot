@@ -1,7 +1,7 @@
 # SI-V2R SR7-P0 Result
 
 ```yaml
-decision: SI_V2R_SR7_P0_HARNESS_FROZEN
+decision: SI_V2R_SR7_P0_REWORK_REQUIRED
 baseline: 9c0dfd2fa0a060195199f21655ccdffd2cc68c9c
 case_count: 24
 dimension_count: 14
@@ -19,6 +19,10 @@ configuration, runtime-attestation, dimension, mask, comparison, schedule,
 evidence, and synthetic-fixture hashes are recorded in
 `prelive_result.json`.
 
-No live A/B comparison is authorized by P0. A later P1 must use these hashes
-without modifying the scoring mask, retry policy, drift rules, schedule, or
-evidence schema after outputs are observed.
+This checkpoint is an implementation checkpoint only, not an independently
+accepted freeze. The previous raw-equality grader was representation-sensitive;
+the current correction replaces it with explicit semantic-equivalence
+predicates and adversarial invariance coverage. No live A/B comparison is
+authorized by P0. A later P1 must use the repaired hashes without modifying the
+scoring mask, retry policy, drift rules, schedule, or evidence schema after
+outputs are observed.

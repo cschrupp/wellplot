@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import subprocess
 from collections import Counter
+from copy import deepcopy
 from pathlib import Path
 
 from scripts.semantic_ir_v2r_sr7_c0_config_probe import canonical_json as c0_canonical_json
@@ -18,6 +19,8 @@ from scripts.semantic_ir_v2r_sr7_p0_comparison_contract import (
     SCHEMA_SHA256,
     SYSTEM_ROLES,
     _configuration_contract,
+    _dimension_equivalent,
+    _semantic_model,
     _synthetic_mask,
     _synthetic_rows,
     build_artifacts,
@@ -194,6 +197,164 @@ def test_pure_grader_is_deterministic_and_respects_mask() -> None:
     assert first["CONSTRAINT_SCOPE"]["status"] == "MASKED"
     assert first["FEATURE_KIND"]["status"] == "CORRECT"
     assert first["SECTION_STRUCTURE"]["status"] == "CORRECT"
+
+
+def _gold_case(case_id: str) -> dict[str, object]:
+    cases = json.loads(GOLD_PATH.read_text(encoding="utf-8"))["cases"]
+    return next(case for case in cases if case["case_id"] == case_id)
+
+
+def test_semantic_id_alpha_renaming_preserves_all_applicable_scores() -> None:
+    """Local correlation handles do not become semantic grading values."""
+    gold = _gold_case("cm59-mixed-amber-24")
+    renamed = deepcopy(gold)
+    mapping: dict[str, str] = {}
+    for section_index, section in enumerate(renamed["sections"]):
+        for feature_index, feature in enumerate(section["features"]):
+            old_id = feature["semantic_id"]
+            mapping[old_id] = f"local-{section_index}-{feature_index}"
+            feature["semantic_id"] = mapping[old_id]
+    for section in renamed["sections"]:
+        for feature in section["features"]:
+            if "target_semantic_id" in feature:
+                feature["target_semantic_id"] = mapping[feature["target_semantic_id"]]
+        reference = section.get("reference_intent")
+        if reference and reference.get("target_semantic_id"):
+            reference["target_semantic_id"] = mapping[reference["target_semantic_id"]]
+
+    mask = _fixture("case_dimension_mask.json")
+    graded = grade_semantics(gold, gold, renamed, mask)
+    assert all(
+        result["status"] == "CORRECT"
+        for result in graded.values()
+        if result["status"] not in {"NOT_APPLICABLE", "MASKED"}
+    )
+
+
+def test_normalized_owned_text_does_not_create_false_failures() -> None:
+    """Case, punctuation, and spacing variation is normalized in owned context."""
+    gold = _gold_case("cm59-mixed-amber-24")
+    varied = deepcopy(gold)
+    varied["report_work"]["requirements"] = ["READY FOR SIGNOFF!"]
+    varied["sections"][0]["features"][1]["requirements"] = [
+        "ANNOTATE THE INTERVAL TOP WITH A MARKER"
+    ]
+    mask = _fixture("case_dimension_mask.json")
+    graded = grade_semantics(gold, gold, varied, mask)
+    assert graded["REPORT_CONTENT"]["status"] == "CORRECT"
+    assert graded["REQUIRED_CONTEXT"]["status"] == "CORRECT"
+    assert graded["ANNOTATION"]["status"] == "CORRECT"
+
+
+def test_normalized_section_source_context_preserves_its_owner() -> None:
+    """Source hints are normalized but cannot be silently dropped or relocated."""
+    gold = _gold_case("cm59-single-fig-05")
+    gold["sections"][0]["source_hints"] = ["Well Alpha"]
+    equivalent = deepcopy(gold)
+    equivalent["sections"][0]["source_hints"] = ["well alpha"]
+    missing = deepcopy(gold)
+    missing["sections"][0]["source_hints"] = []
+    assert _dimension_equivalent(
+        _semantic_model(equivalent), _semantic_model(gold), "REQUIRED_CONTEXT"
+    )
+    assert not _dimension_equivalent(
+        _semantic_model(missing), _semantic_model(gold), "REQUIRED_CONTEXT"
+    )
+
+
+def test_required_context_moved_to_wrong_owner_fails() -> None:
+    """Context retained under the wrong owner is not semantic preservation."""
+    gold = _gold_case("cm59-mixed-amber-24")
+    moved = deepcopy(gold)
+    moved["sections"][0]["requirements"] = ["Annotate the interval top with a marker."]
+    moved["sections"][0]["features"][1]["requirements"] = []
+    mask = _fixture("case_dimension_mask.json")
+    graded = grade_semantics(gold, gold, moved, mask)
+    assert graded["REQUIRED_CONTEXT"]["status"] == "INCORRECT"
+
+
+def test_annotation_id_rename_passes_but_annotation_omission_fails() -> None:
+    """Annotation identity spelling is irrelevant, but removing the feature is not."""
+    gold = _gold_case("cm59-mixed-amber-24")
+    renamed = deepcopy(gold)
+    renamed["sections"][0]["features"][1]["semantic_id"] = "annotation-local"
+    omitted = deepcopy(gold)
+    omitted["sections"][0]["features"] = [omitted["sections"][0]["features"][0]]
+    mask = _fixture("case_dimension_mask.json")
+    renamed_grade = grade_semantics(gold, gold, renamed, mask)
+    omitted_grade = grade_semantics(gold, gold, omitted, mask)
+    assert renamed_grade["ANNOTATION"]["status"] == "CORRECT"
+    assert omitted_grade["ANNOTATION"]["status"] == "INCORRECT"
+
+
+def test_reordered_semantically_distinguishable_sections_fails_section_order() -> None:
+    """Order remains meaningful when section signatures differ semantically."""
+    gold = _gold_case("cm59-alloc-verde-19")
+    reordered = deepcopy(gold)
+    reordered["sections"].reverse()
+    assert not _dimension_equivalent(
+        _semantic_model(reordered), _semantic_model(gold), "SECTION_ORDER"
+    )
+
+
+def test_reference_target_uses_feature_position_not_target_id_spelling() -> None:
+    """Target-ID renaming passes while retargeting to another feature fails."""
+    gold = {
+        "summary": "Reference one scalar feature.",
+        "report_work": None,
+        "sections": [
+            {
+                "kind": "log_plot",
+                "goal": "Reference one scalar feature.",
+                "source_hints": [],
+                "features": [
+                    {
+                        "kind": "curve",
+                        "semantic_id": "left",
+                        "requirements": [],
+                        "constraints": [],
+                    },
+                    {
+                        "kind": "curve",
+                        "semantic_id": "right",
+                        "requirements": [],
+                        "constraints": [],
+                    },
+                ],
+                "reference_intent": {"kind": "reference_track", "target_semantic_id": "left"},
+                "requirements": [],
+                "constraints": [],
+            }
+        ],
+        "unresolved_requirements": [],
+    }
+    renamed = deepcopy(gold)
+    renamed["sections"][0]["features"][0]["semantic_id"] = "renamed-left"
+    renamed["sections"][0]["features"][1]["semantic_id"] = "renamed-right"
+    renamed["sections"][0]["reference_intent"]["target_semantic_id"] = "renamed-left"
+    retargeted = deepcopy(renamed)
+    retargeted["sections"][0]["reference_intent"]["target_semantic_id"] = "renamed-right"
+    assert _dimension_equivalent(
+        _semantic_model(renamed), _semantic_model(gold), "REFERENCE_TARGET"
+    )
+    assert not _dimension_equivalent(
+        _semantic_model(retargeted), _semantic_model(gold), "REFERENCE_TARGET"
+    )
+
+
+def test_constraint_scope_is_model_owned_except_for_garnet_mask() -> None:
+    """The dimension contract records the SR4 exception at case scope."""
+    dimensions = _fixture("semantic_dimension_contract.json")
+    owners = {row["dimension"]: row["owner"] for row in dimensions["dimensions"]}
+    assert owners["CONSTRAINT_SCOPE"] == "MODEL"
+    assert dimensions["case_specific_overrides"] == [
+        {
+            "case_id": "cm59-single-garnet-06",
+            "dimension": "CONSTRAINT_SCOPE",
+            "owner": "UNRESOLVED_CONTRACT",
+            "reason": "SR4 leaves Garnet depth-column ownership unresolved.",
+        }
+    ]
 
 
 def test_deterministic_repair_does_not_create_model_or_blocked_system_credit() -> None:

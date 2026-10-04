@@ -27,3 +27,8 @@ candidate behavior.
 
 The mask is immutable after P0. Its SHA-256 is recorded in
 `case_dimension_mask.json` and the pre-live result.
+
+`CONSTRAINT_SCOPE` is normally model-owned. The only contract exception is
+Garnet's `MASKED_UNRESOLVED_CONTRACT` row for the depth-column ownership
+question. The dimension contract does not make constraint scope globally
+unresolved.

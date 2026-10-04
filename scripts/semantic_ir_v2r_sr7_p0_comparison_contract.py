@@ -17,6 +17,9 @@ from typing import Any
 from scripts.si_v2r_model_qualification import (
     STRUCTURAL_RETRY_PROMPT,
     V2R_SYSTEM_PROMPT,
+    _required_context_preservation,
+    context_projection,
+    semantic_projection,
 )
 from wellplot.agent.code_mode.semantic_ir_v2r import SemanticIRV2R
 
@@ -209,11 +212,11 @@ def build_dimension_contract() -> dict[str, Any]:
         "REFERENCE_KIND": "MODEL",
         "REFERENCE_TARGET": "MODEL",
         "ANNOTATION": "MODEL",
-        "CONSTRAINT_SCOPE": "UNRESOLVED_CONTRACT",
+        "CONSTRAINT_SCOPE": "MODEL",
         "UNRESOLVED_REQUIREMENT": "MODEL",
     }
     return {
-        "schema_version": "si-v2r.sr7-p0.semantic-dimension-contract.v1",
+        "schema_version": "si-v2r.sr7-p0.semantic-dimension-contract.v2",
         "baseline": BASELINE_SHA,
         "dimensions": [
             {
@@ -225,6 +228,21 @@ def build_dimension_contract() -> dict[str, Any]:
         ],
         "allowed_model_roles": list(MODEL_ROLES),
         "allowed_system_roles": list(SYSTEM_ROLES),
+        "equivalence": {
+            "identity": "semantic_ids_are_local_handles_not_semantic_values",
+            "relationship_targets": "compare_target_feature_position_within_section",
+            "text": "compare_normalized_owned_context_using_lq0_preservation_rules",
+            "section_order": "ordered_id_invariant_semantic_and_owned_context_signatures",
+            "CONSTRAINT_SCOPE": "MODEL_EXCEPT_GARNET_CASE_SPECIFIC_MASK",
+        },
+        "case_specific_overrides": [
+            {
+                "case_id": "cm59-single-garnet-06",
+                "dimension": "CONSTRAINT_SCOPE",
+                "owner": "UNRESOLVED_CONTRACT",
+                "reason": "SR4 leaves Garnet depth-column ownership unresolved.",
+            }
+        ],
         "historical_outcomes_used_to_construct_mask": False,
     }
 
@@ -495,82 +513,158 @@ def build_evidence_schema() -> dict[str, Any]:
     }
 
 
-def _section_signature(section: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "kind": section.get("kind"),
-        "features": [
-            {"kind": feature.get("kind"), "semantic_id": feature.get("semantic_id")}
-            for feature in section.get("features", [])
-        ],
-    }
+def _report_content_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R) -> bool:
+    """Compare report-owned requirements without requiring wording identity."""
+    generated_report = context_projection(generated)["report_work"]
+    gold_report = context_projection(gold)["report_work"]
+    if (generated_report is None) != (gold_report is None):
+        return False
+    if gold_report is None:
+        return True
+    generated_values = [
+        generated_report["goal"],
+        *generated_report["requirements"],
+        *generated_report["constraints"],
+    ]
+    for field_name in ("requirements", "constraints"):
+        for required in gold_report[field_name]:
+            if required and not any(required in value for value in generated_values):
+                return False
+    return True
 
 
-def _dimension_value(generated: dict[str, Any], dimension: str) -> object:
-    sections = generated.get("sections", [])
+def _section_order_projection(intent: SemanticIRV2R) -> list[dict[str, object]]:
+    """Build ordered section signatures without using local semantic IDs."""
+    hard_sections = semantic_projection(intent)["sections"]
+    context_sections = context_projection(intent)["sections"]
+    return [
+        {"semantic": hard_section, "context": context_section}
+        for hard_section, context_section in zip(hard_sections, context_sections, strict=True)
+    ]
+
+
+def _owned_context_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R) -> bool:
+    """Apply LQ0 preservation plus normalized section-owned source context."""
+    preserved, _ = _required_context_preservation(generated, gold)
+    if not preserved:
+        return False
+    generated_sections = context_projection(generated)["sections"]
+    gold_sections = context_projection(gold)["sections"]
+    if len(generated_sections) != len(gold_sections):
+        return False
+    for generated_section, gold_section in zip(generated_sections, gold_sections, strict=True):
+        for required in gold_section["source_hints"]:
+            if required and not any(
+                required in value for value in generated_section["source_hints"]
+            ):
+                return False
+        required_hint = gold_section["existing_section_hint"]
+        generated_hint = generated_section["existing_section_hint"]
+        if required_hint and (generated_hint is None or required_hint not in generated_hint):
+            return False
+    return True
+
+
+def _annotation_projection(intent: SemanticIRV2R) -> list[list[dict[str, object]]]:
+    """Project annotation meaning and owned context while omitting annotation IDs."""
+    hard_sections = semantic_projection(intent)["sections"]
+    context_sections = context_projection(intent)["sections"]
+    result: list[list[dict[str, object]]] = []
+    for hard_section, context_section in zip(hard_sections, context_sections, strict=True):
+        annotations = []
+        for feature, feature_context in zip(
+            hard_section["features"], context_section["feature_context"], strict=True
+        ):
+            if feature["kind"] == "annotation":
+                annotations.append(feature_context)
+        result.append(annotations)
+    return result
+
+
+def _constraint_projection(intent: SemanticIRV2R) -> list[dict[str, object]]:
+    """Project constraint ownership with normalized text and stable positions."""
+    return [
+        {
+            "section": section["constraints"],
+            "features": [feature["constraints"] for feature in section["feature_context"]],
+        }
+        for section in context_projection(intent)["sections"]
+    ]
+
+
+def _unresolved_projection(intent: SemanticIRV2R) -> list[str]:
+    """Normalize unresolved requirements without preserving spelling noise."""
+    return context_projection(intent)["unresolved_requirements"]
+
+
+def _dimension_equivalent(generated: SemanticIRV2R, gold: SemanticIRV2R, dimension: str) -> bool:
+    """Evaluate one dimension using accepted semantic, ownership, and text rules."""
+    generated_hard = semantic_projection(generated)
+    gold_hard = semantic_projection(gold)
     if dimension == "REPORT_PRESENCE":
-        return generated.get("report_work") is not None
+        return generated_hard["report_work_present"] == gold_hard["report_work_present"]
     if dimension == "REPORT_CONTENT":
-        return generated.get("report_work")
+        return _report_content_equivalent(generated, gold)
     if dimension == "SECTION_STRUCTURE":
-        return [section.get("kind") for section in sections]
+        return [section["kind"] for section in generated_hard["sections"]] == [
+            section["kind"] for section in gold_hard["sections"]
+        ]
     if dimension == "SECTION_ALLOCATION":
-        return len(sections)
+        return generated_hard["section_count"] == gold_hard["section_count"]
     if dimension == "SECTION_ORDER":
-        return [_section_signature(section) for section in sections]
+        return _section_order_projection(generated) == _section_order_projection(gold)
     if dimension == "FEATURE_KIND":
         return [
-            [feature.get("kind") for feature in section.get("features", [])] for section in sections
+            [feature["kind"] for feature in section["features"]]
+            for section in generated_hard["sections"]
+        ] == [
+            [feature["kind"] for feature in section["features"]]
+            for section in gold_hard["sections"]
         ]
     if dimension == "FEATURE_MULTIPLICITY":
-        return [len(section.get("features", [])) for section in sections]
-    if dimension == "REQUIRED_CONTEXT":
-        return [
-            {
-                "source_hints": section.get("source_hints", []),
-                "requirements": section.get("requirements", []),
-                "constraints": section.get("constraints", []),
-                "feature_requirements": [
-                    {
-                        "requirements": feature.get("requirements", []),
-                        "constraints": feature.get("constraints", []),
-                    }
-                    for feature in section.get("features", [])
-                ],
-            }
-            for section in sections
+        return [len(section["features"]) for section in generated_hard["sections"]] == [
+            len(section["features"]) for section in gold_hard["sections"]
         ]
+    if dimension == "REQUIRED_CONTEXT":
+        return _owned_context_equivalent(generated, gold)
     if dimension == "REFERENCE_PRESENCE":
-        return [section.get("reference_intent") is not None for section in sections]
+        return [
+            section["reference_intent"] is not None for section in generated_hard["sections"]
+        ] == [section["reference_intent"] is not None for section in gold_hard["sections"]]
     if dimension == "REFERENCE_KIND":
-        return [(section.get("reference_intent") or {}).get("kind") for section in sections]
+        return [
+            None if section["reference_intent"] is None else section["reference_intent"]["kind"]
+            for section in generated_hard["sections"]
+        ] == [
+            None if section["reference_intent"] is None else section["reference_intent"]["kind"]
+            for section in gold_hard["sections"]
+        ]
     if dimension == "REFERENCE_TARGET":
         return [
-            (section.get("reference_intent") or {}).get("target_semantic_id")
-            for section in sections
+            None
+            if section["reference_intent"] is None
+            else section["reference_intent"].get("target_feature_position")
+            for section in generated_hard["sections"]
+        ] == [
+            None
+            if section["reference_intent"] is None
+            else section["reference_intent"].get("target_feature_position")
+            for section in gold_hard["sections"]
         ]
     if dimension == "ANNOTATION":
-        return [
-            {
-                "semantic_id": feature.get("semantic_id"),
-                "requirements": feature.get("requirements", []),
-            }
-            for section in sections
-            for feature in section.get("features", [])
-            if feature.get("kind") == "annotation"
-        ]
+        return _annotation_projection(generated) == _annotation_projection(gold)
     if dimension == "CONSTRAINT_SCOPE":
-        return [
-            {
-                "section": section.get("constraints", []),
-                "features": [
-                    feature.get("constraints", []) for feature in section.get("features", [])
-                ],
-            }
-            for section in sections
-        ]
+        return _constraint_projection(generated) == _constraint_projection(gold)
     if dimension == "UNRESOLVED_REQUIREMENT":
-        return generated.get("unresolved_requirements", [])
+        return _unresolved_projection(generated) == _unresolved_projection(gold)
     raise KeyError(dimension)
+
+
+def _semantic_model(value: dict[str, Any]) -> SemanticIRV2R:
+    """Validate a fixture or provider object without its external case label."""
+    return SemanticIRV2R.model_validate(
+        {key: item for key, item in value.items() if key != "case_id"}
+    )
 
 
 def grade_semantics(
@@ -597,10 +691,14 @@ def grade_semantics(
                 "model_role": row["model_role"],
             }
             continue
-        expected = _dimension_value(frozen_gold, dimension)
-        actual = _dimension_value(generated_v2r, dimension)
+        expected_model = _semantic_model(frozen_gold)
+        actual_model = _semantic_model(generated_v2r)
         result[dimension] = {
-            "status": "CORRECT" if actual == expected else "INCORRECT",
+            "status": (
+                "CORRECT"
+                if _dimension_equivalent(actual_model, expected_model, dimension)
+                else "INCORRECT"
+            ),
             "model_role": row["model_role"],
         }
     return result
@@ -1014,9 +1112,9 @@ def _prelive_result(
         "evidence_schema_sha256": sha256_text(canonical_json(evidence)),
     }
     return {
-        "schema_version": "si-v2r.sr7-p0.prelive-result.v1",
+        "schema_version": "si-v2r.sr7-p0.prelive-result.v2",
         "baseline": BASELINE_SHA,
-        "decision": "SI_V2R_SR7_P0_HARNESS_FROZEN",
+        "decision": "SI_V2R_SR7_P0_REWORK_REQUIRED",
         "configuration_a_fingerprint": CONFIGURATION_A_FINGERPRINT,
         "configuration_b_fingerprint": CONFIGURATION_B_FINGERPRINT,
         "case_count": 24,
