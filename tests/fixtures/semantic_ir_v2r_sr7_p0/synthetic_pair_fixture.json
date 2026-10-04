@@ -1,0 +1,310 @@
+{
+  "expected_branches": {
+    "a-better": "A_BETTER",
+    "b-better": "B_BETTER",
+    "equal": "UNCHANGED",
+    "mixed": "UNCHANGED",
+    "not-comparable": "NOT_COMPARABLE"
+  },
+  "provider_calls": 0,
+  "rows": [
+    {
+      "attempt_index": 0,
+      "case_id": "a-better",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "a-better",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "a-better",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "a-better",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "b-better",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "b-better",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "b-better",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "b-better",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "equal",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "equal",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "equal",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "equal",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "mixed",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "ANNOTATION": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        },
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "mixed",
+      "configuration_id": "A",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "ANNOTATION": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        },
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "mixed",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "ANNOTATION": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        },
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "mixed",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "ANNOTATION": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        },
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "INCORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "not-comparable",
+      "configuration_id": "A",
+      "final_canonical_status": "FAIL",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "NOT_EVALUABLE_STRUCTURAL"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "not-comparable",
+      "configuration_id": "A",
+      "final_canonical_status": "FAIL",
+      "initial_canonical_status": "FAIL",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "NOT_EVALUABLE_STRUCTURAL"
+        }
+      }
+    },
+    {
+      "attempt_index": 0,
+      "case_id": "not-comparable",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "attempt_index": 1,
+      "case_id": "not-comparable",
+      "configuration_id": "B",
+      "final_canonical_status": "PASS",
+      "initial_canonical_status": "PASS",
+      "semantic_dimension_results": {
+        "REPORT_CONTENT": {
+          "model_role": "PRIMARY_MODEL_OBLIGATION",
+          "status": "CORRECT"
+        }
+      }
+    },
+    {
+      "branch": "system_credit_blocked",
+      "model_status": "INCORRECT",
+      "system_status": "SYSTEM_BLOCKED"
+    },
+    {
+      "branch": "infrastructure_non_evaluable",
+      "status": "NOT_EVALUABLE_INFRA"
+    },
+    {
+      "branch": "configuration_drift",
+      "decision": "INCONCLUSIVE_CONFIGURATION_DRIFT"
+    },
+    {
+      "branch": "masked_dimension",
+      "status": "MASKED"
+    },
+    {
+      "branch": "structural_terminal",
+      "status": "NOT_EVALUABLE_STRUCTURAL"
+    }
+  ],
+  "schema_version": "si-v2r.sr7-p0.synthetic-paired-fixture.v1"
+}

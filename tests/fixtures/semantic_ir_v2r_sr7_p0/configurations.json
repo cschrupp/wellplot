@@ -1,0 +1,46 @@
+{
+  "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "comparison_claim": "model-plus-serving configuration comparison",
+  "configurations": [
+    {
+      "artifact_provenance": "UNAVAILABLE_FROM_SERVING_INTERFACE",
+      "base_url": "http://192.168.2.140:8888/v1",
+      "concurrency": 1,
+      "configuration_id": "A",
+      "fingerprint": "154513f15bba419aae7ce87c8a0e26a601f45829281e385c599d597fc810711a",
+      "max_tokens": 16384,
+      "provider": "openai_compat",
+      "reasoning_effort": null,
+      "requested_model": "qwen3.6-35b-a3b",
+      "role": "CURRENT_BASELINE",
+      "strict": true,
+      "structured_output": "response_format=json_schema",
+      "temperature": 0.0,
+      "timeout_seconds": 900,
+      "top_p": null
+    },
+    {
+      "artifact_provenance": "UNAVAILABLE_FROM_HOSTED_PROVIDER",
+      "base_url": "https://integrate.api.nvidia.com/v1",
+      "concurrency": 1,
+      "configuration_id": "B",
+      "fingerprint": "a473cc25db1415373b81d7775c263170d7c6388fa45caa5572b11308e8b7d980",
+      "max_tokens": 16384,
+      "provider": "NVIDIA",
+      "reasoning_effort": "low",
+      "requested_model": "nvidia/nemotron-3-super-120b-a12b",
+      "role": "CANDIDATE",
+      "strict": true,
+      "structured_output": "response_format=json_schema",
+      "temperature": 1.0,
+      "timeout_seconds": 900,
+      "top_p": 0.95
+    }
+  ],
+  "not_claimed": [
+    "model-only causal superiority",
+    "production readiness",
+    "generalization"
+  ],
+  "schema_version": "si-v2r.sr7-p0.configuration-contract.v1"
+}

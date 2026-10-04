@@ -1,0 +1,44 @@
+{
+  "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "material_fields": {
+    "A": {
+      "base_url": "required",
+      "case_corpus_sha256": "required",
+      "comparison_concurrency": "required",
+      "configuration_id": "required",
+      "max_tokens": "required",
+      "requested_model": "required",
+      "retry_prompt_sha256": "required",
+      "returned_model": "required",
+      "schema_sha256": "required",
+      "strict": "required",
+      "structured_output_type": "required",
+      "system_prompt_sha256": "required",
+      "temperature": "required",
+      "timeout_seconds": "required"
+    },
+    "B": {
+      "base_url": "required",
+      "case_corpus_sha256": "required",
+      "comparison_concurrency": "required",
+      "configuration_id": "required",
+      "max_tokens": "required",
+      "reasoning_effort": "required",
+      "requested_model": "required",
+      "retry_prompt_sha256": "required",
+      "returned_model": "required",
+      "schema_sha256": "required",
+      "strict": "required",
+      "structured_output_type": "required",
+      "system_prompt_sha256": "required",
+      "temperature": "required",
+      "timeout_seconds": "required",
+      "top_p": "required"
+    }
+  },
+  "preflight_mismatch": "abort before first semantic call",
+  "schema_version": "si-v2r.sr7-p0.runtime-attestation.v1",
+  "unavailable_provenance": "UNAVAILABLE_FROM_SERVING_INTERFACE",
+  "unexpected_returned_model": "stop and classify INCONCLUSIVE_CONFIGURATION_DRIFT",
+  "unrelated_catalog_changes": "not material drift"
+}

@@ -1,0 +1,89 @@
+{
+  "allowed_model_roles": [
+    "PRIMARY_MODEL_OBLIGATION",
+    "RAW_MODEL_DIAGNOSTIC",
+    "MASKED_UNRESOLVED_CONTRACT",
+    "NOT_APPLICABLE"
+  ],
+  "allowed_system_roles": [
+    "SYSTEM_CREDIT_ELIGIBLE",
+    "SYSTEM_OBSERVED_ONLY",
+    "SYSTEM_CREDIT_BLOCKED",
+    "SYSTEM_NOT_APPLICABLE"
+  ],
+  "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "dimensions": [
+    {
+      "dimension": "REPORT_PRESENCE",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "DETERMINISTIC_BOUNDARY"
+    },
+    {
+      "dimension": "REPORT_CONTENT",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "SECTION_STRUCTURE",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "SECTION_ALLOCATION",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "SECTION_ORDER",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "FEATURE_KIND",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "FEATURE_MULTIPLICITY",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "REQUIRED_CONTEXT",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "REFERENCE_PRESENCE",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "SHARED_EXPLICIT_BOUNDARY"
+    },
+    {
+      "dimension": "REFERENCE_KIND",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "REFERENCE_TARGET",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "ANNOTATION",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    },
+    {
+      "dimension": "CONSTRAINT_SCOPE",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "UNRESOLVED_CONTRACT"
+    },
+    {
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "meaning": "semantic obligation defined by the frozen V2R contract",
+      "owner": "MODEL"
+    }
+  ],
+  "historical_outcomes_used_to_construct_mask": false,
+  "schema_version": "si-v2r.sr7-p0.semantic-dimension-contract.v1"
+}

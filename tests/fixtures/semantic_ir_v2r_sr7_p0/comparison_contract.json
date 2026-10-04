@@ -1,0 +1,36 @@
+{
+  "attempts_are_repeated_measurements": true,
+  "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "case_relation": [
+    "A_BETTER",
+    "B_BETTER",
+    "UNCHANGED",
+    "NOT_COMPARABLE"
+  ],
+  "directional_rules": {
+    "A_DIRECTIONALLY_BETTER": "symmetric",
+    "B_DIRECTIONALLY_BETTER": [
+      "B_BETTER primary cases > A_BETTER primary cases",
+      "B primary dimension accuracy > A primary dimension accuracy",
+      "B terminal structural failures <= A terminal structural failures"
+    ],
+    "NO_CLEAR_DIRECTIONAL_DIFFERENCE": "otherwise when evidence is comparable"
+  },
+  "mixed_tradeoff_reason": "MIXED_TRADEOFF",
+  "mixed_tradeoff_relation": "UNCHANGED",
+  "no_arbitrary_weighting": true,
+  "no_p_value_promotion_gate": true,
+  "primary_dimensions": "PRIMARY_MODEL_OBLIGATION",
+  "schema_version": "si-v2r.sr7-p0.comparison-contract.v1",
+  "secondary_dimensions": "PRIMARY_MODEL_OBLIGATION + RAW_MODEL_DIAGNOSTIC",
+  "structural_relation_tuple": [
+    "final_canonical_count",
+    "initial_canonical_pass_count"
+  ],
+  "study_integrity_decisions": [
+    "INCONCLUSIVE_INFRASTRUCTURE",
+    "INCONCLUSIVE_CONFIGURATION_DRIFT",
+    "INCONCLUSIVE_EVIDENCE"
+  ],
+  "system_outcomes_separate": true
+}

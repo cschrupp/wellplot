@@ -1,0 +1,2360 @@
+{
+  "baseline": "9c0dfd2fa0a060195199f21655ccdffd2cc68c9c",
+  "case_count": 24,
+  "dimension_count": 14,
+  "rows": [
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "FEATURE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-cascade-01",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "FEATURE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-elm-02",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "FEATURE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-harbor-03",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "FEATURE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-report-kestrel-04",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-fig-05",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "MASKED_UNRESOLVED_CONTRACT",
+      "reason": "depth-column ownership/scope remains unresolved by SR4",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-garnet-06",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-hazel-07",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the gold intent contains explicit contextual requirements",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "ANNOTATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "annotation semantics remain model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-single-iris-08",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "accepted Iris contract retains unresolved promotion as model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-juniper-09",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-linden-10",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-mica-11",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-reference-nova-12",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-opal-13",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-quartz-14",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-ruby-15",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-multi-slate-16",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple independent sections require allocation",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "SECTION_ORDER",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple sections have an ordered request",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-tamarind-17",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple independent sections require allocation",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "SECTION_ORDER",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple sections have an ordered request",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "explicit reference presence is a shared boundary obligation",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "reference kind remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-umber-18",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple independent sections require allocation",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "SECTION_ORDER",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple sections have an ordered request",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-verde-19",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple independent sections require allocation",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "SECTION_ORDER",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "multiple sections have an ordered request",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-alloc-willow-20",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-xenon-21",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-yarrow-22",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "ANNOTATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-zephyr-23",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REPORT_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "presence is owned by the deterministic report boundary",
+      "system_role": "SYSTEM_CREDIT_ELIGIBLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REPORT_CONTENT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "report content remains model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "SECTION_STRUCTURE",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the request requires one or more section structures",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "SECTION_ALLOCATION",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "SECTION_ORDER",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "FEATURE_KIND",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "FEATURE_MULTIPLICITY",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the section contains one or more requested features",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REQUIRED_CONTEXT",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "the gold intent contains explicit contextual requirements",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REFERENCE_PRESENCE",
+      "model_role": "RAW_MODEL_DIAGNOSTIC",
+      "reason": "unspecified reference generation is diagnostic only",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REFERENCE_KIND",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "REFERENCE_TARGET",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "ANNOTATION",
+      "model_role": "PRIMARY_MODEL_OBLIGATION",
+      "reason": "annotation semantics remain model-owned",
+      "system_role": "SYSTEM_CREDIT_BLOCKED"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "CONSTRAINT_SCOPE",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    },
+    {
+      "case_id": "cm59-mixed-amber-24",
+      "dimension": "UNRESOLVED_REQUIREMENT",
+      "model_role": "NOT_APPLICABLE",
+      "reason": "no corresponding obligation in the frozen gold intent",
+      "system_role": "SYSTEM_NOT_APPLICABLE"
+    }
+  ],
+  "schema_version": "si-v2r.sr7-p0.case-dimension-mask.v1"
+}
