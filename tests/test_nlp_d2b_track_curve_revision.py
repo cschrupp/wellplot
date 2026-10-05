@@ -248,6 +248,7 @@ def test_d2b_public_revision_persists_renders_and_passes_frozen_las_verifier() -
             _document_and_inventory(logfile)
         )
         before_path = _before_path(directory, before_document)
+        normalized_before = load_authoring_document(before_path)
         planner = _RevisionPlanner(calls=[])
         backend = _RevisionBackend(channel=NEW_CHANNEL, requests=[])
         report_compiler = _UnusedReportCompiler()
@@ -267,6 +268,8 @@ def test_d2b_public_revision_persists_renders_and_passes_frozen_las_verifier() -
         after_track_ids = [track.id for track in after_section.tracks]
         new_track = after_section.tracks[6]
         new_binding = new_track.bindings[0]
+        before_payload = normalized_before.model_dump(mode="json")
+        after_payload = after_document.model_dump(mode="json")
         verdict = verify_las_revision(
             before_path,
             logfile,
@@ -286,6 +289,12 @@ def test_d2b_public_revision_persists_renders_and_passes_frozen_las_verifier() -
     assert len(before_track_ids) == 6
     assert after_track_ids[:6] == before_track_ids
     assert len(after_track_ids) == 7
+    assert after_payload["sections"][0]["tracks"][:6] == before_payload["sections"][0]["tracks"]
+    assert after_payload["sections"][0]["id"] == before_payload["sections"][0]["id"]
+    assert after_payload["sections"][0]["title"] == before_payload["sections"][0]["title"]
+    assert after_payload["sections"][0]["subtitle"] == before_payload["sections"][0]["subtitle"]
+    for field in ("title", "subtitle", "header", "remarks", "page", "depth", "output", "tail"):
+        assert after_payload[field] == before_payload[field]
     assert new_track.id
     assert new_track.kind == "normal"
     assert new_track.title == NEW_TRACK_TITLE
