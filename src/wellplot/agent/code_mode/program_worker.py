@@ -47,6 +47,10 @@ wp.source(candidate_id): candidate_id (positional or keyword)
 wp.section(report): id_hint, title, subtitle, depth_minimum, depth_maximum, source
 wp.target_section(report): no keyword arguments; the host supplies the target
 wp.update_section(target): title, subtitle, depth_minimum, depth_maximum
+wp.target_track(section): track_id (from the grounded existing inventory)
+wp.target_curve(track): binding_id (from the grounded existing inventory)
+wp.update_curve(track, curve): channel, label, scale_minimum, scale_maximum,
+    scale_kind, reverse, scale_unit, color, line_style, line_width
 wp.track(section): id_hint, kind, title, width_mm, scale_minimum, scale_maximum,
     scale_kind, reverse
 wp.curve(track): channel, id_hint, label, scale_minimum, scale_maximum, scale_kind,
@@ -60,9 +64,9 @@ target. The target-section call accepts no section ID; the host supplies the
 opaque target. Use only source candidate IDs and channel mnemonics supplied in
 the task context. Do not invent, derive, suffix, expand, or rename them.
 Multiple bindings may reference the same source channel. Do not select or
-update existing tracks, bindings, fills, or annotations. Do not use report-wide
-settings or filesystem operations. Never create a second section in an
-existing-target task.
+update existing objects unless they were selected through the grounded
+inventory. Do not use report-wide settings or filesystem operations. Never
+create a second section in an existing-target task.
 Return only the program source, with no markdown fences or explanation."""
 
 _CHANNEL_GROUNDING_RULE = (
@@ -276,7 +280,8 @@ def _worker_prompt(
         instruction = (
             "Revise the one host-selected existing section from this scoped context. "
             "Use wp.target_section(report) without an ID, then apply a sparse section "
-            "update or add requested new child tracks. Do not create a second section. "
+            "update, update one grounded existing curve, or add requested new child "
+            "tracks. Do not create a second section. "
         )
     return (
         instruction
@@ -309,6 +314,30 @@ def _sdk_reference(section_context: ResolvedSectionContext) -> str:
             )
     else:
         lines.append("No host-approved source handle is available; omit source association.")
+
+    if section_context.existing_curves:
+        lines.append("Grounded existing curve inventory; use exact identities only:")
+        lines.extend(
+            "- "
+            + json.dumps(
+                {
+                    "track_id": curve.track_id,
+                    "track_title": curve.track_title,
+                    "track_kind": curve.track_kind,
+                    "binding_id": curve.binding_id,
+                    "channel": curve.channel,
+                    "label": curve.label,
+                    "scale_kind": curve.scale_kind,
+                    "scale_minimum": curve.scale_minimum,
+                    "scale_maximum": curve.scale_maximum,
+                    "reverse": curve.reverse,
+                },
+                sort_keys=True,
+            )
+            for curve in section_context.existing_curves
+        )
+    else:
+        lines.append("No grounded existing curve is available for selection or update.")
 
     channel_examples: list[str] = []
     seen_channels: set[tuple[str, str]] = set()
@@ -411,7 +440,23 @@ def _fresh_builder(
         ],
     )
     handles = HandleBuilder(allocator=allocator)
-    builder = IntentBuilder(handles=handles)
+    existing_track_ids = {
+        section.id: tuple(track.id for track in section.tracks) for section in document.sections
+    }
+    existing_curve_ids = {
+        (section.id, track.id): tuple(
+            binding.binding_id
+            for binding in getattr(track, "bindings", ())
+            if getattr(binding, "kind", None) == "curve"
+        )
+        for section in document.sections
+        for track in section.tracks
+    }
+    builder = IntentBuilder(
+        handles=handles,
+        existing_track_ids_by_section=existing_track_ids,
+        existing_curve_ids_by_track=existing_curve_ids,
+    )
     if section_context.section_id is not None:
         builder.register_section_target(section_context.section_id)
     for source in section_context.sources:
@@ -507,8 +552,8 @@ def _validate_section_intent(
         raise ProgramDryRunError(
             "Existing-section programs must contain a sparse section mutation.",
             remediation_hint=(
-                "Apply a section title, subtitle, depth range, or create a new child "
-                "track beneath wp.target_section(report)."
+                "Apply a section title, subtitle, depth range, update a grounded curve, "
+                "or create a new child track beneath wp.target_section(report)."
             ),
         )
     return section.section_id

@@ -88,6 +88,21 @@ class SourceContext(_EnrichmentModel):
     channels: tuple[ChannelContext, ...] = ()
 
 
+class ExistingCurveContext(_EnrichmentModel):
+    """One exact existing curve identity available to a revision worker."""
+
+    track_id: str = Field(min_length=1)
+    track_title: str = Field(min_length=1)
+    track_kind: str = Field(min_length=1)
+    binding_id: str = Field(min_length=1)
+    channel: str = Field(min_length=1)
+    label: str | None = Field(default=None, min_length=1)
+    scale_kind: str | None = Field(default=None, min_length=1)
+    scale_minimum: float | None = None
+    scale_maximum: float | None = None
+    reverse: bool | None = None
+
+
 class ResolvedSectionContext(_EnrichmentModel):
     """Canonical read-only context for one semantic section task."""
 
@@ -95,6 +110,7 @@ class ResolvedSectionContext(_EnrichmentModel):
     section_id: str | None = Field(default=None, min_length=1)
     sources: tuple[SourceContext, ...] = ()
     channels: tuple[ChannelInspectionSummary, ...] = ()
+    existing_curves: tuple[ExistingCurveContext, ...] = ()
 
 
 class ReportContext(_EnrichmentModel):
@@ -237,6 +253,7 @@ class SemanticEnricher:
                 task_index=task_index,
                 section_id=resolved_section_ids[task_index],
                 inspection=inspection,
+                document=document,
                 sources=resolved_sources[task_index],
             )
             for task_index, task in enumerate(plan.section_tasks)
@@ -287,6 +304,7 @@ class SemanticEnricher:
         task_index: int,
         section_id: str | None,
         inspection: AuthoringInspectionFacade,
+        document: AuthoringDocumentSpec,
         sources: tuple[SourceContext, ...],
     ) -> ResolvedSectionContext:
         """Project canonical section and channels through the inspection facade."""
@@ -308,6 +326,7 @@ class SemanticEnricher:
             section_id=section_id,
             sources=sources,
             channels=channels,
+            existing_curves=_existing_curves(document, section_id),
         )
 
 
@@ -319,6 +338,40 @@ class _NormalizedCandidate:
     path: Path
     source_format: SourceFormat
     labels: tuple[str, ...]
+
+
+def _existing_curves(
+    document: AuthoringDocumentSpec,
+    section_id: str | None,
+) -> tuple[ExistingCurveContext, ...]:
+    """Project exact curve identities from the selected current section."""
+    if section_id is None:
+        return ()
+    for section in document.sections:
+        if section.id != section_id:
+            continue
+        curves: list[ExistingCurveContext] = []
+        for track in section.tracks:
+            for binding in getattr(track, "bindings", ()):
+                if getattr(binding, "kind", None) != "curve":
+                    continue
+                scale = getattr(binding, "scale", None)
+                curves.append(
+                    ExistingCurveContext(
+                        track_id=track.id,
+                        track_title=track.title,
+                        track_kind=track.kind,
+                        binding_id=binding.binding_id,
+                        channel=binding.channel,
+                        label=getattr(binding, "label", None),
+                        scale_kind=None if scale is None else scale.kind.value,
+                        scale_minimum=None if scale is None else scale.minimum,
+                        scale_maximum=None if scale is None else scale.maximum,
+                        reverse=None if scale is None else scale.reverse,
+                    )
+                )
+        return tuple(curves)
+    return ()
 
 
 def _normalize_roots(roots: Mapping[str, str | Path]) -> dict[str, Path]:
@@ -598,6 +651,7 @@ __all__ = [
     "EnrichedSemanticContext",
     "EnrichmentWarning",
     "EnrichmentErrorCode",
+    "ExistingCurveContext",
     "HeaderSlotInspectionSummary",
     "LoadedSource",
     "ReportContext",

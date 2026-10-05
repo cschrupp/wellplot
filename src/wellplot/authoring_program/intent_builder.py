@@ -26,7 +26,7 @@ persist, render, or call an application service.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
@@ -101,9 +101,31 @@ class IntentBuilder:
     canonical identifiers and typed-handle ownership.
     """
 
-    def __init__(self, *, handles: HandleBuilder | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        handles: HandleBuilder | None = None,
+        existing_track_ids_by_section: Mapping[str, Sequence[str]] | None = None,
+        existing_curve_ids_by_track: Mapping[tuple[str, str], Sequence[str]] | None = None,
+    ) -> None:
         """Create one isolated compiler with a CM-13 identity context."""
         self._handles = handles or HandleBuilder()
+        self._existing_track_ids_by_section = (
+            None
+            if existing_track_ids_by_section is None
+            else {
+                section_id: frozenset(track_ids)
+                for section_id, track_ids in existing_track_ids_by_section.items()
+            }
+        )
+        self._existing_curve_ids_by_track = (
+            None
+            if existing_curve_ids_by_track is None
+            else {
+                key: frozenset(binding_ids)
+                for key, binding_ids in existing_curve_ids_by_track.items()
+            }
+        )
         self._sources: dict[str, tuple[SourceHandle, AuthoringDataSource]] = {}
         self._section_target_id: str | None = None
         self._report: ReportHandle | None = None
@@ -434,6 +456,15 @@ class IntentBuilder:
     def select_track(self, section: SectionHandle, *, track_id: str) -> TrackHandle:
         """Adopt one host-resolved track identity under one selected section."""
         owned_section = self._require_section(section)
+        if (
+            self._existing_track_ids_by_section is not None
+            and track_id
+            not in self._existing_track_ids_by_section.get(owned_section.section_id, frozenset())
+        ):
+            raise ProgramNameError(
+                f"Track '{track_id}' is not an existing grounded track in section "
+                f"'{owned_section.section_id}'."
+            )
         track = self._handles.adopt_track(owned_section, track_id)
         self._handles.validate_track_parent(owned_section, track)
         if track.token not in self._tracks:
@@ -948,6 +979,9 @@ class IntentBuilder:
                     "section": self._runtime_section,
                     "target_section": self._runtime_target_section,
                     "update_section": self._runtime_update_section,
+                    "target_track": self._runtime_target_track,
+                    "target_curve": self._runtime_target_curve,
+                    "update_curve": self._runtime_update_curve,
                     "track": self._runtime_track,
                     "curve": self._runtime_curve,
                     "raster": self._runtime_raster,
@@ -1043,6 +1077,13 @@ class IntentBuilder:
     ) -> BindingHandle:
         """Adopt one exact binding identity with a typed partial fragment."""
         owned_track = self._require_track(track)
+        if kind == "curve" and self._existing_curve_ids_by_track is not None:
+            key = (owned_track.section_id, owned_track.track_id)
+            if binding_id not in self._existing_curve_ids_by_track.get(key, frozenset()):
+                raise ProgramNameError(
+                    f"Curve binding '{binding_id}' is not an existing grounded binding "
+                    f"on track '{owned_track.track_id}'."
+                )
         binding = self._handles.adopt_binding(owned_track, binding_id)
         self._handles.validate_leaf_parent(owned_track, binding)
         if binding.token not in self._bindings:
@@ -1450,6 +1491,74 @@ class IntentBuilder:
             subtitle=_optional_runtime_text(values, "subtitle"),
             depth_minimum=_optional_runtime_number(values, "depth_minimum"),
             depth_maximum=_optional_runtime_number(values, "depth_maximum"),
+        )
+        return None
+
+    def _runtime_target_track(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Adopt one exact existing track identity from the grounded inventory."""
+        section = _runtime_handle_arg(args, "wp.target_track", SectionHandle)
+        values = _runtime_kwargs(kwargs, "wp.target_track", {"track_id"})
+        return self.select_track(
+            section,
+            track_id=_required_runtime_text(values, "track_id", "wp.target_track"),
+        )
+
+    def _runtime_target_curve(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Adopt one exact existing curve identity from the grounded inventory."""
+        track = _runtime_handle_arg(args, "wp.target_curve", TrackHandle)
+        values = _runtime_kwargs(kwargs, "wp.target_curve", {"binding_id"})
+        return self.select_curve(
+            track,
+            binding_id=_required_runtime_text(values, "binding_id", "wp.target_curve"),
+        )
+
+    def _runtime_update_curve(
+        self,
+        args: tuple[RuntimeValue, ...],
+        kwargs: Mapping[str, RuntimeValue],
+    ) -> RuntimeValue:
+        """Apply a sparse scale/style update to one grounded existing curve."""
+        if len(args) != 2:
+            raise ProgramTypeError("wp.update_curve requires track and curve handles.")
+        track = _runtime_handle(args[0], "wp.update_curve", TrackHandle)
+        binding = _runtime_handle(args[1], "wp.update_curve", BindingHandle)
+        values = _runtime_kwargs(
+            kwargs,
+            "wp.update_curve",
+            {
+                "channel",
+                "label",
+                "scale_minimum",
+                "scale_maximum",
+                "scale_kind",
+                "reverse",
+                "scale_unit",
+                "color",
+                "line_style",
+                "line_width",
+            },
+        )
+        self.update_curve(
+            track,
+            binding,
+            channel=_optional_runtime_text(values, "channel"),
+            label=_optional_runtime_text(values, "label"),
+            scale_minimum=_optional_runtime_number(values, "scale_minimum"),
+            scale_maximum=_optional_runtime_number(values, "scale_maximum"),
+            scale_kind=_optional_runtime_text(values, "scale_kind") or "linear",
+            reverse=_optional_runtime_bool(values, "reverse", default=False),
+            scale_unit=_optional_runtime_text(values, "scale_unit"),
+            color=_optional_runtime_text(values, "color"),
+            line_style=_optional_runtime_text(values, "line_style"),
+            line_width=_optional_runtime_number(values, "line_width"),
         )
         return None
 

@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Literal
 
 from ..api.serialize import report_to_dict
+from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
 from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
-from .code_mode.enrichment import SemanticEnricher
+from .code_mode.enrichment import LoadedSource, SemanticEnricher
 from .code_mode.facade import CodeModeCompileFacade
 from .code_mode.planner import SemanticPlanner
 from .code_mode.program_worker import ProgramSectionCompiler
@@ -38,6 +40,7 @@ class _NotebookDocumentContext:
     logfile_path: Path
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
+    available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
 
 
 def _json_value(value: object) -> object:
@@ -65,20 +68,23 @@ def _relative_path(path: Path, *, root: Path) -> str:
         return str(path.resolve())
 
 
-def _declared_source_candidates(
+def _declared_source_inventory(
     spec: object,
     *,
     logfile_path: Path,
     root: Path,
-) -> tuple[AgentSourceConfig, ...]:
-    """Project only logfile-declared sources into opaque v2 candidates."""
+) -> tuple[
+    tuple[AgentSourceConfig, ...],
+    dict[str, tuple[AuthoringChannelCandidate, ...]],
+]:
+    """Project declared sources and deterministic channel inventories."""
     declared = resolve_section_data_sources_for_logfile(
         spec,
         base_dir=logfile_path.parent,
         allowed_root=root,
     )
     unique_sources = sorted(set(declared.values()), key=lambda item: (str(item[0]), item[1]))
-    return tuple(
+    candidates = tuple(
         AgentSourceConfig(
             candidate_id=f"source-{index}",
             root_id="server",
@@ -88,19 +94,49 @@ def _declared_source_candidates(
         )
         for index, (path, source_format) in enumerate(unique_sources, start=1)
     )
+    candidate_by_source = {
+        (Path(candidate.path), candidate.trusted_format or "auto"): candidate
+        for candidate in candidates
+    }
+    loader = LogfileSourceLoader()
+    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
+    loaded: dict[tuple[Path, str], LoadedSource] = {}
+    for section_id, (path, source_format) in declared.items():
+        if not path.is_file():
+            continue
+        cache_key = (path, source_format)
+        if cache_key not in loaded:
+            loaded[cache_key] = loader.load(path, source_format)
+        source = loaded[cache_key]
+        candidate = candidate_by_source[(path, source_format)]
+        available_channels[section_id] = tuple(
+            AuthoringChannelCandidate(
+                mnemonic=channel.mnemonic,
+                kind=channel.kind,
+                unit=channel.unit,
+                description=channel.description,
+                aliases=list(channel.aliases),
+                value_shape=list(channel.shape),
+                source_path=candidate.path,
+            )
+            for channel in source.channels
+        )
+    return candidates, available_channels
 
 
 def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocumentContext:
     """Load one canonical logfile and its explicitly declared sources."""
     spec = load_logfile(logfile_path, allowed_root=root)
+    source_candidates, available_channels = _declared_source_inventory(
+        spec,
+        logfile_path=logfile_path,
+        root=root,
+    )
     return _NotebookDocumentContext(
         logfile_path=logfile_path,
         document=AuthoringService.from_mapping(report_to_dict(spec)).document,
-        source_candidates=_declared_source_candidates(
-            spec,
-            logfile_path=logfile_path,
-            root=root,
-        ),
+        source_candidates=source_candidates,
+        available_channels=available_channels,
     )
 
 
@@ -237,7 +273,11 @@ def _apply_result(
         return False, False, False, ["Compilation succeeded without an intent."], "compile_failed"
 
     private_service = AuthoringService(context.document)
-    plan = reconcile_authoring(result.intent, existing=private_service.document)
+    plan = reconcile_authoring(
+        result.intent,
+        existing=private_service.document,
+        available_channels=context.available_channels,
+    )
     if not plan.ready:
         errors = [f"{issue.code}: {issue.message}" for issue in plan.issues]
         return False, False, False, errors, "reconciliation_blocked"
