@@ -9,6 +9,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from wellplot.authoring import load_authoring_document
 
 _EXPECTED_SECTIONS = ("main_pass", "repeat_pass")
@@ -77,6 +79,11 @@ _LINE_STYLE_ALIASES = {
     ":": ":",
     "dotted": ":",
 }
+
+_PASS = "PASS"
+_FAIL = "FAIL"
+_NOT_CHECKABLE = "NOT_CHECKABLE"
+_HARNESS_ERROR = "HARNESS_ERROR"
 
 
 def _close(left: object, right: float) -> bool:
@@ -351,6 +358,211 @@ def _check_sections(payload: Mapping[str, Any], errors: list[str]) -> None:
                 errors.append(f"{section_id}/cbl: duplicate CBL bindings need distinct ids")
 
 
+def _check_section_order(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check only the ordered section identities."""
+    sections = payload.get("sections")
+    actual = [item.get("id") for item in sections] if isinstance(sections, list) else None
+    if actual != list(_EXPECTED_SECTIONS):
+        errors.append(f"section order is {actual!r}, expected {list(_EXPECTED_SECTIONS)!r}")
+
+
+def _check_track_structure(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check ordered track identity, type, and width for both sections."""
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        errors.append("sections are missing")
+        return
+    expected_ids = [item[0] for item in _EXPECTED_TRACKS]
+    for section in sections:
+        if not isinstance(section, Mapping):
+            errors.append("section is not an object")
+            continue
+        tracks = section.get("tracks")
+        if not isinstance(tracks, list):
+            errors.append(f"{section.get('id')}: tracks are missing")
+            continue
+        actual_ids = [item.get("id") for item in tracks if isinstance(item, Mapping)]
+        if actual_ids != expected_ids:
+            errors.append(f"{section.get('id')}: track order is {actual_ids!r}")
+            continue
+        for track, (track_id, kind, width) in zip(tracks, _EXPECTED_TRACKS, strict=True):
+            if not isinstance(track, Mapping):
+                errors.append(f"{section.get('id')}/{track_id}: track is not an object")
+                continue
+            if track.get("kind") != kind:
+                errors.append(f"{section.get('id')}/{track_id}: kind is {track.get('kind')!r}")
+            if not _close(track.get("width_mm"), width):
+                errors.append(f"{section.get('id')}/{track_id}: width is {track.get('width_mm')!r}")
+
+
+def _check_binding_structure(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check channel identity and multiplicity without checking presentation."""
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        errors.append("sections are missing")
+        return
+    expected_by_track = {
+        track_id: [item[0] for item in expected] for track_id, expected in _EXPECTED_CURVES.items()
+    }
+    for section in sections:
+        if not isinstance(section, Mapping):
+            continue
+        for track_id, expected_channels in expected_by_track.items():
+            track = next(
+                (item for item in section.get("tracks", []) if item.get("id") == track_id),
+                None,
+            )
+            if not isinstance(track, Mapping):
+                errors.append(f"{section.get('id')}/{track_id}: track is missing")
+                continue
+            bindings = [item for item in track.get("bindings", []) if isinstance(item, Mapping)]
+            actual_channels = [item.get("channel") for item in bindings]
+            if actual_channels != expected_channels:
+                errors.append(
+                    f"{section.get('id')}/{track_id}: channels are {actual_channels!r}, "
+                    f"expected {expected_channels!r}"
+                )
+            if track_id == "cbl" and len({item.get("binding_id") for item in bindings}) != 2:
+                errors.append(f"{section.get('id')}/cbl: repeated CBL bindings need distinct ids")
+
+
+def _check_reference_semantics(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check the explicit depth/reference track used by the CBL contract."""
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        errors.append("sections are missing")
+        return
+    for section in sections:
+        if not isinstance(section, Mapping):
+            continue
+        depth = next(
+            (item for item in section.get("tracks", []) if item.get("id") == "depth"),
+            None,
+        )
+        if not isinstance(depth, Mapping) or depth.get("kind") != "reference":
+            errors.append(f"{section.get('id')}/depth: reference track is missing")
+
+
+def _check_presentation(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check labels, scales, styles, widths, and other explicit presentation."""
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        errors.append("sections are missing")
+        return
+    for section_id, section in ((item.get("id"), item) for item in sections):
+        if not isinstance(section, Mapping):
+            continue
+        for track_id, expected_curves in _EXPECTED_CURVES.items():
+            track = next(
+                (item for item in section.get("tracks", []) if item.get("id") == track_id),
+                None,
+            )
+            if not isinstance(track, Mapping):
+                errors.append(f"{section_id}/{track_id}: track is missing")
+                continue
+            bindings = [item for item in track.get("bindings", []) if isinstance(item, Mapping)]
+            if len(bindings) != len(expected_curves):
+                errors.append(f"{section_id}/{track_id}: presentation bindings are incomplete")
+                continue
+            for index, expected in enumerate(expected_curves):
+                _check_curve(
+                    bindings[index],
+                    expected,
+                    section_id=str(section_id),
+                    track_id=track_id,
+                    index=index,
+                    errors=errors,
+                )
+        raster = next(
+            (item for item in section.get("tracks", []) if item.get("id") == "vdl"),
+            None,
+        )
+        if isinstance(raster, Mapping):
+            _check_raster(raster, section_id=str(section_id), errors=errors)
+
+
+def _check_raster_requirement(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check raster settings for every expected VDL track."""
+    sections = payload.get("sections")
+    if not isinstance(sections, list):
+        errors.append("sections are missing")
+        return
+    for section in sections:
+        if not isinstance(section, Mapping):
+            continue
+        for track in section.get("tracks", []):
+            if isinstance(track, Mapping) and track.get("id") == "vdl":
+                _check_raster(track, section_id=str(section.get("id")), errors=errors)
+
+
+def _requirement_result(
+    requirement_id: str,
+    checker: object,
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Run one deterministic checker and preserve its requirement identity."""
+    errors: list[str] = []
+    try:
+        checker(payload, errors)  # type: ignore[operator]
+    except Exception as exc:  # pragma: no cover - defensive harness boundary
+        return {
+            "id": requirement_id,
+            "status": _HARNESS_ERROR,
+            "errors": [f"checker raised {type(exc).__name__}: {exc}"],
+        }
+    return {"id": requirement_id, "status": _PASS if not errors else _FAIL, "errors": errors}
+
+
+def _cbl_requirements(
+    payload: Mapping[str, Any],
+    *,
+    canonical_valid: bool,
+    execution_evidence: Mapping[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Return the requirement-level CBL acceptance result."""
+    requirements = [
+        _requirement_result("CBL-01", _check_header, payload),
+        _requirement_result("CBL-02", _check_remarks, payload),
+        _requirement_result("CBL-03", _check_section_order, payload),
+        _requirement_result("CBL-04", _check_track_structure, payload),
+        _requirement_result("CBL-05", _check_binding_structure, payload),
+        _requirement_result("CBL-06", _check_reference_semantics, payload),
+        _requirement_result("CBL-07", _check_raster_requirement, payload),
+        _requirement_result("CBL-08", _check_presentation, payload),
+    ]
+    if not canonical_valid:
+        requirements.append(
+            {
+                "id": "CBL-09",
+                "status": _FAIL,
+                "errors": ["canonical document validation failed"],
+            }
+        )
+    elif execution_evidence is None:
+        requirements.append(
+            {
+                "id": "CBL-09",
+                "status": _NOT_CHECKABLE,
+                "errors": [],
+                "reason": "persistence/render evidence was not supplied",
+            }
+        )
+    else:
+        evidence_errors = [
+            key for key in ("persisted", "rendered") if execution_evidence.get(key) is not True
+        ]
+        requirements.append(
+            {
+                "id": "CBL-09",
+                "status": _PASS if not evidence_errors else _FAIL,
+                "errors": [
+                    f"missing successful execution evidence: {key}" for key in evidence_errors
+                ],
+            }
+        )
+    return requirements
+
+
 def _check_report_settings(payload: Mapping[str, Any], errors: list[str]) -> None:
     page = payload.get("page")
     if not isinstance(page, Mapping):
@@ -386,8 +598,18 @@ def _check_readable_font(
         errors.append(f"{target}: {key} must be automatic or at least 6 pt, got {value!r}")
 
 
-def verify_cbl_packet(logfile_path: str | Path) -> dict[str, Any]:
-    """Verify the final supported CBL packet without consulting the agent."""
+def verify_cbl_packet(
+    logfile_path: str | Path,
+    *,
+    execution_evidence: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Verify the final supported CBL packet without consulting the agent.
+
+    ``ok`` and ``errors`` remain compatible with the original notebook helper.
+    D0 consumers should use ``acceptance_status`` and ``requirements`` because
+    those fields distinguish unsupported execution evidence from workflow
+    failures and verifier failures.
+    """
     path = Path(logfile_path)
     result: dict[str, Any] = {
         "ok": False,
@@ -396,12 +618,30 @@ def verify_cbl_packet(logfile_path: str | Path) -> dict[str, Any]:
         if path.is_file()
         else None,
         "errors": [],
+        "requirements": [],
+        "acceptance_status": _HARNESS_ERROR,
+        "harness_error": False,
     }
     errors: list[str] = result["errors"]
     try:
         document = load_authoring_document(path)
     except Exception as exc:  # pragma: no cover - exact Pydantic errors vary by version
         errors.append(f"document validation failed: {exc}")
+        result["harness_error"] = False
+        try:
+            raw_payload = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except Exception:
+            raw_payload = None
+        if isinstance(raw_payload, Mapping):
+            result["requirements"] = _cbl_requirements(
+                raw_payload,
+                canonical_valid=False,
+                execution_evidence=execution_evidence,
+            )
+            result["requirements"][0]["errors"].append(str(exc))
+        else:
+            result["requirements"] = [{"id": "CBL-09", "status": _FAIL, "errors": list(errors)}]
+        result["acceptance_status"] = _FAIL
         return result
     payload = document.model_dump(mode="json")
     _check_header(payload, errors)
@@ -409,6 +649,21 @@ def verify_cbl_packet(logfile_path: str | Path) -> dict[str, Any]:
     _check_sections(payload, errors)
     _check_report_settings(payload, errors)
     result["ok"] = not errors
+    result["requirements"] = _cbl_requirements(
+        payload,
+        canonical_valid=True,
+        execution_evidence=execution_evidence,
+    )
+    requirement_statuses = {item["status"] for item in result["requirements"]}
+    if _HARNESS_ERROR in requirement_statuses:
+        result["acceptance_status"] = _HARNESS_ERROR
+        result["harness_error"] = True
+    elif _FAIL in requirement_statuses:
+        result["acceptance_status"] = _FAIL
+    elif _NOT_CHECKABLE in requirement_statuses:
+        result["acceptance_status"] = _NOT_CHECKABLE
+    else:
+        result["acceptance_status"] = _PASS
     return result
 
 

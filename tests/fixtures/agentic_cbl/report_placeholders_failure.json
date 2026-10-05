@@ -1,0 +1,34 @@
+{
+  "run_id": "e0ca7511c300484ea4d9b03c6573415c",
+  "description": "Reduced report artifact with empty requested remark bodies.",
+  "artifact": {
+    "intent": {
+      "remarks": [
+        {
+          "remark_id": "remark-1",
+          "title": "Supported Reconstruction Scope",
+          "text": "",
+          "lines": [],
+          "font_size": 0.0001,
+          "title_font_size": 0.0001
+        },
+        {
+          "remark_id": "remark-2",
+          "title": "Data Sources",
+          "text": "",
+          "lines": [],
+          "font_size": 0.0001,
+          "title_font_size": 0.0001
+        },
+        {
+          "remark_id": "remark-3",
+          "title": "Public Data and IP Notice",
+          "text": "",
+          "lines": [],
+          "font_size": 0.0001,
+          "title_font_size": 0.0001
+        }
+      ]
+    }
+  }
+}

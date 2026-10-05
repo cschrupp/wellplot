@@ -1,0 +1,46 @@
+{
+  "requested_scale_change": {
+    "before_assertions": [
+      {
+        "path": "/sections/0/id",
+        "operator": "equals",
+        "value": "main_pass"
+      }
+    ],
+    "required_changes": {
+      "LAS-05": [
+        {
+          "path": "/sections/0/tracks/0/bindings/0/scale/minimum",
+          "operator": "equals",
+          "value": 10.0
+        }
+      ]
+    },
+    "allowed_change_paths": [
+      "/sections/0/tracks/0/bindings/0/scale"
+    ],
+    "prohibited_change_paths": [
+      "/sections/0/tracks/1",
+      "/remarks",
+      "/header"
+    ],
+    "expected_outcome": "accepted"
+  },
+  "rejected_ambiguous_request": {
+    "before_assertions": [
+      {
+        "path": "/sections/0/id",
+        "operator": "equals",
+        "value": "main_pass"
+      }
+    ],
+    "required_changes": {},
+    "allowed_change_paths": [],
+    "prohibited_change_paths": [
+      "/sections",
+      "/remarks",
+      "/header"
+    ],
+    "expected_outcome": "rejected"
+  }
+}
