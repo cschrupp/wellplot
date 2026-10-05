@@ -17,10 +17,22 @@ and authorization is required before live execution.
   checkpoint. A mismatch or dirty checkout fails before credentials are read.
 - Each logical attempt permits at most one infrastructure retry and one
   structural retry, with a maximum of three physical calls.
+- Structural response evidence records JSON parsing, exact JSON-Schema
+  validation, and canonical Pydantic validation as separate stages. A valid
+  JSON response that passes JSON Schema but fails canonical validation remains
+  distinguishable from a schema failure.
+- Provider metadata captured before structural validation, including returned
+  model identity, is retained on structural failures. An exhausted structural
+  retry is a completed logical row, not configuration drift, when the returned
+  model matches the frozen configuration.
 - A crash-safe JSONL journal is written after each completed logical attempt.
   The canonical evidence file is written only after all 96 rows validate.
 - Configuration drift and infrastructure exhaustion preserve the partial
   journal and stop without automatic resume or replay.
+- Final comparison accuracy counts only dimensions marked
+  `PRIMARY_MODEL_OBLIGATION` in the frozen case×dimension mask. Any late
+  runtime-attestation, call-limit, or configuration-fingerprint error fails
+  closed as `INCONCLUSIVE_EVIDENCE` before comparison derivation.
 - Evidence retains canonical semantic output and bounded provider metadata only;
   credentials, authorization headers, hidden reasoning, and environment dumps
   are not serialized.

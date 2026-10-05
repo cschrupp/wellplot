@@ -22,5 +22,35 @@
       }
     ],
     "unresolved_requirements": []
+  },
+  "invalid_json": "{not-json",
+  "json_schema_failure": {
+    "report_work": null,
+    "sections": [],
+    "unresolved_requirements": []
+  },
+  "pydantic_only_failure": {
+    "summary": "One synthetic scalar curve.",
+    "report_work": null,
+    "sections": [
+      {
+        "kind": "log_plot",
+        "goal": "Plot the synthetic curve.",
+        "existing_section_hint": null,
+        "source_hints": [],
+        "features": [
+          {
+            "kind": "curve",
+            "semantic_id": "synthetic_curve",
+            "requirements": [],
+            "constraints": []
+          }
+        ],
+        "reference_intent": {"kind": "reference_track"},
+        "requirements": [],
+        "constraints": []
+      }
+    ],
+    "unresolved_requirements": []
   }
 }

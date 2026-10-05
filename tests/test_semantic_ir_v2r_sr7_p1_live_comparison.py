@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Never
 
@@ -19,12 +21,14 @@ from scripts.semantic_ir_v2r_sr7_p1_live_comparison import (
     _finalize_rows,
     _load_cases,
     _load_p0_contracts,
+    _parse_and_validate_content,
     execute_logical_attempt,
     main,
     run_matrix,
     verify_preflight,
 )
 
+from wellplot.agent.code_mode.semantic_ir_v2r import SemanticIRV2R
 from wellplot.agent.providers.base import (
     ProviderFailureCategory,
     ProviderMetrics,
@@ -43,6 +47,23 @@ P1_FIXTURE = REPO_ROOT / "tests/fixtures/semantic_ir_v2r_sr7_p1/fake_transport_s
 
 def _valid_payload() -> dict[str, object]:
     return json.loads(P1_FIXTURE.read_text(encoding="utf-8"))["valid_response"]
+
+
+def _transport_fixture(name: str) -> object:
+    return json.loads(P1_FIXTURE.read_text(encoding="utf-8"))[name]
+
+
+def _raw_content(name: str) -> RawContent:
+    """Encode one fixture as provider message content."""
+    value = _transport_fixture(name)
+    return RawContent(value if isinstance(value, str) else json.dumps(value))
+
+
+@dataclass(frozen=True)
+class RawContent:
+    """Provider content sent through the real P1 staged-validation helper."""
+
+    content: str
 
 
 class FakeBackend:
@@ -70,8 +91,21 @@ class FakeBackend:
             "usage": {"prompt_tokens": 1, "completion_tokens": 1},
             "latency_ms": 1.0,
         }
+        if isinstance(outcome, RawContent):
+            value = _parse_and_validate_content(
+                outcome.content,
+                response_model,
+                self.last_metadata,
+            )
+            return StructuredGenerationResult(
+                value=value,
+                metrics=ProviderMetrics(latency_ms=1.0),
+            )
         if isinstance(outcome, BaseException):
             raise outcome
+        self.last_metadata.update(
+            {"valid_json": True, "json_schema_status": "PASS", "pydantic_status": "PASS"}
+        )
         return StructuredGenerationResult(
             value=response_model.model_validate(outcome),
             metrics=ProviderMetrics(latency_ms=1.0),
@@ -213,15 +247,55 @@ def test_dry_run_never_constructs_a_network_backend(
     assert "PRELIVE_PROVIDER_FREE" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    ("fixture_name", "expected_projection"),
+    [
+        (
+            "invalid_json",
+            {"valid_json": False, "json_schema_status": None, "pydantic_status": None},
+        ),
+        (
+            "json_schema_failure",
+            {"valid_json": True, "json_schema_status": "FAIL", "pydantic_status": None},
+        ),
+        (
+            "pydantic_only_failure",
+            {"valid_json": True, "json_schema_status": "PASS", "pydantic_status": "FAIL"},
+        ),
+    ],
+)
+def test_staged_validation_distinguishes_structural_failure_types(
+    fixture_name: str, expected_projection: dict[str, object]
+) -> None:
+    """Record JSON, JSON-Schema, and canonical-validation stages independently."""
+    metadata: dict[str, object] = {}
+    content = _transport_fixture(fixture_name)
+    if not isinstance(content, str):
+        content = json.dumps(content)
+    with pytest.raises(StructuredResponseProviderError):
+        _parse_and_validate_content(content, SemanticIRV2R, metadata)
+    assert {key: metadata[key] for key in expected_projection} == expected_projection
+
+
+def test_staged_validation_accepts_canonical_success() -> None:
+    """Record all three successful validation stages."""
+    metadata: dict[str, object] = {}
+    value = _parse_and_validate_content(json.dumps(_valid_payload()), SemanticIRV2R, metadata)
+    assert isinstance(value, SemanticIRV2R)
+    assert metadata == {
+        "valid_json": True,
+        "json_schema_status": "PASS",
+        "pydantic_status": "PASS",
+    }
+
+
 def test_initial_structured_failure_recovers_with_one_structural_retry() -> None:
     """Record initial failure and bounded structural retry recovery."""
     case, gold, mask = _case_context()
     config = _configuration_contract(REPO_ROOT)["A"]
     backend = SequenceBackend(
         [
-            StructuredResponseProviderError(
-                "invalid", response_reason=ProviderResponseFailureReason.INVALID_JSON
-            ),
+            _raw_content("invalid_json"),
             _valid_payload(),
         ]
     )
@@ -248,9 +322,45 @@ def test_initial_structured_failure_recovers_with_one_structural_retry() -> None
     assert len(backend.calls) == 2
     assert row["structural_retry_count"] == 1
     assert row["infrastructure_retry_count"] == 0
-    assert row["initial_pydantic_status"] == "FAIL"
+    assert row["initial_valid_json"] is False
+    assert row["initial_json_schema_status"] is None
+    assert row["initial_pydantic_status"] is None
     assert row["retry_pydantic_status"] == "PASS"
     assert row["final_canonical_status"] == "PASS"
+
+
+def test_exhausted_structural_failure_keeps_runtime_metadata_and_continues_logically() -> None:
+    """A valid-model structural failure is not configuration drift."""
+    case, gold, mask = _case_context()
+    config = _configuration_contract(REPO_ROOT)["A"]
+    backend = SequenceBackend([_raw_content("pydantic_only_failure")] * 2)
+    provenance = verify_preflight(
+        REPO_ROOT,
+        authorized_checkpoint=None,
+        output_path=Path("/tmp/p1-test-output-structural"),
+        journal_path=Path("/tmp/p1-test-journal-structural"),
+        terminal_path=Path("/tmp/p1-test-terminal-structural"),
+        require_exact_checkpoint=False,
+        require_clean=False,
+    )
+    row = asyncio.run(
+        execute_logical_attempt(
+            case=case,
+            gold=gold,
+            configuration=config,
+            mask=mask,
+            backend=backend,
+            provenance=provenance,
+            execution_order_index=0,
+        )
+    )
+    assert len(backend.calls) == 2
+    assert row["final_canonical_status"] == "FAIL"
+    assert row["terminal_row_status"] == "COMPLETE"
+    assert row["runtime_attestation_status"] == "OK"
+    assert row["retry_valid_json"] is True
+    assert row["retry_json_schema_status"] == "PASS"
+    assert row["retry_pydantic_status"] == "FAIL"
 
 
 def test_transient_failure_uses_one_infrastructure_retry() -> None:
@@ -388,6 +498,38 @@ def test_run_matrix_consumes_exact_96_rows_and_writes_only_staged_journal(tmp_pa
     assert not terminal.exists()
 
 
+def test_structural_failure_does_not_stop_the_remaining_schedule(tmp_path: Path) -> None:
+    """Complete all 96 logical rows after one exhausted structural failure."""
+    a_backend = SequenceBackend([_raw_content("invalid_json")] * 2 + [_valid_payload()] * 47)
+    b_backend = SequenceBackend(
+        [_valid_payload()] * 48,
+        returned_model="nvidia/nemotron-3-super-120b-a12b",
+    )
+    output = tmp_path / "evidence.jsonl"
+    result = asyncio.run(
+        run_matrix(
+            repo_root=REPO_ROOT,
+            backends={"A": a_backend, "B": b_backend},
+            output_path=output,
+            journal_path=tmp_path / "journal.jsonl",
+            terminal_path=tmp_path / "terminal.json",
+            require_clean=False,
+        )
+    )
+    assert result["decision"] in {
+        "CONFIGURATION_A_DIRECTIONALLY_BETTER",
+        "CONFIGURATION_B_DIRECTIONALLY_BETTER",
+        "NO_CLEAR_DIRECTIONAL_DIFFERENCE",
+    }
+    assert len(a_backend.calls) == 49
+    assert len(b_backend.calls) == 48
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    assert len(rows) == 96
+    failed_rows = [row for row in rows if row["final_canonical_status"] == "FAIL"]
+    assert len(failed_rows) == 1
+    assert failed_rows[0]["terminal_row_status"] == "COMPLETE"
+
+
 def test_schedule_preserves_even_odd_ordering() -> None:
     """Preserve the frozen A/B order for even and odd case indexes."""
     schedule = _load_p0_contracts(REPO_ROOT)["schedule"]["rows"]
@@ -464,6 +606,84 @@ def test_run_matrix_stops_on_configuration_drift(tmp_path: Path) -> None:
     assert result["decision"] == "INCONCLUSIVE_CONFIGURATION_DRIFT"
     assert len(a_backend.calls) == 1
     assert len(b_backend.calls) == 0
+
+
+def _complete_evidence_population(
+    tmp_path: Path,
+) -> tuple[list[dict[str, object]], dict[str, object], dict[str, object]]:
+    """Build one complete provider-free population for finalizer tests."""
+    output = tmp_path / "evidence.jsonl"
+    asyncio.run(
+        run_matrix(
+            repo_root=REPO_ROOT,
+            backends={
+                "A": SequenceBackend([_valid_payload()] * 48),
+                "B": SequenceBackend(
+                    [_valid_payload()] * 48,
+                    returned_model="nvidia/nemotron-3-super-120b-a12b",
+                ),
+            },
+            output_path=output,
+            journal_path=tmp_path / "journal.jsonl",
+            terminal_path=tmp_path / "terminal.json",
+            require_clean=False,
+        )
+    )
+    rows = [json.loads(line) for line in output.read_text(encoding="utf-8").splitlines()]
+    provenance = verify_preflight(
+        REPO_ROOT,
+        authorized_checkpoint=None,
+        output_path=tmp_path / "unused-output",
+        journal_path=tmp_path / "unused-journal",
+        terminal_path=tmp_path / "unused-terminal",
+        require_exact_checkpoint=False,
+        require_clean=False,
+    )
+    return rows, provenance, _load_p0_contracts(REPO_ROOT)
+
+
+def test_primary_accuracy_ignores_raw_diagnostic_dimensions(tmp_path: Path) -> None:
+    """Raw diagnostic changes cannot alter primary dimension accuracy."""
+    rows, provenance, contracts = _complete_evidence_population(tmp_path)
+    raw_mask = next(
+        item for item in contracts["mask"]["rows"] if item["model_role"] == "RAW_MODEL_DIAGNOSTIC"
+    )
+    target = next(
+        row
+        for row in rows
+        if row["configuration_id"] == "A" and row["case_id"] == raw_mask["case_id"]
+    )
+    dimension = raw_mask["dimension"]
+    original_status = target["semantic_dimension_results"][dimension]["status"]
+    assert original_status in {"CORRECT", "INCORRECT"}
+    baseline = _finalize_rows(REPO_ROOT, rows, provenance, contracts)
+    changed_rows = copy.deepcopy(rows)
+    changed_target = next(
+        row
+        for row in changed_rows
+        if row["configuration_id"] == "A" and row["case_id"] == raw_mask["case_id"]
+    )
+    changed_target["semantic_dimension_results"][dimension]["status"] = (
+        "INCORRECT" if original_status == "CORRECT" else "CORRECT"
+    )
+    changed = _finalize_rows(REPO_ROOT, changed_rows, provenance, contracts)
+    assert changed["summary"]["a_dimension_accuracy"] == baseline["summary"]["a_dimension_accuracy"]
+
+
+def test_late_integrity_errors_force_inconclusive_evidence(tmp_path: Path) -> None:
+    """Runtime, fingerprint, and call-limit errors cannot yield a decision."""
+    rows, provenance, contracts = _complete_evidence_population(tmp_path)
+    mutations = (
+        ("runtime_material_attestation", {"returned_model": "wrong-model"}, "RUNTIME_ATTESTATION"),
+        ("configuration_fingerprint", "0" * 64, "CONFIGURATION_FINGERPRINT"),
+        ("provider_call_count", MAX_PHYSICAL_CALLS + 1, "PHYSICAL_CALL_LIMIT"),
+    )
+    for field, value, expected_error in mutations:
+        changed_rows = copy.deepcopy(rows)
+        changed_rows[0][field] = value
+        result = _finalize_rows(REPO_ROOT, changed_rows, provenance, contracts)
+        assert result["decision"] == "INCONCLUSIVE_EVIDENCE"
+        assert expected_error in result["integrity_errors"]
 
 
 def test_completed_rows_exclude_secrets_and_hidden_reasoning(tmp_path: Path) -> None:

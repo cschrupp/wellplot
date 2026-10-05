@@ -18,6 +18,8 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, NoReturn
 
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import ValidationError
 
 from scripts.semantic_ir_v2r_sr7_p0_comparison_contract import (
@@ -296,6 +298,61 @@ def _safe_provider_failure(error: ProviderRequestError) -> _CallObservation:
     )
 
 
+def _backend_metadata(backend: ModelBackendProtocol) -> dict[str, Any]:
+    """Copy bounded transport metadata even when provider validation fails."""
+    metadata = getattr(backend, "last_metadata", {})
+    return dict(metadata) if isinstance(metadata, dict) else {}
+
+
+def _parse_and_validate_content(
+    content: str,
+    response_model: type[SemanticIRV2R],
+    metadata: dict[str, Any],
+) -> SemanticIRV2R:
+    """Apply JSON parsing, JSON Schema, and canonical validation in order."""
+    try:
+        parsed = json.loads(content)
+    except json.JSONDecodeError:
+        metadata.update(
+            {
+                "valid_json": False,
+                "json_schema_status": None,
+                "pydantic_status": None,
+            }
+        )
+        raise StructuredResponseProviderError(
+            "provider returned invalid structured JSON",
+            response_reason=ProviderResponseFailureReason.INVALID_JSON,
+        ) from None
+
+    try:
+        Draft202012Validator(response_model.model_json_schema()).validate(parsed)
+    except JsonSchemaValidationError:
+        metadata.update(
+            {
+                "valid_json": True,
+                "json_schema_status": "FAIL",
+                "pydantic_status": None,
+            }
+        )
+        raise StructuredResponseProviderError(
+            "provider returned JSON that does not satisfy the response schema",
+            response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        ) from None
+
+    metadata.update({"valid_json": True, "json_schema_status": "PASS"})
+    try:
+        value = response_model.model_validate(parsed)
+    except ValidationError:
+        metadata["pydantic_status"] = "FAIL"
+        raise StructuredResponseProviderError(
+            "provider returned JSON that failed canonical validation",
+            response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        ) from None
+    metadata["pydantic_status"] = "PASS"
+    return value
+
+
 async def _call_backend(
     backend: ModelBackendProtocol,
     request: StructuredGenerationRequest,
@@ -305,7 +362,8 @@ async def _call_backend(
     try:
         result = await backend.generate_structured(request, response_model=SemanticIRV2R)
     except StructuredResponseProviderError as error:
-        metadata = error.diagnostic_metadata()
+        metadata = _backend_metadata(backend)
+        metadata.update(error.diagnostic_metadata())
         return _CallObservation(
             phase=phase,
             outcome="structured_failure",
@@ -325,15 +383,24 @@ async def _call_backend(
             metadata=observed.metadata,
         )
     except ValidationError:
+        metadata = _backend_metadata(backend)
+        metadata.update(
+            {
+                "valid_json": True,
+                "json_schema_status": "PASS",
+                "pydantic_status": "FAIL",
+            }
+        )
         return _CallObservation(
             phase=phase,
             outcome="structured_failure",
             value=None,
             reason="schema_validation",
             category=ProviderFailureCategory.INVALID_RESPONSE.value,
-            metadata={},
+            metadata=metadata,
         )
-    metadata = getattr(backend, "last_metadata", {})
+    metadata = _backend_metadata(backend)
+    metadata.update({"valid_json": True, "json_schema_status": "PASS", "pydantic_status": "PASS"})
     return _CallObservation(
         phase=phase,
         outcome="structured_success",
@@ -360,9 +427,23 @@ def _call_projection(call: _CallObservation | None) -> dict[str, Any]:
     return {
         "transport_status": "PASS" if success or structured_failure else call.category,
         "finish_reason": call.metadata.get("finish_reason"),
-        "valid_json": True if success else False if structured_failure else None,
-        "json_schema_status": "PASS" if success else "FAIL" if structured_failure else None,
-        "pydantic_status": "PASS" if success else "FAIL" if structured_failure else None,
+        "valid_json": (
+            call.metadata.get("valid_json") if structured_failure else True if success else None
+        ),
+        "json_schema_status": (
+            call.metadata.get("json_schema_status")
+            if structured_failure
+            else "PASS"
+            if success
+            else None
+        ),
+        "pydantic_status": (
+            call.metadata.get("pydantic_status")
+            if structured_failure
+            else "PASS"
+            if success
+            else None
+        ),
         "usage": call.metadata.get("usage"),
         "latency_ms": call.metadata.get("latency_ms"),
     }
@@ -625,23 +706,27 @@ def _finalize_rows(
             errors.append("PHYSICAL_CALL_LIMIT")
         if row["configuration_fingerprint"] != expected["fingerprint"]:
             errors.append("CONFIGURATION_FINGERPRINT")
+    if errors:
+        return {
+            "decision": "INCONCLUSIVE_EVIDENCE",
+            "evidence_invalid": True,
+            "integrity_errors": sorted(set(errors)),
+            "rows": len(rows),
+        }
     comparison = derive_comparison(rows, contracts["mask"])
-    primary_rows = [
-        row
-        for row in rows
-        if any(
-            mask_row["case_id"] == row["case_id"]
-            and mask_row["model_role"] == "PRIMARY_MODEL_OBLIGATION"
-            for mask_row in contracts["mask"]["rows"]
-        )
-    ]
+    primary_dimensions = {
+        (mask_row["case_id"], mask_row["dimension"])
+        for mask_row in contracts["mask"]["rows"]
+        if mask_row["model_role"] == "PRIMARY_MODEL_OBLIGATION"
+    }
 
     def accuracy(configuration_id: str) -> float:
         statuses = [
             result["status"]
-            for row in primary_rows
+            for row in rows
             if row["configuration_id"] == configuration_id
-            for result in row["semantic_dimension_results"].values()
+            for dimension, result in row["semantic_dimension_results"].items()
+            if (row["case_id"], dimension) in primary_dimensions
             if result["status"] in {"CORRECT", "INCORRECT"}
         ]
         return sum(status == "CORRECT" for status in statuses) / len(statuses) if statuses else 0.0
@@ -870,19 +955,7 @@ class _HttpxStructuredBackend:
                 "provider returned no structured content",
                 response_reason=ProviderResponseFailureReason.MISSING_CONTENT,
             )
-        try:
-            parsed = json.loads(content)
-            value = response_model.model_validate(parsed)
-        except json.JSONDecodeError:
-            raise StructuredResponseProviderError(
-                "provider returned invalid structured JSON",
-                response_reason=ProviderResponseFailureReason.INVALID_JSON,
-            ) from None
-        except ValidationError:
-            raise StructuredResponseProviderError(
-                "provider returned schema-invalid structured JSON",
-                response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
-            ) from None
+        value = _parse_and_validate_content(content, response_model, self.last_metadata)
         return StructuredGenerationResult(
             value=value,
             metrics=ProviderMetrics(
