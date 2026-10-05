@@ -8,13 +8,22 @@
       }
     ],
     "required_changes": {
-      "LAS-05": [
-        {
-          "path": "/sections/0/tracks/0/bindings/0/scale/minimum",
-          "operator": "equals",
-          "value": 10.0
-        }
-      ]
+      "LAS-05": {
+        "before": [
+          {
+            "path": "/sections/0/tracks/0/bindings/0/scale/minimum",
+            "operator": "equals",
+            "value": 0.0
+          }
+        ],
+        "after": [
+          {
+            "path": "/sections/0/tracks/0/bindings/0/scale/minimum",
+            "operator": "equals",
+            "value": 10.0
+          }
+        ]
+      }
     },
     "allowed_change_paths": [
       "/sections/0/tracks/0/bindings/0/scale"

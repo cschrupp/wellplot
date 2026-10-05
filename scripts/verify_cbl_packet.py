@@ -359,11 +359,31 @@ def _check_sections(payload: Mapping[str, Any], errors: list[str]) -> None:
 
 
 def _check_section_order(payload: Mapping[str, Any], errors: list[str]) -> None:
-    """Check only the ordered section identities."""
+    """Check section order and the section-level depth range."""
     sections = payload.get("sections")
     actual = [item.get("id") for item in sections] if isinstance(sections, list) else None
     if actual != list(_EXPECTED_SECTIONS):
         errors.append(f"section order is {actual!r}, expected {list(_EXPECTED_SECTIONS)!r}")
+    if not isinstance(sections, list):
+        return
+    for section in sections:
+        if not isinstance(section, Mapping):
+            errors.append("section is not an object")
+            continue
+        depth_range = section.get("depth_range")
+        if depth_range is None:
+            continue
+        try:
+            invalid_depth_range = (
+                not isinstance(depth_range, Sequence)
+                or isinstance(depth_range, (str, bytes, bytearray))
+                or len(depth_range) != 2
+                or float(depth_range[0]) >= float(depth_range[1])
+            )
+        except (TypeError, ValueError):
+            invalid_depth_range = True
+        if invalid_depth_range:
+            errors.append(f"{section.get('id')}: depth range is invalid")
 
 
 def _check_track_structure(payload: Mapping[str, Any], errors: list[str]) -> None:
@@ -407,6 +427,15 @@ def _check_binding_structure(payload: Mapping[str, Any], errors: list[str]) -> N
     for section in sections:
         if not isinstance(section, Mapping):
             continue
+        section_id = str(section.get("id"))
+        source = section.get("data_source")
+        expected_source = "CBL_Main.dlis" if section_id == "main_pass" else "CBL_Repeat.dlis"
+        if (
+            not isinstance(source, Mapping)
+            or source.get("source_format") != "dlis"
+            or Path(str(source.get("source_path", ""))).name != expected_source
+        ):
+            errors.append(f"{section_id}: source is not {expected_source}")
         for track_id, expected_channels in expected_by_track.items():
             track = next(
                 (item for item in section.get("tracks", []) if item.get("id") == track_id),
@@ -481,6 +510,12 @@ def _check_presentation(payload: Mapping[str, Any], errors: list[str]) -> None:
             _check_raster(raster, section_id=str(section_id), errors=errors)
 
 
+def _check_report_presentation(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Attribute report header and page/output presentation to CBL-01."""
+    _check_header(payload, errors)
+    _check_report_settings(payload, errors)
+
+
 def _check_raster_requirement(payload: Mapping[str, Any], errors: list[str]) -> None:
     """Check raster settings for every expected VDL track."""
     sections = payload.get("sections")
@@ -521,7 +556,7 @@ def _cbl_requirements(
 ) -> list[dict[str, Any]]:
     """Return the requirement-level CBL acceptance result."""
     requirements = [
-        _requirement_result("CBL-01", _check_header, payload),
+        _requirement_result("CBL-01", _check_report_presentation, payload),
         _requirement_result("CBL-02", _check_remarks, payload),
         _requirement_result("CBL-03", _check_section_order, payload),
         _requirement_result("CBL-04", _check_track_structure, payload),
@@ -654,6 +689,12 @@ def verify_cbl_packet(
         canonical_valid=True,
         execution_evidence=execution_evidence,
     )
+    if errors and not any(item["status"] == _FAIL for item in result["requirements"]):
+        # Keep the legacy compatibility surface and the D0 surface fail-closed
+        # if a future legacy check is added without a requirement mapping.
+        cbl09 = next(item for item in result["requirements"] if item["id"] == "CBL-09")
+        cbl09["status"] = _FAIL
+        cbl09["errors"].append("legacy verifier errors were not attributed to a requirement")
     requirement_statuses = {item["status"] for item in result["requirements"]}
     if _HARNESS_ERROR in requirement_statuses:
         result["acceptance_status"] = _HARNESS_ERROR

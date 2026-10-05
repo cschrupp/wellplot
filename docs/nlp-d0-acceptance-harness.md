@@ -49,7 +49,10 @@ the verifier never infers a successful render from a valid YAML document.
 
 `scripts/verify_las_revision.py` compares canonical before/after document
 models, never raw file bytes. Acceptance specifications declare the intended
-change paths and prohibited paths. The verifier checks:
+change paths and prohibited paths. Each exercised LAS-02 through LAS-06
+requirement declares both before-state and after-state assertions, and at
+least one assertion path must intersect a real canonical before-to-after
+delta. The verifier checks:
 
 | ID | Scope |
 | --- | --- |
@@ -71,6 +74,9 @@ requested operation itself appears successful.
 The current fixture exercises a scale revision and a rejected no-op. Other
 dimensions remain visible as `NOT_CHECKABLE` until the corresponding
 deterministic acceptance specification is defined.
+
+Unknown requirement IDs or malformed change specifications are
+`HARNESS_ERROR`; they are never silently treated as unexercised dimensions.
 
 ## Expected-answer isolation
 

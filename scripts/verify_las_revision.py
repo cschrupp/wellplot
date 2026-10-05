@@ -153,16 +153,59 @@ def _assertions(
 
 
 def _check_required_changes(
+    before: Mapping[str, Any],
     after: Mapping[str, Any],
-    required_changes: object,
+    change_spec: Mapping[str, Any],
+    differences: Sequence[Mapping[str, Any]],
+    *,
+    requirement_id: str,
 ) -> list[str]:
-    if required_changes is None:
-        return []
-    if not isinstance(required_changes, list) or not all(
-        isinstance(item, Mapping) for item in required_changes
+    errors = _assertions(
+        before,
+        change_spec["before"],
+        field_name=f"required_changes.{requirement_id}.before",
+    )
+    errors.extend(
+        _assertions(
+            after,
+            change_spec["after"],
+            field_name=f"required_changes.{requirement_id}.after",
+        )
+    )
+    asserted_paths = [
+        str(assertion["path"]) for side in ("before", "after") for assertion in change_spec[side]
+    ]
+    if not any(
+        any(
+            _path_is_within(str(change["path"]), asserted_path)
+            or _path_is_within(asserted_path, str(change["path"]))
+            for asserted_path in asserted_paths
+        )
+        for change in differences
     ):
-        raise ValueError("required_changes must be a list of assertion objects")
-    return _assertions(after, required_changes, field_name="required_changes")
+        errors.append("required semantic change has no canonical before-to-after delta")
+    return errors
+
+
+def _validate_required_changes(required_changes: object) -> Mapping[str, Any]:
+    """Validate the requirement-keyed before/after change specification."""
+    if not isinstance(required_changes, Mapping):
+        raise ValueError("required_changes must be an object keyed by LAS requirement")
+    unknown = set(required_changes) - _CHANGE_REQUIREMENT_IDS
+    if unknown:
+        raise ValueError(f"unknown required_changes requirement IDs: {sorted(unknown)!r}")
+    for requirement_id, change_spec in required_changes.items():
+        if not isinstance(change_spec, Mapping):
+            raise ValueError(f"{requirement_id} must declare before and after assertions")
+        if set(change_spec) != {"before", "after"}:
+            raise ValueError(f"{requirement_id} must contain only before and after assertions")
+        for side in ("before", "after"):
+            assertions = change_spec[side]
+            if not isinstance(assertions, list) or not assertions:
+                raise ValueError(f"{requirement_id}.{side} must be a non-empty assertion list")
+            if not all(isinstance(item, Mapping) for item in assertions):
+                raise ValueError(f"{requirement_id}.{side} must contain assertion objects")
+    return required_changes
 
 
 def _requirement(
@@ -254,12 +297,10 @@ def verify_las_revision(
             )
         )
 
-        by_requirement = acceptance.get("required_changes", {})
-        if not isinstance(by_requirement, Mapping):
-            raise ValueError("required_changes must be an object keyed by LAS requirement")
+        by_requirement = _validate_required_changes(acceptance.get("required_changes", {}))
         for requirement_id in ("LAS-02", "LAS-03", "LAS-04", "LAS-05", "LAS-06"):
-            assertions = by_requirement.get(requirement_id)
-            if assertions is None:
+            change_spec = by_requirement.get(requirement_id)
+            if change_spec is None:
                 requirements.append(
                     _requirement(
                         requirement_id, reason="dimension is not exercised by this revision"
@@ -267,7 +308,16 @@ def verify_las_revision(
                 )
             else:
                 requirements.append(
-                    _requirement(requirement_id, _check_required_changes(after, assertions))
+                    _requirement(
+                        requirement_id,
+                        _check_required_changes(
+                            before,
+                            after,
+                            change_spec,
+                            differences,
+                            requirement_id=requirement_id,
+                        ),
+                    )
                 )
 
         allowed = acceptance.get("allowed_change_paths")

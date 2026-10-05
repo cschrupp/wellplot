@@ -173,6 +173,36 @@ def test_cbl_unsuccessful_render_evidence_is_a_requirement_failure(tmp_path: Pat
     assert _requirement(result, "CBL-09")["status"] == "FAIL"
 
 
+def test_cbl_wrong_source_is_attributed_to_binding_requirement(tmp_path: Path) -> None:
+    """Reject a canonical packet whose section points at the wrong source file."""
+    payload = _cbl_payload()
+    payload["sections"][0]["data_source"]["source_path"] = "Wrong.dlis"
+    path = tmp_path / "wrong-source.yaml"
+    _write_payload(path, payload)
+
+    result = cbl_verifier.verify_cbl_packet(
+        path, execution_evidence={"persisted": True, "rendered": True}
+    )
+
+    assert result["acceptance_status"] == "FAIL"
+    assert _requirement(result, "CBL-05")["status"] == "FAIL"
+
+
+def test_cbl_legacy_report_setting_errors_cannot_be_accepted(tmp_path: Path) -> None:
+    """Keep report-level legacy checks on the requirement-level status surface."""
+    payload = _cbl_payload()
+    payload["page"]["orientation"] = "landscape"
+    path = tmp_path / "wrong-report-settings.yaml"
+    _write_payload(path, payload)
+
+    result = cbl_verifier.verify_cbl_packet(
+        path, execution_evidence={"persisted": True, "rendered": True}
+    )
+
+    assert result["acceptance_status"] == "FAIL"
+    assert _requirement(result, "CBL-01")["status"] == "FAIL"
+
+
 def _las_paths(tmp_path: Path) -> tuple[Path, Path, dict[str, object]]:
     before = tmp_path / "before.yaml"
     after = tmp_path / "after.yaml"
@@ -214,6 +244,28 @@ def test_las_requested_delta_passes_and_preserves_unrelated_state(tmp_path: Path
         "LAS-07",
         "LAS-09",
     }
+
+
+def test_las_exercised_change_rejects_an_already_satisfied_noop(tmp_path: Path) -> None:
+    """Do not call a requested change successful when before and after are equal."""
+    before, after, payload = _las_paths(tmp_path)
+    already_satisfied = copy.deepcopy(payload)
+    already_satisfied["sections"][0]["tracks"][0]["bindings"][0]["scale"]["minimum"] = 10.0
+    _write_payload(before, already_satisfied)
+    _write_payload(after, already_satisfied)
+    acceptance = json.loads((D0_FIXTURES / "las_revision_specs.json").read_text())[
+        "requested_scale_change"
+    ]
+
+    result = las_verifier.verify_las_revision(
+        before,
+        after,
+        acceptance,
+        execution_evidence={"accepted": True, "persisted": True, "rendered": True},
+    )
+
+    assert result["workflow_status"] == "FAIL"
+    assert _requirement(result, "LAS-05")["status"] == "FAIL"
 
 
 def test_las_collateral_mutation_fails_even_when_requested_change_succeeds(tmp_path: Path) -> None:
@@ -314,6 +366,21 @@ def test_las_verifier_errors_are_separate_from_workflow_failures(tmp_path: Path)
     before, after, payload = _las_paths(tmp_path)
     _write_payload(after, copy.deepcopy(payload))
     acceptance = {"required_changes": [], "allowed_change_paths": None}
+
+    result = las_verifier.verify_las_revision(before, after, acceptance)
+
+    assert result["status"] == "HARNESS_ERROR"
+    assert result["harness_error"] is True
+
+
+def test_las_unknown_requirement_id_is_a_harness_error(tmp_path: Path) -> None:
+    """Reject an acceptance spec that silently introduces an unsupported dimension."""
+    before, after, payload = _las_paths(tmp_path)
+    _write_payload(after, copy.deepcopy(payload))
+    acceptance = json.loads((D0_FIXTURES / "las_revision_specs.json").read_text())[
+        "rejected_ambiguous_request"
+    ]
+    acceptance["required_changes"] = {"LAS-50": {"before": [], "after": []}}
 
     result = las_verifier.verify_las_revision(before, after, acceptance)
 
