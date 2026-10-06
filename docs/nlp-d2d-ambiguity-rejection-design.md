@@ -18,13 +18,13 @@ D2D closes the negative-path LAS revision requirement:
 
 - `LAS-01` — ground against the actual current document before deciding whether a request is safe;
 - `LAS-07` — a rejected request produces zero semantic mutation;
-- `LAS-08` — ambiguity or unavailable-source grounding fails closed with an actionable deterministic result.
+- `LAS-08` — ambiguity or unavailable source/channel grounding fails closed with an actionable deterministic result.
 
 D2D is deliberately a rejection slice. It does not create or mutate a plot object.
 
 The canonical delivery rule remains:
 
-> When a target is ambiguous, fail closed rather than choosing. When a requested source is unavailable, return an actionable error rather than silently substituting another declared source.
+> When a target is ambiguous, fail closed rather than choosing. When a requested source or channel is unavailable, return an actionable error rather than silently substituting another declared source or channel.
 
 ## Architectural Finding
 
@@ -79,11 +79,32 @@ No worker is dispatched because enrichment happens before graph fan-out.
 
 `DirectNotebookSession._apply_result()` returns immediately when compilation fails, before constructing an authoring plan or persisting a mutation.
 
+### Unavailable channel in a valid source
+
+Channel availability is enforced later than source selection.
+
+The section worker receives only the inspected channels from the selected source. Its private `ProgramRuntime.dry_run()` reconciles the worker's intent against those exact `available_channels`.
+
+If a requested binding channel is absent, canonical reconciliation records an issue equivalent to:
+
+```text
+channel_missing: No source channel matches 'NPHI'.
+```
+
+The private dry run returns an artifact-free failed `ProgramExecutionResult` using the existing bounded program diagnostic:
+
+```text
+stage = dry_run
+code  = program.dry_run_error
+```
+
+The compile graph therefore exposes a failed section worker and never produces a merged intent. `DirectNotebookSession._apply_result()` again short-circuits before canonical application or persistence.
+
 Therefore the expected D2D implementation is acceptance evidence over existing behavior, not a new error architecture.
 
 ## D2D Acceptance Cases
 
-D2D must include exactly two primary public-path rejection cases.
+D2D must include exactly three primary public-path rejection cases.
 
 ---
 
@@ -280,6 +301,158 @@ No section backend program should be generated.
 
 ---
 
+# Case C — Requested Channel Unavailable in a Valid Source
+
+## Frozen Scientist Request
+
+```text
+In the Main Log section, add a normal track titled "Neutron", 28 mm wide, and plot NPHI from fixture.las on it labeled "Neutron" with a linear scale from 0 to 45.
+```
+
+The source is intentionally valid and declared. The requested scalar channel `NPHI` is intentionally absent from that source's inspected channel inventory.
+
+## Frozen Planner Output
+
+A deterministic planner must return exactly one existing-section task equivalent to:
+
+```python
+SectionTask(
+    goal="Add the requested Neutron track and NPHI binding from the named source.",
+    capability_ids=(
+        "section.log_plot",
+        "track.normal",
+        "binding.curve",
+    ),
+    existing_section_hint="Main Log",
+    source_hints=("fixture.las",),
+    requirements=(FROZEN_D2D_MISSING_CHANNEL_REQUEST,),
+)
+```
+
+The plan must preserve both the explicit source identity and the requested channel semantics.
+
+## Fixture Requirement
+
+Use the same repository-contained LAS-backed single-logfile fixture used for grounded D2B-style structural revision.
+
+Before invoking revision, prove:
+
+- `Main Log` exists uniquely;
+- `fixture.las` is a real declared source candidate selected by the actual source matcher;
+- the inspected source contains scalar channels such as the fixture's real available channels;
+- `NPHI` is absent from every inspected channel mnemonic/alias for the selected source;
+- no alternate source containing `NPHI` is introduced.
+
+The test must inspect the real deterministic source context. It must not fake a `channel_missing` reconciliation issue.
+
+## Deterministic Worker Contract
+
+Unlike Cases A/B, Case C is expected to reach exactly one section worker.
+
+The deterministic section backend must inspect its actual bounded worker context and prove:
+
+```text
+target.kind == existing
+selected source candidate == fixture.las
+NPHI not in section_context.sources[*].channels[*].mnemonic/aliases
+```
+
+Only after proving the requested channel is genuinely unavailable may it emit a program that faithfully represents the scientist's request:
+
+```python
+report = wp.report()
+section = wp.target_section(report)
+
+track = wp.track(
+    section,
+    kind="normal",
+    title="Neutron",
+    width_mm=28,
+)
+
+wp.curve(
+    track,
+    channel="NPHI",
+    label="Neutron",
+    scale_minimum=0,
+    scale_maximum=45,
+    scale_kind="linear",
+    reverse=False,
+)
+```
+
+Do not substitute `GR`, `CALI`, or any other available channel.
+
+Because `ProgramSectionCompiler` may perform its existing bounded repair attempt, any repair response must preserve the requested unavailable `NPHI` channel. A repair must not convert the request into a different scientifically meaningful curve merely to obtain a successful program.
+
+## Expected Rejection
+
+The real public path must reach:
+
+```text
+DirectNotebookSession.revise(...)
+→ deterministic planner
+→ Main Log resolves uniquely
+→ fixture.las resolves uniquely
+→ source metadata inspection
+→ one section worker
+→ worker emits requested NPHI binding
+→ ProgramRuntime.dry_run()
+→ canonical available-channel reconciliation
+→ channel_missing
+→ worker failure with no artifact
+→ compile result has no merged intent
+→ DirectNotebookSession apply short-circuit
+→ zero persistent mutation
+```
+
+Required worker diagnostic evidence is equivalent to:
+
+```text
+stage = dry_run
+code  = program.dry_run_error
+message contains:
+channel_missing: No source channel matches 'NPHI'.
+```
+
+Required public evidence:
+
+```text
+result.report_facts["success"] == False
+result.report_facts["changed"] == False
+result.report_facts["apply_status"] == "compile_failed"
+submitted_intent is None
+```
+
+## Worker Isolation
+
+Case C must prove:
+
+```text
+section worker calls = 1
+report worker calls  = 0
+aggregate worker_count = 1
+failed_workers = 1
+successful_workers = 0
+```
+
+The section worker must not return an accepted intent artifact.
+
+## No-Substitution Evidence
+
+The test must prove:
+
+- the scientist requested `NPHI`;
+- the planner retained the NPHI requirement;
+- the worker attempted `NPHI`;
+- the inspected source did not contain `NPHI`;
+- no available channel was selected as a replacement;
+- no track or binding was persisted.
+
+This is the integrated unavailable-channel acceptance case. It is distinct from the D2B `NOT_A_CHANNEL` regression, which intentionally corrupted a worker program while the scientist request still named a valid channel.
+
+---
+
 # D0 LAS-08 Contract
 
 Use the frozen `scripts/verify_las_revision.py` unchanged.
@@ -396,7 +569,16 @@ and a user-facing reason equivalent to:
 A source hint did not match an explicit host candidate.
 ```
 
-Exact punctuation is not the acceptance object; the stable diagnostic code and truthful actionable meaning are.
+For unavailable channel, evidence must include the worker/private-dry-run diagnostic:
+
+```text
+stage = dry_run
+code  = program.dry_run_error
+message contains:
+channel_missing: No source channel matches 'NPHI'.
+```
+
+Exact punctuation is not the acceptance object; the stable diagnostic code/stage and truthful actionable meaning are.
 
 D2D must not expose absolute filesystem paths, provider internals, generated program text, or private model material in the user-facing error.
 
@@ -413,7 +595,9 @@ Missing-source handling must prove the host does not:
 - create a track or binding without the requested source;
 - invoke the worker and ask it to improvise.
 
-The rejection must happen in deterministic enrichment before worker fan-out.
+For Case B, rejection must happen in deterministic enrichment before worker fan-out.
+
+For Case C, the selected source is valid, so rejection must instead happen during the one section worker's private canonical dry run. The system must not use the repair opportunity to substitute another available channel.
 
 ---
 
@@ -443,7 +627,9 @@ The existing path already provides:
 - facade normalization to safe diagnostics;
 - failed results with no merged intent;
 - public apply short-circuit before reconciliation/persistence;
-- zero-worker evidence for pre-fan-out failures.
+- zero-worker evidence for pre-fan-out failures;
+- private worker dry-run channel grounding against inspected `available_channels`;
+- artifact-free worker failure for unavailable requested channels.
 
 Therefore future D2D implementation authorization should initially permit only:
 
@@ -454,7 +640,7 @@ docs/nlp-d2d-ambiguity-rejection-result.md
 
 No production files are expected to change.
 
-If either integrated public-path case fails because existing production behavior does not satisfy this design, implementation must STOP and request a scope amendment rather than repairing production opportunistically.
+If any integrated public-path case fails because existing production behavior does not satisfy this design, implementation must STOP and request a scope amendment rather than repairing production opportunistically.
 
 ## Production Files Explicitly Not Authorized by This Design Expectation
 
@@ -495,7 +681,9 @@ Future D2D implementation must run existing direct tests that establish the lowe
 - ambiguous section hints fail as `SECTION_HINT_AMBIGUOUS`;
 - revision unresolved hints do not downgrade to new-section work;
 - facade enrichment failures produce no worker evidence;
-- failed public session results expose no intent.
+- failed public session results expose no intent;
+- section-worker private dry run rejects bindings whose requested channel is absent from the selected inspected channel set;
+- failed worker outcomes do not expose an intent artifact.
 
 The D2D public-path tests complement these unit/contract tests; they do not replace them.
 
@@ -517,13 +705,19 @@ Before revision, prove `missing.las` is not present in the candidate inventory.
 
 If a future fixture change introduces such a candidate, the test must fail rather than silently becoming a positive mutation case.
 
-## C. No worker fallback
+## C. Missing-channel fixture sanity
 
-Use worker doubles that fail immediately if called.
+Before revision, prove `fixture.las` resolves and `NPHI` is absent from its inspected channel inventory.
 
-Both rejection cases must complete with zero worker calls.
+If a future fixture change introduces `NPHI`, the test must fail before invoking the acceptance path rather than silently becoming a positive structural revision.
 
-## D. Mutation sentinel
+## D. Worker isolation and no fallback
+
+For Cases A/B, use worker doubles that fail immediately if called; both must complete with zero worker calls.
+
+For Case C, permit exactly one section worker and zero report workers. The worker must fail closed on `NPHI` and must not substitute an available channel during its initial or repair candidate.
+
+## E. Mutation sentinel
 
 A controlled verifier-only negative regression must show that if any unrelated canonical field is changed while `expected_outcome="rejected"`, D0 produces:
 
@@ -549,7 +743,7 @@ D2D does not authorize:
 - filesystem discovery outside declared candidates;
 - source upload workflows;
 - conditional-instruction execution semantics;
-- unavailable-channel redesign;
+- unavailable-channel **redesign** beyond the integrated Case C acceptance path;
 - planner redesign;
 - worker redesign;
 - persistence changes;
@@ -573,7 +767,7 @@ STOP and request architecture/scope review if D2D appears to require:
 - modifying the public result schema;
 - changing reconciliation or persistence;
 - weakening the D0 verifier;
-- invoking a worker after an enrichment rejection;
+- invoking a worker after an enrichment rejection in Cases A/B;
 - provider/model calls;
 - production changes outside a separately approved amendment.
 
@@ -588,6 +782,8 @@ Future D2D implementation should run:
 - `tests/test_code_mode_enrichment.py`;
 - `tests/test_code_mode_facade.py`;
 - `tests/test_agent_session.py`;
+- `tests/test_code_mode_program_worker.py`;
+- relevant authoring context/reconciliation channel-grounding tests;
 - relevant direct-notebook tests;
 - full repository suite;
 - Ruff;
@@ -717,6 +913,59 @@ LAS-07:
 LAS-08:
 workflow_status:
 
+CASE C — MISSING CHANNEL IN VALID SOURCE
+
+Request:
+In the Main Log section, add a normal track titled "Neutron", 28 mm wide, and plot NPHI from fixture.las on it labeled "Neutron" with a linear scale from 0 to 45.
+
+Selected source:
+fixture.las
+
+Requested channel:
+NPHI
+
+Requested channel absent from inspected source:
+PASS/FAIL
+
+Worker context grounding evidence:
+<exact source/channel evidence>
+
+Public result:
+success:
+changed:
+apply_status:
+submitted_intent:
+
+Worker diagnostic:
+stage:
+code:
+message:
+
+Alternative channel substitution:
+NONE
+
+Worker counts:
+section:
+report:
+aggregate worker_count:
+failed_workers:
+successful_workers:
+
+Before/after byte identity:
+PASS/FAIL
+
+Before/after canonical identity:
+PASS/FAIL
+
+Render unchanged file:
+PASS/FAIL
+
+D0:
+LAS-01:
+LAS-07:
+LAS-08:
+workflow_status:
+
 Focused tests:
 <result>
 
@@ -752,12 +1001,13 @@ NOT AUTHORIZED
 
 `WELLPLOT-NLP-D2D-DESIGN-001`
 
-Selected approach: prove the existing deterministic pre-worker rejection path for two distinct unsafe revision conditions:
+Selected approach: prove three existing deterministic fail-closed paths through the public revision boundary:
 
-1. ambiguous existing-section identity;
-2. explicitly requested source absent from the declared host candidate inventory.
+1. ambiguous existing-section identity rejected during enrichment;
+2. explicitly requested source absent from the declared host candidate inventory rejected during enrichment;
+3. explicitly requested channel absent from a valid selected source rejected by the section worker's private canonical dry run.
 
-Evidence class: `KNOWN-GOOD / INTEGRATED ACCEPTANCE` — lower-level deterministic behavior already exists and is unit-tested; D2D adds notebook-facing LAS-08 acceptance evidence and zero-mutation proof.
+Evidence class: `KNOWN-GOOD / INTEGRATED ACCEPTANCE` — lower-level deterministic behavior already exists and is unit-tested; D2D adds notebook-facing LAS-08 acceptance evidence and zero-mutation proof across target ambiguity, source absence, and channel absence.
 
 Expected production changes: none.
 
