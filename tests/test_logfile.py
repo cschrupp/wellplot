@@ -822,6 +822,48 @@ class LogFileTests(unittest.TestCase):
         self.assertEqual(curve.fill.label, "Sand Fill")
         self.assertEqual(curve.fill.color, "#f59e0b")
 
+    def test_binding_fill_id_is_optional_but_validated_when_present(self) -> None:
+        """Accept a canonical fill identity without weakening the fill schema."""
+        payload = build_mapping()
+        payload["document"]["layout"]["log_sections"][0]["tracks"] = [
+            {
+                "id": "gr_fill",
+                "title": "GR",
+                "kind": "normal",
+                "width_mm": 28,
+                "position": 1,
+            }
+        ]
+        payload["document"]["bindings"]["channels"] = [
+            {
+                "channel": "GR",
+                "track_id": "gr_fill",
+                "kind": "curve",
+                "fill": {
+                    "fill_id": "main.gr.fill.gr_lower_fill",
+                    "kind": "to_lower_limit",
+                    "color": "#d9d9d9",
+                    "alpha": 0.25,
+                },
+            }
+        ]
+
+        spec = logfile_from_mapping(payload)
+        serialized_fill = spec.document["bindings"]["channels"][0]["fill"]
+        self.assertEqual(serialized_fill["fill_id"], "main.gr.fill.gr_lower_fill")
+
+        empty_id = yaml.safe_load(yaml.safe_dump(payload))
+        empty_id["document"]["bindings"]["channels"][0]["fill"]["fill_id"] = ""
+        with self.assertRaises(TemplateValidationError):
+            logfile_from_mapping(empty_id)
+
+        unknown_field = yaml.safe_load(yaml.safe_dump(payload))
+        unknown_field["document"]["bindings"]["channels"][0]["fill"]["invented_property"] = (
+            "something"
+        )
+        with self.assertRaises(TemplateValidationError):
+            logfile_from_mapping(unknown_field)
+
     def test_binding_can_parse_baseline_split_fill(self) -> None:
         """Parse baseline split fills from logfile channel bindings."""
         payload = build_mapping()

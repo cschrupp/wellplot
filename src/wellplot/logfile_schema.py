@@ -1310,6 +1310,7 @@ LOGFILE_JSON_SCHEMA: dict[str, Any] = {
             "required": ["kind"],
             "additionalProperties": False,
             "properties": {
+                "fill_id": {"type": "string", "minLength": 1},
                 "kind": {
                     "type": "string",
                     "enum": [

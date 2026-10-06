@@ -250,6 +250,55 @@ def test_legacy_binding_fill_round_trips_through_canonical_track() -> None:
     assert rendered.tracks[0].elements[0].fill.color == "#8fd19e"
 
 
+def test_logfile_projection_preserves_d2c_fill_payload_and_identity() -> None:
+    """Persist a canonical D2C fill and retain its identity after reload."""
+    mapping = _legacy_mapping()
+    document_mapping = mapping["document"]
+    assert isinstance(document_mapping, dict)
+    bindings = document_mapping["bindings"]["channels"]
+    assert isinstance(bindings, list)
+    binding = bindings[0]
+    binding["id"] = "main.gr.GR.3"
+    binding["fill"] = {
+        "fill_id": "main.gr.fill.gr_lower_fill",
+        "kind": "to_lower_limit",
+        "color": "#d9d9d9",
+        "alpha": 0.25,
+    }
+
+    canonical_before = authoring_document_from_mapping(mapping)
+    normalized_before = authoring_document_from_mapping(
+        authoring_document_to_logfile_mapping(canonical_before)
+    )
+    gr_before = normalized_before.sections[0].tracks[0]
+    assert isinstance(gr_before, NormalTrackSpec)
+    assert len(gr_before.fills) == 1
+    binding_before = gr_before.bindings[0].model_dump(mode="json")
+    fill_before = gr_before.fills[0]
+
+    projected = authoring_document_to_logfile_mapping(normalized_before)
+    projected_bindings = projected["document"]["bindings"]["channels"]
+    serialized = next(item for item in projected_bindings if item["id"] == "main.gr.GR.3")
+    assert serialized["fill"] == {
+        "fill_id": "main.gr.fill.gr_lower_fill",
+        "kind": "to_lower_limit",
+        "color": "#d9d9d9",
+        "alpha": 0.25,
+    }
+
+    canonical_after = authoring_document_from_mapping(projected)
+    gr_after = canonical_after.sections[0].tracks[0]
+    assert isinstance(gr_after, NormalTrackSpec)
+    assert len(gr_after.fills) == 1
+    assert gr_after.bindings[0].model_dump(mode="json") == binding_before
+    fill_after = gr_after.fills[0]
+    assert fill_after.fill_id == fill_before.fill_id == "main.gr.fill.gr_lower_fill"
+    assert fill_after.kind == fill_before.kind
+    assert fill_after.binding_id == fill_before.binding_id == "main.gr.GR.3"
+    assert fill_after.color == fill_before.color == "#d9d9d9"
+    assert fill_after.alpha == fill_before.alpha == 0.25
+
+
 def test_canonical_mapping_round_trips() -> None:
     """Normalized authoring YAML can be loaded without legacy conversion."""
     document = authoring_document_from_mapping(_legacy_mapping())

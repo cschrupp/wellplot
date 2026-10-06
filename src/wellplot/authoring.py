@@ -775,6 +775,7 @@ def _fill_from_mapping(
 
     return CurveFillSpec(
         kind=kind,
+        fill_id=_as_text(data.get("fill_id"), context=f"{context}.fill_id"),
         binding_id=binding_id,
         other_binding_id=other_binding_id,
         baseline=baseline,
@@ -1783,8 +1784,19 @@ def authoring_document_to_logfile_mapping(
             section_payload["data"] = section.data_source.model_dump(mode="json", exclude_none=True)
         rendered_sections.append(section_payload)
         for track in section.tracks:
+            fills_by_binding_id: dict[str, CurveFillSpec] = {}
+            for fill in getattr(track, "fills", ()):
+                if fill.binding_id in fills_by_binding_id:
+                    raise TemplateValidationError(
+                        "Multiple fills for one binding cannot be represented in the "
+                        "legacy binding-level fill envelope."
+                    )
+                fills_by_binding_id[fill.binding_id] = fill
             for binding in getattr(track, "bindings", ()):
                 binding_payload = _binding_element(binding)
+                fill = fills_by_binding_id.get(binding.binding_id)
+                if fill is not None:
+                    binding_payload["fill"] = _fill_element(fill)
                 style = binding_payload.get("style")
                 if isinstance(style, Mapping):
                     style = dict(style)
@@ -1938,6 +1950,8 @@ def _fill_element(fill: CurveFillSpec) -> dict[str, Any]:
         else {}
     )
     legacy_fill["kind"] = fill.kind.value
+    if fill.fill_id is not None:
+        legacy_fill["fill_id"] = fill.fill_id
     if fill.other_binding_id is not None:
         legacy_fill.setdefault("other_element_id", fill.other_binding_id)
     if fill.baseline is not None:

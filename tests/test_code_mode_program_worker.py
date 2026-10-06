@@ -12,6 +12,7 @@ import wellplot.authoring_program.program_runtime as runtime_module
 from wellplot.agent.code_mode.enrichment import (
     ChannelContext,
     EnrichedSemanticContext,
+    ExistingCurveContext,
     LoadedSource,
     ReportContext,
     ResolvedSectionContext,
@@ -19,6 +20,7 @@ from wellplot.agent.code_mode.enrichment import (
 )
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
 from wellplot.agent.code_mode.program_worker import (
+    SECTION_PROGRAM_CAPABILITIES,
     ProgramSectionCompiler,
     _fresh_builder,
     _sdk_reference,
@@ -188,6 +190,102 @@ def _revision_program(*, title: str = "Revised section") -> str:
     )
 
 
+def _fill_task() -> SectionTask:
+    """Build the bounded existing-section task used by D2C worker tests."""
+    return SectionTask(
+        goal="Add a grounded lower-limit fill to the GR curve.",
+        capability_ids=(
+            "section.log_plot",
+            "track.normal",
+            "binding.curve",
+            "fill.curve",
+        ),
+        existing_section_hint="Existing section",
+        requirements=("Create one grounded lower-limit fill on the GR track.",),
+    )
+
+
+def _fill_program(*, binding_id: str = "existing.GR") -> str:
+    """Return one existing-section program that creates a track-local fill."""
+    return (
+        "report = wp.report()\n"
+        "section = wp.target_section(report)\n"
+        "track = wp.target_track(section, track_id='existing-track')\n"
+        f"curve = wp.target_curve(track, binding_id={binding_id!r})\n"
+        "wp.fill(track, curve, kind='to_lower_limit', "
+        "color='#d9d9d9', alpha=0.25)\n"
+    )
+
+
+def _fill_context(*, include_other_track: bool = False) -> EnrichedSemanticContext:
+    """Build a grounded existing-curve context for D2C worker tests."""
+    task = _fill_task()
+    base = _context(task=task, section_id="existing")
+    section = base.sections[0].model_copy(
+        update={
+            "existing_curves": (
+                ExistingCurveContext(
+                    track_id="existing-track",
+                    track_title="Existing track",
+                    track_kind="normal",
+                    binding_id="existing.GR",
+                    channel="GR",
+                    label="GR",
+                ),
+                *(
+                    (
+                        ExistingCurveContext(
+                            track_id="other-track",
+                            track_title="Other track",
+                            track_kind="normal",
+                            binding_id="other.CALI",
+                            channel="CALI",
+                            label="CALI",
+                        ),
+                    )
+                    if include_other_track
+                    else ()
+                ),
+            )
+        }
+    )
+    return base.model_copy(update={"sections": (section,)})
+
+
+def _fill_document(*, include_other_track: bool = False) -> AuthoringDocumentSpec:
+    """Build a document with one grounded curve and an optional sibling track."""
+    tracks: list[dict[str, object]] = [
+        {
+            "id": "existing-track",
+            "title": "Existing track",
+            "kind": "normal",
+            "width_mm": 20,
+            "bindings": [{"binding_id": "existing.GR", "channel": "GR"}],
+        }
+    ]
+    if include_other_track:
+        tracks.append(
+            {
+                "id": "other-track",
+                "title": "Other track",
+                "kind": "normal",
+                "width_mm": 20,
+                "bindings": [{"binding_id": "other.CALI", "channel": "CALI"}],
+            }
+        )
+    return AuthoringDocumentSpec(
+        name="cm-d2c-worker",
+        title="Current report",
+        sections=[
+            {
+                "id": "existing",
+                "title": "Existing section",
+                "tracks": tracks,
+            }
+        ],
+    )
+
+
 def _generic_binding_task() -> SectionTask:
     """Build a generic section task requiring scalar and array bindings."""
     return SectionTask(
@@ -336,6 +434,90 @@ def test_worker_sdk_reference_exposes_only_exact_context_grounded_contract() -> 
     assert "'ARRAY_CHANNEL'" not in reference
     assert 'wp.curve(normal, channel="CBL")' in reference
     assert 'wp.raster(array, channel="VDL")' in reference
+
+
+def test_d2c_declares_fill_capability_and_sdk_vocabulary() -> None:
+    """Expose only the existing grounded fill-creation operation to the worker."""
+    assert "fill.curve" in SECTION_PROGRAM_CAPABILITIES
+    reference = _sdk_reference(_fill_context().sections[0])
+
+    assert "wp.fill(track, binding[, other_binding])" in reference
+    assert "kind, id_hint, label, color, alpha" in reference
+    assert "fill_id" not in reference
+    assert "select_fill" not in reference
+    assert "update_fill" not in reference
+    assert "remove_fill" not in reference
+
+
+def test_d2c_grounded_fill_compiles_without_mutating_document() -> None:
+    """Compile one fill from an exact grounded curve identity."""
+    backend = _Backend(responses=[_fill_program()])
+    document = _fill_document()
+    before = document.model_dump(mode="python")
+
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_fill_context(),
+            document=document,
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    assert result.artifact is not None
+    section = result.artifact.intent_fragment.sections[0]
+    assert section.section_id == "existing"
+    assert section.tracks is not None
+    assert len(section.tracks) == 1
+    track = section.tracks[0]
+    assert track.track_id == "existing-track"
+    assert track.fills is not None
+    assert len(track.fills) == 1
+    fill = track.fills[0]
+    assert fill.kind == "to_lower_limit"
+    assert fill.binding_id == "existing.GR"
+    assert fill.color == "#d9d9d9"
+    assert fill.alpha == 0.25
+    assert document.model_dump(mode="python") == before
+
+
+def test_d2c_invented_binding_is_rejected_at_worker_boundary() -> None:
+    """An existing-target fill cannot substitute an invented binding identity."""
+    program = _fill_program(binding_id="existing.GR.404")
+    backend = _Backend(responses=[program, program])
+
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_fill_context(),
+            document=_fill_document(),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert len(backend.requests) == 2
+    assert any("not an existing grounded binding" in str(item) for item in result.diagnostics)
+
+
+def test_d2c_cross_track_binding_is_rejected_at_worker_boundary() -> None:
+    """A sibling-track binding cannot be used by a fill on the selected track."""
+    program = _fill_program(binding_id="other.CALI")
+    backend = _Backend(responses=[program, program])
+
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=_fill_context(include_other_track=True),
+            document=_fill_document(include_other_track=True),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert len(backend.requests) == 2
+    assert result.diagnostics
 
 
 def test_worker_sdk_reference_uses_exact_single_candidate_without_fake_ids() -> None:

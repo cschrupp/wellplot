@@ -35,6 +35,7 @@ SECTION_PROGRAM_CAPABILITIES = frozenset(
         "track.array",
         "binding.curve",
         "binding.raster",
+        "fill.curve",
     }
 )
 
@@ -57,6 +58,7 @@ wp.curve(track): channel, id_hint, label, scale_minimum, scale_maximum, scale_ki
     reverse, color, line_style, line_width
 wp.raster(track): channel, id_hint, label, profile, normalization, color_minimum,
     color_maximum, colormap, alpha
+wp.fill(track, binding[, other_binding]): kind, id_hint, label, color, alpha
 
 Use wp.section(report) only for a new section. Use
 wp.target_section(report) followed by wp.update_section() for an existing
@@ -280,8 +282,9 @@ def _worker_prompt(
         instruction = (
             "Revise the one host-selected existing section from this scoped context. "
             "Use wp.target_section(report) without an ID, then apply a sparse section "
-            "update, update one grounded existing curve, or add requested new child "
-            "tracks. Do not create a second section. "
+            "update, update one grounded existing curve, add a requested fill using "
+            "grounded existing bindings, or add requested new child tracks. Do not "
+            "create a second section. "
         )
     return (
         instruction
@@ -553,7 +556,8 @@ def _validate_section_intent(
             "Existing-section programs must contain a sparse section mutation.",
             remediation_hint=(
                 "Apply a section title, subtitle, depth range, update a grounded curve, "
-                "or create a new child track beneath wp.target_section(report)."
+                "create a grounded fill, or create a new child track beneath "
+                "wp.target_section(report)."
             ),
         )
     return section.section_id
