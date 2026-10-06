@@ -8,8 +8,7 @@ Authorization: `WELLPLOT-NLP-D2C-AUTH-001`
 
 Implementation baseline: `c435c729ec550be029f432b727abffacbd0d68c2`
 
-Scope amendments: `WELLPLOT-NLP-D2C-REWORK-001`,
-`WELLPLOT-NLP-D2C-SCOPE-AMEND-001`, and
+Scope amendments: `WELLPLOT-NLP-D2C-SCOPE-AMEND-001` and
 `WELLPLOT-NLP-D2C-SCOPE-AMEND-002`
 
 Provider, endpoint, and real model calls: `0`
