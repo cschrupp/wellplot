@@ -338,7 +338,10 @@ Use the same repository-contained LAS-backed single-logfile fixture used for gro
 Before invoking revision, prove:
 
 - `Main Log` exists uniquely;
-- `fixture.las` is a real declared source candidate selected by the actual source matcher;
+- the actual host-generated candidate ID for `fixture.las` is selected by the source
+  matcher (expected `source-1` for this single-source fixture);
+- the selected candidate labels include `fixture.las` and the basename of its
+  canonical path is `fixture.las`;
 - the inspected source contains scalar channels such as the fixture's real available channels;
 - `NPHI` is absent from every inspected channel mnemonic/alias for the selected source;
 - no alternate source containing `NPHI` is introduced.
@@ -353,7 +356,9 @@ The deterministic section backend must inspect its actual bounded worker context
 
 ```text
 target.kind == existing
-selected source candidate == fixture.las
+selected source candidate_id == <actual host candidate ID>
+selected source labels include fixture.las
+basename(selected canonical_path) == fixture.las
 NPHI not in section_context.sources[*].channels[*].mnemonic/aliases
 ```
 
@@ -691,7 +696,7 @@ The D2D public-path tests complement these unit/contract tests; they do not repl
 
 # Adversarial Requirements
 
-In addition to the two primary cases, future D2D tests should include bounded assertions that prevent false acceptance.
+In addition to the three primary cases, future D2D tests should include bounded assertions that prevent false acceptance.
 
 ## A. Ambiguity fixture sanity
 
@@ -918,7 +923,16 @@ CASE C — MISSING CHANNEL IN VALID SOURCE
 Request:
 In the Main Log section, add a normal track titled "Neutron", 28 mm wide, and plot NPHI from fixture.las on it labeled "Neutron" with a linear scale from 0 to 45.
 
-Selected source:
+Selected candidate_id:
+<actual host candidate ID, expected source-1 for this fixture>
+
+Selected source filename:
+fixture.las
+
+Source-label match:
+PASS/FAIL
+
+Canonical-path basename:
 fixture.las
 
 Requested channel:
