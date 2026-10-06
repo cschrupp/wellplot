@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -75,8 +76,18 @@ class _RevisionBackend:
     async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
         """Verify source grounding and return one restricted track/curve program."""
         self.requests.append(request)
-        assert '"kind":"existing"' in request.user_prompt
-        assert NEW_CHANNEL in request.user_prompt
+        payload_start = request.user_prompt.index('{"capabilities":')
+        payload = json.loads(request.user_prompt[payload_start:])
+        section_context = payload["section_context"]
+        assert section_context["target"]["kind"] == "existing"
+        sources = section_context["sources"]
+        assert sources
+        assert any(source["candidate_id"] == "source-1" for source in sources)
+        source_channels = [channel for source in sources for channel in source["channels"]]
+        assert any(
+            channel["mnemonic"] == NEW_CHANNEL and channel["kind"] == "scalar"
+            for channel in source_channels
+        )
         assert "Grounded existing curve inventory" in request.user_prompt
         assert "wp.track(section)" in request.user_prompt
         assert "wp.curve(track)" in request.user_prompt

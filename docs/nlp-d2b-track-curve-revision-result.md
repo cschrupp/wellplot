@@ -26,15 +26,18 @@ persistence, reload, renderer, and frozen D0 verifier. A report compiler
 double fails if report work is dispatched.
 
 The declared source is the fixture LAS file. The section worker inspects its
-actual bounded `ProgramGenerationRequest.user_prompt` and proves that the
-existing target, inspected `CALI` scalar channel, and `wp.track`/`wp.curve`
-contract are present before returning the deterministic program.
+actual bounded `ProgramGenerationRequest.user_prompt`, parses its structured
+JSON payload, and proves that the existing target and at least one source
+candidate are present. It then checks `CALI` with `kind=scalar` specifically
+inside `section_context.sources[*].channels`, not merely anywhere in the
+prompt text, before returning the deterministic program.
 
 Inspected source identity: the declared temporary fixture source
 `fixture.las`, loaded by `LogfileSourceLoader` from the logfile's section data
-source. The worker request contains the inspected channel mnemonic `CALI`, the
-existing target marker, the grounded existing-curve inventory, and the SDK
-entries for `wp.track(section)` and `wp.curve(track)`.
+source. The worker request contains candidate `source-1`, the inspected channel
+mnemonic `CALI` with scalar kind inside the source projection, the existing
+target marker, the grounded existing-curve inventory, and the SDK entries for
+`wp.track(section)` and `wp.curve(track)`.
 
 ## Fixture State
 
@@ -113,7 +116,7 @@ non-empty output file.
 ## Verification
 
 The D2B focused suite contains `5 passed` tests. The adjacent delivery and
-deterministic authoring suite contains `118 passed` and one reproduced baseline
+deterministic authoring suite contains `123 passed` and one reproduced baseline
 failure in `tests/test_direct_notebook.py`, caused by the absent
 `workspace/data/30-23a-3 8117_d.las` fixture. The full suite reports:
 
