@@ -33,7 +33,7 @@ from wellplot.capabilities import create_builtin_registry
 AMBIGUOUS_REQUEST = "In the Main Log section, change the Gamma Ray curve scale to 10–100."
 MISSING_SOURCE_REQUEST = (
     'In the Main Log section, add a normal track titled "Neutron" and plot NPHI '
-    "from absent-source on it."
+    "from missing.las on it."
 )
 MISSING_CHANNEL_REQUEST = (
     'In the Main Log section, add a normal track titled "Neutron", 28 mm wide, '
@@ -223,7 +223,7 @@ def _rejection_acceptance(*, section_ids: tuple[str, ...]) -> dict[str, object]:
         ],
         "required_changes": {},
         "allowed_change_paths": [],
-        "prohibited_change_paths": [],
+        "prohibited_change_paths": ["/sections", "/remarks", "/header"],
         "expected_outcome": "rejected",
     }
 
@@ -333,11 +333,16 @@ def test_d2d_missing_explicit_source_fails_closed() -> None:
         before_path, before_document, before_bytes = _before_artifact(directory, logfile)
         context = direct_notebook._load_document_context(logfile, root=REPO_ROOT)
         assert len(context.source_candidates) == 1
-        assert all("absent-source" not in str(candidate) for candidate in context.source_candidates)
-        assert not any(path.name == "absent-source" for path in directory.rglob("*"))
-        planner = _RevisionPlanner(
-            _task(MISSING_SOURCE_REQUEST, source_hints=("absent-source",)), []
-        )
+        for candidate in context.source_candidates:
+            identity_values = (
+                candidate.candidate_id,
+                *candidate.labels,
+                Path(candidate.path).name,
+                Path(candidate.path).stem,
+            )
+            assert "missing.las" not in identity_values
+        assert not any(path.name == "missing.las" for path in directory.rglob("*"))
+        planner = _RevisionPlanner(_task(MISSING_SOURCE_REQUEST, source_hints=("missing.las",)), [])
         worker = _FailingWorker()
         adapter, report_compiler = _adapter(planner, worker)
         result = asyncio.run(adapter.revise(feedback=MISSING_SOURCE_REQUEST, logfile_path=logfile))

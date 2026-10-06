@@ -4,13 +4,16 @@
 
 ```yaml
 authorization: WELLPLOT-NLP-D2D-AUTH-001
-baseline: c1e2e72ad4d53c87e39819c3467b95e72da66f77
+rework: WELLPLOT-NLP-D2D-REWORK-001
+scope_amendment: WELLPLOT-NLP-D2D-SCOPE-AMEND-001
+baseline: cd26c74fadf1e65bcb49925ee20dc229a644b0fa
 branch: delivery/nlp-d2d-ambiguity-rejection
 provider_calls: 0
 endpoint_calls: 0
 real_model_calls: 0
-production_files_changed: 0
-decision: WELLPLOT_NLP_D2D_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
+production_files_changed: 1
+production_file: src/wellplot/agent/code_mode/enrichment.py
+decision: WELLPLOT_NLP_D2D_REWORK_COMPLETE_REVIEW_PENDING
 ```
 
 This result records the bounded D2D implementation and deterministic evidence. It
@@ -37,6 +40,14 @@ provider, endpoint, or model request is made.
 
 ## Rejection Evidence
 
+Frozen requests:
+
+```yaml
+case_a: In the Main Log section, change the Gamma Ray curve scale to 10–100.
+case_b: In the Main Log section, add a normal track titled "Neutron" and plot NPHI from missing.las on it.
+case_c: In the Main Log section, add a normal track titled "Neutron", 28 mm wide, and plot NPHI from fixture.las on it labeled "Neutron" with a linear scale from 0 to 45.
+```
+
 | Case | Deterministic result | Workers | Terminal diagnostic |
 | --- | --- | ---: | --- |
 | A: ambiguous existing section | `compile_failed`, unchanged | 0 | `enrichment.section_hint_ambiguous`: The existing-section hint matched multiple inspected sections. |
@@ -59,14 +70,37 @@ worker_inspected_channels: [CALI, CBL, GR, RT, VDL]
 NPHI_in_worker_inventory: false
 ```
 
-The worker receives the bounded candidate ID and inspected channel inventory;
-the canonical path remains host-owned and is not serialized into the worker
-payload.
+The host boundary binds `source-1` to the `fixture.las` label and canonical-path
+basename. The worker boundary receives that same candidate ID with the inspected
+channel inventory; canonical paths and source labels remain host-owned and are
+not serialized into the worker payload.
 
 Case C made two bounded generation attempts: one initial generation and one
 repair. Both attempted only `NPHI`; neither introduced an available channel.
 The final worker evidence contains one `program.dry_run_error` diagnostic and
 no submitted intent.
+
+The scope amendment also verifies that the missing-source rejection is not
+caused by the generic source-format label. For the fixture candidate, the
+deterministic projection is:
+
+```yaml
+candidate_id: source-1
+filename: fixture.las
+stem: fixture
+raw_labels: [fixture.las, fixture, las]
+source_format: las
+effective_identity_labels: [source-1, fixture.las, fixture, fixture.las, fixture]
+generic_source_format_label_excluded: PASS
+missing_las_matched_candidate: NO
+diagnostic: enrichment.source_missing
+worker_count: 0
+new_enrichment_regression: PASS
+```
+
+The duplicate filename/stem values are retained by the existing lexical
+projection. Only the generic normalized format label `las` is excluded; the
+lexical matcher itself is unchanged.
 
 ## D0 Evidence
 
@@ -107,16 +141,22 @@ so rejection status cannot conceal unrelated canonical mutation.
 
 ## Validation
 
-Focused D2D suite:
+Focused amendment and D2D suites:
 
 ```text
-5 passed
+21 passed
 ```
 
-The D0-D2C delivery tests plus the specified adjacent suites completed with:
+The D0-D2D delivery tests completed with:
 
 ```text
-217 passed
+52 passed
+```
+
+The adjacent suites completed with:
+
+```text
+95 passed
 1 reproduced pre-existing failure
 ```
 
@@ -129,7 +169,7 @@ production source changed.
 Full repository suite:
 
 ```text
-2548 passed
+2549 passed
 36 failed
 10 skipped
 11 subtests passed
@@ -141,14 +181,19 @@ formatting, Python compilation, and `git diff --check` pass for the D2D files.
 
 ## Scope Boundary
 
-Only these files are authorized for this D2D implementation:
+The amendment authorized these five files:
 
 ```text
+src/wellplot/agent/code_mode/enrichment.py
+tests/test_code_mode_enrichment.py
 tests/test_nlp_d2d_ambiguity_rejection.py
+docs/nlp-d2d-ambiguity-rejection-design.md
 docs/nlp-d2d-ambiguity-rejection-result.md
 ```
 
-No production source, existing test, verifier, planner, enrichment, worker,
-renderer, source-loader, or authoring-reconciliation file is changed by D2D.
+The production correction is limited to filtering an exact normalized
+source-format label from candidate lexical identity labels. No other source
+loader, matcher, verifier, planner, worker, renderer, or reconciliation
+behavior changed.
 
 D2E, D3, and D4 remain unauthorized pending independent review.

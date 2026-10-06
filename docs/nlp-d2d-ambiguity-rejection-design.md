@@ -356,11 +356,28 @@ The deterministic section backend must inspect its actual bounded worker context
 
 ```text
 target.kind == existing
-selected source candidate_id == <actual host candidate ID>
-selected source labels include fixture.las
-basename(selected canonical_path) == fixture.las
+```
+
+The host-side source context must independently prove the identity binding:
+
+```text
+host candidate_id == <actual host candidate ID>
+host candidate labels include fixture.las
+basename(host canonical_path) == fixture.las
+```
+
+The worker-side bounded context must then prove the same host-selected identity
+is the source whose inspected channels it received:
+
+```text
+worker source candidate_id == <actual host candidate ID>
 NPHI not in section_context.sources[*].channels[*].mnemonic/aliases
 ```
+
+The worker payload intentionally does not carry canonical host paths or source
+labels. The acceptance proof is compositional: host candidate identity is bound
+to `fixture.las`, and that same candidate ID is bound to the worker's inspected
+channel inventory.
 
 Only after proving the requested channel is genuinely unavailable may it emit a program that faithfully represents the scientist's request:
 

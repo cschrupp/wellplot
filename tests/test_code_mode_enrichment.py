@@ -181,6 +181,29 @@ def test_explicit_sources_are_normalized_and_formats_are_inferred(
     assert loader.calls == [(Path(source.canonical_path), source_format)]
 
 
+def test_format_label_does_not_match_unrelated_filename_hint(tmp_path: Path) -> None:
+    """Generic source-format metadata cannot satisfy a missing source hint."""
+    (tmp_path / "fixture.las").write_text("source", encoding="utf-8")
+    enricher, loader = _enricher(tmp_path)
+    candidate = SourceCandidate(
+        candidate_id="source-1",
+        root_id="input",
+        path="fixture.las",
+        labels=("fixture.las", "fixture", "las"),
+        trusted_format="las",
+    )
+
+    with pytest.raises(SemanticEnrichmentError) as caught:
+        enricher.enrich(
+            plan=_plan(source_hints=("missing.las",)),
+            document=_document(),
+            source_candidates=(candidate,),
+        )
+
+    assert caught.value.code is EnrichmentErrorCode.SOURCE_MISSING
+    assert loader.calls == []
+
+
 def test_source_selection_is_bounded_to_explicit_candidates(tmp_path: Path) -> None:
     """A matching filename outside the candidate list is never discovered."""
     (tmp_path / "hidden.dlis").write_text("source", encoding="utf-8")

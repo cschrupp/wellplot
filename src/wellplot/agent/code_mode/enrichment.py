@@ -538,14 +538,14 @@ def _select_sources(
 def _candidate_labels(candidate: _NormalizedCandidate) -> tuple[str, ...]:
     """Return only host-supplied labels and canonical filename labels."""
     labels: list[str] = []
-    for value in (
-        candidate.candidate_id,
-        candidate.path.name,
-        candidate.path.stem,
-        *candidate.labels,
-    ):
+    for value in (candidate.candidate_id, candidate.path.name, candidate.path.stem):
         normalized = _normalize_lexical(value)
         if normalized:
+            labels.append(normalized)
+    format_label = _normalize_lexical(candidate.source_format)
+    for raw_label in candidate.labels:
+        normalized = _normalize_lexical(raw_label)
+        if normalized and normalized != format_label:
             labels.append(normalized)
     return tuple(labels)
 
