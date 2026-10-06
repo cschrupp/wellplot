@@ -245,6 +245,10 @@ Expected change location:
 src/wellplot/agent/code_mode/program_worker.py
 ```
 
+The same production change must add `fill.curve` to the worker's declared
+`SECTION_PROGRAM_CAPABILITIES` inventory. The executable SDK vocabulary and
+the declared capability inventory must remain consistent.
+
 The future implementation should add the executable SDK contract equivalent to:
 
 ```text
@@ -262,6 +266,11 @@ The worker contract must make clear:
 - no report-wide mutation accompanies a section fill request.
 
 The existing-section worker instruction should be minimally expanded from its current vocabulary to permit adding a requested fill using grounded existing child identities.
+
+The worker's diagnostic/remediation vocabulary should mention grounded fill
+creation alongside section updates, existing-curve updates, and new-track
+creation. This is descriptive contract consistency only; it must not add fill
+repair, selection, update, or removal behavior.
 
 Do not add a second fill compiler or direct document mutation path.
 
@@ -475,6 +484,21 @@ src/wellplot/agent/code_mode/program_worker.py
 tests/test_nlp_d2c_fill_revision.py
 docs/nlp-d2c-fill-revision-result.md
 ```
+
+The existing worker contract suite must also be included:
+
+```text
+tests/test_code_mode_program_worker.py
+```
+
+Changes to that suite must remain limited to D2C worker-contract coverage for:
+
+- exposing `fill.curve` in the section-worker capability inventory;
+- exposing `wp.fill(...)` in the SDK reference;
+- creating a fill from an exact grounded existing binding;
+- preserving repair/reference consistency if the fill vocabulary is reused;
+- rejecting invented or cross-track binding identities where the worker
+  contract is the appropriate test boundary.
 
 No other production file is expected.
 
