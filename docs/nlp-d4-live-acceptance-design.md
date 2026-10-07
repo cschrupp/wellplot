@@ -1478,37 +1478,3 @@ PRODUCTION PROMOTION: NOT AUTHORIZED
 ```
 
 Stop for independent D4 design closure review.
-
----
-
-
-
-```text
-WELLPLOT-NLP-D4-DESIGN-001
-```
-
-Selected approach:
-
-```text
-one current release-candidate configuration
-five frozen integrated cases
-nine scientist turns
-real local DLIS + LAS sources
-one attempt per turn
-45-call hard maximum
-final-artifact and zero-mutation grading
-no model comparison
-no harness retry
-no automatic rerun
-```
-
-D4A implementation remains unauthorized until independent review accepts this design.
-
-Live inference remains unauthorized until:
-
-1. D4 design acceptance;
-2. provider-free D4A harness implementation;
-3. independent D4A harness review;
-4. explicit D4B live-execution authorization.
-
-D4 production promotion is not authorized by any of those gates.
