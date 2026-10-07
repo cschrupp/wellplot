@@ -10,6 +10,18 @@ Design authorization:
 WELLPLOT-NLP-D4-DESIGN-001
 ```
 
+Design rework authorization:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-REWORK-001
+```
+
+Rework parent:
+
+```text
+0a966e1bdb4a4acadf2ea583009e5b9ba7bb1e7b
+```
+
 Input baseline:
 
 ```text
@@ -84,34 +96,60 @@ No production promotion follows automatically.
 
 # 3. Frozen Live Configuration
 
-D4 evaluates one configuration only.
+D4 evaluates one release-candidate configuration only.
 
 ```text
 engine: v2
-provider: openai
-model: gpt-5.4
+provider_requested: openai
+model_requested: gpt-5.4
 timeout_seconds: 120
-temperature: unset / public default
-max_output_tokens: unset / public default
 concurrency: 1
+
+planner:
+  temperature = 0.0
+  max_output_tokens = None / omitted
+
+report worker:
+  temperature = None / omitted
+  max_output_tokens = None / omitted
+
+section worker:
+  temperature = None / omitted
+  max_output_tokens = None / omitted
+
+program repair:
+  temperature = None / omitted
+  max_output_tokens = None / omitted
 ```
 
-Why this configuration:
+This reflects the frozen production graph rather than a generic provider default:
 
 - `DEFAULT_AUTHORING_ENGINE` is `v2`;
 - `create_project_session(... provider="openai")` is the public default;
-- the current frozen code resolves the OpenAI default model to `gpt-5.4`;
-- D4 should test the current release candidate, not choose among models.
+- the current frozen code resolves the OpenAI default model label to `gpt-5.4`;
+- `workflow.py` calls the semantic planner with `temperature=0.0`;
+- report/section workers inherit the session temperature, which is `None` in the default route;
+- repair generation inherits the worker temperature.
 
-The future harness must pass the model explicitly as `gpt-5.4`; it must not rely on an environment override.
+The future live harness must pass the model explicitly as `gpt-5.4`; it must not rely on an environment override.
 
-No fallback model.
+Decision-bearing model provenance is limited to what the current WellPlot boundary can prove:
+
+```text
+requested provider = openai
+requested model = gpt-5.4
+requested-model drift = 0
+WellPlot-side provider fallback = 0
+WellPlot-side model fallback = 0
+```
+
+D4 does **not** claim that the provider's internal deployed snapshot/model identity was independently observed unless D4A later proves that through a bounded, reviewed observation.
 
 No provider substitution.
 
 No OpenAI-compatible local fallback.
 
-If this exact configuration cannot be instantiated at live-execution time:
+If this exact requested configuration cannot be instantiated at live-execution time:
 
 ```text
 D4_LIVE_ACCEPTANCE_INCONCLUSIVE
@@ -167,10 +205,16 @@ generate_program(...)
 
 without changing arguments or outputs.
 
+This wrapper observes **logical WellPlot generation calls**, not raw HTTP attempts.
+
 It may record only:
 
-- monotonically increasing call index;
+- monotonically increasing logical-generation-call index;
 - operation kind: `structured` or `program`;
+- requested provider label;
+- requested model label;
+- request temperature;
+- request max-output-token setting;
 - success/failure;
 - stable provider failure category;
 - reported input tokens;
@@ -191,7 +235,11 @@ It must not record:
 
 The wrapper has **no retry behavior**.
 
-All allowed retries/corrections remain the existing production behavior.
+It enforces the D4 logical-generation-call cap before delegation.
+
+All semantic retries/corrections remain the existing production behavior.
+
+SDK transport retries occur below this wrapper and are accounted for separately; the wrapper must never label its call count as an observed physical HTTP-request count.
 
 ---
 
@@ -200,7 +248,7 @@ All allowed retries/corrections remain the existing production behavior.
 The production planner already permits at most:
 
 ```text
-2 structured provider calls per scientist turn
+2 logical structured-generation calls per scientist turn
 ```
 
 (one initial call plus one schema/semantic correction).
@@ -208,12 +256,30 @@ The production planner already permits at most:
 Each report/section worker permits:
 
 ```text
-1 initial program call
+1 initial logical program-generation call
 + at most 2 bounded repair-generation calls
-= 3 program calls maximum per worker
+= 3 logical program-generation calls maximum per worker
 ```
 
-D4 adds no retry outside this envelope.
+These are application-level semantic retry/repair limits.
+
+The OpenAI Python SDK has a separate transport-retry policy below `ModelBackendProtocol`.
+
+The frozen repository dependency environment currently resolves:
+
+```text
+openai == 2.34.0
+```
+
+D4A must provider-free inspect and freeze the actual runtime SDK retry setting. The expected current release-candidate value is:
+
+```text
+max_retries = 2
+```
+
+If provider-free inspection shows a different value, D4A must STOP for design review rather than silently changing the campaign accounting.
+
+D4 adds no retry outside the production semantic envelope or SDK's frozen transport policy.
 
 No harness-level retry.
 
@@ -693,13 +759,15 @@ No D4 request may be changed after D4A independent acceptance.
 
 ---
 
-# 16. Call Budget
+# 16. Logical Generation and Transport Retry Budgets
 
 No harness retries are authorized.
 
-Hard maximum physical provider calls:
+## Logical generation-call budget
 
-| Case | Turns | Maximum |
+At the WellPlot `ModelBackendProtocol` boundary:
+
+| Case | Turns | Maximum logical generation calls |
 | --- | ---: | ---: |
 | D4-C01 | 1 | 11 |
 | D4-L01 | 4 | 20 |
@@ -711,8 +779,8 @@ Hard maximum physical provider calls:
 Derivation:
 
 ```text
-planner <= 2 calls / turn
-worker <= 3 calls / dispatched worker
+planner <= 2 logical calls / turn
+worker <= 3 logical calls / dispatched worker
 
 CBL:
 2 + (3 workers × 3) = 11
@@ -724,15 +792,49 @@ pre-worker deterministic rejection:
 2
 ```
 
-The live wrapper must hard-stop before physical provider call 46.
+The `CountingBackend` must hard-stop **before logical generation call 46 is delegated**.
 
-Call-cap exhaustion is:
+Logical-call-cap exhaustion is:
 
 ```text
 D4_LIVE_ACCEPTANCE_INCONCLUSIVE
 ```
 
 not a semantic failure.
+
+## SDK transport retry budget
+
+The WellPlot logical-call counter does not directly observe SDK-internal HTTP retries.
+
+D4A must freeze the OpenAI SDK's actual runtime `max_retries` value. With the expected current value:
+
+```text
+max_retries = 2
+```
+
+each logical generation call has at most:
+
+```text
+1 initial HTTP attempt + 2 retry attempts = 3 HTTP attempts
+```
+
+Therefore the campaign has a theoretical SDK transport-attempt upper bound of:
+
+```text
+45 × 3 = 135 HTTP attempts
+```
+
+Terminology in all D4 evidence must remain distinct:
+
+```text
+logical_generation_calls
+sdk_max_retries
+physical_http_attempt_upper_bound
+```
+
+Do not report `logical_generation_calls` as an observed physical HTTP-request count.
+
+D4 does not add lower-level HTTP instrumentation merely to count attempts.
 
 ---
 
@@ -766,20 +868,63 @@ Infrastructure/configuration failure stops the campaign immediately.
 
 ---
 
-# 18. No Resume / No Selective Rerun
+# 18. Crash-Safe Campaign State / No Resume / No Selective Rerun
 
-A D4B campaign starts only when its canonical local JSONL journal path is absent or zero-length.
+D4B uses two local evidence files:
 
-If the process stops after any provider call:
+```text
+workspace/evaluations/d4-live-acceptance/d4-live-v1.state.json
+workspace/evaluations/d4-live-acceptance/d4-live-v1.jsonl
+```
 
-- preserve partial evidence;
-- mark the campaign inconclusive;
-- do not append;
-- do not resume;
-- do not merge rows from another execution;
-- do not rerun only failed cases.
+A new campaign may start only when **both paths are absent**.
 
-Any fresh rerun requires independent review and explicit reauthorization.
+A zero-length pre-existing file is not treated as a fresh campaign.
+
+## Pre-live sequence
+
+Before credentials are read or a real provider/client is constructed:
+
+1. run all provider-free integrity/source/dependency/checkpoint interlocks;
+2. require both state and journal paths to be absent;
+3. generate one campaign identifier;
+4. atomically create the state file with:
+
+```text
+experiment_version
+campaign_id
+production_baseline
+live_harness_checkpoint
+status = STARTED
+logical_generation_calls = 0
+```
+
+Only after the durable `STARTED` sentinel exists may the harness load credentials and construct the real provider.
+
+## Interruption semantics
+
+Once a `STARTED` state exists:
+
+- automatic resume is forbidden;
+- selective rerun is forbidden;
+- appending to another campaign is forbidden;
+- merging rows across campaigns is forbidden.
+
+If execution stops after `STARTED` for any reason—including authentication/configuration failure before the first completed turn—the campaign becomes:
+
+```text
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+```
+
+The journal may legitimately contain zero completed turn rows.
+
+Preserve partial evidence.
+
+Do not resume.
+
+Do not rerun only failed cases.
+
+A fresh campaign requires independent review and a new explicit live authorization.
 
 ---
 
@@ -911,7 +1056,8 @@ D4-L04 = SAFE_ACTIONABLE_FAILURE
 ```text
 UNDETECTED_INCORRECT_OUTPUT = 0
 UNINTENDED_MUTATION = 0
-provider/model fallback = 0
+WellPlot-side provider/model fallback = 0
+requested-model drift = 0
 call cap exceeded = 0
 infrastructure inconclusive turns = 0
 ```
@@ -922,12 +1068,16 @@ A safely detected model error in a positive case still means D4 acceptance faile
 
 # 22. Latency / Retry / Usage Evidence
 
-D4 must measure rather than guess:
+D4 must measure what is actually observable and label derived bounds separately.
 
-Per physical provider call:
+Per logical generation call:
 
+- logical call index;
 - operation type;
-- latency;
+- requested provider/model;
+- request temperature;
+- request max-output-token setting;
+- backend-observed latency;
 - input tokens if returned;
 - output tokens if returned;
 - total tokens if returned;
@@ -936,9 +1086,9 @@ Per physical provider call:
 Per scientist turn:
 
 - total wall-clock duration;
-- physical provider-call count;
-- structured-call count;
-- program-call count;
+- logical generation-call count;
+- structured logical-call count;
+- program logical-call count;
 - worker repair count;
 - worker count;
 - success/failure;
@@ -946,12 +1096,16 @@ Per scientist turn:
 
 Population:
 
-- total calls;
+- total logical generation calls;
+- frozen SDK `max_retries`;
+- physical HTTP-attempt upper bound;
 - total reported tokens;
 - median and maximum turn latency;
 - total repairs;
 - turns with repair;
 - provider failure count.
+
+D4 does not claim to observe exact physical HTTP-attempt count through `CountingBackend`.
 
 No monetary cost threshold is frozen in D4 unless a rate card is separately frozen before D4B authorization.
 
@@ -969,7 +1123,13 @@ Future live raw evidence stays local under:
 workspace/evaluations/d4-live-acceptance/
 ```
 
-Canonical journal name:
+Canonical campaign-state file:
+
+```text
+d4-live-v1.state.json
+```
+
+Canonical turn journal:
 
 ```text
 d4-live-v1.jsonl
@@ -977,10 +1137,21 @@ d4-live-v1.jsonl
 
 Case-local artifacts may be retained under case directories.
 
-The JSONL must contain bounded evidence only:
+The state file contains bounded campaign-lifecycle evidence such as:
 
 - experiment version;
-- accepted checkpoint;
+- campaign ID;
+- production baseline;
+- live harness checkpoint;
+- status;
+- logical-generation-call count.
+
+The JSONL must contain bounded turn evidence only:
+
+- experiment version;
+- campaign ID;
+- production baseline;
+- live harness checkpoint;
 - case ID;
 - turn ID;
 - execution index;
@@ -988,13 +1159,15 @@ The JSONL must contain bounded evidence only:
 - starting artifact SHA-256;
 - ending artifact SHA-256;
 - render SHA-256 where applicable;
-- provider/model labels;
+- requested provider/model labels;
 - result status;
 - apply status;
 - outcome taxonomy;
 - diagnostics codes/stages;
 - worker metrics;
-- provider call/usage/latency aggregates;
+- logical-call/usage/latency aggregates;
+- frozen SDK retry setting;
+- physical HTTP-attempt upper bound;
 - verifier requirement statuses;
 - diff/grader status.
 
@@ -1008,30 +1181,82 @@ Do not store:
 - raw generated programs;
 - hidden reasoning.
 
-The committed final result records the journal SHA-256, not the local source data.
+The committed final result records hashes of the local state/journal evidence, not local source data.
 
 ---
 
-# 24. Harness Integrity
+# 24. Harness Integrity and Runtime Provenance
 
-Before constructing a real provider, D4A must authenticate:
+D4 has two distinct checkpoint identities.
 
-- exact D3 frozen baseline;
+## Frozen production baseline
+
+```text
+production_baseline =
+2c8e851fcd8b315e5d1861652a97984202db7488
+```
+
+This is the accepted D3 production behavior.
+
+## Future accepted harness checkpoint
+
+```text
+live_harness_checkpoint =
+<future independently accepted D4A SHA>
+```
+
+D4B runs from the exact D4A checkpoint, not directly from the D3 commit.
+
+Before credentials are read or the `STARTED` state is created, D4B provider-free preflight must authenticate:
+
+- `git HEAD == live_harness_checkpoint`;
+- clean Git working tree;
 - exact case-population fixture hash;
 - exact gold/grader fixture hash;
 - exact live harness source hash;
-- exact relevant production source hashes:
-  - planner;
-  - enrichment;
-  - report worker;
-  - section worker;
-  - provider backend;
-  - direct notebook adapter;
-  - reconciler/verifiers;
 - all three local source hashes;
-- clean Git working tree;
-- branch/checkpoint match;
-- empty/absent journal.
+- source channel preconditions;
+- both campaign state/journal paths absent;
+- exact `uv.lock` SHA-256;
+- installed `openai` package version equals the D4A-frozen version;
+- actual runtime OpenAI SDK `max_retries` equals the D4A-frozen value;
+- requested provider/model configuration equals `openai / gpt-5.4`.
+
+D4A must also freeze hashes at both checkpoints for all authorized production components relevant to the live path, including at minimum:
+
+- planner;
+- workflow;
+- capability/report/section safety layers;
+- enrichment;
+- report worker;
+- section worker;
+- repair coordinator;
+- provider backend/client loader;
+- direct notebook adapter;
+- reconciler/executor/persistence surfaces;
+- CBL/LAS verifiers.
+
+D4B must prove the authorized production components at `live_harness_checkpoint` are byte-identical to their versions at `production_baseline`.
+
+D4A harness/scripts/tests/docs may differ from D3.
+
+Production behavior may not.
+
+The current repository lock resolves:
+
+```text
+openai == 2.34.0
+```
+
+D4A must freeze the observed provider-free runtime version rather than relying only on this prose.
+
+Any checkpoint, production hash, dependency version, retry setting, source, or working-tree mismatch yields:
+
+```text
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+```
+
+before provider construction.
 
 The harness must fail before credentials are read if any frozen artifact differs.
 
@@ -1082,16 +1307,30 @@ The live provider receives only normal production context and the scientist requ
 The future harness must prove without inference:
 
 - exact nine-turn schedule;
-- exact 45-call hard cap;
-- call 46 rejected before delegation;
+- exact 45 logical-generation-call hard cap;
+- logical call 46 rejected before delegation;
 - no wrapper retries;
+- frozen OpenAI SDK version;
+- frozen SDK `max_retries`;
+- correct physical HTTP-attempt upper-bound derivation;
+- planner request temperature is exactly `0.0`;
+- report/section/repair request temperatures are omitted/`None`;
+- max-output-token settings are omitted/`None`;
+- requested provider/model are exactly `openai / gpt-5.4`;
+- no WellPlot-side provider/model fallback path;
 - source preflight occurs before backend construction;
 - source hashes/channels recorded without source bytes entering evidence;
 - request hashes frozen;
 - known D1-D3 exact request duplicates rejected;
-- partial journal prevents execution;
-- dirty/mismatched checkpoint prevents execution;
-- credentials are not accessed before all interlocks pass;
+- production-baseline and live-harness-checkpoint identities remain distinct;
+- authorized production hashes at the harness checkpoint equal the D3 production baseline;
+- dirty/mismatched harness checkpoint prevents execution;
+- dependency/retry mismatch prevents execution;
+- existing state file prevents execution;
+- existing journal prevents execution;
+- `STARTED` state is written atomically before credential/provider construction;
+- a synthetic crash after `STARTED` and before first turn cannot be resumed;
+- credentials are not accessed before all provider-free interlocks and durable `STARTED` state creation;
 - raw provider/program text is absent from evidence rows;
 - expected case ordering;
 - positive and negative grader behavior using deterministic fake results;
@@ -1175,6 +1414,74 @@ Production promotion remains separately governed.
 ---
 
 # 31. D4 Design Decision
+
+```text
+WELLPLOT-NLP-D4-DESIGN-001
+```
+
+Reworked under:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-REWORK-001
+```
+
+Selected approach:
+
+```text
+one current release-candidate configuration
+five frozen integrated cases
+nine scientist turns
+real local DLIS + LAS sources
+one attempt per turn
+
+45 logical generation calls maximum
+OpenAI SDK retry policy frozen separately
+physical HTTP attempts represented only as an upper bound
+
+planner temperature fixed at 0.0
+worker/repair temperature omitted
+
+requested provider/model provenance only
+no unsupported remote snapshot claim
+
+crash-safe STARTED campaign sentinel
+no automatic resume
+
+separate D3 production baseline and future D4A harness checkpoint
+production-byte identity required
+runtime OpenAI version + retry policy frozen
+
+final-artifact and zero-mutation grading
+no model comparison
+no harness retry
+```
+
+The scientific population remains unchanged from the initial D4 design.
+
+D4A implementation remains unauthorized until independent closure review accepts this reworked design.
+
+Live inference remains unauthorized until:
+
+1. D4 design acceptance;
+2. provider-free D4A harness implementation;
+3. independent D4A harness review;
+4. explicit D4B live-execution authorization.
+
+D4 production promotion is not authorized by any of those gates.
+
+Current status:
+
+```text
+D4A HARNESS IMPLEMENTATION: NOT AUTHORIZED
+D4B LIVE INFERENCE: NOT AUTHORIZED
+PRODUCTION PROMOTION: NOT AUTHORIZED
+```
+
+Stop for independent D4 design closure review.
+
+---
+
+
 
 ```text
 WELLPLOT-NLP-D4-DESIGN-001
