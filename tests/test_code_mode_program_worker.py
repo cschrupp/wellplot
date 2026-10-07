@@ -409,6 +409,76 @@ def test_worker_prompt_is_scoped_to_the_indexed_section() -> None:
     assert "Exact executable Wellplot SDK contract" in prompt
 
 
+def test_worker_prompt_projects_only_selected_document_track_inventory() -> None:
+    """Track grounding comes from the selected canonical section, not request text."""
+    backend = _Backend(
+        responses=[
+            "report = wp.report()\n"
+            "section = wp.target_section(report)\n"
+            "track = wp.target_track(section, track_id='combo')\n"
+            "wp.curve(track, channel='GR', label='GR')\n"
+        ]
+    )
+    document = AuthoringDocumentSpec(
+        name="cm-d3-inventory",
+        title="Current report",
+        sections=[
+            {
+                "id": "existing",
+                "title": "Existing section",
+                "tracks": [
+                    {
+                        "id": "combo",
+                        "title": "Combo",
+                        "kind": "normal",
+                        "width_mm": 50,
+                        "bindings": [],
+                    }
+                ],
+            },
+            {
+                "id": "sibling",
+                "title": "Sibling section",
+                "tracks": [
+                    {
+                        "id": "hidden",
+                        "title": "Hidden",
+                        "kind": "normal",
+                        "width_mm": 20,
+                        "bindings": [{"binding_id": "sibling.GR", "channel": "GR"}],
+                    }
+                ],
+            },
+        ],
+    )
+    context = _context(section_id="existing")
+
+    result = _run(
+        _compiler(backend).compile(
+            task_index=0,
+            context=context,
+            document=document,
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(backend.requests[0].user_prompt.split("\n\n", 1)[1])
+    assert payload["section_context"]["existing_tracks"] == [
+        {
+            "track_id": "combo",
+            "title": "Combo",
+            "kind": "normal",
+            "width_mm": 50.0,
+            "binding_ids": [],
+        }
+    ]
+    assert "hidden" not in backend.requests[0].user_prompt
+    assert (
+        "Grounded existing track inventory; use exact identities only:" in payload["sdk_reference"]
+    )
+
+
 def test_worker_sdk_reference_exposes_only_exact_context_grounded_contract() -> None:
     """Section docs contain legal keywords and only host-approved channels."""
     context = _context(

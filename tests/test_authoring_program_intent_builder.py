@@ -135,6 +135,73 @@ def test_generic_track_and_binding_kinds_are_available_to_programs() -> None:
     ]
 
 
+def test_track_and_raster_presentation_keywords_preserve_explicit_values() -> None:
+    """D3 presentation keywords map to typed fields without default injection."""
+    builder = _builder()
+    report = builder.report()
+    section = builder.add_section(report, id_hint="main", title="Main")
+    track = builder.add_track(
+        section,
+        id_hint="vdl",
+        kind="array",
+        title="VDL",
+        width_mm=48,
+        grid_vertical_main_visible=False,
+        grid_vertical_secondary_visible=False,
+    )
+    builder.add_raster(
+        track,
+        channel="VDL",
+        colorbar_enabled=True,
+        colorbar_label="Amplitude",
+        colorbar_position="header",
+        sample_axis_enabled=True,
+        sample_axis_unit="us",
+        sample_axis_minimum=200,
+        sample_axis_maximum=1200,
+        sample_axis_tick_count=7,
+        sample_axis_source_origin=40,
+        sample_axis_source_step=10,
+    )
+
+    result = builder.intent().sections[0]
+    track_intent = result.tracks[0]
+    raster = track_intent.bindings[0]
+    assert track_intent.grid.model_dump(exclude_unset=True) == {
+        "vertical_main_visible": False,
+        "vertical_secondary_visible": False,
+    }
+    assert raster.colorbar.model_dump(exclude_unset=True) == {
+        "enabled": True,
+        "label": "Amplitude",
+        "position": "header",
+    }
+    assert raster.sample_axis.model_dump(exclude_unset=True) == {
+        "enabled": True,
+        "unit": "us",
+        "minimum": 200.0,
+        "maximum": 1200.0,
+        "tick_count": 7,
+        "source_origin": 40.0,
+        "source_step": 10.0,
+    }
+
+
+def test_track_and_raster_presentation_keywords_omit_unrequested_fields() -> None:
+    """Omitted D3 presentation keywords do not create typed defaults."""
+    builder = _builder()
+    report = builder.report()
+    section = builder.add_section(report, id_hint="main", title="Main")
+    track = builder.add_track(section, id_hint="vdl", kind="array", title="VDL", width_mm=48)
+    builder.add_raster(track, channel="VDL")
+
+    track_intent = builder.intent().sections[0].tracks[0]
+    raster = track_intent.bindings[0]
+    assert track_intent.grid is None
+    assert raster.colorbar is None
+    assert raster.sample_axis is None
+
+
 def _expected_intent(*, include_raster_limits: bool = True) -> AuthoringDocumentIntent:
     """Return the exact canonical desired state constructed by the fixture program."""
     gr = AuthoringCurveBindingIntent(

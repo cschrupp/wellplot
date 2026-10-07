@@ -53,11 +53,15 @@ wp.target_curve(track): binding_id (from the grounded existing inventory)
 wp.update_curve(track, curve): channel, label, scale_minimum, scale_maximum,
     scale_kind, reverse, scale_unit, color, line_style, line_width
 wp.track(section): id_hint, kind, title, width_mm, scale_minimum, scale_maximum,
-    scale_kind, reverse
+    scale_kind, reverse, grid_vertical_main_visible,
+    grid_vertical_secondary_visible
 wp.curve(track): channel, id_hint, label, scale_minimum, scale_maximum, scale_kind,
     reverse, color, line_style, line_width
 wp.raster(track): channel, id_hint, label, profile, normalization, color_minimum,
-    color_maximum, colormap, alpha
+    color_maximum, colormap, alpha, colorbar_enabled, colorbar_label,
+    colorbar_position, sample_axis_enabled, sample_axis_unit,
+    sample_axis_minimum, sample_axis_maximum, sample_axis_tick_count,
+    sample_axis_source_origin, sample_axis_source_step
 wp.fill(track, binding[, other_binding]): kind, id_hint, label, color, alpha
 
 Use wp.section(report) only for a new section. Use
@@ -110,6 +114,7 @@ class ProgramSectionCompiler:
                 task=task,
                 section_context=section_context,
                 capabilities=capabilities,
+                document=document,
             ),
             timeout_seconds=timeout_seconds,
             temperature=temperature,
@@ -128,8 +133,8 @@ class ProgramSectionCompiler:
         diagnostic = initial.diagnostics[0]
         coordinator = self.repair_coordinator or ProgramRepairCoordinator(self.backend)
         repair = await coordinator.repair(
-            semantic_task=_repair_context_text(task, section_context),
-            sdk_docs=_sdk_reference(section_context),
+            semantic_task=_repair_context_text(task, section_context, document=document),
+            sdk_docs=_sdk_reference(section_context, document=document),
             previous_program=generated.text,
             diagnostic=diagnostic,
             timeout_seconds=timeout_seconds,
@@ -258,13 +263,17 @@ def _worker_prompt(
     task: SectionTask,
     section_context: ResolvedSectionContext,
     capabilities: tuple[dict[str, object], ...],
+    document: AuthoringDocumentSpec,
 ) -> str:
     """Serialize only the selected section's bounded worker context."""
     payload = {
         "section_task": _semantic_task_payload(task),
         "capabilities": capabilities,
-        "section_context": _bounded_section_context(section_context),
-        "sdk_reference": _sdk_reference(section_context),
+        "section_context": _bounded_section_context(
+            section_context,
+            existing_tracks=_existing_track_inventory(document, section_context),
+        ),
+        "sdk_reference": _sdk_reference(section_context, document=document),
     }
     if section_context.section_id is None:
         if section_context.sources:
@@ -294,9 +303,16 @@ def _worker_prompt(
     )
 
 
-def _sdk_reference(section_context: ResolvedSectionContext) -> str:
+def _sdk_reference(
+    section_context: ResolvedSectionContext,
+    *,
+    document: AuthoringDocumentSpec | None = None,
+) -> str:
     """Build executable SDK documentation from host-approved source handles."""
     source_ids = tuple(source.candidate_id for source in section_context.sources)
+    existing_tracks = (
+        () if document is None else _existing_track_inventory(document, section_context)
+    )
     lines = [_SDK_REFERENCE]
     if source_ids:
         lines.extend(
@@ -342,6 +358,12 @@ def _sdk_reference(section_context: ResolvedSectionContext) -> str:
     else:
         lines.append("No grounded existing curve is available for selection or update.")
 
+    if existing_tracks:
+        lines.append("Grounded existing track inventory; use exact identities only:")
+        lines.extend("- " + json.dumps(track, sort_keys=True) for track in existing_tracks)
+    else:
+        lines.append("No grounded existing track is available for selection or update.")
+
     channel_examples: list[str] = []
     seen_channels: set[tuple[str, str]] = set()
     for source in section_context.sources:
@@ -379,10 +401,15 @@ def _semantic_task_payload(task: SectionTask) -> dict[str, object]:
     }
 
 
-def _bounded_section_context(section_context: ResolvedSectionContext) -> dict[str, object]:
-    """Project only source candidates and exact channel facts into a worker prompt."""
+def _bounded_section_context_with_tracks(
+    section_context: ResolvedSectionContext,
+    *,
+    existing_tracks: tuple[dict[str, object], ...],
+) -> dict[str, object]:
+    """Project source facts and the selected section's grounded track inventory."""
     return {
         "target": {"kind": "existing" if section_context.section_id else "new"},
+        "existing_tracks": list(existing_tracks),
         "sources": [
             {
                 "candidate_id": source.candidate_id,
@@ -404,17 +431,65 @@ def _bounded_section_context(section_context: ResolvedSectionContext) -> dict[st
 def _repair_context_text(
     task: SectionTask,
     section_context: ResolvedSectionContext,
+    *,
+    document: AuthoringDocumentSpec | None = None,
 ) -> str:
     """Build bounded repair context with the same channel facts as initial generation."""
     return json.dumps(
         {
             "task": _semantic_task_payload(task),
             "target": {"kind": "existing" if section_context.section_id else "new"},
-            "section_context": _bounded_section_context(section_context),
+            "section_context": _bounded_section_context_with_tracks(
+                section_context,
+                existing_tracks=(
+                    () if document is None else _existing_track_inventory(document, section_context)
+                ),
+            ),
             "channel_grounding_rule": _CHANNEL_GROUNDING_RULE,
         },
         sort_keys=True,
         separators=(",", ":"),
+    )
+
+
+def _bounded_section_context(
+    section_context: ResolvedSectionContext,
+    *,
+    existing_tracks: tuple[dict[str, object], ...] = (),
+) -> dict[str, object]:
+    """Project source facts and selected-section track facts into a worker prompt."""
+    return _bounded_section_context_with_tracks(
+        section_context,
+        existing_tracks=existing_tracks,
+    )
+
+
+def _existing_track_inventory(
+    document: AuthoringDocumentSpec,
+    section_context: ResolvedSectionContext,
+) -> tuple[dict[str, object], ...]:
+    """Project only the canonical tracks in the host-selected section."""
+    if section_context.section_id is None:
+        return ()
+    section = next(
+        (item for item in document.sections if item.id == section_context.section_id),
+        None,
+    )
+    if section is None:
+        raise ValueError(
+            f"Selected section '{section_context.section_id}' is not present in the document."
+        )
+    return tuple(
+        {
+            "track_id": track.id,
+            "title": track.title,
+            "kind": track.kind,
+            "width_mm": track.width_mm,
+            "binding_ids": [
+                binding.binding_id for binding in (getattr(track, "bindings", None) or ())
+            ],
+        }
+        for track in section.tracks
     )
 
 

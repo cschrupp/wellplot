@@ -47,6 +47,7 @@ from ..model.intent import (
     AuthoringDepthIntent,
     AuthoringDocumentIntent,
     AuthoringFillIntent,
+    AuthoringGridIntent,
     AuthoringHeaderFieldIntent,
     AuthoringOutputIntent,
     AuthoringPageIntent,
@@ -419,6 +420,8 @@ class IntentBuilder:
         scale_maximum: float | None = None,
         scale_kind: str = "linear",
         reverse: bool = False,
+        grid_vertical_main_visible: bool | None = None,
+        grid_vertical_secondary_visible: bool | None = None,
     ) -> TrackHandle:
         """Create one typed track with a narrow optional horizontal scale."""
         owned_section = self._require_section(section)
@@ -442,6 +445,10 @@ class IntentBuilder:
                 title=title,
                 width_mm=width_mm,
                 x_scale=scale,
+                grid=_optional_grid(
+                    vertical_main_visible=grid_vertical_main_visible,
+                    vertical_secondary_visible=grid_vertical_secondary_visible,
+                ),
             ),
             "Track desired state",
         )
@@ -594,6 +601,16 @@ class IntentBuilder:
         alpha: float | None = None,
         colorbar: AuthoringRasterColorbarSpec | None = None,
         sample_axis: AuthoringRasterSampleAxisSpec | None = None,
+        colorbar_enabled: bool | None = None,
+        colorbar_label: str | None = None,
+        colorbar_position: str | None = None,
+        sample_axis_enabled: bool | None = None,
+        sample_axis_unit: str | None = None,
+        sample_axis_minimum: float | None = None,
+        sample_axis_maximum: float | None = None,
+        sample_axis_tick_count: int | None = None,
+        sample_axis_source_origin: float | None = None,
+        sample_axis_source_step: float | None = None,
     ) -> BindingHandle:
         """Add one raster binding with explicit display and amplitude options."""
         owned_track = self._require_track(track)
@@ -616,8 +633,22 @@ class IntentBuilder:
                 profile=profile,
                 normalization=normalization,
                 color_limits=color_limits,
-                colorbar=colorbar,
-                sample_axis=sample_axis,
+                colorbar=_coalesce_raster_colorbar(
+                    colorbar,
+                    enabled=colorbar_enabled,
+                    label=colorbar_label,
+                    position=colorbar_position,
+                ),
+                sample_axis=_coalesce_raster_sample_axis(
+                    sample_axis,
+                    enabled=sample_axis_enabled,
+                    unit=sample_axis_unit,
+                    minimum=sample_axis_minimum,
+                    maximum=sample_axis_maximum,
+                    tick_count=sample_axis_tick_count,
+                    source_origin=sample_axis_source_origin,
+                    source_step=sample_axis_source_step,
+                ),
                 style=_optional_style(colormap=colormap, alpha=alpha),
             ),
             "Raster binding desired state",
@@ -1581,6 +1612,8 @@ class IntentBuilder:
                 "scale_maximum",
                 "scale_kind",
                 "reverse",
+                "grid_vertical_main_visible",
+                "grid_vertical_secondary_visible",
             },
         )
         return self.add_track(
@@ -1593,6 +1626,12 @@ class IntentBuilder:
             scale_maximum=_optional_runtime_number(values, "scale_maximum"),
             scale_kind=_optional_runtime_text(values, "scale_kind") or "linear",
             reverse=_optional_runtime_bool(values, "reverse", default=False),
+            grid_vertical_main_visible=_optional_runtime_bool_or_none(
+                values, "grid_vertical_main_visible"
+            ),
+            grid_vertical_secondary_visible=_optional_runtime_bool_or_none(
+                values, "grid_vertical_secondary_visible"
+            ),
         )
 
     def _runtime_curve(
@@ -1652,6 +1691,16 @@ class IntentBuilder:
                 "color_maximum",
                 "colormap",
                 "alpha",
+                "colorbar_enabled",
+                "colorbar_label",
+                "colorbar_position",
+                "sample_axis_enabled",
+                "sample_axis_unit",
+                "sample_axis_minimum",
+                "sample_axis_maximum",
+                "sample_axis_tick_count",
+                "sample_axis_source_origin",
+                "sample_axis_source_step",
             },
         )
         return self.add_raster(
@@ -1665,6 +1714,18 @@ class IntentBuilder:
             color_maximum=_optional_runtime_number(values, "color_maximum"),
             colormap=_optional_runtime_text(values, "colormap"),
             alpha=_optional_runtime_number(values, "alpha"),
+            colorbar_enabled=_optional_runtime_bool_or_none(values, "colorbar_enabled"),
+            colorbar_label=_optional_runtime_text(values, "colorbar_label"),
+            colorbar_position=_optional_runtime_text(values, "colorbar_position"),
+            sample_axis_enabled=_optional_runtime_bool_or_none(values, "sample_axis_enabled"),
+            sample_axis_unit=_optional_runtime_text(values, "sample_axis_unit"),
+            sample_axis_minimum=_optional_runtime_number(values, "sample_axis_minimum"),
+            sample_axis_maximum=_optional_runtime_number(values, "sample_axis_maximum"),
+            sample_axis_tick_count=_optional_runtime_integer(
+                values, "sample_axis_tick_count", "wp.raster"
+            ),
+            sample_axis_source_origin=_optional_runtime_number(values, "sample_axis_source_origin"),
+            sample_axis_source_step=_optional_runtime_number(values, "sample_axis_source_step"),
         )
 
     def _runtime_fill(
@@ -1830,6 +1891,65 @@ def _optional_style(
     if not fields:
         return None
     return _validated(AuthoringStyleIntent, fields, "Style desired state")
+
+
+def _optional_grid(
+    *,
+    vertical_main_visible: bool | None = None,
+    vertical_secondary_visible: bool | None = None,
+) -> AuthoringGridIntent | None:
+    """Return a grid patch only when an executable grid option was supplied."""
+    fields = _non_null_fields(
+        vertical_main_visible=vertical_main_visible,
+        vertical_secondary_visible=vertical_secondary_visible,
+    )
+    if not fields:
+        return None
+    return _validated(AuthoringGridIntent, fields, "Grid desired state")
+
+
+def _coalesce_raster_colorbar(
+    colorbar: AuthoringRasterColorbarSpec | None,
+    *,
+    enabled: bool | None,
+    label: str | None,
+    position: str | None,
+) -> AuthoringRasterColorbarSpec | None:
+    """Build the typed colorbar spec without allowing two competing inputs."""
+    fields = _non_null_fields(enabled=enabled, label=label, position=position)
+    if not fields:
+        return colorbar
+    if colorbar is not None:
+        raise ProgramPolicyError("Raster colorbar accepts either a typed spec or keywords.")
+    return _validated(AuthoringRasterColorbarSpec, fields, "Raster colorbar desired state")
+
+
+def _coalesce_raster_sample_axis(
+    sample_axis: AuthoringRasterSampleAxisSpec | None,
+    *,
+    enabled: bool | None,
+    unit: str | None,
+    minimum: float | None,
+    maximum: float | None,
+    tick_count: int | None,
+    source_origin: float | None,
+    source_step: float | None,
+) -> AuthoringRasterSampleAxisSpec | None:
+    """Build the typed sample-axis spec without inferring omitted settings."""
+    fields = _non_null_fields(
+        enabled=enabled,
+        unit=unit,
+        minimum=minimum,
+        maximum=maximum,
+        tick_count=tick_count,
+        source_origin=source_origin,
+        source_step=source_step,
+    )
+    if not fields:
+        return sample_axis
+    if sample_axis is not None:
+        raise ProgramPolicyError("Raster sample axis accepts either a typed spec or keywords.")
+    return _validated(AuthoringRasterSampleAxisSpec, fields, "Raster sample-axis desired state")
 
 
 def _replace_annotation_id(annotation: AnnotationSpec, annotation_id: str) -> AnnotationSpec:
