@@ -1,0 +1,1207 @@
+# WellPlot NLP D4 — Bounded Integrated Live Acceptance Design
+
+## Status
+
+`DESIGN_ONLY / HARNESS_NOT_AUTHORIZED / LIVE_INFERENCE_NOT_AUTHORIZED`
+
+Design authorization:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-001
+```
+
+Input baseline:
+
+```text
+2c8e851fcd8b315e5d1861652a97984202db7488
+WELLPLOT_NLP_D3_ACCEPTED
+```
+
+Design branch:
+
+```text
+delivery/nlp-d4-live-acceptance-design
+```
+
+D1 through D3 are accepted. D4 is the bounded integrated live-acceptance gate from the current NLP completion plan.
+
+This document authorizes **no provider call, endpoint probe, model inference, harness implementation, production change, routing change, prompt change, or release promotion**.
+
+---
+
+# 1. Purpose
+
+D4 answers one release-relevant question:
+
+> Can the current accepted WellPlot Code Mode v2 stack, using the current public default live provider/model configuration, produce safe and scientifically correct scientist-visible outcomes across the two accepted workflows under a small frozen population containing unseen wording, value, source, and failure variations?
+
+D4 is not:
+
+- a planner benchmark;
+- a model tournament;
+- prompt research;
+- a comparison against historical V2R candidates;
+- a new Semantic IR experiment;
+- a provider-selection exercise;
+- a production cutover.
+
+The acceptance object remains the final persisted/rendered artifact or the verified zero-mutation failure outcome.
+
+---
+
+# 2. D4 Phase Separation
+
+D4 must remain split into independently reviewed gates.
+
+## D4A — provider-free harness
+
+Future work may implement the frozen cases, graders, call counter, evidence journal, and preflight checks.
+
+D4A makes:
+
+```text
+provider calls = 0
+endpoint calls = 0
+model calls = 0
+program-provider calls = 0
+```
+
+D4A must be independently reviewed before live execution.
+
+## D4B — live execution
+
+Only a separate explicit live authorization may run the frozen harness.
+
+No code, case, grader, threshold, model, provider, or source change is permitted between D4B authorization and execution.
+
+## D4C — provider-free finalization
+
+After the live population completes, derive the bounded summary and decision without making more provider calls.
+
+No production promotion follows automatically.
+
+---
+
+# 3. Frozen Live Configuration
+
+D4 evaluates one configuration only.
+
+```text
+engine: v2
+provider: openai
+model: gpt-5.4
+timeout_seconds: 120
+temperature: unset / public default
+max_output_tokens: unset / public default
+concurrency: 1
+```
+
+Why this configuration:
+
+- `DEFAULT_AUTHORING_ENGINE` is `v2`;
+- `create_project_session(... provider="openai")` is the public default;
+- the current frozen code resolves the OpenAI default model to `gpt-5.4`;
+- D4 should test the current release candidate, not choose among models.
+
+The future harness must pass the model explicitly as `gpt-5.4`; it must not rely on an environment override.
+
+No fallback model.
+
+No provider substitution.
+
+No OpenAI-compatible local fallback.
+
+If this exact configuration cannot be instantiated at live-execution time:
+
+```text
+D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+STOP
+```
+
+A different provider/model requires a separately reviewed design amendment.
+
+---
+
+# 4. Production Path Under Test
+
+D4 must execute the accepted Code Mode v2 stack:
+
+```text
+SemanticPlanner
+→ SemanticEnricher
+→ ReportProgramCompiler / ProgramSectionCompiler
+→ merge
+→ deterministic reconciliation
+→ AuthoringService execution
+→ validation
+→ persistence
+→ renderer
+```
+
+Scientist-facing operations enter through:
+
+```text
+DirectNotebookSession.run()
+DirectNotebookSession.revise()
+DirectNotebookSession.render_logfile_to_file()
+```
+
+D4A may compose the session explicitly rather than call the convenience factory only so that a transparent evidence backend can count provider calls and returned usage metrics.
+
+The actual delegated backend must still be the unchanged backend created by the current production OpenAI provider path.
+
+No production module may be changed merely for observability.
+
+---
+
+# 5. Transparent Provider Evidence Wrapper
+
+D4A may define a harness-local `CountingBackend` implementing the existing `ModelBackendProtocol`.
+
+It may wrap the real production backend and delegate:
+
+```text
+generate_structured(...)
+generate_program(...)
+```
+
+without changing arguments or outputs.
+
+It may record only:
+
+- monotonically increasing call index;
+- operation kind: `structured` or `program`;
+- success/failure;
+- stable provider failure category;
+- reported input tokens;
+- reported output tokens;
+- reported total tokens;
+- reported provider-call latency;
+- local wall-clock latency.
+
+It must not record:
+
+- credentials;
+- authorization headers;
+- environment dumps;
+- raw provider response objects;
+- hidden reasoning;
+- raw generated program text;
+- raw structured provider payloads.
+
+The wrapper has **no retry behavior**.
+
+All allowed retries/corrections remain the existing production behavior.
+
+---
+
+# 6. Existing Internal Retry Envelope
+
+The production planner already permits at most:
+
+```text
+2 structured provider calls per scientist turn
+```
+
+(one initial call plus one schema/semantic correction).
+
+Each report/section worker permits:
+
+```text
+1 initial program call
++ at most 2 bounded repair-generation calls
+= 3 program calls maximum per worker
+```
+
+D4 adds no retry outside this envelope.
+
+No harness-level retry.
+
+No smoke inference.
+
+No selective case rerun.
+
+No automatic resume after interruption.
+
+---
+
+# 7. Real Source Set
+
+D4 uses local external data and does not commit source files.
+
+## CBL construction data
+
+Use exactly the D3 frozen real DLIS pair:
+
+```text
+workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Main.dlis
+size = 111573216
+sha256 = 3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f7
+
+workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis
+size = 3294924
+sha256 = a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640
+```
+
+Required channel contract remains the accepted D3 contract.
+
+## LAS revision data
+
+Use:
+
+```text
+workspace/data/CBL_Main_REV1.las
+```
+
+This source is already referenced by:
+
+```text
+examples/cbl_main.log.yaml
+```
+
+D4A must perform a provider-free preflight and freeze before any future live authorization:
+
+- file exists;
+- file size;
+- SHA-256;
+- real LAS parsing;
+- exact observed channel inventory;
+- at minimum scalar `GR`, `CALI`, and `RT`;
+- `NPHI` must be absent for the frozen missing-channel case.
+
+If the real LAS is absent, cannot be parsed, lacks a required channel, or contains `NPHI`:
+
+```text
+D4A BLOCKED — SOURCE PREFLIGHT
+```
+
+Do not substitute synthetic LAS data.
+
+Do not change the case population automatically.
+
+All three real source files remain gitignored and uncommitted.
+
+---
+
+# 8. Provider-Free Starting Artifacts
+
+D4A must construct disposable case-local artifacts before any future inference.
+
+## CBL seed
+
+Reuse the D3 minimum-valid construction scaffold:
+
+```text
+main_pass
+  source = CBL_Main.dlis
+  combo anchor = normal / 50 mm / zero bindings
+
+repeat_pass
+  source = CBL_Repeat.dlis
+  combo anchor = normal / 50 mm / zero bindings
+```
+
+No requested scientific content may be preseeded.
+
+## LAS base seed
+
+Start from the structure of:
+
+```text
+examples/cbl_main.log.yaml
+```
+
+but stage the frozen real LAS into the disposable case directory as:
+
+```text
+CBL_Main_REV1.las
+```
+
+Normalize the live-test starting document provider-free to:
+
+```text
+title = Original Well Log Report
+section id = main
+section title = Main Log
+tracks = depth, cbl, vdl, gr, cali, rt
+GR scale = linear 0..100
+GR fills = []
+no Resistivity QC track
+source basename = CBL_Main_REV1.las
+```
+
+All other state becomes preservation baseline.
+
+D4 gold must be derived from this frozen provider-free seed before provider construction.
+
+---
+
+# 9. Population
+
+The D4 population contains:
+
+```text
+5 cases
+9 scientist turns
+1 live attempt per turn
+```
+
+There is no repeated stochastic trial and no second arm.
+
+The population intentionally contains:
+
+- unseen wording;
+- unseen requested values;
+- alternate real channel usage;
+- DLIS and LAS source types;
+- direct success;
+- successive stateful revision;
+- ambiguity requiring clarification;
+- missing source;
+- missing channel.
+
+---
+
+# 10. Case D4-C01 — CBL Construction, Unseen Wording
+
+Workflow:
+
+```text
+CBL-CONSTRUCT
+```
+
+Sources:
+
+```text
+CBL_Main.dlis
+CBL_Repeat.dlis
+```
+
+One scientist turn.
+
+Frozen request:
+
+```text
+Using CBL_Main.dlis as the main-pass data and CBL_Repeat.dlis as the repeat-pass
+data, finish the supported cased-hole CBL/VDL report in the existing scaffold.
+Keep the existing section identities main_pass and repeat_pass and limit the
+report to the heading, remarks, those two strip sections, and the tail.
+
+Use these service titles, in order: "Cement Bond Log", "Variable Density Log",
+and "Gamma Ray - CCL".
+
+Set the report metadata to:
+Company University of Utah; well FORGE 16B (78)-32; field Utah Forge; county
+Beaver; state Utah; section NWSW 32; township 26; range 9; footage
+972' FSL & 523' FWL; latitude 38.501242; longitude -112.882661; logging date
+08-May-2023; KB 5445.50 ft; GL 5415.00 ft; DF 5445.00 ft; drilling and log
+datum Kelly Bushing; top interval 25.00 ft; bottom interval 4845.00 ft; fluid
+Fresh Water; run ONE; driller depth 4980.00 ft; logged depth TD Not Tag;
+density 8.4 lbm/gal; maximum temperature 177.2 degF; logged by
+D. May / D. Jones; witnessed by Leroy Swearingen.
+
+Include three remarks:
+1. Supported Reconstruction Scope — reconstruct only the supported heading,
+remarks, main pass, repeat pass, and tail; do not invent unsupported well
+diagrams, calibration reports, or vendor parameter tables.
+2. Data Sources — use the staged DLIS files for the main and repeat passes.
+3. Public Data and IP Notice — keep the WellPlot reproduction boundary explicit
+and do not recreate vendor disclaimer artwork.
+
+For each pass, use four tracks from left to right:
+combo = normal 50 mm; depth = reference 10 mm; cbl = normal 44 mm;
+vdl = array 48 mm.
+
+On combo:
+ECGR_STGC → "Gamma Ray (ECGR_STGC) QTGC-B", linear 0..150,
+#16a34a, width 0.8.
+TT → "Transit Time for CBL (TT) QSLT-B", linear 200..400 reversed,
+#2142ff, width 0.75.
+TENS → "Cable Tension (TENS)", linear 5000..0, #111111 dashed,
+width 0.65.
+MTEM → "Mud Temperature (MTEM) LEH-MT", linear 100..500,
+#111111, width 0.9.
+
+On depth:
+STIT → "Stuck Tool Indicator, Total (STIT)", linear 0..50,
+#111111, width 0.65.
+TDSP → "Cable Drag", linear 0..50, #92400e dotted, width 0.65.
+VSEC → "Tool_Tot. Drag", linear 0..50, #1d4ed8 dashed, width 0.65.
+
+On cbl, plot CBL twice with two different binding identities. Both labels are
+"CBL Amplitude (CBL) QSLT-B". The first is linear 0..100, #111111, width 0.75.
+The second is linear 0..10, #2563eb dashed, width 0.65.
+
+On vdl, plot VDL as a raster labelled
+"VDL VariableDensity (VDL) QSLT-B". Use a linear track scale 200..1200,
+profile vdl, gray_r, colorbar enabled with label Amplitude in the header, and
+sample axis enabled in us from 200 to 1200 with 7 ticks, source origin 40 and
+step 10. Hide both vertical main and secondary grid lines.
+
+Use only channels actually present in the staged sources, preserve the full
+labels above, and keep the result restrained and readable.
+```
+
+This request must not equal the D3 frozen request after normalization.
+
+Acceptance:
+
+```text
+DIRECT_CORRECT
+CBL-01..CBL-09 PASS
+real non-empty render
+persisted bytes unchanged by grader/render
+```
+
+No user correction is permitted.
+
+---
+
+# 11. Case D4-L01 — Successive LAS Revisions With New Values
+
+Workflow:
+
+```text
+LAS-REVISE
+```
+
+Source:
+
+```text
+CBL_Main_REV1.las
+```
+
+Four sequential turns against the same evolving persisted artifact.
+
+## L01-T1
+
+```text
+Rename this report "Formation Integrity Review". Do not alter the plotted sections.
+```
+
+Expected:
+
+```text
+title = Formation Integrity Review
+all unrelated state preserved
+```
+
+## L01-T2
+
+```text
+In Main Log, set the Gamma Ray curve to a linear 5–125 scale. Leave its label and styling unchanged.
+```
+
+Expected:
+
+```text
+GR scale = linear 5..125
+unrelated state preserved
+```
+
+## L01-T3
+
+```text
+Append a 30 mm normal track named "Resistivity QC" to Main Log. Plot RT on it as "Resistivity QC" with a linear 0–5 scale.
+```
+
+Expected:
+
+```text
+one new final track
+title = Resistivity QC
+kind = normal
+width = 30 mm
+one RT curve
+label = Resistivity QC
+scale = linear 0..5
+prior state preserved
+```
+
+## L01-T4
+
+```text
+On Main Log's GR track, fill from the Gamma Ray curve to its lower scale boundary with #f2e8a0 at 20% opacity; preserve everything else.
+```
+
+Expected:
+
+```text
+GR lower-limit fill
+color = #f2e8a0
+alpha = 0.20
+target = grounded GR binding
+all previous accepted changes preserved
+```
+
+Each turn must:
+
+- persist;
+- reload;
+- pass a case-specific LAS before/after contract;
+- preserve prohibited paths;
+- render successfully.
+
+Final state must contain all four cumulative requested changes.
+
+Outcome:
+
+```text
+DIRECT_CORRECT
+```
+
+for every turn.
+
+---
+
+# 12. Case D4-L02 — Ambiguity Then Explicit Clarification
+
+Provider-free seed:
+
+- two sections;
+- titles:
+  - `Main Log – Upper`
+  - `Main Log – Lower`;
+- both are valid real-LAS-backed sections;
+- both contain a grounded GR curve starting at linear `0..100`.
+
+## L02-T1 ambiguous request
+
+```text
+In Main Log, change the Gamma Ray curve to a linear 20–110 scale.
+```
+
+Required outcome:
+
+```text
+SAFE_ACTIONABLE_FAILURE
+changed = false
+persisted bytes exactly unchanged
+no submitted intent applied
+```
+
+Preferred deterministic category:
+
+```text
+enrichment.section_hint_ambiguous
+```
+
+A persisted mutation after this request is an immediate release-blocking failure.
+
+## L02-T2 clarification
+
+Only after T1 is proven unchanged:
+
+```text
+Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper.
+```
+
+Expected:
+
+```text
+Main Log – Upper GR = linear 20..110
+Main Log – Lower GR unchanged at linear 0..100
+all other state preserved
+real render succeeds
+```
+
+Case outcome:
+
+```text
+CORRECT_AFTER_CLARIFICATION
+```
+
+---
+
+# 13. Case D4-L03 — Missing Explicit Source
+
+Seed:
+
+single `Main Log` real-LAS-backed document.
+
+Request:
+
+```text
+In Main Log, add a 24 mm normal track titled "Neutron QC" and plot NPHI from missing_neutron.las on it with a linear 0–45 scale.
+```
+
+Expected:
+
+```text
+SAFE_ACTIONABLE_FAILURE
+changed = false
+bytes unchanged
+no Neutron QC track
+no NPHI binding
+```
+
+Preferred deterministic category:
+
+```text
+enrichment.source_missing
+```
+
+Silent fallback to `CBL_Main_REV1.las` is an immediate release-blocking failure.
+
+---
+
+# 14. Case D4-L04 — Channel Unavailable In Valid Source
+
+Precondition:
+
+```text
+CBL_Main_REV1.las exists and does not contain NPHI
+```
+
+Request:
+
+```text
+In Main Log, add a 24 mm normal track titled "Neutron QC" and plot NPHI from CBL_Main_REV1.las on it with a linear 0–45 scale.
+```
+
+Expected:
+
+```text
+SAFE_ACTIONABLE_FAILURE
+changed = false
+bytes unchanged
+no Neutron QC track
+no substituted channel
+```
+
+A valid safe terminal failure may occur at planner, enrichment, worker dry-run, or reconciliation boundaries, but it must:
+
+- be non-provider/non-infrastructure;
+- expose a non-empty actionable diagnostic/user-report reason;
+- leave the artifact exactly unchanged.
+
+Substitution of `GR`, `CALI`, `RT`, or any other available channel is an immediate release-blocking failure.
+
+---
+
+# 15. Unseen-Population Guard
+
+D4A must compute normalized SHA-256 hashes for all nine scientist turns.
+
+It must assert that none is byte-equivalent to the exact accepted D1-D3 scientist requests.
+
+The harness may reuse accepted deterministic starting structures and graders.
+
+It may not reuse the exact accepted request strings as live cases.
+
+No D4 request may be changed after D4A independent acceptance.
+
+---
+
+# 16. Call Budget
+
+No harness retries are authorized.
+
+Hard maximum physical provider calls:
+
+| Case | Turns | Maximum |
+| --- | ---: | ---: |
+| D4-C01 | 1 | 11 |
+| D4-L01 | 4 | 20 |
+| D4-L02 | 2 | 7 |
+| D4-L03 | 1 | 2 |
+| D4-L04 | 1 | 5 |
+| **Total** | **9** | **45** |
+
+Derivation:
+
+```text
+planner <= 2 calls / turn
+worker <= 3 calls / dispatched worker
+
+CBL:
+2 + (3 workers × 3) = 11
+
+one-worker accepted LAS turn:
+2 + 3 = 5
+
+pre-worker deterministic rejection:
+2
+```
+
+The live wrapper must hard-stop before physical provider call 46.
+
+Call-cap exhaustion is:
+
+```text
+D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+```
+
+not a semantic failure.
+
+---
+
+# 17. Execution Ordering
+
+Future D4B must run in exactly this order:
+
+```text
+1. D4-C01
+2. D4-L01 T1
+3. D4-L01 T2
+4. D4-L01 T3
+5. D4-L01 T4
+6. D4-L02 T1
+7. D4-L02 T2
+8. D4-L03
+9. D4-L04
+```
+
+Concurrency:
+
+```text
+1
+```
+
+Do not reorder based on early results.
+
+Semantic failure does not stop the population unless continuing would destroy required case state.
+
+Infrastructure/configuration failure stops the campaign immediately.
+
+---
+
+# 18. No Resume / No Selective Rerun
+
+A D4B campaign starts only when its canonical local JSONL journal path is absent or zero-length.
+
+If the process stops after any provider call:
+
+- preserve partial evidence;
+- mark the campaign inconclusive;
+- do not append;
+- do not resume;
+- do not merge rows from another execution;
+- do not rerun only failed cases.
+
+Any fresh rerun requires independent review and explicit reauthorization.
+
+---
+
+# 19. Outcome Taxonomy
+
+Every turn receives exactly one outcome.
+
+## `DIRECT_CORRECT`
+
+The request is accepted without scientist correction and the final persisted/rendered artifact satisfies all deterministic gold.
+
+## `CORRECT_AFTER_CLARIFICATION`
+
+An initial ambiguity fails safely with zero mutation and the frozen clarification produces the correct artifact.
+
+## `SAFE_ACTIONABLE_FAILURE`
+
+The system rejects an impossible/unsafe request, does not mutate the artifact, and returns a bounded actionable reason.
+
+## `DETECTED_INCORRECT_OUTPUT`
+
+The model/provider proposes invalid work but deterministic safety/validation prevents persistence. This is safe but does **not** satisfy a positive case.
+
+## `UNDETECTED_INCORRECT_OUTPUT`
+
+The system reports/persists success but deterministic scientific grading finds the artifact incorrect.
+
+This is release-blocking.
+
+## `UNINTENDED_MUTATION`
+
+A failed/ambiguous request or accepted sparse revision changes state outside the frozen allowed set.
+
+This is release-blocking.
+
+## `INFRASTRUCTURE_INCONCLUSIVE`
+
+Authentication, provider transport, rate limit, timeout exhaustion, configuration failure, interrupted population, or call-cap exhaustion prevents a valid semantic result.
+
+---
+
+# 20. Deterministic Grading
+
+Provider output never grades itself.
+
+## CBL
+
+D4-C01 must use unchanged:
+
+```text
+scripts/verify_cbl_packet.py
+```
+
+and the direct D3-style canonical assertions.
+
+## LAS positive sequence
+
+Use:
+
+```text
+scripts/verify_las_revision.py
+```
+
+with D4-specific before/after contracts for the new values.
+
+Every accepted revision must prove:
+
+- required semantic change;
+- exact allowed-change surface;
+- prohibited paths unchanged;
+- persistence;
+- reload;
+- real render.
+
+## Ambiguity / failures
+
+Capture bytes immediately before the turn.
+
+A safe failure requires:
+
+```text
+changed = false
+post_bytes == pre_bytes
+canonical post-state == canonical pre-state
+no prohibited new object
+```
+
+The grader, verifier, and renderer must not mutate the acceptance artifact.
+
+---
+
+# 21. Scientist-Visible Success Criteria
+
+D4 passes only if all are true:
+
+## Positive construction
+
+```text
+D4-C01 = DIRECT_CORRECT
+CBL-01..CBL-09 PASS
+```
+
+## Successive revision
+
+All four D4-L01 turns:
+
+```text
+DIRECT_CORRECT
+```
+
+with cumulative preservation and successful render after every turn.
+
+## Clarification
+
+```text
+D4-L02 T1 = SAFE_ACTIONABLE_FAILURE
+D4-L02 T2 = CORRECT_AFTER_CLARIFICATION
+```
+
+## Negative safety
+
+```text
+D4-L03 = SAFE_ACTIONABLE_FAILURE
+D4-L04 = SAFE_ACTIONABLE_FAILURE
+```
+
+## Population-wide invariants
+
+```text
+UNDETECTED_INCORRECT_OUTPUT = 0
+UNINTENDED_MUTATION = 0
+provider/model fallback = 0
+call cap exceeded = 0
+infrastructure inconclusive turns = 0
+```
+
+A safely detected model error in a positive case still means D4 acceptance failed because the user did not receive the requested artifact.
+
+---
+
+# 22. Latency / Retry / Usage Evidence
+
+D4 must measure rather than guess:
+
+Per physical provider call:
+
+- operation type;
+- latency;
+- input tokens if returned;
+- output tokens if returned;
+- total tokens if returned;
+- success/failure category.
+
+Per scientist turn:
+
+- total wall-clock duration;
+- physical provider-call count;
+- structured-call count;
+- program-call count;
+- worker repair count;
+- worker count;
+- success/failure;
+- render duration.
+
+Population:
+
+- total calls;
+- total reported tokens;
+- median and maximum turn latency;
+- total repairs;
+- turns with repair;
+- provider failure count.
+
+No monetary cost threshold is frozen in D4 unless a rate card is separately frozen before D4B authorization.
+
+Token/latency evidence is descriptive in this gate.
+
+Scientific correctness and mutation safety are decision-bearing.
+
+---
+
+# 23. Evidence Journal
+
+Future live raw evidence stays local under:
+
+```text
+workspace/evaluations/d4-live-acceptance/
+```
+
+Canonical journal name:
+
+```text
+d4-live-v1.jsonl
+```
+
+Case-local artifacts may be retained under case directories.
+
+The JSONL must contain bounded evidence only:
+
+- experiment version;
+- accepted checkpoint;
+- case ID;
+- turn ID;
+- execution index;
+- request SHA-256;
+- starting artifact SHA-256;
+- ending artifact SHA-256;
+- render SHA-256 where applicable;
+- provider/model labels;
+- result status;
+- apply status;
+- outcome taxonomy;
+- diagnostics codes/stages;
+- worker metrics;
+- provider call/usage/latency aggregates;
+- verifier requirement statuses;
+- diff/grader status.
+
+Do not store:
+
+- API keys;
+- headers;
+- environment dumps;
+- absolute local data paths;
+- raw provider responses;
+- raw generated programs;
+- hidden reasoning.
+
+The committed final result records the journal SHA-256, not the local source data.
+
+---
+
+# 24. Harness Integrity
+
+Before constructing a real provider, D4A must authenticate:
+
+- exact D3 frozen baseline;
+- exact case-population fixture hash;
+- exact gold/grader fixture hash;
+- exact live harness source hash;
+- exact relevant production source hashes:
+  - planner;
+  - enrichment;
+  - report worker;
+  - section worker;
+  - provider backend;
+  - direct notebook adapter;
+  - reconciler/verifiers;
+- all three local source hashes;
+- clean Git working tree;
+- branch/checkpoint match;
+- empty/absent journal.
+
+The harness must fail before credentials are read if any frozen artifact differs.
+
+---
+
+# 25. Credential Boundary
+
+Credentials use the existing production loader.
+
+D4 evidence may record only:
+
+```text
+credential_source = configured
+```
+
+or equivalent bounded state.
+
+Do not print, hash, serialize, or inspect the secret value.
+
+D4A provider-free tests must use fake credentials/clients only.
+
+---
+
+# 26. Expected D4A Implementation Scope
+
+Subject to independent design acceptance, expected provider-free harness files are:
+
+```text
+scripts/nlp_d4_live_acceptance.py
+tests/test_nlp_d4_live_acceptance.py
+tests/fixtures/nlp_d4_live_cases.json
+tests/fixtures/nlp_d4_live_gold.json
+docs/nlp-d4-live-harness-result.md
+```
+
+No production file is expected to change.
+
+The cases file contains scientist requests and non-secret case metadata.
+
+The gold file contains deterministic evaluator expectations.
+
+The live provider receives only normal production context and the scientist request; evaluator gold must never be included in provider prompts.
+
+---
+
+# 27. D4A Provider-Free Tests
+
+The future harness must prove without inference:
+
+- exact nine-turn schedule;
+- exact 45-call hard cap;
+- call 46 rejected before delegation;
+- no wrapper retries;
+- source preflight occurs before backend construction;
+- source hashes/channels recorded without source bytes entering evidence;
+- request hashes frozen;
+- known D1-D3 exact request duplicates rejected;
+- partial journal prevents execution;
+- dirty/mismatched checkpoint prevents execution;
+- credentials are not accessed before all interlocks pass;
+- raw provider/program text is absent from evidence rows;
+- expected case ordering;
+- positive and negative grader behavior using deterministic fake results;
+- terminal summary derivation from synthetic complete/incomplete populations;
+- no production mutation by harness preparation.
+
+D4A itself must make zero endpoint/provider/model calls.
+
+---
+
+# 28. Terminal D4 Decisions
+
+Only three top-level decisions are permitted:
+
+```text
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_FAILED
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+```
+
+## PASSED
+
+All criteria in Section 21 pass.
+
+## FAILED
+
+The population is complete and infrastructure-valid, but one or more semantic/scientific/safety criteria fail.
+
+Examples:
+
+- a positive case fails safely;
+- wrong scientific artifact;
+- wrong source/channel;
+- unexpected mutation;
+- ambiguity is silently resolved;
+- missing source/channel is substituted;
+- requested artifact cannot be rendered.
+
+## INCONCLUSIVE
+
+The population cannot be validly completed because of infrastructure/configuration/evidence integrity.
+
+No semantic threshold may convert an infrastructure run into FAILED.
+
+---
+
+# 29. Failure Does Not Authorize Research
+
+A valid `FAILED` result closes that D4 campaign.
+
+It may motivate a separately scoped bounded engineering issue.
+
+It does **not** authorize:
+
+- prompt tuning during the campaign;
+- model switching;
+- another holdout;
+- another model comparison;
+- replaying only failures;
+- changing graders after seeing results;
+- reopening Semantic IR research.
+
+A new live campaign requires a new reviewed design/authorization.
+
+---
+
+# 30. Release Boundary
+
+Even:
+
+```text
+WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED
+```
+
+does not itself switch production routing or publish a release.
+
+It establishes evidence for a later explicit release/promotion decision.
+
+Production promotion remains separately governed.
+
+---
+
+# 31. D4 Design Decision
+
+```text
+WELLPLOT-NLP-D4-DESIGN-001
+```
+
+Selected approach:
+
+```text
+one current release-candidate configuration
+five frozen integrated cases
+nine scientist turns
+real local DLIS + LAS sources
+one attempt per turn
+45-call hard maximum
+final-artifact and zero-mutation grading
+no model comparison
+no harness retry
+no automatic rerun
+```
+
+D4A implementation remains unauthorized until independent review accepts this design.
+
+Live inference remains unauthorized until:
+
+1. D4 design acceptance;
+2. provider-free D4A harness implementation;
+3. independent D4A harness review;
+4. explicit D4B live-execution authorization.
+
+D4 production promotion is not authorized by any of those gates.
