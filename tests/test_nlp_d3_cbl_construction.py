@@ -37,9 +37,7 @@ from wellplot.logfile import load_logfile
 from wellplot.model.channels import ArrayChannel
 
 _FIXTURE_ROOT = REPO_ROOT / "tests" / "fixtures" / "agentic_cbl"
-_EXTERNAL_ROOT = Path(
-    "/home/user/projects/well_log_os/workspace/tutorials/agent_cbl_log_example_from_prompt"
-)
+_EXTERNAL_ROOT = REPO_ROOT / "workspace" / "tutorials" / "agent_cbl_log_example_from_prompt"
 _EXTERNAL_FILES = {
     "CBL_Main.dlis": (
         111573216,
@@ -61,6 +59,40 @@ _REQUIRED_CHANNELS = {
     "CBL": "scalar",
     "VDL": "array",
 }
+_REPORT_SLOT_IDS = frozenset(
+    {
+        "general.company",
+        "general.well",
+        "general.field",
+        "general.county",
+        "general.country",
+        "general.section",
+        "general.township",
+        "general.range",
+        "general.footage",
+        "general.latitude",
+        "general.longitude",
+        "general.logging_date",
+        "general.measured_from",
+        "general.log_measured_from",
+        "general.elevation_kb",
+        "general.elevation_gl",
+        "general.elevation_df",
+        "general.top_log_interval",
+        "general.bottom_log_interval",
+        "general.fluid_type",
+        "service_title.1",
+        "service_title.2",
+        "service_title.3",
+        "detail.row_2.column_1.cell_1",
+        "detail.row_4.column_1.cell_1",
+        "detail.row_5.column_1.cell_1",
+        "detail.row_12.value_1",
+        "detail.row_19.column_1.cell_1",
+        "detail.row_23.value_1",
+        "detail.row_24.value_1",
+    }
+)
 
 
 def _normalized_request() -> str:
@@ -80,39 +112,97 @@ D3_REQUEST = _normalized_request()
 D3_REQUEST_SHA256 = hashlib.sha256(D3_REQUEST.encode("utf-8")).hexdigest()
 
 _REPORT_REQUIREMENTS = (
-    "Set service titles to Cement Bond Log, Variable Density Log, and Gamma Ray - CCL.",
-    "Set the requested University of Utah / FORGE 16B (78)-32 well header values.",
-    "Set the requested location, elevation, datum, interval, fluid, and logging values.",
+    "service_title.1 = Cement Bond Log",
+    "service_title.2 = Variable Density Log",
+    "service_title.3 = Gamma Ray - CCL",
+    "general.company = University of Utah",
+    "general.well = FORGE 16B (78)-32",
+    "general.field = Utah Forge",
+    "general.county = Beaver",
+    "general.country = Utah",
+    "general.section = NWSW 32",
+    "general.township = 26",
+    "general.range = 9",
+    "general.footage = 972' FSL & 523' FWL",
+    "general.latitude = 38.501242",
+    "general.longitude = -112.882661",
+    "general.logging_date = 08-May-2023",
+    "general.measured_from = Kelly Bushing",
+    "general.log_measured_from = Kelly Bushing",
+    "general.elevation_kb = 5445.50 ft",
+    "general.elevation_gl = 5415.00 ft",
+    "general.elevation_df = 5445.00 ft",
+    "general.top_log_interval = 25.00 ft",
+    "general.bottom_log_interval = 4845.00 ft",
+    "general.fluid_type = Fresh Water",
+    "detail.row_2.column_1.cell_1 = ONE",
+    "detail.row_4.column_1.cell_1 = 4980.00 ft",
+    "detail.row_5.column_1.cell_1 = TD Not Tag",
+    "detail.row_12.value_1 = 8.4 lbm/gal",
+    "detail.row_19.column_1.cell_1 = 177.2 degF",
+    "detail.row_23.value_1 = D. May / D. Jones",
+    "detail.row_24.value_1 = Leroy Swearingen",
     (
-        "Set run number ONE, driller depth 4980.00 ft, logged depth TD Not Tag, "
-        "density 8.4 lbm/gal, temperature 177.2 degF, logged by D. May / D. Jones, "
-        "and witnessed by Leroy Swearingen."
+        "remark Supported Reconstruction Scope = Reconstruct only the supported subset: "
+        "heading page, remarks, main pass, repeat pass, and tail."
     ),
-    "Add the three requested titled remarks with their requested text.",
+    (
+        "remark Data Sources = Use the staged DLIS files under the project directory as "
+        "the main and repeat packet sources."
+    ),
+    (
+        "remark Public Data and IP Notice = Keep the wellplot reproduction boundary "
+        "explicit and avoid vendor-specific disclaimer artwork."
+    ),
     "Preserve the cased-hole packet boundary and do not invent unsupported vendor-only content.",
 )
 _SECTION_REQUIREMENTS = (
-    "Preserve the existing combo anchor as the first normal 50 mm track.",
+    "track combo = kind normal, width_mm 50",
+    "track depth = kind reference, width_mm 10",
+    "track cbl = kind normal, width_mm 44",
+    "track vdl = kind array, width_mm 48, scale linear 200..1200",
     (
-        "Create depth as a 10 mm reference track, cbl as a 44 mm normal track, "
-        "and vdl as a 48 mm array track."
+        "binding combo.ECGR_STGC = label Gamma Ray (ECGR_STGC) QTGC-B, "
+        "scale linear 0..150, color #16a34a, line_width 0.8"
     ),
     (
-        "Bind ECGR_STGC, TT, TENS, and MTEM on combo with the exact requested labels, "
-        "scales, colors, and line styles."
+        "binding combo.TT = label Transit Time for CBL (TT) QSLT-B, "
+        "scale linear 200..400, reverse true, color #2142ff, line_width 0.75"
     ),
     (
-        "Bind STIT, TDSP, and VSEC on depth with the exact requested labels, scales, "
-        "colors, and line styles."
+        "binding combo.TENS = label Cable Tension (TENS), scale linear 5000..0, "
+        "color #111111, line_style dashed, line_width 0.65"
     ),
     (
-        "Bind CBL twice on cbl with the exact requested labels, scales, styles, "
-        "and distinct identities."
+        "binding combo.MTEM = label Mud Temperature (MTEM) LEH-MT, "
+        "scale linear 100..500, color #111111, line_width 0.9"
     ),
     (
-        "Bind VDL on vdl as a vdl raster with the requested x scale, colormap, "
-        "colorbar, sample axis, and hidden vertical grids."
+        "binding depth.STIT = label Stuck Tool Indicator, Total (STIT), "
+        "scale linear 0..50, color #111111, line_width 0.65"
     ),
+    (
+        "binding depth.TDSP = label Cable Drag, scale linear 0..50, "
+        "color #92400e, line_style dotted, line_width 0.65"
+    ),
+    (
+        "binding depth.VSEC = label Tool_Tot. Drag, scale linear 0..50, "
+        "color #1d4ed8, line_style dashed, line_width 0.65"
+    ),
+    (
+        "binding cbl.CBL[1] = label CBL Amplitude (CBL) QSLT-B, "
+        "scale linear 0..100, color #111111, line_width 0.75"
+    ),
+    (
+        "binding cbl.CBL[2] = label CBL Amplitude (CBL) QSLT-B, "
+        "scale linear 0..10, color #2563eb, line_style dashed, line_width 0.65"
+    ),
+    "binding cbl.CBL[1] and cbl.CBL[2] have distinct identities",
+    "binding vdl.VDL = label VDL VariableDensity (VDL) QSLT-B, profile vdl, colormap gray_r",
+    "track vdl = hidden vertical main and secondary grids",
+    "binding vdl.VDL = colorbar enabled, label Amplitude, position header",
+    "binding vdl.VDL = sample axis enabled, unit us, range 200..1200, ticks 7, origin 40, step 10",
+    "Bind only channels confirmed in the selected staged DLIS source.",
 )
 
 
@@ -183,6 +273,12 @@ class _D3ReportBackend:
         assert isinstance(task, dict)
         _assert_requirements(task["requirements"], _REPORT_REQUIREMENTS)
         assert task["capability_ids"] == ["report.standard"]
+        report_context = payload["report_context"]
+        assert isinstance(report_context, dict)
+        header_slots = report_context["header_slots"]
+        assert isinstance(header_slots, list)
+        observed_slot_ids = {slot["slot_id"] for slot in header_slots}
+        assert _REPORT_SLOT_IDS.issubset(observed_slot_ids)
         assert "track" not in " ".join(task["requirements"]).lower()
         return ProgramGenerationResult(
             text=_report_program(),
@@ -211,7 +307,12 @@ class _D3SectionBackend:
             "binding.curve",
             "binding.raster",
         ]
-        source_name = "CBL_Main.dlis" if "Main Pass" in str(task["goal"]) else "CBL_Repeat.dlis"
+        assert task["existing_section_hint"] in {"Main Pass", "Repeat Pass"}
+        source_hints = task["source_hints"]
+        assert source_hints in [["CBL_Main.dlis"], ["CBL_Repeat.dlis"]]
+        source_name = source_hints[0]
+        expected_section_hint = "Main Pass" if source_name == "CBL_Main.dlis" else "Repeat Pass"
+        assert task["existing_section_hint"] == expected_section_hint
         context = payload["section_context"]
         assert isinstance(context, dict)
         assert context["target"] == {"kind": "existing"}
@@ -470,6 +571,7 @@ def test_d3_one_shot_real_dlis_construction() -> None:
         assert result.report_facts["success"] is True, result.user_report_text
         assert result.report_facts["changed"] is True
         assert result.report_facts["apply_status"] == "persisted"
+        assert result.submitted_intent is not None
         assert len(planner.calls) == 1
         assert len(report.requests) == 1
         assert len(section.requests) == 2
@@ -478,7 +580,13 @@ def test_d3_one_shot_real_dlis_construction() -> None:
         assert compilation["metrics"]["successful_workers"] == 3
         assert compilation["metrics"]["failed_workers"] == 0
         assert compilation["metrics"]["total_repairs"] == 0
+        assert [(worker["kind"], worker["plan_order"]) for worker in compilation["workers"]] == [
+            ("report", 0),
+            ("section", 1),
+            ("section", 2),
+        ]
         assert output.is_file()
+        persisted_bytes = output.read_bytes()
 
         reloaded = AuthoringService.from_mapping(
             report_to_dict(load_logfile(output, allowed_root=REPO_ROOT))
@@ -488,10 +596,42 @@ def test_d3_one_shot_real_dlis_construction() -> None:
             [track.id for track in section.tracks] == ["combo", "depth", "cbl", "vdl"]
             for section in reloaded.sections
         )
-        assert all(
-            len(next(track for track in section.tracks if track.id == "combo").bindings) == 4
-            for section in reloaded.sections
-        )
+        for section, source_name in zip(
+            reloaded.sections,
+            ("CBL_Main.dlis", "CBL_Repeat.dlis"),
+            strict=True,
+        ):
+            assert Path(section.data_source.source_path).name == source_name
+            tracks = {track.id: track for track in section.tracks}
+            assert len(tracks["combo"].bindings) == 4
+            assert len(tracks["depth"].bindings) == 3
+            assert len(tracks["cbl"].bindings) == 2
+            assert len(tracks["vdl"].bindings) == 1
+            cbl_binding_ids = {binding.binding_id for binding in tracks["cbl"].bindings}
+            assert len(cbl_binding_ids) == 2
+
+            vdl = tracks["vdl"]
+            assert vdl.x_scale is not None
+            assert vdl.x_scale.kind.value == "linear"
+            assert vdl.x_scale.minimum == 200.0
+            assert vdl.x_scale.maximum == 1200.0
+            assert vdl.grid.vertical_main_visible is False
+            assert vdl.grid.vertical_secondary_visible is False
+            raster = vdl.bindings[0]
+            assert raster.channel == "VDL"
+            assert raster.label == "VDL VariableDensity (VDL) QSLT-B"
+            assert raster.profile.value == "vdl"
+            assert raster.style.colormap == "gray_r"
+            assert raster.colorbar.enabled is True
+            assert raster.colorbar.label == "Amplitude"
+            assert raster.colorbar.position.value == "header"
+            assert raster.sample_axis.enabled is True
+            assert raster.sample_axis.unit == "us"
+            assert raster.sample_axis.minimum == 200.0
+            assert raster.sample_axis.maximum == 1200.0
+            assert raster.sample_axis.tick_count == 7
+            assert raster.sample_axis.source_origin == 40.0
+            assert raster.sample_axis.source_step == 10.0
 
         rendered = asyncio.run(
             adapter.render_logfile_to_file(
@@ -502,6 +642,7 @@ def test_d3_one_shot_real_dlis_construction() -> None:
         )
         assert rendered
         assert render.is_file() and render.stat().st_size > 0
+        assert output.read_bytes() == persisted_bytes
 
         verdict = verify_cbl_packet(
             output,
@@ -509,6 +650,7 @@ def test_d3_one_shot_real_dlis_construction() -> None:
         )
         assert verdict["acceptance_status"] == "PASS", verdict
         assert verdict["errors"] == []
+        assert output.read_bytes() == persisted_bytes
         assert {item["id"] for item in verdict["requirements"]} == {
             "CBL-01",
             "CBL-02",

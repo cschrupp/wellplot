@@ -85,12 +85,31 @@ The final CBL verifier remains `scripts/verify_cbl_packet.py`; it is not
 modified by D3. The authoritative test is
 `tests/test_nlp_d3_cbl_construction.py`.
 
+## Rework-001 Evidence
+
+The deterministic workers now fail before program generation unless the actual
+serialized task payload carries the complete frozen semantics. Report-task
+checks cover every requested service title, header/detail value, and remark;
+the report worker also verifies that every emitted host slot is present in the
+actual `report_context.header_slots` inventory. Main and Repeat section-task
+checks cover every track, binding, style, scale, duplicate CBL identity, and
+VDL presentation value. The section payload additionally carries only the
+planner-owned `existing_section_hint` and `source_hints`; it does not expose
+canonical section IDs or filesystem paths.
+
+The integrated acceptance resolves the authorized DLIS pair from the
+repository-relative ignored workspace, verifies both frozen hashes, and then
+asserts source-hint custody, submitted intent, report/section worker order,
+per-track binding multiplicities, source basenames, VDL canonical fields, and
+byte immutability across render and CBL verification.
+
 ## Verification
 
 ```yaml
-d3_focused_non_integrated: 49 passed, 1 deselected
-d0_d2e_adjacent: 93 passed
-full_suite: 2545 passed, 36 failed, 21 skipped, 11 subtests passed
+d3_focused_non_integrated: 45 passed, 1 deselected
+d3_integrated: 1 passed, 2 deselected, 2 warnings
+d0_d3_delivery: 96 passed, 2 warnings
+full_suite: 2550 passed, 36 failed, 21 skipped, 11 subtests passed
 known_baseline_failures: 36 reproduced; no D3-attributable failure identified
 ruff: PASS
 format: PASS

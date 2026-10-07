@@ -447,6 +447,56 @@ def test_invalid_narrow_sdk_values_are_rejected_by_canonical_intent_validation()
         builder.add_raster(track, channel="VDL", color_minimum=-100)
 
 
+@pytest.mark.parametrize(
+    ("source", "message"),
+    [
+        (
+            "report = wp.report()\n"
+            "section = wp.section(report, id_hint='main', title='Main')\n"
+            "track = wp.track(section, id_hint='vdl', kind='array', title='VDL', width_mm=48, "
+            "grid_vertical_main_visible='no')\n",
+            "grid_vertical_main_visible.*must be a boolean",
+        ),
+        (
+            "report = wp.report()\n"
+            "section = wp.section(report, id_hint='main', title='Main')\n"
+            "track = wp.track(section, id_hint='vdl', kind='array', title='VDL', width_mm=48)\n"
+            "wp.raster(track, channel='VDL', sample_axis_source_origin=40)\n",
+            "Raster sample-axis desired state is invalid",
+        ),
+        (
+            "report = wp.report()\n"
+            "section = wp.section(report, id_hint='main', title='Main')\n"
+            "track = wp.track(section, id_hint='vdl', kind='array', title='VDL', width_mm=48)\n"
+            "wp.raster(track, channel='VDL', sample_axis_minimum=200)\n",
+            "Raster sample-axis desired state is invalid",
+        ),
+        (
+            "report = wp.report()\n"
+            "section = wp.section(report, id_hint='main', title='Main')\n"
+            "track = wp.track(section, id_hint='vdl', kind='array', title='VDL', width_mm=48)\n"
+            "wp.raster(track, channel='VDL', sample_axis_tick_count=1)\n",
+            "Raster sample-axis desired state is invalid",
+        ),
+        (
+            "report = wp.report()\n"
+            "section = wp.section(report, id_hint='main', title='Main')\n"
+            "track = wp.track(section, id_hint='vdl', kind='array', title='VDL', width_mm=48)\n"
+            "wp.raster(track, channel='VDL', sample_axis_tick_count=7.0)\n",
+            "sample_axis_tick_count.*must be an integer",
+        ),
+    ],
+)
+def test_malformed_d3_grid_and_sample_axis_values_fail_closed(
+    source: str,
+    message: str,
+) -> None:
+    """Malformed D3 presentation values fail in the typed program boundary."""
+    builder = _builder()
+    with pytest.raises(ProgramTypeError, match=message):
+        interpret_authoring_program(_program(source), builder.runtime_environment())
+
+
 def test_intent_builder_has_no_application_service_or_edge_imports() -> None:
     """Intent compilation stays independent from services, providers, MCP, and graphs."""
     module_path = Path(__file__).parents[1] / "src/wellplot/authoring_program/intent_builder.py"

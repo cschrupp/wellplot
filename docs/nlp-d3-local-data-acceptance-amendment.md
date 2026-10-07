@@ -48,7 +48,7 @@ Frozen observed identities:
 ```text
 CBL_Main.dlis
 size    = 111573216
-sha256  = 3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f
+sha256  = 3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f7
 
 CBL_Repeat.dlis
 size    = 3294924
@@ -189,7 +189,7 @@ Required main file:
 ```text
 workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Main.dlis
 111573216 bytes
-3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f
+3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f7
 ```
 
 Required repeat file:
@@ -351,7 +351,7 @@ main size:
 111573216
 
 main SHA-256:
-3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f
+3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f7
 
 repeat local path:
 workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis

@@ -392,10 +392,12 @@ def _sdk_reference(
 
 
 def _semantic_task_payload(task: SectionTask) -> dict[str, object]:
-    """Return the planner-approved semantic task without document mechanics."""
+    """Return planner-owned section semantics without document mechanics."""
     return {
         "goal": task.goal,
         "capability_ids": list(task.capability_ids),
+        "existing_section_hint": task.existing_section_hint,
+        "source_hints": list(task.source_hints),
         "requirements": list(task.requirements),
         "constraints": list(task.constraints),
     }
