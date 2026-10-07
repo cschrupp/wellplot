@@ -163,8 +163,8 @@ The adjacent suites completed with:
 The reproduced failure is
 `tests/test_direct_notebook.py::test_project_session_uses_example_seed_and_declared_sources_only`.
 It fails because the existing example seed references the absent repository
-fixture `workspace/data/30-23a-3 8117_d.las`; it is unrelated to D2D and no
-production source changed.
+fixture `workspace/data/30-23a-3 8117_d.las`. The failure reproduces from the
+established pre-D2D baseline and is unrelated to the D2D enrichment correction.
 
 Full repository suite:
 
