@@ -6,6 +6,10 @@
 
 Design authorization: `WELLPLOT-NLP-D3-DESIGN-001`
 
+Design rework authorization: `WELLPLOT-NLP-D3-DESIGN-REWORK-001`
+
+Rework parent: `92026e1cfa89f6ec5e5761cff37126252108b2c9`
+
 Input baseline: `694f0121c11e21d1baa7a01dcae52045cfa4dd28` (`WELLPLOT_NLP_D2E_ACCEPTED`)
 
 Design branch: `delivery/nlp-d3-cbl-construction-design`
@@ -151,33 +155,49 @@ Keep the cased-hole scaffold intact.
 Keep the section ids main_pass and repeat_pass.
 ```
 
-The scaffold may own only mechanically stable packet structure that is not the scientist's requested scientific plot content.
+The canonical model requires every `AuthoringSectionSpec` to contain at least one track. Therefore a section shell with `tracks: []` is not a valid D3 seed and is explicitly rejected by this design.
+
+The minimum valid scaffold owns only mechanically stable packet structure that is not the scientist's requested scientific binding content.
 
 ## Scaffold may provide
 
 - cased-hole header slot structure;
 - page/depth/output defaults;
 - tail scaffold;
-- exactly two ordered section shells:
+- exactly two ordered source-bearing section shells:
   - `main_pass`
   - `repeat_pass`;
 - section titles:
   - `Main Pass`
   - `Repeat Pass`;
-- each section's declared staged DLIS source.
+- each section's declared staged DLIS source;
+- exactly one structural anchor track per section:
+  - id `combo`
+  - kind `normal`
+  - title `Combo`
+  - width `50 mm`
+  - zero bindings
+  - zero fills.
+
+The `combo` anchor exists only because the canonical section contract requires at least one track and because `combo` is the requested first final track. It must contain no scientific curve content before the public request.
 
 ## Scaffold must NOT provide
 
 - requested header values;
 - requested service-title values;
 - requested remarks;
-- any of the requested four tracks;
+- any combo curve binding;
+- the requested `depth` track;
+- the requested `cbl` track;
+- the requested `vdl` track;
 - any curve binding;
 - any raster binding;
 - any requested CBL duplication;
-- any requested scientific presentation settings.
+- any requested VDL presentation settings.
 
-Thus the one public request must perform the scientifically substantial construction.
+Thus D3 does **not** claim that the request creates eight tracks from zero. It proves that one scientist request transforms two minimal valid source-bearing section scaffolds containing only structural `combo` anchors into the complete two-section CBL/VDL packet.
+
+The scientist request remains responsible for all 20 scientific bindings and for creating the remaining six tracks.
 
 ---
 
@@ -189,26 +209,54 @@ Build the test-local scaffold from the stable report structure in:
 tests/fixtures/agentic_cbl/base.template.yaml
 ```
 
-Do not modify that historical fixture.
+Do not modify that historical fixture merely to seed D3.
 
-Create one self-contained test-local source logfile with the template's report/page/depth/tail/header-slot structure and exactly:
+Create one self-contained test-local source logfile with the template's report/page/depth/tail/header-slot structure and exactly two canonical sections.
+
+Conceptually:
 
 ```yaml
 sections:
   - id: main_pass
     title: Main Pass
     data_source: CBL_Main.dlis
-    tracks: []
+    tracks:
+      - id: combo
+        kind: normal
+        title: Combo
+        width_mm: 50
+        bindings: []
 
   - id: repeat_pass
     title: Repeat Pass
     data_source: CBL_Repeat.dlis
-    tracks: []
+    tracks:
+      - id: combo
+        kind: normal
+        title: Combo
+        width_mm: 50
+        bindings: []
 ```
 
 The exact serialized legacy/logfile envelope may follow current normal authoring/logfile conventions.
 
-There must be no starting bindings.
+Before `run()`:
+
+```text
+section count = 2
+
+main_pass tracks   = [combo]
+repeat_pass tracks = [combo]
+
+each combo:
+  kind       = normal
+  title      = Combo
+  width_mm   = 50
+  bindings   = []
+  fills      = []
+
+total bindings = 0
+```
 
 There must be no starting remarks satisfying the frozen prompt.
 
@@ -216,58 +264,109 @@ The scaffold's stable page/output/tail settings remain part of the cased-hole sc
 
 ---
 
-# 7. Real Source Data Requirement
+# 7. Reproducible Real-DLIS Fixture Requirement
 
-D3 must use real renderable DLIS bytes.
+D3 must use real renderable DLIS bytes, but the acceptance inputs must also be reproducible from a clean repository checkout.
 
-Canonical source inputs:
-
-```text
-workspace/data/CBL_Main.dlis
-workspace/data/CBL_Repeat.dlis
-```
-
-The integration test must stage/copy those real files into its test-local project directory as:
+Independent review established that:
 
 ```text
-CBL_Main.dlis
-CBL_Repeat.dlis
+workspace/ is gitignored
+workspace/data/CBL_Main.dlis is not committed
+workspace/data/CBL_Repeat.dlis is not committed
 ```
 
-The source scaffold must declare those staged copies.
+Therefore machine-local `workspace/data` files are **not** an acceptable frozen D3 test dependency.
 
-Before construction, assert both canonical source files exist and are readable.
+## Required future fixture location
 
-If either source file is absent in the implementation environment:
+Before D3 implementation can claim deterministic acceptance, the two real files must become versioned D3 test fixtures at:
+
+```text
+tests/fixtures/agentic_cbl/data/CBL_Main.dlis
+tests/fixtures/agentic_cbl/data/CBL_Repeat.dlis
+```
+
+The implementation must also add:
+
+```text
+tests/fixtures/agentic_cbl/data/manifest.json
+```
+
+containing, for each file:
+
+- exact filename;
+- byte size;
+- SHA-256;
+- provenance/source description;
+- redistribution basis or permission status;
+- expected source format `dlis`;
+- required D3 channel mnemonics.
+
+If the files are too large for ordinary Git policy, Git LFS is the preferred versioned transport and the required `.gitattributes` change becomes part of the D3 implementation scope.
+
+## Provenance / redistribution gate
+
+The existing repository notes describe these as public or repository-provided demonstration data but also instruct users to confirm provenance and redistribution rights.
+
+D3 must not silently convert that ambiguity into a committed binary fixture.
+
+Before committing the fixture bytes, the implementation operator must establish and record a redistribution basis sufficient for the repository's test use.
+
+If redistribution cannot be established:
 
 ```text
 STOP
 ```
 
+and request a data-fixture governance decision. Do not substitute machine-local acceptance.
+
+## Fixture integrity
+
+The D3 integration test must:
+
+1. load the manifest;
+2. SHA-256 both versioned files;
+3. require exact manifest matches;
+4. copy them into the test-local project as:
+   - `CBL_Main.dlis`
+   - `CBL_Repeat.dlis`;
+5. require real source inspection and real rendering from those copied bytes.
+
+The scaffold declares only the staged test-local filenames.
+
 Do not:
 
-- replace them with text placeholders;
+- use `workspace/data` as the acceptance source;
+- replace the files with text placeholders;
 - fake the source loader;
 - mock the renderer;
-- skip the D3 acceptance test;
-- silently use another source file.
+- skip the D3 acceptance test when fixtures are absent;
+- silently fetch unpinned mutable URLs;
+- accept a hash mismatch.
 
-Request a data-fixture/scope decision instead.
-
-The final render must therefore exercise the real DLIS loader and real deterministic renderer.
+After D3 implementation is complete, a clean clone with its versioned fixture transport must be sufficient to execute D3 without workstation-specific files.
 
 ---
 
 # 8. Preflight: Scaffold Must Not Already Satisfy D3
 
-Before the public `run()` call, inspect the scaffold and prove it is incomplete.
+Before the public `run()` call, inspect the scaffold and prove it is scientifically incomplete.
 
 At minimum:
 
 ```text
-main_pass tracks = []
-repeat_pass tracks = []
-bindings = 0
+main_pass tracks   = [combo]
+repeat_pass tracks = [combo]
+
+main combo bindings   = 0
+repeat combo bindings = 0
+
+depth track absent
+cbl track absent
+vdl track absent
+
+total bindings = 0
 requested remarks absent
 requested service-title values not already complete
 ```
@@ -288,11 +387,11 @@ CBL-08
 
 and should fail other content dimensions that depend on the requested values.
 
-This prevents D3 from passing by seeding the final answer.
+This prevents D3 from passing by seeding the final scientific answer while still respecting the canonical requirement that every section begin with at least one track.
 
 ---
 
-# 9. Frozen Deterministic Plan
+# 9. Frozen Deterministic Plan and Semantic Ownership
 
 D3 deterministic acceptance uses zero provider/model calls.
 
@@ -319,13 +418,25 @@ repeat_pass
 
 The planner source summary must expose two source labels corresponding to the staged filenames.
 
+The D3 planner fixture must prove **semantic decomposition**, not merely return three work units. Scientific values must be present in the task that owns them because workers receive isolated task payloads.
+
 ## Report task
 
 ```text
 capability_ids = ("report.standard",)
 ```
 
-Requirements contain the exact normalized scientist request.
+The report task requirements must contain only report-wide scientist semantics:
+
+- the three service titles;
+- all requested general header values;
+- the requested run/logging detail values;
+- the three requested remarks and their required phrases;
+- the instruction to keep the supported packet boundary and not invent unsupported vendor-only content.
+
+The report task must not carry combo/depth/CBL/VDL track construction requirements.
+
+The deterministic report backend must assert its actual `ReportTask.requirements` contains the frozen report semantic set before emitting a program.
 
 ## Main section task
 
@@ -342,6 +453,33 @@ capabilities:
   binding.raster
 ```
 
+Its `requirements` must independently preserve the complete local scientific contract:
+
+- preserve/use the existing `combo` anchor as the first 50 mm normal track;
+- add `depth` as a 10 mm reference track;
+- add `cbl` as a 44 mm normal track;
+- add `vdl` as a 48 mm array track with x-scale 200-1200;
+- combo curves:
+  - ECGR_STGC, full label, scale 0-150, green, width 0.8;
+  - TT, full label, scale 200-400 reverse, blue, width 0.75;
+  - TENS, full label, scale 5000-0, dark, dashed, width 0.65;
+  - MTEM, full label, scale 100-500, dark, width 0.9;
+- depth/reference curves:
+  - STIT, full label, 0-50, dark, width 0.65;
+  - TDSP, label `Cable Drag`, 0-50, brown, dotted, width 0.65;
+  - VSEC, label `Tool_Tot. Drag`, 0-50, blue, dashed, width 0.65;
+- two distinct CBL bindings to channel `CBL`, both with the full CBL label:
+  - 0-100 dark width 0.75;
+  - 0-10 blue dashed width 0.65;
+- VDL raster:
+  - channel VDL;
+  - full requested label;
+  - profile vdl;
+  - colormap gray_r;
+  - hidden vertical main and secondary grid lines;
+  - colorbar enabled, label Amplitude, position header;
+  - sample axis enabled, unit us, 200-1200, 7 ticks, origin 40, step 10.
+
 ## Repeat section task
 
 ```text
@@ -355,6 +493,35 @@ capabilities:
   track.array
   binding.curve
   binding.raster
+```
+
+The repeat task must carry the same complete local scientific requirements independently. It may not rely on the main task, report task, sibling worker, external call order, or a test-global CBL answer object.
+
+## Required planner-to-worker chain of custody
+
+The deterministic section backend must parse the actual serialized `section_task` in its `ProgramGenerationRequest` and assert that the local frozen semantic values above are present before returning any controlled program.
+
+The backend may use test constants to **verify** the received semantic payload. It must not use those constants as a substitute for missing planner semantics.
+
+Therefore this is forbidden:
+
+```text
+task says only "build CBL section"
++
+test backend knows the golden packet
++
+backend emits full packet anyway
+```
+
+The accepted chain must be:
+
+```text
+scientist request
+-> planner-owned task-local semantics
+-> isolated worker task payload
+-> host-grounded source/track context
+-> restricted program
+-> canonical intent
 ```
 
 The two tasks must remain distinct and ordered main then repeat.
@@ -512,14 +679,39 @@ Preserving those defaults is part of the "keep the cased-hole scaffold intact" c
 
 # 13. Section Construction Contract
 
-Each section worker targets one existing empty section shell using:
+Each section worker targets one existing section shell:
 
 ```python
 report = wp.report()
 section = wp.target_section(report)
 ```
 
-Then it constructs exactly four tracks in this order:
+The existing `combo` anchor is host-owned structure and must be selected through grounded existing-track evidence:
+
+```python
+combo = wp.target_track(section, track_id="combo")
+```
+
+The worker then adds the four requested combo curve bindings to that existing track.
+
+It creates exactly three new tracks after the anchor, in this order:
+
+```text
+depth
+cbl
+vdl
+```
+
+Final track contract on both sections:
+
+| Track | Origin | Kind | Width |
+| --- | --- | --- | ---: |
+| combo | existing structural anchor | normal | 50 mm |
+| depth | D3 request | reference | 10 mm |
+| cbl | D3 request | normal | 44 mm |
+| vdl | D3 request | array | 48 mm |
+
+The final canonical order must be:
 
 ```text
 combo
@@ -528,20 +720,15 @@ cbl
 vdl
 ```
 
-Track contract on both sections:
-
-| Track | Kind | Width |
-| --- | --- | ---: |
-| combo | normal | 50 mm |
-| depth | reference | 10 mm |
-| cbl | normal | 44 mm |
-| vdl | array | 48 mm |
-
 No fifth track.
 
 No reordered track.
 
+No duplicate `combo` track.
+
 No track may be created in the sibling section.
+
+D3 must explicitly prove that the existing anchor remained the same canonical track identity and acquired exactly the four requested combo bindings.
 
 ---
 
@@ -733,41 +920,61 @@ These values must be explicit canonical output, not renderer-only defaults.
 
 ---
 
-# 18. Known Code Mode Representability Gap
+# 18. Known Code Mode Representability Gaps
 
-At frozen D2E baseline, canonical models already represent all D3 VDL settings.
+At frozen D2E baseline, canonical models already represent all requested D3 scientific output, but two bounded worker-surface gaps remain.
 
-`IntentBuilder.add_raster()` already accepts typed colorbar/sample-axis objects.
+## A. VDL executable SDK bridge
+
+`IntentBuilder.add_raster()` already accepts typed colorbar/sample-axis objects, and canonical tracks already carry grid intent.
 
 The missing layer is the executable authoring-program vocabulary.
 
-Current `wp.raster(...)` runtime accepts:
-
-```text
-channel
-id_hint
-label
-profile
-normalization
-color_minimum
-color_maximum
-colormap
-alpha
-```
-
-It does not expose the requested colorbar/sample-axis fields.
+Current `wp.raster(...)` does not expose the requested colorbar/sample-axis fields.
 
 Current `wp.track(...)` can express x-scale but not the requested VDL vertical-grid visibility.
 
-Therefore D3 is expected to require a bounded Code Mode SDK bridge.
+## B. Empty-anchor existing-track grounding
 
-This is a known design finding, not implementation authorization.
+D3 now uses a minimum valid existing `combo` anchor with zero bindings.
+
+The private builder already seeds existing track IDs from the canonical document and can enforce `wp.target_track(...)` ownership.
+
+However the worker prompt currently exposes grounded existing **curves**, not an empty existing-track inventory. A worker therefore cannot legitimately discover/select the anchor from its bounded prompt.
+
+D3 requires a local `program_worker.py` context bridge that derives the selected section's existing track inventory directly from the canonical `document` and host-selected `section_context.section_id`.
+
+The projection must be bounded to:
+
+```text
+track_id
+title
+kind
+width_mm
+binding_ids
+```
+
+For the D3 seed each worker must observe exactly one existing track:
+
+```text
+track_id    = combo
+title       = Combo
+kind        = normal
+width_mm    = 50
+binding_ids = []
+```
+
+This projection must be added to the worker prompt/SDK reference and repair context as host-grounded evidence.
+
+Do not modify `enrichment.py` merely to transport this document-owned track fact; `ProgramSectionCompiler.compile(...)` already owns both the canonical document and host-resolved section target.
+
+These are known design findings, not implementation authorization.
 
 ---
 
-# 19. Frozen SDK Extension Design
+# 19. Frozen Worker-Surface Extension Design
 
-Future D3 implementation should extend only the narrow authoring-program vocabulary needed by the already supported canonical models.
+Future D3 implementation should extend only the narrow worker/authoring-program surfaces needed by already-supported canonical models.
 
 ## wp.track additions
 
@@ -817,9 +1024,33 @@ Do not expose generic object construction.
 
 Do not let programs set fields outside this frozen vocabulary.
 
+## Existing-track worker projection
+
+Inside `program_worker.py`, derive the host-selected section's existing tracks from the canonical document and serialize only:
+
+```text
+track_id
+title
+kind
+width_mm
+binding_ids
+```
+
+into:
+
+- the initial worker prompt's bounded section context;
+- the executable SDK reference;
+- bounded repair context.
+
+The SDK reference must explicitly identify those IDs as the only grounded values valid for `wp.target_track(section, track_id=...)`.
+
+No generic track search, fuzzy title matching, or document serialization is authorized.
+
+For D3, the deterministic backend must prove that `combo` appears in this actual host-grounded inventory before emitting `wp.target_track(section, track_id="combo")`.
+
 ---
 
-# 20. Expected Production Change Boundary
+# 20. Expected Production and Fixture Change Boundary
 
 Expected D3 production files:
 
@@ -830,10 +1061,29 @@ src/wellplot/agent/code_mode/program_worker.py
 
 Purpose:
 
-- map the frozen flat SDK keywords into already-supported typed canonical intent;
-- advertise those exact keywords in the section worker executable SDK reference.
+- map the frozen flat grid/raster SDK keywords into already-supported typed canonical intent;
+- advertise those exact keywords in the section worker executable SDK reference;
+- expose the bounded host-grounded existing-track inventory from the selected section.
 
 No other production file is expected to change.
+
+Expected D3 fixture/provenance files:
+
+```text
+tests/fixtures/agentic_cbl/data/CBL_Main.dlis
+tests/fixtures/agentic_cbl/data/CBL_Repeat.dlis
+tests/fixtures/agentic_cbl/data/manifest.json
+```
+
+If Git LFS is required:
+
+```text
+.gitattributes
+```
+
+is additionally expected solely to version the D3 binary fixtures reproducibly.
+
+The fixture bytes/provenance gate must be satisfied before the integrated D3 test can claim acceptance.
 
 In particular, D3 does not expect changes to:
 
@@ -856,7 +1106,7 @@ If any of those become necessary, future implementation must STOP for scope revi
 
 ---
 
-# 21. Required SDK Regression Evidence
+# 21. Required Worker/SDK Regression Evidence
 
 A future implementation must add deterministic lower-level tests proving:
 
@@ -903,11 +1153,44 @@ sample_axis_source_step=10
 
 produces the exact canonical sample-axis object.
 
+## Existing-track projection
+
+A program-worker test must provide an existing selected section containing an empty `combo` track and prove the worker request exposes:
+
+```text
+combo
+Combo
+normal
+50
+[]
+```
+
+through the bounded existing-track inventory and executable SDK reference.
+
+It must also prove a track from a sibling section is not exposed as selectable context for the current worker.
+
+## Existing-anchor execution
+
+A restricted section program must be able to:
+
+```python
+report = wp.report()
+section = wp.target_section(report)
+combo = wp.target_track(section, track_id="combo")
+wp.curve(combo, channel="ECGR_STGC", ...)
+```
+
+and dry-run successfully when `combo` is the exact grounded existing track.
+
+An ungrounded track ID must remain rejected.
+
 ## Backward compatibility
 
-Existing programs that omit these arguments must retain their existing intent semantics.
+Existing programs that omit the new grid/raster arguments must retain their existing intent semantics.
 
-No implicit D3 values may be inserted for unrelated raster programs.
+Existing workers without an empty structural anchor must retain their existing behavior.
+
+No implicit D3 values may be inserted for unrelated programs.
 
 ---
 
@@ -917,17 +1200,24 @@ The future D3 deterministic section backend must parse the actual structured wor
 
 Before returning a program, it must assert:
 
+- the local `section_task.requirements` carries the complete frozen scientific semantics for that section;
 - target kind is `existing`;
 - exactly one source is scoped to the task;
 - the source contains all required real inspected channels;
 - the selected capability inventory includes the needed track/binding categories;
-- the executable SDK reference advertises the frozen D3 grid/raster additions.
+- the bounded existing-track inventory contains exactly the expected local `combo` anchor;
+- the executable SDK reference advertises:
+  - `wp.target_track` for the grounded combo identity;
+  - the frozen D3 grid additions;
+  - the frozen D3 raster colorbar/sample-axis additions.
 
-Then it may emit the controlled section program.
+Only after those checks may it emit the controlled program.
 
 The backend must route main vs repeat from the actual task semantics / source hint, not merely an external call counter.
 
-The two section programs may share the same scientific track/binding program because the host supplies different section targets and selected sources.
+The two section programs may share a code-generation helper because their local scientific specifications are equivalent, but each backend invocation must independently prove its own task payload and own selected source.
+
+The backend must not fill missing planner semantics from a global golden answer object.
 
 ---
 
@@ -1102,19 +1392,43 @@ Future D3 implementation must include bounded checks preventing false acceptance
 
 ## A. Starting artifact is incomplete
 
-The source scaffold must not already contain requested tracks/bindings/remarks.
+The source scaffold must contain only the structural `combo` anchor per section.
 
-## B. Exact worker count
+Before `run()`:
+
+```text
+combo bindings = 0
+depth absent
+cbl absent
+vdl absent
+requested remarks absent
+```
+
+## B. Task-local semantic chain
+
+The report backend must fail the test if report semantics are missing from the actual report task.
+
+Each section backend must fail before program emission if any frozen local scientific semantic is missing from the actual `section_task.requirements`.
+
+A hard-coded golden section program may not compensate for an under-specified planner task.
+
+## C. Grounded existing anchor
+
+Each section worker must prove that the local `combo` track came from the host-grounded existing-track inventory.
+
+The worker may not invent/select `combo` solely because the request text contains that word.
+
+## D. Exact worker count
 
 Exactly three successful workers.
 
 No hidden fourth construction worker.
 
-## C. Source isolation
+## E. Source isolation
 
 Main and repeat workers must not see/use the sibling source as their selected source.
 
-## D. Binding multiplicity
+## F. Binding multiplicity
 
 On each section:
 
@@ -1131,7 +1445,7 @@ Total per section:
 10 bindings
 ```
 
-## E. Repeated channel identity
+## G. Repeated channel identity
 
 Two CBL bindings:
 
@@ -1141,13 +1455,13 @@ different binding IDs
 different requested scales/styles
 ```
 
-## F. No generic-label collapse
+## H. No generic-label collapse
 
 Full scientist labels must persist exactly.
 
 Do not accept generic aliases such as `GR` or `CBL` when the request supplies the full label.
 
-## G. VDL exactness
+## I. VDL exactness
 
 The test must independently assert the requested:
 
@@ -1160,7 +1474,13 @@ The test must independently assert the requested:
 
 This protects against accidental verifier drift.
 
-## H. No post-run repair
+## J. Versioned source integrity
+
+The integration test must verify the manifest SHA-256 and byte size for both real DLIS fixtures before staging them.
+
+A missing fixture or hash mismatch is a failure, not a skip.
+
+## K. No post-run repair
 
 Capture final logfile bytes after `run()`.
 
@@ -1189,7 +1509,7 @@ Do not turn D3 into a model-selection experiment.
 
 # 30. Expected Future Implementation Scope
 
-Subject to independent design review, expected implementation scope is:
+Subject to independent design closure review, expected implementation scope is:
 
 ```text
 src/wellplot/authoring_program/intent_builder.py
@@ -1201,7 +1521,21 @@ tests/test_code_mode_program_worker.py
 
 tests/test_nlp_d3_cbl_construction.py
 docs/nlp-d3-cbl-construction-result.md
+
+tests/fixtures/agentic_cbl/data/CBL_Main.dlis
+tests/fixtures/agentic_cbl/data/CBL_Repeat.dlis
+tests/fixtures/agentic_cbl/data/manifest.json
 ```
+
+If Git LFS is required for those binary fixtures, also:
+
+```text
+.gitattributes
+```
+
+Before any future implementation authorization is treated as executable, the operator must confirm that the two real DLIS inputs are available and that their redistribution basis is documented sufficiently to create the versioned fixtures.
+
+If that prerequisite cannot be met, implementation must STOP at the data-fixture gate rather than producing a local-only D3 result.
 
 An implementation authorization may narrow or amend this set after review.
 
@@ -1297,11 +1631,16 @@ STOP and request architecture/scope review if D3 requires:
 
 Also STOP if:
 
-- either real CBL DLIS source is unavailable;
+- real CBL DLIS fixture provenance/redistribution cannot be established;
+- the versioned fixture bytes cannot be provided from a clean checkout;
+- either manifest hash does not match its fixture;
 - real source inspection does not expose a requested channel;
 - the report scaffold lacks a required semantic header/detail slot;
+- the minimum valid scaffold cannot retain one empty `combo` anchor per section;
+- the bounded existing-track projection cannot ground that anchor without wider context architecture changes;
 - the bounded SDK bridge cannot express the VDL requirements without wider architecture changes;
-- final diff/packet contains extra tracks, bindings, or sections;
+- a section task does not carry the complete local scientific semantics and the backend would need to reconstruct them from external constants;
+- final packet contains extra tracks, bindings, or sections;
 - the one-shot public call cannot produce all nine CBL requirements.
 
 ---
@@ -1342,12 +1681,33 @@ Record:
 - source-line normalization;
 - exact public API call.
 
+## Fixture provenance
+
+For both versioned DLIS fixtures:
+
+- repository fixture path;
+- byte size;
+- SHA-256;
+- provenance description;
+- redistribution basis;
+- clean-checkout availability.
+
 ## Scaffold
 
 - section IDs/order;
-- empty starting tracks;
+- exact starting `combo` anchor identity/kind/width on each section;
+- zero starting bindings;
+- absent depth/cbl/vdl tracks;
 - source basenames;
 - preflight verifier failure/incompleteness.
+
+## Planner semantic decomposition
+
+- one report task with exact report-local semantic requirement evidence;
+- one main task with complete main-local scientific requirements;
+- one repeat task with complete repeat-local scientific requirements;
+- source hints per task;
+- proof that section workers do not depend on report/sibling semantics.
 
 ## Source grounding
 
@@ -1357,17 +1717,28 @@ For main and repeat:
 - inspected channel set;
 - source format.
 
+## Existing-track grounding
+
+For main and repeat:
+
+- worker-visible bounded track inventory;
+- exact `combo` anchor evidence;
+- absence of sibling track leakage.
+
 ## Report worker
 
 - approved header/detail/service slots;
+- report-task semantic assertions;
 - program generation count;
 - repair count;
 - report mutation categories.
 
 ## Main worker
 
+- task-local semantic assertion;
 - selected source;
 - channel inventory;
+- grounded combo anchor;
 - track/binding program;
 - repair count.
 
@@ -1389,6 +1760,7 @@ submitted intent ownership
 
 - section order;
 - track order;
+- preserved combo anchor identities;
 - binding multiplicity;
 - duplicate CBL IDs;
 - source basenames;
@@ -1420,6 +1792,63 @@ document_sha256
 ---
 
 # 34. Design Decision
+
+`WELLPLOT-NLP-D3-DESIGN-001`
+
+Reworked under:
+
+```text
+WELLPLOT-NLP-D3-DESIGN-REWORK-001
+```
+
+Selected approach:
+
+One deterministic public `DirectNotebookSession.run()` reconstruction from a deliberately incomplete but canonically valid cased-hole source scaffold, using the established substantial CBL request and two reproducibly versioned real DLIS fixtures.
+
+Each source-bearing section begins with only one empty structural `combo` anchor. The scientist request supplies all scientific bindings and creates the remaining `depth`, `cbl`, and `vdl` tracks.
+
+The planner fixture must decompose the scientist request into task-local semantic requirements. Report, main, and repeat workers may act only on semantics actually present in their isolated task payloads.
+
+Known implementation gaps are bounded to:
+
+1. executable SDK exposure for already-supported VDL grid, colorbar, and sample-axis semantics;
+2. a host-grounded existing-track projection inside `program_worker.py` so an empty existing `combo` anchor can be selected safely.
+
+Expected architecture impact:
+
+```text
+small / local
+```
+
+Expected renderer/reconciler/schema/enrichment impact:
+
+```text
+none
+```
+
+Data prerequisite:
+
+The two real CBL DLIS inputs must become reproducibly versioned D3 fixtures with SHA-256/provenance/redistribution metadata. If that prerequisite cannot be satisfied, D3 implementation must stop.
+
+Evidence class:
+
+```text
+INTEGRATED DETERMINISTIC CONSTRUCTION ACCEPTANCE
+```
+
+Reversible: yes.
+
+Next gate:
+
+Independent closure review of this reworked D3 design and explicit design acceptance.
+
+D3 implementation remains unauthorized until that gate passes.
+
+D4 remains unauthorized.
+
+---
+
+
 
 `WELLPLOT-NLP-D3-DESIGN-001`
 
