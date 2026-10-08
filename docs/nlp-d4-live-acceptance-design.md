@@ -2,7 +2,7 @@
 
 ## Status
 
-`DESIGN_ONLY / HARNESS_NOT_AUTHORIZED / LIVE_INFERENCE_NOT_AUTHORIZED`
+`DESIGN_REWORK_PENDING_REVIEW / HARNESS_NOT_AUTHORIZED / LIVE_INFERENCE_NOT_AUTHORIZED`
 
 Design authorization:
 
@@ -14,6 +14,12 @@ Design rework authorization:
 
 ```text
 WELLPLOT-NLP-D4-DESIGN-REWORK-001
+```
+
+Current design rework authorization:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-REWORK-002
 ```
 
 Rework parent:
@@ -1410,6 +1416,165 @@ does not itself switch production routing or publish a release.
 It establishes evidence for a later explicit release/promotion decision.
 
 Production promotion remains separately governed.
+
+# 32. D4 Design Rework 002 — Real LAS Population Correction
+
+Status:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-REWORK-002 / PROVIDER_FREE_REVIEW_PENDING
+```
+
+This section is the authoritative replacement for the LAS-specific portions of
+Sections 7, 8, 11, 12, 13, and 14 above. It does not authorize D4A
+implementation, provider construction, credentials, or live inference. The
+CBL population and all non-source D4 controls remain unchanged.
+
+## 32.1 Source decision
+
+The original `CBL_Main_REV1.las` contract is superseded because the real file
+does not contain `GR`, `CALI`, or `RT`. The selected real source is:
+
+```yaml
+path: workspace/data/30-23a-3 8117_d.las
+basename: 30-23a-3 8117_d.las
+size: 5987785
+sha256: 7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9
+parse: PASS
+```
+
+The complete channel inventory observed through the repository LAS loader is:
+
+```text
+CAL, CALI, CGR, DRHO, DT, DTL, GR, GRD, ILD, ILM, MSFL,
+NPHI, PEF, POTA., RHOB, SFLU, SP, THOR, URAN
+```
+
+The source depth range is `336.5..10242.5 FT`. The proposed ambiguity windows
+are valid and non-overlapping at their boundaries:
+
+```yaml
+upper:
+  minimum_ft: 8400
+  maximum_ft: 9300
+  observed_samples: 1801
+lower:
+  minimum_ft: 9300
+  maximum_ft: 10200
+  observed_samples: 1801
+```
+
+The source is external, local, gitignored, and must not be committed or copied
+into Git. The source contract is intentionally mnemonic-exact:
+
+```yaml
+GR: present
+CALI: present
+ILD: present
+ILM: present
+MSFL: present
+NPHI: present
+RT: absent
+```
+
+No `ILD`, `ILM`, or `MSFL` value is an alias for `RT` in this contract.
+
+## 32.2 Revised LAS seed
+
+The LAS seed is one deterministic section backed by the selected source:
+
+```yaml
+title: Original Well Log Report
+section_id: main
+section_title: Main Log
+source_basename: 30-23a-3 8117_d.las
+tracks:
+  - depth
+  - gr
+  - porosity
+gr:
+  binding: GR
+  label: Gamma Ray
+  scale: {kind: linear, minimum: 0.0, maximum: 100.0}
+  fills: []
+porosity:
+  binding: NPHI
+  label: Neutron Porosity
+  scale: {kind: linear, minimum: 0.0, maximum: 45.0}
+resistivity_qc_track: absent
+```
+
+The complete seed must preserve deterministic source, section, track, binding,
+label, scale, and style state. It must not preload the later ILD QC track or GR
+fill. Gold is derived from this seed before any future provider construction.
+
+## 32.3 Revised LAS requests and gold
+
+The CBL request remains byte-for-byte unchanged. The four L01 requests retain
+their successive-revision semantics; L01-T3 now uses the real `ILD` channel and
+its established logarithmic scale. L02 preserves the two-section ambiguity and
+clarification. L03 tests explicit missing-source custody even though `NPHI` is
+available in the valid source. L04 tests the absence of `RT` and forbids
+substitution by `ILD`, `ILM`, or `MSFL`.
+
+```yaml
+D4-L01:T1: "Rename this report \"Formation Integrity Review\". Do not alter the plotted sections."
+D4-L01:T2: "In Main Log, set the Gamma Ray curve to a linear 5–125 scale. Leave its label and styling unchanged."
+D4-L01:T3: "Append a 30 mm normal track named \"Resistivity QC\" to Main Log. Plot ILD on it as \"Resistivity QC\" with a logarithmic 0.2–2000 scale."
+D4-L01:T4: "On Main Log's GR track, fill from the Gamma Ray curve to its lower scale boundary with #f2e8a0 at 20% opacity; preserve everything else."
+D4-L02:T1: "In Main Log, change the Gamma Ray curve to a linear 20–110 scale."
+D4-L02:T2: "Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper."
+D4-L03:C01: "In Main Log, add a 24 mm normal track titled \"Neutron QC\" and plot NPHI from missing_neutron.las on it with a linear 0–45 scale."
+D4-L04:C01: "In Main Log, add a 24 mm normal track titled \"Resistivity Alias QC\" and plot RT from \"30-23a-3 8117_d.las\" on it with a logarithmic 0.2–2000 scale."
+```
+
+Expected outcomes remain `DIRECT_CORRECT` for all four L01 turns,
+`SAFE_ACTIONABLE_FAILURE` for L02-T1, `CORRECT_AFTER_CLARIFICATION` for
+L02-T2, and `SAFE_ACTIONABLE_FAILURE` for L03 and L04. L03 must not fall back
+from `missing_neutron.las` to the valid source. L04 must not create a track or
+binding and must not substitute `ILD`, `ILM`, `MSFL`, or any other channel for
+the requested `RT`.
+
+## 32.4 Recomputed request identities
+
+Normalized hashes use the existing D4 newline/trailing-space normalization. The
+following nine values are frozen by this rework and must be reproduced by D4A:
+
+```yaml
+D4-C01:C01: 5ef3a1e528b2e539dcd895ec09767547151a7706eff911a99cc050c61d7d8f3c
+D4-L01:T1: 0ffe99d4e0131f2649370730e913cd5147f73dccff24ed0f2d1ce928b2f41a34
+D4-L01:T2: 866ff67469139034c2062f1c668283c5532d0fc69fd711ed8e55e6c71d12d5f8
+D4-L01:T3: 49405cb494cc3cead9cc015c99ef6e0e048583d716be3421930c39d995b95136
+D4-L01:T4: 0819dd6cb0964cc61752c96682aa4fa2b8924c6a47bb57e7897bd0b5ec52557b
+D4-L02:T1: 6bc23defbb254104f567c7a3c2caf33b77ad06f6d0dd124c3dc9b796f3fda541
+D4-L02:T2: eee91c864757d6a4d8f23d906928964318868c8063f5e61e3afba4c794ee32c9
+D4-L03:C01: ee73de7b557d7f624125cb2c469ce0df1d27c9a6a6c0a21545f28bee98d3d237
+D4-L04:C01: bb38915973039b15a8b266b7ca2b7ad6faed2599eb8d8465d60bee662dce7ed6
+```
+
+The population remains exactly five cases, nine turns, one attempt per turn,
+concurrency one, and the original execution order. The logical-call budget
+remains `11 + 20 + 7 + 2 + 5 = 45`; any changed worker envelope stops D4A for
+design review. All configuration, custody, evidence, retry, checkpoint,
+production-identity, and terminal-decision controls remain unchanged.
+
+## 32.5 Governance transition
+
+The previous D4A authorization is suspended and cannot be resumed against this
+amended population:
+
+```yaml
+WELLPLOT-NLP-D4A-AUTH-001: SUSPENDED / SUPERSEDED-PENDING-DESIGN-REWORK
+D4A implementation: NOT AUTHORIZED
+D4B live inference: NOT AUTHORIZED
+provider_calls: 0
+endpoint_calls: 0
+model_calls: 0
+```
+
+After independent acceptance of this design rework, a new D4A implementation
+authorization must be issued from its exact accepted checkpoint. This document
+is the design-only handoff and stops for independent closure review.
 
 ---
 
