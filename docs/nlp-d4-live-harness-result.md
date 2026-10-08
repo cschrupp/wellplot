@@ -5,9 +5,9 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-001
-authorized_parent: 8618c3ef2207236ad50d5fc576cf1c96badbfb95
-rework_parent: 0958f1d5ead027df092b0ce6e6c09e37694348f3
+rework: WELLPLOT-NLP-D4A-REWORK-002
+authorized_parent: f703ae628a233baddc512882ec6f3d0ccd61334c
+rework_parent: f703ae628a233baddc512882ec6f3d0ccd61334c
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
@@ -63,6 +63,13 @@ The harness implements and tests:
 - bounded evidence redaction with no credentials, headers, raw programs, or raw provider payloads;
 - deterministic safe-failure, semantic-failure, and infrastructure decision precedence.
 
+The accepted future-live orchestration is implemented as `run_campaign()`. It
+creates the exclusive STARTED sentinel, binds logical-call custody before the
+first turn, executes the frozen nine-turn order sequentially, dispatches the
+real CBL/LAS graders, appends the complete bounded turn schema, and derives the
+terminal decision without retries or resume behavior. D4A exercises this same
+runner with a deterministic rehearsal context only.
+
 The `CountingBackend` records only operation kind, call index, configured
 provider/model, request controls, bounded outcome/category, and provider usage
 metrics. It never stores generated program text or structured response data.
@@ -71,7 +78,7 @@ metrics. It never stores generated program text or structured response data.
 
 ```yaml
 cases_fixture_sha256: f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298
-gold_fixture_sha256: 795f9280d201ee91365b1575737fa26ca782b65699debf32cf21e020faaf33e2
+gold_fixture_sha256: 99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968
 uv_lock_sha256: 0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6
 production_component_hashes: 21
 ```
@@ -88,6 +95,13 @@ The focused D4A suite uses only fake backends and reports:
 tests/test_nlp_d4_live_acceptance.py: 29 passed
 provider / endpoint / model calls: 0
 ```
+
+The complete fake-provider campaign rehearsal also passes all nine frozen turns
+in the required order. It writes the real campaign state and journal, records
+17 logical calls through custody, invokes the real LAS verifier for every
+positive LAS turn, preserves the redaction boundary, and derives
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED`. The rehearsal reports zero provider,
+endpoint, and model calls; no evaluator gold is sent to a provider prompt.
 
 The provider-free preflight now requires an external authorization record
 before execution. That record supplies the independently accepted D4A

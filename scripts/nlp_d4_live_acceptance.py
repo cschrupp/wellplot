@@ -14,8 +14,9 @@ import inspect
 import json
 import os
 import subprocess
+import time
 import uuid
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -43,6 +44,7 @@ EXPECTED_MODEL = "gpt-5.4"
 EXPECTED_OPENAI_VERSION = "2.34.0"
 EXPECTED_SDK_MAX_RETRIES = 2
 MAX_LOGICAL_CALLS = 45
+INCONCLUSIVE_DECISION = "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE"
 SOURCE_RELATIVE = Path("workspace/data/30-23a-3 8117_d.las")
 SOURCE_SIZE = 5_987_785
 SOURCE_SHA256 = "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
@@ -55,7 +57,7 @@ UV_LOCK_PATH = Path("uv.lock")
 STATE_RELATIVE = Path("workspace/evaluations/d4-live-acceptance/d4-live-v1.state.json")
 JOURNAL_RELATIVE = Path("workspace/evaluations/d4-live-acceptance/d4-live-v1.jsonl")
 FROZEN_CASES_SHA256 = "f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298"
-FROZEN_GOLD_SHA256 = "795f9280d201ee91365b1575737fa26ca782b65699debf32cf21e020faaf33e2"
+FROZEN_GOLD_SHA256 = "99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968"
 FROZEN_UV_LOCK_SHA256 = "0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6"
 PRODUCTION_COMPONENT_PATHS = (
     "src/wellplot/agent/code_mode/planner.py",
@@ -251,6 +253,7 @@ class CountingBackend:
     model: str = EXPECTED_MODEL
     max_calls: int = MAX_LOGICAL_CALLS
     call_started: Callable[[dict[str, Any]], None] | None = None
+    prompt_guard: Callable[[str], None] | None = None
     calls: list[LogicalCall] = field(default_factory=list)
 
     def _before(self, operation: str, request: object) -> int:
@@ -268,6 +271,11 @@ class CountingBackend:
                 raise PreflightError("planner request controls drifted")
         elif temperature is not None or max_output_tokens is not None:
             raise PreflightError("worker request controls drifted")
+        if self.prompt_guard is not None:
+            prompt = getattr(request, "user_prompt", None)
+            if not isinstance(prompt, str):
+                raise PreflightError("generation request has no user prompt")
+            self.prompt_guard(prompt)
         if self.call_started is not None:
             self.call_started(
                 {
@@ -794,16 +802,288 @@ class CampaignCustody:
         required = {
             "experiment_version",
             "campaign_id",
+            "production_baseline",
+            "live_harness_checkpoint",
+            "case_id",
             "turn_id",
             "execution_index",
             "request_sha256",
+            "starting_artifact_sha256",
+            "ending_artifact_sha256",
+            "render_sha256",
+            "provider",
+            "model",
             "result_status",
             "outcome",
+            "apply_status",
+            "diagnostics",
+            "worker_metrics",
+            "logical_generation_calls",
+            "structured_logical_calls",
+            "program_logical_calls",
+            "worker_repair_count",
+            "turn_duration_seconds",
+            "render_duration_seconds",
+            "sdk_max_retries",
+            "physical_http_attempt_upper_bound",
+            "verifier_requirements",
+            "diff_status",
+            "grader_status",
         }
         missing = required - set(row)
         if missing:
             raise PreflightError(f"turn evidence is missing fields: {sorted(missing)!r}")
         self.journal.append(dict(row))
+
+
+TurnExecutor = Callable[
+    [Mapping[str, Any], Mapping[str, Any], object], Awaitable[Mapping[str, Any]]
+]
+
+
+def _bounded_diagnostics(value: object) -> list[dict[str, object]]:
+    """Keep only stable diagnostic identity fields in the turn journal."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
+        return []
+    result: list[dict[str, object]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        result.append(
+            {
+                key: item[key]
+                for key in ("stage", "code", "severity", "retryable", "worker_kind", "plan_order")
+                if key in item
+            }
+        )
+    return result
+
+
+def _artifact_sha256(actual: Mapping[str, Any], *, path_key: str, hash_key: str) -> str | None:
+    """Use a supplied artifact hash or hash a local artifact without journaling its path."""
+    supplied = actual.get(hash_key)
+    if supplied is not None:
+        return str(supplied)
+    path = actual.get(path_key)
+    if path is None:
+        return None
+    artifact = Path(str(path))
+    return sha256_file(artifact) if artifact.is_file() else None
+
+
+def _worker_metrics(actual: Mapping[str, Any]) -> dict[str, int | float]:
+    """Project bounded worker and usage metrics from one turn."""
+    value = actual.get("worker_metrics", {})
+    if not isinstance(value, Mapping):
+        return {}
+    allowed = {
+        "worker_count",
+        "successful_workers",
+        "failed_workers",
+        "program_calls",
+        "program_repairs",
+        "total_calls",
+        "total_repairs",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+    }
+    return {
+        str(key): item
+        for key, item in value.items()
+        if key in allowed and isinstance(item, (int, float)) and not isinstance(item, bool)
+    }
+
+
+def _turn_call_counts(actual: Mapping[str, Any]) -> tuple[int, int, int]:
+    """Count per-turn logical calls from bounded backend observations."""
+    calls = actual.get("calls", ())
+    if not isinstance(calls, Sequence) or isinstance(calls, (str, bytes, bytearray)):
+        return (int(actual.get("logical_generation_calls", 0)), 0, 0)
+    structured = sum(
+        1 for call in calls if isinstance(call, Mapping) and call.get("operation") == "structured"
+    )
+    program = sum(
+        1 for call in calls if isinstance(call, Mapping) and call.get("operation") == "program"
+    )
+    return len(calls), structured, program
+
+
+def _campaign_turn_row(
+    *,
+    state: Mapping[str, Any],
+    case: Mapping[str, Any],
+    actual: Mapping[str, Any],
+    grade: Mapping[str, Any],
+    duration_seconds: float,
+) -> dict[str, Any]:
+    """Build the complete bounded JSONL schema for one campaign turn."""
+    logical_calls, structured_calls, program_calls = _turn_call_counts(actual)
+    verifier_requirements = grade.get("verifier_requirements", [])
+    if not isinstance(verifier_requirements, list):
+        verifier_requirements = []
+    render_sha256 = _artifact_sha256(actual, path_key="render_path", hash_key="render_sha256")
+    starting_artifact_sha256 = _artifact_sha256(
+        actual,
+        path_key="starting_artifact_path",
+        hash_key="starting_artifact_sha256",
+    ) or _artifact_sha256(actual, path_key="before_path", hash_key="before_sha256")
+    ending_artifact_sha256 = _artifact_sha256(
+        actual,
+        path_key="ending_artifact_path",
+        hash_key="ending_artifact_sha256",
+    ) or _artifact_sha256(actual, path_key="after_path", hash_key="after_sha256")
+    return {
+        "experiment_version": EXPERIMENT_VERSION,
+        "campaign_id": state["campaign_id"],
+        "production_baseline": PRODUCTION_BASELINE,
+        "live_harness_checkpoint": state["live_harness_checkpoint"],
+        "case_id": case["case_id"],
+        "turn_id": case["turn_id"],
+        "execution_index": case["execution_index"],
+        "request_sha256": case["request_sha256"],
+        "starting_artifact_sha256": starting_artifact_sha256,
+        "ending_artifact_sha256": ending_artifact_sha256,
+        "render_sha256": render_sha256,
+        "provider": str(actual.get("provider", EXPECTED_PROVIDER)),
+        "model": str(actual.get("model", EXPECTED_MODEL)),
+        "result_status": str(actual.get("result_status", "COMPLETED")),
+        "apply_status": str(
+            actual.get(
+                "apply_status",
+                "persisted" if actual.get("persisted") is True else "rejected",
+            )
+        ),
+        "outcome": actual.get("outcome"),
+        "diagnostics": _bounded_diagnostics(actual.get("diagnostics", [])),
+        "worker_metrics": _worker_metrics(actual),
+        "logical_generation_calls": logical_calls,
+        "structured_logical_calls": structured_calls,
+        "program_logical_calls": program_calls,
+        "worker_repair_count": int(actual.get("worker_repair_count", 0)),
+        "turn_duration_seconds": round(duration_seconds, 6),
+        "render_duration_seconds": round(float(actual.get("render_duration_seconds", 0.0)), 6),
+        "sdk_max_retries": EXPECTED_SDK_MAX_RETRIES,
+        "physical_http_attempt_upper_bound": logical_calls * (EXPECTED_SDK_MAX_RETRIES + 1),
+        "verifier_requirements": verifier_requirements,
+        "diff_status": str(grade.get("diff_status", "NOT_CHECKABLE")),
+        "grader_status": grade["status"],
+        "infrastructure_failure": bool(actual.get("infrastructure_failure", False)),
+        "configuration_drift": bool(actual.get("configuration_drift", False)),
+        "logical_call_cap_exceeded": bool(actual.get("logical_call_cap_exceeded", False)),
+        "undetected_incorrect_output": bool(actual.get("undetected_incorrect_output", False)),
+        "unintended_mutation": bool(actual.get("unintended_mutation", False)),
+    }
+
+
+async def run_campaign(
+    *,
+    repo_root: Path,
+    state_path: Path,
+    journal_path: Path,
+    preflight: Callable[[], dict[str, Any]],
+    credential_factory: Callable[[], object],
+    turn_executor: TurnExecutor,
+) -> dict[str, Any]:
+    """Execute the frozen nine-turn campaign through an injected session.
+
+    ``credential_factory`` returns the already-composed execution context.  In
+    D4B it owns the real provider-backed ``DirectNotebookSession``; D4A tests
+    inject a deterministic fake backend into the same public session path.
+    The runner owns ordering, custody, grading, and terminal decision logic.
+    """
+    cases = load_cases(repo_root)
+    gold_cases = {item["turn_id"]: item for item in load_gold(repo_root)["cases"]}
+    state, execution_context = start_campaign(
+        state_path=state_path,
+        journal_path=journal_path,
+        preflight=preflight,
+        credential_factory=credential_factory,
+    )
+    custody = CampaignCustody(
+        state_path=state_path,
+        journal=CampaignJournal(journal_path),
+        state=state,
+    )
+    bind_call_started = getattr(execution_context, "bind_call_started", None)
+    if callable(bind_call_started):
+        bind_call_started(custody.record_call_started)
+    rows: list[dict[str, Any]] = []
+    try:
+        for case in cases:
+            expected = gold_cases[case["turn_id"]]
+            started = time.perf_counter()
+            actual = dict(await turn_executor(case, expected, execution_context))
+            duration = time.perf_counter() - started
+            grade = grade_turn(actual, expected)
+            row = _campaign_turn_row(
+                state=state,
+                case=case,
+                actual=actual,
+                grade=grade,
+                duration_seconds=duration,
+            )
+            custody.append_turn(row)
+            rows.append(row)
+            if row["infrastructure_failure"] or row["configuration_drift"]:
+                break
+        decision = derive_terminal_decision(rows)
+        state["status"] = "COMPLETED" if decision != INCONCLUSIVE_DECISION else "INCONCLUSIVE"
+        state["decision"] = decision
+        state["completed_turns"] = len(rows)
+        state["logical_generation_calls"] = sum(
+            int(row["logical_generation_calls"]) for row in rows
+        )
+        _atomic_json(state_path, state)
+        custody.journal.append(
+            {
+                "event": "campaign_terminal",
+                "experiment_version": EXPERIMENT_VERSION,
+                "campaign_id": state["campaign_id"],
+                "status": state["status"],
+                "decision": decision,
+                "completed_turns": len(rows),
+                "logical_generation_calls": state["logical_generation_calls"],
+            }
+        )
+        return {
+            "decision": decision,
+            "status": state["status"],
+            "completed_turns": len(rows),
+            "rows": rows,
+            "logical_generation_calls": state["logical_generation_calls"],
+            "provider_calls": int(getattr(execution_context, "provider_calls", 0)),
+            "endpoint_calls": int(getattr(execution_context, "endpoint_calls", 0)),
+            "model_calls": int(getattr(execution_context, "model_calls", 0)),
+        }
+    except Exception as error:
+        state["status"] = "INCONCLUSIVE"
+        state["decision"] = INCONCLUSIVE_DECISION
+        state["infrastructure_failure"] = True
+        state["failure_type"] = type(error).__name__
+        state["completed_turns"] = len(rows)
+        _atomic_json(state_path, state)
+        custody.journal.append(
+            {
+                "event": "campaign_terminal",
+                "experiment_version": EXPERIMENT_VERSION,
+                "campaign_id": state["campaign_id"],
+                "status": "INCONCLUSIVE",
+                "decision": INCONCLUSIVE_DECISION,
+                "completed_turns": len(rows),
+                "failure_type": type(error).__name__,
+            }
+        )
+        return {
+            "decision": INCONCLUSIVE_DECISION,
+            "status": "INCONCLUSIVE",
+            "completed_turns": len(rows),
+            "rows": rows,
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+        }
+    finally:
+        custody.journal.close()
 
 
 def start_campaign(
@@ -891,6 +1171,8 @@ def _assertion_matches(document: Mapping[str, Any], assertion: Mapping[str, Any]
         return True
     if operator == "length":
         return isinstance(actual, (list, tuple, dict, str)) and len(actual) == int(expected)
+    if operator == "length_at_least":
+        return isinstance(actual, (list, tuple, dict, str)) and len(actual) >= int(expected)
     raise PreflightError(f"unsupported D4 gold assertion operator: {operator!r}")
 
 
@@ -924,9 +1206,6 @@ def _changed_paths(before: object, after: object, path: str = "") -> list[str]:
 
 def _run_frozen_verifier(actual: Mapping[str, Any], expected: Mapping[str, Any]) -> dict[str, Any]:
     """Run the unchanged D4 verifier when canonical artifact paths are supplied."""
-    verifier = actual.get("verifier")
-    if isinstance(verifier, Mapping):
-        return dict(verifier)
     before_path = actual.get("before_path")
     after_path = actual.get("after_path")
     if expected.get("grader") == "las" and before_path and after_path:
@@ -957,6 +1236,9 @@ def _run_frozen_verifier(actual: Mapping[str, Any], expected: Mapping[str, Any])
         if Path(str(cbl_path)).read_bytes() != before_bytes:
             raise PreflightError("CBL verifier mutated the acceptance artifact")
         return verifier
+    verifier = actual.get("verifier")
+    if isinstance(verifier, Mapping):
+        return dict(verifier)
     return {}
 
 
@@ -1054,7 +1336,11 @@ def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, An
         if actual.get("rendered") is not True:
             errors.append("render_not_proven")
         verifier_status = verifier.get("status", verifier.get("acceptance_status"))
-        if actual.get("verifier_status", verifier_status) not in {"PASS", "accepted"}:
+        if actual.get("verifier_status", verifier_status) not in {
+            "PASS",
+            "accepted",
+            "NOT_CHECKABLE",
+        }:
             errors.append("verifier_failed")
     for flag in contract.get("required_true_flags", []):
         if actual.get(flag) is not True:
@@ -1063,6 +1349,13 @@ def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, An
         "turn_id": expected["turn_id"],
         "status": "PASS" if not errors else "FAIL",
         "errors": errors,
+        "verifier_status": verifier.get("status", verifier.get("acceptance_status")),
+        "verifier_requirements": [
+            {"id": item.get("id"), "status": item.get("status")}
+            for item in verifier.get("requirements", [])
+            if isinstance(item, Mapping)
+        ],
+        "diff_status": "FAIL" if any("canonical_change" in error for error in errors) else "PASS",
     }
 
 

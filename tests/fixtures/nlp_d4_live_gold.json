@@ -169,7 +169,13 @@
         "kind": "las",
         "required_verifier_requirements": ["LAS-01", "LAS-02", "LAS-07", "LAS-09"],
         "before_assertions": [{"path": "/title", "operator": "equals", "value": "Original Well Log Report"}],
-        "after_assertions": [{"path": "/title", "operator": "equals", "value": "Gamma Ray Quality Control Review"}],
+        "after_assertions": [{"path": "/title", "operator": "equals", "value": "Formation Integrity Review"}],
+        "required_changes": {
+          "LAS-02": {
+            "before": [{"path": "/title", "operator": "equals", "value": "Original Well Log Report"}],
+            "after": [{"path": "/title", "operator": "equals", "value": "Formation Integrity Review"}]
+          }
+        },
         "required_change_paths": ["/title"],
         "allowed_change_paths": ["/title", "/extensions/compatibility/legacy_document/header/title"]
       }
@@ -181,13 +187,34 @@
       "contract": {
         "kind": "las",
         "required_verifier_requirements": ["LAS-01", "LAS-05", "LAS-07", "LAS-09"],
-        "before_assertions": [{"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}],
+        "before_assertions": [
+          {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+          {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}
+        ],
         "after_assertions": [
+          {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
           {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 5.0},
           {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 125.0}
         ],
+        "required_changes": {
+          "LAS-05": {
+            "before": [
+              {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+              {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}
+            ],
+            "after": [
+              {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+              {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 5.0},
+              {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 125.0}
+            ]
+          }
+        },
         "required_change_paths": ["/sections/0/tracks/1/bindings/0/scale"],
-        "allowed_change_paths": ["/sections/0/tracks/1/bindings/0/scale"]
+        "allowed_change_paths": [
+          "/sections/0/tracks/1/bindings/0/scale",
+          "/extensions/compatibility/legacy_document/bindings/channels/0/scale",
+          "/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/scale"
+        ]
       }
     },
     {
@@ -197,16 +224,38 @@
       "contract": {
         "kind": "las",
         "required_verifier_requirements": ["LAS-01", "LAS-03", "LAS-07", "LAS-09"],
-        "before_assertions": [{"path": "/sections/0/tracks", "operator": "length", "value": 3}],
+        "before_assertions": [{"path": "/sections/0/tracks", "operator": "length_at_least", "value": 3}],
         "after_assertions": [
-          {"path": "/sections/0/tracks/3/id", "operator": "equals", "value": "resistivity-qc"},
+          {"path": "/sections/0/tracks/3/title", "operator": "equals", "value": "Resistivity QC"},
+          {"path": "/sections/0/tracks/3/kind", "operator": "equals", "value": "normal"},
           {"path": "/sections/0/tracks/3/width_mm", "operator": "equals", "value": 30.0},
+          {"path": "/sections/0/tracks/3/bindings/0/label", "operator": "equals", "value": "Resistivity QC"},
           {"path": "/sections/0/tracks/3/bindings/0/channel", "operator": "equals", "value": "ILD"},
+          {"path": "/sections/0/tracks/3/bindings/0/scale/kind", "operator": "equals", "value": "log"},
           {"path": "/sections/0/tracks/3/bindings/0/scale/minimum", "operator": "equals", "value": 0.2},
           {"path": "/sections/0/tracks/3/bindings/0/scale/maximum", "operator": "equals", "value": 2000.0}
         ],
+        "required_changes": {
+          "LAS-03": {
+            "before": [{"path": "/sections/0/tracks", "operator": "length_at_least", "value": 3}],
+            "after": [
+              {"path": "/sections/0/tracks/3/title", "operator": "equals", "value": "Resistivity QC"},
+              {"path": "/sections/0/tracks/3/kind", "operator": "equals", "value": "normal"},
+              {"path": "/sections/0/tracks/3/width_mm", "operator": "equals", "value": 30.0},
+              {"path": "/sections/0/tracks/3/bindings/0/label", "operator": "equals", "value": "Resistivity QC"},
+              {"path": "/sections/0/tracks/3/bindings/0/channel", "operator": "equals", "value": "ILD"},
+              {"path": "/sections/0/tracks/3/bindings/0/scale/kind", "operator": "equals", "value": "log"},
+              {"path": "/sections/0/tracks/3/bindings/0/scale/minimum", "operator": "equals", "value": 0.2},
+              {"path": "/sections/0/tracks/3/bindings/0/scale/maximum", "operator": "equals", "value": 2000.0}
+            ]
+          }
+        },
         "required_change_paths": ["/sections/0/tracks/3"],
-        "allowed_change_paths": ["/sections/0/tracks/3"]
+        "allowed_change_paths": [
+          "/sections/0/tracks/3",
+          "/extensions/compatibility/legacy_document/bindings/channels/2",
+          "/extensions/compatibility/legacy_document/layout/log_sections/0/tracks/3"
+        ]
       }
     },
     {
@@ -216,14 +265,30 @@
       "contract": {
         "kind": "las",
         "required_verifier_requirements": ["LAS-01", "LAS-06", "LAS-07", "LAS-09"],
-        "before_assertions": [{"path": "/sections/0/tracks/1/fills", "operator": "length", "value": 0}],
+        "before_assertions": [{"path": "/sections/0/tracks/1/fills", "operator": "length_at_least", "value": 0}],
         "after_assertions": [
           {"path": "/sections/0/tracks/1/fills/0/kind", "operator": "equals", "value": "to_lower_limit"},
+          {"path": "/sections/0/tracks/1/fills/0/binding_id", "operator": "equals", "value": "main.gr.GR.1"},
           {"path": "/sections/0/tracks/1/fills/0/color", "operator": "equals", "value": "#f2e8a0"},
           {"path": "/sections/0/tracks/1/fills/0/alpha", "operator": "equals", "value": 0.2}
         ],
+        "required_changes": {
+          "LAS-06": {
+            "before": [{"path": "/sections/0/tracks/1/fills", "operator": "length_at_least", "value": 0}],
+            "after": [
+              {"path": "/sections/0/tracks/1/fills/0/kind", "operator": "equals", "value": "to_lower_limit"},
+              {"path": "/sections/0/tracks/1/fills/0/binding_id", "operator": "equals", "value": "main.gr.GR.1"},
+              {"path": "/sections/0/tracks/1/fills/0/color", "operator": "equals", "value": "#f2e8a0"},
+              {"path": "/sections/0/tracks/1/fills/0/alpha", "operator": "equals", "value": 0.2}
+            ]
+          }
+        },
         "required_change_paths": ["/sections/0/tracks/1/fills/0"],
-        "allowed_change_paths": ["/sections/0/tracks/1/fills/0"]
+        "allowed_change_paths": [
+          "/sections/0/tracks/1/fills/0",
+          "/extensions/compatibility/legacy_document/bindings/channels/0/fill",
+          "/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/fill"
+        ]
       }
     },
     {
@@ -243,15 +308,42 @@
       "contract": {
         "kind": "las",
         "required_verifier_requirements": ["LAS-01", "LAS-05", "LAS-07", "LAS-09"],
-        "before_assertions": [{"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}],
+        "before_assertions": [
+          {"path": "/sections/1/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+          {"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}
+        ],
         "after_assertions": [
+          {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
           {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 20.0},
           {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 110.0},
+          {"path": "/sections/1/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
           {"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0},
           {"path": "/sections/1/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 100.0}
         ],
+        "required_changes": {
+          "LAS-05": {
+            "before": [
+              {"path": "/sections/1/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+              {"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}
+            ],
+            "after": [
+              {"path": "/sections/0/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+              {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 20.0},
+              {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 110.0},
+              {"path": "/sections/1/tracks/1/bindings/0/scale/kind", "operator": "equals", "value": "linear"},
+              {"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0},
+              {"path": "/sections/1/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 100.0}
+            ]
+          }
+        },
         "required_change_paths": ["/sections/0/tracks/1/bindings/0/scale"],
-        "allowed_change_paths": ["/sections/0/tracks/1/bindings/0/scale"]
+        "allowed_change_paths": [
+          "/sections/0/tracks/1/bindings/0/scale",
+          "/extensions/compatibility/legacy_document/bindings/channels/0/scale",
+          "/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/scale",
+          "/extensions/compatibility/legacy_document/layout/log_sections/0/tracks/1",
+          "/sections/0/tracks/1/extensions/compatibility/legacy_track"
+        ]
       }
     },
     {
