@@ -10,16 +10,22 @@ Design authorization:
 WELLPLOT-NLP-D4-DESIGN-001
 ```
 
-Design rework authorization:
+Historical design rework authorization:
 
 ```text
 WELLPLOT-NLP-D4-DESIGN-REWORK-001
 ```
 
-Current design rework authorization:
+Previous source rework authorization:
 
 ```text
 WELLPLOT-NLP-D4-DESIGN-REWORK-002
+```
+
+Current design rework authorization:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-REWORK-004
 ```
 
 Previous design-rework parent:
@@ -28,10 +34,22 @@ Previous design-rework parent:
 0a966e1bdb4a4acadf2ea583009e5b9ba7bb1e7b
 ```
 
-Current design-rework parent:
+REWORK-002 parent:
 
 ```text
 f07600bf88856d91012192f231be857ccb067744
+```
+
+REWORK-003 parent:
+
+```text
+65560766931f908131ac8723c805def7ead594db
+```
+
+Current REWORK-004 parent:
+
+```text
+329c44e1ad6766340cfb382e04d61b1acdd9d85b
 ```
 
 Input baseline:
@@ -1423,12 +1441,12 @@ It establishes evidence for a later explicit release/promotion decision.
 
 Production promotion remains separately governed.
 
-# 32. D4 Design Rework 002 — Real LAS Population Correction
+# 32. D4 Design Rework 002/004 — Real LAS Population Correction and Canonical Seed
 
 Status:
 
 ```text
-WELLPLOT-NLP-D4-DESIGN-REWORK-002 / PROVIDER_FREE_REVIEW_PENDING
+WELLPLOT-NLP-D4-DESIGN-REWORK-004 / PROVIDER_FREE_REVIEW_PENDING
 ```
 
 This section is the authoritative replacement for the LAS-specific portions of
@@ -1490,95 +1508,154 @@ No `ILD`, `ILM`, or `MSFL` value is an alias for `RT` in this contract.
 
 ## 32.2 Revised LAS seed
 
-The LAS seed is one fully enumerated canonical document backed by the selected
-source. D4A must construct this mapping exactly; it must not inherit unspecified
-track, binding, style, or reference state from another example:
+The LAS seed is one fully enumerated `AuthoringDocumentSpec` mapping backed by
+the selected source. D4A must construct this mapping exactly; it must not
+inherit unspecified track, binding, style, or reference state from another
+example. Track list order is the canonical order; there is no separate track
+position field. Binding style belongs to each binding, not to its parent track.
+The mapping below deliberately uses only canonical model fields. Harness-only
+concepts such as local output handling, compatibility mirrors, and preservation
+projections are specified outside this mapping.
 
 ```yaml
-document:
-  title: Original Well Log Report
-  subtitle: null
-  remarks: []
-  sections:
-    - id: main
-      title: Main Log
-      subtitle: null
-      source:
-        basename: 30-23a-3 8117_d.las
-        format: las
-      tracks:
-        - id: depth
-          title: Depth
-          kind: reference
-          width_mm: 16.0
-          position: 1
-          reference:
-            axis: depth
-            define_layout: true
-            unit: ft
-            scale_ratio: 200
-            major_step: 50
-            secondary_grid:
-              display: true
-              line_count: 5
-          bindings: []
-        - id: gr
-          title: Gamma Ray
-          kind: normal
-          width_mm: 28.0
-          position: 2
-          style:
-            color: '#b71c1c'
-            line_style: solid
-            line_width: 0.8
-          bindings:
-            - id: main.gr.GR.1
-              kind: curve
-              channel: GR
-              label: Gamma Ray
-              scale: {kind: linear, minimum: 0.0, maximum: 100.0, reverse: false}
-              style:
-                color: '#b71c1c'
-                line_style: solid
-                line_width: 0.8
-          fills: []
-        - id: porosity
-          title: Neutron Porosity
-          kind: normal
-          width_mm: 28.0
-          position: 3
-          style:
-            color: '#1b5e20'
-            line_style: solid
-            line_width: 0.8
-          bindings:
-            - id: main.porosity.NPHI.1
-              kind: curve
-              channel: NPHI
-              label: Neutron Porosity
-              scale: {kind: linear, minimum: 0.0, maximum: 45.0, reverse: false}
-              style:
-                color: '#1b5e20'
-                line_style: solid
-                line_width: 0.8
-          fills: []
-  report_defaults:
-    page: default
-    depth_range: full_source
-    output: case_local_only
-  compatibility_mirrors: deterministic_only
-  absent_optional_fields: null
+name: D4 LAS Acceptance Seed
+title: Original Well Log Report
+subtitle: null
+output:
+  backend: matplotlib
+  output_path: d4-live-acceptance.pdf
+  dpi: 180
+  continuous_strip_page_height_mm: null
+  extensions: {}
+page:
+  size: letter
+  width_mm: null
+  height_mm: null
+  orientation: portrait
+  continuous: false
+  bottom_track_header_enabled: true
+  margin_left_mm: 0.0
+  margin_right_mm: 10.0
+  margin_top_mm: 10.0
+  margin_bottom_mm: 10.0
+  header_height_mm: 18.0
+  track_header_height_mm: 8.0
+  footer_height_mm: 10.0
+  track_gap_mm: 0.0
+depth:
+  unit: ft
+  scale: '1:240'
+  major_step: null
+  minor_step: null
+header: null
+tail:
+  enabled: false
+  extensions: {}
+sections:
+  - id: main
+    title: Main Log
+    subtitle: null
+    depth_range: null
+    data_source:
+      source_path: workspace/data/30-23a-3 8117_d.las
+      source_format: las
+    tracks:
+      - id: depth
+        title: Depth
+        kind: reference
+        width_mm: 16.0
+        axis: depth
+        define_layout: true
+        unit: ft
+        scale_ratio: 200
+        major_step: 50
+        minor_step: null
+        secondary_grid_display: true
+        secondary_grid_line_count: 5
+        display_unit_in_header: true
+        display_scale_in_header: true
+        display_annotations_in_header: true
+        precision: 2
+        values_orientation: horizontal
+        events: []
+        bindings: []
+      - id: gr
+        title: Gamma Ray
+        kind: normal
+        width_mm: 28.0
+        x_scale: null
+        bindings:
+          - kind: curve
+            binding_id: main.gr.GR.1
+            channel: GR
+            label: Gamma Ray
+            scale:
+              kind: linear
+              minimum: 0.0
+              maximum: 100.0
+              reverse: false
+              unit: null
+            style:
+              color: '#b71c1c'
+              line_style: '-'
+              line_width: 0.8
+              alpha: 1.0
+              fill_color: null
+              fill_alpha: 0.2
+              colormap: viridis
+            wrap: false
+            render_mode: line
+        fills: []
+      - id: porosity
+        title: Neutron Porosity
+        kind: normal
+        width_mm: 28.0
+        x_scale: null
+        bindings:
+          - kind: curve
+            binding_id: main.porosity.NPHI.1
+            channel: NPHI
+            label: Neutron Porosity
+            scale:
+              kind: linear
+              minimum: 0.0
+              maximum: 45.0
+              reverse: false
+              unit: null
+            style:
+              color: '#1b5e20'
+              line_style: '-'
+              line_width: 0.8
+              alpha: 1.0
+              fill_color: null
+              fill_alpha: 0.2
+              colormap: viridis
+            wrap: false
+            render_mode: line
+        fills: []
+    extensions: {}
+remarks: []
+extensions: {}
 ```
 
-The complete seed contract is exactly three tracks in positions 1–3, two
-scalar curve bindings with the IDs shown above, no fills, no remarks, no
-subtitle, and no Resistivity QC track. The renderer's `default` page and
-`full_source` depth range are host defaults, while `case_local_only` output is
-never part of the scientist-visible semantic acceptance state. Any compatibility
-mirror generated by canonical persistence is deterministic and included in the
-before/after preservation projection. The seed must not preload the later ILD
-QC track or GR fill. Gold is derived from this exact seed before any future
-provider construction.
+The canonical model defaults for `grid`, `track_header`, and binding display
+submodels are deterministic and remain part of the validated model even when
+their default-valued fields are omitted from the mapping. The complete seed
+contract is exactly three tracks in the listed order, two scalar curve bindings
+with the IDs shown above, no fills, no remarks, no subtitle, and no Resistivity
+QC track. The renderer's `output_path` is harness-local and is not a scientist-
+visible semantic assertion. Any compatibility mirror generated by canonical
+persistence is deterministic and included in the before/after preservation
+projection. The seed must not preload the later ILD QC track or GR fill. Gold
+is derived from this exact seed before any future provider construction.
+
+The provider-free closure check is mandatory:
+
+```python
+AuthoringDocumentSpec.model_validate(frozen_las_seed)
+```
+
+must pass using this exact mapping before D4A can be authorized.
 
 ## 32.3 Revised LAS requests and gold
 
