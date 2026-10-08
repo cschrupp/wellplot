@@ -5,7 +5,9 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
+rework: WELLPLOT-NLP-D4A-REWORK-001
 authorized_parent: 8618c3ef2207236ad50d5fc576cf1c96badbfb95
+rework_parent: 0958f1d5ead027df092b0ce6e6c09e37694348f3
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
@@ -69,7 +71,9 @@ metrics. It never stores generated program text or structured response data.
 
 ```yaml
 cases_fixture_sha256: f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298
-gold_fixture_sha256: 05f920b5212d589d6c3763f003ab0465630408cf44539202bc45ecbf56648f24
+gold_fixture_sha256: 795f9280d201ee91365b1575737fa26ca782b65699debf32cf21e020faaf33e2
+uv_lock_sha256: 0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6
+production_component_hashes: 21
 ```
 
 The final harness checkpoint is intentionally not embedded here because a
@@ -81,13 +85,31 @@ exact candidate commit and parent.
 The focused D4A suite uses only fake backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 11 passed
+tests/test_nlp_d4_live_acceptance.py: 25 passed
 provider / endpoint / model calls: 0
 ```
 
+The provider-free preflight now requires an external authorization record
+before execution. That record supplies the independently accepted D4A
+checkpoint, harness-source SHA-256, fixture/gold/lockfile hashes,
+production-component manifest, source hashes, provider/model, and SDK retry
+settings. Preflight compares every value before campaign state or credentials
+are accessed.
+
+The grader contract is explicit per turn. CBL requires `CBL-01` through
+`CBL-09`; positive LAS turns declare required before/after assertions, allowed
+change paths, and verifier requirements; safe-failure turns require byte and
+canonical-state identity, actionable diagnostics, no intent/persistence/render,
+and no source/channel substitution. The unchanged CBL/LAS verifiers are used
+when canonical artifact paths are supplied, and their input bytes are checked
+for non-mutation.
+
 The D0–D2E delivery suite completed with `53 passed`. D3's real-DLIS/render
-integration suite was invoked separately; its terminal result must be recorded
-in the implementation handoff rather than inferred from partial progress.
+one-shot test was invoked separately but did not terminate within the bounded
+180-second verification timeout; it is not claimed as passing. A full-suite
+run produced `2159 passed, 22 failed, 3 skipped, 11 subtests`, but the exact
+failures were not classified against the authorized parent and the process
+ended during pytest cleanup. No D4A test failure was observed in that run.
 
 Static checks required for this slice are `ruff check`, `ruff format --check`,
 Python compilation, and `git diff --check`. No production source under

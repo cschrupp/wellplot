@@ -152,14 +152,128 @@
     "forbidden_channels": ["RT"]
   },
   "cases": [
-    {"turn_id": "D4-C01:C01", "expected_outcome": "DIRECT_CORRECT", "grader": "cbl"},
-    {"turn_id": "D4-L01:T1", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
-    {"turn_id": "D4-L01:T2", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
-    {"turn_id": "D4-L01:T3", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
-    {"turn_id": "D4-L01:T4", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
-    {"turn_id": "D4-L02:T1", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"},
-    {"turn_id": "D4-L02:T2", "expected_outcome": "CORRECT_AFTER_CLARIFICATION", "grader": "las"},
-    {"turn_id": "D4-L03:C01", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"},
-    {"turn_id": "D4-L04:C01", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"}
+    {
+      "turn_id": "D4-C01:C01",
+      "expected_outcome": "DIRECT_CORRECT",
+      "grader": "cbl",
+      "contract": {
+        "kind": "cbl",
+        "required_verifier_requirements": ["CBL-01", "CBL-02", "CBL-03", "CBL-04", "CBL-05", "CBL-06", "CBL-07", "CBL-08", "CBL-09"]
+      }
+    },
+    {
+      "turn_id": "D4-L01:T1",
+      "expected_outcome": "DIRECT_CORRECT",
+      "grader": "las",
+      "contract": {
+        "kind": "las",
+        "required_verifier_requirements": ["LAS-01", "LAS-02", "LAS-07", "LAS-09"],
+        "before_assertions": [{"path": "/title", "operator": "equals", "value": "Original Well Log Report"}],
+        "after_assertions": [{"path": "/title", "operator": "equals", "value": "Gamma Ray Quality Control Review"}],
+        "required_change_paths": ["/title"],
+        "allowed_change_paths": ["/title", "/extensions/compatibility/legacy_document/header/title"]
+      }
+    },
+    {
+      "turn_id": "D4-L01:T2",
+      "expected_outcome": "DIRECT_CORRECT",
+      "grader": "las",
+      "contract": {
+        "kind": "las",
+        "required_verifier_requirements": ["LAS-01", "LAS-05", "LAS-07", "LAS-09"],
+        "before_assertions": [{"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}],
+        "after_assertions": [
+          {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 5.0},
+          {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 125.0}
+        ],
+        "required_change_paths": ["/sections/0/tracks/1/bindings/0/scale"],
+        "allowed_change_paths": ["/sections/0/tracks/1/bindings/0/scale"]
+      }
+    },
+    {
+      "turn_id": "D4-L01:T3",
+      "expected_outcome": "DIRECT_CORRECT",
+      "grader": "las",
+      "contract": {
+        "kind": "las",
+        "required_verifier_requirements": ["LAS-01", "LAS-03", "LAS-07", "LAS-09"],
+        "before_assertions": [{"path": "/sections/0/tracks", "operator": "length", "value": 3}],
+        "after_assertions": [
+          {"path": "/sections/0/tracks/3/id", "operator": "equals", "value": "resistivity-qc"},
+          {"path": "/sections/0/tracks/3/width_mm", "operator": "equals", "value": 30.0},
+          {"path": "/sections/0/tracks/3/bindings/0/channel", "operator": "equals", "value": "ILD"},
+          {"path": "/sections/0/tracks/3/bindings/0/scale/minimum", "operator": "equals", "value": 0.2},
+          {"path": "/sections/0/tracks/3/bindings/0/scale/maximum", "operator": "equals", "value": 2000.0}
+        ],
+        "required_change_paths": ["/sections/0/tracks/3"],
+        "allowed_change_paths": ["/sections/0/tracks/3"]
+      }
+    },
+    {
+      "turn_id": "D4-L01:T4",
+      "expected_outcome": "DIRECT_CORRECT",
+      "grader": "las",
+      "contract": {
+        "kind": "las",
+        "required_verifier_requirements": ["LAS-01", "LAS-06", "LAS-07", "LAS-09"],
+        "before_assertions": [{"path": "/sections/0/tracks/1/fills", "operator": "length", "value": 0}],
+        "after_assertions": [
+          {"path": "/sections/0/tracks/1/fills/0/kind", "operator": "equals", "value": "to_lower_limit"},
+          {"path": "/sections/0/tracks/1/fills/0/color", "operator": "equals", "value": "#f2e8a0"},
+          {"path": "/sections/0/tracks/1/fills/0/alpha", "operator": "equals", "value": 0.2}
+        ],
+        "required_change_paths": ["/sections/0/tracks/1/fills/0"],
+        "allowed_change_paths": ["/sections/0/tracks/1/fills/0"]
+      }
+    },
+    {
+      "turn_id": "D4-L02:T1",
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "grader": "las",
+      "contract": {
+        "kind": "safety",
+        "required_false_flags": ["intent_applied", "persisted", "rendered"],
+        "prohibited_paths": ["/sections", "/title", "/remarks"]
+      }
+    },
+    {
+      "turn_id": "D4-L02:T2",
+      "expected_outcome": "CORRECT_AFTER_CLARIFICATION",
+      "grader": "las",
+      "contract": {
+        "kind": "las",
+        "required_verifier_requirements": ["LAS-01", "LAS-05", "LAS-07", "LAS-09"],
+        "before_assertions": [{"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0}],
+        "after_assertions": [
+          {"path": "/sections/0/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 20.0},
+          {"path": "/sections/0/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 110.0},
+          {"path": "/sections/1/tracks/1/bindings/0/scale/minimum", "operator": "equals", "value": 0.0},
+          {"path": "/sections/1/tracks/1/bindings/0/scale/maximum", "operator": "equals", "value": 100.0}
+        ],
+        "required_change_paths": ["/sections/0/tracks/1/bindings/0/scale"],
+        "allowed_change_paths": ["/sections/0/tracks/1/bindings/0/scale"]
+      }
+    },
+    {
+      "turn_id": "D4-L03:C01",
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "grader": "las",
+      "contract": {
+        "kind": "safety",
+        "required_false_flags": ["intent_applied", "persisted", "rendered", "fallback_used", "substituted_channel", "prohibited_object_present"],
+        "prohibited_paths": ["/sections/0/tracks/3", "/sections/0/bindings"]
+      }
+    },
+    {
+      "turn_id": "D4-L04:C01",
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "grader": "las",
+      "contract": {
+        "kind": "safety",
+        "required_false_flags": ["intent_applied", "persisted", "rendered", "fallback_used", "substituted_channel", "prohibited_object_present"],
+        "prohibited_channels": ["ILD", "ILM", "MSFL", "GR", "CALI"],
+        "prohibited_paths": ["/sections/0/tracks/3", "/sections/0/bindings"]
+      }
+    }
   ]
 }
