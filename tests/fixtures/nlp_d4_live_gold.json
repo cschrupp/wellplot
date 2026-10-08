@@ -1,0 +1,165 @@
+{
+  "experiment_version": "WELLPLOT-NLP-D4A",
+  "canonical_las_seed": {
+    "name": "D4 LAS Acceptance Seed",
+    "title": "Original Well Log Report",
+    "subtitle": null,
+    "output": {
+      "backend": "matplotlib",
+      "output_path": "d4-live-acceptance.pdf",
+      "dpi": 180,
+      "continuous_strip_page_height_mm": null,
+      "extensions": {}
+    },
+    "page": {
+      "size": "letter",
+      "width_mm": null,
+      "height_mm": null,
+      "orientation": "portrait",
+      "continuous": false,
+      "bottom_track_header_enabled": true,
+      "margin_left_mm": 0.0,
+      "margin_right_mm": 10.0,
+      "margin_top_mm": 10.0,
+      "margin_bottom_mm": 10.0,
+      "header_height_mm": 18.0,
+      "track_header_height_mm": 8.0,
+      "footer_height_mm": 10.0,
+      "track_gap_mm": 0.0
+    },
+    "depth": {
+      "unit": "ft",
+      "scale": "1:240",
+      "major_step": null,
+      "minor_step": null
+    },
+    "header": null,
+    "tail": {
+      "enabled": false,
+      "extensions": {}
+    },
+    "sections": [
+      {
+        "id": "main",
+        "title": "Main Log",
+        "subtitle": null,
+        "depth_range": null,
+        "data_source": {
+          "source_path": "workspace/data/30-23a-3 8117_d.las",
+          "source_format": "las"
+        },
+        "tracks": [
+          {
+            "id": "depth",
+            "title": "Depth",
+            "kind": "reference",
+            "width_mm": 16.0,
+            "axis": "depth",
+            "define_layout": true,
+            "unit": "ft",
+            "scale_ratio": 200,
+            "major_step": 50,
+            "minor_step": null,
+            "secondary_grid_display": true,
+            "secondary_grid_line_count": 5,
+            "display_unit_in_header": true,
+            "display_scale_in_header": true,
+            "display_annotations_in_header": true,
+            "precision": 2,
+            "values_orientation": "horizontal",
+            "events": [],
+            "bindings": []
+          },
+          {
+            "id": "gr",
+            "title": "Gamma Ray",
+            "kind": "normal",
+            "width_mm": 28.0,
+            "x_scale": null,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "main.gr.GR.1",
+                "channel": "GR",
+                "label": "Gamma Ray",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 100.0,
+                  "reverse": false,
+                  "unit": null
+                },
+                "style": {
+                  "color": "#b71c1c",
+                  "line_style": "-",
+                  "line_width": 0.8,
+                  "alpha": 1.0,
+                  "fill_color": null,
+                  "fill_alpha": 0.2,
+                  "colormap": "viridis"
+                },
+                "wrap": false,
+                "render_mode": "line"
+              }
+            ],
+            "fills": []
+          },
+          {
+            "id": "porosity",
+            "title": "Neutron Porosity",
+            "kind": "normal",
+            "width_mm": 28.0,
+            "x_scale": null,
+            "bindings": [
+              {
+                "kind": "curve",
+                "binding_id": "main.porosity.NPHI.1",
+                "channel": "NPHI",
+                "label": "Neutron Porosity",
+                "scale": {
+                  "kind": "linear",
+                  "minimum": 0.0,
+                  "maximum": 45.0,
+                  "reverse": false,
+                  "unit": null
+                },
+                "style": {
+                  "color": "#1b5e20",
+                  "line_style": "-",
+                  "line_width": 0.8,
+                  "alpha": 1.0,
+                  "fill_color": null,
+                  "fill_alpha": 0.2,
+                  "colormap": "viridis"
+                },
+                "wrap": false,
+                "render_mode": "line"
+              }
+            ],
+            "fills": []
+          }
+        ],
+        "extensions": {}
+      }
+    ],
+    "remarks": [],
+    "extensions": {}
+  },
+  "source_contract": {
+    "path": "workspace/data/30-23a-3 8117_d.las",
+    "sha256": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "required_channels": ["GR", "CALI", "ILD", "ILM", "MSFL", "NPHI"],
+    "forbidden_channels": ["RT"]
+  },
+  "cases": [
+    {"turn_id": "D4-C01:C01", "expected_outcome": "DIRECT_CORRECT", "grader": "cbl"},
+    {"turn_id": "D4-L01:T1", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
+    {"turn_id": "D4-L01:T2", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
+    {"turn_id": "D4-L01:T3", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
+    {"turn_id": "D4-L01:T4", "expected_outcome": "DIRECT_CORRECT", "grader": "las"},
+    {"turn_id": "D4-L02:T1", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"},
+    {"turn_id": "D4-L02:T2", "expected_outcome": "CORRECT_AFTER_CLARIFICATION", "grader": "las"},
+    {"turn_id": "D4-L03:C01", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"},
+    {"turn_id": "D4-L04:C01", "expected_outcome": "SAFE_ACTIONABLE_FAILURE", "grader": "las"}
+  ]
+}

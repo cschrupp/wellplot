@@ -1,0 +1,86 @@
+{
+  "experiment_version": "WELLPLOT-NLP-D4A",
+  "cases": [
+    {
+      "case_id": "D4-C01",
+      "turn_id": "D4-C01:C01",
+      "workflow": "CBL-CONSTRUCT",
+      "execution_index": 1,
+      "expected_outcome": "DIRECT_CORRECT",
+      "request": "Using CBL_Main.dlis as the main-pass data and CBL_Repeat.dlis as the repeat-pass\ndata, finish the supported cased-hole CBL/VDL report in the existing scaffold.\nKeep the existing section identities main_pass and repeat_pass and limit the\nreport to the heading, remarks, those two strip sections, and the tail.\n\nUse these service titles, in order: \"Cement Bond Log\", \"Variable Density Log\",\nand \"Gamma Ray - CCL\".\n\nSet the report metadata to:\nCompany University of Utah; well FORGE 16B (78)-32; field Utah Forge; county\nBeaver; state Utah; section NWSW 32; township 26; range 9; footage\n972' FSL & 523' FWL; latitude 38.501242; longitude -112.882661; logging date\n08-May-2023; KB 5445.50 ft; GL 5415.00 ft; DF 5445.00 ft; drilling and log\ndatum Kelly Bushing; top interval 25.00 ft; bottom interval 4845.00 ft; fluid\nFresh Water; run ONE; driller depth 4980.00 ft; logged depth TD Not Tag;\ndensity 8.4 lbm/gal; maximum temperature 177.2 degF; logged by\nD. May / D. Jones; witnessed by Leroy Swearingen.\n\nInclude three remarks:\n1. Supported Reconstruction Scope — reconstruct only the supported heading,\nremarks, main pass, repeat pass, and tail; do not invent unsupported well\ndiagrams, calibration reports, or vendor parameter tables.\n2. Data Sources — use the staged DLIS files for the main and repeat passes.\n3. Public Data and IP Notice — keep the WellPlot reproduction boundary explicit\nand do not recreate vendor disclaimer artwork.\n\nFor each pass, use four tracks from left to right:\ncombo = normal 50 mm; depth = reference 10 mm; cbl = normal 44 mm;\nvdl = array 48 mm.\n\nOn combo:\nECGR_STGC → \"Gamma Ray (ECGR_STGC) QTGC-B\", linear 0..150,\n#16a34a, width 0.8.\nTT → \"Transit Time for CBL (TT) QSLT-B\", linear 200..400 reversed,\n#2142ff, width 0.75.\nTENS → \"Cable Tension (TENS)\", linear 5000..0, #111111 dashed,\nwidth 0.65.\nMTEM → \"Mud Temperature (MTEM) LEH-MT\", linear 100..500,\n#111111, width 0.9.\n\nOn depth:\nSTIT → \"Stuck Tool Indicator, Total (STIT)\", linear 0..50,\n#111111, width 0.65.\nTDSP → \"Cable Drag\", linear 0..50, #92400e dotted, width 0.65.\nVSEC → \"Tool_Tot. Drag\", linear 0..50, #1d4ed8 dashed, width 0.65.\n\nOn cbl, plot CBL twice with two different binding identities. Both labels are\n\"CBL Amplitude (CBL) QSLT-B\". The first is linear 0..100, #111111, width 0.75.\nThe second is linear 0..10, #2563eb dashed, width 0.65.\n\nOn vdl, plot VDL as a raster labelled\n\"VDL VariableDensity (VDL) QSLT-B\". Use a linear track scale 200..1200,\nprofile vdl, gray_r, colorbar enabled with label Amplitude in the header, and\nsample axis enabled in us from 200 to 1200 with 7 ticks, source origin 40 and\nstep 10. Hide both vertical main and secondary grid lines.\n\nUse only channels actually present in the staged sources, preserve the full\nlabels above, and keep the result restrained and readable.",
+      "request_sha256": "5ef3a1e528b2e539dcd895ec09767547151a7706eff911a99cc050c61d7d8f3c"
+    },
+    {
+      "case_id": "D4-L01",
+      "turn_id": "D4-L01:T1",
+      "workflow": "LAS-REVISE",
+      "execution_index": 2,
+      "expected_outcome": "DIRECT_CORRECT",
+      "request": "Rename this report \"Formation Integrity Review\". Do not alter the plotted sections.",
+      "request_sha256": "0ffe99d4e0131f2649370730e913cd5147f73dccff24ed0f2d1ce928b2f41a34"
+    },
+    {
+      "case_id": "D4-L01",
+      "turn_id": "D4-L01:T2",
+      "workflow": "LAS-REVISE",
+      "execution_index": 3,
+      "expected_outcome": "DIRECT_CORRECT",
+      "request": "In Main Log, set the Gamma Ray curve to a linear 5–125 scale. Leave its label and styling unchanged.",
+      "request_sha256": "866ff67469139034c2062f1c668283c5532d0fc69fd711ed8e55e6c71d12d5f8"
+    },
+    {
+      "case_id": "D4-L01",
+      "turn_id": "D4-L01:T3",
+      "workflow": "LAS-REVISE",
+      "execution_index": 4,
+      "expected_outcome": "DIRECT_CORRECT",
+      "request": "Append a 30 mm normal track named \"Resistivity QC\" to Main Log. Plot ILD on it as \"Resistivity QC\" with a logarithmic 0.2–2000 scale.",
+      "request_sha256": "49405cb494cc3cead9cc015c99ef6e0e048583d716be3421930c39d995b95136"
+    },
+    {
+      "case_id": "D4-L01",
+      "turn_id": "D4-L01:T4",
+      "workflow": "LAS-REVISE",
+      "execution_index": 5,
+      "expected_outcome": "DIRECT_CORRECT",
+      "request": "On Main Log's GR track, fill from the Gamma Ray curve to its lower scale boundary with #f2e8a0 at 20% opacity; preserve everything else.",
+      "request_sha256": "0819dd6cb0964cc61752c96682aa4fa2b8924c6a47bb57e7897bd0b5ec52557b"
+    },
+    {
+      "case_id": "D4-L02",
+      "turn_id": "D4-L02:T1",
+      "workflow": "LAS-REVISE",
+      "execution_index": 6,
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "request": "In Main Log, change the Gamma Ray curve to a linear 20–110 scale.",
+      "request_sha256": "6bc23defbb254104f567c7a3c2caf33b77ad06f6d0dd124c3dc9b796f3fda541"
+    },
+    {
+      "case_id": "D4-L02",
+      "turn_id": "D4-L02:T2",
+      "workflow": "LAS-REVISE",
+      "execution_index": 7,
+      "expected_outcome": "CORRECT_AFTER_CLARIFICATION",
+      "request": "Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper.",
+      "request_sha256": "eee91c864757d6a4d8f23d906928964318868c8063f5e61e3afba4c794ee32c9"
+    },
+    {
+      "case_id": "D4-L03",
+      "turn_id": "D4-L03:C01",
+      "workflow": "LAS-REVISE",
+      "execution_index": 8,
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "request": "In Main Log, add a 24 mm normal track titled \"Neutron QC\" and plot NPHI from missing_neutron.las on it with a linear 0–45 scale.",
+      "request_sha256": "ee73de7b557d7f624125cb2c469ce0df1d27c9a6a6c0a21545f28bee98d3d237"
+    },
+    {
+      "case_id": "D4-L04",
+      "turn_id": "D4-L04:C01",
+      "workflow": "LAS-REVISE",
+      "execution_index": 9,
+      "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+      "request": "In Main Log, add a 24 mm normal track titled \"Resistivity Alias QC\" and plot RT from \"30-23a-3 8117_d.las\" on it with a logarithmic 0.2–2000 scale.",
+      "request_sha256": "bb38915973039b15a8b266b7ca2b7ad6faed2599eb8d8465d60bee662dce7ed6"
+    }
+  ]
+}
