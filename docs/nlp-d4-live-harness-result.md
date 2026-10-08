@@ -85,7 +85,7 @@ exact candidate commit and parent.
 The focused D4A suite uses only fake backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 25 passed
+tests/test_nlp_d4_live_acceptance.py: 29 passed
 provider / endpoint / model calls: 0
 ```
 
@@ -106,10 +106,12 @@ for non-mutation.
 
 The D0–D2E delivery suite completed with `53 passed`. D3's real-DLIS/render
 one-shot test was invoked separately but did not terminate within the bounded
-180-second verification timeout; it is not claimed as passing. A full-suite
-run produced `2159 passed, 22 failed, 3 skipped, 11 subtests`, but the exact
-failures were not classified against the authorized parent and the process
-ended during pytest cleanup. No D4A test failure was observed in that run.
+180-second verification timeout; it is not claimed as passing. The terminal
+non-D3 full-suite comparison produced `2587 passed, 36 failed, 10 skipped,
+11 subtests`; the exact 36 failure identities matched the authorized parent
+baseline, so there were zero new attributable failures. The full suite
+including D3 did not terminate within the bounded verification run and is not
+claimed as passing.
 
 Static checks required for this slice are `ruff check`, `ruff format --check`,
 Python compilation, and `git diff --check`. No production source under
