@@ -3,16 +3,18 @@
 ## Status
 
 ```yaml
-decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
-authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-006
-authorized_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
-rework_parent: 1f94c668cc4a5e2cb9809b64759b86955a369ccb
+decision: WELLPLOT_NLP_D4A_AMENDED_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
+authorization: WELLPLOT-NLP-D4A-QWEN-HARNESS-IMPLEMENTATION-001
+implementation_base: 94a373c292178d21613853ef57f74a81c8e17986
+design_authority: 0d0158fc3ddb8844b866444a8b6192be3f5aa93f
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
+provider: openai_compat
+runtime: local llama.cpp
+model: qwen3.6-35b-a3b
 live_inference: NOT_STARTED
 provider_calls: 0
-endpoint_calls: NOT_OBSERVED
-model_calls: NOT_OBSERVED
+endpoint_identity_calls: 0
+model_calls: 0
 D4B: NOT_AUTHORIZED
 D4C: NOT_AUTHORIZED
 production_promotion: NOT_AUTHORIZED
@@ -20,6 +22,10 @@ production_promotion: NOT_AUTHORIZED
 
 This record describes the provider-free D4A harness only. It is not an
 independent acceptance of the harness and does not authorize D4B execution.
+The implementation performed no real endpoint identity observation: real
+`/v1/models` calls, `/props` calls, provider generation calls, and model calls
+are all zero. Synthetic endpoint identity is test evidence only, not observed
+llama.cpp provenance.
 
 ## Scope
 
@@ -55,13 +61,40 @@ The harness implements and tests:
 - exact request identities and execution order;
 - rejection of D3 request reuse;
 - production-tree comparison against the D3 baseline;
-- OpenAI package version `2.34.0` and runtime `max_retries = 2` inspection;
+- OpenAI-compatible package version `2.34.0` and runtime `max_retries = 2`
+  inspection;
 - a 45-call logical-generation ceiling with call 46 rejected before delegation;
 - zero harness retries and distinct logical/transport accounting;
 - atomic `STARTED` state creation before credential/provider construction;
 - rejection of any existing state or journal, including zero-length artifacts;
 - bounded evidence redaction with no credentials, headers, raw programs, or raw provider payloads;
 - deterministic safe-failure, semantic-failure, and infrastructure decision precedence.
+
+The amended live target is fixed to local llama.cpp through the existing
+production `OpenAICompatibleBackendV2` and production `_provider_backend(...)`
+boundary. The harness accepts only the credential names
+`OPENAI_COMPAT_API_KEY`, `OPENAI_COMPAT_API_KEY.txt`, and
+`openai_compat_api_key.txt` (including the same key in `.env` or `.env.local`);
+it does not fall back to `OPENAI_API_KEY`. The token is loaded only after
+durable `STARTED` state exists, passed explicitly to the production provider
+factory, and never stored, hashed, or serialized.
+
+The fixed endpoint contract is:
+
+```text
+server origin:       http://192.168.2.140:8888
+OpenAI-compatible:   http://192.168.2.140:8888/v1
+model catalog:       http://192.168.2.140:8888/v1/models
+properties:          http://192.168.2.140:8888/props
+requested model:     qwen3.6-35b-a3b
+```
+
+The two authenticated, non-generation GETs are projected into a bounded
+identity containing the exact Qwen-only catalog, model-path basename and
+fingerprint, context size, build information, slot count, and
+`gguf_byte_identity: NOT_AVAILABLE` unless a host-level artifact hash is
+separately available. Raw `/props`, absolute model paths, chat templates, and
+credentials are not persisted. Server authentication is not claimed.
 
 The accepted future-live orchestration is implemented as `run_campaign()` and
 the campaign-owned `D4CampaignAdapter` in the harness script. The adapter
@@ -100,7 +133,7 @@ The L02 starting artifact instantiates the accepted shared-boundary windows:
 cases_fixture_sha256: f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298
 gold_fixture_sha256: 99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968
 uv_lock_sha256: 0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6
-production_component_hashes: 21
+production_component_hashes: 23
 ```
 
 The final harness checkpoint is intentionally not embedded here because a
@@ -112,9 +145,15 @@ exact candidate commit and parent.
 The focused D4A suite uses only deterministic backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 33 passed, 1 skipped
-provider calls: 0; endpoint/model calls: NOT_OBSERVED
+tests/test_nlp_d4_live_acceptance.py: 61 passed, 1 skipped
+provider calls: 0; real endpoint identity calls: 0; model calls: 0
 ```
+
+The D0-D4 delivery regression reports `116 passed, 2 skipped`. The full
+repository suite reports `2621 passed, 36 failed, 12 skipped, 11 subtests`;
+the 36 failures reproduce the established repository baseline and none is
+attributable to the three authorized D4A files. Ruff, formatting, Python
+compilation, and `git diff --check` pass.
 
 The provider-free campaign rehearsal also passes all nine frozen turns in the
 required order. It writes the real campaign state and journal, records 16
@@ -127,12 +166,37 @@ backends and therefore performs zero external provider activity; this is not
 used as a claim about endpoint or remote-model instrumentation in a future live
 campaign. No evaluator gold is sent to a provider prompt.
 
-The provider-free preflight now requires an external authorization record
-before execution. That record supplies the independently accepted D4A
-checkpoint, harness-source SHA-256, fixture/gold/lockfile hashes,
-production-component manifest, source hashes, provider/model, and SDK retry
-settings. Preflight compares every value before campaign state or credentials
-are accessed.
+The provider-free preflight requires an external authorization record before
+execution. That record supplies the accepted implementation checkpoint,
+design authority, harness-source SHA-256, fixture/gold/lockfile hashes,
+production-component manifest, source hashes, provider/model, fixed endpoint
+URLs, expected endpoint identity projection, and SDK retry settings. Preflight
+compares every value before campaign state, credentials, or endpoint access.
+It records endpoint identity as not observed; it does not probe the real
+server.
+
+After `STARTED`, runtime construction is inside the protected custody boundary:
+
+```text
+STARTED
+→ load OPENAI_COMPAT_API_KEY
+→ GET /v1/models
+→ GET /props
+→ validate sanitized identity
+→ persist endpoint_identity_verified
+→ construct production OpenAICompatibleBackendV2
+→ bind logical-call custody
+→ run the nine turns
+```
+
+Every catchable post-`STARTED` exception produces durable terminal state with
+decision `WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE` and one allowlisted
+reason code such as `credential_unavailable`,
+`endpoint_identity_mismatch`, `provider_construction_failed`,
+`provider_execution_failed`, `call_cap_exceeded`, or
+`evidence_integrity_failure`. Exception text and tracebacks are not persisted.
+If terminal journal append fails, the state file remains terminal with
+`evidence_integrity_failure` as the decision-bearing reason.
 
 The grader contract is explicit per turn. CBL requires `CBL-01` through
 `CBL-09`; positive LAS turns declare required before/after assertions, allowed
@@ -163,13 +227,9 @@ generated CBL logfile as the ending artifact, so both artifact hashes are
 concrete. Canonical journal rows retain only stable diagnostic fields; free-
 form diagnostic messages remain transient and are not persisted.
 
-The REWORK-006 focused suite completed with `37 passed, 1 skipped`. The
-D0–D4 delivery suite completed with `92 passed, 2 skipped`. D3's real-DLIS/render
-one-shot test was invoked separately but did not terminate within the bounded
-180-second verification timeout; it is not claimed as passing. The terminal
-full-suite comparison produced `2597 passed, 36 failed, 12 skipped,
-11 subtests`; the exact 36 failure identities matched the authorized parent
-baseline, so there were zero new attributable failures.
+These are local implementation-validation results, not independent CI
+evidence. No real endpoint, provider, or model calls occurred during this
+implementation.
 
 Static checks required for this slice are `ruff check`, `ruff format --check`,
 Python compilation, and `git diff --check`. No production source under

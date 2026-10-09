@@ -18,6 +18,8 @@ import os
 import subprocess
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -43,9 +45,14 @@ from wellplot.model.authoring import AuthoringDocumentSpec
 
 EXPERIMENT_VERSION = "WELLPLOT-NLP-D4A"
 PRODUCTION_BASELINE = "2c8e851fcd8b315e5d1861652a97984202db7488"
-AUTHORIZED_DESIGN_CHECKPOINT = "8618c3ef2207236ad50d5fc576cf1c96badbfb95"
-EXPECTED_PROVIDER = "openai"
-EXPECTED_MODEL = "gpt-5.4"
+AUTHORIZED_DESIGN_CHECKPOINT = "0d0158fc3ddb8844b866444a8b6192be3f5aa93f"
+EXPECTED_PROVIDER = "openai_compat"
+EXPECTED_MODEL = "qwen3.6-35b-a3b"
+LLAMA_SERVER_ORIGIN = "http://192.168.2.140:8888"
+OPENAI_COMPAT_BASE_URL = f"{LLAMA_SERVER_ORIGIN}/v1"
+MODEL_CATALOG_URL = f"{OPENAI_COMPAT_BASE_URL}/models"
+PROPS_URL = f"{LLAMA_SERVER_ORIGIN}/props"
+CREDENTIAL_SOURCE = "OPENAI_COMPAT_API_KEY"
 EXPECTED_OPENAI_VERSION = "2.34.0"
 EXPECTED_SDK_MAX_RETRIES = 2
 MAX_LOGICAL_CALLS = 45
@@ -78,6 +85,8 @@ PRODUCTION_COMPONENT_PATHS = (
     "src/wellplot/agent/providers/openai.py",
     "src/wellplot/agent/providers/openai_v2.py",
     "src/wellplot/agent/providers/openai_program_v2.py",
+    "src/wellplot/agent/providers/openai_compat_v2.py",
+    "src/wellplot/agent/providers/_v2_client.py",
     "src/wellplot/agent/direct_notebook.py",
     "src/wellplot/authoring.py",
     "src/wellplot/authoring_reconciler.py",
@@ -126,6 +135,12 @@ FROZEN_PRODUCTION_COMPONENT_SHA256 = {
     ),
     "src/wellplot/agent/providers/openai_program_v2.py": (
         "e68b4bb63da930b4eb5c399741bfd486a4a8563d405a505d5aafefb86c6bc062"
+    ),
+    "src/wellplot/agent/providers/openai_compat_v2.py": (
+        "579b299c6a01604207cfac3abf20eff15004a634ea773be75ec3c156835fc787"
+    ),
+    "src/wellplot/agent/providers/_v2_client.py": (
+        "41a0589c909d48eba3117ac4984b86b3d6eff1e4bebe32eb9e031f3db186cb33"
     ),
     "src/wellplot/agent/direct_notebook.py": (
         "6a4915ee395a599cf5fc74df151bc8ea025990b5b3fdf003cf9fe8b3624a44cc"
@@ -176,6 +191,55 @@ class CallCapExceeded(RuntimeError):
     """Raised before delegating logical generation call 46."""
 
 
+TERMINAL_REASON_CODES = frozenset(
+    {
+        "credential_unavailable",
+        "endpoint_unreachable",
+        "endpoint_identity_mismatch",
+        "provider_construction_failed",
+        "provider_execution_failed",
+        "call_cap_exceeded",
+        "evidence_integrity_failure",
+    }
+)
+
+
+class PostStartedFailure(RuntimeError):
+    """Carry one stable, non-secret reason across the post-STARTED boundary."""
+
+    def __init__(self, reason_code: str) -> None:
+        """Validate and retain one allowlisted reason code."""
+        if reason_code not in TERMINAL_REASON_CODES:
+            raise ValueError(f"unknown terminal reason code: {reason_code}")
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+
+
+@dataclass(frozen=True, slots=True)
+class EndpointIdentity:
+    """Sanitized identity projected from the two authenticated endpoint responses."""
+
+    model_catalog: tuple[str, ...]
+    model_path_basename: str
+    model_path_fingerprint_sha256: str
+    context_size: int
+    build_info: str
+    total_slots: int
+    gguf_byte_identity: str = "NOT_AVAILABLE"
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return only the bounded identity fields allowed in evidence."""
+        return {
+            "model_catalog": list(self.model_catalog),
+            "model_path_basename": self.model_path_basename,
+            "model_path_fingerprint_sha256": self.model_path_fingerprint_sha256,
+            "context_size": self.context_size,
+            "build_info": self.build_info,
+            "total_slots": self.total_slots,
+            "gguf_byte_identity": self.gguf_byte_identity,
+        }
+
+
 @dataclass(frozen=True, slots=True)
 class FrozenAuthorization:
     """External D4B authorization facts that must not be self-derived."""
@@ -189,6 +253,11 @@ class FrozenAuthorization:
     source_sha256: Mapping[str, str]
     provider: str = EXPECTED_PROVIDER
     model: str = EXPECTED_MODEL
+    server_origin: str = LLAMA_SERVER_ORIGIN
+    openai_compat_base_url: str = OPENAI_COMPAT_BASE_URL
+    model_catalog_url: str = MODEL_CATALOG_URL
+    props_url: str = PROPS_URL
+    endpoint_identity: Mapping[str, Any] = field(default_factory=dict)
     openai_version: str = EXPECTED_OPENAI_VERSION
     sdk_max_retries: int = EXPECTED_SDK_MAX_RETRIES
 
@@ -203,6 +272,13 @@ class FrozenAuthorization:
             "uv_lock_sha256",
             "production_component_sha256",
             "source_sha256",
+            "provider",
+            "model",
+            "server_origin",
+            "openai_compat_base_url",
+            "model_catalog_url",
+            "props_url",
+            "endpoint_identity",
         }
         missing = required - set(value)
         if missing:
@@ -217,6 +293,11 @@ class FrozenAuthorization:
             source_sha256=dict(value["source_sha256"]),
             provider=str(value.get("provider", EXPECTED_PROVIDER)),
             model=str(value.get("model", EXPECTED_MODEL)),
+            server_origin=str(value.get("server_origin", LLAMA_SERVER_ORIGIN)),
+            openai_compat_base_url=str(value.get("openai_compat_base_url", OPENAI_COMPAT_BASE_URL)),
+            model_catalog_url=str(value.get("model_catalog_url", MODEL_CATALOG_URL)),
+            props_url=str(value.get("props_url", PROPS_URL)),
+            endpoint_identity=dict(value.get("endpoint_identity", {})),
             openai_version=str(value.get("openai_version", EXPECTED_OPENAI_VERSION)),
             sdk_max_retries=int(value.get("sdk_max_retries", EXPECTED_SDK_MAX_RETRIES)),
         )
@@ -511,6 +592,119 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _authenticated_json_get(url: str, api_key: str) -> object:
+    """Fetch one bounded endpoint response without retaining its raw body."""
+    request = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {api_key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20.0) as response:
+            if response.geturl() != url:
+                raise PostStartedFailure("endpoint_identity_mismatch")
+            body = response.read()
+    except PostStartedFailure:
+        raise
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
+        raise PostStartedFailure("endpoint_unreachable") from None
+    try:
+        return json.loads(body)
+    except (TypeError, ValueError):
+        raise PostStartedFailure("endpoint_identity_mismatch") from None
+
+
+def _project_model_catalog(payload: object) -> tuple[str, ...]:
+    """Project and validate the exact single-model OpenAI catalog."""
+    if not isinstance(payload, Mapping) or not isinstance(payload.get("data"), list):
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    identifiers: list[str] = []
+    for item in payload["data"]:
+        if not isinstance(item, Mapping) or not isinstance(item.get("id"), str):
+            raise PostStartedFailure("endpoint_identity_mismatch")
+        identifier = item["id"].strip()
+        if not identifier or identifier in identifiers:
+            raise PostStartedFailure("endpoint_identity_mismatch")
+        identifiers.append(identifier)
+    if tuple(identifiers) != (EXPECTED_MODEL,):
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    return tuple(identifiers)
+
+
+def _project_props(payload: object) -> dict[str, object]:
+    """Project the bounded llama.cpp `/props` identity without raw paths."""
+    if not isinstance(payload, Mapping):
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    model_path = payload.get("model_path")
+    generation = payload.get("default_generation_settings")
+    build_info = payload.get("build_info")
+    total_slots = payload.get("total_slots")
+    if (
+        not isinstance(model_path, str)
+        or not model_path.strip()
+        or not isinstance(generation, Mapping)
+        or isinstance(generation.get("n_ctx"), bool)
+        or not isinstance(generation.get("n_ctx"), int)
+        or generation["n_ctx"] <= 0
+        or not isinstance(build_info, str)
+        or not build_info.strip()
+        or isinstance(total_slots, bool)
+        or not isinstance(total_slots, int)
+        or total_slots <= 0
+    ):
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    normalized_path = model_path.strip()
+    basename = Path(normalized_path).name
+    if not basename:
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    return {
+        "model_path_basename": basename,
+        "model_path_fingerprint_sha256": sha256_text(normalized_path),
+        "context_size": generation["n_ctx"],
+        "build_info": build_info.strip()[:256],
+        "total_slots": total_slots,
+        "gguf_byte_identity": "NOT_AVAILABLE",
+    }
+
+
+def observe_endpoint_identity(
+    api_key: str,
+    *,
+    http_get_json: Callable[[str, str], object] | None = None,
+) -> dict[str, Any]:
+    """Observe exactly `/v1/models` and `/props`, returning sanitized identity."""
+    getter = http_get_json or _authenticated_json_get
+    catalog = _project_model_catalog(getter(MODEL_CATALOG_URL, api_key))
+    props = _project_props(getter(PROPS_URL, api_key))
+    return EndpointIdentity(model_catalog=catalog, **props).as_dict()
+
+
+def validate_endpoint_identity(
+    observed: Mapping[str, Any],
+    authorization: FrozenAuthorization,
+) -> dict[str, Any]:
+    """Require observed endpoint identity to equal the external authorization."""
+    configured = {
+        "server_origin": LLAMA_SERVER_ORIGIN,
+        "openai_compat_base_url": OPENAI_COMPAT_BASE_URL,
+        "model_catalog_url": MODEL_CATALOG_URL,
+        "props_url": PROPS_URL,
+        "provider": EXPECTED_PROVIDER,
+        "model": EXPECTED_MODEL,
+    }
+    expected = dict(authorization.endpoint_identity)
+    if (
+        authorization.server_origin != LLAMA_SERVER_ORIGIN
+        or authorization.openai_compat_base_url != OPENAI_COMPAT_BASE_URL
+        or authorization.model_catalog_url != MODEL_CATALOG_URL
+        or authorization.props_url != PROPS_URL
+        or not expected
+        or dict(observed) != expected
+    ):
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    return {**configured, **dict(observed)}
+
+
 _ACCEPTED_D1_D3_REQUESTS = (
     "Change the Gamma Ray curve scale to a linear scale from 10 to 100.",
     'Change the report title to "Gamma Ray Quality Control Review".',
@@ -743,10 +937,21 @@ def verify_frozen_contract(
         raise PreflightError("working tree is not clean")
     if authorization.provider != EXPECTED_PROVIDER or authorization.model != EXPECTED_MODEL:
         raise PreflightError("provider/model configuration drifted")
+    if (
+        authorization.server_origin != LLAMA_SERVER_ORIGIN
+        or authorization.openai_compat_base_url != OPENAI_COMPAT_BASE_URL
+        or authorization.model_catalog_url != MODEL_CATALOG_URL
+        or authorization.props_url != PROPS_URL
+    ):
+        raise PreflightError("endpoint configuration drifted")
     if authorization.openai_version != EXPECTED_OPENAI_VERSION:
         raise PreflightError("authorized OpenAI version drifted")
     if authorization.sdk_max_retries != EXPECTED_SDK_MAX_RETRIES:
         raise PreflightError("authorized SDK retry setting drifted")
+    if not isinstance(authorization.endpoint_identity, Mapping) or not (
+        authorization.endpoint_identity
+    ):
+        raise PreflightError("authorized endpoint identity projection is missing")
     if authorization.cases_fixture_sha256 != FROZEN_CASES_SHA256:
         raise PreflightError("authorized cases fixture hash is not the frozen hash")
     if authorization.gold_fixture_sha256 != FROZEN_GOLD_SHA256:
@@ -896,6 +1101,21 @@ class CampaignCustody:
                 "experiment_version": EXPERIMENT_VERSION,
                 "campaign_id": self.state["campaign_id"],
                 **dict(event),
+            }
+        )
+
+    def record_endpoint_identity(self, identity: Mapping[str, Any]) -> None:
+        """Persist sanitized endpoint identity before provider construction."""
+        self.state["identity_endpoint_calls"] = 2
+        self.state["endpoint_identity"] = dict(identity)
+        _atomic_json(self.state_path, self.state)
+        self.journal.append(
+            {
+                "event": "endpoint_identity_verified",
+                "experiment_version": EXPERIMENT_VERSION,
+                "campaign_id": self.state["campaign_id"],
+                "identity_endpoint_calls": 2,
+                **dict(identity),
             }
         )
 
@@ -1284,6 +1504,7 @@ class D4CampaignAdapter:
     source_path: Path | None = None
     cbl_artifact_path: Path | None = None
     provider_backed: bool = False
+    identity_endpoint_calls: int = 0
     _current_by_case: dict[str, Path] = field(default_factory=dict)
 
     def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
@@ -1563,6 +1784,11 @@ def create_live_campaign_adapter(
     """Create the explicit D4B provider-backed adapter without fallback paths."""
     from wellplot.agent.direct_notebook import _provider_backend
 
+    if base_url != OPENAI_COMPAT_BASE_URL:
+        raise PostStartedFailure("endpoint_identity_mismatch")
+    if not isinstance(api_key, str) or not api_key.strip():
+        raise PostStartedFailure("credential_unavailable")
+
     backend, credential_source = _provider_backend(
         provider=EXPECTED_PROVIDER,
         model=EXPECTED_MODEL,
@@ -1595,7 +1821,116 @@ def create_live_campaign_adapter(
         session=session,
         call_source=CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
         provider_backed=True,
+        identity_endpoint_calls=2,
     )
+
+
+def load_d4_api_key(repo_root: Path) -> str:
+    """Load only the amended OpenAI-compatible credential names."""
+    from wellplot.agent.providers._v2_client import load_api_key
+
+    try:
+        return load_api_key(
+            server_root=repo_root,
+            api_key=None,
+            env_var_names=("OPENAI_COMPAT_API_KEY",),
+            env_file_keys=("OPENAI_COMPAT_API_KEY",),
+            text_file_names=(
+                "OPENAI_COMPAT_API_KEY.txt",
+                "openai_compat_api_key.txt",
+            ),
+            missing_message="OpenAI-compatible API key was not configured.",
+        )
+    except RuntimeError:
+        raise PostStartedFailure("credential_unavailable") from None
+
+
+def create_live_campaign_runtime(
+    *,
+    repo_root: Path,
+    artifact_root: Path,
+    authorization: FrozenAuthorization,
+    record_identity: Callable[[Mapping[str, Any]], None],
+    http_get_json: Callable[[str, str], object] | None = None,
+) -> D4CampaignAdapter:
+    """Compose credential, endpoint provenance, and provider inside custody."""
+    api_key = load_d4_api_key(repo_root)
+    observed = observe_endpoint_identity(api_key, http_get_json=http_get_json)
+    identity = validate_endpoint_identity(observed, authorization)
+    record_identity(identity)
+    try:
+        return create_live_campaign_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=api_key,
+            base_url=OPENAI_COMPAT_BASE_URL,
+            timeout=120.0,
+        )
+    except PostStartedFailure:
+        raise
+    except Exception:
+        raise PostStartedFailure("provider_construction_failed") from None
+
+
+def _terminal_reason_code(error: Exception, *, runtime_construction: bool) -> str:
+    """Map post-STARTED failures to the finite non-secret terminal taxonomy."""
+    if isinstance(error, PostStartedFailure):
+        return error.reason_code
+    if isinstance(error, CallCapExceeded):
+        return "call_cap_exceeded"
+    if isinstance(error, (OSError, PreflightError)):
+        return "evidence_integrity_failure"
+    if runtime_construction:
+        return "provider_construction_failed"
+    return "provider_execution_failed"
+
+
+def _finish_inconclusive(
+    custody: CampaignCustody,
+    *,
+    rows: Sequence[Mapping[str, Any]],
+    reason_code: str,
+    execution_context: D4CampaignAdapter | None = None,
+) -> dict[str, Any]:
+    """Durably close a post-STARTED failure without persisting exception text."""
+    if reason_code not in TERMINAL_REASON_CODES:
+        reason_code = "evidence_integrity_failure"
+    state = custody.state
+    state["status"] = "TERMINAL"
+    state["decision"] = INCONCLUSIVE_DECISION
+    state["terminal_decision"] = INCONCLUSIVE_DECISION
+    state["terminal_reason_code"] = reason_code
+    state["completed_turns"] = len(rows)
+    state["infrastructure_failure"] = True
+    _atomic_json(custody.state_path, state)
+    event = {
+        "event": "campaign_terminal",
+        "experiment_version": EXPERIMENT_VERSION,
+        "campaign_id": state["campaign_id"],
+        "status": "TERMINAL",
+        "decision": INCONCLUSIVE_DECISION,
+        "terminal_decision": INCONCLUSIVE_DECISION,
+        "terminal_reason_code": reason_code,
+        "completed_turns": len(rows),
+        "logical_generation_calls": state["logical_generation_calls"],
+    }
+    try:
+        custody.journal.append(event)
+    except Exception:
+        state["terminal_reason_code"] = "evidence_integrity_failure"
+        _atomic_json(custody.state_path, state)
+    return {
+        "decision": INCONCLUSIVE_DECISION,
+        "status": "TERMINAL",
+        "terminal_reason_code": state["terminal_reason_code"],
+        "completed_turns": len(rows),
+        "rows": list(rows),
+        "logical_generation_calls": int(state["logical_generation_calls"]),
+        "provider_calls": int(getattr(execution_context, "provider_calls", 0)),
+        "endpoint_calls": getattr(execution_context, "endpoint_calls", None),
+        "identity_endpoint_calls": int(state.get("identity_endpoint_calls", 0)),
+        "model_calls": getattr(execution_context, "model_calls", None),
+    }
 
 
 async def run_campaign(
@@ -1604,30 +1939,26 @@ async def run_campaign(
     state_path: Path,
     journal_path: Path,
     preflight: Callable[[], dict[str, Any]],
-    execution_factory: Callable[[], D4CampaignAdapter],
+    execution_factory: Callable[[CampaignCustody], D4CampaignAdapter],
 ) -> dict[str, Any]:
     """Execute the frozen nine-turn campaign through the harness adapter."""
     cases = load_cases(repo_root)
     gold_cases = {item["turn_id"]: item for item in load_gold(repo_root)["cases"]}
-    state, execution_context = start_campaign(
+    state, custody = start_campaign(
         state_path=state_path,
         journal_path=journal_path,
         preflight=preflight,
-        execution_factory=execution_factory,
     )
-    custody = CampaignCustody(
-        state_path=state_path,
-        journal=CampaignJournal(journal_path),
-        state=state,
-    )
-    bind_call_started = getattr(execution_context, "bind_call_started", None)
-    if callable(bind_call_started):
-        bind_call_started(custody.record_call_started)
-    bind_call_completed = getattr(execution_context, "bind_call_completed", None)
-    if callable(bind_call_completed):
-        bind_call_completed(custody.record_call_completed)
     rows: list[dict[str, Any]] = []
+    execution_context: D4CampaignAdapter | None = None
     try:
+        execution_context = execution_factory(custody)
+        bind_call_started = getattr(execution_context, "bind_call_started", None)
+        if callable(bind_call_started):
+            bind_call_started(custody.record_call_started)
+        bind_call_completed = getattr(execution_context, "bind_call_completed", None)
+        if callable(bind_call_completed):
+            bind_call_completed(custody.record_call_completed)
         for case in cases:
             expected = gold_cases[case["turn_id"]]
             started = time.perf_counter()
@@ -1683,34 +2014,21 @@ async def run_campaign(
             "logical_generation_calls": int(state["logical_generation_calls"]),
             "provider_calls": int(getattr(execution_context, "provider_calls", 0)),
             "endpoint_calls": getattr(execution_context, "endpoint_calls", None),
+            "identity_endpoint_calls": int(
+                getattr(execution_context, "identity_endpoint_calls", 0)
+            ),
             "model_calls": getattr(execution_context, "model_calls", None),
         }
     except Exception as error:
-        state["status"] = "INCONCLUSIVE"
-        state["decision"] = INCONCLUSIVE_DECISION
-        state["infrastructure_failure"] = True
-        state["failure_type"] = type(error).__name__
-        state["completed_turns"] = len(rows)
-        _atomic_json(state_path, state)
-        custody.journal.append(
-            {
-                "event": "campaign_terminal",
-                "experiment_version": EXPERIMENT_VERSION,
-                "campaign_id": state["campaign_id"],
-                "status": "INCONCLUSIVE",
-                "decision": INCONCLUSIVE_DECISION,
-                "completed_turns": len(rows),
-                "failure_type": type(error).__name__,
-            }
+        return _finish_inconclusive(
+            custody,
+            rows=rows,
+            reason_code=_terminal_reason_code(
+                error,
+                runtime_construction=execution_context is None,
+            ),
+            execution_context=execution_context,
         )
-        return {
-            "decision": INCONCLUSIVE_DECISION,
-            "status": "INCONCLUSIVE",
-            "completed_turns": len(rows),
-            "rows": rows,
-            "error_type": type(error).__name__,
-            "error_message": str(error),
-        }
     finally:
         custody.journal.close()
 
@@ -1720,9 +2038,8 @@ def start_campaign(
     state_path: Path,
     journal_path: Path,
     preflight: Callable[[], dict[str, Any]],
-    execution_factory: Callable[[], D4CampaignAdapter],
-) -> tuple[dict[str, Any], D4CampaignAdapter]:
-    """Create durable STARTED state before accessing credentials/provider code."""
+) -> tuple[dict[str, Any], CampaignCustody]:
+    """Create durable STARTED state before accessing runtime/provider code."""
     assert_campaign_paths_absent(state_path, journal_path)
     provenance = preflight()
     campaign_id = f"d4-live-v1-{uuid.uuid4().hex}"
@@ -1746,7 +2063,11 @@ def start_campaign(
         if key in provenance:
             state[key] = provenance[key]
     _atomic_json(state_path, state, exclusive=True)
-    return state, execution_factory()
+    return state, CampaignCustody(
+        state_path=state_path,
+        journal=CampaignJournal(journal_path),
+        state=state,
+    )
 
 
 def evidence_is_redacted(value: object) -> bool:
@@ -2046,6 +2367,13 @@ def provider_free_preflight(
         "accepted_checkpoint": authorization.accepted_checkpoint,
         **attestation,
         "authorized_design_checkpoint": AUTHORIZED_DESIGN_CHECKPOINT,
+        "provider": EXPECTED_PROVIDER,
+        "model": EXPECTED_MODEL,
+        "server_origin": LLAMA_SERVER_ORIGIN,
+        "openai_compat_base_url": OPENAI_COMPAT_BASE_URL,
+        "model_catalog_url": MODEL_CATALOG_URL,
+        "props_url": PROPS_URL,
+        "credential_source": CREDENTIAL_SOURCE,
         "production": production,
         "population": {
             "cases": 5,
@@ -2065,7 +2393,9 @@ def provider_free_preflight(
         "openai_retry": sdk,
         "provider_calls": 0,
         "endpoint_calls": 0,
+        "identity_endpoint_calls": 0,
         "model_calls": 0,
+        "endpoint_identity_observed": False,
     }
 
 
@@ -2100,12 +2430,11 @@ def _main() -> int:
                     state_path=state_path,
                     journal_path=journal_path,
                     preflight=lambda: provider_free_preflight(repo_root, authorization),
-                    execution_factory=lambda: create_live_campaign_adapter(
+                    execution_factory=lambda custody: create_live_campaign_runtime(
                         repo_root=repo_root,
                         artifact_root=artifact_root,
-                        api_key=None,
-                        base_url=None,
-                        timeout=120.0,
+                        authorization=authorization,
+                        record_identity=custody.record_endpoint_identity,
                     ),
                 )
             )

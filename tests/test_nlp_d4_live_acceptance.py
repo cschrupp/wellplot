@@ -6,7 +6,7 @@ import asyncio
 import copy
 import json
 import sys
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -33,6 +33,8 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+from wellplot.agent.providers.response_diagnostics import StructuredResponseProviderError
 from wellplot.agent.session import AgentSession, AgentSessionConfig
 from wellplot.authoring import (
     _fill_element,
@@ -44,6 +46,38 @@ from wellplot.model.authoring import AuthoringDocumentSpec
 
 class _Value(BaseModel):
     value: str = "ok"
+
+
+class _RequiredValue(BaseModel):
+    value: str
+
+
+class _FakeCompletions:
+    def __init__(self, content: str) -> None:
+        self.content = content
+        self.kwargs: dict[str, object] | None = None
+
+    async def create(self, **kwargs: object) -> object:
+        self.kwargs = kwargs
+        return SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        role="assistant",
+                        content=self.content,
+                        refusal=None,
+                        tool_calls=None,
+                    ),
+                    finish_reason="stop",
+                )
+            ],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1, total_tokens=2),
+        )
+
+
+class _FakeClient:
+    def __init__(self, content: str) -> None:
+        self.chat = SimpleNamespace(completions=_FakeCompletions(content))
 
 
 class _Backend:
@@ -115,6 +149,15 @@ def _authorization() -> d4.FrozenAuthorization:
             "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis": (
                 "a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640"
             ),
+        },
+        endpoint_identity={
+            "model_catalog": [d4.EXPECTED_MODEL],
+            "model_path_basename": "qwen3.6-35b-a3b.gguf",
+            "model_path_fingerprint_sha256": "a" * 64,
+            "context_size": 32768,
+            "build_info": "llama.cpp test build",
+            "total_slots": 1,
+            "gguf_byte_identity": "NOT_AVAILABLE",
         },
     )
 
@@ -331,6 +374,409 @@ def test_openai_retry_policy_is_provider_free() -> None:
     assert evidence["physical_http_attempt_upper_bound"] == 135
 
 
+def test_endpoint_identity_projects_only_bounded_props_and_exact_catalog() -> None:
+    """Fake authenticated GETs prove the Qwen-only catalog and sanitized props."""
+    requests: list[tuple[str, str]] = []
+    responses = {
+        d4.MODEL_CATALOG_URL: {"data": [{"id": d4.EXPECTED_MODEL, "object": "model"}]},
+        d4.PROPS_URL: {
+            "model_path": "/srv/models/qwen3.6-35b-a3b.gguf",
+            "default_generation_settings": {"n_ctx": 32768},
+            "build_info": "llama.cpp build abc",
+            "total_slots": 1,
+            "chat_template": "must not persist",
+        },
+    }
+
+    def fake_get(url: str, token: str) -> object:
+        requests.append((url, token))
+        return responses[url]
+
+    identity = d4.observe_endpoint_identity("secret-token", http_get_json=fake_get)
+    assert [url for url, _ in requests] == [d4.MODEL_CATALOG_URL, d4.PROPS_URL]
+    assert all(token == "secret-token" for _, token in requests)
+    assert "secret-token" not in json.dumps(identity)
+    assert identity["model_catalog"] == [d4.EXPECTED_MODEL]
+    assert identity["model_path_basename"] == "qwen3.6-35b-a3b.gguf"
+    assert identity["model_path_fingerprint_sha256"] == d4.sha256_text(
+        "/srv/models/qwen3.6-35b-a3b.gguf"
+    )
+    assert "model_path" not in identity
+    assert "chat_template" not in identity
+    assert identity["gguf_byte_identity"] == "NOT_AVAILABLE"
+
+
+@pytest.mark.parametrize(
+    "catalog",
+    [
+        {"data": []},
+        {"data": [{"id": "wrong-model"}]},
+        {"data": [{"id": d4.EXPECTED_MODEL}, {"id": "fallback"}]},
+        {"data": [{"object": "model"}]},
+    ],
+)
+def test_endpoint_identity_rejects_catalog_drift(catalog: dict[str, object]) -> None:
+    """Missing, aliased, extra, and malformed catalog entries fail closed."""
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4.observe_endpoint_identity(
+            "token",
+            http_get_json=lambda url, token: (
+                catalog
+                if url == d4.MODEL_CATALOG_URL
+                else {
+                    "model_path": "/models/qwen.gguf",
+                    "default_generation_settings": {"n_ctx": 1},
+                    "build_info": "build",
+                    "total_slots": 1,
+                }
+            ),
+        )
+
+
+@pytest.mark.parametrize(
+    "props",
+    [
+        {"default_generation_settings": {"n_ctx": 32768}, "build_info": "build", "total_slots": 1},
+        {
+            "model_path": "/models/qwen.gguf",
+            "default_generation_settings": {},
+            "build_info": "build",
+            "total_slots": 1,
+        },
+        {
+            "model_path": "/models/qwen.gguf",
+            "default_generation_settings": {"n_ctx": 32768},
+            "total_slots": 1,
+        },
+        {
+            "model_path": "/models/qwen.gguf",
+            "default_generation_settings": {"n_ctx": 32768},
+            "build_info": "build",
+            "total_slots": 0,
+        },
+    ],
+)
+def test_endpoint_identity_rejects_invalid_props(props: dict[str, object]) -> None:
+    """The bounded /props projection requires all four identity facts."""
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4.observe_endpoint_identity(
+            "token",
+            http_get_json=lambda url, token: (
+                {"data": [{"id": d4.EXPECTED_MODEL}]} if url == d4.MODEL_CATALOG_URL else props
+            ),
+        )
+
+
+def test_endpoint_identity_must_match_external_authorization() -> None:
+    """Observed identity cannot silently select a different deployment."""
+    authorization = _authorization()
+    observed = dict(authorization.endpoint_identity)
+    observed["build_info"] = "different build"
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4.validate_endpoint_identity(observed, authorization)
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["server_origin", "openai_compat_base_url", "model_catalog_url", "props_url"],
+)
+def test_endpoint_identity_rejects_authorized_url_drift(field: str) -> None:
+    """The configured origin and every frozen endpoint URL are immutable."""
+    authorization = _authorization()
+    observed = dict(authorization.endpoint_identity)
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4.validate_endpoint_identity(observed, replace(authorization, **{field: "http://wrong"}))
+
+
+def test_credential_loader_does_not_fall_back_to_openai_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The amended harness accepts only the OpenAI-compatible credential names."""
+    monkeypatch.delenv("OPENAI_COMPAT_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "must-not-be-used")
+    with (
+        TemporaryDirectory() as temporary,
+        pytest.raises(
+            d4.PostStartedFailure,
+            match="credential_unavailable",
+        ),
+    ):
+        d4.load_d4_api_key(Path(temporary))
+
+
+def test_runtime_passes_loaded_token_only_to_explicit_provider_factory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Runtime composition keeps the credential ephemeral and provider-bound."""
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral-token")
+
+    def fake_adapter(**kwargs: object) -> object:
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(d4, "create_live_campaign_adapter", fake_adapter)
+    recorded: list[dict[str, object]] = []
+
+    def fake_get(url: str, token: str) -> object:
+        if url == d4.MODEL_CATALOG_URL:
+            return {"data": [{"id": d4.EXPECTED_MODEL}]}
+        return {
+            "model_path": "/models/qwen.gguf",
+            "default_generation_settings": {"n_ctx": 32768},
+            "build_info": "build",
+            "total_slots": 1,
+        }
+
+    authorization = replace(
+        _authorization(),
+        endpoint_identity={
+            "model_catalog": [d4.EXPECTED_MODEL],
+            "model_path_basename": "qwen.gguf",
+            "model_path_fingerprint_sha256": d4.sha256_text("/models/qwen.gguf"),
+            "context_size": 32768,
+            "build_info": "build",
+            "total_slots": 1,
+            "gguf_byte_identity": "NOT_AVAILABLE",
+        },
+    )
+    result = d4.create_live_campaign_runtime(
+        repo_root=REPO_ROOT,
+        artifact_root=REPO_ROOT / "tmp",
+        authorization=authorization,
+        record_identity=lambda identity: recorded.append(dict(identity)),
+        http_get_json=fake_get,
+    )
+    assert result is not None
+    assert captured["api_key"] == "ephemeral-token"
+    assert captured["base_url"] == d4.OPENAI_COMPAT_BASE_URL
+    assert "ephemeral-token" not in json.dumps(recorded)
+
+
+def test_real_compat_backend_uses_frozen_sparse_token_contract() -> None:
+    """Production backend kwargs omit both legacy token parameter names."""
+    structured_client = _FakeClient('{"value":"ok"}')
+    structured = OpenAICompatibleBackendV2(
+        model=d4.EXPECTED_MODEL,
+        client=structured_client,
+        structured_output="json_schema",
+    )
+    asyncio.run(structured.generate_structured(_structured_request(), response_model=_Value))
+    structured_kwargs = structured_client.chat.completions.kwargs
+    assert structured_kwargs is not None
+    assert structured_kwargs["model"] == d4.EXPECTED_MODEL
+    assert structured_kwargs["temperature"] == 0.0
+    assert structured_kwargs["response_format"]["type"] == "json_schema"
+    assert structured_kwargs["response_format"]["json_schema"]["strict"] is True
+    assert "max_tokens" not in structured_kwargs
+    assert "max_completion_tokens" not in structured_kwargs
+
+    program_client = _FakeClient("report = wp.report()")
+    program = OpenAICompatibleBackendV2(model=d4.EXPECTED_MODEL, client=program_client)
+    asyncio.run(program.generate_program(_program_request()))
+    program_kwargs = program_client.chat.completions.kwargs
+    assert program_kwargs is not None
+    assert program_kwargs["model"] == d4.EXPECTED_MODEL
+    assert "temperature" not in program_kwargs
+    assert "max_tokens" not in program_kwargs
+    assert "max_completion_tokens" not in program_kwargs
+
+
+@pytest.mark.parametrize("content", ["not-json", "{}"])
+def test_real_compat_backend_rejects_invalid_local_structured_content(content: str) -> None:
+    """Local JSON/Pydantic validation remains authoritative over provider success."""
+    backend = OpenAICompatibleBackendV2(
+        model=d4.EXPECTED_MODEL,
+        client=_FakeClient(content),
+        structured_output="json_schema",
+    )
+    with pytest.raises(StructuredResponseProviderError):
+        asyncio.run(
+            backend.generate_structured(_structured_request(), response_model=_RequiredValue)
+        )
+
+
+def _run_post_started_failure(
+    root: Path,
+    failure: Callable[[d4.CampaignCustody], object],
+) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
+    """Run one fake post-STARTED failure and return state plus terminal event."""
+    state_path = root / "state.json"
+    journal_path = root / "journal.jsonl"
+    result = asyncio.run(
+        d4.run_campaign(
+            repo_root=REPO_ROOT,
+            state_path=state_path,
+            journal_path=journal_path,
+            preflight=lambda: {"current_checkout": "a" * 40},
+            execution_factory=failure,
+        )
+    )
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    events = [json.loads(line) for line in journal_path.read_text().splitlines()]
+    return result, state, events
+
+
+def test_missing_credential_after_started_is_durable_inconclusive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Credential failure occurs after STARTED and leaves a terminal journal event."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        monkeypatch.setattr(
+            d4,
+            "load_d4_api_key",
+            lambda repo_root: (_ for _ in ()).throw(
+                d4.PostStartedFailure("credential_unavailable")
+            ),
+        )
+        result, state, events = _run_post_started_failure(
+            root,
+            lambda custody: d4.create_live_campaign_runtime(
+                repo_root=REPO_ROOT,
+                artifact_root=root,
+                authorization=_authorization(),
+                record_identity=custody.record_endpoint_identity,
+            ),
+        )
+    assert result["terminal_reason_code"] == "credential_unavailable"
+    assert state["status"] == "TERMINAL"
+    assert state["terminal_decision"] == d4.INCONCLUSIVE_DECISION
+    assert state["terminal_reason_code"] == "credential_unavailable"
+    assert state["completed_turns"] == 0
+    assert state["logical_generation_calls"] == 0
+    assert events[-1]["event"] == "campaign_terminal"
+    assert events[-1]["terminal_reason_code"] == "credential_unavailable"
+
+
+def test_endpoint_unavailable_after_started_has_no_provider_or_logical_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Endpoint failure is terminal before provider construction or generation."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+        result, state, events = _run_post_started_failure(
+            root,
+            lambda custody: d4.create_live_campaign_runtime(
+                repo_root=REPO_ROOT,
+                artifact_root=root,
+                authorization=_authorization(),
+                record_identity=custody.record_endpoint_identity,
+                http_get_json=lambda url, token: (_ for _ in ()).throw(
+                    d4.PostStartedFailure("endpoint_unreachable")
+                ),
+            ),
+        )
+    assert result["terminal_reason_code"] == "endpoint_unreachable"
+    assert state["logical_generation_calls"] == 0
+    assert events[-1]["terminal_reason_code"] == "endpoint_unreachable"
+
+
+def test_identity_mismatch_after_started_has_no_provider_or_logical_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A wrong model catalog cannot fall through to provider construction."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+        result, state, events = _run_post_started_failure(
+            root,
+            lambda custody: d4.create_live_campaign_runtime(
+                repo_root=REPO_ROOT,
+                artifact_root=root,
+                authorization=_authorization(),
+                record_identity=custody.record_endpoint_identity,
+                http_get_json=lambda url, token: (
+                    {"data": [{"id": "wrong-model"}]} if url == d4.MODEL_CATALOG_URL else {}
+                ),
+            ),
+        )
+    assert result["terminal_reason_code"] == "endpoint_identity_mismatch"
+    assert state["logical_generation_calls"] == 0
+    assert events[-1]["terminal_reason_code"] == "endpoint_identity_mismatch"
+
+
+def test_provider_construction_failure_is_durable_inconclusive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Successful identity observation followed by construction failure is terminal."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+        monkeypatch.setattr(
+            d4,
+            "create_live_campaign_adapter",
+            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("provider unavailable")),
+        )
+
+        def fake_get(url: str, token: str) -> object:
+            if url == d4.MODEL_CATALOG_URL:
+                return {"data": [{"id": d4.EXPECTED_MODEL}]}
+            return {
+                "model_path": "/models/qwen.gguf",
+                "default_generation_settings": {"n_ctx": 32768},
+                "build_info": "build",
+                "total_slots": 1,
+            }
+
+        result, state, events = _run_post_started_failure(
+            root,
+            lambda custody: d4.create_live_campaign_runtime(
+                repo_root=REPO_ROOT,
+                artifact_root=root,
+                authorization=replace(
+                    _authorization(),
+                    endpoint_identity={
+                        "model_catalog": [d4.EXPECTED_MODEL],
+                        "model_path_basename": "qwen.gguf",
+                        "model_path_fingerprint_sha256": d4.sha256_text("/models/qwen.gguf"),
+                        "context_size": 32768,
+                        "build_info": "build",
+                        "total_slots": 1,
+                        "gguf_byte_identity": "NOT_AVAILABLE",
+                    },
+                ),
+                record_identity=custody.record_endpoint_identity,
+                http_get_json=fake_get,
+            ),
+        )
+    assert result["terminal_reason_code"] == "provider_construction_failed"
+    assert state["logical_generation_calls"] == 0
+    assert events[-1]["terminal_reason_code"] == "provider_construction_failed"
+
+
+def test_journal_failure_leaves_state_terminal_evidence_integrity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If terminal journaling fails, state remains the bounded evidence source."""
+
+    def fail_append(self: d4.CampaignJournal, event: Mapping[str, object]) -> None:
+        raise OSError("journal unavailable")
+
+    monkeypatch.setattr(d4.CampaignJournal, "append", fail_append)
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        state_path = root / "state.json"
+        journal_path = root / "journal.jsonl"
+        result = asyncio.run(
+            d4.run_campaign(
+                repo_root=REPO_ROOT,
+                state_path=state_path,
+                journal_path=journal_path,
+                preflight=lambda: {"current_checkout": "a" * 40},
+                execution_factory=lambda custody: (_ for _ in ()).throw(
+                    d4.PostStartedFailure("credential_unavailable")
+                ),
+            )
+        )
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+    assert result["terminal_reason_code"] == "evidence_integrity_failure"
+    assert state["status"] == "TERMINAL"
+    assert state["terminal_decision"] == d4.INCONCLUSIVE_DECISION
+    assert state["terminal_reason_code"] == "evidence_integrity_failure"
+
+
 def test_live_cli_requires_explicit_d4b_authorization(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -445,8 +891,8 @@ def test_counting_backend_reserves_unique_indexes_under_concurrent_calls() -> No
     assert sum(isinstance(result, d4.CallCapExceeded) for result in results) == 1
 
 
-def test_campaign_state_is_durable_before_credentials() -> None:
-    """Write STARTED state before invoking credential construction."""
+def test_campaign_state_is_durable_before_post_started_runtime() -> None:
+    """Write STARTED state before invoking any post-STARTED runtime code."""
     with TemporaryDirectory() as temporary:
         directory = Path(temporary)
         state_path = directory / "state.json"
@@ -457,18 +903,12 @@ def test_campaign_state_is_durable_before_credentials() -> None:
             events.append("preflight")
             return {"current_checkout": "a" * 40}
 
-        def credentials() -> object:
-            events.append("credentials")
-            assert state_path.is_file()
-            return object()
-
         state, _ = d4.start_campaign(
             state_path=state_path,
             journal_path=journal_path,
             preflight=preflight,
-            execution_factory=credentials,
         )
-        assert events == ["preflight", "credentials"]
+        assert events == ["preflight"]
         assert state["status"] == "STARTED"
         assert json.loads(state_path.read_text())["status"] == "STARTED"
 
@@ -483,7 +923,6 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
             state_path=state_path,
             journal_path=journal_path,
             preflight=lambda: {"current_checkout": "a" * 40},
-            execution_factory=lambda: object(),
         )
         custody = d4.CampaignCustody(
             state_path=state_path,
@@ -539,7 +978,6 @@ def test_existing_campaign_artifacts_block_resume() -> None:
                 state_path=state_path,
                 journal_path=journal_path,
                 preflight=lambda: {"current_checkout": "a" * 40},
-                execution_factory=lambda: pytest.fail("credentials accessed"),
             )
 
 
@@ -1197,7 +1635,7 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
                 state_path=state_path,
                 journal_path=journal_path,
                 preflight=lambda: {"current_checkout": "a" * 40},
-                execution_factory=lambda: adapter,
+                execution_factory=lambda custody: adapter,
             )
         )
         journal_rows = [json.loads(line) for line in journal_path.read_text().splitlines()]
