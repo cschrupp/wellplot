@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -432,7 +433,11 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
             journal=d4.CampaignJournal(journal_path),
             state=state,
         )
-        backend = d4.CountingBackend(delegate=_Backend(), call_started=custody.record_call_started)
+        backend = d4.CountingBackend(
+            delegate=_Backend(),
+            call_started=custody.record_call_started,
+            call_completed=custody.record_call_completed,
+        )
 
         async def run() -> None:
             await backend.generate_structured(_structured_request(), response_model=_Value)
@@ -444,6 +449,11 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
         assert events[0]["event"] == "logical_call_started"
         assert events[0]["logical_generation_calls"] == 1
         assert "raw_structured_payload" not in events[0]
+        assert events[1]["event"] == "logical_call_completed"
+        assert events[1]["index"] == 1
+        assert events[1]["outcome"] == "success"
+        assert events[1]["total_tokens"] == 5
+        assert "raw_structured_payload" not in events[1]
         custody.journal.close()
 
 
@@ -867,6 +877,110 @@ class _D4SessionHarness:
         return cls(root, planner, adapter)
 
 
+@dataclass
+class _GeneratedCblSession:
+    """Provider-free session double that records the exact CBL render input."""
+
+    template: Path
+    provider: str = "deterministic"
+    model: str = "d4-rehearsal-model"
+    render_source: Path | None = None
+
+    async def run(self, *, output_logfile: Path, source_logfile_path: Path, goal: str) -> object:
+        del source_logfile_path, goal
+        output_logfile.write_bytes(self.template.read_bytes())
+        return SimpleNamespace(
+            submitted_intent=None,
+            report_facts={
+                "success": True,
+                "compilation": {
+                    "diagnostics": [],
+                    "workers": [],
+                    "metrics": {
+                        "worker_count": 0,
+                        "successful_workers": 0,
+                        "failed_workers": 0,
+                        "total_calls": 0,
+                        "total_repairs": 0,
+                    },
+                },
+                "apply_status": "persisted",
+                "changed": True,
+            },
+        )
+
+    async def render_logfile_to_file(
+        self,
+        *,
+        logfile_path: Path,
+        output_path: Path,
+        overwrite: bool,
+    ) -> dict[str, object]:
+        del overwrite
+        self.render_source = Path(logfile_path)
+        output_path.write_bytes(b"rendered generated CBL")
+        return {"output_path": str(output_path)}
+
+
+def test_live_cbl_branch_verifies_and_renders_generated_artifact() -> None:
+    """The live CBL path grades and renders the generated artifact, not LAS seed state."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        template = _build_rehearsal_cbl_artifact(root)
+        session = _GeneratedCblSession(template=template)
+        adapter = d4.D4CampaignAdapter(
+            repo_root=REPO_ROOT,
+            artifact_root=root,
+            session=session,
+            call_source=d4.CampaignCallSource(backends=(), calls=[]),
+        )
+        case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-C01:C01")
+        expected = next(
+            item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == case["turn_id"]
+        )
+        actual = asyncio.run(adapter.execute_turn(case, expected))
+        grade = d4.grade_turn(actual, expected)
+
+        assert grade["status"] == "PASS", grade
+        assert actual["artifact_path"] == actual["after_path"]
+        assert actual["rendered_artifact_path"] == actual["artifact_path"]
+        assert session.render_source == actual["artifact_path"]
+        assert actual["rendered"] is True
+        wrong_artifact = dict(actual, rendered_artifact_path=root / "wrong-cbl.log.yaml")
+        assert d4.grade_turn(wrong_artifact, expected)["status"] == "FAIL"
+
+
+def test_d4_l02_seed_instantiates_the_frozen_depth_windows() -> None:
+    """Both L02 sections use the accepted source and exact shared-boundary ranges."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        harness = _D4SessionHarness.create(root)
+        document = d4.load_logfile_document(harness.adapter._base_for("D4-L02"))
+        sections = document["sections"]
+        assert sections[0]["data_source"] == sections[1]["data_source"]
+        assert [section["depth_range"] for section in sections] == [
+            [8400.0, 9300.0],
+            [9300.0, 10200.0],
+        ]
+
+
+def test_observed_negative_outcomes_distinguish_safe_rejection_from_bad_output() -> None:
+    """A persisted illegal proposal is not equivalent to an untouched rejection."""
+    safe = {
+        "persisted": False,
+        "rendered": False,
+        "observed_safe_rejection": True,
+    }
+    bad = {
+        "persisted": False,
+        "rendered": False,
+        "observed_safe_rejection": False,
+    }
+    case = {"workflow": "LAS-REVISE", "request": "missing channel"}
+    assert d4._observed_outcome(safe, case, {"sections": []}) == "SAFE_ACTIONABLE_FAILURE"
+    assert d4._observed_outcome(bad, case, {"sections": []}) == "DETECTED_INCORRECT_OUTPUT"
+
+
 def _write_rehearsal_document(path: Path, payload: dict[str, object]) -> None:
     """Write a mutated canonical document through the real logfile adapter."""
     document = AuthoringDocumentSpec.model_validate(payload)
@@ -939,6 +1053,16 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert result["model_calls"] == 0
     assert all(row["grader_status"] == "PASS" for row in result["rows"])
     assert all(
+        set(row["token_usage"])
+        == {
+            "input_tokens",
+            "output_tokens",
+            "total_tokens",
+            "latency_ms",
+        }
+        for row in result["rows"]
+    )
+    assert all(
         {item["status"] for item in row["verifier_requirements"]} <= {"PASS", "NOT_CHECKABLE"}
         for row in result["rows"]
         if row["turn_id"].startswith("D4-L01") or row["turn_id"] == "D4-L02:T2"
@@ -949,6 +1073,7 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert state_status == "COMPLETED"
     assert result["logical_generation_calls"] == 16
     assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 16
+    assert sum(row.get("event") == "logical_call_completed" for row in journal_rows) == 16
     assert sum("turn_id" in row for row in journal_rows) == 9
     assert journal_rows[-1]["event"] == "campaign_terminal"
     assert all("raw_generated_program" not in row for row in journal_rows)

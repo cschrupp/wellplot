@@ -5,14 +5,14 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-003
+rework: WELLPLOT-NLP-D4A-REWORK-004
 authorized_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
-rework_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
+rework_parent: 2059c6c0e172c0e0a6dc05ef5f93f4e2dfdc1b24
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
-endpoint_calls: 0
-model_calls: 0
+endpoint_calls: NOT_OBSERVED
+model_calls: NOT_OBSERVED
 D4B: NOT_AUTHORIZED
 D4C: NOT_AUTHORIZED
 production_promotion: NOT_AUTHORIZED
@@ -66,16 +66,28 @@ The harness implements and tests:
 The accepted future-live orchestration is implemented as `run_campaign()` and
 the campaign-owned `D4CampaignAdapter` in the harness script. The adapter
 composes the existing `DirectNotebookSession`, stages each frozen starting
-artifact, executes the CBL/LAS turn branches, renders successful LAS turns,
-and supplies artifact paths to the unchanged graders. The runner creates the
-exclusive STARTED sentinel, binds logical-call custody before the first turn,
-executes the frozen nine-turn order sequentially, appends the complete bounded
-turn schema, and derives the terminal decision without retries or resume
-behavior. D4A exercises this same adapter with deterministic backends only.
+artifact, executes the CBL/LAS turn branches, renders the exact generated CBL
+artifact and successful LAS post-turn artifact, and supplies artifact paths to
+the unchanged graders. CBL uses its artifact verifier contract rather than the
+LAS canonical-diff contract. The runner creates the exclusive STARTED
+sentinel, binds logical-call start and completion custody before the first
+turn, executes the frozen nine-turn order sequentially, appends the complete
+bounded turn schema, and derives the terminal decision without retries or
+resume behavior. D4A exercises this same adapter with deterministic backends
+only.
 
 The `CountingBackend` records only operation kind, call index, configured
 provider/model, request controls, bounded outcome/category, and provider usage
-metrics. It never stores generated program text or structured response data.
+metrics. Turn rows include aggregate bounded token/latency usage, and both
+pre-delegation starts and post-delegation completions are written
+through durable campaign custody. It never stores generated program text or
+structured response data. Exact endpoint/HTTP and remote model call counts are
+not claimed; the SDK retry setting and physical-attempt upper bound remain the
+available transport evidence.
+
+The L02 starting artifact instantiates the accepted shared-boundary windows:
+`Main Log – Upper` uses `8400.0..9300.0` ft and `Main Log – Lower` uses
+`9300.0..10200.0` ft, both from the same authenticated LAS source.
 
 ## Frozen Artifact Hashes
 
@@ -95,8 +107,8 @@ exact candidate commit and parent.
 The focused D4A suite uses only deterministic backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 30 passed, 1 skipped
-provider / endpoint / model calls: 0
+tests/test_nlp_d4_live_acceptance.py: 33 passed, 1 skipped
+provider calls: 0; endpoint/model calls: NOT_OBSERVED
 ```
 
 The provider-free campaign rehearsal also passes all nine frozen turns in the
@@ -105,8 +117,10 @@ logical generation calls through the shared `CountingBackend` and durable
 custody boundary, invokes the real LAS verifier for every positive LAS turn and
 the real CBL verifier for the accepted deterministic CBL artifact, preserves the
 redaction boundary, and derives
-`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED`. The rehearsal reports zero provider,
-endpoint, and model calls; no evaluator gold is sent to a provider prompt.
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED`. The rehearsal uses deterministic
+backends and therefore performs zero external provider activity; this is not
+used as a claim about endpoint or remote-model instrumentation in a future live
+campaign. No evaluator gold is sent to a provider prompt.
 
 The provider-free preflight now requires an external authorization record
 before execution. That record supplies the independently accepted D4A

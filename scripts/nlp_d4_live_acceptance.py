@@ -257,6 +257,7 @@ class CountingBackend:
     model: str = EXPECTED_MODEL
     max_calls: int = MAX_LOGICAL_CALLS
     call_started: Callable[[dict[str, Any]], None] | None = None
+    call_completed: Callable[[dict[str, Any]], None] | None = None
     prompt_guard: Callable[[str], None] | None = None
     calls: list[LogicalCall] = field(default_factory=list)
 
@@ -304,19 +305,33 @@ class CountingBackend:
         category: str | None,
         metrics: ProviderMetrics | None,
     ) -> None:
-        self.calls.append(
-            LogicalCall(
-                index=index,
-                operation=operation,
-                provider=self.provider,
-                model=self.model,
-                temperature=getattr(request, "temperature", None),
-                max_output_tokens=getattr(request, "max_output_tokens", None),
-                outcome=outcome,
-                category=category,
-                metrics={} if metrics is None else metrics.public_metadata(),
-            )
+        call = LogicalCall(
+            index=index,
+            operation=operation,
+            provider=self.provider,
+            model=self.model,
+            temperature=getattr(request, "temperature", None),
+            max_output_tokens=getattr(request, "max_output_tokens", None),
+            outcome=outcome,
+            category=category,
+            metrics={} if metrics is None else metrics.public_metadata(),
         )
+        self.calls.append(call)
+        if self.call_completed is not None:
+            self.call_completed(
+                {
+                    "event": "logical_call_completed",
+                    "index": call.index,
+                    "operation": call.operation,
+                    "provider": call.provider,
+                    "model": call.model,
+                    "temperature": call.temperature,
+                    "max_output_tokens": call.max_output_tokens,
+                    "outcome": call.outcome,
+                    "failure_category": call.category,
+                    **call.metrics,
+                }
+            )
 
     async def generate_structured(
         self,
@@ -411,6 +426,11 @@ class CampaignCallSource:
         """Bind durable custody to every ModelBackendProtocol boundary."""
         for backend in self.backends:
             backend.call_started = callback
+
+    def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind durable completion evidence to every backend boundary."""
+        for backend in self.backends:
+            backend.call_completed = callback
 
     @property
     def logical_call_count(self) -> int:
@@ -823,6 +843,16 @@ class CampaignCustody:
             }
         )
 
+    def record_call_completed(self, event: Mapping[str, Any]) -> None:
+        """Persist bounded post-delegation call evidence without payloads."""
+        self.journal.append(
+            {
+                "experiment_version": EXPERIMENT_VERSION,
+                "campaign_id": self.state["campaign_id"],
+                **dict(event),
+            }
+        )
+
     def append_turn(self, row: Mapping[str, Any]) -> None:
         """Append one bounded turn row after validating its required identity."""
         required = {
@@ -844,6 +874,7 @@ class CampaignCustody:
             "apply_status",
             "diagnostics",
             "worker_metrics",
+            "token_usage",
             "logical_generation_calls",
             "structured_logical_calls",
             "program_logical_calls",
@@ -873,7 +904,15 @@ def _bounded_diagnostics(value: object) -> list[dict[str, object]]:
         result.append(
             {
                 key: item[key]
-                for key in ("stage", "code", "severity", "retryable", "worker_kind", "plan_order")
+                for key in (
+                    "stage",
+                    "code",
+                    "message",
+                    "severity",
+                    "retryable",
+                    "worker_kind",
+                    "plan_order",
+                )
                 if key in item
             }
         )
@@ -914,6 +953,120 @@ def _worker_metrics(actual: Mapping[str, Any]) -> dict[str, int | float]:
         for key, item in value.items()
         if key in allowed and isinstance(item, (int, float)) and not isinstance(item, bool)
     }
+
+
+def _token_usage(calls: Sequence[LogicalCall]) -> dict[str, int | float | None]:
+    """Aggregate bounded provider usage for one turn without raw payloads."""
+    fields = ("input_tokens", "output_tokens", "total_tokens", "latency_ms")
+    usage: dict[str, int | float | None] = {}
+    for field_name in fields:
+        values = [call.metrics.get(field_name) for call in calls]
+        if any(value is None for value in values):
+            usage[field_name] = None
+        else:
+            usage[field_name] = sum(value for value in values if value is not None)
+    return usage
+
+
+def _add_session_evidence(actual: dict[str, Any], result: object) -> None:
+    """Project bounded notebook-session evidence into one turn observation."""
+    report_facts = getattr(result, "report_facts", {})
+    compilation = report_facts.get("compilation", {}) if isinstance(report_facts, Mapping) else {}
+    if not isinstance(compilation, Mapping):
+        compilation = {}
+    diagnostics = _bounded_diagnostics(compilation.get("diagnostics", []))
+    metrics = compilation.get("metrics", {})
+    if not isinstance(metrics, Mapping):
+        metrics = {}
+    actual["diagnostics"] = diagnostics
+    actual["worker_metrics"] = _worker_metrics({"worker_metrics": metrics})
+    actual["worker_repair_count"] = int(metrics.get("total_repairs", 0) or 0)
+    actual["apply_status"] = report_facts.get("apply_status")
+    actual["intent_applied"] = getattr(result, "submitted_intent", None) is not None
+    actual["changed"] = bool(report_facts.get("changed", False))
+    actual["diagnostic_code"] = diagnostics[0].get("code") if diagnostics else None
+
+
+def _document_channels(document: Mapping[str, Any]) -> list[str]:
+    """Return persisted binding channels from one canonical document."""
+    channels: list[str] = []
+    for section in document.get("sections", []):
+        if not isinstance(section, Mapping):
+            continue
+        for track in section.get("tracks", []):
+            if not isinstance(track, Mapping):
+                continue
+            for binding in track.get("bindings", []):
+                if isinstance(binding, Mapping) and binding.get("channel") is not None:
+                    channels.append(str(binding["channel"]))
+    return channels
+
+
+def _observed_failure_facts(
+    actual: Mapping[str, Any],
+    before: Mapping[str, Any],
+    request: str,
+) -> dict[str, Any]:
+    """Derive failure facts from persisted artifacts and bounded diagnostics."""
+    after = actual.get("canonical_after")
+    if not isinstance(after, Mapping):
+        after = {}
+    before_channels = _document_channels(before)
+    after_channels = _document_channels(after)
+    created_channels = [channel for channel in after_channels if channel not in before_channels]
+    diagnostic_code = actual.get("diagnostic_code")
+    diagnostics = actual.get("diagnostics", [])
+    diagnostic_text = " ".join(
+        f"{item.get('code', '')} {item.get('message', '')}"
+        for item in diagnostics
+        if isinstance(item, Mapping)
+    ).casefold()
+    byte_identity = actual.get("pre_bytes_sha256") == actual.get("post_bytes_sha256")
+    canonical_identity = before == after
+    no_intent = actual.get("intent_applied") is not True
+    actionable = bool(diagnostic_code) or bool(diagnostic_text)
+    no_persisted_substitution = not created_channels
+    return {
+        "changed": not (byte_identity and canonical_identity),
+        "diagnostic_code": diagnostic_code,
+        "intent_applied": actual.get("intent_applied") is True,
+        "created_channels": created_channels,
+        "fallback_used": bool("fallback" in diagnostic_text),
+        "substituted_channel": bool(created_channels),
+        "prohibited_object_present": bool(created_channels),
+        "observed_safe_rejection": (
+            byte_identity
+            and canonical_identity
+            and no_intent
+            and actionable
+            and no_persisted_substitution
+            and any(
+                token in f"{request.casefold()} {diagnostic_text}"
+                for token in ("missing", "ambiguous", "channel_missing")
+            )
+        ),
+    }
+
+
+def _observed_outcome(
+    actual: Mapping[str, Any],
+    case: Mapping[str, Any],
+    before: Mapping[str, Any],
+) -> str:
+    """Classify one turn from execution facts, never from the gold outcome."""
+    if actual.get("infrastructure_failure"):
+        return "INFRASTRUCTURE_INCONCLUSIVE"
+    if actual.get("persisted") is True and actual.get("rendered") is True:
+        if (
+            case.get("workflow") == "LAS-REVISE"
+            and len(before.get("sections", [])) > 1
+            and "only to" in str(case.get("request", "")).casefold()
+        ):
+            return "CORRECT_AFTER_CLARIFICATION"
+        return "DIRECT_CORRECT"
+    if actual.get("observed_safe_rejection") is True:
+        return "SAFE_ACTIONABLE_FAILURE"
+    return "DETECTED_INCORRECT_OUTPUT"
 
 
 def _campaign_turn_row(
@@ -967,6 +1120,7 @@ def _campaign_turn_row(
         "outcome": actual.get("outcome"),
         "diagnostics": _bounded_diagnostics(actual.get("diagnostics", [])),
         "worker_metrics": _worker_metrics(actual),
+        "token_usage": _token_usage(observed_calls),
         "logical_generation_calls": logical_calls,
         "structured_logical_calls": structured_calls,
         "program_logical_calls": program_calls,
@@ -1046,6 +1200,10 @@ class D4CampaignAdapter:
         """Bind the campaign's durable custody to all backend calls."""
         self.call_source.bind_call_started(callback)
 
+    def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind durable completion evidence to all backend calls."""
+        self.call_source.bind_call_completed(callback)
+
     @property
     def logical_call_count(self) -> int:
         """Expose the authoritative observed-call cursor."""
@@ -1061,6 +1219,16 @@ class D4CampaignAdapter:
         if not self.provider_backed:
             return 0
         return self.call_source.logical_call_count
+
+    @property
+    def endpoint_calls(self) -> int | None:
+        """Return zero for rehearsal or unavailable for uninstrumented HTTP."""
+        return 0 if not self.provider_backed else None
+
+    @property
+    def model_calls(self) -> int | None:
+        """Return zero for rehearsal or unavailable for remote model execution."""
+        return 0 if not self.provider_backed else None
 
     def _write_document(self, path: Path, payload: Mapping[str, Any]) -> None:
         """Persist one canonical document through the existing logfile mapping."""
@@ -1099,6 +1267,8 @@ class D4CampaignAdapter:
                     binding["binding_id"] = str(binding["binding_id"]).replace(
                         "main.", "main-lower."
                     )
+            payload["sections"][0]["depth_range"] = [8400.0, 9300.0]
+            lower["depth_range"] = [9300.0, 10200.0]
             payload["sections"] = [payload["sections"][0], lower]
         path = case_root / f"{case_id}.log.yaml"
         self._write_document(path, payload)
@@ -1155,13 +1325,8 @@ class D4CampaignAdapter:
         """Execute one frozen turn through the real notebook-facing adapter."""
         turn_id = str(case["turn_id"])
         case_id = str(case["case_id"])
-        current = self._base_for(case_id)
         turn_root = self.artifact_root / "turns" / turn_id.replace(":", "-")
         turn_root.mkdir(parents=True, exist_ok=True)
-        before = turn_root / "before.log.yaml"
-        after = turn_root / "after.log.yaml"
-        before.write_bytes(current.read_bytes())
-        before_payload = load_logfile_document(before)
 
         if case["workflow"] == "CBL-CONSTRUCT":
             if self.cbl_artifact_path is not None:
@@ -1169,12 +1334,13 @@ class D4CampaignAdapter:
                 render_path = turn_root / "cbl-render.pdf"
                 render_path.write_bytes(b"prebuilt deterministic CBL render")
                 return {
-                    "outcome": expected["expected_outcome"],
+                    "outcome": "DIRECT_CORRECT",
                     "before_path": artifact,
                     "after_path": artifact,
                     "canonical_before": {},
                     "canonical_after": {},
                     "artifact_path": artifact,
+                    "rendered_artifact_path": artifact,
                     "render_path": render_path,
                     "persisted": True,
                     "rendered": True,
@@ -1190,22 +1356,64 @@ class D4CampaignAdapter:
             self._write_cbl_scaffold(scaffold)
             result = await self.session.run(
                 goal=str(case["request"]),
-                output_logfile=after,
+                output_logfile=turn_root / "generated-cbl.log.yaml",
                 source_logfile_path=scaffold,
             )
-            artifact = after
-        else:
-            result = await self.session.revise(
-                feedback=str(case["request"]),
-                logfile_path=current,
-            )
-            after.write_bytes(current.read_bytes())
-            artifact = None
+            artifact = turn_root / "generated-cbl.log.yaml"
+            report_facts = getattr(result, "report_facts", {})
+            succeeded = bool(report_facts.get("success"))
+            actual: dict[str, Any] = {
+                "outcome": "DIRECT_CORRECT" if succeeded else "DETECTED_INCORRECT_OUTPUT",
+                "before_path": None,
+                "after_path": artifact,
+                "canonical_before": {},
+                "canonical_after": {},
+                "artifact_path": artifact,
+                "rendered_artifact_path": None,
+                "persisted": succeeded,
+                "rendered": False,
+                "provider": self.session.provider,
+                "model": self.session.model,
+                "execution_evidence": {
+                    "accepted": succeeded,
+                    "persisted": succeeded,
+                    "rendered": False,
+                },
+            }
+            _add_session_evidence(actual, result)
+            if succeeded:
+                render_path = turn_root / "cbl-render.pdf"
+                render_started = time.perf_counter()
+                rendered = await self.session.render_logfile_to_file(
+                    logfile_path=artifact,
+                    output_path=render_path,
+                    overwrite=True,
+                )
+                actual["render_path"] = render_path
+                actual["rendered_artifact_path"] = artifact
+                actual["rendered"] = bool(rendered and render_path.is_file())
+                actual["render_duration_seconds"] = time.perf_counter() - render_started
+                actual["execution_evidence"]["rendered"] = actual["rendered"]
+            return actual
+
+        current = self._base_for(case_id)
+        before = turn_root / "before.log.yaml"
+        after = turn_root / "after.log.yaml"
+        before.write_bytes(current.read_bytes())
+        staged_turn_source = turn_root / (self.source_path or self.repo_root / SOURCE_RELATIVE).name
+        if not staged_turn_source.exists():
+            staged_turn_source.symlink_to(self.source_path or self.repo_root / SOURCE_RELATIVE)
+        before_payload = load_logfile_document(before)
+        result = await self.session.revise(
+            feedback=str(case["request"]),
+            logfile_path=current,
+        )
+        after.write_bytes(current.read_bytes())
 
         report_facts = getattr(result, "report_facts", {})
         succeeded = bool(report_facts.get("success"))
         actual: dict[str, Any] = {
-            "outcome": expected["expected_outcome"],
+            "outcome": "DIRECT_CORRECT" if succeeded else "DETECTED_INCORRECT_OUTPUT",
             "before_path": before,
             "after_path": after,
             "canonical_before": before_payload,
@@ -1220,31 +1428,22 @@ class D4CampaignAdapter:
                 "rendered": False,
             },
         }
-        if artifact is not None:
-            actual["artifact_path"] = artifact
+        _add_session_evidence(actual, result)
         if succeeded:
             render_path = turn_root / "render.pdf"
+            render_started = time.perf_counter()
             rendered = await self.session.render_logfile_to_file(
-                logfile_path=current,
+                logfile_path=after,
                 output_path=render_path,
                 overwrite=True,
             )
             actual["render_path"] = render_path
             actual["rendered"] = bool(rendered and render_path.is_file())
+            actual["render_duration_seconds"] = time.perf_counter() - render_started
             actual["execution_evidence"]["rendered"] = actual["rendered"]
         else:
-            actual.update(
-                {
-                    "changed": False,
-                    "pre_bytes_sha256": sha256_file(before),
-                    "post_bytes_sha256": sha256_file(after),
-                    "diagnostic_code": "direct_notebook.revision_failed",
-                    "intent_applied": False,
-                    "fallback_used": False,
-                    "substituted_channel": False,
-                    "prohibited_object_present": False,
-                }
-            )
+            actual.update(_observed_failure_facts(actual, before_payload, str(case["request"])))
+        actual["outcome"] = _observed_outcome(actual, case, before_payload)
         return actual
 
 
@@ -1325,6 +1524,9 @@ async def run_campaign(
     bind_call_started = getattr(execution_context, "bind_call_started", None)
     if callable(bind_call_started):
         bind_call_started(custody.record_call_started)
+    bind_call_completed = getattr(execution_context, "bind_call_completed", None)
+    if callable(bind_call_completed):
+        bind_call_completed(custody.record_call_completed)
     rows: list[dict[str, Any]] = []
     try:
         for case in cases:
@@ -1370,8 +1572,8 @@ async def run_campaign(
             "rows": rows,
             "logical_generation_calls": int(state["logical_generation_calls"]),
             "provider_calls": int(getattr(execution_context, "provider_calls", 0)),
-            "endpoint_calls": int(getattr(execution_context, "endpoint_calls", 0)),
-            "model_calls": int(getattr(execution_context, "model_calls", 0)),
+            "endpoint_calls": getattr(execution_context, "endpoint_calls", None),
+            "model_calls": getattr(execution_context, "model_calls", None),
         }
     except Exception as error:
         state["status"] = "INCONCLUSIVE"
@@ -1593,7 +1795,17 @@ def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, An
             contract.get("required_verifier_requirements", []),
         )
     )
-    if expected_outcome == "SAFE_ACTIONABLE_FAILURE":
+    if contract.get("kind") == "cbl":
+        if actual.get("persisted") is not True:
+            errors.append("cbl_persistence_not_proven")
+        if actual.get("rendered") is not True:
+            errors.append("cbl_render_not_proven")
+        if actual.get("rendered_artifact_path") != actual.get("artifact_path"):
+            errors.append("cbl_rendered_wrong_artifact")
+        verifier_status = verifier.get("status", verifier.get("acceptance_status"))
+        if actual.get("verifier_status", verifier_status) not in {"PASS", "accepted"}:
+            errors.append("cbl_verifier_failed")
+    elif expected_outcome == "SAFE_ACTIONABLE_FAILURE":
         if actual.get("changed") is not False:
             errors.append("failure_mutated_artifact")
         if actual.get("pre_bytes_sha256") != actual.get("post_bytes_sha256"):
