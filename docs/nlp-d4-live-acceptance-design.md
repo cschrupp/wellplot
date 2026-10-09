@@ -2,7 +2,7 @@
 
 ## Status
 
-`WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REVIEW-PENDING`
+`WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001_COMPLETE_REVIEW_PENDING`
 
 Design authorization:
 
@@ -38,6 +38,18 @@ Design amendment parent:
 
 ```text
 8618c3ef2207236ad50d5fc576cf1c96badbfb95
+```
+
+Current amendment rework:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001
+```
+
+Amendment rework parent:
+
+```text
+9f872101eba49ebfc95503cfe2e4ca8b6070781b
 ```
 
 Previous design-rework parent:
@@ -127,9 +139,10 @@ model inference calls = 0
 program-provider calls = 0
 ```
 
-The amended local preflight may make one bounded non-generation
-`GET /v1/models` request to the frozen endpoint. That endpoint observation is
-recorded separately and is not a provider/model inference call.
+The amended local preflight may make bounded non-generation `GET /v1/models`
+and `GET /props` requests to the frozen endpoint after the authenticated
+credential boundary. Those endpoint observations are recorded separately and
+are not provider/model inference calls.
 
 D4A must be independently reviewed before live execution.
 
@@ -158,6 +171,7 @@ engine: v2
 provider_boundary: openai_compat
 runtime: local llama.cpp
 endpoint: http://192.168.2.140:8888/v1
+endpoint_authentication: required
 model_requested: qwen3.6-35b-a3b
 model_family: Qwen3.6-35B-A3B
 structured_output: json_schema
@@ -165,7 +179,7 @@ timeout_seconds: 120
 concurrency: 1
 fallback: none
 model_substitution: forbidden
-credential_source: configured LLAMA_CPP_API_KEY
+credential_source: configured OPENAI_COMPAT_API_KEY
 
 planner:
   temperature = 0.0
@@ -182,12 +196,17 @@ section worker:
 program repair:
   temperature = None / omitted
   max_output_tokens = None / omitted
+
+wire token-limit fields:
+  max_tokens = absent
+  max_completion_tokens = absent
 ```
 
 The endpoint and served model identifier are explicit design inputs, not values
 to infer from environment defaults. D4A must freeze the endpoint's exact
-normalized base URL and the exact `/v1/models` identifier returned by the
-server before any campaign authorization. A mismatch is configuration drift.
+normalized base URL, the exact `/v1/models` identifier, and the authenticated
+`/props` provenance record returned by the server before any campaign
+authorization. A mismatch is configuration drift.
 
 This reflects the frozen production graph rather than a generic provider default:
 
@@ -231,6 +250,13 @@ STOP
 
 A different endpoint, model identifier, provider boundary, or structured-output
 mode requires a separately reviewed design amendment.
+
+Structured-output acceptance is owned by WellPlot's existing adapter contract:
+the client sends the intended JSON-Schema request shape, then independently
+JSON-decodes and validates every structured response against the canonical
+Pydantic model. A llama.cpp HTTP 200 response is not evidence that server-side
+grammar enforcement occurred. Malformed or nonconforming output fails closed;
+no production change to the adapter is authorized by this amendment.
 
 ---
 
@@ -966,20 +992,16 @@ A zero-length pre-existing file is not treated as a fresh campaign.
 
 ## Pre-live sequence
 
-Before credentials are read or a real provider/client is constructed:
+The amended design selects an authenticated endpoint contract. It does not
+claim that model identity was observed before credentials were accessed.
+Before provider construction or generation:
 
-1. run all provider-free integrity/source/dependency/checkpoint interlocks;
+1. run all static provider-free integrity/source/dependency/checkpoint
+   interlocks;
 2. require both state and journal paths to be absent;
 3. validate the normalized endpoint contract;
-4. perform one bounded `GET /v1/models` request against the frozen local
-   endpoint, without a completion request or model inference;
-5. require the returned catalog to contain exactly the frozen served model
-   identifier `qwen3.6-35b-a3b`, with no fallback identifier accepted;
-6. verify the WellPlot OpenAI-compatible adapter is configured for
-   `response_format.type = json_schema`, `strict = true`, the `max_tokens`
-   parameter, and the frozen timeout/temperature controls;
-7. generate one campaign identifier;
-8. atomically create the state file with:
+4. generate one campaign identifier;
+5. atomically create the state file with:
 
 ```text
 experiment_version
@@ -990,15 +1012,26 @@ status = STARTED
 logical_generation_calls = 0
 ```
 
-Only after the durable `STARTED` sentinel exists may the harness load credentials and construct the real provider.
+Only after the durable `STARTED` sentinel exists may the harness load the
+configured `OPENAI_COMPAT_API_KEY`. It must then perform bounded authenticated
+`GET /v1/models` and `GET /props` requests, without a completion request or
+model inference, before constructing the real provider.
 
-The preflight must not claim to prove model semantic correctness. The endpoint
-catalog check establishes reachability and model identity only. Structured
-generation and program-generation compatibility are checked at the actual
-production adapter boundary during the authorized population; an unsupported
-response format, rejected request shape, or incompatible program response is
-an infrastructure/configuration failure and makes the campaign inconclusive.
-No separate smoke completion is permitted.
+The `/v1/models` response must contain the deliberate server alias
+`qwen3.6-35b-a3b`. `/props` must provide the frozen model-path identity,
+context-size, build-information, and other stable runtime/model metadata
+recorded by the accepted configuration. If host access is available, D4A also
+records the GGUF filename, byte size, and SHA-256. If host access is
+unavailable, it records `gguf_byte_identity = NOT_AVAILABLE` and does not
+claim cryptographic weight identity.
+
+The preflight must not claim to prove model semantic correctness. It verifies
+endpoint reachability, configured serving identity, and request-shape
+configuration only. Structured generation and program-generation compatibility
+are checked at the actual production adapter boundary during the authorized
+population; an unsupported response format, rejected request shape, or
+incompatible program response is an infrastructure/configuration failure and
+makes the campaign inconclusive. No separate smoke completion is permitted.
 
 ## Interruption semantics
 
@@ -1333,7 +1366,9 @@ live_harness_checkpoint =
 
 D4B runs from the exact D4A checkpoint, not directly from the D3 commit.
 
-Before credentials are read or the `STARTED` state is created, D4B provider-free preflight must authenticate:
+Before `STARTED`, D4B performs only static provider-free interlocks. After
+`STARTED` and credential loading, the authenticated local-endpoint interlocks
+must authenticate:
 
 - `git HEAD == live_harness_checkpoint`;
 - clean Git working tree;
@@ -1347,8 +1382,13 @@ Before credentials are read or the `STARTED` state is created, D4B provider-free
 - installed `openai` package version equals the D4A-frozen client version;
 - actual runtime OpenAI client retry setting equals the D4A-frozen value;
 - normalized endpoint equals `http://192.168.2.140:8888/v1`;
-- `/v1/models` exposes exactly the requested identifier
+- `/v1/models` exposes exactly the deliberate server alias
   `qwen3.6-35b-a3b`;
+- `/props` matches the frozen model-path, context-size, build-information, and
+  stable runtime/model metadata record;
+- when host access exists, the GGUF filename, size, and SHA-256 match the
+  frozen artifact record; otherwise GGUF byte identity is explicitly
+  `NOT_AVAILABLE`;
 - the OpenAI-compatible adapter is configured for strict JSON Schema output,
   with the accepted D4 request-control envelope;
 - no provider/model fallback or substitution is configured.
@@ -1390,14 +1430,16 @@ WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
 
 before provider construction.
 
-The harness must fail before credentials are read if any frozen artifact differs.
+Static mismatches must fail before credentials are read. Endpoint identity,
+`/props`, or credential mismatches after `STARTED` must be durably recorded as
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE`.
 
 ---
 
 # 25. Credential Boundary
 
 Credentials use the existing production loader and the configured
-`LLAMA_CPP_API_KEY` source for the frozen endpoint. A local placeholder may be
+`OPENAI_COMPAT_API_KEY` source for the frozen endpoint. A local placeholder may be
 used only when the existing OpenAI-compatible loader explicitly permits it;
 the campaign must never silently switch credential source or provider.
 
@@ -1451,6 +1493,8 @@ The future harness must prove without inference:
 - planner request temperature is exactly `0.0`;
 - report/section/repair request temperatures are omitted/`None`;
 - max-output-token settings are omitted/`None`;
+- generated wire requests contain neither `max_tokens` nor
+  `max_completion_tokens`;
 - endpoint/model catalog identity is exactly frozen;
 - strict JSON Schema and program-generation request shaping is configured;
 - no WellPlot-side provider/model fallback path;
@@ -1473,13 +1517,15 @@ The future harness must prove without inference:
 - terminal summary derivation from synthetic complete/incomplete populations;
 - durable bounded `INCONCLUSIVE` state and journal evidence for every
   catchable exception after `STARTED`, including provider-construction failure;
-- `/v1/models` endpoint/model identity preflight without completion inference;
+- `/v1/models` and `/props` endpoint/model identity preflight without
+  completion inference;
 - strict JSON Schema and program-generation adapter compatibility checks;
 - no production mutation by harness preparation.
 
 D4A itself must make zero provider/model generation calls and zero model
 inference calls. Its only permitted network activity is the bounded
-non-generation `/v1/models` identity check defined in Section 18.
+non-generation `/v1/models` and `/props` identity checks defined in Section
+18.
 
 ---
 
@@ -1991,7 +2037,7 @@ D4 production promotion is not authorized by any of those gates.
 Current status:
 
 ```text
-WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REVIEW-PENDING
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001_COMPLETE_REVIEW_PENDING
 D4A HARNESS IMPLEMENTATION: NOT AUTHORIZED
 D4B LIVE INFERENCE: NOT AUTHORIZED
 PRODUCTION PROMOTION: NOT AUTHORIZED
