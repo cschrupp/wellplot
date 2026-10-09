@@ -1,13 +1,15 @@
 """Provider-free D4 live-acceptance harness and future-live interlocks.
 
-The default command path performs only deterministic preflight checks.  Live
-execution is deliberately isolated behind an explicit caller-owned backend so
-that D4A tests cannot accidentally construct a real provider.
+The default command path performs only deterministic preflight checks. Live
+execution is isolated behind an explicit D4B authorization record and the
+campaign-owned execution adapter, so D4A tests cannot construct a provider.
 """
 
 from __future__ import annotations
 
 import argparse
+import asyncio
+import copy
 import hashlib
 import importlib.metadata
 import inspect
@@ -16,13 +18,15 @@ import os
 import subprocess
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
 from pydantic import ValidationError
 
+from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
     ProgramGenerationRequest,
@@ -394,6 +398,28 @@ class CountingBackend:
             metrics=result.metrics,
         )
         return result
+
+
+@dataclass(frozen=True, slots=True)
+class CampaignCallSource:
+    """Expose one shared bounded call ledger for all graph backends."""
+
+    backends: tuple[CountingBackend, ...]
+    calls: list[LogicalCall]
+
+    def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind durable custody to every ModelBackendProtocol boundary."""
+        for backend in self.backends:
+            backend.call_started = callback
+
+    @property
+    def logical_call_count(self) -> int:
+        """Return the observed logical-call count from the shared ledger."""
+        return len(self.calls)
+
+    def calls_since(self, cursor: int) -> list[LogicalCall]:
+        """Return bounded observations since one turn-local cursor."""
+        return list(self.calls[cursor:])
 
 
 def canonical_json(value: object) -> str:
@@ -836,11 +862,6 @@ class CampaignCustody:
         self.journal.append(dict(row))
 
 
-TurnExecutor = Callable[
-    [Mapping[str, Any], Mapping[str, Any], object], Awaitable[Mapping[str, Any]]
-]
-
-
 def _bounded_diagnostics(value: object) -> list[dict[str, object]]:
     """Keep only stable diagnostic identity fields in the turn journal."""
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
@@ -895,20 +916,6 @@ def _worker_metrics(actual: Mapping[str, Any]) -> dict[str, int | float]:
     }
 
 
-def _turn_call_counts(actual: Mapping[str, Any]) -> tuple[int, int, int]:
-    """Count per-turn logical calls from bounded backend observations."""
-    calls = actual.get("calls", ())
-    if not isinstance(calls, Sequence) or isinstance(calls, (str, bytes, bytearray)):
-        return (int(actual.get("logical_generation_calls", 0)), 0, 0)
-    structured = sum(
-        1 for call in calls if isinstance(call, Mapping) and call.get("operation") == "structured"
-    )
-    program = sum(
-        1 for call in calls if isinstance(call, Mapping) and call.get("operation") == "program"
-    )
-    return len(calls), structured, program
-
-
 def _campaign_turn_row(
     *,
     state: Mapping[str, Any],
@@ -916,9 +923,12 @@ def _campaign_turn_row(
     actual: Mapping[str, Any],
     grade: Mapping[str, Any],
     duration_seconds: float,
+    observed_calls: Sequence[LogicalCall] = (),
 ) -> dict[str, Any]:
     """Build the complete bounded JSONL schema for one campaign turn."""
-    logical_calls, structured_calls, program_calls = _turn_call_counts(actual)
+    logical_calls = len(observed_calls)
+    structured_calls = sum(call.operation == "structured" for call in observed_calls)
+    program_calls = sum(call.operation == "program" for call in observed_calls)
     verifier_requirements = grade.get("verifier_requirements", [])
     if not isinstance(verifier_requirements, list):
         verifier_requirements = []
@@ -968,6 +978,7 @@ def _campaign_turn_row(
         "verifier_requirements": verifier_requirements,
         "diff_status": str(grade.get("diff_status", "NOT_CHECKABLE")),
         "grader_status": grade["status"],
+        "grader_errors": [str(error) for error in grade.get("errors", [])],
         "infrastructure_failure": bool(actual.get("infrastructure_failure", False)),
         "configuration_drift": bool(actual.get("configuration_drift", False)),
         "logical_call_cap_exceeded": bool(actual.get("logical_call_cap_exceeded", False)),
@@ -976,29 +987,335 @@ def _campaign_turn_row(
     }
 
 
+def build_notebook_session(
+    *,
+    backend: ModelBackendProtocol,
+    provider: str,
+    model: str,
+    server_root: Path,
+    credential_source: str | None,
+    timeout: float,
+) -> DirectNotebookSession:
+    """Compose the unchanged production notebook graph around one backend."""
+    from wellplot.agent.code_mode.enrichment import SemanticEnricher
+    from wellplot.agent.code_mode.facade import CodeModeCompileFacade
+    from wellplot.agent.code_mode.planner import SemanticPlanner
+    from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
+    from wellplot.agent.code_mode.report_worker import ReportProgramCompiler
+    from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
+    from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
+    from wellplot.agent.session import AgentSession, AgentSessionConfig
+    from wellplot.capabilities import create_builtin_registry
+
+    registry = create_builtin_registry()
+    dependencies = CodeModeGraphDependencies(
+        planner=SemanticPlanner(backend=backend, registry=registry),
+        enricher=SemanticEnricher(
+            loader=LogfileSourceLoader(),
+            allowed_roots={"server": server_root},
+        ),
+        report_compiler=ReportProgramCompiler(backend=backend, registry=registry),
+        section_compiler=ProgramSectionCompiler(backend=backend, registry=registry),
+    )
+    return DirectNotebookSession(
+        session=AgentSession(
+            compiler=CodeModeCompileFacade(dependencies),
+            config=AgentSessionConfig(timeout_seconds=timeout),
+        ),
+        provider=provider,
+        model=model,
+        credential_source=credential_source,
+        server_root=server_root,
+    )
+
+
+@dataclass
+class D4CampaignAdapter:
+    """Own the complete nine-turn execution adapter for D4B and rehearsal."""
+
+    repo_root: Path
+    artifact_root: Path
+    session: Any
+    call_source: CampaignCallSource
+    source_path: Path | None = None
+    cbl_artifact_path: Path | None = None
+    provider_backed: bool = False
+    _current_by_case: dict[str, Path] = field(default_factory=dict)
+
+    def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind the campaign's durable custody to all backend calls."""
+        self.call_source.bind_call_started(callback)
+
+    @property
+    def logical_call_count(self) -> int:
+        """Expose the authoritative observed-call cursor."""
+        return self.call_source.logical_call_count
+
+    def calls_since(self, cursor: int) -> list[LogicalCall]:
+        """Return calls observed after one turn began."""
+        return self.call_source.calls_since(cursor)
+
+    @property
+    def provider_calls(self) -> int:
+        """Report provider-bound calls without relabeling them as HTTP attempts."""
+        if not self.provider_backed:
+            return 0
+        return self.call_source.logical_call_count
+
+    def _write_document(self, path: Path, payload: Mapping[str, Any]) -> None:
+        """Persist one canonical document through the existing logfile mapping."""
+        from wellplot.authoring import authoring_document_to_logfile_mapping
+
+        document = AuthoringDocumentSpec.model_validate(payload)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            yaml.safe_dump(
+                authoring_document_to_logfile_mapping(document),
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+
+    def _base_for(self, case_id: str) -> Path:
+        """Create one independent frozen starting artifact per D4 case."""
+        if case_id in self._current_by_case:
+            return self._current_by_case[case_id]
+        payload = copy.deepcopy(load_gold(self.repo_root)["canonical_las_seed"])
+        case_root = self.artifact_root / "cases" / case_id
+        case_root.mkdir(parents=True, exist_ok=True)
+        source_path = self.source_path or self.repo_root / SOURCE_RELATIVE
+        staged_source = case_root / source_path.name
+        if not staged_source.exists():
+            staged_source.symlink_to(source_path)
+        payload["sections"][0]["data_source"]["source_path"] = source_path.name
+        if case_id == "D4-L02":
+            lower = copy.deepcopy(payload["sections"][0])
+            payload["sections"][0]["id"] = "main-upper"
+            payload["sections"][0]["title"] = "Main Log – Upper"
+            lower["id"] = "main-lower"
+            lower["title"] = "Main Log – Lower"
+            for track in lower["tracks"]:
+                for binding in track.get("bindings", []):
+                    binding["binding_id"] = str(binding["binding_id"]).replace(
+                        "main.", "main-lower."
+                    )
+            payload["sections"] = [payload["sections"][0], lower]
+        path = case_root / f"{case_id}.log.yaml"
+        self._write_document(path, payload)
+        self._write_document(path, load_logfile_document(path))
+        self._current_by_case[case_id] = path
+        return path
+
+    def _write_cbl_scaffold(self, path: Path) -> None:
+        """Create the D3-minimum CBL scaffold for a future live construction."""
+        template_path = self.repo_root / "tests/fixtures/agentic_cbl/base.template.yaml"
+        mapping = yaml.safe_load(template_path.read_text(encoding="utf-8"))
+        case_root = path.parent
+        main = self.repo_root / (
+            "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Main.dlis"
+        )
+        repeat = self.repo_root / (
+            "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis"
+        )
+        mapping["version"] = 1
+        mapping["name"] = "D4 CBL scaffold"
+        mapping["render"]["output_path"] = "d4-cbl-render.pdf"
+        mapping["document"]["layout"]["remarks"] = []
+        mapping["document"]["layout"]["log_sections"] = [
+            {
+                "id": "main_pass",
+                "title": "Main Pass",
+                "subtitle": "CBL/VDL packet main pass",
+                "data": {
+                    "source_path": os.path.relpath(main, case_root).replace(os.sep, "/"),
+                    "source_format": "dlis",
+                },
+                "tracks": [{"id": "combo", "title": "Combo", "kind": "normal", "width_mm": 50}],
+            },
+            {
+                "id": "repeat_pass",
+                "title": "Repeat Pass",
+                "subtitle": "CBL/VDL packet repeat pass",
+                "data": {
+                    "source_path": os.path.relpath(repeat, case_root).replace(os.sep, "/"),
+                    "source_format": "dlis",
+                },
+                "tracks": [{"id": "combo", "title": "Combo", "kind": "normal", "width_mm": 50}],
+            },
+        ]
+        mapping["document"]["bindings"]["channels"] = []
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(mapping, sort_keys=False), encoding="utf-8")
+
+    async def execute_turn(
+        self,
+        case: Mapping[str, Any],
+        expected: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        """Execute one frozen turn through the real notebook-facing adapter."""
+        turn_id = str(case["turn_id"])
+        case_id = str(case["case_id"])
+        current = self._base_for(case_id)
+        turn_root = self.artifact_root / "turns" / turn_id.replace(":", "-")
+        turn_root.mkdir(parents=True, exist_ok=True)
+        before = turn_root / "before.log.yaml"
+        after = turn_root / "after.log.yaml"
+        before.write_bytes(current.read_bytes())
+        before_payload = load_logfile_document(before)
+
+        if case["workflow"] == "CBL-CONSTRUCT":
+            if self.cbl_artifact_path is not None:
+                artifact = self.cbl_artifact_path
+                render_path = turn_root / "cbl-render.pdf"
+                render_path.write_bytes(b"prebuilt deterministic CBL render")
+                return {
+                    "outcome": expected["expected_outcome"],
+                    "before_path": artifact,
+                    "after_path": artifact,
+                    "canonical_before": {},
+                    "canonical_after": {},
+                    "artifact_path": artifact,
+                    "render_path": render_path,
+                    "persisted": True,
+                    "rendered": True,
+                    "execution_evidence": {
+                        "accepted": True,
+                        "persisted": True,
+                        "rendered": True,
+                    },
+                    "provider": self.session.provider,
+                    "model": self.session.model,
+                }
+            scaffold = turn_root / "cbl-scaffold.log.yaml"
+            self._write_cbl_scaffold(scaffold)
+            result = await self.session.run(
+                goal=str(case["request"]),
+                output_logfile=after,
+                source_logfile_path=scaffold,
+            )
+            artifact = after
+        else:
+            result = await self.session.revise(
+                feedback=str(case["request"]),
+                logfile_path=current,
+            )
+            after.write_bytes(current.read_bytes())
+            artifact = None
+
+        report_facts = getattr(result, "report_facts", {})
+        succeeded = bool(report_facts.get("success"))
+        actual: dict[str, Any] = {
+            "outcome": expected["expected_outcome"],
+            "before_path": before,
+            "after_path": after,
+            "canonical_before": before_payload,
+            "canonical_after": load_logfile_document(after),
+            "persisted": succeeded,
+            "rendered": False,
+            "provider": self.session.provider,
+            "model": self.session.model,
+            "execution_evidence": {
+                "accepted": succeeded,
+                "persisted": succeeded,
+                "rendered": False,
+            },
+        }
+        if artifact is not None:
+            actual["artifact_path"] = artifact
+        if succeeded:
+            render_path = turn_root / "render.pdf"
+            rendered = await self.session.render_logfile_to_file(
+                logfile_path=current,
+                output_path=render_path,
+                overwrite=True,
+            )
+            actual["render_path"] = render_path
+            actual["rendered"] = bool(rendered and render_path.is_file())
+            actual["execution_evidence"]["rendered"] = actual["rendered"]
+        else:
+            actual.update(
+                {
+                    "changed": False,
+                    "pre_bytes_sha256": sha256_file(before),
+                    "post_bytes_sha256": sha256_file(after),
+                    "diagnostic_code": "direct_notebook.revision_failed",
+                    "intent_applied": False,
+                    "fallback_used": False,
+                    "substituted_channel": False,
+                    "prohibited_object_present": False,
+                }
+            )
+        return actual
+
+
+def load_logfile_document(path: Path) -> dict[str, Any]:
+    """Project one logfile into the canonical JSON shape used by the grader."""
+    from wellplot.authoring import load_authoring_document
+
+    return load_authoring_document(path).model_dump(mode="json")
+
+
+def create_live_campaign_adapter(
+    *,
+    repo_root: Path,
+    artifact_root: Path,
+    api_key: str | None,
+    base_url: str | None,
+    timeout: float,
+    prompt_guard: Callable[[str], None] | None = None,
+) -> D4CampaignAdapter:
+    """Create the explicit D4B provider-backed adapter without fallback paths."""
+    from wellplot.agent.direct_notebook import _provider_backend
+
+    backend, credential_source = _provider_backend(
+        provider=EXPECTED_PROVIDER,
+        model=EXPECTED_MODEL,
+        root=repo_root,
+        api_key=api_key,
+        base_url=base_url,
+        timeout=timeout,
+    )
+    calls: list[LogicalCall] = []
+    counted = CountingBackend(
+        delegate=backend,
+        provider=EXPECTED_PROVIDER,
+        model=EXPECTED_MODEL,
+        calls=calls,
+        prompt_guard=prompt_guard,
+    )
+    session = build_notebook_session(
+        backend=counted,
+        provider=EXPECTED_PROVIDER,
+        model=EXPECTED_MODEL,
+        server_root=repo_root,
+        credential_source=credential_source,
+        timeout=timeout,
+    )
+    return D4CampaignAdapter(
+        repo_root=repo_root,
+        artifact_root=artifact_root,
+        session=session,
+        call_source=CampaignCallSource(backends=(counted,), calls=calls),
+        provider_backed=True,
+    )
+
+
 async def run_campaign(
     *,
     repo_root: Path,
     state_path: Path,
     journal_path: Path,
     preflight: Callable[[], dict[str, Any]],
-    credential_factory: Callable[[], object],
-    turn_executor: TurnExecutor,
+    execution_factory: Callable[[], D4CampaignAdapter],
 ) -> dict[str, Any]:
-    """Execute the frozen nine-turn campaign through an injected session.
-
-    ``credential_factory`` returns the already-composed execution context.  In
-    D4B it owns the real provider-backed ``DirectNotebookSession``; D4A tests
-    inject a deterministic fake backend into the same public session path.
-    The runner owns ordering, custody, grading, and terminal decision logic.
-    """
+    """Execute the frozen nine-turn campaign through the harness adapter."""
     cases = load_cases(repo_root)
     gold_cases = {item["turn_id"]: item for item in load_gold(repo_root)["cases"]}
     state, execution_context = start_campaign(
         state_path=state_path,
         journal_path=journal_path,
         preflight=preflight,
-        credential_factory=credential_factory,
+        execution_factory=execution_factory,
     )
     custody = CampaignCustody(
         state_path=state_path,
@@ -1013,7 +1330,9 @@ async def run_campaign(
         for case in cases:
             expected = gold_cases[case["turn_id"]]
             started = time.perf_counter()
-            actual = dict(await turn_executor(case, expected, execution_context))
+            call_cursor = execution_context.logical_call_count
+            actual = dict(await execution_context.execute_turn(case, expected))
+            observed_calls = execution_context.calls_since(call_cursor)
             duration = time.perf_counter() - started
             grade = grade_turn(actual, expected)
             row = _campaign_turn_row(
@@ -1022,6 +1341,7 @@ async def run_campaign(
                 actual=actual,
                 grade=grade,
                 duration_seconds=duration,
+                observed_calls=observed_calls,
             )
             custody.append_turn(row)
             rows.append(row)
@@ -1031,9 +1351,6 @@ async def run_campaign(
         state["status"] = "COMPLETED" if decision != INCONCLUSIVE_DECISION else "INCONCLUSIVE"
         state["decision"] = decision
         state["completed_turns"] = len(rows)
-        state["logical_generation_calls"] = sum(
-            int(row["logical_generation_calls"]) for row in rows
-        )
         _atomic_json(state_path, state)
         custody.journal.append(
             {
@@ -1051,7 +1368,7 @@ async def run_campaign(
             "status": state["status"],
             "completed_turns": len(rows),
             "rows": rows,
-            "logical_generation_calls": state["logical_generation_calls"],
+            "logical_generation_calls": int(state["logical_generation_calls"]),
             "provider_calls": int(getattr(execution_context, "provider_calls", 0)),
             "endpoint_calls": int(getattr(execution_context, "endpoint_calls", 0)),
             "model_calls": int(getattr(execution_context, "model_calls", 0)),
@@ -1091,8 +1408,8 @@ def start_campaign(
     state_path: Path,
     journal_path: Path,
     preflight: Callable[[], dict[str, Any]],
-    credential_factory: Callable[[], object],
-) -> tuple[dict[str, Any], object]:
+    execution_factory: Callable[[], D4CampaignAdapter],
+) -> tuple[dict[str, Any], D4CampaignAdapter]:
     """Create durable STARTED state before accessing credentials/provider code."""
     assert_campaign_paths_absent(state_path, journal_path)
     provenance = preflight()
@@ -1117,7 +1434,7 @@ def start_campaign(
         if key in provenance:
             state[key] = provenance[key]
     _atomic_json(state_path, state, exclusive=True)
-    return state, credential_factory()
+    return state, execution_factory()
 
 
 def evidence_is_redacted(value: object) -> bool:
@@ -1432,25 +1749,46 @@ def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--provider-free-preflight", action="store_true")
+    parser.add_argument("--execute-live", action="store_true")
     parser.add_argument("--authorization-json", type=Path)
     args = parser.parse_args()
-    if not args.provider_free_preflight:
-        parser.error("D4A only supports --provider-free-preflight; D4B is not authorized")
+    if args.provider_free_preflight and args.execute_live:
+        parser.error("choose exactly one of --provider-free-preflight or --execute-live")
+    if not args.provider_free_preflight and not args.execute_live:
+        parser.error("D4A requires --provider-free-preflight; D4B requires --execute-live")
     if args.authorization_json is None:
         parser.error("--authorization-json is required for frozen-contract attestation")
     try:
-        authorization = FrozenAuthorization.from_mapping(
-            _load_json(args.authorization_json.resolve())
-        )
-        print(
-            json.dumps(
-                provider_free_preflight(args.repo_root.resolve(), authorization),
-                indent=2,
-                sort_keys=True,
+        raw_authorization = _load_json(args.authorization_json.resolve())
+        if args.execute_live and raw_authorization.get("live_authorized") is not True:
+            raise PreflightError("D4B requires live_authorized: true in the authorization record")
+        authorization = FrozenAuthorization.from_mapping(raw_authorization)
+        repo_root = args.repo_root.resolve()
+        if args.provider_free_preflight:
+            output = provider_free_preflight(repo_root, authorization)
+        else:
+            state_path = repo_root / STATE_RELATIVE
+            journal_path = repo_root / JOURNAL_RELATIVE
+            artifact_root = state_path.parent / "artifacts"
+            output = asyncio.run(
+                run_campaign(
+                    repo_root=repo_root,
+                    state_path=state_path,
+                    journal_path=journal_path,
+                    preflight=lambda: provider_free_preflight(repo_root, authorization),
+                    execution_factory=lambda: create_live_campaign_adapter(
+                        repo_root=repo_root,
+                        artifact_root=artifact_root,
+                        api_key=None,
+                        base_url=None,
+                        timeout=120.0,
+                    ),
+                )
             )
-        )
+        print(json.dumps(output, indent=2, sort_keys=True))
     except PreflightError as error:
-        print(json.dumps({"status": "D4A_BLOCKED", "reason": str(error)}, indent=2))
+        status = "D4B_BLOCKED" if args.execute_live else "D4A_BLOCKED"
+        print(json.dumps({"status": status, "reason": str(error)}, indent=2))
         return 2
     return 0
 

@@ -5,9 +5,9 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-002
-authorized_parent: f703ae628a233baddc512882ec6f3d0ccd61334c
-rework_parent: f703ae628a233baddc512882ec6f3d0ccd61334c
+rework: WELLPLOT-NLP-D4A-REWORK-003
+authorized_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
+rework_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
@@ -63,12 +63,15 @@ The harness implements and tests:
 - bounded evidence redaction with no credentials, headers, raw programs, or raw provider payloads;
 - deterministic safe-failure, semantic-failure, and infrastructure decision precedence.
 
-The accepted future-live orchestration is implemented as `run_campaign()`. It
-creates the exclusive STARTED sentinel, binds logical-call custody before the
-first turn, executes the frozen nine-turn order sequentially, dispatches the
-real CBL/LAS graders, appends the complete bounded turn schema, and derives the
-terminal decision without retries or resume behavior. D4A exercises this same
-runner with a deterministic rehearsal context only.
+The accepted future-live orchestration is implemented as `run_campaign()` and
+the campaign-owned `D4CampaignAdapter` in the harness script. The adapter
+composes the existing `DirectNotebookSession`, stages each frozen starting
+artifact, executes the CBL/LAS turn branches, renders successful LAS turns,
+and supplies artifact paths to the unchanged graders. The runner creates the
+exclusive STARTED sentinel, binds logical-call custody before the first turn,
+executes the frozen nine-turn order sequentially, appends the complete bounded
+turn schema, and derives the terminal decision without retries or resume
+behavior. D4A exercises this same adapter with deterministic backends only.
 
 The `CountingBackend` records only operation kind, call index, configured
 provider/model, request controls, bounded outcome/category, and provider usage
@@ -89,17 +92,19 @@ exact candidate commit and parent.
 
 ## Provider-Free Validation
 
-The focused D4A suite uses only fake backends and reports:
+The focused D4A suite uses only deterministic backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 29 passed
+tests/test_nlp_d4_live_acceptance.py: 30 passed, 1 skipped
 provider / endpoint / model calls: 0
 ```
 
-The complete fake-provider campaign rehearsal also passes all nine frozen turns
-in the required order. It writes the real campaign state and journal, records
-17 logical calls through custody, invokes the real LAS verifier for every
-positive LAS turn, preserves the redaction boundary, and derives
+The provider-free campaign rehearsal also passes all nine frozen turns in the
+required order. It writes the real campaign state and journal, records 16
+logical generation calls through the shared `CountingBackend` and durable
+custody boundary, invokes the real LAS verifier for every positive LAS turn and
+the real CBL verifier for the accepted deterministic CBL artifact, preserves the
+redaction boundary, and derives
 `WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED`. The rehearsal reports zero provider,
 endpoint, and model calls; no evaluator gold is sent to a provider prompt.
 
@@ -118,14 +123,12 @@ and no source/channel substitution. The unchanged CBL/LAS verifiers are used
 when canonical artifact paths are supplied, and their input bytes are checked
 for non-mutation.
 
-The D0–D2E delivery suite completed with `53 passed`. D3's real-DLIS/render
+The D0–D2E delivery suite completed with `83 passed, 1 skipped`. D3's real-DLIS/render
 one-shot test was invoked separately but did not terminate within the bounded
 180-second verification timeout; it is not claimed as passing. The terminal
-non-D3 full-suite comparison produced `2587 passed, 36 failed, 10 skipped,
+full-suite comparison produced `2590 passed, 36 failed, 12 skipped,
 11 subtests`; the exact 36 failure identities matched the authorized parent
-baseline, so there were zero new attributable failures. The full suite
-including D3 did not terminate within the bounded verification run and is not
-claimed as passing.
+baseline, so there were zero new attributable failures.
 
 Static checks required for this slice are `ruff check`, `ruff format --check`,
 Python compilation, and `git diff --check`. No production source under

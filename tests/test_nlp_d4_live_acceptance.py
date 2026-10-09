@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -18,7 +19,7 @@ from tests._mcp_fixtures import REPO_ROOT
 
 from wellplot.agent.code_mode.enrichment import SemanticEnricher
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan, SemanticPlanner
 from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
 from wellplot.agent.code_mode.report_worker import ReportProgramCompiler
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
@@ -35,7 +36,6 @@ from wellplot.agent.session import AgentSession, AgentSessionConfig
 from wellplot.authoring import (
     _fill_element,
     authoring_document_to_logfile_mapping,
-    load_authoring_document,
 )
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDocumentSpec
@@ -330,6 +330,25 @@ def test_openai_retry_policy_is_provider_free() -> None:
     assert evidence["physical_http_attempt_upper_bound"] == 135
 
 
+def test_live_cli_requires_explicit_d4b_authorization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Keep the live adapter unreachable from an ordinary preflight invocation."""
+    authorization_path = tmp_path / "authorization.json"
+    authorization_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "nlp_d4_live_acceptance.py",
+            "--execute-live",
+            "--authorization-json",
+            str(authorization_path),
+        ],
+    )
+    assert d4._main() == 2
+
+
 def test_counting_backend_preserves_controls_and_records_bounded_metadata() -> None:
     """Record logical calls without retaining provider payloads."""
     delegate = _Backend()
@@ -389,7 +408,7 @@ def test_campaign_state_is_durable_before_credentials() -> None:
             state_path=state_path,
             journal_path=journal_path,
             preflight=preflight,
-            credential_factory=credentials,
+            execution_factory=credentials,
         )
         assert events == ["preflight", "credentials"]
         assert state["status"] == "STARTED"
@@ -406,7 +425,7 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
             state_path=state_path,
             journal_path=journal_path,
             preflight=lambda: {"current_checkout": "a" * 40},
-            credential_factory=lambda: object(),
+            execution_factory=lambda: object(),
         )
         custody = d4.CampaignCustody(
             state_path=state_path,
@@ -453,7 +472,7 @@ def test_existing_campaign_artifacts_block_resume() -> None:
                 state_path=state_path,
                 journal_path=journal_path,
                 preflight=lambda: {"current_checkout": "a" * 40},
-                credential_factory=lambda: pytest.fail("credentials accessed"),
+                execution_factory=lambda: pytest.fail("credentials accessed"),
             )
 
 
@@ -607,12 +626,10 @@ class _D4SessionPlanner:
     """Return deterministic semantic tasks through the real session facade."""
 
     calls: list[dict[str, object]]
-    logical_calls: list[dict[str, str]]
 
-    async def plan(self, **kwargs: object) -> SemanticPlan:
+    def plan(self, **kwargs: object) -> SemanticPlan:
         """Map each frozen LAS request to its bounded production work unit."""
         self.calls.append(kwargs)
-        self.logical_calls.append({"operation": "structured"})
         request = str(kwargs["request"])
         if request.startswith("Rename this report"):
             return SemanticPlan(
@@ -660,15 +677,41 @@ class _D4SessionPlanner:
 
 
 @dataclass
+class _D4PlannerBackend:
+    """Adapt the deterministic plan fixture to the structured backend boundary."""
+
+    planner: _D4SessionPlanner
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[SemanticPlan],
+    ) -> StructuredGenerationResult[SemanticPlan]:
+        del response_model
+        context = json.loads(request.user_prompt.split("Context:\n", 1)[1])
+        value = self.planner.plan(
+            request=context["request"],
+            mode=context["mode"],
+            current_document_summary=context["current_document_summary"],
+            source_summary=context["source_summary"],
+            timeout_seconds=request.timeout_seconds,
+            temperature=request.temperature,
+            max_output_tokens=request.max_output_tokens,
+        )
+        return StructuredGenerationResult(
+            value=value,
+            metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
+        )
+
+
+@dataclass
 class _D4SessionReportBackend:
     """Emit the deterministic D4 title operation through ReportProgramCompiler."""
-
-    logical_calls: list[dict[str, str]]
 
     async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
         """Return only the report title operation required by D4-L01:T1."""
         del request
-        self.logical_calls.append({"operation": "program"})
         return ProgramGenerationResult(
             text='report = wp.report(title="Formation Integrity Review")\n',
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
@@ -678,8 +721,6 @@ class _D4SessionReportBackend:
 @dataclass
 class _D4SessionSectionBackend:
     """Emit deterministic section programs after inspecting real worker context."""
-
-    logical_calls: list[dict[str, str]]
 
     @staticmethod
     def _payload(request: ProgramGenerationRequest) -> dict[str, object]:
@@ -702,7 +743,6 @@ class _D4SessionSectionBackend:
         source_channels = {
             channel["mnemonic"] for source in sources for channel in source["channels"]
         }
-        self.logical_calls.append({"operation": "program"})
         if requirement == "Preserve the plotted sections.":
             program = (
                 "report = wp.report()\n"
@@ -769,20 +809,34 @@ class _D4SessionHarness:
 
     root: Path
     planner: _D4SessionPlanner
-    report_backend: _D4SessionReportBackend
-    section_backend: _D4SessionSectionBackend
-    adapter: DirectNotebookSession
+    adapter: d4.D4CampaignAdapter
 
     @classmethod
     def create(cls, root: Path) -> _D4SessionHarness:
         """Build the unchanged production graph around deterministic backends."""
-        calls: list[dict[str, str]] = []
-        planner = _D4SessionPlanner(calls=[], logical_calls=calls)
-        report_backend = _D4SessionReportBackend(logical_calls=calls)
-        section_backend = _D4SessionSectionBackend(logical_calls=calls)
+        calls: list[d4.LogicalCall] = []
+        planner = _D4SessionPlanner(calls=[])
+        planner_backend = d4.CountingBackend(
+            delegate=_D4PlannerBackend(planner),
+            provider="deterministic",
+            model="d4-rehearsal-model",
+            calls=calls,
+        )
+        report_backend = d4.CountingBackend(
+            delegate=_D4SessionReportBackend(),
+            provider="deterministic",
+            model="d4-rehearsal-model",
+            calls=calls,
+        )
+        section_backend = d4.CountingBackend(
+            delegate=_D4SessionSectionBackend(),
+            provider="deterministic",
+            model="d4-rehearsal-model",
+            calls=calls,
+        )
         registry = create_builtin_registry()
         dependencies = CodeModeGraphDependencies(
-            planner=planner,  # type: ignore[arg-type]
+            planner=SemanticPlanner(backend=planner_backend, registry=registry),
             enricher=SemanticEnricher(
                 loader=LogfileSourceLoader(),
                 allowed_roots={"server": root},
@@ -790,7 +844,7 @@ class _D4SessionHarness:
             report_compiler=ReportProgramCompiler(backend=report_backend, registry=registry),
             section_compiler=ProgramSectionCompiler(backend=section_backend, registry=registry),
         )
-        adapter = DirectNotebookSession(
+        session = DirectNotebookSession(
             session=AgentSession(
                 compiler=CodeModeCompileFacade(dependencies),
                 config=AgentSessionConfig(timeout_seconds=10.0),
@@ -800,18 +854,17 @@ class _D4SessionHarness:
             credential_source="none",
             server_root=root,
         )
-        return cls(root, planner, report_backend, section_backend, adapter)
-
-    @property
-    def logical_calls(self) -> list[dict[str, str]]:
-        """Return and retain the shared logical-call list used by all doubles."""
-        return self.planner.logical_calls
-
-    def take_calls(self) -> list[dict[str, str]]:
-        """Take the calls emitted by the current production-session turn."""
-        calls = list(self.logical_calls)
-        self.logical_calls.clear()
-        return calls
+        call_source = d4.CampaignCallSource(
+            backends=(planner_backend, report_backend, section_backend),
+            calls=calls,
+        )
+        adapter = d4.D4CampaignAdapter(
+            repo_root=REPO_ROOT,
+            artifact_root=root,
+            session=session,
+            call_source=call_source,
+        )
+        return cls(root, planner, adapter)
 
 
 def _write_rehearsal_document(path: Path, payload: dict[str, object]) -> None:
@@ -836,184 +889,46 @@ def _write_rehearsal_document(path: Path, payload: dict[str, object]) -> None:
     )
 
 
-def test_campaign_runner_rehearses_all_nine_turns_and_real_las_verifier(
-    tmp_path: Path,
-) -> None:
-    """Run the complete frozen sequence with durable evidence and real LAS grading."""
-    state_path = tmp_path / "state.json"
-    journal_path = tmp_path / "journal.jsonl"
-    current_by_case: dict[str, Path] = {}
-    order: list[str] = []
+def _build_rehearsal_cbl_artifact(root: Path) -> Path:
+    """Write the accepted D0/D3 canonical CBL artifact as a fixture input."""
+    from tests.test_nlp_d0_acceptance import _cbl_payload
 
-    class _RehearsalContext:
-        """Expose only bounded fake execution metrics to the campaign runner."""
+    output = root / "d4-cbl-output.log.yaml"
+    output.write_text(yaml.safe_dump(_cbl_payload(), sort_keys=False), encoding="utf-8")
+    return output
 
-        provider_calls = 0
-        endpoint_calls = 0
-        model_calls = 0
 
-        def __init__(self) -> None:
-            self._call_started = None
+def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
+    """Run all turns through the frozen adapter and both unchanged graders."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        state_path = root / "state.json"
+        journal_path = root / "journal.jsonl"
+        source_name = "30-23a-3 8117_d.las"
+        source_path = root / source_name
+        source_path.write_text(_D4_REHEARSAL_LAS, encoding="utf-8")
+        session_harness = _D4SessionHarness.create(root)
+        adapter = session_harness.adapter
+        adapter.source_path = source_path
+        adapter.cbl_artifact_path = _build_rehearsal_cbl_artifact(root)
 
-        def bind_call_started(self, callback: object) -> None:
-            self._call_started = callback
-
-        def record_calls(self, calls: list[Mapping[str, object]]) -> None:
-            assert callable(self._call_started)
-            for call in calls:
-                self._call_started(
-                    {"event": "logical_call_started", "operation": call["operation"]}
-                )
-
-    rehearsal_context = _RehearsalContext()
-    source_name = "30-23a-3 8117_d.las"
-    (tmp_path / source_name).write_text(_D4_REHEARSAL_LAS, encoding="utf-8")
-    session_harness = _D4SessionHarness.create(tmp_path)
-
-    def _base_for(case_id: str) -> Path:
-        """Create one independent persisted starting artifact per D4 case."""
-        if case_id in current_by_case:
-            return current_by_case[case_id]
-        source = copy.deepcopy(d4.load_gold(REPO_ROOT)["canonical_las_seed"])
-        source["sections"][0]["data_source"]["source_path"] = source_name
-        if case_id == "D4-L02":
-            lower = copy.deepcopy(source["sections"][0])
-            source["sections"][0]["id"] = "main-upper"
-            source["sections"][0]["title"] = "Main Log – Upper"
-            lower["id"] = "main-lower"
-            lower["title"] = "Main Log – Lower"
-            for track in lower["tracks"]:
-                for binding in track.get("bindings", []):
-                    binding["binding_id"] = str(binding["binding_id"]).replace(
-                        "main.", "main-lower."
-                    )
-            source["sections"] = [source["sections"][0], lower]
-        path = tmp_path / f"{case_id}.log.yaml"
-        _write_rehearsal_document(path, source)
-        normalized = load_authoring_document(path).model_dump(mode="json")
-        _write_rehearsal_document(path, normalized)
-        current_by_case[case_id] = path
-        return path
-
-    async def execute_turn(
-        case: Mapping[str, object],
-        expected: Mapping[str, object],
-        context: _RehearsalContext,
-    ) -> Mapping[str, object]:
-        """Apply deterministic fixture mutations while using the actual harness."""
-
-        def finish(actual: dict[str, object]) -> dict[str, object]:
-            calls = actual.get("calls", [])
-            assert isinstance(calls, list)
-            context.record_calls(calls)
-            return actual
-
-        turn_id = str(case["turn_id"])
-        case_id = str(case["case_id"])
-        order.append(turn_id)
-        current = _base_for(case_id)
-        before = tmp_path / f"{turn_id.replace(':', '-')}.before.yaml"
-        after = tmp_path / f"{turn_id.replace(':', '-')}.after.yaml"
-        before.write_bytes(current.read_bytes())
-        before_payload = load_authoring_document(before).model_dump(mode="json")
-
-        if turn_id == "D4-C01:C01":
-            return finish(
-                {
-                    "outcome": "DIRECT_CORRECT",
-                    "canonical_before": {},
-                    "canonical_after": {},
-                    "persisted": True,
-                    "rendered": True,
-                    "verifier": {
-                        "acceptance_status": "PASS",
-                        "requirements": [
-                            {"id": item, "status": "PASS"}
-                            for item in expected["contract"]["required_verifier_requirements"]
-                        ],
-                    },
-                    "provider": "deterministic",
-                    "model": "d4-rehearsal",
-                    "calls": [{"operation": "structured"}, {"operation": "program"}],
-                    "worker_metrics": {"worker_count": 3, "program_calls": 3},
-                }
+        result = asyncio.run(
+            d4.run_campaign(
+                repo_root=REPO_ROOT,
+                state_path=state_path,
+                journal_path=journal_path,
+                preflight=lambda: {"current_checkout": "a" * 40},
+                execution_factory=lambda: adapter,
             )
-
-        result = await session_harness.adapter.revise(
-            feedback=str(case["request"]),
-            logfile_path=current,
         )
-        after.write_bytes(current.read_bytes())
-        session_calls = session_harness.take_calls()
-        facts = result.report_facts
-        after_document = load_authoring_document(after).model_dump(mode="json")
-        if facts["success"] is True:
-            render_path = tmp_path / f"{turn_id.replace(':', '-')}.pdf"
-            rendered = await session_harness.adapter.render_logfile_to_file(
-                logfile_path=current,
-                output_path=render_path,
-                overwrite=True,
-            )
-            assert rendered and render_path.is_file() and render_path.stat().st_size > 0
-            return finish(
-                {
-                    "outcome": expected["expected_outcome"],
-                    "before_path": before,
-                    "after_path": after,
-                    "render_path": render_path,
-                    "canonical_before": before_payload,
-                    "canonical_after": after_document,
-                    "persisted": True,
-                    "rendered": True,
-                    "execution_evidence": {
-                        "accepted": True,
-                        "persisted": True,
-                        "rendered": True,
-                    },
-                    "provider": "deterministic",
-                    "model": "d4-rehearsal-model",
-                    "calls": session_calls,
-                    "worker_metrics": {"worker_count": 1, "program_calls": 1},
-                }
-            )
+        journal_rows = [json.loads(line) for line in journal_path.read_text().splitlines()]
+        state_status = json.loads(state_path.read_text(encoding="utf-8"))["status"]
 
-        return finish(
-            {
-                "outcome": expected["expected_outcome"],
-                "before_path": before,
-                "after_path": after,
-                "canonical_before": before_payload,
-                "canonical_after": after_document,
-                "changed": False,
-                "pre_bytes_sha256": d4.sha256_file(before),
-                "post_bytes_sha256": d4.sha256_file(after),
-                "diagnostic_code": "program.dry_run_error",
-                "intent_applied": False,
-                "persisted": False,
-                "rendered": False,
-                "fallback_used": False,
-                "substituted_channel": False,
-                "prohibited_object_present": False,
-                "provider": "deterministic",
-                "model": "d4-rehearsal-model",
-                "calls": session_calls,
-            }
-        )
-
-    result = asyncio.run(
-        d4.run_campaign(
-            repo_root=REPO_ROOT,
-            state_path=state_path,
-            journal_path=journal_path,
-            preflight=lambda: {"current_checkout": "a" * 40},
-            credential_factory=lambda: rehearsal_context,
-            turn_executor=execute_turn,
-        )
-    )
-
-    assert order == [case["turn_id"] for case in d4.load_cases(REPO_ROOT)], result
+    assert [row["turn_id"] for row in result["rows"]] == [
+        case["turn_id"] for case in d4.load_cases(REPO_ROOT)
+    ], result
     assert result["decision"] == "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED", [
-        (row["turn_id"], row["grader_status"], row["diff_status"])
+        (row["turn_id"], row["grader_status"], row["grader_errors"])
         for row in result["rows"]
         if row["grader_status"] != "PASS"
     ]
@@ -1028,9 +943,12 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_las_verifier(
         for row in result["rows"]
         if row["turn_id"].startswith("D4-L01") or row["turn_id"] == "D4-L02:T2"
     )
-    journal_rows = [json.loads(line) for line in journal_path.read_text().splitlines()]
-    assert json.loads(state_path.read_text(encoding="utf-8"))["status"] == "COMPLETED"
-    assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 17
+    cbl_row = next(row for row in result["rows"] if row["turn_id"] == "D4-C01:C01")
+    assert {item["status"] for item in cbl_row["verifier_requirements"]} == {"PASS"}
+    assert cbl_row["starting_artifact_sha256"] == cbl_row["ending_artifact_sha256"]
+    assert state_status == "COMPLETED"
+    assert result["logical_generation_calls"] == 16
+    assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 16
     assert sum("turn_id" in row for row in journal_rows) == 9
     assert journal_rows[-1]["event"] == "campaign_terminal"
     assert all("raw_generated_program" not in row for row in journal_rows)
