@@ -2,7 +2,7 @@
 
 ## Status
 
-`WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001_COMPLETE_REVIEW_PENDING`
+`WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-002_COMPLETE_REVIEW_PENDING`
 
 Design authorization:
 
@@ -43,13 +43,13 @@ Design amendment parent:
 Current amendment rework:
 
 ```text
-WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-002
 ```
 
 Amendment rework parent:
 
 ```text
-9f872101eba49ebfc95503cfe2e4ca8b6070781b
+d528ae7a0a1fd2bb09ea93d3982a147c21e0c036
 ```
 
 Previous design-rework parent:
@@ -140,9 +140,10 @@ program-provider calls = 0
 ```
 
 The amended local preflight may make bounded non-generation `GET /v1/models`
-and `GET /props` requests to the frozen endpoint after the authenticated
-credential boundary. Those endpoint observations are recorded separately and
-are not provider/model inference calls.
+and `GET /props` requests to the frozen endpoint after the configured
+credential is loaded. Those endpoint observations are recorded separately and
+are not provider/model inference calls; server-side authentication is not
+claimed.
 
 D4A must be independently reviewed before live execution.
 
@@ -170,8 +171,13 @@ deployment below. No fallback or silent substitution is permitted.
 engine: v2
 provider_boundary: openai_compat
 runtime: local llama.cpp
-endpoint: http://192.168.2.140:8888/v1
-endpoint_authentication: required
+llama_server_origin: http://192.168.2.140:8888
+openai_compat_base_url: http://192.168.2.140:8888/v1
+model_catalog_url: http://192.168.2.140:8888/v1/models
+props_url: http://192.168.2.140:8888/props
+client_credential_source: OPENAI_COMPAT_API_KEY
+credential_access: after STARTED
+server_authentication: not claimed / not decision-bearing
 model_requested: qwen3.6-35b-a3b
 model_family: Qwen3.6-35B-A3B
 structured_output: json_schema
@@ -202,11 +208,11 @@ wire token-limit fields:
   max_completion_tokens = absent
 ```
 
-The endpoint and served model identifier are explicit design inputs, not values
-to infer from environment defaults. D4A must freeze the endpoint's exact
-normalized base URL, the exact `/v1/models` identifier, and the authenticated
-`/props` provenance record returned by the server before any campaign
-authorization. A mismatch is configuration drift.
+The server origin, OpenAI-compatible base URL, model catalog URL, and root
+`/props` URL are distinct design inputs, not values to infer from generic URL
+concatenation. D4A must freeze each URL, the exact `/v1/models` identifier,
+and the `/props` provenance record before any campaign authorization. A
+mismatch is configuration drift.
 
 This reflects the frozen production graph rather than a generic provider default:
 
@@ -236,12 +242,19 @@ hardware state remained unchanged unless a separately authenticated host-level
 artifact proves it. The decision-bearing identity is the endpoint catalog
 identity plus the explicitly frozen endpoint contract.
 
+The client credential is sent using the existing production HTTP policy, but
+the design makes no claim that the llama.cpp server enforces authentication.
+Proving server-side API-key enforcement would require a separate bounded
+valid-key versus invalid-key non-inference test and is not decision-bearing for
+this D4 campaign.
+
 No provider substitution.
 
 No remote provider fallback.
 
 If this exact requested endpoint/model/structured-output configuration cannot
-be instantiated or authenticated at live-execution time:
+be instantiated at live-execution time, or the credential-bearing identity
+requests fail:
 
 ```text
 D4_LIVE_ACCEPTANCE_INCONCLUSIVE
@@ -992,8 +1005,10 @@ A zero-length pre-existing file is not treated as a fresh campaign.
 
 ## Pre-live sequence
 
-The amended design selects an authenticated endpoint contract. It does not
-claim that model identity was observed before credentials were accessed.
+The amended design selects a credential-bearing endpoint-observation contract.
+It does not claim that the llama.cpp server enforces authentication, and it
+does not claim that model identity was observed before credentials were
+accessed.
 Before provider construction or generation:
 
 1. run all static provider-free integrity/source/dependency/checkpoint
@@ -1013,9 +1028,17 @@ logical_generation_calls = 0
 ```
 
 Only after the durable `STARTED` sentinel exists may the harness load the
-configured `OPENAI_COMPAT_API_KEY`. It must then perform bounded authenticated
-`GET /v1/models` and `GET /props` requests, without a completion request or
-model inference, before constructing the real provider.
+configured `OPENAI_COMPAT_API_KEY`. It must then perform bounded credential-
+bearing requests to the explicitly frozen URLs:
+
+```text
+GET http://192.168.2.140:8888/v1/models
+GET http://192.168.2.140:8888/props
+```
+
+These requests must not be described as authenticated unless server-side
+enforcement has separately been proven. They occur without a completion
+request or model inference, before constructing the real provider.
 
 The `/v1/models` response must contain the deliberate server alias
 `qwen3.6-35b-a3b`. `/props` must provide the frozen model-path identity,
@@ -1367,8 +1390,8 @@ live_harness_checkpoint =
 D4B runs from the exact D4A checkpoint, not directly from the D3 commit.
 
 Before `STARTED`, D4B performs only static provider-free interlocks. After
-`STARTED` and credential loading, the authenticated local-endpoint interlocks
-must authenticate:
+`STARTED` and credential loading, the credential-bearing local-endpoint
+identity interlocks must verify:
 
 - `git HEAD == live_harness_checkpoint`;
 - clean Git working tree;
@@ -1381,7 +1404,10 @@ must authenticate:
 - exact `uv.lock` SHA-256;
 - installed `openai` package version equals the D4A-frozen client version;
 - actual runtime OpenAI client retry setting equals the D4A-frozen value;
-- normalized endpoint equals `http://192.168.2.140:8888/v1`;
+- server origin equals `http://192.168.2.140:8888`;
+- OpenAI-compatible base URL equals `http://192.168.2.140:8888/v1`;
+- model catalog URL equals `http://192.168.2.140:8888/v1/models`;
+- props URL equals `http://192.168.2.140:8888/props`;
 - `/v1/models` exposes exactly the deliberate server alias
   `qwen3.6-35b-a3b`;
 - `/props` matches the frozen model-path, context-size, build-information, and
@@ -2037,10 +2063,10 @@ D4 production promotion is not authorized by any of those gates.
 Current status:
 
 ```text
-WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-001_COMPLETE_REVIEW_PENDING
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REWORK-002_COMPLETE_REVIEW_PENDING
 D4A HARNESS IMPLEMENTATION: NOT AUTHORIZED
 D4B LIVE INFERENCE: NOT AUTHORIZED
 PRODUCTION PROMOTION: NOT AUTHORIZED
 ```
 
-Stop for independent D4 design amendment closure review.
+Stop for independent D4 design amendment REWORK-002 closure review.
