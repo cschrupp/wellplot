@@ -16,6 +16,7 @@ import inspect
 import json
 import os
 import subprocess
+import threading
 import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
@@ -248,6 +249,26 @@ class LogicalCall:
     metrics: dict[str, int | float | None]
 
 
+@dataclass(slots=True)
+class LogicalCallLedger:
+    """Reserve unique logical-call identities before any provider delegation."""
+
+    max_calls: int = MAX_LOGICAL_CALLS
+    started_calls: int = 0
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def reserve(self) -> int:
+        """Atomically reserve the next call index or reject it before delegation."""
+        with self._lock:
+            next_index = self.started_calls + 1
+            if next_index > self.max_calls:
+                raise CallCapExceeded(
+                    f"logical generation call {next_index} rejected before delegation"
+                )
+            self.started_calls = next_index
+            return next_index
+
+
 @dataclass
 class CountingBackend:
     """Count logical generation calls without adding retries or payload capture."""
@@ -260,13 +281,16 @@ class CountingBackend:
     call_completed: Callable[[dict[str, Any]], None] | None = None
     prompt_guard: Callable[[str], None] | None = None
     calls: list[LogicalCall] = field(default_factory=list)
+    ledger: LogicalCallLedger | None = None
+
+    def __post_init__(self) -> None:
+        """Give standalone wrappers a ledger while allowing campaign sharing."""
+        if self.ledger is None:
+            self.ledger = LogicalCallLedger(max_calls=self.max_calls)
+        elif self.ledger.max_calls != self.max_calls:
+            raise ValueError("counting backend and logical-call ledger caps must match")
 
     def _before(self, operation: str, request: object) -> int:
-        if len(self.calls) >= self.max_calls:
-            raise CallCapExceeded(
-                f"logical generation call {self.max_calls + 1} rejected before delegation"
-            )
-        index = len(self.calls) + 1
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
         if operation not in {"structured", "program"}:
@@ -281,6 +305,8 @@ class CountingBackend:
             if not isinstance(prompt, str):
                 raise PreflightError("generation request has no user prompt")
             self.prompt_guard(prompt)
+        assert self.ledger is not None
+        index = self.ledger.reserve()
         if self.call_started is not None:
             self.call_started(
                 {
@@ -421,6 +447,20 @@ class CampaignCallSource:
 
     backends: tuple[CountingBackend, ...]
     calls: list[LogicalCall]
+    ledger: LogicalCallLedger | None = None
+
+    def __post_init__(self) -> None:
+        """Require all campaign wrappers to use one start-time ledger."""
+        if self.ledger is None:
+            if self.backends:
+                ledger = self.backends[0].ledger
+                assert ledger is not None
+            else:
+                ledger = LogicalCallLedger()
+            object.__setattr__(self, "ledger", ledger)
+        assert self.ledger is not None
+        if any(backend.ledger is not self.ledger for backend in self.backends):
+            raise ValueError("campaign backends must share one logical-call ledger")
 
     def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind durable custody to every ModelBackendProtocol boundary."""
@@ -434,12 +474,16 @@ class CampaignCallSource:
 
     @property
     def logical_call_count(self) -> int:
-        """Return the observed logical-call count from the shared ledger."""
-        return len(self.calls)
+        """Return the reserved logical-call count from the shared ledger."""
+        assert self.ledger is not None
+        return self.ledger.started_calls
 
     def calls_since(self, cursor: int) -> list[LogicalCall]:
         """Return bounded observations since one turn-local cursor."""
-        return list(self.calls[cursor:])
+        return sorted(
+            (call for call in self.calls if call.index > cursor),
+            key=lambda call: call.index,
+        )
 
 
 def canonical_json(value: object) -> str:
@@ -832,6 +876,8 @@ class CampaignCustody:
         next_count = int(self.state.get("logical_generation_calls", 0)) + 1
         if next_count > MAX_LOGICAL_CALLS:
             raise CallCapExceeded("logical generation call exceeds the frozen campaign cap")
+        if event.get("index") != next_count:
+            raise PreflightError("logical-call ledger index drifted from campaign custody")
         self.state["logical_generation_calls"] = next_count
         _atomic_json(self.state_path, self.state)
         self.journal.append(
@@ -1526,11 +1572,13 @@ def create_live_campaign_adapter(
         timeout=timeout,
     )
     calls: list[LogicalCall] = []
+    ledger = LogicalCallLedger()
     counted = CountingBackend(
         delegate=backend,
         provider=EXPECTED_PROVIDER,
         model=EXPECTED_MODEL,
         calls=calls,
+        ledger=ledger,
         prompt_guard=prompt_guard,
     )
     session = build_notebook_session(
@@ -1545,7 +1593,7 @@ def create_live_campaign_adapter(
         repo_root=repo_root,
         artifact_root=artifact_root,
         session=session,
-        call_source=CampaignCallSource(backends=(counted,), calls=calls),
+        call_source=CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
         provider_backed=True,
     )
 

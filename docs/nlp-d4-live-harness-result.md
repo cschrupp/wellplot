@@ -5,9 +5,9 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-005
+rework: WELLPLOT-NLP-D4A-REWORK-006
 authorized_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
-rework_parent: b7dd01672264e0b09e2b9ff468831eda817f051c
+rework_parent: 1f94c668cc4a5e2cb9809b64759b86955a369ccb
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
@@ -85,6 +85,11 @@ structured response data. Exact endpoint/HTTP and remote model call counts are
 not claimed; the SDK retry setting and physical-attempt upper bound remain the
 available transport evidence.
 
+Logical-call indexes are reserved at start time from one shared lock-protected
+ledger used by the planner, report-worker, and section-worker wrappers. The
+45-call ceiling is enforced against reserved calls before delegation, and
+completion records retain the reserved index even when worker calls overlap.
+
 The L02 starting artifact instantiates the accepted shared-boundary windows:
 `Main Log – Upper` uses `8400.0..9300.0` ft and `Main Log – Lower` uses
 `9300.0..10200.0` ft, both from the same authenticated LAS source.
@@ -137,7 +142,7 @@ and no source/channel substitution. The unchanged CBL/LAS verifiers are used
 when canonical artifact paths are supplied, and their input bytes are checked
 for non-mutation.
 
-## REWORK-005 taxonomy and evidence corrections
+## REWORK-005/006 taxonomy, evidence, and call-custody corrections
 
 The final outcome taxonomy is derived only after the deterministic grader has
 inspected the observed artifact. A persisted and rendered artifact that fails
@@ -158,11 +163,11 @@ generated CBL logfile as the ending artifact, so both artifact hashes are
 concrete. Canonical journal rows retain only stable diagnostic fields; free-
 form diagnostic messages remain transient and are not persisted.
 
-The REWORK-005 focused suite completed with `36 passed, 1 skipped`. The
-D0–D2E delivery suite previously completed with `83 passed, 1 skipped`. D3's real-DLIS/render
+The REWORK-006 focused suite completed with `37 passed, 1 skipped`. The
+D0–D4 delivery suite completed with `92 passed, 2 skipped`. D3's real-DLIS/render
 one-shot test was invoked separately but did not terminate within the bounded
 180-second verification timeout; it is not claimed as passing. The terminal
-full-suite comparison produced `2590 passed, 36 failed, 12 skipped,
+full-suite comparison produced `2597 passed, 36 failed, 12 skipped,
 11 subtests`; the exact 36 failure identities matched the authorized parent
 baseline, so there were zero new attributable failures.
 

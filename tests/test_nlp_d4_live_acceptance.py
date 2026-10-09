@@ -388,6 +388,63 @@ def test_call_46_is_rejected_before_delegation() -> None:
     assert len(backend.calls) == d4.MAX_LOGICAL_CALLS
 
 
+def test_counting_backend_reserves_unique_indexes_under_concurrent_calls() -> None:
+    """Reserve start identities before overlapping delegates and enforce the cap."""
+
+    class _BlockingBackend(_Backend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.release = asyncio.Event()
+
+        async def generate_structured(
+            self,
+            request: StructuredGenerationRequest,
+            *,
+            response_model: type[_Value],
+        ) -> StructuredGenerationResult[_Value]:
+            result = await super().generate_structured(request, response_model=response_model)
+            await self.release.wait()
+            return result
+
+    async def run() -> tuple[list[dict[str, object]], list[dict[str, object]], list[object], int]:
+        delegate = _BlockingBackend()
+        ledger = d4.LogicalCallLedger(max_calls=2)
+        events: list[dict[str, object]] = []
+        calls: list[d4.LogicalCall] = []
+        backends = tuple(
+            d4.CountingBackend(
+                delegate=delegate,
+                max_calls=2,
+                ledger=ledger,
+                calls=calls,
+                call_started=events.append,
+                call_completed=events.append,
+            )
+            for _ in range(2)
+        )
+        tasks = [
+            asyncio.create_task(
+                backend.generate_structured(_structured_request(), response_model=_Value)
+            )
+            for backend in (*backends, backends[0])
+        ]
+        while delegate.calls < 2:
+            await asyncio.sleep(0)
+        backends[0].delegate.release.set()
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        started = [event for event in events if event["event"] == "logical_call_started"]
+        completed = [event for event in events if event["event"] == "logical_call_completed"]
+        return started, completed, results, delegate.calls
+
+    started, completed, results, delegated = asyncio.run(run())
+    assert [event["index"] for event in started] == [1, 2]
+    assert sorted(event["index"] for event in completed) == [1, 2]
+    assert len({event["index"] for event in started}) == 2
+    assert len({event["index"] for event in completed}) == 2
+    assert delegated == 2
+    assert sum(isinstance(result, d4.CallCapExceeded) for result in results) == 1
+
+
 def test_campaign_state_is_durable_before_credentials() -> None:
     """Write STARTED state before invoking credential construction."""
     with TemporaryDirectory() as temporary:
@@ -827,24 +884,28 @@ class _D4SessionHarness:
     def create(cls, root: Path) -> _D4SessionHarness:
         """Build the unchanged production graph around deterministic backends."""
         calls: list[d4.LogicalCall] = []
+        ledger = d4.LogicalCallLedger()
         planner = _D4SessionPlanner(calls=[])
         planner_backend = d4.CountingBackend(
             delegate=_D4PlannerBackend(planner),
             provider="deterministic",
             model="d4-rehearsal-model",
             calls=calls,
+            ledger=ledger,
         )
         report_backend = d4.CountingBackend(
             delegate=_D4SessionReportBackend(),
             provider="deterministic",
             model="d4-rehearsal-model",
             calls=calls,
+            ledger=ledger,
         )
         section_backend = d4.CountingBackend(
             delegate=_D4SessionSectionBackend(),
             provider="deterministic",
             model="d4-rehearsal-model",
             calls=calls,
+            ledger=ledger,
         )
         registry = create_builtin_registry()
         dependencies = CodeModeGraphDependencies(
@@ -869,6 +930,7 @@ class _D4SessionHarness:
         call_source = d4.CampaignCallSource(
             backends=(planner_backend, report_backend, section_backend),
             calls=calls,
+            ledger=ledger,
         )
         adapter = d4.D4CampaignAdapter(
             repo_root=REPO_ROOT,
@@ -1183,6 +1245,15 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert result["logical_generation_calls"] == 16
     assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 16
     assert sum(row.get("event") == "logical_call_completed" for row in journal_rows) == 16
+    started_indexes = [
+        row["index"] for row in journal_rows if row.get("event") == "logical_call_started"
+    ]
+    completed_indexes = [
+        row["index"] for row in journal_rows if row.get("event") == "logical_call_completed"
+    ]
+    assert started_indexes == list(range(1, 17))
+    assert sorted(completed_indexes) == list(range(1, 17))
+    assert len(set(completed_indexes)) == 16
     assert sum("turn_id" in row for row in journal_rows) == 9
     assert journal_rows[-1]["event"] == "campaign_terminal"
     assert all("raw_generated_program" not in row for row in journal_rows)
