@@ -53,6 +53,7 @@ OPENAI_COMPAT_BASE_URL = f"{LLAMA_SERVER_ORIGIN}/v1"
 MODEL_CATALOG_URL = f"{OPENAI_COMPAT_BASE_URL}/models"
 PROPS_URL = f"{LLAMA_SERVER_ORIGIN}/props"
 CREDENTIAL_SOURCE = "OPENAI_COMPAT_API_KEY"
+MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES = 1_048_576
 EXPECTED_OPENAI_VERSION = "2.34.0"
 EXPECTED_SDK_MAX_RETRIES = 2
 MAX_LOGICAL_CALLS = 45
@@ -217,7 +218,7 @@ class PostStartedFailure(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class EndpointIdentity:
-    """Sanitized identity projected from the two authenticated endpoint responses."""
+    """Sanitized identity projected from two credential-bearing responses."""
 
     model_catalog: tuple[str, ...]
     model_path_basename: str
@@ -592,7 +593,7 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _authenticated_json_get(url: str, api_key: str) -> object:
+def _credential_bearing_json_get(url: str, api_key: str) -> object:
     """Fetch one bounded endpoint response without retaining its raw body."""
     request = urllib.request.Request(
         url,
@@ -603,7 +604,9 @@ def _authenticated_json_get(url: str, api_key: str) -> object:
         with urllib.request.urlopen(request, timeout=20.0) as response:
             if response.geturl() != url:
                 raise PostStartedFailure("endpoint_identity_mismatch")
-            body = response.read()
+            body = response.read(MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES + 1)
+            if len(body) > MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES:
+                raise PostStartedFailure("endpoint_identity_mismatch")
     except PostStartedFailure:
         raise
     except (OSError, urllib.error.URLError, urllib.error.HTTPError):
@@ -648,6 +651,7 @@ def _project_props(payload: object) -> dict[str, object]:
         or generation["n_ctx"] <= 0
         or not isinstance(build_info, str)
         or not build_info.strip()
+        or len(build_info.strip()) > 256
         or isinstance(total_slots, bool)
         or not isinstance(total_slots, int)
         or total_slots <= 0
@@ -661,7 +665,7 @@ def _project_props(payload: object) -> dict[str, object]:
         "model_path_basename": basename,
         "model_path_fingerprint_sha256": sha256_text(normalized_path),
         "context_size": generation["n_ctx"],
-        "build_info": build_info.strip()[:256],
+        "build_info": build_info.strip(),
         "total_slots": total_slots,
         "gguf_byte_identity": "NOT_AVAILABLE",
     }
@@ -671,10 +675,15 @@ def observe_endpoint_identity(
     api_key: str,
     *,
     http_get_json: Callable[[str, str], object] | None = None,
+    request_started: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Observe exactly `/v1/models` and `/props`, returning sanitized identity."""
-    getter = http_get_json or _authenticated_json_get
+    getter = http_get_json or _credential_bearing_json_get
+    if request_started is not None:
+        request_started("model_catalog")
     catalog = _project_model_catalog(getter(MODEL_CATALOG_URL, api_key))
+    if request_started is not None:
+        request_started("props")
     props = _project_props(getter(PROPS_URL, api_key))
     return EndpointIdentity(model_catalog=catalog, **props).as_dict()
 
@@ -1104,9 +1113,30 @@ class CampaignCustody:
             }
         )
 
+    def record_identity_endpoint_started(self, kind: str) -> None:
+        """Durably reserve one credential-bearing identity request before dispatch."""
+        expected = {1: "model_catalog", 2: "props"}
+        next_count = int(self.state.get("identity_endpoint_calls", 0)) + 1
+        if expected.get(next_count) != kind:
+            raise PreflightError("identity endpoint request order drifted")
+        self.state["identity_endpoint_calls"] = next_count
+        _atomic_json(self.state_path, self.state)
+        self.journal.append(
+            {
+                "event": "identity_endpoint_call_started",
+                "experiment_version": EXPERIMENT_VERSION,
+                "campaign_id": self.state["campaign_id"],
+                "identity_endpoint_calls": next_count,
+                "index": next_count,
+                "kind": kind,
+            }
+        )
+
     def record_endpoint_identity(self, identity: Mapping[str, Any]) -> None:
         """Persist sanitized endpoint identity before provider construction."""
-        self.state["identity_endpoint_calls"] = 2
+        if int(self.state.get("identity_endpoint_calls", 0)) != 2:
+            raise PreflightError("endpoint identity request count is incomplete")
+        identity_endpoint_calls = int(self.state["identity_endpoint_calls"])
         self.state["endpoint_identity"] = dict(identity)
         _atomic_json(self.state_path, self.state)
         self.journal.append(
@@ -1114,7 +1144,7 @@ class CampaignCustody:
                 "event": "endpoint_identity_verified",
                 "experiment_version": EXPERIMENT_VERSION,
                 "campaign_id": self.state["campaign_id"],
-                "identity_endpoint_calls": 2,
+                "identity_endpoint_calls": identity_endpoint_calls,
                 **dict(identity),
             }
         )
@@ -1851,11 +1881,16 @@ def create_live_campaign_runtime(
     artifact_root: Path,
     authorization: FrozenAuthorization,
     record_identity: Callable[[Mapping[str, Any]], None],
+    record_identity_request: Callable[[str], None],
     http_get_json: Callable[[str, str], object] | None = None,
 ) -> D4CampaignAdapter:
     """Compose credential, endpoint provenance, and provider inside custody."""
     api_key = load_d4_api_key(repo_root)
-    observed = observe_endpoint_identity(api_key, http_get_json=http_get_json)
+    observed = observe_endpoint_identity(
+        api_key,
+        http_get_json=http_get_json,
+        request_started=record_identity_request,
+    )
     identity = validate_endpoint_identity(observed, authorization)
     record_identity(identity)
     try:
@@ -2052,6 +2087,7 @@ def start_campaign(
         ),
         "status": "STARTED",
         "logical_generation_calls": 0,
+        "identity_endpoint_calls": 0,
     }
     for key in (
         "harness_source_sha256",
@@ -2435,6 +2471,7 @@ def _main() -> int:
                         artifact_root=artifact_root,
                         authorization=authorization,
                         record_identity=custody.record_endpoint_identity,
+                        record_identity_request=custody.record_identity_endpoint_started,
                     ),
                 )
             )

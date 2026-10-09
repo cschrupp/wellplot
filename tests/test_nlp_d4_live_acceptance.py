@@ -375,8 +375,9 @@ def test_openai_retry_policy_is_provider_free() -> None:
 
 
 def test_endpoint_identity_projects_only_bounded_props_and_exact_catalog() -> None:
-    """Fake authenticated GETs prove the Qwen-only catalog and sanitized props."""
+    """Fake credential-bearing GETs prove the Qwen-only catalog and sanitized props."""
     requests: list[tuple[str, str]] = []
+    started: list[str] = []
     responses = {
         d4.MODEL_CATALOG_URL: {"data": [{"id": d4.EXPECTED_MODEL, "object": "model"}]},
         d4.PROPS_URL: {
@@ -392,8 +393,13 @@ def test_endpoint_identity_projects_only_bounded_props_and_exact_catalog() -> No
         requests.append((url, token))
         return responses[url]
 
-    identity = d4.observe_endpoint_identity("secret-token", http_get_json=fake_get)
+    identity = d4.observe_endpoint_identity(
+        "secret-token",
+        http_get_json=fake_get,
+        request_started=started.append,
+    )
     assert [url for url, _ in requests] == [d4.MODEL_CATALOG_URL, d4.PROPS_URL]
+    assert started == ["model_catalog", "props"]
     assert all(token == "secret-token" for _, token in requests)
     assert "secret-token" not in json.dumps(identity)
     assert identity["model_catalog"] == [d4.EXPECTED_MODEL]
@@ -403,7 +409,105 @@ def test_endpoint_identity_projects_only_bounded_props_and_exact_catalog() -> No
     )
     assert "model_path" not in identity
     assert "chat_template" not in identity
+    assert identity["build_info"] == "llama.cpp build abc"
     assert identity["gguf_byte_identity"] == "NOT_AVAILABLE"
+
+
+def test_endpoint_identity_accepts_response_exactly_at_byte_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The bounded HTTP reader accepts a valid body exactly at its limit."""
+
+    class FakeResponse:
+        def __init__(self, body: bytes) -> None:
+            self.body = body
+            self.read_sizes: list[int] = []
+
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def geturl(self) -> str:
+            return self.url
+
+        def read(self, amount: int) -> bytes:
+            self.read_sizes.append(amount)
+            return self.body[:amount]
+
+    catalog_payload = json.dumps(
+        {"data": [{"id": d4.EXPECTED_MODEL}]}, separators=(",", ":")
+    ).encode()
+    props_payload = json.dumps(
+        {
+            "model_path": "/models/qwen.gguf",
+            "default_generation_settings": {"n_ctx": 32768},
+            "build_info": "build",
+            "total_slots": 1,
+        },
+        separators=(",", ":"),
+    ).encode()
+    bodies = [
+        catalog_payload + b" " * (d4.MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES - len(catalog_payload)),
+        props_payload + b" " * (d4.MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES - len(props_payload)),
+    ]
+    all_responses = [FakeResponse(body) for body in bodies]
+    responses = list(all_responses)
+
+    def fake_urlopen(request: object, *, timeout: float) -> FakeResponse:
+        del request, timeout
+        response = responses.pop(0)
+        response.url = d4.MODEL_CATALOG_URL if len(responses) == 1 else d4.PROPS_URL
+        return response
+
+    monkeypatch.setattr(d4.urllib.request, "urlopen", fake_urlopen)
+    identity = d4.observe_endpoint_identity("token")
+    assert identity["build_info"] == "build"
+    assert [response.read_sizes for response in all_responses] == [
+        [d4.MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES + 1]
+    ] * 2
+
+
+def test_endpoint_identity_rejects_response_over_byte_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An oversized endpoint body is rejected after one bounded read."""
+
+    class FakeResponse:
+        def __init__(self) -> None:
+            self.read_sizes: list[int] = []
+
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def geturl(self) -> str:
+            return d4.MODEL_CATALOG_URL
+
+        def read(self, amount: int) -> bytes:
+            self.read_sizes.append(amount)
+            return b"{" + b" " * amount
+
+    response = FakeResponse()
+    monkeypatch.setattr(d4.urllib.request, "urlopen", lambda request, timeout: response)
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4.observe_endpoint_identity("token")
+    assert response.read_sizes == [d4.MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES + 1]
+
+
+def test_endpoint_identity_rejects_lossy_build_info() -> None:
+    """Identity-bearing build information is bounded without truncation."""
+    props = {
+        "model_path": "/models/qwen.gguf",
+        "default_generation_settings": {"n_ctx": 32768},
+        "build_info": "x" * 257,
+        "total_slots": 1,
+    }
+    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+        d4._project_props(props)
 
 
 @pytest.mark.parametrize(
@@ -545,6 +649,7 @@ def test_runtime_passes_loaded_token_only_to_explicit_provider_factory(
         artifact_root=REPO_ROOT / "tmp",
         authorization=authorization,
         record_identity=lambda identity: recorded.append(dict(identity)),
+        record_identity_request=lambda kind: None,
         http_get_json=fake_get,
     )
     assert result is not None
@@ -637,6 +742,7 @@ def test_missing_credential_after_started_is_durable_inconclusive(
                 artifact_root=root,
                 authorization=_authorization(),
                 record_identity=custody.record_endpoint_identity,
+                record_identity_request=custody.record_identity_endpoint_started,
             ),
         )
     assert result["terminal_reason_code"] == "credential_unavailable"
@@ -663,6 +769,7 @@ def test_endpoint_unavailable_after_started_has_no_provider_or_logical_call(
                 artifact_root=root,
                 authorization=_authorization(),
                 record_identity=custody.record_endpoint_identity,
+                record_identity_request=custody.record_identity_endpoint_started,
                 http_get_json=lambda url, token: (_ for _ in ()).throw(
                     d4.PostStartedFailure("endpoint_unreachable")
                 ),
@@ -670,7 +777,44 @@ def test_endpoint_unavailable_after_started_has_no_provider_or_logical_call(
         )
     assert result["terminal_reason_code"] == "endpoint_unreachable"
     assert state["logical_generation_calls"] == 0
+    assert state["identity_endpoint_calls"] == 1
+    assert [
+        event["kind"] for event in events if event["event"] == "identity_endpoint_call_started"
+    ] == ["model_catalog"]
     assert events[-1]["terminal_reason_code"] == "endpoint_unreachable"
+
+
+def test_props_unavailable_after_started_counts_both_identity_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed /props request is counted after the catalog request succeeds."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+
+        def fake_get(url: str, token: str) -> object:
+            if url == d4.MODEL_CATALOG_URL:
+                return {"data": [{"id": d4.EXPECTED_MODEL}]}
+            raise d4.PostStartedFailure("endpoint_unreachable")
+
+        result, state, events = _run_post_started_failure(
+            root,
+            lambda custody: d4.create_live_campaign_runtime(
+                repo_root=REPO_ROOT,
+                artifact_root=root,
+                authorization=_authorization(),
+                record_identity=custody.record_endpoint_identity,
+                record_identity_request=custody.record_identity_endpoint_started,
+                http_get_json=fake_get,
+            ),
+        )
+    assert result["terminal_reason_code"] == "endpoint_unreachable"
+    assert state["identity_endpoint_calls"] == 2
+    assert [
+        (event["index"], event["kind"])
+        for event in events
+        if event["event"] == "identity_endpoint_call_started"
+    ] == [(1, "model_catalog"), (2, "props")]
 
 
 def test_identity_mismatch_after_started_has_no_provider_or_logical_call(
@@ -687,6 +831,7 @@ def test_identity_mismatch_after_started_has_no_provider_or_logical_call(
                 artifact_root=root,
                 authorization=_authorization(),
                 record_identity=custody.record_endpoint_identity,
+                record_identity_request=custody.record_identity_endpoint_started,
                 http_get_json=lambda url, token: (
                     {"data": [{"id": "wrong-model"}]} if url == d4.MODEL_CATALOG_URL else {}
                 ),
@@ -694,6 +839,7 @@ def test_identity_mismatch_after_started_has_no_provider_or_logical_call(
         )
     assert result["terminal_reason_code"] == "endpoint_identity_mismatch"
     assert state["logical_generation_calls"] == 0
+    assert state["identity_endpoint_calls"] == 1
     assert events[-1]["terminal_reason_code"] == "endpoint_identity_mismatch"
 
 
@@ -738,11 +884,14 @@ def test_provider_construction_failure_is_durable_inconclusive(
                     },
                 ),
                 record_identity=custody.record_endpoint_identity,
+                record_identity_request=custody.record_identity_endpoint_started,
                 http_get_json=fake_get,
             ),
         )
     assert result["terminal_reason_code"] == "provider_construction_failed"
     assert state["logical_generation_calls"] == 0
+    assert state["identity_endpoint_calls"] == 2
+    assert any(event["event"] == "endpoint_identity_verified" for event in events)
     assert events[-1]["terminal_reason_code"] == "provider_construction_failed"
 
 

@@ -3,9 +3,10 @@
 ## Status
 
 ```yaml
-decision: WELLPLOT_NLP_D4A_AMENDED_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
-authorization: WELLPLOT-NLP-D4A-QWEN-HARNESS-IMPLEMENTATION-001
+decision: WELLPLOT_NLP_D4A_QWEN_HARNESS_REWORK_001_COMPLETE_REVIEW_PENDING
+authorization: WELLPLOT-NLP-D4A-QWEN-HARNESS-REWORK-001
 implementation_base: 94a373c292178d21613853ef57f74a81c8e17986
+rework_parent: 3b2b10e017c7380fec336a30ad5283fa21221914
 design_authority: 0d0158fc3ddb8844b866444a8b6192be3f5aa93f
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 provider: openai_compat
@@ -89,12 +90,15 @@ properties:          http://192.168.2.140:8888/props
 requested model:     qwen3.6-35b-a3b
 ```
 
-The two authenticated, non-generation GETs are projected into a bounded
+The two credential-bearing, non-generation GETs are projected into a bounded
 identity containing the exact Qwen-only catalog, model-path basename and
 fingerprint, context size, build information, slot count, and
 `gguf_byte_identity: NOT_AVAILABLE` unless a host-level artifact hash is
-separately available. Raw `/props`, absolute model paths, chat templates, and
-credentials are not persisted. Server authentication is not claimed.
+separately available. Each response body is read with a fixed one-MiB cap
+plus one byte to detect overflow; `build_info` must be non-empty and no more
+than 256 characters and is persisted without truncation. Raw `/props`,
+absolute model paths, chat templates, and credentials are not persisted.
+Server authentication is not claimed.
 
 The accepted future-live orchestration is implemented as `run_campaign()` and
 the campaign-owned `D4CampaignAdapter` in the harness script. The adapter
@@ -145,12 +149,12 @@ exact candidate commit and parent.
 The focused D4A suite uses only deterministic backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 61 passed, 1 skipped
+tests/test_nlp_d4_live_acceptance.py: 65 passed, 1 skipped
 provider calls: 0; real endpoint identity calls: 0; model calls: 0
 ```
 
-The D0-D4 delivery regression reports `116 passed, 2 skipped`. The full
-repository suite reports `2621 passed, 36 failed, 12 skipped, 11 subtests`;
+The D0-D4 delivery regression reports `120 passed, 2 skipped`. The full
+repository suite reports `2625 passed, 36 failed, 12 skipped, 11 subtests`;
 the 36 failures reproduce the established repository baseline and none is
 attributable to the three authorized D4A files. Ruff, formatting, Python
 compilation, and `git diff --check` pass.
@@ -180,8 +184,8 @@ After `STARTED`, runtime construction is inside the protected custody boundary:
 ```text
 STARTED
 → load OPENAI_COMPAT_API_KEY
-→ GET /v1/models
-→ GET /props
+→ persist identity request #1, then GET /v1/models
+→ persist identity request #2, then GET /props
 → validate sanitized identity
 → persist endpoint_identity_verified
 → construct production OpenAICompatibleBackendV2
