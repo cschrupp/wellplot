@@ -5,9 +5,9 @@
 ```yaml
 decision: WELLPLOT_NLP_D4A_IMPLEMENTATION_COMPLETE_REVIEW_PENDING
 authorization: WELLPLOT-NLP-D4A-AUTH-002
-rework: WELLPLOT-NLP-D4A-REWORK-004
+rework: WELLPLOT-NLP-D4A-REWORK-005
 authorized_parent: 7e528cfe4501c3c85417373d436f742fa1b12387
-rework_parent: 2059c6c0e172c0e0a6dc05ef5f93f4e2dfdc1b24
+rework_parent: b7dd01672264e0b09e2b9ff468831eda817f051c
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 live_inference: NOT_STARTED
 provider_calls: 0
@@ -137,7 +137,29 @@ and no source/channel substitution. The unchanged CBL/LAS verifiers are used
 when canonical artifact paths are supplied, and their input bytes are checked
 for non-mutation.
 
-The D0–D2E delivery suite completed with `83 passed, 1 skipped`. D3's real-DLIS/render
+## REWORK-005 taxonomy and evidence corrections
+
+The final outcome taxonomy is derived only after the deterministic grader has
+inspected the observed artifact. A persisted and rendered artifact that fails
+its scientific contract is therefore `UNDETECTED_INCORRECT_OUTPUT`, while an
+unexpected mutation is `UNINTENDED_MUTATION`. A non-persisted unsafe proposal
+is `DETECTED_INCORRECT_OUTPUT` unless the observed diagnostics establish the
+case-specific `SAFE_ACTIONABLE_FAILURE`; correct graded artifacts remain
+`DIRECT_CORRECT` or `CORRECT_AFTER_CLARIFICATION`.
+
+Safe-actionable classification uses observed diagnostic codes and bounded
+diagnostic messages only. It does not use scientist request wording. The
+accepted anchors are `enrichment.section_hint_ambiguous`,
+`enrichment.source_missing`, and the exact `program.dry_run_error` evidence
+for missing `RT` through `channel_missing`.
+
+The live CBL branch records the scaffold as the starting artifact and the
+generated CBL logfile as the ending artifact, so both artifact hashes are
+concrete. Canonical journal rows retain only stable diagnostic fields; free-
+form diagnostic messages remain transient and are not persisted.
+
+The REWORK-005 focused suite completed with `36 passed, 1 skipped`. The
+D0–D2E delivery suite previously completed with `83 passed, 1 skipped`. D3's real-DLIS/render
 one-shot test was invoked separately but did not terminate within the bounded
 180-second verification timeout; it is not claimed as passing. The terminal
 full-suite comparison produced `2590 passed, 36 failed, 12 skipped,

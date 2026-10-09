@@ -580,6 +580,8 @@ def test_terminal_decision_precedence_is_frozen() -> None:
     assert d4.derive_terminal_decision(passed) == "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED"
     failed = [*passed[:-1], {"grader_status": "FAIL"}]
     assert d4.derive_terminal_decision(failed) == "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_FAILED"
+    detected = [*passed[:-1], {"grader_status": "PASS", "outcome": "DETECTED_INCORRECT_OUTPUT"}]
+    assert d4.derive_terminal_decision(detected) == "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_FAILED"
     incomplete = passed[:-1]
     assert d4.derive_terminal_decision(incomplete) == "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE"
     infra = [*passed[:-1], {"grader_status": "PASS", "infrastructure_failure": True}]
@@ -944,6 +946,9 @@ def test_live_cbl_branch_verifies_and_renders_generated_artifact() -> None:
         assert grade["status"] == "PASS", grade
         assert actual["artifact_path"] == actual["after_path"]
         assert actual["rendered_artifact_path"] == actual["artifact_path"]
+        assert actual["starting_artifact_path"].name == "cbl-scaffold.log.yaml"
+        assert d4.sha256_file(actual["starting_artifact_path"])
+        assert actual["ending_artifact_path"] == actual["artifact_path"]
         assert session.render_source == actual["artifact_path"]
         assert actual["rendered"] is True
         wrong_artifact = dict(actual, rendered_artifact_path=root / "wrong-cbl.log.yaml")
@@ -979,6 +984,104 @@ def test_observed_negative_outcomes_distinguish_safe_rejection_from_bad_output()
     case = {"workflow": "LAS-REVISE", "request": "missing channel"}
     assert d4._observed_outcome(safe, case, {"sections": []}) == "SAFE_ACTIONABLE_FAILURE"
     assert d4._observed_outcome(bad, case, {"sections": []}) == "DETECTED_INCORRECT_OUTPUT"
+
+
+def test_safe_actionable_failure_uses_observed_diagnostics_not_request_text() -> None:
+    """Request wording cannot turn an unrelated failure into a safe rejection."""
+    before = {"sections": []}
+    common = {
+        "persisted": False,
+        "rendered": False,
+        "intent_applied": False,
+        "canonical_before": before,
+        "canonical_after": before,
+        "pre_bytes_sha256": "same",
+        "post_bytes_sha256": "same",
+        "created_channels": [],
+    }
+
+    parse_failure = {
+        **common,
+        "diagnostic_code": "program.parse_error",
+        "diagnostics": [
+            {
+                "code": "program.parse_error",
+                "message": "could not parse missing_neutron.las",
+            }
+        ],
+    }
+    assert d4._observed_failure_facts(parse_failure, before)["observed_safe_rejection"] is False
+
+    source_missing = {
+        **common,
+        "diagnostic_code": "enrichment.source_missing",
+        "diagnostics": [{"code": "enrichment.source_missing"}],
+    }
+    assert d4._observed_failure_facts(source_missing, before)["observed_safe_rejection"] is True
+
+    ambiguous = {
+        **common,
+        "diagnostic_code": "enrichment.section_hint_ambiguous",
+        "diagnostics": [{"code": "enrichment.section_hint_ambiguous"}],
+    }
+    assert d4._observed_failure_facts(ambiguous, before)["observed_safe_rejection"] is True
+
+    missing_rt = {
+        **common,
+        "diagnostic_code": "program.dry_run_error",
+        "diagnostics": [
+            {
+                "code": "program.dry_run_error",
+                "message": "channel_missing: No source channel matches 'RT'.",
+            }
+        ],
+    }
+    assert d4._observed_failure_facts(missing_rt, before)["observed_safe_rejection"] is True
+
+
+def test_outcome_taxonomy_is_derived_after_deterministic_grade() -> None:
+    """A persisted scientific mismatch is undetected, not direct correctness."""
+    expected = next(
+        item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == "D4-L01:T1"
+    )
+    case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-L01:T1")
+    actual = {
+        "canonical_before": {"title": "Original Well Log Report"},
+        "canonical_after": {"title": "Wrong title"},
+        "persisted": True,
+        "rendered": True,
+        "verifier": _verifier(expected["contract"]["required_verifier_requirements"]),
+    }
+    grade = d4.grade_turn(actual, expected)
+    assert grade["status"] == "FAIL"
+    assert d4._observed_outcome(actual, case, actual["canonical_before"], grade) == (
+        "UNDETECTED_INCORRECT_OUTPUT"
+    )
+
+
+def test_failed_request_with_mutation_is_unintended_mutation() -> None:
+    """A failed safety path that mutates the document is not safely rejected."""
+    expected = next(
+        item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == "D4-L03:C01"
+    )
+    case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-L03:C01")
+    before = {"sections": []}
+    actual = {
+        "changed": True,
+        "persisted": False,
+        "rendered": False,
+        "intent_applied": False,
+        "canonical_before": before,
+        "canonical_after": {"sections": [{"id": "unexpected"}]},
+        "pre_bytes_sha256": "before",
+        "post_bytes_sha256": "after",
+        "diagnostic_code": "enrichment.source_missing",
+        "diagnostics": [{"code": "enrichment.source_missing"}],
+        "created_channels": [],
+    }
+    grade = d4.grade_turn(actual, expected)
+    assert grade["status"] == "FAIL"
+    assert d4._observed_outcome(actual, case, before, grade) == "UNINTENDED_MUTATION"
 
 
 def _write_rehearsal_document(path: Path, payload: dict[str, object]) -> None:
@@ -1052,6 +1155,10 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert result["endpoint_calls"] == 0
     assert result["model_calls"] == 0
     assert all(row["grader_status"] == "PASS" for row in result["rows"])
+    gold_by_turn = {item["turn_id"]: item for item in d4.load_gold(REPO_ROOT)["cases"]}
+    assert [row["outcome"] for row in result["rows"]] == [
+        gold_by_turn[row["turn_id"]]["expected_outcome"] for row in result["rows"]
+    ]
     assert all(
         set(row["token_usage"])
         == {
@@ -1070,6 +1177,8 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     cbl_row = next(row for row in result["rows"] if row["turn_id"] == "D4-C01:C01")
     assert {item["status"] for item in cbl_row["verifier_requirements"]} == {"PASS"}
     assert cbl_row["starting_artifact_sha256"] == cbl_row["ending_artifact_sha256"]
+    assert cbl_row["starting_artifact_sha256"] is not None
+    assert cbl_row["ending_artifact_sha256"] is not None
     assert state_status == "COMPLETED"
     assert result["logical_generation_calls"] == 16
     assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 16
@@ -1077,3 +1186,8 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert sum("turn_id" in row for row in journal_rows) == 9
     assert journal_rows[-1]["event"] == "campaign_terminal"
     assert all("raw_generated_program" not in row for row in journal_rows)
+    assert all(
+        "message" not in diagnostic
+        for row in journal_rows
+        for diagnostic in row.get("diagnostics", [])
+    )

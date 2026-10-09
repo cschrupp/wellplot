@@ -894,7 +894,7 @@ class CampaignCustody:
 
 
 def _bounded_diagnostics(value: object) -> list[dict[str, object]]:
-    """Keep only stable diagnostic identity fields in the turn journal."""
+    """Keep bounded diagnostic facts transiently for outcome classification."""
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
         return []
     result: list[dict[str, object]] = []
@@ -917,6 +917,14 @@ def _bounded_diagnostics(value: object) -> list[dict[str, object]]:
             }
         )
     return result
+
+
+def _journal_diagnostics(value: object) -> list[dict[str, object]]:
+    """Project diagnostics to stable journal fields without free-form messages."""
+    fields = ("stage", "code", "severity", "retryable", "worker_kind", "plan_order")
+    return [
+        {key: item[key] for key in fields if key in item} for item in _bounded_diagnostics(value)
+    ]
 
 
 def _artifact_sha256(actual: Mapping[str, Any], *, path_key: str, hash_key: str) -> str | None:
@@ -1005,7 +1013,6 @@ def _document_channels(document: Mapping[str, Any]) -> list[str]:
 def _observed_failure_facts(
     actual: Mapping[str, Any],
     before: Mapping[str, Any],
-    request: str,
 ) -> dict[str, Any]:
     """Derive failure facts from persisted artifacts and bounded diagnostics."""
     after = actual.get("canonical_after")
@@ -1016,16 +1023,35 @@ def _observed_failure_facts(
     created_channels = [channel for channel in after_channels if channel not in before_channels]
     diagnostic_code = actual.get("diagnostic_code")
     diagnostics = actual.get("diagnostics", [])
+    byte_identity = (
+        actual.get("pre_bytes_sha256") is not None
+        and actual.get("post_bytes_sha256") is not None
+        and actual.get("pre_bytes_sha256") == actual.get("post_bytes_sha256")
+    )
+    canonical_identity = before == after
+    no_intent = actual.get("intent_applied") is not True
+    no_persisted_substitution = not created_channels
     diagnostic_text = " ".join(
         f"{item.get('code', '')} {item.get('message', '')}"
         for item in diagnostics
         if isinstance(item, Mapping)
     ).casefold()
-    byte_identity = actual.get("pre_bytes_sha256") == actual.get("post_bytes_sha256")
-    canonical_identity = before == after
-    no_intent = actual.get("intent_applied") is not True
-    actionable = bool(diagnostic_code) or bool(diagnostic_text)
-    no_persisted_substitution = not created_channels
+    observed_safe_diagnostic = False
+    for item in diagnostics:
+        if not isinstance(item, Mapping):
+            continue
+        code = str(item.get("code", ""))
+        message = str(item.get("message", "")).casefold()
+        if code in {"enrichment.section_hint_ambiguous", "enrichment.source_missing"}:
+            observed_safe_diagnostic = True
+            break
+        if (
+            code == "program.dry_run_error"
+            and "channel_missing" in message
+            and "no source channel matches 'rt'" in message
+        ):
+            observed_safe_diagnostic = True
+            break
     return {
         "changed": not (byte_identity and canonical_identity),
         "diagnostic_code": diagnostic_code,
@@ -1038,25 +1064,42 @@ def _observed_failure_facts(
             byte_identity
             and canonical_identity
             and no_intent
-            and actionable
             and no_persisted_substitution
-            and any(
-                token in f"{request.casefold()} {diagnostic_text}"
-                for token in ("missing", "ambiguous", "channel_missing")
-            )
+            and observed_safe_diagnostic
         ),
     }
+
+
+def _grade_has_unintended_mutation(grade: Mapping[str, Any]) -> bool:
+    """Identify mutation evidence that must outrank ordinary semantic failure."""
+    mutation_errors = {
+        "canonical_change_outside_allowed_paths",
+        "failure_mutated_artifact",
+        "failure_bytes_changed",
+        "failure_canonical_state_changed",
+        "prohibited_channel_substitution",
+        "prohibited_path_mutation",
+    }
+    return any(error in mutation_errors for error in grade.get("errors", []))
 
 
 def _observed_outcome(
     actual: Mapping[str, Any],
     case: Mapping[str, Any],
     before: Mapping[str, Any],
+    grade: Mapping[str, Any] | None = None,
 ) -> str:
-    """Classify one turn from execution facts, never from the gold outcome."""
+    """Classify one turn after deterministic grading, never from the gold outcome."""
+    grade_status = grade.get("status", "PASS") if isinstance(grade, Mapping) else "PASS"
     if actual.get("infrastructure_failure"):
         return "INFRASTRUCTURE_INCONCLUSIVE"
+    if actual.get("unintended_mutation") or (
+        isinstance(grade, Mapping) and _grade_has_unintended_mutation(grade)
+    ):
+        return "UNINTENDED_MUTATION"
     if actual.get("persisted") is True and actual.get("rendered") is True:
+        if grade_status != "PASS":
+            return "UNDETECTED_INCORRECT_OUTPUT"
         if (
             case.get("workflow") == "LAS-REVISE"
             and len(before.get("sections", [])) > 1
@@ -1118,7 +1161,7 @@ def _campaign_turn_row(
             )
         ),
         "outcome": actual.get("outcome"),
-        "diagnostics": _bounded_diagnostics(actual.get("diagnostics", [])),
+        "diagnostics": _journal_diagnostics(actual.get("diagnostics", [])),
         "worker_metrics": _worker_metrics(actual),
         "token_usage": _token_usage(observed_calls),
         "logical_generation_calls": logical_calls,
@@ -1136,6 +1179,7 @@ def _campaign_turn_row(
         "infrastructure_failure": bool(actual.get("infrastructure_failure", False)),
         "configuration_drift": bool(actual.get("configuration_drift", False)),
         "logical_call_cap_exceeded": bool(actual.get("logical_call_cap_exceeded", False)),
+        "detected_incorrect_output": actual.get("outcome") == "DETECTED_INCORRECT_OUTPUT",
         "undetected_incorrect_output": bool(actual.get("undetected_incorrect_output", False)),
         "unintended_mutation": bool(actual.get("unintended_mutation", False)),
     }
@@ -1334,9 +1378,11 @@ class D4CampaignAdapter:
                 render_path = turn_root / "cbl-render.pdf"
                 render_path.write_bytes(b"prebuilt deterministic CBL render")
                 return {
-                    "outcome": "DIRECT_CORRECT",
+                    "outcome": None,
                     "before_path": artifact,
                     "after_path": artifact,
+                    "starting_artifact_path": artifact,
+                    "ending_artifact_path": artifact,
                     "canonical_before": {},
                     "canonical_after": {},
                     "artifact_path": artifact,
@@ -1363,9 +1409,11 @@ class D4CampaignAdapter:
             report_facts = getattr(result, "report_facts", {})
             succeeded = bool(report_facts.get("success"))
             actual: dict[str, Any] = {
-                "outcome": "DIRECT_CORRECT" if succeeded else "DETECTED_INCORRECT_OUTPUT",
-                "before_path": None,
+                "outcome": None,
+                "before_path": scaffold,
                 "after_path": artifact,
+                "starting_artifact_path": scaffold,
+                "ending_artifact_path": artifact,
                 "canonical_before": {},
                 "canonical_after": {},
                 "artifact_path": artifact,
@@ -1413,9 +1461,11 @@ class D4CampaignAdapter:
         report_facts = getattr(result, "report_facts", {})
         succeeded = bool(report_facts.get("success"))
         actual: dict[str, Any] = {
-            "outcome": "DIRECT_CORRECT" if succeeded else "DETECTED_INCORRECT_OUTPUT",
+            "outcome": None,
             "before_path": before,
             "after_path": after,
+            "starting_artifact_path": before,
+            "ending_artifact_path": after,
             "canonical_before": before_payload,
             "canonical_after": load_logfile_document(after),
             "persisted": succeeded,
@@ -1428,6 +1478,8 @@ class D4CampaignAdapter:
                 "rendered": False,
             },
         }
+        actual["pre_bytes_sha256"] = sha256_file(before)
+        actual["post_bytes_sha256"] = sha256_file(after)
         _add_session_evidence(actual, result)
         if succeeded:
             render_path = turn_root / "render.pdf"
@@ -1442,8 +1494,7 @@ class D4CampaignAdapter:
             actual["render_duration_seconds"] = time.perf_counter() - render_started
             actual["execution_evidence"]["rendered"] = actual["rendered"]
         else:
-            actual.update(_observed_failure_facts(actual, before_payload, str(case["request"])))
-        actual["outcome"] = _observed_outcome(actual, case, before_payload)
+            actual.update(_observed_failure_facts(actual, before_payload))
         return actual
 
 
@@ -1537,6 +1588,17 @@ async def run_campaign(
             observed_calls = execution_context.calls_since(call_cursor)
             duration = time.perf_counter() - started
             grade = grade_turn(actual, expected)
+            actual["unintended_mutation"] = _grade_has_unintended_mutation(grade)
+            actual["outcome"] = _observed_outcome(
+                actual,
+                case,
+                actual.get("canonical_before", {}),
+                grade,
+            )
+            actual["undetected_incorrect_output"] = (
+                actual["outcome"] == "UNDETECTED_INCORRECT_OUTPUT"
+            )
+            actual["unintended_mutation"] = actual["outcome"] == "UNINTENDED_MUTATION"
             row = _campaign_turn_row(
                 state=state,
                 case=case,
@@ -1777,11 +1839,7 @@ def _grader_requirements(verifier: Mapping[str, Any], required_ids: Sequence[str
 
 def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
     """Grade deterministic scientific and safety contracts without provider material."""
-    outcome = actual.get("outcome")
-    expected_outcome = expected.get("expected_outcome")
     errors: list[str] = []
-    if outcome != expected_outcome:
-        errors.append("outcome_mismatch")
     contract = expected.get("contract")
     if not isinstance(contract, Mapping):
         errors.append("missing_case_specific_contract")
@@ -1805,7 +1863,7 @@ def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, An
         verifier_status = verifier.get("status", verifier.get("acceptance_status"))
         if actual.get("verifier_status", verifier_status) not in {"PASS", "accepted"}:
             errors.append("cbl_verifier_failed")
-    elif expected_outcome == "SAFE_ACTIONABLE_FAILURE":
+    elif contract.get("kind") == "safety":
         if actual.get("changed") is not False:
             errors.append("failure_mutated_artifact")
         if actual.get("pre_bytes_sha256") != actual.get("post_bytes_sha256"):
@@ -1899,7 +1957,13 @@ def derive_terminal_decision(rows: Sequence[dict[str, Any]]) -> str:
     if any(row.get("grader_status") != "PASS" for row in rows):
         return "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_FAILED"
     if any(
-        row.get("undetected_incorrect_output") or row.get("unintended_mutation") for row in rows
+        row.get("outcome")
+        in {
+            "DETECTED_INCORRECT_OUTPUT",
+            "UNDETECTED_INCORRECT_OUTPUT",
+            "UNINTENDED_MUTATION",
+        }
+        for row in rows
     ):
         return "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_FAILED"
     return "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_PASSED"
