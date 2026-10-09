@@ -2,7 +2,7 @@
 
 ## Status
 
-`DESIGN_REWORK_PENDING_REVIEW / HARNESS_NOT_AUTHORIZED / LIVE_INFERENCE_NOT_AUTHORIZED`
+`WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REVIEW-PENDING`
 
 Design authorization:
 
@@ -26,6 +26,18 @@ Current design rework authorization:
 
 ```text
 WELLPLOT-NLP-D4-DESIGN-REWORK-004
+```
+
+Current design amendment:
+
+```text
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-001
+```
+
+Design amendment parent:
+
+```text
+8618c3ef2207236ad50d5fc576cf1c96badbfb95
 ```
 
 Previous design-rework parent:
@@ -67,7 +79,11 @@ delivery/nlp-d4-live-acceptance-design
 
 D1 through D3 are accepted. D4 is the bounded integrated live-acceptance gate from the current NLP completion plan.
 
-This document authorizes **no provider call, endpoint probe, model inference, harness implementation, production change, routing change, prompt change, or release promotion**.
+This document authorizes **no provider call, endpoint probe, model inference,
+harness implementation, production change, routing change, prompt change, or
+release promotion now**. A future independently authorized D4A preflight may
+perform only the bounded non-generation endpoint identity check specified
+below.
 
 ---
 
@@ -75,7 +91,11 @@ This document authorizes **no provider call, endpoint probe, model inference, ha
 
 D4 answers one release-relevant question:
 
-> Can the current accepted WellPlot Code Mode v2 stack, using the current public default live provider/model configuration, produce safe and scientifically correct scientist-visible outcomes across the two accepted workflows under a small frozen population containing unseen wording, value, source, and failure variations?
+> Can the current accepted WellPlot Code Mode v2 stack, using the canonical
+> local llama.cpp/Qwen3.6-35B-A3B configuration, produce safe and
+> scientifically correct scientist-visible outcomes across the two accepted
+> workflows under a small frozen population containing unseen wording, value,
+> source, and failure variations?
 
 D4 is not:
 
@@ -102,11 +122,14 @@ Future work may implement the frozen cases, graders, call counter, evidence jour
 D4A makes:
 
 ```text
-provider calls = 0
-endpoint calls = 0
-model calls = 0
+provider/model generation calls = 0
+model inference calls = 0
 program-provider calls = 0
 ```
+
+The amended local preflight may make one bounded non-generation
+`GET /v1/models` request to the frozen endpoint. That endpoint observation is
+recorded separately and is not a provider/model inference call.
 
 D4A must be independently reviewed before live execution.
 
@@ -126,14 +149,23 @@ No production promotion follows automatically.
 
 # 3. Frozen Live Configuration
 
-D4 evaluates one release-candidate configuration only.
+D4 evaluates one release-candidate configuration only. The inherited
+`openai / gpt-5.4` target is superseded by the controlled local Qwen
+deployment below. No fallback or silent substitution is permitted.
 
 ```text
 engine: v2
-provider_requested: openai
-model_requested: gpt-5.4
+provider_boundary: openai_compat
+runtime: local llama.cpp
+endpoint: http://192.168.2.140:8888/v1
+model_requested: qwen3.6-35b-a3b
+model_family: Qwen3.6-35B-A3B
+structured_output: json_schema
 timeout_seconds: 120
 concurrency: 1
+fallback: none
+model_substitution: forbidden
+credential_source: configured LLAMA_CPP_API_KEY
 
 planner:
   temperature = 0.0
@@ -152,41 +184,53 @@ program repair:
   max_output_tokens = None / omitted
 ```
 
+The endpoint and served model identifier are explicit design inputs, not values
+to infer from environment defaults. D4A must freeze the endpoint's exact
+normalized base URL and the exact `/v1/models` identifier returned by the
+server before any campaign authorization. A mismatch is configuration drift.
+
 This reflects the frozen production graph rather than a generic provider default:
 
 - `DEFAULT_AUTHORING_ENGINE` is `v2`;
-- `create_project_session(... provider="openai")` is the public default;
-- the current frozen code resolves the OpenAI default model label to `gpt-5.4`;
+- the D4 amendment selects the existing OpenAI-compatible backend boundary;
+- the controlled server must expose `qwen3.6-35b-a3b` as its model identifier;
 - `workflow.py` calls the semantic planner with `temperature=0.0`;
-- report/section workers inherit the session temperature, which is `None` in the default route;
-- repair generation inherits the worker temperature.
+- the accepted D4 timeout and generation-control envelope remain unchanged;
+- repair generation remains within the existing worker repair envelope.
 
-The future live harness must pass the model explicitly as `gpt-5.4`; it must not rely on an environment override.
+The future live harness must pass the model explicitly as
+`qwen3.6-35b-a3b`; it must not rely on an environment override.
 
 Decision-bearing model provenance is limited to what the current WellPlot boundary can prove:
 
 ```text
-requested provider = openai
-requested model = gpt-5.4
+requested provider boundary = openai_compat
+requested runtime = local llama.cpp
+requested model = qwen3.6-35b-a3b
 requested-model drift = 0
 WellPlot-side provider fallback = 0
 WellPlot-side model fallback = 0
 ```
 
-D4 does **not** claim that the provider's internal deployed snapshot/model identity was independently observed unless D4A later proves that through a bounded, reviewed observation.
+D4 does not claim that an internal llama.cpp process, binary, GGUF, or
+hardware state remained unchanged unless a separately authenticated host-level
+artifact proves it. The decision-bearing identity is the endpoint catalog
+identity plus the explicitly frozen endpoint contract.
 
 No provider substitution.
 
-No OpenAI-compatible local fallback.
+No remote provider fallback.
 
-If this exact requested configuration cannot be instantiated at live-execution time:
+If this exact requested endpoint/model/structured-output configuration cannot
+be instantiated or authenticated at live-execution time:
 
 ```text
 D4_LIVE_ACCEPTANCE_INCONCLUSIVE
 STOP
 ```
 
-A different provider/model requires a separately reviewed design amendment.
+A different endpoint, model identifier, provider boundary, or structured-output
+mode requires a separately reviewed design amendment.
 
 ---
 
@@ -216,7 +260,10 @@ DirectNotebookSession.render_logfile_to_file()
 
 D4A may compose the session explicitly rather than call the convenience factory only so that a transparent evidence backend can count provider calls and returned usage metrics.
 
-The actual delegated backend must still be the unchanged backend created by the current production OpenAI provider path.
+The actual delegated backend must remain the unchanged production
+OpenAI-compatible backend pointed at the frozen local llama.cpp endpoint. The
+amendment changes the provider boundary and runtime target only; it does not
+authorize a production routing change.
 
 No production module may be changed merely for observability.
 
@@ -293,7 +340,9 @@ Each report/section worker permits:
 
 These are application-level semantic retry/repair limits.
 
-The OpenAI Python SDK has a separate transport-retry policy below `ModelBackendProtocol`.
+The OpenAI Python SDK remains the transport client for the OpenAI-compatible
+llama.cpp endpoint. Its transport-retry policy is below
+`ModelBackendProtocol` and is not a WellPlot semantic retry.
 
 The frozen repository dependency environment currently resolves:
 
@@ -301,7 +350,8 @@ The frozen repository dependency environment currently resolves:
 openai == 2.34.0
 ```
 
-D4A must provider-free inspect and freeze the actual runtime SDK retry setting. The expected current release-candidate value is:
+D4A must provider-free inspect and freeze the actual runtime SDK retry setting.
+The expected current release-candidate value is:
 
 ```text
 max_retries = 2
@@ -309,7 +359,10 @@ max_retries = 2
 
 If provider-free inspection shows a different value, D4A must STOP for design review rather than silently changing the campaign accounting.
 
-D4 adds no retry outside the production semantic envelope or SDK's frozen transport policy.
+D4 adds no retry outside the production semantic envelope or SDK's frozen
+transport policy. The llama.cpp server is not treated as a source of retry
+evidence; the client setting and the bounded logical-call ledger are the only
+retry controls used by this design.
 
 No harness-level retry.
 
@@ -917,8 +970,16 @@ Before credentials are read or a real provider/client is constructed:
 
 1. run all provider-free integrity/source/dependency/checkpoint interlocks;
 2. require both state and journal paths to be absent;
-3. generate one campaign identifier;
-4. atomically create the state file with:
+3. validate the normalized endpoint contract;
+4. perform one bounded `GET /v1/models` request against the frozen local
+   endpoint, without a completion request or model inference;
+5. require the returned catalog to contain exactly the frozen served model
+   identifier `qwen3.6-35b-a3b`, with no fallback identifier accepted;
+6. verify the WellPlot OpenAI-compatible adapter is configured for
+   `response_format.type = json_schema`, `strict = true`, the `max_tokens`
+   parameter, and the frozen timeout/temperature controls;
+7. generate one campaign identifier;
+8. atomically create the state file with:
 
 ```text
 experiment_version
@@ -931,6 +992,14 @@ logical_generation_calls = 0
 
 Only after the durable `STARTED` sentinel exists may the harness load credentials and construct the real provider.
 
+The preflight must not claim to prove model semantic correctness. The endpoint
+catalog check establishes reachability and model identity only. Structured
+generation and program-generation compatibility are checked at the actual
+production adapter boundary during the authorized population; an unsupported
+response format, rejected request shape, or incompatible program response is
+an infrastructure/configuration failure and makes the campaign inconclusive.
+No separate smoke completion is permitted.
+
 ## Interruption semantics
 
 Once a `STARTED` state exists:
@@ -940,13 +1009,40 @@ Once a `STARTED` state exists:
 - appending to another campaign is forbidden;
 - merging rows across campaigns is forbidden.
 
-If execution stops after `STARTED` for any reason—including authentication/configuration failure before the first completed turn—the campaign becomes:
+After `STARTED`, the outer campaign boundary must catch every exception,
+including credential loading and provider-construction failures, and durably
+record a terminal operational result before returning control to the caller.
+The terminal record contains only bounded fields:
+
+```text
+status = TERMINAL
+terminal_decision = WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+terminal_reason_code = <allowlisted category>
+completed_turns
+logical_generation_calls
+```
+
+The allowlisted reason code may identify categories such as
+`credential_unavailable`, `provider_construction_failed`,
+`endpoint_unreachable`, `structured_output_unsupported`,
+`program_output_invalid`, or `process_interrupted`; it must never contain raw
+exception text, credentials, headers, or provider payloads. The state update
+is atomic. A bounded terminal journal event is written before or together with
+the terminal state whenever the journal can be opened. If journal writing
+fails, the state records `evidence_integrity_failure` and remains the
+decision-bearing source for the inconclusive result.
+
+If execution stops after `STARTED` for any reason—including authentication/configuration failure before the first completed turn—the campaign is:
 
 ```text
 WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
 ```
 
-The journal may legitimately contain zero completed turn rows.
+The journal may contain zero completed turn rows but must contain the bounded
+terminal event when the failure is catchable. A stale `STARTED` state without a
+terminal record, such as after a hard process kill, is itself treated as
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE`; it cannot be resumed or
+repaired in place.
 
 Preserve partial evidence.
 
@@ -1248,9 +1344,14 @@ Before credentials are read or the `STARTED` state is created, D4B provider-free
 - source channel preconditions;
 - both campaign state/journal paths absent;
 - exact `uv.lock` SHA-256;
-- installed `openai` package version equals the D4A-frozen version;
-- actual runtime OpenAI SDK `max_retries` equals the D4A-frozen value;
-- requested provider/model configuration equals `openai / gpt-5.4`.
+- installed `openai` package version equals the D4A-frozen client version;
+- actual runtime OpenAI client retry setting equals the D4A-frozen value;
+- normalized endpoint equals `http://192.168.2.140:8888/v1`;
+- `/v1/models` exposes exactly the requested identifier
+  `qwen3.6-35b-a3b`;
+- the OpenAI-compatible adapter is configured for strict JSON Schema output,
+  with the accepted D4 request-control envelope;
+- no provider/model fallback or substitution is configured.
 
 D4A must also freeze hashes at both checkpoints for all authorized production components relevant to the live path, including at minimum:
 
@@ -1280,7 +1381,8 @@ openai == 2.34.0
 
 D4A must freeze the observed provider-free runtime version rather than relying only on this prose.
 
-Any checkpoint, production hash, dependency version, retry setting, source, or working-tree mismatch yields:
+Any checkpoint, production hash, dependency version, retry setting, endpoint,
+model-catalog, source, or working-tree mismatch yields:
 
 ```text
 WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
@@ -1294,7 +1396,10 @@ The harness must fail before credentials are read if any frozen artifact differs
 
 # 25. Credential Boundary
 
-Credentials use the existing production loader.
+Credentials use the existing production loader and the configured
+`LLAMA_CPP_API_KEY` source for the frozen endpoint. A local placeholder may be
+used only when the existing OpenAI-compatible loader explicitly permits it;
+the campaign must never silently switch credential source or provider.
 
 D4 evidence may record only:
 
@@ -1340,13 +1445,14 @@ The future harness must prove without inference:
 - exact 45 logical-generation-call hard cap;
 - logical call 46 rejected before delegation;
 - no wrapper retries;
-- frozen OpenAI SDK version;
-- frozen SDK `max_retries`;
+- frozen OpenAI-compatible client version;
+- frozen client retry setting;
 - correct physical HTTP-attempt upper-bound derivation;
 - planner request temperature is exactly `0.0`;
 - report/section/repair request temperatures are omitted/`None`;
 - max-output-token settings are omitted/`None`;
-- requested provider/model are exactly `openai / gpt-5.4`;
+- endpoint/model catalog identity is exactly frozen;
+- strict JSON Schema and program-generation request shaping is configured;
 - no WellPlot-side provider/model fallback path;
 - source preflight occurs before backend construction;
 - source hashes/channels recorded without source bytes entering evidence;
@@ -1365,9 +1471,15 @@ The future harness must prove without inference:
 - expected case ordering;
 - positive and negative grader behavior using deterministic fake results;
 - terminal summary derivation from synthetic complete/incomplete populations;
+- durable bounded `INCONCLUSIVE` state and journal evidence for every
+  catchable exception after `STARTED`, including provider-construction failure;
+- `/v1/models` endpoint/model identity preflight without completion inference;
+- strict JSON Schema and program-generation adapter compatibility checks;
 - no production mutation by harness preparation.
 
-D4A itself must make zero endpoint/provider/model calls.
+D4A itself must make zero provider/model generation calls and zero model
+inference calls. Its only permitted network activity is the bounded
+non-generation `/v1/models` identity check defined in Section 18.
 
 ---
 
@@ -1426,6 +1538,100 @@ It does **not** authorize:
 A new live campaign requires a new reviewed design/authorization.
 
 ---
+
+# 29A. Model Strategy and Escalation Gate
+
+The canonical WellPlot reference model remains Qwen3.6-35B-A3B. A stronger
+external model is not a default replacement and is not introduced to explain
+an inconclusive campaign.
+
+## Decision record
+
+```text
+DECISION:
+Retain local Qwen3.6-35B-A3B as the single D4 qualification target.
+
+PROJECT SCOPE:
+The model performs bounded semantic planning/program generation; deterministic
+WellPlot components own grounding, reconciliation, mutation, persistence,
+scientific verification, rendering, and failure containment.
+
+EXTERNAL EVIDENCE:
+llama.cpp documents an OpenAI-compatible /v1/models catalog, configurable model
+aliases, and JSON-schema response formats. Its server implementation converts
+JSON Schema to grammar. Upstream issue reports also document versions that
+silently accept or fail open on structured-output requests, so HTTP 200 alone
+is not treated as proof of constraint enforcement.
+
+ESTABLISHED PRACTICE:
+Pin the endpoint/model identity, validate structured responses locally, and
+fail closed when the serving contract is unavailable or ambiguous.
+
+WELLPLOT DIFFERENCE:
+The semantic workload is scientist-facing and the final acceptance object is
+the persisted/rendered plot or a verified zero-mutation failure, not provider
+text quality.
+
+OPTIONS CONSIDERED:
+A. Retain and qualify Qwen locally.
+B. Substitute a stronger hosted model immediately.
+C. Add automatic model fallback.
+
+SELECTED APPROACH:
+A. B and C are not authorized by a D4 result.
+
+EVIDENCE CLASS:
+ADAPTED, with WellPlot-specific model-capability conclusions requiring
+EMPIRICALLY_SUPPORTED evidence.
+
+REVERSIBLE:
+YES. The provider boundary remains replaceable without changing the scientific
+population or deterministic acceptance layers.
+```
+
+## Escalation eligibility
+
+Qwen remains the reference target when the amended D4 campaign passes. A
+campaign classified `INCONCLUSIVE` establishes only an infrastructure,
+configuration, or evidence problem; it does not establish model weakness.
+
+Model-selection work becomes eligible only when all of the following hold:
+
+1. The complete frozen 5-case/9-turn population finishes with no infrastructure,
+   endpoint, structured-output, program-compatibility, provenance, or evidence
+   integrity failure.
+2. Every release-blocking failure is independently classified as model-owned,
+   rather than a source-grounding, contract, prompt-context, deterministic
+   safety, persistence, renderer, or serving-stack defect.
+3. The failure is not repaired by the existing deterministic architecture. A
+   model-proposed unsafe action that is correctly rejected is not by itself
+   evidence that Qwen is incapable; it is scored according to the frozen gold.
+4. For ordinary semantic failures, the same model-owned mechanism affects at
+   least two distinct required turns, or a single confirmed unsafe persistence
+   failure is severe enough to be release-blocking. The evidence must be
+   present in the bounded campaign rows, not inferred from provider prose.
+5. One bounded provider-free review has excluded an actionable WellPlot repair.
+   If that review identifies a repair, Qwen remains the target and a new
+   separately authorized qualification is required after the repair.
+
+Only after these conditions may a separate model-selection design compare a
+candidate model. That comparison must reuse the frozen scientific population
+and deterministic graders, declare its exact serving configuration, and carry
+no automatic production-routing authority. It must not be started merely to
+improve a failed score or to bypass an unresolved local endpoint contract.
+
+## Stop conditions
+
+Stop model research when Qwen passes, when a complete failure is explained by
+WellPlot and receives a bounded engineering decision, or when the escalation
+criteria are not met. Do not create another prompt/model experiment solely
+because a result is ambiguous or operationally inconclusive.
+
+Reference evidence:
+
+- https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
+- https://github.com/ggml-org/llama.cpp/issues/24097
+- https://github.com/ggml-org/llama.cpp/issues/19051
 
 # 30. Release Boundary
 
@@ -1742,31 +1948,30 @@ WELLPLOT-NLP-D4-DESIGN-REWORK-001
 Selected approach:
 
 ```text
-one current release-candidate configuration
+one current local llama.cpp/Qwen release-candidate configuration
 five frozen integrated cases
 nine scientist turns
 real local DLIS + LAS sources
 one attempt per turn
 
 45 logical generation calls maximum
-OpenAI SDK retry policy frozen separately
+OpenAI-compatible client retry policy frozen separately
 physical HTTP attempts represented only as an upper bound
 
-planner temperature fixed at 0.0
-worker/repair temperature omitted
+accepted D4 timeout and generation-control envelope unchanged
 
-requested provider/model provenance only
-no unsupported remote snapshot claim
+endpoint catalog and requested model provenance
+no unsupported remote process/binary/GGUF claim
 
 crash-safe STARTED campaign sentinel
 no automatic resume
 
 separate D3 production baseline and future D4A harness checkpoint
 production-byte identity required
-runtime OpenAI version + retry policy frozen
+runtime client version + retry policy frozen
 
 final-artifact and zero-mutation grading
-no model comparison
+Qwen retained unless the finite escalation gate is met
 no harness retry
 ```
 
@@ -1786,9 +1991,10 @@ D4 production promotion is not authorized by any of those gates.
 Current status:
 
 ```text
+WELLPLOT-NLP-D4-DESIGN-AMENDMENT-REVIEW-PENDING
 D4A HARNESS IMPLEMENTATION: NOT AUTHORIZED
 D4B LIVE INFERENCE: NOT AUTHORIZED
 PRODUCTION PROMOTION: NOT AUTHORIZED
 ```
 
-Stop for independent D4 design closure review.
+Stop for independent D4 design amendment closure review.
