@@ -176,7 +176,7 @@ openai_compat_base_url: http://192.168.2.140:8888/v1
 model_catalog_url: http://192.168.2.140:8888/v1/models
 props_url: http://192.168.2.140:8888/props
 client_credential_source: OPENAI_COMPAT_API_KEY
-credential_access: after STARTED
+credential_access: during operational readiness before STARTED
 server_authentication: not claimed / not decision-bearing
 model_requested: qwen3.6-35b-a3b
 model_family: Qwen3.6-35B-A3B
@@ -253,13 +253,17 @@ No provider substitution.
 No remote provider fallback.
 
 If this exact requested endpoint/model/structured-output configuration cannot
-be instantiated at live-execution time, or the credential-bearing identity
-requests fail:
+be prepared during operational readiness, or the credential-bearing identity
+requests fail before `STARTED`:
 
 ```text
-D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+NOT_READY
 STOP
 ```
+
+The readiness failure does not create a campaign result and may be retried
+after the operational problem is corrected while the frozen code, model,
+provider, endpoint, scientific population, and authorization remain unchanged.
 
 A different endpoint, model identifier, provider boundary, or structured-output
 mode requires a separately reviewed design amendment.
@@ -1009,14 +1013,39 @@ The amended design selects a credential-bearing endpoint-observation contract.
 It does not claim that the llama.cpp server enforces authentication, and it
 does not claim that model identity was observed before credentials were
 accessed.
-Before provider construction or generation:
 
-1. run all static provider-free integrity/source/dependency/checkpoint
-   interlocks;
-2. require both state and journal paths to be absent;
-3. validate the normalized endpoint contract;
-4. generate one campaign identifier;
-5. atomically create the state file with:
+Before campaign creation, run the static provider-free integrity, source,
+dependency, checkpoint, and artifact interlocks. Static failure yields
+`D4B_BLOCKED`; it is not a campaign result and must leave both canonical
+campaign paths absent.
+
+After static preflight succeeds, operational readiness must:
+
+1. load the configured `OPENAI_COMPAT_API_KEY`;
+2. validate the normalized endpoint contract;
+3. perform exactly one bounded credential-bearing request to each frozen URL:
+
+```text
+GET http://192.168.2.140:8888/v1/models
+GET http://192.168.2.140:8888/props
+```
+
+4. validate the exact frozen Qwen endpoint identity;
+5. construct the production OpenAI-compatible live adapter;
+6. establish `LIVE_READY` without making a completion request or model call.
+
+Readiness must have zero logical generation calls, zero model calls, and zero
+scientist turns. It collects only bounded in-memory readiness data and never
+persists credentials, headers, raw endpoint responses, absolute model paths,
+or other secret material. A readiness failure yields `NOT_READY` with a
+bounded reason such as `credential_unavailable`, `endpoint_unreachable`,
+`endpoint_identity_mismatch`, or `provider_construction_failed`; both
+canonical campaign paths remain absent and readiness may be retried.
+
+After `LIVE_READY`, require both state and journal paths to be absent, then:
+
+1. generate one campaign identifier;
+2. atomically create the state file with:
 
 ```text
 experiment_version
@@ -1027,18 +1056,9 @@ status = STARTED
 logical_generation_calls = 0
 ```
 
-Only after the durable `STARTED` sentinel exists may the harness load the
-configured `OPENAI_COMPAT_API_KEY`. It must then perform bounded credential-
-bearing requests to the explicitly frozen URLs:
-
-```text
-GET http://192.168.2.140:8888/v1/models
-GET http://192.168.2.140:8888/props
-```
-
-These requests must not be described as authenticated unless server-side
-enforcement has separately been proven. They occur without a completion
-request or model inference, before constructing the real provider.
+3. bind campaign custody and project the sanitized readiness provenance into
+   the campaign state/journal. Readiness identity requests are not logical
+   generation calls.
 
 The `/v1/models` response must contain the deliberate server alias
 `qwen3.6-35b-a3b`. `/props` must provide the frozen model-path identity,
@@ -1065,8 +1085,8 @@ Once a `STARTED` state exists:
 - appending to another campaign is forbidden;
 - merging rows across campaigns is forbidden.
 
-After `STARTED`, the outer campaign boundary must catch every exception,
-including credential loading and provider-construction failures, and durably
+After `STARTED`, the outer campaign boundary must catch every scientific
+execution, provider-execution, and evidence-integrity exception and durably
 record a terminal operational result before returning control to the caller.
 The terminal record contains only bounded fields:
 
@@ -1079,16 +1099,16 @@ logical_generation_calls
 ```
 
 The allowlisted reason code may identify categories such as
-`credential_unavailable`, `provider_construction_failed`,
-`endpoint_unreachable`, `structured_output_unsupported`,
-`program_output_invalid`, or `process_interrupted`; it must never contain raw
-exception text, credentials, headers, or provider payloads. The state update
-is atomic. A bounded terminal journal event is written before or together with
-the terminal state whenever the journal can be opened. If journal writing
-fails, the state records `evidence_integrity_failure` and remains the
-decision-bearing source for the inconclusive result.
+`provider_execution_failed`, `structured_output_unsupported`,
+`program_output_invalid`, `process_interrupted`, `call_cap_exceeded`, or
+`evidence_integrity_failure`; it must never contain raw exception text,
+credentials, headers, or provider payloads. The state update is atomic. A
+bounded terminal journal event is written before or together with the
+terminal state whenever the journal can be opened. If journal writing fails,
+the state records `evidence_integrity_failure` and remains the decision-bearing
+source for the inconclusive result.
 
-If execution stops after `STARTED` for any reason—including authentication/configuration failure before the first completed turn—the campaign is:
+If scientific execution stops after `STARTED` for any reason, the campaign is:
 
 ```text
 WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
@@ -1448,17 +1468,23 @@ openai == 2.34.0
 D4A must freeze the observed provider-free runtime version rather than relying only on this prose.
 
 Any checkpoint, production hash, dependency version, retry setting, endpoint,
-model-catalog, source, or working-tree mismatch yields:
+model-catalog, source, or working-tree mismatch in the static contract
+preflight yields:
 
 ```text
-WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE
+D4B_BLOCKED
 ```
 
-before provider construction.
+before credentials, endpoint requests, or provider construction. A credential,
+endpoint-identity, or provider-construction failure during operational
+readiness yields `NOT_READY`, leaves both canonical campaign paths absent, and
+may be retried without consuming the scientific authorization. Only failures
+after `STARTED` during scientific execution or evidence custody yield
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE`.
 
 Static mismatches must fail before credentials are read. Endpoint identity,
-`/props`, or credential mismatches after `STARTED` must be durably recorded as
-`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE`.
+`/props`, and credential checks belong to operational readiness and must not be
+described as post-`STARTED` campaign results.
 
 ---
 
@@ -1534,15 +1560,18 @@ The future harness must prove without inference:
 - dependency/retry mismatch prevents execution;
 - existing state file prevents execution;
 - existing journal prevents execution;
-- `STARTED` state is written atomically before credential/provider construction;
+- operational readiness succeeds before `STARTED`; `STARTED` state is written
+  atomically before scientific execution and campaign custody is bound;
 - a synthetic crash after `STARTED` and before first turn cannot be resumed;
-- credentials are not accessed before all provider-free interlocks and durable `STARTED` state creation;
+- credentials are accessed only during operational readiness after static
+  provider-free interlocks and before `STARTED`; readiness failure leaves the
+  canonical campaign paths absent;
 - raw provider/program text is absent from evidence rows;
 - expected case ordering;
 - positive and negative grader behavior using deterministic fake results;
 - terminal summary derivation from synthetic complete/incomplete populations;
 - durable bounded `INCONCLUSIVE` state and journal evidence for every
-  catchable exception after `STARTED`, including provider-construction failure;
+  catchable exception after `STARTED` during scientific execution;
 - `/v1/models` and `/props` endpoint/model identity preflight without
   completion inference;
 - strict JSON Schema and program-generation adapter compatibility checks;
