@@ -1409,9 +1409,20 @@ live_harness_checkpoint =
 
 D4B runs from the exact D4A checkpoint, not directly from the D3 commit.
 
-Before `STARTED`, D4B performs only static provider-free interlocks. After
-`STARTED` and credential loading, the credential-bearing local-endpoint
-identity interlocks must verify:
+Before `STARTED`, D4B must complete both the static provider-free interlocks
+and operational readiness.
+
+Static interlocks validate the frozen repository, fixtures, sources,
+dependencies, campaign-path absence, and configuration contract.
+
+Operational readiness then loads the configured credential, performs the
+bounded credential-bearing `/v1/models` and `/props` observations, validates
+the exact frozen Qwen endpoint identity, and constructs the production
+OpenAI-compatible live adapter.
+
+All static and readiness checks must succeed before `STARTED` is created.
+
+The resulting checks must verify:
 
 - `git HEAD == live_harness_checkpoint`;
 - clean Git working tree;
