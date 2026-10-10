@@ -66,6 +66,15 @@ def test_request_projection_is_bounded_and_deterministic() -> None:
     assert "/tmp/private" not in evidence.model_dump_json()
 
 
+def test_cbl_vdl_request_projects_curve_and_raster_intent() -> None:
+    """Mixed CBL/VDL syntax is not classified as raster-only."""
+    evidence = project_section_leaf_request(
+        "combo = normal 50 mm; depth = reference 10 mm; cbl = normal 44 mm; vdl = raster"
+    )
+    assert evidence.curve_explicit is True
+    assert evidence.raster_explicit is True
+
+
 def test_prairie_raster_only_curve_binding_is_removed() -> None:
     """A raster-only reference section loses only the stray curve binding."""
     plan = _plan(
@@ -438,4 +447,6 @@ def test_policy_version_is_frozen() -> None:
         plan=_plan(_task("section.log_plot", "track.array", "binding.raster")),
         registry=REGISTRY,
     )
+    assert result.policy_version == "cm58.section-leaf-admissibility.v2"
+    assert result.evidence().policy_version == "cm58.section-leaf-admissibility.v2"
     assert result.evidence().policy_version == SECTION_LEAF_POLICY_VERSION

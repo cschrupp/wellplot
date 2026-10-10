@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ...capabilities import CapabilityRegistry
 from .planner import PlannerSemanticError, SectionTask, SemanticPlan, validate_semantic_plan
 
-REFERENCE_POLICY_VERSION = "cm58.reference-admissibility.v1"
+REFERENCE_POLICY_VERSION = "cm58.reference-admissibility.v2"
 _REFERENCE_CAPABILITY = "track.reference"
 _NORMAL_CAPABILITY = "track.normal"
 _ARRAY_CAPABILITY = "track.array"

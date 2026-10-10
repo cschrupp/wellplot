@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import pytest
 
 from wellplot.agent.code_mode.capability_safety import (
+    REFERENCE_POLICY_VERSION,
     CapabilitySafetyFailure,
     ReferenceIntent,
     classify_reference_intent,
@@ -88,6 +89,7 @@ def _successful_section_result() -> ProgramExecutionResult:
     ("text", "expected"),
     [
         ("Place a depth reference beside the density curve.", ReferenceIntent.EXPLICITLY_REQUESTED),
+        ("depth = reference 10 mm", ReferenceIntent.EXPLICITLY_REQUESTED),
         ("Use a reference track.", ReferenceIntent.EXPLICITLY_REQUESTED),
         ("Align a depth column with the image.", ReferenceIntent.EXPLICITLY_REQUESTED),
         ("ADD AN EXPLICIT DEPTH REFERENCE!", ReferenceIntent.EXPLICITLY_REQUESTED),
@@ -178,6 +180,25 @@ def test_explicit_reference_is_preserved() -> None:
     assert result.safe_plan == original
     assert result.changed is False
     assert result.actions == ()
+
+
+def test_depth_equals_reference_preserves_reference_and_emits_v2_evidence() -> None:
+    """The frozen depth syntax preserves reference capabilities and v2 evidence."""
+    original = _plan("section.log_plot", "track.reference", "binding.curve")
+    result = enforce_capability_safety(
+        request="depth = reference 10 mm",
+        plan=original,
+        registry=REGISTRY,
+    )
+    assert result.safe_plan == original
+    assert result.safe_plan.section_tasks[0].capability_ids == (
+        "section.log_plot",
+        "track.reference",
+        "binding.curve",
+    )
+    assert result.policy_version == "cm58.reference-admissibility.v2"
+    assert result.evidence().policy_version == "cm58.reference-admissibility.v2"
+    assert result.policy_version == REFERENCE_POLICY_VERSION
 
 
 def test_explicit_forbid_repairs_injected_reference() -> None:

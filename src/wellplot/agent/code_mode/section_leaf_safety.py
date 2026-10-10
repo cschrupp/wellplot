@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ...capabilities import CapabilityRegistry
 from .planner import PlannerSemanticError, SectionTask, SemanticPlan, validate_semantic_plan
 
-SECTION_LEAF_POLICY_VERSION = "cm58.section-leaf-admissibility.v1"
+SECTION_LEAF_POLICY_VERSION = "cm58.section-leaf-admissibility.v2"
 
 _SECTION_CAPABILITY = "section.log_plot"
 _NORMAL_CAPABILITY = "track.normal"
