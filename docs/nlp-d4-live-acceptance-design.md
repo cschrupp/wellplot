@@ -911,14 +911,75 @@ A new campaign may start only when **both paths are absent**.
 
 A zero-length pre-existing file is not treated as a fresh campaign.
 
+## 18A. Operational Readiness Boundary Amendment
+
+The irreversible scientific campaign boundary begins only after the live
+runtime has reached `LIVE_READY`. This amendment supersedes the lifecycle
+clauses in this section that place credential loading, endpoint identity
+checks, or provider construction after `STARTED`. It does not change the
+scientific population, request hashes, gold, grading, call ceiling, model,
+provider, source artifacts, or outcome taxonomy.
+
+The D4B sequence is:
+
+```text
+static provider-free contract preflight
+    -> operational readiness
+       -> load OPENAI_COMPAT_API_KEY
+       -> credential-bearing GET /v1/models
+       -> credential-bearing GET /props
+       -> validate the frozen endpoint identity
+       -> construct the production live adapter
+    -> LIVE_READY
+    -> require absent campaign state and journal paths
+    -> atomically create fresh STARTED state
+    -> bind campaign custody
+    -> execute the frozen scientific population
+```
+
+Operational readiness performs no generation, model inference, or scientist
+turn. It collects only bounded in-memory readiness data until the campaign is
+started. The readiness result may contain the sanitized endpoint identity,
+`identity_endpoint_calls = 2`, the prepared execution adapter, and bounded
+provider/model counters. It must never contain an API key, authorization
+header, raw endpoint response, absolute model path, or other secret material.
+
+If readiness fails, the result is `NOT_READY` with a bounded reason such as
+`credential_unavailable`, `endpoint_unreachable`,
+`endpoint_identity_mismatch`, or `provider_construction_failed`. Readiness
+failure must leave both canonical campaign paths absent and must record zero
+logical generation and model calls. Readiness may be retried after the
+operational problem is corrected without consuming the scientific campaign
+authorization, provided the frozen code, scientific configuration, and
+authorization remain unchanged.
+
+After `LIVE_READY`, campaign creation still requires both canonical paths to
+be absent. The new `STARTED` state must include the sanitized readiness
+provenance needed to identify the runtime that entered the experiment,
+including the provider/model labels, endpoint identity projection, and
+readiness identity-request count. These readiness requests are not logical
+generation calls.
+
+Once `STARTED` exists, the existing custody rules apply without change:
+resume, selective rerun, second invocation, row merging, prompt changes, and
+model substitution are forbidden. Any failure after that point produces the
+existing durable terminal evidence, including
+`WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE` for infrastructure or evidence
+failures.
+
 ## Pre-live sequence
 
-Before credentials are read or a real provider/client is constructed:
+Before readiness begins:
 
 1. run all provider-free integrity/source/dependency/checkpoint interlocks;
-2. require both state and journal paths to be absent;
-3. generate one campaign identifier;
-4. atomically create the state file with:
+2. do not create or modify the campaign state or journal;
+3. do not access credentials, endpoints, or a real provider/client.
+
+After readiness succeeds:
+
+1. require both state and journal paths to be absent;
+2. generate one campaign identifier;
+3. atomically create the state file with:
 
 ```text
 experiment_version
@@ -929,7 +990,8 @@ status = STARTED
 logical_generation_calls = 0
 ```
 
-Only after the durable `STARTED` sentinel exists may the harness load credentials and construct the real provider.
+Only after the durable `STARTED` sentinel exists may the harness bind
+scientific call custody and execute the frozen turns.
 
 ## Interruption semantics
 
@@ -1358,9 +1420,12 @@ The future harness must prove without inference:
 - dependency/retry mismatch prevents execution;
 - existing state file prevents execution;
 - existing journal prevents execution;
-- `STARTED` state is written atomically before credential/provider construction;
+- readiness succeeds before `STARTED`; `STARTED` state is written atomically
+  before scientific execution and campaign custody is bound;
 - a synthetic crash after `STARTED` and before first turn cannot be resumed;
-- credentials are not accessed before all provider-free interlocks and durable `STARTED` state creation;
+- credentials are accessed only during operational readiness after all
+  provider-free interlocks and before `STARTED`; readiness failure leaves the
+  canonical campaign paths absent;
 - raw provider/program text is absent from evidence rows;
 - expected case ordering;
 - positive and negative grader behavior using deterministic fake results;
