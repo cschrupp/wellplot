@@ -780,6 +780,18 @@ class _PostStartedFailureAdapter:
         raise d4.PostStartedFailure("provider_execution_failed")
 
 
+class _PostStartedInternalFailureAdapter(_PostStartedFailureAdapter):
+    """Minimal adapter exposing an unexpected deterministic exception."""
+
+    async def execute_turn(
+        self,
+        case: Mapping[str, object],
+        expected: Mapping[str, object],
+    ) -> object:
+        del case, expected
+        raise ValueError("diagnostic-only internal failure")
+
+
 def _run_ready_failure(
     root: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -980,6 +992,16 @@ def test_post_started_provider_failure_is_durable_inconclusive() -> None:
     assert state["terminal_decision"] == d4.INCONCLUSIVE_DECISION
     assert state["completed_turns"] == 0
     assert events[-1]["event"] == "campaign_terminal"
+
+
+def test_post_started_internal_failure_is_not_labeled_as_provider_failure() -> None:
+    """Unexpected deterministic exceptions use the bounded internal reason."""
+    with TemporaryDirectory() as temporary:
+        result, state, _events = _run_post_started_failure(
+            Path(temporary), _PostStartedInternalFailureAdapter()
+        )
+    assert result["terminal_reason_code"] == "execution_internal_error"
+    assert state["terminal_reason_code"] == "execution_internal_error"
 
 
 def test_journal_failure_leaves_state_terminal_evidence_integrity(

@@ -123,6 +123,7 @@ def _contains_any_signal(text: str, signals: tuple[str, ...]) -> bool:
 _CURVE_SIGNALS = (
     "curve",
     "curves",
+    "cbl",
     "scalar",
     "scalar curve",
     "scalar curves",

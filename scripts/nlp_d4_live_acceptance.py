@@ -206,6 +206,7 @@ POST_STARTED_REASON_CODES = frozenset(
     {
         "provider_execution_failed",
         "call_cap_exceeded",
+        "execution_internal_error",
         "evidence_integrity_failure",
     }
 )
@@ -1965,7 +1966,7 @@ def _terminal_reason_code(error: Exception, *, runtime_construction: bool) -> st
         return "evidence_integrity_failure"
     if runtime_construction:
         return "provider_construction_failed"
-    return "provider_execution_failed"
+    return "execution_internal_error"
 
 
 def _finish_inconclusive(

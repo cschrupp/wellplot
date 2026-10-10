@@ -90,6 +90,7 @@ class CapabilitySafetyFailure(RuntimeError):
 
 _POSITIVE_REFERENCE_PHRASES = (
     "depth reference",
+    "depth = reference",
     "reference track",
     "reference column",
     "reference lane",
