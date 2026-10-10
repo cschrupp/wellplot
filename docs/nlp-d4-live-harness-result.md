@@ -94,6 +94,20 @@ properties:          http://192.168.2.140:8888/props
 requested model:     qwen3.6-35b-a3b
 ```
 
+## Timeout Repair
+
+The live generation timeout is `900` seconds. This bounded repair addresses
+the local Qwen generation exceeding the former `120`-second client envelope.
+The provider, model, endpoint contract, scientific population, prompts, gold,
+graders, and scientific semantics are unchanged. SDK `max_retries = 2` is
+unchanged, and no automatic model-call retry or scientist-turn replay was
+added.
+
+The first fresh campaign reached one logical generation call and terminated
+with `provider_execution_failed`; its final journal event classified the
+bounded failure as `timeout`. It is preserved byte-for-byte under its unique
+campaign archive, and is not treated as a Qwen semantic result.
+
 The two credential-bearing, non-generation GETs are projected into a bounded
 identity containing the exact Qwen-only catalog, model-path basename and
 fingerprint, context size, build information, slot count, and

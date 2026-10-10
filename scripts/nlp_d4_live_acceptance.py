@@ -56,6 +56,7 @@ CREDENTIAL_SOURCE = "OPENAI_COMPAT_API_KEY"
 MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES = 1_048_576
 EXPECTED_OPENAI_VERSION = "2.34.0"
 EXPECTED_SDK_MAX_RETRIES = 2
+LIVE_GENERATION_TIMEOUT_SECONDS = 900.0
 MAX_LOGICAL_CALLS = 45
 INCONCLUSIVE_DECISION = "WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE"
 SOURCE_RELATIVE = Path("workspace/data/30-23a-3 8117_d.las")
@@ -1940,7 +1941,7 @@ def prepare_live_runtime(
             artifact_root=artifact_root,
             api_key=api_key,
             base_url=OPENAI_COMPAT_BASE_URL,
-            timeout=120.0,
+            timeout=LIVE_GENERATION_TIMEOUT_SECONDS,
         )
     except ReadinessFailure as error:
         raise ReadinessFailure(error.reason_code, identity_endpoint_calls) from None

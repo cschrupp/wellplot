@@ -670,6 +670,7 @@ def test_readiness_passes_loaded_token_only_to_explicit_provider_factory(
     assert result.endpoint_identity["model_catalog"] == [d4.EXPECTED_MODEL]
     assert captured["api_key"] == "ephemeral-token"
     assert captured["base_url"] == d4.OPENAI_COMPAT_BASE_URL
+    assert captured["timeout"] == d4.LIVE_GENERATION_TIMEOUT_SECONDS == 900.0
     assert "ephemeral-token" not in json.dumps(result.endpoint_identity)
 
 
