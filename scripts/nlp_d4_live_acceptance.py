@@ -45,7 +45,7 @@ from wellplot.model.authoring import AuthoringDocumentSpec
 
 EXPERIMENT_VERSION = "WELLPLOT-NLP-D4A"
 PRODUCTION_BASELINE = "2c8e851fcd8b315e5d1861652a97984202db7488"
-AUTHORIZED_DESIGN_CHECKPOINT = "0d0158fc3ddb8844b866444a8b6192be3f5aa93f"
+AUTHORIZED_DESIGN_CHECKPOINT = "7422f0d1b984daa1765335aefd26518fd459ae4d"
 EXPECTED_PROVIDER = "openai_compat"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
 LLAMA_SERVER_ORIGIN = "http://192.168.2.140:8888"
@@ -192,17 +192,38 @@ class CallCapExceeded(RuntimeError):
     """Raised before delegating logical generation call 46."""
 
 
-TERMINAL_REASON_CODES = frozenset(
+READINESS_REASON_CODES = frozenset(
     {
         "credential_unavailable",
         "endpoint_unreachable",
         "endpoint_identity_mismatch",
         "provider_construction_failed",
+    }
+)
+
+POST_STARTED_REASON_CODES = frozenset(
+    {
         "provider_execution_failed",
         "call_cap_exceeded",
         "evidence_integrity_failure",
     }
 )
+
+TERMINAL_REASON_CODES = POST_STARTED_REASON_CODES
+
+
+class ReadinessFailure(RuntimeError):
+    """Carry one bounded pre-campaign operational-readiness failure."""
+
+    def __init__(self, reason_code: str, identity_endpoint_calls: int = 0) -> None:
+        """Validate and retain one readiness reason and truthful call count."""
+        if reason_code not in READINESS_REASON_CODES:
+            raise ValueError(f"unknown readiness reason code: {reason_code}")
+        if identity_endpoint_calls < 0 or identity_endpoint_calls > 2:
+            raise ValueError("identity endpoint call count must be between zero and two")
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+        self.identity_endpoint_calls = identity_endpoint_calls
 
 
 class PostStartedFailure(RuntimeError):
@@ -210,7 +231,7 @@ class PostStartedFailure(RuntimeError):
 
     def __init__(self, reason_code: str) -> None:
         """Validate and retain one allowlisted reason code."""
-        if reason_code not in TERMINAL_REASON_CODES:
+        if reason_code not in POST_STARTED_REASON_CODES:
             raise ValueError(f"unknown terminal reason code: {reason_code}")
         super().__init__(reason_code)
         self.reason_code = reason_code
@@ -603,41 +624,41 @@ def _credential_bearing_json_get(url: str, api_key: str) -> object:
     try:
         with urllib.request.urlopen(request, timeout=20.0) as response:
             if response.geturl() != url:
-                raise PostStartedFailure("endpoint_identity_mismatch")
+                raise ReadinessFailure("endpoint_identity_mismatch")
             body = response.read(MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES + 1)
             if len(body) > MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES:
-                raise PostStartedFailure("endpoint_identity_mismatch")
-    except PostStartedFailure:
+                raise ReadinessFailure("endpoint_identity_mismatch")
+    except ReadinessFailure:
         raise
     except (OSError, urllib.error.URLError, urllib.error.HTTPError):
-        raise PostStartedFailure("endpoint_unreachable") from None
+        raise ReadinessFailure("endpoint_unreachable") from None
     try:
         return json.loads(body)
     except (TypeError, ValueError):
-        raise PostStartedFailure("endpoint_identity_mismatch") from None
+        raise ReadinessFailure("endpoint_identity_mismatch") from None
 
 
 def _project_model_catalog(payload: object) -> tuple[str, ...]:
     """Project and validate the exact single-model OpenAI catalog."""
     if not isinstance(payload, Mapping) or not isinstance(payload.get("data"), list):
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     identifiers: list[str] = []
     for item in payload["data"]:
         if not isinstance(item, Mapping) or not isinstance(item.get("id"), str):
-            raise PostStartedFailure("endpoint_identity_mismatch")
+            raise ReadinessFailure("endpoint_identity_mismatch")
         identifier = item["id"].strip()
         if not identifier or identifier in identifiers:
-            raise PostStartedFailure("endpoint_identity_mismatch")
+            raise ReadinessFailure("endpoint_identity_mismatch")
         identifiers.append(identifier)
     if tuple(identifiers) != (EXPECTED_MODEL,):
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     return tuple(identifiers)
 
 
 def _project_props(payload: object) -> dict[str, object]:
     """Project the bounded llama.cpp `/props` identity without raw paths."""
     if not isinstance(payload, Mapping):
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     model_path = payload.get("model_path")
     generation = payload.get("default_generation_settings")
     build_info = payload.get("build_info")
@@ -656,11 +677,11 @@ def _project_props(payload: object) -> dict[str, object]:
         or not isinstance(total_slots, int)
         or total_slots <= 0
     ):
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     normalized_path = model_path.strip()
     basename = Path(normalized_path).name
     if not basename:
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     return {
         "model_path_basename": basename,
         "model_path_fingerprint_sha256": sha256_text(normalized_path),
@@ -710,7 +731,7 @@ def validate_endpoint_identity(
         or not expected
         or dict(observed) != expected
     ):
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     return {**configured, **dict(observed)}
 
 
@@ -1815,9 +1836,9 @@ def create_live_campaign_adapter(
     from wellplot.agent.direct_notebook import _provider_backend
 
     if base_url != OPENAI_COMPAT_BASE_URL:
-        raise PostStartedFailure("endpoint_identity_mismatch")
+        raise ReadinessFailure("endpoint_identity_mismatch")
     if not isinstance(api_key, str) or not api_key.strip():
-        raise PostStartedFailure("credential_unavailable")
+        raise ReadinessFailure("credential_unavailable")
 
     backend, credential_source = _provider_backend(
         provider=EXPECTED_PROVIDER,
@@ -1851,7 +1872,6 @@ def create_live_campaign_adapter(
         session=session,
         call_source=CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
         provider_backed=True,
-        identity_endpoint_calls=2,
     )
 
 
@@ -1872,39 +1892,66 @@ def load_d4_api_key(repo_root: Path) -> str:
             missing_message="OpenAI-compatible API key was not configured.",
         )
     except RuntimeError:
-        raise PostStartedFailure("credential_unavailable") from None
+        raise ReadinessFailure("credential_unavailable") from None
 
 
-def create_live_campaign_runtime(
+@dataclass(frozen=True, slots=True)
+class LiveReadiness:
+    """Prepared provider runtime and sanitized identity before campaign start."""
+
+    adapter: D4CampaignAdapter
+    endpoint_identity: Mapping[str, Any]
+    identity_endpoint_calls: int
+
+
+def prepare_live_runtime(
     *,
     repo_root: Path,
     artifact_root: Path,
     authorization: FrozenAuthorization,
-    record_identity: Callable[[Mapping[str, Any]], None],
-    record_identity_request: Callable[[str], None],
     http_get_json: Callable[[str, str], object] | None = None,
-) -> D4CampaignAdapter:
-    """Compose credential, endpoint provenance, and provider inside custody."""
-    api_key = load_d4_api_key(repo_root)
-    observed = observe_endpoint_identity(
-        api_key,
-        http_get_json=http_get_json,
-        request_started=record_identity_request,
-    )
-    identity = validate_endpoint_identity(observed, authorization)
-    record_identity(identity)
+) -> LiveReadiness:
+    """Prepare credential, endpoint provenance, and provider before STARTED."""
+    identity_endpoint_calls = 0
+
+    def record_identity_request(kind: str) -> None:
+        nonlocal identity_endpoint_calls
+        expected = {1: "model_catalog", 2: "props"}
+        identity_endpoint_calls += 1
+        if expected.get(identity_endpoint_calls) != kind:
+            raise ReadinessFailure("endpoint_identity_mismatch", identity_endpoint_calls)
+
     try:
-        return create_live_campaign_adapter(
+        api_key = load_d4_api_key(repo_root)
+        observed = observe_endpoint_identity(
+            api_key,
+            http_get_json=http_get_json,
+            request_started=record_identity_request,
+        )
+        identity = validate_endpoint_identity(observed, authorization)
+    except ReadinessFailure as error:
+        raise ReadinessFailure(error.reason_code, identity_endpoint_calls) from None
+    except Exception as error:
+        raise ReadinessFailure("endpoint_identity_mismatch", identity_endpoint_calls) from error
+
+    try:
+        adapter = create_live_campaign_adapter(
             repo_root=repo_root,
             artifact_root=artifact_root,
             api_key=api_key,
             base_url=OPENAI_COMPAT_BASE_URL,
             timeout=120.0,
         )
-    except PostStartedFailure:
-        raise
+    except ReadinessFailure as error:
+        raise ReadinessFailure(error.reason_code, identity_endpoint_calls) from None
     except Exception:
-        raise PostStartedFailure("provider_construction_failed") from None
+        raise ReadinessFailure("provider_construction_failed", identity_endpoint_calls) from None
+    adapter.identity_endpoint_calls = identity_endpoint_calls
+    return LiveReadiness(
+        adapter=adapter,
+        endpoint_identity=dict(identity),
+        identity_endpoint_calls=identity_endpoint_calls,
+    )
 
 
 def _terminal_reason_code(error: Exception, *, runtime_construction: bool) -> str:
@@ -1973,21 +2020,21 @@ async def run_campaign(
     repo_root: Path,
     state_path: Path,
     journal_path: Path,
-    preflight: Callable[[], dict[str, Any]],
-    execution_factory: Callable[[CampaignCustody], D4CampaignAdapter],
+    provenance: Mapping[str, Any],
+    readiness: LiveReadiness,
 ) -> dict[str, Any]:
-    """Execute the frozen nine-turn campaign through the harness adapter."""
+    """Start and execute the frozen nine-turn campaign after readiness."""
     cases = load_cases(repo_root)
     gold_cases = {item["turn_id"]: item for item in load_gold(repo_root)["cases"]}
     state, custody = start_campaign(
         state_path=state_path,
         journal_path=journal_path,
-        preflight=preflight,
+        provenance=provenance,
+        readiness=readiness,
     )
     rows: list[dict[str, Any]] = []
-    execution_context: D4CampaignAdapter | None = None
+    execution_context = readiness.adapter
     try:
-        execution_context = execution_factory(custody)
         bind_call_started = getattr(execution_context, "bind_call_started", None)
         if callable(bind_call_started):
             bind_call_started(custody.record_call_started)
@@ -2072,11 +2119,13 @@ def start_campaign(
     *,
     state_path: Path,
     journal_path: Path,
-    preflight: Callable[[], dict[str, Any]],
+    provenance: Mapping[str, Any],
+    readiness: LiveReadiness,
 ) -> tuple[dict[str, Any], CampaignCustody]:
-    """Create durable STARTED state before accessing runtime/provider code."""
+    """Create durable STARTED state only after operational readiness."""
     assert_campaign_paths_absent(state_path, journal_path)
-    provenance = preflight()
+    if readiness.identity_endpoint_calls != 2:
+        raise PreflightError("live readiness did not observe both identity endpoints")
     campaign_id = f"d4-live-v1-{uuid.uuid4().hex}"
     state = {
         "experiment_version": EXPERIMENT_VERSION,
@@ -2086,8 +2135,19 @@ def start_campaign(
             "accepted_checkpoint", provenance["current_checkout"]
         ),
         "status": "STARTED",
+        "readiness_status": "LIVE_READY",
+        "provider": EXPECTED_PROVIDER,
+        "model": EXPECTED_MODEL,
         "logical_generation_calls": 0,
-        "identity_endpoint_calls": 0,
+        "identity_endpoint_calls": readiness.identity_endpoint_calls,
+        "endpoint_identity": dict(readiness.endpoint_identity),
+        "readiness": {
+            "status": "LIVE_READY",
+            "provider": EXPECTED_PROVIDER,
+            "model": EXPECTED_MODEL,
+            "identity_endpoint_calls": readiness.identity_endpoint_calls,
+            "endpoint_identity": dict(readiness.endpoint_identity),
+        },
     }
     for key in (
         "harness_source_sha256",
@@ -2460,22 +2520,39 @@ def _main() -> int:
             state_path = repo_root / STATE_RELATIVE
             journal_path = repo_root / JOURNAL_RELATIVE
             artifact_root = state_path.parent / "artifacts"
+            provenance = provider_free_preflight(repo_root, authorization)
+            readiness = prepare_live_runtime(
+                repo_root=repo_root,
+                artifact_root=artifact_root,
+                authorization=authorization,
+            )
+            assert_campaign_paths_absent(state_path, journal_path)
             output = asyncio.run(
                 run_campaign(
                     repo_root=repo_root,
                     state_path=state_path,
                     journal_path=journal_path,
-                    preflight=lambda: provider_free_preflight(repo_root, authorization),
-                    execution_factory=lambda custody: create_live_campaign_runtime(
-                        repo_root=repo_root,
-                        artifact_root=artifact_root,
-                        authorization=authorization,
-                        record_identity=custody.record_endpoint_identity,
-                        record_identity_request=custody.record_identity_endpoint_started,
-                    ),
+                    provenance=provenance,
+                    readiness=readiness,
                 )
             )
         print(json.dumps(output, indent=2, sort_keys=True))
+    except ReadinessFailure as error:
+        print(
+            json.dumps(
+                {
+                    "status": "NOT_READY",
+                    "reason_code": error.reason_code,
+                    "identity_endpoint_calls": error.identity_endpoint_calls,
+                    "provider_calls": 0,
+                    "endpoint_calls": 0,
+                    "model_calls": 0,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 2
     except PreflightError as error:
         status = "D4B_BLOCKED" if args.execute_live else "D4A_BLOCKED"
         print(json.dumps({"status": status, "reason": str(error)}, indent=2))

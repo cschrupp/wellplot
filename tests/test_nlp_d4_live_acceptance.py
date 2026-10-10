@@ -162,6 +162,20 @@ def _authorization() -> d4.FrozenAuthorization:
     )
 
 
+def _prepared_readiness(adapter: object, calls: int = 2) -> d4.LiveReadiness:
+    """Build provider-free readiness for direct campaign-runner tests."""
+    return d4.LiveReadiness(
+        adapter=adapter,
+        endpoint_identity={"model_catalog": [d4.EXPECTED_MODEL]},
+        identity_endpoint_calls=calls,
+    )
+
+
+def _test_provenance() -> dict[str, str]:
+    """Build minimal frozen provenance for isolated custody tests."""
+    return {"current_checkout": "a" * 40}
+
+
 def _put(document: dict[str, object], path: str, value: object) -> None:
     """Set a JSON-pointer-like value in a synthetic canonical artifact."""
     parts = path.strip("/").split("/") if path.strip("/") else []
@@ -273,6 +287,7 @@ def test_unseen_guard_rejects_every_known_d1_d3_request() -> None:
 
 def test_frozen_contract_attestation_binds_checkpoint_and_all_artifacts(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """A correct external authorization passes before campaign state creation."""
     authorization = _authorization()
@@ -282,6 +297,8 @@ def test_frozen_contract_attestation_binds_checkpoint_and_all_artifacts(
         "_git",
         lambda repo, *args: "" if args == ("status", "--porcelain") else real_git(repo, *args),
     )
+    monkeypatch.setattr(d4, "STATE_RELATIVE", tmp_path / "state.json")
+    monkeypatch.setattr(d4, "JOURNAL_RELATIVE", tmp_path / "journal.jsonl")
     observed = d4.verify_frozen_contract(REPO_ROOT, authorization)
     assert observed["accepted_checkpoint"] == authorization.accepted_checkpoint
     assert observed["cases_fixture_sha256"] == authorization.cases_fixture_sha256
@@ -493,7 +510,7 @@ def test_endpoint_identity_rejects_response_over_byte_limit(
 
     response = FakeResponse()
     monkeypatch.setattr(d4.urllib.request, "urlopen", lambda request, timeout: response)
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4.observe_endpoint_identity("token")
     assert response.read_sizes == [d4.MAX_ENDPOINT_IDENTITY_RESPONSE_BYTES + 1]
 
@@ -506,7 +523,7 @@ def test_endpoint_identity_rejects_lossy_build_info() -> None:
         "build_info": "x" * 257,
         "total_slots": 1,
     }
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4._project_props(props)
 
 
@@ -521,7 +538,7 @@ def test_endpoint_identity_rejects_lossy_build_info() -> None:
 )
 def test_endpoint_identity_rejects_catalog_drift(catalog: dict[str, object]) -> None:
     """Missing, aliased, extra, and malformed catalog entries fail closed."""
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4.observe_endpoint_identity(
             "token",
             http_get_json=lambda url, token: (
@@ -562,7 +579,7 @@ def test_endpoint_identity_rejects_catalog_drift(catalog: dict[str, object]) -> 
 )
 def test_endpoint_identity_rejects_invalid_props(props: dict[str, object]) -> None:
     """The bounded /props projection requires all four identity facts."""
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4.observe_endpoint_identity(
             "token",
             http_get_json=lambda url, token: (
@@ -576,7 +593,7 @@ def test_endpoint_identity_must_match_external_authorization() -> None:
     authorization = _authorization()
     observed = dict(authorization.endpoint_identity)
     observed["build_info"] = "different build"
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4.validate_endpoint_identity(observed, authorization)
 
 
@@ -588,7 +605,7 @@ def test_endpoint_identity_rejects_authorized_url_drift(field: str) -> None:
     """The configured origin and every frozen endpoint URL are immutable."""
     authorization = _authorization()
     observed = dict(authorization.endpoint_identity)
-    with pytest.raises(d4.PostStartedFailure, match="endpoint_identity_mismatch"):
+    with pytest.raises(d4.ReadinessFailure, match="endpoint_identity_mismatch"):
         d4.validate_endpoint_identity(observed, replace(authorization, **{field: "http://wrong"}))
 
 
@@ -601,14 +618,14 @@ def test_credential_loader_does_not_fall_back_to_openai_key(
     with (
         TemporaryDirectory() as temporary,
         pytest.raises(
-            d4.PostStartedFailure,
+            d4.ReadinessFailure,
             match="credential_unavailable",
         ),
     ):
         d4.load_d4_api_key(Path(temporary))
 
 
-def test_runtime_passes_loaded_token_only_to_explicit_provider_factory(
+def test_readiness_passes_loaded_token_only_to_explicit_provider_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Runtime composition keeps the credential ephemeral and provider-bound."""
@@ -617,10 +634,9 @@ def test_runtime_passes_loaded_token_only_to_explicit_provider_factory(
 
     def fake_adapter(**kwargs: object) -> object:
         captured.update(kwargs)
-        return object()
+        return SimpleNamespace()
 
     monkeypatch.setattr(d4, "create_live_campaign_adapter", fake_adapter)
-    recorded: list[dict[str, object]] = []
 
     def fake_get(url: str, token: str) -> object:
         if url == d4.MODEL_CATALOG_URL:
@@ -644,18 +660,17 @@ def test_runtime_passes_loaded_token_only_to_explicit_provider_factory(
             "gguf_byte_identity": "NOT_AVAILABLE",
         },
     )
-    result = d4.create_live_campaign_runtime(
+    result = d4.prepare_live_runtime(
         repo_root=REPO_ROOT,
         artifact_root=REPO_ROOT / "tmp",
         authorization=authorization,
-        record_identity=lambda identity: recorded.append(dict(identity)),
-        record_identity_request=lambda kind: None,
         http_get_json=fake_get,
     )
-    assert result is not None
+    assert result.identity_endpoint_calls == 2
+    assert result.endpoint_identity["model_catalog"] == [d4.EXPECTED_MODEL]
     assert captured["api_key"] == "ephemeral-token"
     assert captured["base_url"] == d4.OPENAI_COMPAT_BASE_URL
-    assert "ephemeral-token" not in json.dumps(recorded)
+    assert "ephemeral-token" not in json.dumps(result.endpoint_identity)
 
 
 def test_real_compat_backend_uses_frozen_sparse_token_contract() -> None:
@@ -703,18 +718,19 @@ def test_real_compat_backend_rejects_invalid_local_structured_content(content: s
 
 def _run_post_started_failure(
     root: Path,
-    failure: Callable[[d4.CampaignCustody], object],
+    adapter: object,
 ) -> tuple[dict[str, object], dict[str, object], list[dict[str, object]]]:
     """Run one fake post-STARTED failure and return state plus terminal event."""
     state_path = root / "state.json"
     journal_path = root / "journal.jsonl"
+    readiness = _prepared_readiness(adapter)
     result = asyncio.run(
         d4.run_campaign(
             repo_root=REPO_ROOT,
             state_path=state_path,
             journal_path=journal_path,
-            preflight=lambda: {"current_checkout": "a" * 40},
-            execution_factory=failure,
+            provenance=_test_provenance(),
+            readiness=readiness,
         )
     )
     state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -722,177 +738,247 @@ def _run_post_started_failure(
     return result, state, events
 
 
-def test_missing_credential_after_started_is_durable_inconclusive(
+def _fake_identity_get(url: str, token: str) -> object:
+    """Return a sanitized fake endpoint response without network access."""
+    del token
+    if url == d4.MODEL_CATALOG_URL:
+        return {"data": [{"id": d4.EXPECTED_MODEL}]}
+    return {
+        "model_path": "/models/qwen.gguf",
+        "default_generation_settings": {"n_ctx": 32768},
+        "build_info": "build",
+        "total_slots": 1,
+    }
+
+
+class _PostStartedFailureAdapter:
+    """Minimal prepared adapter that fails only after STARTED exists."""
+
+    provider_calls = 0
+    endpoint_calls = 0
+    model_calls = 0
+    identity_endpoint_calls = 2
+    logical_call_count = 0
+
+    def bind_call_started(self, callback: Callable[[dict[str, object]], None]) -> None:
+        del callback
+
+    def bind_call_completed(self, callback: Callable[[dict[str, object]], None]) -> None:
+        del callback
+
+    def calls_since(self, cursor: int) -> list[object]:
+        del cursor
+        return []
+
+    async def execute_turn(
+        self,
+        case: Mapping[str, object],
+        expected: Mapping[str, object],
+    ) -> object:
+        del case, expected
+        raise d4.PostStartedFailure("provider_execution_failed")
+
+
+def _run_ready_failure(
+    root: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    get_json: Callable[[str, str], object],
+    authorization: d4.FrozenAuthorization | None = None,
+) -> d4.ReadinessFailure:
+    """Run readiness against fake endpoint responses and return its bounded error."""
+    monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+    with pytest.raises(d4.ReadinessFailure) as raised:
+        d4.prepare_live_runtime(
+            repo_root=REPO_ROOT,
+            artifact_root=root,
+            authorization=authorization or _authorization(),
+            http_get_json=get_json,
+        )
+    return raised.value
+
+
+def test_missing_credential_is_not_ready_without_campaign_artifacts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Credential failure occurs after STARTED and leaves a terminal journal event."""
+    """Credential failure is retryable and cannot create campaign custody."""
+    monkeypatch.delenv("OPENAI_COMPAT_API_KEY", raising=False)
     with TemporaryDirectory() as temporary:
         root = Path(temporary)
         monkeypatch.setattr(
             d4,
             "load_d4_api_key",
-            lambda repo_root: (_ for _ in ()).throw(
-                d4.PostStartedFailure("credential_unavailable")
-            ),
+            lambda repo_root: (_ for _ in ()).throw(d4.ReadinessFailure("credential_unavailable")),
         )
-        result, state, events = _run_post_started_failure(
-            root,
-            lambda custody: d4.create_live_campaign_runtime(
+        with pytest.raises(d4.ReadinessFailure) as raised:
+            d4.prepare_live_runtime(
                 repo_root=REPO_ROOT,
                 artifact_root=root,
                 authorization=_authorization(),
-                record_identity=custody.record_endpoint_identity,
-                record_identity_request=custody.record_identity_endpoint_started,
-            ),
+                http_get_json=_fake_identity_get,
+            )
+        error = raised.value
+        assert error.reason_code == "credential_unavailable"
+        assert error.identity_endpoint_calls == 0
+        assert not (root / "state.json").exists()
+        assert not (root / "journal.jsonl").exists()
+
+
+def test_models_unavailable_is_not_ready_after_one_identity_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A catalog failure reports one attempted identity request."""
+
+    def unavailable(url: str, token: str) -> object:
+        del url, token
+        raise d4.ReadinessFailure("endpoint_unreachable")
+
+    with TemporaryDirectory() as temporary:
+        error = _run_ready_failure(Path(temporary), monkeypatch, get_json=unavailable)
+    assert error.reason_code == "endpoint_unreachable"
+    assert error.identity_endpoint_calls == 1
+
+
+def test_props_unavailable_is_not_ready_after_two_identity_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A /props failure reports both attempted identity requests."""
+
+    def unavailable_props(url: str, token: str) -> object:
+        del token
+        if url == d4.MODEL_CATALOG_URL:
+            return {"data": [{"id": d4.EXPECTED_MODEL}]}
+        raise d4.ReadinessFailure("endpoint_unreachable")
+
+    with TemporaryDirectory() as temporary:
+        error = _run_ready_failure(Path(temporary), monkeypatch, get_json=unavailable_props)
+    assert error.reason_code == "endpoint_unreachable"
+    assert error.identity_endpoint_calls == 2
+
+
+def test_identity_mismatch_is_not_ready_and_skips_provider_construction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A wrong catalog identity fails before the provider factory is reached."""
+    constructed = False
+
+    def fake_adapter(**kwargs: object) -> object:
+        nonlocal constructed
+        constructed = True
+        return SimpleNamespace()
+
+    monkeypatch.setattr(d4, "create_live_campaign_adapter", fake_adapter)
+    with TemporaryDirectory() as temporary:
+        error = _run_ready_failure(
+            Path(temporary),
+            monkeypatch,
+            get_json=lambda url, token: {"data": [{"id": "wrong-model"}]},
         )
-    assert result["terminal_reason_code"] == "credential_unavailable"
+    assert error.reason_code == "endpoint_identity_mismatch"
+    assert error.identity_endpoint_calls == 1
+    assert constructed is False
+
+
+def test_provider_construction_failure_is_not_ready_after_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider construction failure remains retryable and has two calls."""
+    monkeypatch.setattr(
+        d4,
+        "create_live_campaign_adapter",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("provider unavailable")),
+    )
+    authorization = replace(
+        _authorization(),
+        endpoint_identity={
+            "model_catalog": [d4.EXPECTED_MODEL],
+            "model_path_basename": "qwen.gguf",
+            "model_path_fingerprint_sha256": d4.sha256_text("/models/qwen.gguf"),
+            "context_size": 32768,
+            "build_info": "build",
+            "total_slots": 1,
+            "gguf_byte_identity": "NOT_AVAILABLE",
+        },
+    )
+    with TemporaryDirectory() as temporary:
+        error = _run_ready_failure(
+            Path(temporary),
+            monkeypatch,
+            get_json=_fake_identity_get,
+            authorization=authorization,
+        )
+    assert error.reason_code == "provider_construction_failed"
+    assert error.identity_endpoint_calls == 2
+
+
+def test_readiness_success_is_live_ready_without_campaign_artifacts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Successful readiness prepares the adapter but does not create custody."""
+    adapter = SimpleNamespace()
+    monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
+    monkeypatch.setattr(d4, "create_live_campaign_adapter", lambda **kwargs: adapter)
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        readiness = d4.prepare_live_runtime(
+            repo_root=REPO_ROOT,
+            artifact_root=root,
+            authorization=replace(
+                _authorization(),
+                endpoint_identity={
+                    "model_catalog": [d4.EXPECTED_MODEL],
+                    "model_path_basename": "qwen.gguf",
+                    "model_path_fingerprint_sha256": d4.sha256_text("/models/qwen.gguf"),
+                    "context_size": 32768,
+                    "build_info": "build",
+                    "total_slots": 1,
+                    "gguf_byte_identity": "NOT_AVAILABLE",
+                },
+            ),
+            http_get_json=_fake_identity_get,
+        )
+        assert readiness.adapter is adapter
+        assert readiness.identity_endpoint_calls == 2
+        assert readiness.endpoint_identity["model_path_basename"] == "qwen.gguf"
+        assert not (root / "state.json").exists()
+        assert not (root / "journal.jsonl").exists()
+
+
+def test_campaign_state_starts_only_after_readiness() -> None:
+    """STARTED state includes sanitized readiness and opens no journal yet."""
+    with TemporaryDirectory() as temporary:
+        directory = Path(temporary)
+        adapter = SimpleNamespace()
+        readiness = d4.LiveReadiness(
+            adapter=adapter,
+            endpoint_identity={"model_catalog": [d4.EXPECTED_MODEL]},
+            identity_endpoint_calls=2,
+        )
+        state, custody = d4.start_campaign(
+            state_path=directory / "state.json",
+            journal_path=directory / "journal.jsonl",
+            provenance={"current_checkout": "a" * 40},
+            readiness=readiness,
+        )
+        assert state["status"] == "STARTED"
+        assert state["readiness_status"] == "LIVE_READY"
+        assert state["identity_endpoint_calls"] == 2
+        assert state["endpoint_identity"] == {"model_catalog": [d4.EXPECTED_MODEL]}
+        assert not (directory / "journal.jsonl").exists()
+        custody.journal.close()
+
+
+def test_post_started_provider_failure_is_durable_inconclusive() -> None:
+    """Only actual execution failures consume STARTED custody."""
+    with TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        adapter = _PostStartedFailureAdapter()
+        result, state, events = _run_post_started_failure(root, adapter)
+    assert result["terminal_reason_code"] == "provider_execution_failed"
     assert state["status"] == "TERMINAL"
     assert state["terminal_decision"] == d4.INCONCLUSIVE_DECISION
-    assert state["terminal_reason_code"] == "credential_unavailable"
     assert state["completed_turns"] == 0
-    assert state["logical_generation_calls"] == 0
     assert events[-1]["event"] == "campaign_terminal"
-    assert events[-1]["terminal_reason_code"] == "credential_unavailable"
-
-
-def test_endpoint_unavailable_after_started_has_no_provider_or_logical_call(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Endpoint failure is terminal before provider construction or generation."""
-    with TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
-        result, state, events = _run_post_started_failure(
-            root,
-            lambda custody: d4.create_live_campaign_runtime(
-                repo_root=REPO_ROOT,
-                artifact_root=root,
-                authorization=_authorization(),
-                record_identity=custody.record_endpoint_identity,
-                record_identity_request=custody.record_identity_endpoint_started,
-                http_get_json=lambda url, token: (_ for _ in ()).throw(
-                    d4.PostStartedFailure("endpoint_unreachable")
-                ),
-            ),
-        )
-    assert result["terminal_reason_code"] == "endpoint_unreachable"
-    assert state["logical_generation_calls"] == 0
-    assert state["identity_endpoint_calls"] == 1
-    assert [
-        event["kind"] for event in events if event["event"] == "identity_endpoint_call_started"
-    ] == ["model_catalog"]
-    assert events[-1]["terminal_reason_code"] == "endpoint_unreachable"
-
-
-def test_props_unavailable_after_started_counts_both_identity_requests(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A failed /props request is counted after the catalog request succeeds."""
-    with TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
-
-        def fake_get(url: str, token: str) -> object:
-            if url == d4.MODEL_CATALOG_URL:
-                return {"data": [{"id": d4.EXPECTED_MODEL}]}
-            raise d4.PostStartedFailure("endpoint_unreachable")
-
-        result, state, events = _run_post_started_failure(
-            root,
-            lambda custody: d4.create_live_campaign_runtime(
-                repo_root=REPO_ROOT,
-                artifact_root=root,
-                authorization=_authorization(),
-                record_identity=custody.record_endpoint_identity,
-                record_identity_request=custody.record_identity_endpoint_started,
-                http_get_json=fake_get,
-            ),
-        )
-    assert result["terminal_reason_code"] == "endpoint_unreachable"
-    assert state["identity_endpoint_calls"] == 2
-    assert [
-        (event["index"], event["kind"])
-        for event in events
-        if event["event"] == "identity_endpoint_call_started"
-    ] == [(1, "model_catalog"), (2, "props")]
-
-
-def test_identity_mismatch_after_started_has_no_provider_or_logical_call(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A wrong model catalog cannot fall through to provider construction."""
-    with TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
-        result, state, events = _run_post_started_failure(
-            root,
-            lambda custody: d4.create_live_campaign_runtime(
-                repo_root=REPO_ROOT,
-                artifact_root=root,
-                authorization=_authorization(),
-                record_identity=custody.record_endpoint_identity,
-                record_identity_request=custody.record_identity_endpoint_started,
-                http_get_json=lambda url, token: (
-                    {"data": [{"id": "wrong-model"}]} if url == d4.MODEL_CATALOG_URL else {}
-                ),
-            ),
-        )
-    assert result["terminal_reason_code"] == "endpoint_identity_mismatch"
-    assert state["logical_generation_calls"] == 0
-    assert state["identity_endpoint_calls"] == 1
-    assert events[-1]["terminal_reason_code"] == "endpoint_identity_mismatch"
-
-
-def test_provider_construction_failure_is_durable_inconclusive(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Successful identity observation followed by construction failure is terminal."""
-    with TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        monkeypatch.setattr(d4, "load_d4_api_key", lambda repo_root: "ephemeral")
-        monkeypatch.setattr(
-            d4,
-            "create_live_campaign_adapter",
-            lambda **kwargs: (_ for _ in ()).throw(RuntimeError("provider unavailable")),
-        )
-
-        def fake_get(url: str, token: str) -> object:
-            if url == d4.MODEL_CATALOG_URL:
-                return {"data": [{"id": d4.EXPECTED_MODEL}]}
-            return {
-                "model_path": "/models/qwen.gguf",
-                "default_generation_settings": {"n_ctx": 32768},
-                "build_info": "build",
-                "total_slots": 1,
-            }
-
-        result, state, events = _run_post_started_failure(
-            root,
-            lambda custody: d4.create_live_campaign_runtime(
-                repo_root=REPO_ROOT,
-                artifact_root=root,
-                authorization=replace(
-                    _authorization(),
-                    endpoint_identity={
-                        "model_catalog": [d4.EXPECTED_MODEL],
-                        "model_path_basename": "qwen.gguf",
-                        "model_path_fingerprint_sha256": d4.sha256_text("/models/qwen.gguf"),
-                        "context_size": 32768,
-                        "build_info": "build",
-                        "total_slots": 1,
-                        "gguf_byte_identity": "NOT_AVAILABLE",
-                    },
-                ),
-                record_identity=custody.record_endpoint_identity,
-                record_identity_request=custody.record_identity_endpoint_started,
-                http_get_json=fake_get,
-            ),
-        )
-    assert result["terminal_reason_code"] == "provider_construction_failed"
-    assert state["logical_generation_calls"] == 0
-    assert state["identity_endpoint_calls"] == 2
-    assert any(event["event"] == "endpoint_identity_verified" for event in events)
-    assert events[-1]["terminal_reason_code"] == "provider_construction_failed"
 
 
 def test_journal_failure_leaves_state_terminal_evidence_integrity(
@@ -913,10 +999,8 @@ def test_journal_failure_leaves_state_terminal_evidence_integrity(
                 repo_root=REPO_ROOT,
                 state_path=state_path,
                 journal_path=journal_path,
-                preflight=lambda: {"current_checkout": "a" * 40},
-                execution_factory=lambda custody: (_ for _ in ()).throw(
-                    d4.PostStartedFailure("credential_unavailable")
-                ),
+                provenance=_test_provenance(),
+                readiness=_prepared_readiness(_PostStartedFailureAdapter()),
             )
         )
         state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -1040,28 +1124,6 @@ def test_counting_backend_reserves_unique_indexes_under_concurrent_calls() -> No
     assert sum(isinstance(result, d4.CallCapExceeded) for result in results) == 1
 
 
-def test_campaign_state_is_durable_before_post_started_runtime() -> None:
-    """Write STARTED state before invoking any post-STARTED runtime code."""
-    with TemporaryDirectory() as temporary:
-        directory = Path(temporary)
-        state_path = directory / "state.json"
-        journal_path = directory / "journal.jsonl"
-        events: list[str] = []
-
-        def preflight() -> dict[str, str]:
-            events.append("preflight")
-            return {"current_checkout": "a" * 40}
-
-        state, _ = d4.start_campaign(
-            state_path=state_path,
-            journal_path=journal_path,
-            preflight=preflight,
-        )
-        assert events == ["preflight"]
-        assert state["status"] == "STARTED"
-        assert json.loads(state_path.read_text())["status"] == "STARTED"
-
-
 def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
     """Logical call count and journal evidence survive each call boundary."""
     with TemporaryDirectory() as temporary:
@@ -1071,7 +1133,8 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
         state, _ = d4.start_campaign(
             state_path=state_path,
             journal_path=journal_path,
-            preflight=lambda: {"current_checkout": "a" * 40},
+            provenance=_test_provenance(),
+            readiness=_prepared_readiness(SimpleNamespace()),
         )
         custody = d4.CampaignCustody(
             state_path=state_path,
@@ -1126,7 +1189,8 @@ def test_existing_campaign_artifacts_block_resume() -> None:
             d4.start_campaign(
                 state_path=state_path,
                 journal_path=journal_path,
-                preflight=lambda: {"current_checkout": "a" * 40},
+                provenance=_test_provenance(),
+                readiness=_prepared_readiness(SimpleNamespace()),
             )
 
 
@@ -1783,8 +1847,8 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
                 repo_root=REPO_ROOT,
                 state_path=state_path,
                 journal_path=journal_path,
-                preflight=lambda: {"current_checkout": "a" * 40},
-                execution_factory=lambda custody: adapter,
+                provenance=_test_provenance(),
+                readiness=_prepared_readiness(adapter),
             )
         )
         journal_rows = [json.loads(line) for line in journal_path.read_text().splitlines()]

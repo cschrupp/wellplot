@@ -3,11 +3,10 @@
 ## Status
 
 ```yaml
-decision: WELLPLOT_NLP_D4A_QWEN_HARNESS_REWORK_001_COMPLETE_REVIEW_PENDING
-authorization: WELLPLOT-NLP-D4A-QWEN-HARNESS-REWORK-001
-implementation_base: 94a373c292178d21613853ef57f74a81c8e17986
-rework_parent: 3b2b10e017c7380fec336a30ad5283fa21221914
-design_authority: 0d0158fc3ddb8844b866444a8b6192be3f5aa93f
+decision: WELLPLOT_NLP_D4B_READINESS_BOUNDARY_IMPLEMENTED_REVIEW_PENDING
+authorization: WELLPLOT-NLP-D4B-READINESS-BOUNDARY-I1-AUTH-001
+implementation_base: f45fda6deb38d516178445d73e1861ce5208e2cf
+design_authority: 7422f0d1b984daa1765335aefd26518fd459ae4d
 production_baseline: 2c8e851fcd8b315e5d1861652a97984202db7488
 provider: openai_compat
 runtime: local llama.cpp
@@ -66,7 +65,12 @@ The harness implements and tests:
   inspection;
 - a 45-call logical-generation ceiling with call 46 rejected before delegation;
 - zero harness retries and distinct logical/transport accounting;
-- atomic `STARTED` state creation before credential/provider construction;
+- static provider-free interlocks before operational readiness;
+- retryable operational readiness before `STARTED`, including credential load,
+  bounded endpoint identity observation, identity validation, and provider
+  construction;
+- atomic `STARTED` state creation only after `LIVE_READY` and a second absence
+  check for campaign state and journal;
 - rejection of any existing state or journal, including zero-length artifacts;
 - bounded evidence redaction with no credentials, headers, raw programs, or raw provider payloads;
 - deterministic safe-failure, semantic-failure, and infrastructure decision precedence.
@@ -77,8 +81,8 @@ boundary. The harness accepts only the credential names
 `OPENAI_COMPAT_API_KEY`, `OPENAI_COMPAT_API_KEY.txt`, and
 `openai_compat_api_key.txt` (including the same key in `.env` or `.env.local`);
 it does not fall back to `OPENAI_API_KEY`. The token is loaded only after
-durable `STARTED` state exists, passed explicitly to the production provider
-factory, and never stored, hashed, or serialized.
+static interlocks pass and before campaign state exists, passed explicitly to
+the production provider factory, and never stored, hashed, or serialized.
 
 The fixed endpoint contract is:
 
@@ -100,8 +104,9 @@ than 256 characters and is persisted without truncation. Raw `/props`,
 absolute model paths, chat templates, and credentials are not persisted.
 Server authentication is not claimed.
 
-The accepted future-live orchestration is implemented as `run_campaign()` and
-the campaign-owned `D4CampaignAdapter` in the harness script. The adapter
+The accepted future-live orchestration is implemented as
+`prepare_live_runtime()`, `LiveReadiness`, `run_campaign()`, and the
+campaign-owned `D4CampaignAdapter` in the harness script. The adapter
 composes the existing `DirectNotebookSession`, stages each frozen starting
 artifact, executes the CBL/LAS turn branches, renders the exact generated CBL
 artifact and successful LAS post-turn artifact, and supplies artifact paths to
@@ -149,15 +154,17 @@ exact candidate commit and parent.
 The focused D4A suite uses only deterministic backends and reports:
 
 ```text
-tests/test_nlp_d4_live_acceptance.py: 65 passed, 1 skipped
+tests/test_nlp_d4_live_acceptance.py: 68 passed, 1 skipped
 provider calls: 0; real endpoint identity calls: 0; model calls: 0
 ```
 
-The D0-D4 delivery regression reports `120 passed, 2 skipped`. The full
-repository suite reports `2625 passed, 36 failed, 12 skipped, 11 subtests`;
-the 36 failures reproduce the established repository baseline and none is
-attributable to the three authorized D4A files. Ruff, formatting, Python
-compilation, and `git diff --check` pass.
+The bounded D0-D2 and D4 delivery regression reports `121 passed`. The
+targeted D3 delivery run reached `55 passed` before interruption in the
+existing slow real-DLIS/render path; the terminal full-suite run completed
+that path. The full repository suite reports `2630 passed, 35 failed,
+10 skipped, 11 subtests`; the failures are outside the three authorized I1
+files and none is attributable to the readiness-boundary change. Ruff,
+formatting, Python compilation, and `git diff --check` pass.
 
 The provider-free campaign rehearsal also passes all nine frozen turns in the
 required order. It writes the real campaign state and journal, records 16
@@ -179,25 +186,27 @@ compares every value before campaign state, credentials, or endpoint access.
 It records endpoint identity as not observed; it does not probe the real
 server.
 
-After `STARTED`, runtime construction is inside the protected custody boundary:
+Operational readiness completes before `STARTED` and is not scientific
+evidence. Its failures are retryable and leave no campaign artifacts:
 
 ```text
-STARTED
+static provider-free preflight
 → load OPENAI_COMPAT_API_KEY
-→ persist identity request #1, then GET /v1/models
-→ persist identity request #2, then GET /props
+→ GET /v1/models and GET /props
 → validate sanitized identity
-→ persist endpoint_identity_verified
 → construct production OpenAICompatibleBackendV2
+→ LIVE_READY
+→ re-check state/journal absence
+→ create durable STARTED state with sanitized readiness provenance
 → bind logical-call custody
 → run the nine turns
 ```
 
-Every catchable post-`STARTED` exception produces durable terminal state with
+Credential, endpoint, identity, and provider-construction failures before
+`STARTED` produce `NOT_READY` with a bounded reason and truthful identity-call
+count. Every catchable post-`STARTED` exception produces durable terminal state with
 decision `WELLPLOT_NLP_D4_LIVE_ACCEPTANCE_INCONCLUSIVE` and one allowlisted
-reason code such as `credential_unavailable`,
-`endpoint_identity_mismatch`, `provider_construction_failed`,
-`provider_execution_failed`, `call_cap_exceeded`, or
+reason code such as `provider_execution_failed`, `call_cap_exceeded`, or
 `evidence_integrity_failure`. Exception text and tracebacks are not persisted.
 If terminal journal append fails, the state file remains terminal with
 `evidence_integrity_failure` as the decision-bearing reason.
