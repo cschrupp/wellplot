@@ -63,6 +63,7 @@ class ReportProgramCompiler:
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        authoritative_request: str | None = None,
     ) -> ProgramExecutionResult:
         """Generate, interpret, and privately dry-run one report program."""
         capabilities = _worker_capabilities(task, self.registry)

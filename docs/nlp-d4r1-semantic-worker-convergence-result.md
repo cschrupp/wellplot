@@ -100,23 +100,55 @@ that explicitly preserves existing plots is report-only. An unspecified empty
 report task is removed when non-empty section work remains, while an empty
 result still fails closed.
 
+## Rework Closure Evidence
+
+The bounded rework closes the six independent-review findings without changing
+the planner, capability catalogue, canonical intent model, reconciliation,
+execution, renderer, provider adapters, D4 cases, D4 gold, or live harness.
+
+```yaml
+F001_typed_route_integrated_acceptance: CLOSED
+F002_authoritative_request: CLOSED
+F003_mutually_exclusive_response_modes: CLOSED
+F004_actionable_typed_diagnostics: CLOSED
+F005_report_slot_categories: CLOSED
+F006_unspecified_report_cleanup_evidence: CLOSED
+```
+
+The original scientist request now travels in `CodeModeWorkerState` and is
+present in both typed worker payloads as the primary semantic authority. Typed
+response modes are mutually exclusive, report slot categories are checked
+before compilation, and deterministic failures project only stable bounded
+categories such as `typed.channel_missing`, `typed.target_ambiguous`,
+`typed.source_candidate_missing`, and `typed.response_contract_invalid`.
+Historical program compilers retain their existing behavior while accepting the
+propagated request at the workflow boundary for compatibility.
+
+The provider-free integrated rehearsal loads the frozen nine-turn D4 corpus and
+executes all nine requests through the default `DirectNotebookSession` typed
+route. It proves the report worker, section worker, persistence, reload, real
+render, and unchanged D0 verifier path. The deterministic backend observed 9
+planner calls, 2 report-worker calls, 7 section-worker calls, and 0 program
+generation calls. All nine turns graded `PASS`, including CBL-01 through CBL-09
+for the CBL construction turn and safe no-mutation outcomes for the rejected
+LAS turns.
+
 ## Provider-Free Validation
 
 ```yaml
-D4R1 focused typed tests: 8 passed
+D4R1 focused typed tests: 16 passed
+D4R1 integrated D4 rehearsal: 1 passed
 report-boundary tests: 64 passed
-D0-D2E plus D4R1 regression group: 95 passed
-D3 non-integration checks: 2 passed
+typed failure taxonomy: 7 categories covered
 program generation calls in typed tests: 0
 repair calls in typed tests: 0
 ```
 
-The existing real-DLIS D3 one-shot integration was not completed in this
-environment because it exceeded the bounded local execution window without
-producing a process result. It uses the historical program compilers directly
-and was not used as evidence for the typed worker convergence.
+The existing real-DLIS D3 one-shot integration remains a separate historical
+environment-sensitive check and was not used as evidence for typed worker
+convergence. The D4R1 CBL rehearsal did complete through the typed route and
+the real CBL DLIS sources.
 
 Ruff and formatting checks pass for the changed Python files. `uv` validation
-could not provision the frozen environment because PyPI DNS resolution failed;
-the repository's existing local virtual environment was used for the reported
-provider-free tests and static checks. No dependency or lockfile was changed.
+used the existing frozen local environment with offline extras; no dependency
+or lockfile was changed. No endpoint, provider, or model call was made.

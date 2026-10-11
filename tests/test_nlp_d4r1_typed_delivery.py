@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -196,6 +197,7 @@ def test_typed_report_worker_uses_one_structured_call() -> None:
                 header_slots=(HeaderSlotInspectionSummary(slot_id="general.well", key="well"),)
             ),
             document=_document(),
+            authoritative_request="Set the report title.",
             timeout_seconds=10,
         )
     )
@@ -266,6 +268,7 @@ def test_typed_section_revisions_are_host_grounded(
             task_index=0,
             context=_context(),
             document=_document(),
+            authoritative_request="Apply the requested section change.",
             timeout_seconds=10,
         )
     )
@@ -313,6 +316,7 @@ def test_typed_reconstruction_preserves_track_kinds() -> None:
             task_index=0,
             context=_context(section_id=None),
             document=_document(),
+            authoritative_request="Reconstruct the requested section.",
             timeout_seconds=10,
         )
     )
@@ -346,14 +350,243 @@ def test_typed_reconstruction_missing_channel_fails_closed() -> None:
             task_index=0,
             context=_context(section_id=None),
             document=_document(),
+            authoritative_request="Reconstruct the requested section.",
             timeout_seconds=10,
         )
     )
 
     assert result.success is False
     assert result.intent_fragment is None
-    assert result.diagnostics[0].code == "typed.section_validation_error"
+    assert result.diagnostics[0].code == "typed.channel_missing"
     assert backend.program_calls == 0
+
+
+def test_typed_worker_payload_preserves_authoritative_request() -> None:
+    """The original scientist request remains explicit at the worker boundary."""
+    authoritative_request = "Set the Gamma Ray scale to 5-125 and preserve its label."
+    backend = _TypedBackend(
+        responses=[
+            DeliverySectionResponse(
+                mode="update_curve_scale",
+                target=DeliveryTarget(handle="curve-1"),
+                scale=DeliveryScale(minimum=5, maximum=125),
+            )
+        ]
+    )
+    result = asyncio.run(
+        TypedDeliverySectionCompiler(backend=backend).compile(
+            task_index=0,
+            context=_context(),
+            document=_document(),
+            authoritative_request=authoritative_request,
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is True
+    payload = json.loads(backend.structured_requests[0].user_prompt)
+    assert payload["authoritative_request"] == authoritative_request
+    assert payload["authority_rules"]["authoritative_request"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "mode": "reconstruct",
+            "section": {"title": "Log", "source_candidate": "source-1", "tracks": []},
+            "track": {"semantic_id": "extra", "kind": "normal", "title": "Extra"},
+        },
+        {
+            "mode": "update_curve_scale",
+            "target": {"handle": "curve-1"},
+            "scale": {"minimum": 1, "maximum": 2},
+            "fill": {
+                "semantic_id": "extra",
+                "target_binding": "GR",
+                "kind": "to_lower_limit",
+            },
+        },
+        {
+            "mode": "add_track_curve",
+            "track": {"semantic_id": "extra", "kind": "normal", "title": "Extra"},
+            "target": {"handle": "curve-1"},
+        },
+        {
+            "mode": "add_fill",
+            "target": {"handle": "curve-1"},
+            "fill": {
+                "semantic_id": "extra",
+                "target_binding": "GR",
+                "kind": "to_lower_limit",
+            },
+            "scale": {"minimum": 1, "maximum": 2},
+        },
+    ],
+)
+def test_typed_response_modes_reject_cross_operation_fields(payload: dict[str, object]) -> None:
+    """Each typed operation accepts exactly its own semantic fields."""
+    with pytest.raises(ValidationError):
+        DeliverySectionResponse.model_validate(payload)
+
+
+def test_typed_report_slot_categories_fail_closed() -> None:
+    """A report slot returned in the wrong collection cannot be discarded."""
+    backend = _TypedBackend(
+        responses=[
+            DeliveryReportResponse(
+                general_fields=(DeliverySlotValue(slot_id="detail.depth", value="100"),),
+            )
+        ]
+    )
+    result = asyncio.run(
+        TypedDeliveryReportCompiler(backend=backend).compile(
+            task=ReportTask(goal="Set report detail."),
+            report_context=ReportContext(
+                header_slots=(HeaderSlotInspectionSummary(slot_id="detail.depth"),)
+            ),
+            document=_document(),
+            authoritative_request="Set report detail.",
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert result.diagnostics[0].code == "typed.report_slot_invalid"
+
+
+def _section_failure_result(
+    response: object,
+    *,
+    context: EnrichedSemanticContext | None = None,
+) -> object:
+    """Compile one deliberately invalid typed response without external calls."""
+    backend = _TypedBackend(responses=[response])
+    return asyncio.run(
+        TypedDeliverySectionCompiler(backend=backend).compile(
+            task_index=0,
+            context=context or _context(),
+            document=_document(),
+            authoritative_request="Apply one bounded typed section operation.",
+            timeout_seconds=10,
+        )
+    )
+
+
+def test_typed_failure_taxonomy_is_stable_and_redacted() -> None:
+    """Typed boundary failures expose stable categories and safe messages."""
+    invalid_response = _section_failure_result(
+        {"mode": "update_curve_scale", "target": {"handle": "curve-1"}}
+    )
+    assert invalid_response.diagnostics[0].code == "typed.response_contract_invalid"
+
+    missing_target = _section_failure_result(
+        DeliverySectionResponse(
+            mode="update_curve_scale",
+            target=DeliveryTarget(channel="NPHI"),
+            scale=DeliveryScale(minimum=2, maximum=20),
+        )
+    )
+    assert missing_target.diagnostics[0].code == "typed.target_missing"
+
+    ambiguous_context = _context()
+    section = ambiguous_context.sections[0]
+    duplicate = section.existing_curves[0].model_copy(update={"binding_id": "main.gr.GR.2"})
+    ambiguous_context = ambiguous_context.model_copy(
+        update={
+            "sections": (
+                section.model_copy(
+                    update={"existing_curves": (*section.existing_curves, duplicate)}
+                ),
+            )
+        }
+    )
+    ambiguous_target = _section_failure_result(
+        DeliverySectionResponse(
+            mode="update_curve_scale",
+            target=DeliveryTarget(channel="GR"),
+            scale=DeliveryScale(minimum=2, maximum=20),
+        ),
+        context=ambiguous_context,
+    )
+    assert ambiguous_target.diagnostics[0].code == "typed.target_ambiguous"
+
+    kind_mismatch = _section_failure_result(
+        DeliverySectionResponse(
+            mode="reconstruct",
+            section=DeliverySection(
+                title="Reconstructed Log",
+                source_candidate="source-1",
+                tracks=(
+                    DeliveryTrack(
+                        semantic_id="waveform",
+                        kind="array",
+                        title="Waveform",
+                        rasters=(DeliveryRaster(semantic_id="gr", channel="GR"),),
+                    ),
+                ),
+            ),
+        ),
+        context=_context(section_id=None),
+    )
+    assert kind_mismatch.diagnostics[0].code == "typed.channel_kind_mismatch"
+
+    missing_source = _section_failure_result(
+        DeliverySectionResponse(
+            mode="reconstruct",
+            section=DeliverySection(
+                title="Reconstructed Log",
+                source_candidate="missing-source",
+                tracks=(
+                    DeliveryTrack(
+                        semantic_id="gr",
+                        kind="normal",
+                        title="Gamma Ray",
+                        curves=(DeliveryCurve(semantic_id="gr", channel="GR"),),
+                    ),
+                ),
+            ),
+        ),
+        context=_context(section_id=None),
+    )
+    assert missing_source.diagnostics[0].code == "typed.source_candidate_missing"
+
+    invalid_fill = _section_failure_result(
+        DeliverySectionResponse(
+            mode="add_fill",
+            target=DeliveryTarget(channel="GR"),
+            fill=DeliveryFill(
+                semantic_id="fill",
+                target_binding="CALI",
+                kind="to_lower_limit",
+            ),
+        )
+    )
+    assert invalid_fill.diagnostics[0].code == "typed.fill_target_invalid"
+
+    compilation_failure = _section_failure_result(
+        DeliverySectionResponse(
+            mode="update_curve_scale",
+            target=DeliveryTarget(channel="GR"),
+            scale=DeliveryScale(minimum=2, maximum=20),
+        ),
+        context=_context(section_id=None),
+    )
+    assert compilation_failure.diagnostics[0].code == "typed.compilation_error"
+
+    for result in (
+        invalid_response,
+        missing_target,
+        ambiguous_target,
+        kind_mismatch,
+        missing_source,
+        invalid_fill,
+        compilation_failure,
+    ):
+        message = result.diagnostics[0].message
+        assert "/tmp" not in message
+        assert "canonical" not in message
+        assert "source-1" not in message
 
 
 @dataclass

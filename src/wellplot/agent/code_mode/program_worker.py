@@ -99,6 +99,7 @@ class ProgramSectionCompiler:
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        authoritative_request: str | None = None,
     ) -> ProgramExecutionResult:
         """Generate, interpret, and privately dry-run one section program."""
         task, section_context = _task_context(context, task_index)

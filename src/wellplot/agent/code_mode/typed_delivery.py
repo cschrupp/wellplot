@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from ...authoring_program.ids import IdAllocator
 from ...authoring_program.models import ProgramDiagnostic, ProgramMetrics
@@ -197,14 +197,19 @@ class DeliverySectionResponse(_DeliveryModel):
     @model_validator(mode="after")
     def validate_mode(self) -> DeliverySectionResponse:
         """Reject incomplete or cross-operation semantic responses."""
-        if self.mode == "reconstruct" and self.section is None:
-            raise ValueError("Reconstruction requires a section response.")
-        if self.mode == "update_curve_scale" and (self.target is None or self.scale is None):
-            raise ValueError("Scale revision requires target and scale.")
-        if self.mode == "add_track_curve" and self.track is None:
-            raise ValueError("Track revision requires a track response.")
-        if self.mode == "add_fill" and (self.target is None or self.fill is None):
-            raise ValueError("Fill revision requires target and fill.")
+        expected = {
+            "reconstruct": {"section"},
+            "update_curve_scale": {"target", "scale"},
+            "add_track_curve": {"track"},
+            "add_fill": {"target", "fill"},
+        }[self.mode]
+        present = {
+            name
+            for name in ("section", "target", "scale", "track", "fill")
+            if getattr(self, name) is not None
+        }
+        if present != expected:
+            raise ValueError(f"{self.mode} response must contain only {sorted(expected)!r}.")
         return self
 
 
@@ -280,6 +285,16 @@ class TypedSemanticWorkerResult:
     metrics: ProgramMetrics
 
 
+class TypedDeliveryError(ValueError):
+    """Safe deterministic failure with a stable typed-worker category."""
+
+    def __init__(self, code: str, safe_message: str) -> None:
+        """Store only the bounded category and safe message."""
+        self.code = code
+        self.safe_message = safe_message
+        super().__init__(safe_message)
+
+
 @dataclass(frozen=True, slots=True)
 class TypedDeliveryReportCompiler:
     """Generate one structured report response and compile it deterministically."""
@@ -292,6 +307,7 @@ class TypedDeliveryReportCompiler:
         task: ReportTask,
         report_context: ReportContext,
         document: object,
+        authoritative_request: str,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -300,6 +316,12 @@ class TypedDeliveryReportCompiler:
         payload = {
             "report_task": task.model_dump(mode="json"),
             "report_context": report_context.model_dump(mode="json"),
+            "authoritative_request": authoritative_request,
+            "authority_rules": {
+                "authoritative_request": "primary authority for explicit scientist semantics",
+                "report_task": "scoped decomposition and routing",
+                "report_context": "host-grounded available report objects",
+            },
             "rules": "Return only explicit report values. Do not emit sections or plot children.",
         }
         try:
@@ -337,6 +359,7 @@ class TypedDeliverySectionCompiler:
         task_index: int,
         context: object,
         document: object,
+        authoritative_request: str,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -347,6 +370,12 @@ class TypedDeliverySectionCompiler:
         payload = {
             "section_task": task.model_dump(mode="json"),
             "section_context": _section_provider_context(section_context),
+            "authoritative_request": authoritative_request,
+            "authority_rules": {
+                "authoritative_request": "primary authority for explicit scientist semantics",
+                "section_task": "scoped decomposition and routing",
+                "section_context": "host-grounded available objects and sources",
+            },
             "rules": (
                 "Return typed semantic fields only. Use request-local handles for existing "
                 "targets. Never return paths, canonical IDs, SDK calls, or program source."
@@ -380,11 +409,15 @@ def _compile_report(
 ) -> AuthoringDocumentIntent:
     """Compile report values after checking every slot against host context."""
     allowed = {slot.slot_id: slot for slot in report_context.header_slots}
+    _validate_report_slots(response, allowed)
 
     def field(value: DeliverySlotValue) -> AuthoringHeaderFieldIntent:
         slot = allowed.get(value.slot_id)
         if slot is None:
-            raise ValueError("Typed report selected an unavailable header slot.")
+            raise TypedDeliveryError(
+                "report_slot_invalid",
+                "Typed report selected an unavailable header slot.",
+            )
         report_value = {
             "value": str(value.value),
             "provenance": "user",
@@ -404,7 +437,10 @@ def _compile_report(
 
     def service(value: DeliverySlotValue) -> AuthoringServiceTitleIntent:
         if value.slot_id not in allowed or not value.slot_id.startswith("service_title"):
-            raise ValueError("Typed report selected an unavailable service-title slot.")
+            raise TypedDeliveryError(
+                "report_slot_invalid",
+                "Typed report selected an unavailable service-title slot.",
+            )
         report_value = {
             "value": str(value.value),
             "provenance": "user",
@@ -431,16 +467,19 @@ def _compile_report(
         if services:
             header_values["service_titles"] = services
         header = AuthoringHeaderIntent(**header_values)
-    remarks = [
-        AuthoringRemarkIntent(
-            remark_id=f"typed-remark-{index + 1}",
-            title=item.title,
-            text=item.text,
-            lines=list(item.lines) if item.text is None else None,
-            alignment=item.alignment,
-        )
-        for index, item in enumerate(response.remarks)
-    ]
+    remarks = []
+    for index, item in enumerate(response.remarks):
+        remark_values: dict[str, object] = {
+            "remark_id": f"typed-remark-{index + 1}",
+            "alignment": item.alignment,
+        }
+        if item.title is not None:
+            remark_values["title"] = item.title
+        if item.text is not None:
+            remark_values["text"] = item.text
+        elif item.lines:
+            remark_values["lines"] = list(item.lines)
+        remarks.append(AuthoringRemarkIntent(**remark_values))
     page_values: dict[str, object] = {}
     if response.page_size is not None:
         page_values["size"] = response.page_size
@@ -484,7 +523,10 @@ def _compile_section(
         assert response.section is not None
         return _compile_reconstruction(response.section, context, document)
     if context.section_id is None:
-        raise ValueError("Section revisions require a resolved existing section.")
+        raise TypedDeliveryError(
+            "compilation_error",
+            "Section revisions require a resolved existing section.",
+        )
     if response.mode == "update_curve_scale":
         assert response.target is not None and response.scale is not None
         target = _resolve_curve(response.target, context)
@@ -506,10 +548,19 @@ def _compile_section(
     target = _resolve_curve(response.target, context)
     fill = response.fill
     if fill.target_binding != target.channel and fill.target_binding != target.label:
-        raise ValueError("Fill target does not match the selected grounded curve.")
+        raise TypedDeliveryError(
+            "fill_target_invalid",
+            "Fill target does not match the selected grounded curve.",
+        )
     other_id = None
     if fill.other_binding:
-        other_id = _resolve_curve(DeliveryTarget(handle=fill.other_binding), context).binding_id
+        try:
+            other_id = _resolve_curve(DeliveryTarget(handle=fill.other_binding), context).binding_id
+        except TypedDeliveryError as error:
+            raise TypedDeliveryError(
+                "fill_target_invalid",
+                "Fill references an unavailable grounded curve.",
+            ) from error
     fill_values: dict[str, object] = {
         "fill_id": _allocator(document).allocate_leaf(
             context.section_id or "section",
@@ -556,7 +607,7 @@ def _compile_reconstruction(
         track_id = (
             existing.id
             if existing is not None
-            else allocator.allocate_track(section_id, f"track-{item.semantic_id}")
+            else allocator.allocate_track(section_id, item.semantic_id)
         )
         used_tracks.add(track_id)
         bindings = _compile_bindings(item, allocator, section_id, track_id, existing, context)
@@ -574,7 +625,10 @@ def _compile_reconstruction(
         None,
     )
     if source is None:
-        raise ValueError("Typed section selected an unavailable source candidate.")
+        raise TypedDeliveryError(
+            "source_candidate_missing",
+            "Typed section selected an unavailable source candidate.",
+        )
     return AuthoringDocumentIntent(
         sections=[
             AuthoringSectionIntent(
@@ -832,7 +886,15 @@ def _resolve_curve(
     if target.track_title:
         matches = [item for item in matches if item.track_title == target.track_title]
     if len(matches) != 1:
-        raise ValueError("Existing curve target is missing or ambiguous.")
+        if not matches:
+            raise TypedDeliveryError(
+                "target_missing",
+                "No grounded existing curve matches the requested target.",
+            )
+        raise TypedDeliveryError(
+            "target_ambiguous",
+            "The requested existing curve target is ambiguous.",
+        )
     return matches[0]
 
 
@@ -847,9 +909,15 @@ def _require_channel(
         item for source in context.sources for item in source.channels if item.mnemonic == channel
     ]
     if not available:
-        raise ValueError(f"channel_missing: No source channel matches '{channel}'.")
+        raise TypedDeliveryError(
+            "channel_missing",
+            f"No source channel matches '{channel}'.",
+        )
     if not any(item.kind == expected_kind for item in available):
-        raise ValueError(f"channel_kind_mismatch: '{channel}' is not {expected_kind}.")
+        raise TypedDeliveryError(
+            "channel_kind_mismatch",
+            f"Source channel '{channel}' is not {expected_kind}.",
+        )
 
 
 def _section_provider_context(context: ResolvedSectionContext) -> dict[str, object]:
@@ -946,17 +1014,55 @@ def _json_payload(value: object) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def _validate_report_slots(
+    response: DeliveryReportResponse,
+    allowed: dict[str, object],
+) -> None:
+    """Reject category-mismatched, unavailable, or duplicate report slots."""
+    assignments: set[str] = set()
+    categories = (
+        (response.general_fields, "general.", "general report"),
+        (response.detail_fields, "detail.", "detail report"),
+        (response.service_titles, "service_title", "service-title"),
+    )
+    for values, prefix, label in categories:
+        for value in values:
+            if not value.slot_id.startswith(prefix) or value.slot_id not in allowed:
+                raise TypedDeliveryError(
+                    "report_slot_invalid",
+                    f"Typed report selected an invalid {label} slot.",
+                )
+            if value.slot_id in assignments:
+                raise TypedDeliveryError(
+                    "report_slot_invalid",
+                    "Typed report assigned one slot more than once.",
+                )
+            assignments.add(value.slot_id)
+
+
 def _typed_failure(kind: str, error: Exception) -> TypedSemanticWorkerResult:
     """Project typed validation failures without leaking provider payloads."""
+    if isinstance(error, TypedDeliveryError):
+        code = f"typed.{error.code}"
+        message = error.safe_message
+        remediation = "Adjust the request to use the grounded typed delivery contract."
+    elif isinstance(error, ValidationError):
+        code = "typed.response_contract_invalid"
+        message = "Typed semantic response did not match the delivery contract."
+        remediation = "Return exactly one valid typed delivery operation."
+    else:
+        code = "typed.compilation_error"
+        message = "Typed semantic response could not be compiled safely."
+        remediation = "Return one response matching the grounded typed delivery contract."
     return TypedSemanticWorkerResult(
         success=False,
         intent_fragment=None,
         diagnostics=(
             ProgramDiagnostic(
                 stage="typed_worker",
-                code=f"typed.{kind}_validation_error",
-                message="Typed semantic response failed deterministic validation.",
-                remediation_hint="Return one response matching the typed delivery contract.",
+                code=code,
+                message=message,
+                remediation_hint=remediation,
             ),
         ),
         metrics=ProgramMetrics(),
@@ -976,6 +1082,7 @@ __all__ = [
     "DeliverySlotValue",
     "DeliveryStyle",
     "DeliveryTarget",
+    "TypedDeliveryError",
     "DeliveryTrack",
     "TypedDeliveryReportCompiler",
     "TypedDeliverySectionCompiler",

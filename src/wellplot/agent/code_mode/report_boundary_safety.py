@@ -45,6 +45,7 @@ class ReportBoundaryAction(_ReportBoundaryModel):
     reason: Literal[
         "explicit_report_intent_missing_capability",
         "explicit_section_only_intent",
+        "unspecified_empty_report_task",
     ]
 
 
@@ -264,6 +265,8 @@ def _remove_report_task(
     plan: SemanticPlan,
     *,
     registry: CapabilityRegistry,
+    intent: ReportBoundaryIntent,
+    reason: Literal["explicit_section_only_intent", "unspecified_empty_report_task"],
 ) -> ReportBoundarySafetyResult:
     """Remove an unrequested report task while preserving all sections."""
     if not plan.section_tasks:
@@ -275,10 +278,10 @@ def _remove_report_task(
     return _validated_repair(
         repaired_plan,
         registry=registry,
-        intent=ReportBoundaryIntent.SECTION_ONLY,
+        intent=intent,
         action=ReportBoundaryAction(
             kind=ReportBoundaryActionKind.REMOVE_REPORT_TASK,
-            reason="explicit_section_only_intent",
+            reason=reason,
         ),
     )
 
@@ -320,7 +323,12 @@ def enforce_report_boundary_safety(
         return _repair_report_capability(plan, intent=intent, registry=registry)
 
     if intent is ReportBoundaryIntent.SECTION_ONLY and report_task is not None:
-        return _remove_report_task(plan, registry=registry)
+        return _remove_report_task(
+            plan,
+            registry=registry,
+            intent=intent,
+            reason="explicit_section_only_intent",
+        )
 
     if (
         intent is ReportBoundaryIntent.UNSPECIFIED
@@ -328,7 +336,12 @@ def enforce_report_boundary_safety(
         and not report_task.capability_ids
         and plan.section_tasks
     ):
-        return _remove_report_task(plan, registry=registry).model_copy(update={"intent": intent})
+        return _remove_report_task(
+            plan,
+            registry=registry,
+            intent=intent,
+            reason="unspecified_empty_report_task",
+        )
 
     return ReportBoundarySafetyResult(
         safe_plan=plan,

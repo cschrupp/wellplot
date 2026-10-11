@@ -73,6 +73,7 @@ class CodeModeWorkerState(TypedDict, total=False):
 
     kind: Literal["report", "section"]
     plan_order: int
+    authoritative_request: str
     report_task: NotRequired[dict[str, Any]]
     report_context: NotRequired[dict[str, Any]]
     section_task: NotRequired[dict[str, Any]]

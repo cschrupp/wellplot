@@ -441,6 +441,7 @@ def test_unspecified_empty_report_task_is_removed_when_sections_remain() -> None
     assert result.safe_plan.report_task is None
     assert result.safe_plan.section_tasks == (section,)
     assert result.actions[0].kind is ReportBoundaryActionKind.REMOVE_REPORT_TASK
+    assert result.actions[0].reason == "unspecified_empty_report_task"
     assert result.intent is ReportBoundaryIntent.UNSPECIFIED
 
 

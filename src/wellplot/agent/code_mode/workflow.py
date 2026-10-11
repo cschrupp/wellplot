@@ -179,6 +179,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     task=ReportTask.model_validate(worker_state["report_task"]),
                     report_context=ReportContext.model_validate(worker_state["report_context"]),
                     document=document,
+                    authoritative_request=worker_state["authoritative_request"],
                     timeout_seconds=worker_state["timeout_seconds"],
                     temperature=worker_state.get("temperature"),
                     max_output_tokens=worker_state.get("max_output_tokens"),
@@ -193,6 +194,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     task_index=0,
                     context=isolated_context,
                     document=document,
+                    authoritative_request=worker_state["authoritative_request"],
                     timeout_seconds=worker_state["timeout_seconds"],
                     temperature=worker_state.get("temperature"),
                     max_output_tokens=worker_state.get("max_output_tokens"),
@@ -339,6 +341,7 @@ def _worker_payload(
         {
             "kind": kind,
             "plan_order": plan_order,
+            "authoritative_request": state["request"],
             "document": state["document"],
             "timeout_seconds": state["timeout_seconds"],
             "temperature": state.get("temperature"),
