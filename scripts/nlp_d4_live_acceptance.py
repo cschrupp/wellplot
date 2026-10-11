@@ -1329,6 +1329,19 @@ def _document_channels(document: Mapping[str, Any]) -> list[str]:
     return channels
 
 
+def _is_actionable_safe_diagnostic(code: str, message: str) -> bool:
+    """Recognize only bounded diagnostics for deterministic safe rejection."""
+    if code in {"enrichment.section_hint_ambiguous", "enrichment.source_missing"}:
+        return True
+    if code == "typed.channel_missing":
+        return True
+    return (
+        code == "program.dry_run_error"
+        and "channel_missing" in message
+        and "no source channel matches 'rt'" in message
+    )
+
+
 def _observed_failure_facts(
     actual: Mapping[str, Any],
     before: Mapping[str, Any],
@@ -1361,14 +1374,7 @@ def _observed_failure_facts(
             continue
         code = str(item.get("code", ""))
         message = str(item.get("message", "")).casefold()
-        if code in {"enrichment.section_hint_ambiguous", "enrichment.source_missing"}:
-            observed_safe_diagnostic = True
-            break
-        if (
-            code == "program.dry_run_error"
-            and "channel_missing" in message
-            and "no source channel matches 'rt'" in message
-        ):
+        if _is_actionable_safe_diagnostic(code, message):
             observed_safe_diagnostic = True
             break
     return {

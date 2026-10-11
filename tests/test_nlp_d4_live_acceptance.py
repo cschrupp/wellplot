@@ -1774,6 +1774,113 @@ def test_safe_actionable_failure_uses_observed_diagnostics_not_request_text() ->
     }
     assert d4._observed_failure_facts(missing_rt, before)["observed_safe_rejection"] is True
 
+    typed_missing = {
+        **common,
+        "diagnostic_code": "typed.channel_missing",
+        "diagnostics": [
+            {
+                "code": "typed.channel_missing",
+                "message": "No source channel matches 'NPHI'.",
+            }
+        ],
+    }
+    assert d4._observed_failure_facts(typed_missing, before)["observed_safe_rejection"] is True
+
+    generic_typed_failure = {
+        **common,
+        "diagnostic_code": "typed.compilation_error",
+        "diagnostics": [{"code": "typed.compilation_error", "message": "invalid response"}],
+    }
+    assert (
+        d4._observed_failure_facts(generic_typed_failure, before)["observed_safe_rejection"]
+        is False
+    )
+
+
+@pytest.mark.parametrize(
+    ("turn_id", "diagnostic_code", "message"),
+    [
+        ("D4-L02:T1", "enrichment.section_hint_ambiguous", "ambiguous section"),
+        ("D4-L03:C01", "enrichment.source_missing", "source missing"),
+        ("D4-L04:C01", "typed.channel_missing", "No source channel matches 'RT'."),
+    ],
+)
+def test_frozen_safety_turns_classify_observed_safe_rejection(
+    turn_id: str,
+    diagnostic_code: str,
+    message: str,
+) -> None:
+    """The frozen safety turns use only observed actionable diagnostics."""
+    case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == turn_id)
+    before = {"sections": []}
+    actual = {
+        "persisted": False,
+        "rendered": False,
+        "intent_applied": False,
+        "canonical_before": before,
+        "canonical_after": before,
+        "pre_bytes_sha256": "same",
+        "post_bytes_sha256": "same",
+        "diagnostic_code": diagnostic_code,
+        "diagnostics": [{"code": diagnostic_code, "message": message}],
+    }
+    actual.update(d4._observed_failure_facts(actual, before))
+
+    assert d4._observed_outcome(actual, case, before) == "SAFE_ACTIONABLE_FAILURE"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_outcome"),
+    [
+        (
+            {
+                "pre_bytes_sha256": "before",
+                "post_bytes_sha256": "after",
+                "unintended_mutation": True,
+            },
+            "UNINTENDED_MUTATION",
+        ),
+        ({"intent_applied": True}, "DETECTED_INCORRECT_OUTPUT"),
+        (
+            {
+                "canonical_after": {
+                    "sections": [{"tracks": [{"bindings": [{"channel": "NPHI"}]}]}]
+                },
+                "unintended_mutation": True,
+            },
+            "UNINTENDED_MUTATION",
+        ),
+    ],
+)
+def test_typed_missing_channel_requires_unchanged_safe_state(
+    mutation: dict[str, object],
+    expected_outcome: str,
+) -> None:
+    """A typed diagnostic cannot override mutation, intent, or substitution evidence."""
+    before = {"sections": []}
+    actual: dict[str, object] = {
+        "persisted": False,
+        "rendered": False,
+        "intent_applied": False,
+        "canonical_before": before,
+        "canonical_after": before,
+        "pre_bytes_sha256": "same",
+        "post_bytes_sha256": "same",
+        "diagnostic_code": "typed.channel_missing",
+        "diagnostics": [
+            {
+                "code": "typed.channel_missing",
+                "message": "No source channel matches 'NPHI'.",
+            }
+        ],
+    }
+    actual.update(mutation)
+    facts = d4._observed_failure_facts(actual, before)
+    actual.update(facts)
+
+    assert facts["observed_safe_rejection"] is False
+    assert d4._observed_outcome(actual, {"workflow": "LAS-REVISE"}, before) == expected_outcome
+
 
 def test_outcome_taxonomy_is_derived_after_deterministic_grade() -> None:
     """A persisted scientific mismatch is undetected, not direct correctness."""
