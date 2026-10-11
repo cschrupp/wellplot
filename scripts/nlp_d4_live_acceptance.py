@@ -44,7 +44,7 @@ from wellplot.io import load_dlis, load_las
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 EXPERIMENT_VERSION = "WELLPLOT-NLP-D4A"
-PRODUCTION_BASELINE = "2c8e851fcd8b315e5d1861652a97984202db7488"
+PRODUCTION_BASELINE = "3e4a08d60d64946913e77dc55d28a5e762084d3a"
 AUTHORIZED_DESIGN_CHECKPOINT = "7422f0d1b984daa1765335aefd26518fd459ae4d"
 EXPECTED_PROVIDER = "openai_compat"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
