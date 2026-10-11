@@ -106,13 +106,13 @@ FROZEN_PRODUCTION_COMPONENT_SHA256 = {
         "1a142cb614409fbeb55ebf77b91714ef8a6be83634f153eac25bf104d8b871da"
     ),
     "src/wellplot/agent/code_mode/capability_safety.py": (
-        "09eaa16eb3b540c785573233092f7650569158a03ce9747d7b4501302a5e8be7"
+        "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568"
     ),
     "src/wellplot/agent/code_mode/report_boundary_safety.py": (
         "86c05471dcbb0f71035ea8eca7eca59cae4f9f9c8665d59d7fe39befe022107f"
     ),
     "src/wellplot/agent/code_mode/section_leaf_safety.py": (
-        "8d7890b9c18e4ffcf8a87f474439ce6da0f07338126ea4052201239b8936347d"
+        "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4"
     ),
     "src/wellplot/agent/code_mode/enrichment.py": (
         "78cfec5e1f704dcd4218ff5047b0d29282ea154ed668b5244f5c6a40d709dd0b"
