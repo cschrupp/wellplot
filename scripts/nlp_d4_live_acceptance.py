@@ -29,6 +29,13 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from wellplot.agent.code_mode.planner import SemanticPlan
+from wellplot.agent.code_mode.typed_delivery import (
+    DeliveryReportResponse,
+    DeliverySectionResponse,
+    TypedDeliveryReportCompiler,
+    TypedDeliverySectionCompiler,
+)
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
@@ -44,7 +51,7 @@ from wellplot.io import load_dlis, load_las
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 EXPERIMENT_VERSION = "WELLPLOT-NLP-D4A"
-PRODUCTION_BASELINE = "3e4a08d60d64946913e77dc55d28a5e762084d3a"
+PRODUCTION_BASELINE = "a850f932bf0d60edd9def7cbe7d1978c099d23f8"
 AUTHORIZED_DESIGN_CHECKPOINT = "7422f0d1b984daa1765335aefd26518fd459ae4d"
 EXPECTED_PROVIDER = "openai_compat"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
@@ -103,13 +110,13 @@ FROZEN_PRODUCTION_COMPONENT_SHA256 = {
         "1e2858b4663996ccacaf1c42979fc62fe988ba7501d6ec63e00911e6cdc86740"
     ),
     "src/wellplot/agent/code_mode/workflow.py": (
-        "1a142cb614409fbeb55ebf77b91714ef8a6be83634f153eac25bf104d8b871da"
+        "2d4c0ead84c9ff2336decc3dc22e1af7c5a8eb9e9a50f6e66a99a65ad394fa52"
     ),
     "src/wellplot/agent/code_mode/capability_safety.py": (
         "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568"
     ),
     "src/wellplot/agent/code_mode/report_boundary_safety.py": (
-        "86c05471dcbb0f71035ea8eca7eca59cae4f9f9c8665d59d7fe39befe022107f"
+        "cc94431bdc9c0d8b7e582de4f931aabf3bd4bea61bbd847051658abf86135c46"
     ),
     "src/wellplot/agent/code_mode/section_leaf_safety.py": (
         "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4"
@@ -118,10 +125,10 @@ FROZEN_PRODUCTION_COMPONENT_SHA256 = {
         "78cfec5e1f704dcd4218ff5047b0d29282ea154ed668b5244f5c6a40d709dd0b"
     ),
     "src/wellplot/agent/code_mode/report_worker.py": (
-        "2048c9c7b0c4a63377daee6911a3b249b503d886c5981d144997d3d0534f463a"
+        "ec1eca740df5218a7a2f204425dfe69e5ba00e3db62392c3852426b2f89d2723"
     ),
     "src/wellplot/agent/code_mode/program_worker.py": (
-        "52fe50ba7a18af0f9efd30d76068572f831076d35682e909692f64de488b3f86"
+        "f3e7876693f9da2cc02d396c6f0f958ae4cf2c588480076177b90aecc8efaac7"
     ),
     "src/wellplot/agent/code_mode/repair.py": (
         "c1470b491c442b5e743a0421a49046cccf8e3f12635293c40b44ff0864a53804"
@@ -145,7 +152,7 @@ FROZEN_PRODUCTION_COMPONENT_SHA256 = {
         "41a0589c909d48eba3117ac4984b86b3d6eff1e4bebe32eb9e031f3db186cb33"
     ),
     "src/wellplot/agent/direct_notebook.py": (
-        "6a4915ee395a599cf5fc74df151bc8ea025990b5b3fdf003cf9fe8b3624a44cc"
+        "9dbb4182ac73897e028bd6b24bd7cd5a05638737099130944f7548709980827d"
     ),
     "src/wellplot/authoring.py": (
         "0c6c0d04c6d71fcc07c7fa6d130c1ff9e026fbd7ae8dc1bb463d50d009caa99b"
@@ -345,6 +352,7 @@ class LogicalCall:
 
     index: int
     operation: str
+    generation_role: str
     provider: str
     model: str
     temperature: float | None
@@ -395,16 +403,42 @@ class CountingBackend:
         elif self.ledger.max_calls != self.max_calls:
             raise ValueError("counting backend and logical-call ledger caps must match")
 
-    def _before(self, operation: str, request: object) -> int:
+    @staticmethod
+    def _generation_role(operation: str, response_model: type[Any] | None) -> str:
+        """Map structured response models to bounded semantic worker roles."""
+        if operation != "structured":
+            raise PreflightError("program generation is forbidden for the typed D4 harness")
+        roles = {
+            SemanticPlan: "planner",
+            DeliveryReportResponse: "report_worker",
+            DeliverySectionResponse: "section_worker",
+        }
+        try:
+            return roles[response_model]
+        except KeyError:
+            raise PreflightError("unrecognized structured generation role") from None
+
+    @staticmethod
+    def _validate_controls(request: object, generation_role: str) -> None:
+        """Attest controls emitted by the accepted planner and typed workers."""
+        expected = (0.0, None) if generation_role == "planner" else (None, None)
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
+        if (temperature, max_output_tokens) != expected:
+            raise PreflightError(f"{generation_role} request controls drifted")
+
+    def _before(
+        self,
+        operation: str,
+        request: object,
+        *,
+        generation_role: str,
+    ) -> int:
         if operation not in {"structured", "program"}:
             raise ValueError(f"unsupported operation: {operation}")
-        if operation == "structured":
-            if temperature != 0.0 or max_output_tokens is not None:
-                raise PreflightError("planner request controls drifted")
-        elif temperature is not None or max_output_tokens is not None:
-            raise PreflightError("worker request controls drifted")
+        temperature = getattr(request, "temperature", None)
+        max_output_tokens = getattr(request, "max_output_tokens", None)
+        self._validate_controls(request, generation_role)
         if self.prompt_guard is not None:
             prompt = getattr(request, "user_prompt", None)
             if not isinstance(prompt, str):
@@ -418,6 +452,7 @@ class CountingBackend:
                     "event": "logical_call_started",
                     "index": index,
                     "operation": operation,
+                    "generation_role": generation_role,
                     "provider": self.provider,
                     "model": self.model,
                     "temperature": temperature,
@@ -431,6 +466,7 @@ class CountingBackend:
         *,
         index: int,
         operation: str,
+        generation_role: str,
         request: object,
         outcome: str,
         category: str | None,
@@ -439,6 +475,7 @@ class CountingBackend:
         call = LogicalCall(
             index=index,
             operation=operation,
+            generation_role=generation_role,
             provider=self.provider,
             model=self.model,
             temperature=getattr(request, "temperature", None),
@@ -454,6 +491,7 @@ class CountingBackend:
                     "event": "logical_call_completed",
                     "index": call.index,
                     "operation": call.operation,
+                    "generation_role": call.generation_role,
                     "provider": call.provider,
                     "model": call.model,
                     "temperature": call.temperature,
@@ -471,7 +509,12 @@ class CountingBackend:
         response_model: type[Any],
     ) -> StructuredGenerationResult[Any]:
         """Delegate one structured call and record only bounded metadata."""
-        index = self._before("structured", request)
+        generation_role = self._generation_role("structured", response_model)
+        index = self._before(
+            "structured",
+            request,
+            generation_role=generation_role,
+        )
         try:
             result = await self.delegate.generate_structured(
                 request,
@@ -481,6 +524,7 @@ class CountingBackend:
             self._record(
                 index=index,
                 operation="structured",
+                generation_role=generation_role,
                 request=request,
                 outcome="failure",
                 category=error.category.value,
@@ -491,6 +535,7 @@ class CountingBackend:
             self._record(
                 index=index,
                 operation="structured",
+                generation_role=generation_role,
                 request=request,
                 outcome="failure",
                 category=ProviderFailureCategory.INVALID_RESPONSE.value,
@@ -500,6 +545,7 @@ class CountingBackend:
         self._record(
             index=index,
             operation="structured",
+            generation_role=generation_role,
             request=request,
             outcome="success",
             category=None,
@@ -511,39 +557,9 @@ class CountingBackend:
         self,
         request: ProgramGenerationRequest,
     ) -> ProgramGenerationResult:
-        """Delegate one program call and retain no generated source text."""
-        index = self._before("program", request)
-        try:
-            result = await self.delegate.generate_program(request)
-        except ProviderRequestError as error:
-            self._record(
-                index=index,
-                operation="program",
-                request=request,
-                outcome="failure",
-                category=error.category.value,
-                metrics=None,
-            )
-            raise
-        except Exception:
-            self._record(
-                index=index,
-                operation="program",
-                request=request,
-                outcome="failure",
-                category=ProviderFailureCategory.INVALID_RESPONSE.value,
-                metrics=None,
-            )
-            raise
-        self._record(
-            index=index,
-            operation="program",
-            request=request,
-            outcome="success",
-            category=None,
-            metrics=result.metrics,
-        )
-        return result
+        """Reject legacy program generation before any delegation or call reservation."""
+        del request
+        raise PreflightError("program generation is forbidden for the typed D4 harness")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1450,6 +1466,9 @@ def _campaign_turn_row(
     logical_calls = len(observed_calls)
     structured_calls = sum(call.operation == "structured" for call in observed_calls)
     program_calls = sum(call.operation == "program" for call in observed_calls)
+    planner_calls = sum(call.generation_role == "planner" for call in observed_calls)
+    report_worker_calls = sum(call.generation_role == "report_worker" for call in observed_calls)
+    section_worker_calls = sum(call.generation_role == "section_worker" for call in observed_calls)
     verifier_requirements = grade.get("verifier_requirements", [])
     if not isinstance(verifier_requirements, list):
         verifier_requirements = []
@@ -1492,6 +1511,9 @@ def _campaign_turn_row(
         "logical_generation_calls": logical_calls,
         "structured_logical_calls": structured_calls,
         "program_logical_calls": program_calls,
+        "planner_logical_calls": planner_calls,
+        "report_worker_logical_calls": report_worker_calls,
+        "section_worker_logical_calls": section_worker_calls,
         "worker_repair_count": int(actual.get("worker_repair_count", 0)),
         "turn_duration_seconds": round(duration_seconds, 6),
         "render_duration_seconds": round(float(actual.get("render_duration_seconds", 0.0)), 6),
@@ -1523,8 +1545,6 @@ def build_notebook_session(
     from wellplot.agent.code_mode.enrichment import SemanticEnricher
     from wellplot.agent.code_mode.facade import CodeModeCompileFacade
     from wellplot.agent.code_mode.planner import SemanticPlanner
-    from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
-    from wellplot.agent.code_mode.report_worker import ReportProgramCompiler
     from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
     from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
     from wellplot.agent.session import AgentSession, AgentSessionConfig
@@ -1537,8 +1557,8 @@ def build_notebook_session(
             loader=LogfileSourceLoader(),
             allowed_roots={"server": server_root},
         ),
-        report_compiler=ReportProgramCompiler(backend=backend, registry=registry),
-        section_compiler=ProgramSectionCompiler(backend=backend, registry=registry),
+        report_compiler=TypedDeliveryReportCompiler(backend=backend),
+        section_compiler=TypedDeliverySectionCompiler(backend=backend),
     )
     return DirectNotebookSession(
         session=AgentSession(

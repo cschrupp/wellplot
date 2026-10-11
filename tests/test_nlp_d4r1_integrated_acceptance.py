@@ -492,8 +492,15 @@ class _D4R1Backend:
 class _D4R1CountingBackend(d4.CountingBackend):
     """Count planner and typed-worker calls without legacy control assumptions."""
 
-    def _before(self, operation: str, request: object) -> int:
+    def _before(
+        self,
+        operation: str,
+        request: object,
+        *,
+        generation_role: str,
+    ) -> int:
         """Reserve and attest every typed boundary call uniformly."""
+        self._validate_controls(request, generation_role)
         if operation not in {"structured", "program"}:
             raise ValueError(f"unsupported operation: {operation}")
         if self.prompt_guard is not None:
@@ -509,6 +516,7 @@ class _D4R1CountingBackend(d4.CountingBackend):
                     "event": "logical_call_started",
                     "index": index,
                     "operation": operation,
+                    "generation_role": generation_role,
                     "provider": self.provider,
                     "model": self.model,
                     "temperature": getattr(request, "temperature", None),

@@ -17,15 +17,16 @@ import yaml
 from pydantic import BaseModel
 from scripts import nlp_d4_live_acceptance as d4
 from tests._mcp_fixtures import REPO_ROOT
+from tests.test_nlp_d4r1_integrated_acceptance import (
+    _cbl_report_response,
+    _section_response,
+)
 
-from wellplot.agent.code_mode.enrichment import SemanticEnricher
-from wellplot.agent.code_mode.facade import CodeModeCompileFacade
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan, SemanticPlanner
-from wellplot.agent.code_mode.program_worker import ProgramSectionCompiler
-from wellplot.agent.code_mode.report_worker import ReportProgramCompiler
-from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
-from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
-from wellplot.agent.direct_notebook import DirectNotebookSession
+from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.typed_delivery import (
+    DeliveryReportResponse,
+    DeliverySectionResponse,
+)
 from wellplot.agent.providers.base import (
     ProgramGenerationRequest,
     ProgramGenerationResult,
@@ -35,12 +36,10 @@ from wellplot.agent.providers.base import (
 )
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 from wellplot.agent.providers.response_diagnostics import StructuredResponseProviderError
-from wellplot.agent.session import AgentSession, AgentSessionConfig
 from wellplot.authoring import (
     _fill_element,
     authoring_document_to_logfile_mapping,
 )
-from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 
@@ -118,6 +117,17 @@ def _structured_request() -> StructuredGenerationRequest:
         user_prompt="user",
         timeout_seconds=120.0,
         temperature=0.0,
+        max_output_tokens=None,
+    )
+
+
+def _worker_structured_request() -> StructuredGenerationRequest:
+    """Build the controls emitted by the accepted typed-worker route."""
+    return StructuredGenerationRequest(
+        system_prompt="system",
+        user_prompt="user",
+        timeout_seconds=120.0,
+        temperature=None,
         max_output_tokens=None,
     )
 
@@ -1053,17 +1063,22 @@ def test_live_cli_requires_explicit_d4b_authorization(
 
 
 def test_counting_backend_preserves_controls_and_records_bounded_metadata() -> None:
-    """Record logical calls without retaining provider payloads."""
+    """Record role-aware controls without retaining provider payloads."""
     delegate = _Backend()
     backend = d4.CountingBackend(delegate=delegate)
 
     async def run() -> None:
-        await backend.generate_structured(_structured_request(), response_model=_Value)
-        await backend.generate_program(_program_request())
+        await backend.generate_structured(_structured_request(), response_model=SemanticPlan)
+        await backend.generate_structured(
+            _worker_structured_request(), response_model=DeliveryReportResponse
+        )
+        with pytest.raises(d4.PreflightError, match="program generation"):
+            await backend.generate_program(_program_request())
 
     asyncio.run(run())
     assert delegate.calls == 2
-    assert [call.operation for call in backend.calls] == ["structured", "program"]
+    assert [call.operation for call in backend.calls] == ["structured", "structured"]
+    assert [call.generation_role for call in backend.calls] == ["planner", "report_worker"]
     assert backend.calls[0].metrics == {
         "input_tokens": 2,
         "output_tokens": 3,
@@ -1071,7 +1086,32 @@ def test_counting_backend_preserves_controls_and_records_bounded_metadata() -> N
         "latency_ms": None,
     }
     assert not hasattr(backend.calls[0], "raw_provider_response")
-    assert not hasattr(backend.calls[1], "raw_generated_program")
+    assert not hasattr(backend.calls[1], "raw_structured_payload")
+
+
+def test_counting_backend_rejects_role_control_drift_before_delegation() -> None:
+    """Planner and typed-worker controls are attested independently."""
+    planner_delegate = _Backend()
+    planner_backend = d4.CountingBackend(delegate=planner_delegate)
+    with pytest.raises(d4.PreflightError, match="planner request controls"):
+        asyncio.run(
+            planner_backend.generate_structured(
+                replace(_structured_request(), temperature=0.2),
+                response_model=SemanticPlan,
+            )
+        )
+    assert planner_delegate.calls == 0
+
+    worker_delegate = _Backend()
+    worker_backend = d4.CountingBackend(delegate=worker_delegate)
+    with pytest.raises(d4.PreflightError, match="report_worker request controls"):
+        asyncio.run(
+            worker_backend.generate_structured(
+                replace(_worker_structured_request(), max_output_tokens=128),
+                response_model=DeliveryReportResponse,
+            )
+        )
+    assert worker_delegate.calls == 0
 
 
 def test_call_46_is_rejected_before_delegation() -> None:
@@ -1081,9 +1121,17 @@ def test_call_46_is_rejected_before_delegation() -> None:
 
     async def run() -> None:
         for _ in range(d4.MAX_LOGICAL_CALLS):
-            await backend.generate_structured(_structured_request(), response_model=_Value)
+            if _ % 2:
+                request = _worker_structured_request()
+                response_model = DeliveryReportResponse
+            else:
+                request = _structured_request()
+                response_model = SemanticPlan
+            await backend.generate_structured(request, response_model=response_model)
         with pytest.raises(d4.CallCapExceeded):
-            await backend.generate_structured(_structured_request(), response_model=_Value)
+            await backend.generate_structured(
+                _worker_structured_request(), response_model=DeliverySectionResponse
+            )
 
     asyncio.run(run())
     assert delegate.calls == d4.MAX_LOGICAL_CALLS
@@ -1126,7 +1174,7 @@ def test_counting_backend_reserves_unique_indexes_under_concurrent_calls() -> No
         )
         tasks = [
             asyncio.create_task(
-                backend.generate_structured(_structured_request(), response_model=_Value)
+                backend.generate_structured(_structured_request(), response_model=SemanticPlan)
             )
             for backend in (*backends, backends[0])
         ]
@@ -1171,7 +1219,7 @@ def test_campaign_custody_persists_calls_and_writes_bounded_jsonl() -> None:
         )
 
         async def run() -> None:
-            await backend.generate_structured(_structured_request(), response_model=_Value)
+            await backend.generate_structured(_structured_request(), response_model=SemanticPlan)
 
         asyncio.run(run())
         persisted = json.loads(state_path.read_text(encoding="utf-8"))
@@ -1374,6 +1422,39 @@ class _D4SessionPlanner:
         """Map each frozen LAS request to its bounded production work unit."""
         self.calls.append(kwargs)
         request = str(kwargs["request"])
+        if request.startswith("Using CBL_Main.dlis"):
+            section_capabilities = (
+                "section.log_plot",
+                "track.normal",
+                "track.reference",
+                "track.array",
+                "binding.curve",
+                "binding.raster",
+            )
+            return SemanticPlan(
+                summary="Reconstruct the bounded CBL packet.",
+                report_task=ReportTask(
+                    goal="Populate the supported CBL report metadata.",
+                    capability_ids=("report.standard",),
+                    requirements=(request,),
+                ),
+                section_tasks=(
+                    SectionTask(
+                        goal="Reconstruct the main CBL pass.",
+                        capability_ids=section_capabilities,
+                        existing_section_hint="Main Pass",
+                        source_hints=("CBL_Main.dlis",),
+                        requirements=(request,),
+                    ),
+                    SectionTask(
+                        goal="Reconstruct the repeat CBL pass.",
+                        capability_ids=section_capabilities,
+                        existing_section_hint="Repeat Pass",
+                        source_hints=("CBL_Repeat.dlis",),
+                        requirements=(request,),
+                    ),
+                ),
+            )
         if request.startswith("Rename this report"):
             return SemanticPlan(
                 summary="D4 report title revision",
@@ -1381,14 +1462,6 @@ class _D4SessionPlanner:
                     goal="Rename the report.",
                     capability_ids=("report.standard",),
                     requirements=(request,),
-                ),
-                section_tasks=(
-                    SectionTask(
-                        goal="Preserve the plotted sections.",
-                        capability_ids=("section.log_plot",),
-                        existing_section_hint="Main Log",
-                        requirements=("Preserve the plotted sections.",),
-                    ),
                 ),
             )
         section_hint = "Main Log – Upper" if "Main Log – Upper" in request else "Main Log"
@@ -1450,100 +1523,78 @@ class _D4PlannerBackend:
 
 @dataclass
 class _D4SessionReportBackend:
-    """Emit the deterministic D4 title operation through ReportProgramCompiler."""
+    """Emit deterministic typed report responses for the frozen D4 turns."""
 
-    async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
-        """Return only the report title operation required by D4-L01:T1."""
-        del request
-        return ProgramGenerationResult(
-            text='report = wp.report(title="Formation Integrity Review")\n',
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[DeliveryReportResponse],
+    ) -> StructuredGenerationResult[DeliveryReportResponse]:
+        """Return only the typed report fields required by the D4 turn."""
+        payload = json.loads(request.user_prompt)
+        authoritative_request = str(payload["authoritative_request"])
+        if authoritative_request.startswith("Rename this report"):
+            value = DeliveryReportResponse(title="Formation Integrity Review")
+        else:
+            value = _cbl_report_response(payload)
+        return StructuredGenerationResult(
+            value=response_model.model_validate(value),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
 
 
 @dataclass
 class _D4SessionSectionBackend:
-    """Emit deterministic section programs after inspecting real worker context."""
+    """Emit deterministic typed section responses from worker context."""
 
-    @staticmethod
-    def _payload(request: ProgramGenerationRequest) -> dict[str, object]:
-        """Decode the production worker's bounded JSON context."""
-        payload_start = request.user_prompt.index('{"capabilities":')
-        payload = json.loads(request.user_prompt[payload_start:])
-        assert isinstance(payload, dict)
-        return payload
-
-    async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
-        """Return one deterministic program for the requested LAS turn."""
-        payload = self._payload(request)
-        task = payload["section_task"]
-        assert isinstance(task, dict)
-        requirement = str(task["requirements"][0])
-        context = payload["section_context"]
-        assert isinstance(context, dict)
-        sources = context["sources"]
-        assert isinstance(sources, list) and sources
-        source_channels = {
-            channel["mnemonic"] for source in sources for channel in source["channels"]
-        }
-        if requirement == "Preserve the plotted sections.":
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "wp.update_section(section, title='Main Log')\n"
-            )
-        elif "set the Gamma Ray curve to a linear 5–125" in requirement:
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "track = wp.target_track(section, track_id='gr')\n"
-                "curve = wp.target_curve(track, binding_id='main.gr.GR.1')\n"
-                "wp.update_curve(track, curve, scale_minimum=5, scale_maximum=125, "
-                "scale_kind='linear', reverse=False)\n"
-            )
-        elif "Append a 30 mm normal track" in requirement:
-            assert "ILD" in source_channels
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "track = wp.track(section, id_hint='resistivity_qc', kind='normal', "
-                "title='Resistivity QC', width_mm=30)\n"
-                "wp.curve(track, channel='ILD', label='Resistivity QC', "
-                "scale_minimum=0.2, scale_maximum=2000, scale_kind='log', reverse=False)\n"
-            )
-        elif "fill from the Gamma Ray curve" in requirement:
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "track = wp.target_track(section, track_id='gr')\n"
-                "curve = wp.target_curve(track, binding_id='main.gr.GR.1')\n"
-                "wp.fill(track, curve, kind='to_lower_limit', id_hint='gr_fill', "
-                "color='#f2e8a0', alpha=0.2)\n"
-            )
-        elif "Apply that 20–110" in requirement:
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "track = wp.target_track(section, track_id='gr')\n"
-                "curve = wp.target_curve(track, binding_id='main.gr.GR.1')\n"
-                "wp.update_curve(track, curve, scale_minimum=20, scale_maximum=110, "
-                "scale_kind='linear', reverse=False)\n"
-            )
-        else:
-            assert "RT" in requirement
-            assert "RT" not in source_channels
-            program = (
-                "report = wp.report()\n"
-                "section = wp.target_section(report)\n"
-                "track = wp.track(section, kind='normal', title='Resistivity Alias QC', "
-                "width_mm=24)\n"
-                "wp.curve(track, channel='RT', label='Resistivity Alias QC', "
-                "scale_minimum=0.2, scale_maximum=2000, scale_kind='log', reverse=False)\n"
-            )
-        return ProgramGenerationResult(
-            text=program,
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[DeliverySectionResponse],
+    ) -> StructuredGenerationResult[DeliverySectionResponse]:
+        """Return one typed section response for the requested D4 turn."""
+        payload = json.loads(request.user_prompt)
+        requirement = str(payload["authoritative_request"])
+        value = _section_response(requirement, payload)
+        return StructuredGenerationResult(
+            value=response_model.model_validate(value),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
+
+
+@dataclass
+class _D4SessionBackend:
+    """Route all deterministic D4 structured responses through one backend."""
+
+    planner: _D4PlannerBackend
+    report: _D4SessionReportBackend
+    section: _D4SessionSectionBackend
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[object],
+    ) -> StructuredGenerationResult[object]:
+        """Select the typed fixture response by the production response model."""
+        if response_model is SemanticPlan:
+            return await self.planner.generate_structured(request, response_model=SemanticPlan)
+        if response_model is DeliveryReportResponse:
+            return await self.report.generate_structured(
+                request, response_model=DeliveryReportResponse
+            )
+        if response_model is DeliverySectionResponse:
+            return await self.section.generate_structured(
+                request, response_model=DeliverySectionResponse
+            )
+        raise AssertionError(f"unexpected D4 response model: {response_model!r}")
+
+    async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
+        """Fail if the aligned D4 route attempts legacy program generation."""
+        del request
+        raise AssertionError("D4 typed harness must not call generate_program")
 
 
 @dataclass
@@ -1560,49 +1611,27 @@ class _D4SessionHarness:
         calls: list[d4.LogicalCall] = []
         ledger = d4.LogicalCallLedger()
         planner = _D4SessionPlanner(calls=[])
-        planner_backend = d4.CountingBackend(
-            delegate=_D4PlannerBackend(planner),
-            provider="deterministic",
-            model="d4-rehearsal-model",
-            calls=calls,
-            ledger=ledger,
-        )
-        report_backend = d4.CountingBackend(
-            delegate=_D4SessionReportBackend(),
-            provider="deterministic",
-            model="d4-rehearsal-model",
-            calls=calls,
-            ledger=ledger,
-        )
-        section_backend = d4.CountingBackend(
-            delegate=_D4SessionSectionBackend(),
-            provider="deterministic",
-            model="d4-rehearsal-model",
-            calls=calls,
-            ledger=ledger,
-        )
-        registry = create_builtin_registry()
-        dependencies = CodeModeGraphDependencies(
-            planner=SemanticPlanner(backend=planner_backend, registry=registry),
-            enricher=SemanticEnricher(
-                loader=LogfileSourceLoader(),
-                allowed_roots={"server": root},
-            ),
-            report_compiler=ReportProgramCompiler(backend=report_backend, registry=registry),
-            section_compiler=ProgramSectionCompiler(backend=section_backend, registry=registry),
-        )
-        session = DirectNotebookSession(
-            session=AgentSession(
-                compiler=CodeModeCompileFacade(dependencies),
-                config=AgentSessionConfig(timeout_seconds=10.0),
+        counted = d4.CountingBackend(
+            delegate=_D4SessionBackend(
+                planner=_D4PlannerBackend(planner),
+                report=_D4SessionReportBackend(),
+                section=_D4SessionSectionBackend(),
             ),
             provider="deterministic",
             model="d4-rehearsal-model",
+            calls=calls,
+            ledger=ledger,
+        )
+        session = d4.build_notebook_session(
+            backend=counted,
+            provider="deterministic",
+            model="d4-rehearsal-model",
+            server_root=REPO_ROOT,
             credential_source="none",
-            server_root=root,
+            timeout=10.0,
         )
         call_source = d4.CampaignCallSource(
-            backends=(planner_backend, report_backend, section_backend),
+            backends=(counted,),
             calls=calls,
             ledger=ledger,
         )
@@ -1970,7 +1999,6 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
         session_harness = _D4SessionHarness.create(root)
         adapter = session_harness.adapter
         adapter.source_path = source_path
-        adapter.cbl_artifact_path = _build_rehearsal_cbl_artifact(root)
 
         result = asyncio.run(
             d4.run_campaign(
@@ -2023,18 +2051,42 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     assert cbl_row["starting_artifact_sha256"] is not None
     assert cbl_row["ending_artifact_sha256"] is not None
     assert state_status == "COMPLETED"
-    assert result["logical_generation_calls"] == 16
-    assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 16
-    assert sum(row.get("event") == "logical_call_completed" for row in journal_rows) == 16
+    assert result["logical_generation_calls"] == 18
+    assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 18
+    assert sum(row.get("event") == "logical_call_completed" for row in journal_rows) == 18
     started_indexes = [
         row["index"] for row in journal_rows if row.get("event") == "logical_call_started"
     ]
     completed_indexes = [
         row["index"] for row in journal_rows if row.get("event") == "logical_call_completed"
     ]
-    assert started_indexes == list(range(1, 17))
-    assert sorted(completed_indexes) == list(range(1, 17))
-    assert len(set(completed_indexes)) == 16
+    assert started_indexes == list(range(1, 19))
+    assert sorted(completed_indexes) == list(range(1, 19))
+    assert len(set(completed_indexes)) == 18
+    assert (
+        sum(
+            row.get("generation_role") == "planner"
+            for row in journal_rows
+            if row.get("event") == "logical_call_started"
+        )
+        == 9
+    )
+    assert (
+        sum(
+            row.get("generation_role") == "report_worker"
+            for row in journal_rows
+            if row.get("event") == "logical_call_started"
+        )
+        == 2
+    )
+    assert (
+        sum(
+            row.get("generation_role") == "section_worker"
+            for row in journal_rows
+            if row.get("event") == "logical_call_started"
+        )
+        == 7
+    )
     assert sum("turn_id" in row for row in journal_rows) == 9
     assert journal_rows[-1]["event"] == "campaign_terminal"
     assert all("raw_generated_program" not in row for row in journal_rows)
