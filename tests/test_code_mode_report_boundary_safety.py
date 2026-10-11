@@ -403,7 +403,7 @@ def test_cm59a_correct_display_plans_are_no_ops(
     assert result.safe_plan == plan
 
 
-def test_report_boundary_policy_is_v2() -> None:
+def test_report_boundary_policy_is_v3() -> None:
     """New report-boundary evidence identifies the revised policy."""
     plan = _plan(section_tasks=(_section_task("section.log_plot", "track.normal"),))
     result = enforce_report_boundary_safety(
@@ -411,8 +411,8 @@ def test_report_boundary_policy_is_v2() -> None:
         plan=plan,
         registry=REGISTRY,
     )
-    assert result.policy_version == "cm58.report-boundary.v2"
-    assert result.evidence().policy_version == "cm58.report-boundary.v2"
+    assert result.policy_version == "cm58.report-boundary.v3"
+    assert result.evidence().policy_version == "cm58.report-boundary.v3"
 
 
 def test_section_only_report_removal_would_empty_plan_fails() -> None:
@@ -427,15 +427,33 @@ def test_section_only_report_removal_would_empty_plan_fails() -> None:
     assert failure.value.code == "report_removal_would_empty_plan"
 
 
-def test_unspecified_empty_report_task_fails_without_guessing() -> None:
-    """An empty report task is ambiguous when request intent is unspecified."""
-    with pytest.raises(ReportBoundarySafetyFailure) as failure:
-        enforce_report_boundary_safety(
-            request="Make the requested changes.",
-            plan=_plan(report_task=ReportTask(goal="unclear report")),
-            registry=REGISTRY,
-        )
-    assert failure.value.code == "empty_report_task_with_unspecified_intent"
+def test_unspecified_empty_report_task_is_removed_when_sections_remain() -> None:
+    """An empty report task cannot suppress valid section work."""
+    section = _section_task("section.log_plot", "track.normal")
+    result = enforce_report_boundary_safety(
+        request="Make the requested changes.",
+        plan=_plan(
+            report_task=ReportTask(goal="unclear report"),
+            section_tasks=(section,),
+        ),
+        registry=REGISTRY,
+    )
+    assert result.safe_plan.report_task is None
+    assert result.safe_plan.section_tasks == (section,)
+    assert result.actions[0].kind is ReportBoundaryActionKind.REMOVE_REPORT_TASK
+    assert result.intent is ReportBoundaryIntent.UNSPECIFIED
+
+
+@pytest.mark.parametrize(
+    "request_text",
+    [
+        'Rename this report "Formation Integrity Review". Do not alter the plotted sections.',
+        'Set the report title to "Formation Integrity Review" and preserve all existing plots.',
+    ],
+)
+def test_negative_section_preservation_is_report_only(request_text: str) -> None:
+    """Preservation language does not create positive section intent."""
+    assert classify_report_boundary_intent(request_text) is ReportBoundaryIntent.REPORT_ONLY
 
 
 def test_unspecified_valid_report_task_passes() -> None:

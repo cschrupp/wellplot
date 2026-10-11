@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from ...capabilities import CapabilityRegistry
 from .planner import PlannerSemanticError, SemanticPlan, validate_semantic_plan
 
-REPORT_BOUNDARY_POLICY_VERSION = "cm58.report-boundary.v2"
+REPORT_BOUNDARY_POLICY_VERSION = "cm58.report-boundary.v3"
 _REPORT_CAPABILITY = "report.standard"
 
 
@@ -168,6 +168,7 @@ def classify_report_boundary_intent(request: str) -> ReportBoundaryIntent:
     section_requested = any(
         _contains_signal(text, signal) for signal in (*_SECTION_SIGNALS, *_SECTION_DISPLAY_SIGNALS)
     )
+    section_requested = section_requested and not _only_preserves_sections(text)
     if report_requested and section_requested:
         return ReportBoundaryIntent.MIXED
     if report_requested:
@@ -175,6 +176,22 @@ def classify_report_boundary_intent(request: str) -> ReportBoundaryIntent:
     if section_requested:
         return ReportBoundaryIntent.SECTION_ONLY
     return ReportBoundaryIntent.UNSPECIFIED
+
+
+def _only_preserves_sections(text: str) -> bool:
+    """Exclude section words used solely by an explicit preservation clause."""
+    preservation_pattern = (
+        r"\b(?:do not|don't|dont|without|preserve|leave)\b"
+        r"[^.?!;]*\b(?:section|sections|plot|plots)\b"
+    )
+    preservation = re.search(preservation_pattern, text)
+    if preservation is None:
+        return False
+    positive_section = re.sub(preservation_pattern, " ", text)
+    return not any(
+        _contains_signal(positive_section, signal)
+        for signal in (*_SECTION_SIGNALS, *_SECTION_DISPLAY_SIGNALS)
+    )
 
 
 def _repair_report_capability(
@@ -272,7 +289,7 @@ def enforce_report_boundary_safety(
     plan: SemanticPlan,
     registry: CapabilityRegistry,
 ) -> ReportBoundarySafetyResult:
-    """Enforce v2 report-boundary admissibility before semantic enrichment."""
+    """Enforce v3 report-boundary admissibility before semantic enrichment."""
     intent = classify_report_boundary_intent(request)
     report_task = plan.report_task
 
@@ -309,11 +326,9 @@ def enforce_report_boundary_safety(
         intent is ReportBoundaryIntent.UNSPECIFIED
         and report_task is not None
         and not report_task.capability_ids
+        and plan.section_tasks
     ):
-        raise ReportBoundarySafetyFailure(
-            "empty_report_task_with_unspecified_intent",
-            "An empty report task cannot be resolved without explicit report intent.",
-        )
+        return _remove_report_task(plan, registry=registry).model_copy(update={"intent": intent})
 
     return ReportBoundarySafetyResult(
         safe_plan=plan,

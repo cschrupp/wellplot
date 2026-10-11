@@ -19,9 +19,11 @@ from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import LoadedSource, SemanticEnricher
 from .code_mode.facade import CodeModeCompileFacade
 from .code_mode.planner import SemanticPlanner
-from .code_mode.program_worker import ProgramSectionCompiler
-from .code_mode.report_worker import ReportProgramCompiler
 from .code_mode.source_loader import LogfileSourceLoader
+from .code_mode.typed_delivery import (
+    TypedDeliveryReportCompiler,
+    TypedDeliverySectionCompiler,
+)
 from .code_mode.workflow import CodeModeGraphDependencies
 from .core import AuthoringResult, AuthoringRunState, AuthoringUserReport
 from .providers._v2_client import is_loopback_url, load_api_key, load_async_openai_client
@@ -243,8 +245,8 @@ def _build_agent_session(
             loader=LogfileSourceLoader(),
             allowed_roots={"server": root},
         ),
-        report_compiler=ReportProgramCompiler(backend=backend, registry=registry),
-        section_compiler=ProgramSectionCompiler(backend=backend, registry=registry),
+        report_compiler=TypedDeliveryReportCompiler(backend=backend),
+        section_compiler=TypedDeliverySectionCompiler(backend=backend),
     )
     return (
         AgentSession(

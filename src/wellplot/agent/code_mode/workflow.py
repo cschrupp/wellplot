@@ -31,9 +31,7 @@ from .planner import (
     SemanticPlan,
     SemanticPlanner,
 )
-from .program_worker import ProgramSectionCompiler
 from .report_boundary_safety import enforce_report_boundary_safety
-from .report_worker import ReportProgramCompiler
 from .section_leaf_safety import enforce_section_leaf_safety
 from .state import CodeModeGraphState, CodeModeWorkerState, WorkerOutcome
 
@@ -44,8 +42,11 @@ class CodeModeGraphDependencies:
 
     planner: SemanticPlanner
     enricher: SemanticEnricher
-    report_compiler: ReportProgramCompiler
-    section_compiler: ProgramSectionCompiler
+    # The default notebook route supplies typed delivery compilers.  The
+    # historical program compilers remain accepted here for compatibility with
+    # the frozen D0-D3 provider-free tests and research fixtures.
+    report_compiler: object
+    section_compiler: object
 
 
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
@@ -212,11 +213,15 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             )
             return _outcome_state(outcome)
 
+        intent_fragment = getattr(result, "intent_fragment", None)
+        if intent_fragment is None and result.success:
+            artifact = getattr(result, "artifact", None)
+            intent_fragment = None if artifact is None else artifact.intent_fragment
         outcome = WorkerOutcome(
             kind=kind,
             plan_order=plan_order,
             success=result.success,
-            intent_fragment=(result.artifact.intent_fragment if result.success else None),
+            intent_fragment=intent_fragment if result.success else None,
             diagnostics=result.diagnostics,
             metrics=result.metrics,
         )
@@ -418,8 +423,6 @@ def _validate_fragment_boundaries(outcomes: Iterable[WorkerOutcome]) -> None:
             ):
                 raise ValueError("Report worker emitted section or child intent.")
         else:
-            if fragment.sections is None or len(fragment.sections) != 1:
-                raise ValueError("Section worker must emit exactly one section fragment.")
             if (
                 any(
                     getattr(fragment, name) is not None
@@ -432,16 +435,29 @@ def _validate_fragment_boundaries(outcomes: Iterable[WorkerOutcome]) -> None:
                         "header",
                         "tail",
                         "remarks",
-                        "curve_bindings",
-                        "raster_bindings",
-                        "fills",
-                        "annotations",
                     )
                 )
                 or fragment.removals
             ):
                 raise ValueError("Section worker emitted report-wide or global intent.")
-            section_id = fragment.sections[0].section_id
+            if fragment.sections is not None:
+                if len(fragment.sections) != 1:
+                    raise ValueError("Section worker must emit exactly one section fragment.")
+                section_id = fragment.sections[0].section_id
+            else:
+                child_fragments = [
+                    child
+                    for name in ("curve_bindings", "raster_bindings", "fills", "annotations")
+                    for child in (getattr(fragment, name) or [])
+                ]
+                child_section_ids = {
+                    getattr(child, "section_id", None) for child in child_fragments
+                }
+                if not child_fragments or len(child_section_ids) != 1:
+                    raise ValueError("Section worker must emit one section-local fragment.")
+                section_id = next(iter(child_section_ids))
+                if section_id is None:
+                    raise ValueError("Section worker fragment must identify its section.")
             if section_id in section_ids:
                 raise ValueError(f"Duplicate v2 section identity {section_id!r}.")
             section_ids.add(section_id)
