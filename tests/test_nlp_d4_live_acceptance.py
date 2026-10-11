@@ -2047,9 +2047,9 @@ def test_campaign_runner_rehearses_all_nine_turns_and_real_graders() -> None:
     )
     cbl_row = next(row for row in result["rows"] if row["turn_id"] == "D4-C01:C01")
     assert {item["status"] for item in cbl_row["verifier_requirements"]} == {"PASS"}
-    assert cbl_row["starting_artifact_sha256"] == cbl_row["ending_artifact_sha256"]
     assert cbl_row["starting_artifact_sha256"] is not None
     assert cbl_row["ending_artifact_sha256"] is not None
+    assert cbl_row["starting_artifact_sha256"] != cbl_row["ending_artifact_sha256"]
     assert state_status == "COMPLETED"
     assert result["logical_generation_calls"] == 18
     assert sum(row.get("event") == "logical_call_started" for row in journal_rows) == 18
