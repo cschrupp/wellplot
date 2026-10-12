@@ -1922,6 +1922,7 @@ def load_d4_api_key(repo_root: Path) -> str:
             env_var_names=("OPENAI_COMPAT_API_KEY",),
             env_file_keys=("OPENAI_COMPAT_API_KEY",),
             text_file_names=(
+                "LLAMA_CPP_API_KEY.txt",
                 "OPENAI_COMPAT_API_KEY.txt",
                 "openai_compat_api_key.txt",
             ),
