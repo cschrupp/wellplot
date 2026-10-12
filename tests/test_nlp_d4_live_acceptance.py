@@ -314,6 +314,15 @@ def test_frozen_contract_attestation_binds_checkpoint_and_all_artifacts(
     assert observed["cases_fixture_sha256"] == authorization.cases_fixture_sha256
     assert observed["gold_fixture_sha256"] == authorization.gold_fixture_sha256
     assert set(observed["production_component_sha256"]) == set(d4.PRODUCTION_COMPONENT_PATHS)
+    for relative in (
+        "src/wellplot/agent/code_mode/typed_delivery.py",
+        "src/wellplot/agent/code_mode/state.py",
+    ):
+        assert relative in d4.PRODUCTION_COMPONENT_PATHS
+        assert (
+            observed["production_component_sha256"][relative]
+            == (d4.FROZEN_PRODUCTION_COMPONENT_SHA256[relative])
+        )
 
 
 @pytest.mark.parametrize(
@@ -352,6 +361,31 @@ def test_frozen_contract_attestation_rejects_component_manifest_drift(
     drifted = replace(authorization, production_component_sha256=components)
     with pytest.raises(d4.PreflightError, match="component"):
         d4.verify_frozen_contract(REPO_ROOT, drifted)
+
+
+def test_frozen_contract_rejects_typed_delivery_component_drift(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The newly frozen typed-delivery boundary fails closed on byte drift."""
+    authorization = _authorization()
+    real_git = d4._git
+    real_sha256_file = d4.sha256_file
+    typed_delivery = REPO_ROOT / "src/wellplot/agent/code_mode/typed_delivery.py"
+    monkeypatch.setattr(
+        d4,
+        "_git",
+        lambda repo, *args: "" if args == ("status", "--porcelain") else real_git(repo, *args),
+    )
+    monkeypatch.setattr(
+        d4,
+        "sha256_file",
+        lambda path: "0" * 64 if path == typed_delivery else real_sha256_file(path),
+    )
+    monkeypatch.setattr(d4, "STATE_RELATIVE", tmp_path / "state.json")
+    monkeypatch.setattr(d4, "JOURNAL_RELATIVE", tmp_path / "journal.jsonl")
+    with pytest.raises(d4.PreflightError, match="production_component_sha256"):
+        d4.verify_frozen_contract(REPO_ROOT, authorization)
 
 
 @pytest.mark.parametrize(

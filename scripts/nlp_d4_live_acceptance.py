@@ -82,6 +82,8 @@ FROZEN_GOLD_SHA256 = "99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306
 FROZEN_UV_LOCK_SHA256 = "0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6"
 PRODUCTION_COMPONENT_PATHS = (
     "src/wellplot/agent/code_mode/planner.py",
+    "src/wellplot/agent/code_mode/typed_delivery.py",
+    "src/wellplot/agent/code_mode/state.py",
     "src/wellplot/agent/code_mode/workflow.py",
     "src/wellplot/agent/code_mode/capability_safety.py",
     "src/wellplot/agent/code_mode/report_boundary_safety.py",
@@ -108,6 +110,12 @@ PRODUCTION_COMPONENT_PATHS = (
 FROZEN_PRODUCTION_COMPONENT_SHA256 = {
     "src/wellplot/agent/code_mode/planner.py": (
         "1e2858b4663996ccacaf1c42979fc62fe988ba7501d6ec63e00911e6cdc86740"
+    ),
+    "src/wellplot/agent/code_mode/typed_delivery.py": (
+        "f76148ba49e5d08b74ab7dd1d6fbc4c3671a7e03ba7073ab053d9d22a2537e32"
+    ),
+    "src/wellplot/agent/code_mode/state.py": (
+        "0d95670d0ac7f3b1e97ec1a2ca7cae94d42fcf398a333f3ba257dab0d13d3212"
     ),
     "src/wellplot/agent/code_mode/workflow.py": (
         "2d4c0ead84c9ff2336decc3dc22e1af7c5a8eb9e9a50f6e66a99a65ad394fa52"
