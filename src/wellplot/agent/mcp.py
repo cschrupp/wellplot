@@ -32,7 +32,7 @@ from typing import TYPE_CHECKING
 
 from wellplot.errors import DependencyUnavailableError
 
-from .core import FunctionToolDefinition
+from .runtime_types import FunctionToolDefinition
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterable
@@ -48,14 +48,14 @@ _SUPPORTED_SERVER_MODULES = frozenset(
 )
 
 
-def _server_command(server_module: str) -> tuple[str, list[str]]:
+def _server_command(server_module: str = AGENTIC_MCP_SERVER_MODULE) -> tuple[str, list[str]]:
     """Launch one supported local MCP server with the host interpreter."""
     if server_module not in _SUPPORTED_SERVER_MODULES:
         raise ValueError(f"Unsupported local MCP server module: {server_module!r}.")
     return sys.executable, ["-m", server_module]
 
 
-def _server_env(extra_environment: Mapping[str, str]) -> dict[str, str]:
+def _server_env(extra_environment: Mapping[str, str] | None = None) -> dict[str, str]:
     """Build one child environment that preserves the current import resolution."""
     env = dict(os.environ)
     pythonpath_entries: list[str] = []
@@ -75,7 +75,7 @@ def _server_env(extra_environment: Mapping[str, str]) -> dict[str, str]:
                 pythonpath_entries.append(entry)
     if pythonpath_entries:
         env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
-    env.update(extra_environment)
+    env.update({} if extra_environment is None else extra_environment)
     return env
 
 

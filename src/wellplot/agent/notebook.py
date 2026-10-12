@@ -36,9 +36,9 @@ from ..mcp.header_archetypes import (
     header_archetype_heading,
 )
 from ..mcp.service import create_logfile_draft
-from .core import AuthoringResult
 from .direct_notebook import create_direct_notebook_session
 from .mcp import AGENTIC_MCP_SERVER_MODULE, LocalStdioMcpRuntime
+from .results import AuthoringResult
 from .routing import (
     DEFAULT_AUTHORING_ENGINE,
     AuthoringEngine,

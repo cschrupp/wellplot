@@ -20,14 +20,9 @@ from wellplot.agent.code_mode.visual_correction import (
     VisualSectionCorrection,
     VisualSectionCorrectionCoordinator,
 )
+from wellplot.agent.code_mode.worker_contracts import CanonicalWorkerResult
 from wellplot.agent.providers.base import ProviderFailureCategory, ProviderRequestError
-from wellplot.authoring_program.models import (
-    AuthoringProgram,
-    ProgramArtifact,
-    ProgramExecutionResult,
-    ProgramMetrics,
-    ProgramSource,
-)
+from wellplot.agent.semantic_runtime import SemanticMetrics
 from wellplot.capabilities import create_builtin_registry
 from wellplot.model.authoring import AuthoringDataSource, AuthoringDocumentSpec
 from wellplot.model.intent import (
@@ -97,13 +92,13 @@ def _execution_result(
     intent: AuthoringDocumentIntent,
     *,
     repairs: int = 0,
-) -> ProgramExecutionResult:
+) -> CanonicalWorkerResult:
     """Build successful bounded section-worker evidence."""
-    return ProgramExecutionResult(
-        program=AuthoringProgram(source=ProgramSource(text="report = wp.report()")),
+    return CanonicalWorkerResult(
         success=True,
-        artifact=ProgramArtifact(intent_fragment=intent),
-        metrics=ProgramMetrics(program_repairs=repairs),
+        intent_fragment=intent,
+        diagnostics=(),
+        metrics=SemanticMetrics(program_repairs=repairs),
     )
 
 
@@ -144,11 +139,11 @@ class _Evaluator:
 class _SectionCompiler:
     """Return one deterministic correction-worker result."""
 
-    result: ProgramExecutionResult
+    result: CanonicalWorkerResult
     error: ProviderRequestError | None = None
     calls: list[dict[str, object]] = field(default_factory=list)
 
-    async def compile(self, **kwargs: object) -> ProgramExecutionResult:
+    async def compile(self, **kwargs: object) -> CanonicalWorkerResult:
         self.calls.append(kwargs)
         if self.error is not None:
             raise self.error

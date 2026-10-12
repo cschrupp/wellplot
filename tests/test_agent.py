@@ -39,7 +39,6 @@ import wellplot.agent.notebook as notebook_module
 from wellplot.agent import (
     AuthoringRequest,
     AuthoringResult,
-    AuthoringSession,
     AuthoringToolCall,
     AuthoringUserReport,
     ExecutedAuthoringPhase,
@@ -56,6 +55,7 @@ from wellplot.agent.core import (
     AuthoringPlanPhase,
     AuthoringPlanResult,
     AuthoringRunState,
+    AuthoringSession,
     FunctionToolDefinition,
     _extract_packet_header_fill_intent,
     _merge_omitted_defaults,
@@ -160,7 +160,7 @@ class FakeMcpSession:
                             "source_format": "las",
                             "bindings_by_track": {},
                         }
-                    ]
+                    ],
                 }
             )
         if name == "check_channel_availability":
@@ -246,9 +246,7 @@ class FakeMcpSession:
             )
         if name == "preview_header_mapping":
             values = dict(arguments.get("values", {}))
-            if self.header_conflict and any(
-                str(key).startswith("detail.") for key in values
-            ):
+            if self.header_conflict and any(str(key).startswith("detail.") for key in values):
                 value = values.get("detail.rm_measured_temp")
                 return SimpleNamespace(
                     structuredContent={
@@ -320,9 +318,7 @@ class FakeMcpSession:
             )
         if name == "apply_header_values":
             values = dict(arguments.get("values", {}))
-            if self.header_conflict and any(
-                str(key).startswith("detail.") for key in values
-            ):
+            if self.header_conflict and any(str(key).startswith("detail.") for key in values):
                 value = values.get("detail.rm_measured_temp")
                 return SimpleNamespace(
                     structuredContent={
@@ -1487,9 +1483,7 @@ class AgentTests(unittest.TestCase):
                         "section_id": "main",
                         "track_id": "gamma",
                         "x_scale": {"kind": "linear", "min": 0, "max": 150},
-                        "channel_scales": {
-                            "GR": {"kind": "linear", "min": 0, "max": 150}
-                        },
+                        "channel_scales": {"GR": {"kind": "linear", "min": 0, "max": 150}},
                     },
                 ),
             )
@@ -2387,9 +2381,7 @@ class AgentTests(unittest.TestCase):
                                         "combo": list(
                                             self.bindings_by_track[("main_pass", "combo")]
                                         ),
-                                        "cbl": list(
-                                            self.bindings_by_track[("main_pass", "cbl")]
-                                        ),
+                                        "cbl": list(self.bindings_by_track[("main_pass", "cbl")]),
                                     },
                                 }
                             ],
@@ -2784,9 +2776,7 @@ class AgentTests(unittest.TestCase):
                 discovered_sections=("main",),
                 available_channels_by_section={"main": ("GR", "RHOB")},
             ),
-            request_coverage=(
-                {"request_item_id": "request-1", "status": "mapped"},
-            ),
+            request_coverage=({"request_item_id": "request-1", "status": "mapped"},),
             defaults_provenance={"main.tracks[0]": "generic_normal_track"},
             phase_summaries=(
                 ExecutedAuthoringPhase(
@@ -3467,11 +3457,9 @@ class AgentTests(unittest.TestCase):
             AuthoringSession.from_local_mcp(provider="anthropic", model="demo")
 
     def test_run_authoring_request_helper_delegates_to_session(self) -> None:
-        """Expose the high-level helper for starter requests."""
-        fake_result = mock.Mock(spec=AuthoringResult)
-        with mock.patch.object(AuthoringSession, "from_local_mcp") as factory:
-            factory.return_value.run = mock.AsyncMock(return_value=fake_result)
-            result = anyio.run(
+        """Reject the retired v1 engine before a request is constructed."""
+        with self.assertRaisesRegex(ValueError, "exactly 'v2'"):
+            anyio.run(
                 partial(
                     run_authoring_request,
                     goal="Build a starter packet.",
@@ -3483,21 +3471,10 @@ class AgentTests(unittest.TestCase):
                 )
             )
 
-        self.assertIs(result, fake_result)
-        factory.return_value.run.assert_awaited_once_with(
-            goal="Build a starter packet.",
-            example_id=None,
-            source_logfile_path="examples/starter.log.yaml",
-            output_logfile="workspace/demo.log.yaml",
-            max_rounds=12,
-        )
-
     def test_revise_authoring_request_helper_delegates_to_session(self) -> None:
-        """Expose the high-level helper for iterative revisions."""
-        fake_result = mock.Mock(spec=AuthoringResult)
-        with mock.patch.object(AuthoringSession, "from_local_mcp") as factory:
-            factory.return_value.revise = mock.AsyncMock(return_value=fake_result)
-            result = anyio.run(
+        """Reject the retired v1 engine before a revision is constructed."""
+        with self.assertRaisesRegex(ValueError, "exactly 'v2'"):
+            anyio.run(
                 partial(
                     revise_authoring_request,
                     feedback="Move GR left of resistivity.",
@@ -3507,13 +3484,6 @@ class AgentTests(unittest.TestCase):
                     engine="v1",
                 )
             )
-
-        self.assertIs(result, fake_result)
-        factory.return_value.revise.assert_awaited_once_with(
-            feedback="Move GR left of resistivity.",
-            logfile_path="workspace/demo.log.yaml",
-            max_rounds=12,
-        )
 
     def test_from_local_mcp_builds_openai_backend(self) -> None:
         """Construct the OpenAI backend through the public session factory."""
@@ -3646,8 +3616,8 @@ class AgentTests(unittest.TestCase):
         ):
             command, args = _server_command()
 
-        self.assertEqual(command, "/tmp/demo/bin/wellplot-mcp")
-        self.assertEqual(args, [])
+        self.assertEqual(command, "/tmp/demo/bin/python3")
+        self.assertEqual(args, ["-m", "wellplot.mcp.agentic_server"])
 
     def test_server_env_propagates_current_pythonpath(self) -> None:
         """Preserve the current import resolution for the child MCP server process."""
@@ -3663,7 +3633,7 @@ class AgentTests(unittest.TestCase):
         self.assertIn("/tmp/existing", pythonpath_entries)
 
     def test_run_authoring_request_uses_public_factory(self) -> None:
-        """Delegate the convenience helper through the public session factory."""
+        """Delegate the convenience helper through the canonical session factory."""
         result = AuthoringResult(
             provider="openai",
             model="gpt-5.4-mini",
@@ -3687,19 +3657,18 @@ class AgentTests(unittest.TestCase):
         stub_session = mock.AsyncMock()
         stub_session.run.return_value = result
 
-        with mock.patch.object(
-            AuthoringSession,
-            "from_local_mcp",
+        with mock.patch(
+            "wellplot.agent.direct_notebook.create_direct_notebook_session",
             return_value=stub_session,
         ) as factory:
             returned = anyio.run(self._run_authoring_request_helper)
 
         self.assertIsNot(returned, result)
-        self.assertEqual(returned.report_facts["engine"], "v1")
+        self.assertEqual(returned.report_facts["engine"], "v2")
         factory.assert_called_once_with(
             provider="openai",
             model="gpt-5.4-mini",
-            server_root=None,
+            server_root=Path.cwd().resolve(),
             api_key=None,
             base_url=None,
             timeout=None,
@@ -3721,5 +3690,5 @@ class AgentTests(unittest.TestCase):
             output_logfile="workspace/demo.log.yaml",
             provider="openai",
             model="gpt-5.4-mini",
-            engine="v1",
+            engine="v2",
         )

@@ -1,10 +1,10 @@
 # D5-2 Single-Engine Convergence Result
 
-Status: `IMPLEMENTED / INDEPENDENT REVIEW PENDING`
+Status: `D5-2R1 IMPLEMENTED / INDEPENDENT REVIEW PENDING`
 
 Branch: `d5/single-engine-convergence`
 
-Starting checkpoint: `316297635d9c6ab81368bf92f14555c91213cd56`
+Starting checkpoint: `ed4d8e9b13f2b76e953bf7645c1f0dcef966d2f8`
 
 ## Decision Boundary
 
@@ -81,53 +81,57 @@ worker boundary required the D4 evaluator to recognize `channel_missing` as
 the canonical equivalent of the historical `typed.channel_missing` label;
 the historical label remains accepted for retained evidence.
 
-## Reachability Audit
+## D5-2R1 Reachability Closeout
 
-Importing the canonical composition, Direct Notebook adapter, and MCP agentic
-adapter does not load `ProgramSectionCompiler`, `ReportProgramCompiler`,
-`TypedDelivery*`, the legacy graph package, or SI-V2/SI-V2R compiler modules.
-No canonical composition constructs those workers.
+The canonical runtime now has one authoring engine. `routing.py` accepts only
+`engine="v2"`, and no routing path constructs the historical
+`AuthoringSession`. The canonical Direct Notebook and MCP adapters share the
+same composition root, planner, deterministic enrichment, canonical workers,
+intent lowerer, reconciliation, executor, and service.
 
-Historical modules and explicit compatibility surfaces remain in the tree for
-the existing D0-D4 evidence and legacy APIs. In particular, the v1 routing
-selector and visual-correction compatibility module still have source-level
-references to historical program components. They are not silently selected
-by the canonical Direct Notebook, MCP, or experiment composition. Removing
-those explicit compatibility surfaces is outside this bounded convergence
-commit and requires a separate compatibility decision.
+The independent stable-fallback execution path has been removed from the
+authoring session. Visual correction now consumes the canonical worker result
+contract and no longer constructs a program compiler. Historical source files
+remain available as retained evidence artifacts, but the provider-free
+reachability audit proves that canonical public entry points load none of the
+legacy v1, stable-fallback, program/report-worker, typed-delivery, graph, or
+Semantic-IR compiler modules.
+
+The audit is executable at
+`scripts/check_d5_single_engine_reachability.py`; the successor production
+attestation is generated and checked by
+`scripts/d5_single_engine_attestation.py` against
+`docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json`. The D4
+component path set is preserved exactly; only its source hashes are
+recomputed. The D4 attestation remains historical evidence and is not
+rewritten.
 
 ## Validation
 
 Provider, endpoint, and model calls: `0`.
 
-Exact D4 rehearsal: `1 passed`, `9/9` turns, `18` logical calls.
+The exact D4 rehearsal passed with `9/9` turns, `18/45` logical calls, real
+persistence, reload, rendering, and frozen grading. The D3 CBL suite passed
+`3` tests through the real DLIS/render path. The D2A-D2E delivery selection
+passed `22` tests. The D5 convergence/reachability selection passed `24`
+tests. The canonical agent, session, notebook, routing, and visual tests
+passed `130` tests in the final focused run.
 
-D3 CBL suite: `3 passed`.
+Static checks passed for all changed files: Ruff, format, compilation, and
+`git diff --check`. Repository-wide Ruff still reports one pre-existing import
+ordering issue in the untouched `src/wellplot/agent/graph/__init__.py`; it is
+outside the D5-2R1 change footprint and does not affect the canonical audit.
 
-Active D5/D1-D2E/D4 regression selection: `143 passed`, `1 failed`.
-The single failure is the frozen D4 contract-attestation test, which correctly
-rejects the old checkpoint and production-component manifest after D5 source
-changes. It is not a D5 behavior failure and must be mechanically
-rebaselined before a future live campaign.
-
-The last full-suite run before the final canonical D4 fixture/evaluator
-adjustment reported `2606 passed`, `96 failed`, `10 skipped`, and `11
-subtests`. Its failures were a mixture of existing baseline failures, frozen
-evidence/attestation drift, and optional dependency provisioning limits; it
-was not rerun after the final bounded test/evaluator adjustment.
-
-Ruff, format checks, targeted Python compilation, and `git diff --check` are
-required final checks for this checkpoint. No live D4 or D5-3 activity is
-authorized by this result.
+No live D4 or D5 activity is authorized by this result.
 
 ## Governance State
 
 ```yaml
-D5-2:
+D5-2R1:
   status: IMPLEMENTED / INDEPENDENT REVIEW PENDING
   provider_model_calls: 0
   production_live_inference: NOT RUN
-  d4_live_attestation: STALE_AFTER_CONVERGENCE
-  d4_rebaseline: REQUIRED_BEFORE_LIVE_USE
+  d4_live_attestation: PRESERVED_AS_HISTORICAL
+  successor_production_attestation: PASS
   d5-3: NOT AUTHORIZED
 ```

@@ -15,8 +15,8 @@ from types import SimpleNamespace
 
 import anyio
 
-from wellplot.agent import AuthoringRequest, AuthoringSession, RevisionRequest
-from wellplot.agent.core import ProviderRunResult
+from wellplot.agent import AuthoringRequest, RevisionRequest
+from wellplot.agent.core import AuthoringSession, ProviderRunResult
 from wellplot.authoring import (
     authoring_document_from_mapping,
     authoring_document_to_yaml,
@@ -521,8 +521,7 @@ def test_old_provider_capability_does_not_fallback_to_scoped_compiler(tmp_path: 
     assert result.plan is None
     assert result.tool_trace == ()
     assert any(
-        "does not support typed authoring extraction" in item
-        for item in result.user_report.why_not
+        "does not support typed authoring extraction" in item for item in result.user_report.why_not
     )
 
 

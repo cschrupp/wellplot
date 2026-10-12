@@ -19,7 +19,7 @@ from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import LoadedSource
 from .code_mode.source_loader import LogfileSourceLoader
 from .composition import create_canonical_compile_facade, create_provider_backend
-from .core import AuthoringResult, AuthoringRunState, AuthoringUserReport
+from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
 from .session import (
     AgentSession,
     AgentSessionConfig,

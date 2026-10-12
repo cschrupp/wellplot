@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import json
+import os
+import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -38,6 +42,44 @@ from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_canonical_entrypoints_do_not_load_retired_modules() -> None:
+    """Canonical imports stay isolated from retired authoring engines."""
+    result = subprocess.run(
+        [sys.executable, "scripts/check_d5_single_engine_reachability.py", "--repo-root", "."],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["status"] == "PASS"
+
+
+def test_legacy_authoring_session_is_not_a_public_package_export() -> None:
+    """The retired engine is not reachable through the shipped agent package."""
+    import wellplot.agent as agent_package
+
+    with pytest.raises(AttributeError):
+        _ = agent_package.AuthoringSession
+
+
+def test_d5_production_manifest_is_current() -> None:
+    """The successor production attestation matches the current sources."""
+    result = subprocess.run(
+        [sys.executable, "scripts/d5_single_engine_attestation.py", "--repo-root", ".", "--check"],
+        cwd=REPO_ROOT,
+        env={**os.environ, "PYTHONPATH": str(REPO_ROOT / "src")},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    result = json.loads(result.stdout)
+    assert result["manifest_version"] == "wellplot.d5.single-engine-production.v1"
+    assert result["production_components"]
 
 
 def _document() -> AuthoringDocumentSpec:

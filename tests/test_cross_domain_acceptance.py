@@ -13,8 +13,8 @@ import pytest
 from pydantic import ValidationError
 
 from wellplot import authoring_document_to_render
-from wellplot.agent import AuthoringSession
 from wellplot.agent.compilation import build_request_manifest
+from wellplot.agent.core import AuthoringSession
 from wellplot.authoring import authoring_document_to_logfile_mapping
 from wellplot.authoring_context import AuthoringContextSnapshot, resolve_authoring_context
 from wellplot.authoring_executor import execute_authoring_plan

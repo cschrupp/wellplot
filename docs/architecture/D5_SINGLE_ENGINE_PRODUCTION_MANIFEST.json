@@ -1,0 +1,32 @@
+{
+  "authority": "WELLPLOT-D5-2R1-REACHABILITY-CLOSEOUT",
+  "historical_d4_attestation": "scripts/nlp_d4_live_acceptance.py",
+  "manifest_version": "wellplot.d5.single-engine-production.v1",
+  "production_components": {
+    "scripts/verify_cbl_packet.py": "528a0ed80d6eb43ddf74188fcc10038e25a696b5f6fd792eaeddd5bc96516613",
+    "scripts/verify_las_revision.py": "abf9f513a3f0b35c03d70f8bc429204a2cc6929cd459452e223ee7785492c004",
+    "src/wellplot/agent/code_mode/capability_safety.py": "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568",
+    "src/wellplot/agent/code_mode/enrichment.py": "b32eb6a310dc818de2473a6eb4a8de7c1b55302fee7052b665f7aef0e5613735",
+    "src/wellplot/agent/code_mode/planner.py": "1e2858b4663996ccacaf1c42979fc62fe988ba7501d6ec63e00911e6cdc86740",
+    "src/wellplot/agent/code_mode/program_worker.py": "f3e7876693f9da2cc02d396c6f0f958ae4cf2c588480076177b90aecc8efaac7",
+    "src/wellplot/agent/code_mode/repair.py": "c1470b491c442b5e743a0421a49046cccf8e3f12635293c40b44ff0864a53804",
+    "src/wellplot/agent/code_mode/report_boundary_safety.py": "cc94431bdc9c0d8b7e582de4f931aabf3bd4bea61bbd847051658abf86135c46",
+    "src/wellplot/agent/code_mode/report_worker.py": "ec1eca740df5218a7a2f204425dfe69e5ba00e3db62392c3852426b2f89d2723",
+    "src/wellplot/agent/code_mode/section_leaf_safety.py": "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4",
+    "src/wellplot/agent/code_mode/state.py": "6e0d44cfb32aab4a9c2d2a32cf3bd2dc91eac76fbf9296c596acb79d6ecc9b6d",
+    "src/wellplot/agent/code_mode/typed_delivery.py": "f76148ba49e5d08b74ab7dd1d6fbc4c3671a7e03ba7073ab053d9d22a2537e32",
+    "src/wellplot/agent/code_mode/workflow.py": "9dff61920195789f147ad432dd8134031313e3893293a10431bf4142ab39fce0",
+    "src/wellplot/agent/direct_notebook.py": "5b14484320d299e9f45b6942959349b3bd4290584d2a37ba4ef0b47f1250bb32",
+    "src/wellplot/agent/operation_executor.py": "b52ab3eaae90a23092d584687caf5a53a742ff4c263bee763eee97e342b878ee",
+    "src/wellplot/agent/providers/_v2_client.py": "41a0589c909d48eba3117ac4984b86b3d6eff1e4bebe32eb9e031f3db186cb33",
+    "src/wellplot/agent/providers/base.py": "4c14afc1e6e53faef1ef99266059b7b88b6c4dec4bfb5a4768ca5b36efc3f049",
+    "src/wellplot/agent/providers/openai.py": "0e49f227ee03f761f3a215f013feb1ab40c542b28ac10e428159065c9ab29a91",
+    "src/wellplot/agent/providers/openai_compat_v2.py": "579b299c6a01604207cfac3abf20eff15004a634ea773be75ec3c156835fc787",
+    "src/wellplot/agent/providers/openai_program_v2.py": "e68b4bb63da930b4eb5c399741bfd486a4a8563d405a505d5aafefb86c6bc062",
+    "src/wellplot/agent/providers/openai_v2.py": "a3548b5d373767abe614c0600194b9558b1057e1caa07b17df948956cc5c0759",
+    "src/wellplot/authoring.py": "0c6c0d04c6d71fcc07c7fa6d130c1ff9e026fbd7ae8dc1bb463d50d009caa99b",
+    "src/wellplot/authoring_executor.py": "f1218bbddf706751e6cbb019017ed9efbae60d9909b1c08660dbc9edda0eb28b",
+    "src/wellplot/authoring_reconciler.py": "1c599c6c6e3945816fd7114b5b35631267f85fd77ff75a7bced87a38fb891034",
+    "src/wellplot/authoring_service.py": "458d2c1c54e7013c3c66bd2196830849148f68364f217df1b95b276a776da954"
+  }
+}

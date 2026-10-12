@@ -25,7 +25,7 @@ from ...model.intent import AuthoringDocumentIntent
 from ..providers.base import ProviderRequestError
 from .enrichment import EnrichedSemanticContext, ReportContext, ResolvedSectionContext
 from .planner import SectionTask, SemanticPlan
-from .program_worker import ProgramSectionCompiler
+from .worker_contracts import CanonicalWorkerResult
 
 VISUAL_SECTION_CAPABILITIES = frozenset({"section.log_plot"})
 MAX_VISUAL_IMAGES = 4
@@ -168,11 +168,28 @@ class VisualEvaluator(Protocol):
         """Review bounded in-memory render material without document access."""
 
 
+class VisualSectionCompiler(Protocol):
+    """Canonical section-worker boundary used for visual corrections."""
+
+    async def compile(
+        self,
+        *,
+        task_index: int,
+        context: object,
+        document: object,
+        authoritative_request: str,
+        timeout_seconds: float,
+        temperature: float | None = None,
+        max_output_tokens: int | None = None,
+    ) -> CanonicalWorkerResult:
+        """Generate one canonical semantic correction fragment."""
+
+
 @dataclass(frozen=True, slots=True)
 class VisualSectionCorrectionCoordinator:
     """Coordinate one root-only visual correction without persistence or routing."""
 
-    section_compiler: ProgramSectionCompiler
+    section_compiler: VisualSectionCompiler
     registry: CapabilityRegistry
     renderer: SectionRenderer
     evaluator: VisualEvaluator
@@ -294,7 +311,7 @@ class VisualSectionCorrectionCoordinator:
                 "repair_count": worker_result.metrics.program_repairs,
             }
         )
-        if not worker_result.success or worker_result.artifact is None:
+        if not worker_result.success or worker_result.intent_fragment is None:
             return _failure(
                 VisualCorrectionStopReason.CORRECTION_WORKER_FAILED,
                 "The visual correction section worker did not produce a valid result.",
@@ -303,7 +320,7 @@ class VisualSectionCorrectionCoordinator:
                 metrics=metrics,
             )
 
-        correction_intent = worker_result.artifact.intent_fragment
+        correction_intent = worker_result.intent_fragment
         intent_error = _validate_root_section_intent(correction_intent, section_id)
         if intent_error is not None:
             return _failure(
@@ -638,6 +655,7 @@ __all__ = [
     "VisualRenderError",
     "VisualSectionCorrection",
     "VisualSectionCorrectionCoordinator",
+    "VisualSectionCompiler",
     "VisualReviewError",
     "VISUAL_SECTION_CAPABILITIES",
 ]

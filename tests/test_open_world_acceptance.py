@@ -9,8 +9,8 @@ from types import SimpleNamespace
 import anyio
 import pytest
 
-from wellplot.agent import AuthoringSession
 from wellplot.agent.compilation import build_request_manifest
+from wellplot.agent.core import AuthoringSession
 from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_service import AuthoringService

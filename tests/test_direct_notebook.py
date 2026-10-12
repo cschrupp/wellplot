@@ -20,7 +20,6 @@ except ModuleNotFoundError:  # pragma: no cover - unittest discovery mode
     from _mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 from wellplot.agent import (
     AuthoringResult,
-    AuthoringSession,
     ProjectPaths,
     ProjectSession,
     display_authoring_result,
@@ -30,6 +29,7 @@ from wellplot.agent.code_mode.enrichment import EnrichedSemanticContext, ReportC
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
 from wellplot.agent.code_mode.planner import ReportTask, SemanticPlan
 from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
+from wellplot.agent.core import AuthoringSession
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 from wellplot.agent.providers.openai_v2 import OpenAIBackendV2
@@ -504,7 +504,7 @@ def test_create_project_session_does_not_construct_legacy_or_mcp_runtime() -> No
                 side_effect=AssertionError("MCP runtime must not be constructed"),
             ),
             mock.patch(
-                "wellplot.agent.direct_notebook.load_async_openai_client",
+                "wellplot.agent.providers._v2_client.load_async_openai_client",
                 return_value=object(),
             ),
         ):
@@ -526,7 +526,7 @@ def test_create_project_session_uses_v2_compat_and_ollama_backends() -> None:
     with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
         root = Path(temporary_directory)
         with mock.patch(
-            "wellplot.agent.direct_notebook.load_async_openai_client",
+            "wellplot.agent.providers._v2_client.load_async_openai_client",
             return_value=object(),
         ):
             compat, _ = notebook_module.create_project_session(

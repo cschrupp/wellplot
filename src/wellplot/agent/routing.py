@@ -1,27 +1,23 @@
-"""Host-owned selection between the v1 and v2 authoring engines."""
+"""Host-owned construction of the canonical authoring engine."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import is_dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Protocol, TypeVar
+from typing import Literal, Protocol, TypeVar
 
-if TYPE_CHECKING:
-    from .core import AuthoringResult
-
-
-AuthoringEngine = Literal["v1", "v2"]
+AuthoringEngine = Literal["v2"]
 DEFAULT_AUTHORING_ENGINE: AuthoringEngine = "v2"
 
 
 class AuthoringSessionProtocol(Protocol):
     """Shared notebook-facing surface implemented by both engines."""
 
-    async def run(self, **kwargs: object) -> AuthoringResult:
+    async def run(self, **kwargs: object) -> object:
         """Build one authoring request."""
 
-    async def revise(self, **kwargs: object) -> AuthoringResult:
+    async def revise(self, **kwargs: object) -> object:
         """Revise one existing authoring document."""
 
     async def render_logfile_to_file(self, **kwargs: object) -> dict[str, object]:
@@ -38,10 +34,10 @@ class AuthoringSessionProtocol(Protocol):
 
 
 def normalize_authoring_engine(engine: str) -> AuthoringEngine:
-    """Validate one explicit engine selector without accepting aliases."""
-    if engine not in {"v1", "v2"}:
-        raise ValueError("engine must be exactly 'v1' or 'v2'.")
-    return engine
+    """Validate the sole supported authoring engine selector."""
+    if engine != "v2":
+        raise ValueError("engine must be exactly 'v2'.")
+    return "v2"
 
 
 SessionT = TypeVar("SessionT", bound=AuthoringSessionProtocol)
@@ -63,10 +59,8 @@ def tag_authoring_result(result: SessionT, *, engine: str) -> SessionT:
 
 
 def _is_authoring_result(value: object) -> bool:
-    """Identify the legacy compatibility envelope without importing core eagerly."""
-    from .core import AuthoringResult
-
-    return isinstance(value, AuthoringResult) and is_dataclass(value)
+    """Identify the canonical result envelope without importing legacy core."""
+    return is_dataclass(value) and hasattr(value, "report_facts")
 
 
 def create_authoring_session(
@@ -80,20 +74,8 @@ def create_authoring_session(
     timeout: float | None,
     v2_factory: Callable[..., SessionT] | None = None,
 ) -> AuthoringSessionProtocol:
-    """Construct exactly the explicitly selected authoring implementation."""
-    normalized_engine = normalize_authoring_engine(engine)
-    if normalized_engine == "v1":
-        from .core import AuthoringSession
-
-        return AuthoringSession.from_local_mcp(
-            provider=provider,
-            model=model,
-            server_root=server_root,
-            api_key=api_key,
-            base_url=base_url,
-            timeout=timeout,
-        )
-
+    """Construct the canonical authoring implementation."""
+    normalize_authoring_engine(engine)
     if server_root is None:
         resolved_root = Path.cwd().resolve()
     else:

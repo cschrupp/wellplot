@@ -94,12 +94,8 @@ from .operation_executor import (
     execute_typed_submissions,
 )
 from .reconciliation_bridge import compile_reconciliation_plan
-from .stable_fallback import (
-    build_catalog_fallback_plan,
-    catalog_channel_candidates,
-    fallback_plan_satisfied,
-    is_track_request,
-)
+from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
+from .runtime_types import AuthoringToolCall, FunctionToolDefinition, ProviderRunResult
 from .tool_contract import stable_tool_profile
 
 if TYPE_CHECKING:
@@ -344,33 +340,6 @@ class RevisionRequest:
     desired_state: AuthoringDocumentIntent | Mapping[str, object] | None = None
 
 
-@dataclass(frozen=True)
-class AuthoringToolCall:
-    """One provider-issued tool call replayed through wellplot MCP."""
-
-    round: int
-    name: str
-    arguments: dict[str, object]
-
-
-@dataclass(frozen=True)
-class FunctionToolDefinition:
-    """Generic function-tool definition passed to one provider adapter."""
-
-    name: str
-    description: str
-    parameters: dict[str, object]
-
-
-@dataclass(frozen=True)
-class ProviderRunResult:
-    """Normalized provider loop result returned to the orchestration core."""
-
-    final_text: str
-    tool_trace: tuple[AuthoringToolCall, ...]
-    report_facts: dict[str, object] = field(default_factory=dict)
-
-
 class ProviderAdapterError(RuntimeError):
     """Normalized provider-adapter failure with a stable diagnostic status."""
 
@@ -438,20 +407,6 @@ class AuthoringPlanPhase:
 
 
 @dataclass(frozen=True)
-class AuthoringRunState:
-    """Structured per-run state captured during one authoring workflow."""
-
-    objectives: tuple[str, ...] = ()
-    completed_objectives: tuple[str, ...] = ()
-    blocked_objectives: tuple[str, ...] = ()
-    discovered_sections: tuple[str, ...] = ()
-    discovered_tracks_by_section: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    discovered_binding_ids_by_track: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    available_channels_by_section: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    last_verification: dict[str, object] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
 class AuthoringPlanResult:
     """Structured planning output for one authoring request."""
 
@@ -489,137 +444,6 @@ class ExecutedAuthoringPhase:
     def preview_bytes(self) -> bytes | None:
         """Return the optional captured phase preview bytes."""
         return self.preview_png
-
-
-@dataclass(frozen=True)
-class AuthoringUserReport:
-    """Concise deterministic operator report for one authoring run."""
-
-    done: tuple[str, ...] = ()
-    could_not_do: tuple[str, ...] = ()
-    why_not: tuple[str, ...] = ()
-    warnings_or_errors: tuple[str, ...] = ()
-    request_inconsistencies: tuple[str, ...] = ()
-    needs_clarification: tuple[dict[str, object], ...] = ()
-    next_help: tuple[str, ...] = ()
-
-    def sections(self) -> tuple[tuple[str, tuple[str, ...]], ...]:
-        """Return the non-empty report sections in display order."""
-        return tuple(
-            (label, items)
-            for label, items in (
-                ("Done", self.done),
-                ("Could not do", self.could_not_do),
-                ("Why not", self.why_not),
-                ("Warnings/errors", self.warnings_or_errors),
-                ("Request inconsistencies", self.request_inconsistencies),
-                (
-                    "Needs clarification",
-                    tuple(_clarification_summary_text(item) for item in self.needs_clarification),
-                ),
-                ("Next help", self.next_help),
-            )
-            if items
-        )
-
-    def to_text(self) -> str:
-        """Render the operator report as concise plain text."""
-        lines: list[str] = []
-        for label, items in self.sections():
-            lines.append(f"{label}:")
-            lines.extend(f"- {item}" for item in items)
-        return "\n".join(lines)
-
-
-@dataclass(frozen=True)
-class AuthoringResult:
-    """Final result for one authoring request."""
-
-    provider: str
-    model: str
-    credential_source: str | None
-    request_kind: str
-    example_id: str | None
-    source_logfile_path: str | None
-    goal: str
-    draft_logfile: str
-    server_root: Path
-    tool_trace: tuple[AuthoringToolCall, ...]
-    final_text: str
-    validation: dict[str, object]
-    draft_summary: dict[str, object]
-    inspect_summary: dict[str, object]
-    change_summary: dict[str, object]
-    draft_text: str
-    report_preview_png: bytes = field(repr=False)
-    section_preview_png: bytes = field(repr=False)
-    plan: AuthoringPlanResult | None = None
-    phase_summaries: tuple[ExecutedAuthoringPhase, ...] = ()
-    run_state: AuthoringRunState = field(default_factory=AuthoringRunState)
-    user_report: AuthoringUserReport = field(default_factory=AuthoringUserReport)
-    needs_clarification: tuple[dict[str, object], ...] = ()
-    request_coverage: tuple[dict[str, object], ...] = ()
-    operation_outcomes: tuple[dict[str, object], ...] = ()
-    defaults_provenance: dict[str, str] = field(default_factory=dict)
-    submitted_intent: dict[str, object] | None = None
-    report_facts: dict[str, object] = field(default_factory=dict)
-
-    @property
-    def draft_path(self) -> Path:
-        """Return the absolute path to the generated draft logfile."""
-        return self.server_root / self.draft_logfile
-
-    @property
-    def summary_lines(self) -> tuple[str, ...]:
-        """Return the normalized change-summary lines for notebook/UI display."""
-        lines = self.change_summary.get("summary_lines", [])
-        if not isinstance(lines, list):
-            return ()
-        normalized: list[str] = []
-        for line in lines:
-            if isinstance(line, str) and line.strip():
-                normalized.append(line)
-        return tuple(normalized)
-
-    def preview_bytes(self, kind: str = "section") -> bytes:
-        """Return one preview payload by logical kind."""
-        normalized_kind = str(kind).strip().lower()
-        if normalized_kind == "section":
-            return self.section_preview_png
-        if normalized_kind == "report":
-            return self.report_preview_png
-        raise ValueError("preview kind must be either 'section' or 'report'.")
-
-    @property
-    def user_report_text(self) -> str:
-        """Return the concise operator report as plain text."""
-        return self.user_report.to_text()
-
-    def write_preview_artifacts(
-        self,
-        *,
-        output_dir: str | Path | None = None,
-    ) -> dict[str, Path]:
-        """Persist the in-memory preview PNGs and return their paths."""
-        if output_dir is None:
-            target_dir = self.draft_path.parent
-        else:
-            raw_target_dir = Path(output_dir)
-            target_dir = (
-                raw_target_dir
-                if raw_target_dir.is_absolute()
-                else self.server_root / raw_target_dir
-            )
-        target_dir.mkdir(parents=True, exist_ok=True)
-        stem = self.draft_path.stem.removesuffix(".log")
-        report_preview = target_dir / f"{stem}_report_preview.png"
-        section_preview = target_dir / f"{stem}_section_preview.png"
-        report_preview.write_bytes(self.report_preview_png)
-        section_preview.write_bytes(self.section_preview_png)
-        return {
-            "report_preview": report_preview,
-            "section_preview": section_preview,
-        }
 
 
 class McpSessionProtocol(Protocol):
@@ -840,26 +664,6 @@ def _is_header_only_request(goal: str, intent: _HeaderFillIntent | None) -> bool
     return not any(re.search(pattern, goal, re.IGNORECASE) for pattern in non_header_patterns)
 
 
-def _catalog_fallback_section_id(
-    goal: str,
-    document: AuthoringDocumentSpec,
-) -> str | None:
-    """Resolve a single section for catalog recovery, never a packet implicitly."""
-    if re.search(r"\b(?:sections\s+ids?|section\s+ids)\b", goal, re.IGNORECASE):
-        return None
-    match = re.search(
-        r"\bsection(?:\s+id)?\s+[`\"']?([A-Za-z][\w.-]*)",
-        goal,
-        re.IGNORECASE,
-    )
-    if match is not None:
-        requested = match.group(1)
-        if any(section.id == requested for section in document.sections):
-            return requested
-        return None
-    return document.sections[0].id if len(document.sections) == 1 else None
-
-
 def _stable_postcondition_errors(
     goal: str,
     baseline: AuthoringDocumentSpec,
@@ -930,9 +734,7 @@ def _stable_postcondition_errors(
                 f"changed from {len(baseline_remarks)} to {len(current_remarks)}."
             )
         if any(not _has_persisted_remark_content(item) for item in current_remarks):
-            errors.append(
-                "Every persisted remarks block must have non-empty text or string lines."
-            )
+            errors.append("Every persisted remarks block must have non-empty text or string lines.")
     return errors
 
 
@@ -944,8 +746,10 @@ def _has_persisted_remark_content(item: object) -> bool:
     if isinstance(text, str) and text.strip():
         return True
     lines = item.get("lines")
-    return isinstance(lines, list) and bool(lines) and all(
-        isinstance(line, str) and line.strip() for line in lines
+    return (
+        isinstance(lines, list)
+        and bool(lines)
+        and all(isinstance(line, str) and line.strip() for line in lines)
     )
 
 
@@ -1951,8 +1755,7 @@ def _resolve_requested_source_path(
     matches = [
         declared_path
         for declared_path in declared.values()
-        if Path(declared_path.replace("\\", "/")).name.casefold()
-        == candidate.name.casefold()
+        if Path(declared_path.replace("\\", "/")).name.casefold() == candidate.name.casefold()
     ]
     if len(matches) != 1:
         return source_path
@@ -2128,20 +1931,6 @@ def _request_seed_label(request: AuthoringRequest) -> str:
         return f"packaged example `{request.example_id}`"
     assert request.source_logfile_path is not None
     return f"starter logfile `{request.source_logfile_path}`"
-
-
-def _catalog_fallback_tool_arguments(
-    name: str,
-    arguments: Mapping[str, object],
-    draft_logfile: str,
-) -> dict[str, object]:
-    """Add the draft target without creating a dual-source inspection request."""
-    call_arguments = dict(arguments)
-    if name == "inspect_source" and call_arguments.get("source_path") is not None:
-        call_arguments.pop("logfile_path", None)
-    else:
-        call_arguments.setdefault("logfile_path", draft_logfile)
-    return call_arguments
 
 
 @dataclass
@@ -2488,170 +2277,6 @@ class AuthoringSession:
             ),
         )
 
-    async def _execute_catalog_fallback(
-        self,
-        *,
-        session: McpSessionProtocol,
-        draft_logfile: str,
-        goal: str,
-        stable_tool_outcomes: list[dict[str, object]],
-        stable_tool_errors: list[str],
-    ) -> tuple[bool, str]:
-        """Execute one catalog or open-world track plan after provider stagnation."""
-        candidates = catalog_channel_candidates(goal)
-        if not candidates and not is_track_request(goal):
-            return False, "No catalog or generic track request was found."
-
-        async def call_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
-            """Call and record one deterministic fallback tool operation."""
-            call_arguments = _catalog_fallback_tool_arguments(
-                name,
-                arguments,
-                draft_logfile,
-            )
-            try:
-                result = await session.call_tool(name, call_arguments)
-                payload = self.runtime.tool_result_payload(result)
-            except Exception as exc:  # noqa: BLE001 - report fallback diagnostics
-                payload = {
-                    "is_error": True,
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-            stable_tool_outcomes.append(
-                {
-                    "name": name,
-                    "arguments": call_arguments,
-                    "payload": payload,
-                    "source": "catalog_fallback",
-                }
-            )
-            if payload.get("is_error") is True:
-                stable_tool_errors.append(
-                    f"{name} failed: {payload.get('error', 'MCP returned an error result.')}"
-                )
-            return payload
-
-        current = load_authoring_document(
-            self.runtime.server_root / draft_logfile,
-            allowed_root=self.runtime.server_root,
-        )
-        section_id = _catalog_fallback_section_id(goal, current)
-        if section_id is None:
-            return False, "Catalog fallback requires one resolvable target section."
-        section = next(item for item in current.sections if item.id == section_id)
-        source_arguments: dict[str, object] = {"include_metadata": False}
-        if candidates:
-            source_arguments["channels"] = list(candidates)
-        if section.data_source is not None:
-            source_path = Path(section.data_source.source_path)
-            if not source_path.is_absolute():
-                source_path = Path(draft_logfile).parent / source_path
-            source_arguments.update(
-                {
-                    "source_path": source_path.as_posix(),
-                    "source_format": section.data_source.source_format,
-                }
-            )
-        source_payload = await call_tool(
-            "inspect_source",
-            source_arguments,
-        )
-        if source_payload.get("is_error") is True:
-            return False, "Catalog fallback could not inspect source-channel availability."
-
-        available: list[str] = []
-        channel_summaries: dict[str, Mapping[str, object]] = {}
-        structured = source_payload.get("structured")
-        if isinstance(structured, Mapping):
-            for key in ("available_channels", "found_channels"):
-                top_level = structured.get(key)
-                if isinstance(top_level, list):
-                    available.extend(str(channel) for channel in top_level)
-            items = structured.get("items", [])
-            if isinstance(items, list):
-                for item in items:
-                    if not isinstance(item, Mapping):
-                        continue
-                    summaries = item.get("channels")
-                    if isinstance(summaries, list):
-                        for summary in summaries:
-                            if not isinstance(summary, Mapping):
-                                continue
-                            mnemonic = summary.get("mnemonic")
-                            if isinstance(mnemonic, str) and mnemonic.strip():
-                                channel_summaries[mnemonic.upper()] = summary
-                                available.append(mnemonic)
-                    found = item.get("found_channels")
-                    if isinstance(found, list):
-                        available.extend(str(channel) for channel in found)
-                    resolutions = item.get("resolutions", [])
-                    if isinstance(resolutions, list):
-                        for resolution in resolutions:
-                            if not isinstance(resolution, Mapping):
-                                continue
-                            matched = resolution.get("matched_channels")
-                            if isinstance(matched, list):
-                                available.extend(str(channel) for channel in matched)
-
-        plan = build_catalog_fallback_plan(
-            goal,
-            section_id=section_id,
-            document=current.model_dump(mode="json"),
-            available_channels=available,
-            channel_summaries=channel_summaries,
-        )
-        if plan is None:
-            return False, "The request did not resolve to a catalog or generic track plan."
-        if fallback_plan_satisfied(plan, current.model_dump(mode="json")):
-            return (
-                True,
-                f"Catalog request is already satisfied by `{plan.track_id}`; "
-                "no recovery mutation was needed.",
-            )
-
-        for operation in plan.operations:
-            payload = await call_tool(operation.tool_name, operation.arguments)
-            if payload.get("is_error") is True:
-                return False, f"Catalog fallback stopped at {operation.tool_name}."
-
-        validation_payload = await call_tool("validate_logfile", {})
-        if validation_payload.get("is_error") is True or not bool(
-            (validation_payload.get("structured") or {}).get("valid", True)
-        ):
-            return False, "Catalog fallback mutations did not produce a valid logfile."
-
-        inspection_payload = await call_tool(
-            "inspect_authoring",
-            {
-                "object_kind": "track",
-                "section_id": plan.section_id,
-                "track_id": plan.track_id,
-                "detail": "full",
-            },
-        )
-        if inspection_payload.get("is_error") is True:
-            return False, "Catalog fallback could not read back the created track."
-        saved = load_authoring_document(
-            self.runtime.server_root / draft_logfile,
-            allowed_root=self.runtime.server_root,
-        )
-        if not fallback_plan_satisfied(plan, saved.model_dump(mode="json")):
-            return False, "Catalog fallback postconditions did not match the persisted document."
-
-        details = [
-            f"Created or reconciled `{plan.track_id}` from catalog family "
-            f"`{plan.family_id or plan.preset_id or 'generic'}`.",
-        ]
-        if plan.expected_channels:
-            details.append(f"Bound available channels: {', '.join(plan.expected_channels)}.")
-        if plan.skipped_channels:
-            details.append(
-                "Skipped unavailable catalog channels: "
-                + ", ".join(plan.skipped_channels)
-                + "."
-            )
-        return True, " ".join(details)
-
     async def _run_stable_mcp_loop(
         self,
         *,
@@ -2729,11 +2354,7 @@ class AuthoringSession:
         tool_definitions = self.runtime.build_tool_definitions(
             mcp_tools,
             allowed_names=set(STABLE_MCP_TOOL_NAMES),
-            excluded_names=(
-                {"edit_header"}
-                if preflight_header_result is not None
-                else set()
-            ),
+            excluded_names=({"edit_header"} if preflight_header_result is not None else set()),
         )
         allowed_names = {tool.name for tool in tool_definitions}
         stable_tool_outcomes: list[dict[str, object]] = []
@@ -3181,9 +2802,7 @@ class AuthoringSession:
         unresolved_error_messages = list(unresolved_mutation_errors.values())
         report_facts["feedback_loop"] = {
             "status": (
-                "blocked"
-                if unresolved_error_messages
-                else controller_status or "provider_finished"
+                "blocked" if unresolved_error_messages else controller_status or "provider_finished"
             ),
             "consecutive_tool_errors": consecutive_tool_errors,
             "repeated_error_count": repeated_error_count,
@@ -5252,19 +4871,23 @@ class AuthoringSession:
             structured = {}
 
         skipped = structured.get("skipped_assignments", [])
-        conflicts = [
-            {
-                "input_key": entry.get("input_key"),
-                "input_value": entry.get("input_value"),
-                "clarification_question": entry.get("clarification_question"),
-                "candidate_labels": entry.get("candidate_labels", []),
-                "candidate_targets": entry.get("candidate_targets", []),
-            }
-            for entry in skipped
-            if isinstance(entry, Mapping)
-            and entry.get("status") == "conflict"
-            and entry.get("clarification_question")
-        ] if isinstance(skipped, list) else []
+        conflicts = (
+            [
+                {
+                    "input_key": entry.get("input_key"),
+                    "input_value": entry.get("input_value"),
+                    "clarification_question": entry.get("clarification_question"),
+                    "candidate_labels": entry.get("candidate_labels", []),
+                    "candidate_targets": entry.get("candidate_targets", []),
+                }
+                for entry in skipped
+                if isinstance(entry, Mapping)
+                and entry.get("status") == "conflict"
+                and entry.get("clarification_question")
+            ]
+            if isinstance(skipped, list)
+            else []
+        )
         applied = structured.get("applied_assignments", [])
         applied_count = len(applied) if isinstance(applied, list) else 0
         completed = (
@@ -5311,7 +4934,9 @@ class AuthoringSession:
                         and entry.get("status") != "unchanged"
                         and entry.get("reason")
                     )
-                ] if isinstance(skipped, list) else [],
+                ]
+                if isinstance(skipped, list)
+                else [],
                 "warnings": list(structured.get("warnings", []))
                 if isinstance(structured.get("warnings"), list)
                 else [],
@@ -8383,16 +8008,12 @@ class AuthoringSession:
             stable_tools = await self._stable_tool_catalog(session)
 
             preflight_tool_trace: tuple[AuthoringToolCall, ...] = ()
-            style_intent, remaining_feedback = _extract_matplotlib_style_intent(
-                request.feedback
-            )
+            style_intent, remaining_feedback = _extract_matplotlib_style_intent(request.feedback)
             effective_feedback = remaining_feedback if remaining_feedback else request.feedback
             if style_intent is not None:
                 style_tool_name = "set_matplotlib_style"
                 if stable_tools is not None:
-                    available_tool_names = {
-                        str(getattr(tool, "name", "")) for tool in stable_tools
-                    }
+                    available_tool_names = {str(getattr(tool, "name", "")) for tool in stable_tools}
                     if "set_matplotlib_style" not in available_tool_names:
                         style_tool_name = (
                             "edit_report_settings"
@@ -8725,7 +8346,7 @@ async def run_authoring_request(
     base_url: str | None = None,
     timeout: float | None = None,
     max_rounds: int = 12,
-    engine: Literal["v1", "v2"] = "v2",
+    engine: Literal["v2"] = "v2",
 ) -> AuthoringResult:
     """Run one high-level request through the selected authoring engine."""
     from .routing import create_authoring_session, tag_authoring_result
@@ -8760,7 +8381,7 @@ async def revise_authoring_request(
     base_url: str | None = None,
     timeout: float | None = None,
     max_rounds: int = 12,
-    engine: Literal["v1", "v2"] = "v2",
+    engine: Literal["v2"] = "v2",
 ) -> AuthoringResult:
     """Revise one draft through the selected authoring engine."""
     from .routing import create_authoring_session, tag_authoring_result

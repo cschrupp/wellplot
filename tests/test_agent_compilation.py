@@ -11,7 +11,6 @@ import anyio
 import pytest
 
 import wellplot.agent.compilation as compilation_module
-from wellplot.agent import AuthoringSession
 from wellplot.agent.compilation import (
     AuthoringAnnotationIntentSubmission,
     AuthoringIntentCoverage,
@@ -36,7 +35,7 @@ from wellplot.agent.compilation import (
     validate_request_inventory,
     validate_scoped_intent_semantics,
 )
-from wellplot.agent.core import AuthoringToolCall, ProviderAdapterError
+from wellplot.agent.core import AuthoringSession, AuthoringToolCall, ProviderAdapterError
 from wellplot.authoring_context import AuthoringContextSnapshot
 from wellplot.model.intent import AuthoringDocumentIntent
 
