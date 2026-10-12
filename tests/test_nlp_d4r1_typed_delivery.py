@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
 from wellplot.agent import direct_notebook
+from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
 from wellplot.agent.code_mode.enrichment import (
     ChannelContext,
     EnrichedSemanticContext,
@@ -40,7 +41,9 @@ from wellplot.agent.code_mode.typed_delivery import (
     TypedDeliveryReportCompiler,
     TypedDeliverySectionCompiler,
 )
+from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
 from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
+from wellplot.agent.inspection import HeaderSlotInspectionSummary
 from wellplot.agent.providers.base import (
     ProgramGenerationRequest,
     ProviderMetrics,
@@ -48,7 +51,6 @@ from wellplot.agent.providers.base import (
     StructuredGenerationResult,
 )
 from wellplot.api.serialize import report_to_dict
-from wellplot.authoring_program.inspection import HeaderSlotInspectionSummary
 from wellplot.authoring_service import AuthoringService
 from wellplot.capabilities import create_builtin_registry
 from wellplot.logfile import load_logfile
@@ -614,31 +616,32 @@ class _GraphPlanner:
         )
 
 
-def test_compile_graph_default_delivery_shape_has_zero_program_metrics() -> None:
-    """The supported graph route dispatches one typed worker and no program worker."""
+def test_compile_graph_canonical_shape_has_zero_program_metrics() -> None:
+    """The supported graph route dispatches one canonical worker and no program worker."""
     with TemporaryDirectory(dir=REPO_ROOT) as temporary_directory:
         fixture = create_mcp_fixture_paths(Path(temporary_directory))
         spec = load_logfile(fixture.single_logfile, allowed_root=REPO_ROOT)
         document = AuthoringService.from_mapping(report_to_dict(spec)).document
         backend = _TypedBackend(
             responses=[
-                DeliverySectionResponse(
-                    mode="add_track_curve",
-                    track=DeliveryTrack(
-                        semantic_id="qc",
-                        kind="normal",
-                        title="Caliper QC",
-                        width_mm=28,
-                        curves=(
-                            DeliveryCurve(
-                                semantic_id="cali",
-                                channel="CALI",
-                                label="Caliper QC",
-                                scale=DeliveryScale(minimum=6, maximum=12),
-                            ),
-                        ),
-                    ),
-                )
+                {
+                    "action": "add_track",
+                    "track": {
+                        "semantic_id": "qc",
+                        "kind": "normal",
+                        "title": "Caliper QC",
+                        "width_mm": 28,
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "semantic_id": "cali",
+                                "channel": "CALI",
+                                "label": "Caliper QC",
+                                "scale": {"kind": "linear", "minimum": 6, "maximum": 12},
+                            }
+                        ],
+                    },
+                }
             ]
         )
         dependencies = CodeModeGraphDependencies(
@@ -647,8 +650,8 @@ def test_compile_graph_default_delivery_shape_has_zero_program_metrics() -> None
                 loader=LogfileSourceLoader(),
                 allowed_roots={"server": REPO_ROOT},
             ),
-            report_compiler=TypedDeliveryReportCompiler(backend=backend),
-            section_compiler=TypedDeliverySectionCompiler(backend=backend),
+            report_compiler=CanonicalReportWorker(backend=backend),
+            section_compiler=CanonicalSectionWorker(backend=backend),
         )
         facade = CodeModeCompileFacade(dependencies)
         result = asyncio.run(
@@ -677,7 +680,7 @@ def test_compile_graph_default_delivery_shape_has_zero_program_metrics() -> None
     assert backend.program_calls == 0
 
 
-def test_direct_notebook_default_session_uses_typed_compilers(
+def test_direct_notebook_default_session_uses_canonical_workers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The public notebook composition selects typed workers by default."""
@@ -698,5 +701,5 @@ def test_direct_notebook_default_session_uses_typed_compilers(
 
     assert credential_source == "deterministic"
     dependencies = session.compiler.dependencies
-    assert isinstance(dependencies.report_compiler, TypedDeliveryReportCompiler)
-    assert isinstance(dependencies.section_compiler, TypedDeliverySectionCompiler)
+    assert isinstance(dependencies.report_compiler, CanonicalReportWorker)
+    assert isinstance(dependencies.section_compiler, CanonicalSectionWorker)

@@ -1,8 +1,8 @@
 {
   "baseline_sha": "25df6d7",
   "response_model": "wellplot.agent.code_mode.section_semantics.SectionSemanticDraft",
-  "schema_sha256": "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4",
-  "schema_chars": 5388,
+  "schema_sha256": "5113b708f50b40fabc0653beab9ce887d641d21df1d20c192fb955e1023a3607",
+  "schema_chars": 8551,
   "track_discriminator": "kind",
   "track_branches": {
     "normal": "NormalTrackSemanticDraft",

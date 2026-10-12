@@ -31,10 +31,11 @@ class AgentSessionConfig(_SessionModel):
     """Provider-neutral execution limits for one direct Python session."""
 
     timeout_seconds: float = Field(default=120.0, gt=0)
+    planner_temperature: float | None = Field(default=0.0, ge=0)
     temperature: float | None = Field(default=None, ge=0)
     max_output_tokens: int | None = Field(default=None, gt=0)
 
-    @field_validator("timeout_seconds", "temperature", mode="before")
+    @field_validator("timeout_seconds", "planner_temperature", "temperature", mode="before")
     @classmethod
     def validate_finite_numbers(cls, value: object) -> object:
         """Match provider validation for finite numeric execution settings."""
@@ -253,8 +254,9 @@ class _CompileFacadeProtocol(Protocol):
         document: AuthoringDocumentSpec,
         source_candidates: Sequence[SourceCandidate],
         timeout_seconds: float,
-        temperature: float | None,
-        max_output_tokens: int | None,
+        planner_temperature: float | None = 0.0,
+        temperature: float | None = None,
+        max_output_tokens: int | None = None,
     ) -> _CompileResultLike:
         """Compile one host-owned document through the v2 graph."""
 
@@ -315,6 +317,7 @@ class AgentSession:
             document=document,
             source_candidates=internal_sources,
             timeout_seconds=self.config.timeout_seconds,
+            planner_temperature=self.config.planner_temperature,
             temperature=self.config.temperature,
             max_output_tokens=self.config.max_output_tokens,
         )

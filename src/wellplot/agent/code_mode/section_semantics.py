@@ -8,6 +8,7 @@ from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ...model.intent import AuthoringStyleIntent
 from .enrichment import ResolvedSectionContext
 
 
@@ -92,13 +93,29 @@ class SemanticSampleAxis(_SemanticModel):
         return self
 
 
+class SemanticGrid(_SemanticModel):
+    """Explicit vertical grid visibility requested for one track."""
+
+    vertical_main_visible: bool | None = None
+    vertical_secondary_visible: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_nonempty(self) -> SemanticGrid:
+        """Reject an empty grid projection."""
+        if self.vertical_main_visible is None and self.vertical_secondary_visible is None:
+            raise ValueError("Grid semantics must contain at least one visibility value.")
+        return self
+
+
 class CurveBindingSemanticDraft(_SemanticModel):
     """One ordered scalar binding; kind is optional because no union selects it."""
 
     kind: Literal["curve"] = "curve"
     semantic_id: str = Field(min_length=1)
     channel: str = Field(min_length=1)
+    label: str | None = Field(default=None, min_length=1)
     scale: SemanticScale | None = None
+    style: AuthoringStyleIntent | None = None
 
 
 class RasterBindingSemanticDraft(_SemanticModel):
@@ -107,7 +124,13 @@ class RasterBindingSemanticDraft(_SemanticModel):
     kind: Literal["raster"] = "raster"
     semantic_id: str = Field(min_length=1)
     channel: str = Field(min_length=1)
+    label: str | None = Field(default=None, min_length=1)
     profile: SemanticRasterProfile | None = None
+    colormap: str | None = Field(default=None, min_length=1)
+    alpha: float | None = Field(default=None, ge=0, le=1)
+    colorbar_enabled: bool | None = None
+    colorbar_label: str | None = Field(default=None, min_length=1)
+    colorbar_position: Literal["right", "header"] | None = None
     sample_axis: SemanticSampleAxis | None = None
 
 
@@ -117,7 +140,9 @@ class NormalTrackSemanticDraft(_SemanticModel):
     semantic_id: str = Field(min_length=1)
     kind: Literal["normal"]
     title: str = Field(min_length=1)
+    width_mm: float | None = Field(default=None, gt=0)
     x_scale: SemanticScale | None = None
+    grid: SemanticGrid | None = None
     bindings: tuple[CurveBindingSemanticDraft, ...] = Field(min_length=1)
 
 
@@ -127,7 +152,9 @@ class ReferenceTrackSemanticDraft(_SemanticModel):
     semantic_id: str = Field(min_length=1)
     kind: Literal["reference"]
     title: str = Field(min_length=1)
+    width_mm: float | None = Field(default=None, gt=0)
     x_scale: SemanticScale | None = None
+    grid: SemanticGrid | None = None
     bindings: tuple[CurveBindingSemanticDraft, ...] = Field(min_length=1)
 
 
@@ -137,7 +164,9 @@ class ArrayTrackSemanticDraft(_SemanticModel):
     semantic_id: str = Field(min_length=1)
     kind: Literal["array"]
     title: str = Field(min_length=1)
+    width_mm: float | None = Field(default=None, gt=0)
     x_scale: SemanticScale
+    grid: SemanticGrid | None = None
     bindings: tuple[RasterBindingSemanticDraft, ...] = Field(min_length=1)
 
 
@@ -181,10 +210,11 @@ def validate_section_semantics(
     draft: SectionSemanticDraft | Mapping[str, object],
     *,
     section_context: ResolvedSectionContext,
+    allow_existing_section: bool = False,
 ) -> SectionSemanticDraft:
     """Validate one structurally valid draft against its selected source context."""
     validated = _revalidate(draft)
-    if section_context.section_id is not None:
+    if section_context.section_id is not None and not allow_existing_section:
         raise SectionSemanticValidationError(
             SectionSemanticErrorCode.REVISION_UNSUPPORTED,
             "Typed section compilation does not yet support existing-section revision.",
@@ -252,7 +282,11 @@ def _revalidate(
     draft: SectionSemanticDraft | Mapping[str, object],
 ) -> SectionSemanticDraft:
     """Revalidate mappings and model instances through the static response model."""
-    raw = draft.model_dump(mode="json") if isinstance(draft, SectionSemanticDraft) else draft
+    raw = (
+        draft.model_dump(mode="json", exclude_unset=True)
+        if isinstance(draft, SectionSemanticDraft)
+        else draft
+    )
     return SectionSemanticDraft.model_validate(raw)
 
 
@@ -267,6 +301,7 @@ __all__ = [
     "SectionSemanticValidationError",
     "SemanticRasterProfile",
     "SemanticSampleAxis",
+    "SemanticGrid",
     "SemanticScale",
     "SemanticScaleKind",
     "TrackSemanticDraft",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
@@ -11,13 +11,14 @@ from typing import Literal
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ...authoring_program.models import (
-    ProgramDiagnostic,
-    ProgramMetrics,
-)
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
-from ..providers.base import ProviderRequestError
+from ..providers.base import ProviderFailureCategory, ProviderRequestError
+from ..providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .capability_safety import (
     CapabilitySafetyEvidence,
     CapabilitySafetyFailure,
@@ -74,7 +75,21 @@ class CompileWorkerEvidence(_CompileModel):
     plan_order: int = Field(ge=0)
     success: bool
     diagnostics: tuple[CompileDiagnostic, ...] = ()
-    metrics: ProgramMetrics = Field(default_factory=ProgramMetrics)
+    metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_compatible_metrics(cls, value: object) -> object:
+        """Accept historical metric models without making them runtime dependencies."""
+        if not isinstance(value, Mapping):
+            return value
+        metrics = value.get("metrics")
+        model_dump = getattr(metrics, "model_dump", None)
+        if isinstance(metrics, SemanticMetrics) or not callable(model_dump):
+            return value
+        normalized = dict(value)
+        normalized["metrics"] = model_dump(mode="json")
+        return normalized
 
 
 class CompileMetrics(_CompileModel):
@@ -141,6 +156,7 @@ class CodeModeCompileFacade:
         document: AuthoringDocumentSpec,
         source_candidates: Sequence[SourceCandidate],
         timeout_seconds: float,
+        planner_temperature: float | None = 0.0,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
     ) -> CodeModeCompileResult:
@@ -153,6 +169,7 @@ class CodeModeCompileFacade:
                 candidate.model_dump(mode="json") for candidate in source_candidates
             ],
             "timeout_seconds": timeout_seconds,
+            "planner_temperature": planner_temperature,
             "temperature": temperature,
             "max_output_tokens": max_output_tokens,
             "worker_outcomes": [],
@@ -224,7 +241,7 @@ def _worker_evidence(outcome: WorkerOutcome) -> CompileWorkerEvidence:
         plan_order=outcome.plan_order,
         success=outcome.success,
         diagnostics=tuple(
-            _program_diagnostic(
+            _semantic_diagnostic(
                 diagnostic,
                 worker_kind=outcome.kind,
                 plan_order=outcome.plan_order,
@@ -235,8 +252,8 @@ def _worker_evidence(outcome: WorkerOutcome) -> CompileWorkerEvidence:
     )
 
 
-def _program_diagnostic(
-    diagnostic: ProgramDiagnostic,
+def _semantic_diagnostic(
+    diagnostic: SemanticDiagnostic,
     *,
     worker_kind: Literal["report", "section"],
     plan_order: int,
@@ -262,9 +279,18 @@ def _program_diagnostic(
 
 def _provider_diagnostic(error: ProviderRequestError) -> CompileDiagnostic:
     """Project only explicitly safe provider failure fields."""
+    if isinstance(error, StructuredResponseProviderError):
+        if error.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION:
+            code = "structured_schema_validation_failure"
+        else:
+            code = "structured_output_decode_failure"
+    elif error.category is ProviderFailureCategory.TRANSPORT:
+        code = "provider_transport_failure"
+    else:
+        code = f"provider.{error.category.value}"
     return CompileDiagnostic(
         stage="planner",
-        code=f"provider.{error.category.value}",
+        code=code,
         message=error.safe_message,
         retryable=error.retryable,
     )

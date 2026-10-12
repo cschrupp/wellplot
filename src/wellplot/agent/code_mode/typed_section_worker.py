@@ -9,21 +9,30 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ...capabilities import CapabilityRegistry
 from ...capabilities.base import CapabilitySpec
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
-from ..providers.base import ModelBackendProtocol, ProviderMetrics, StructuredGenerationRequest
+from ..providers.base import (
+    ModelBackendProtocol,
+    ProviderMetrics,
+    ProviderRequestError,
+    StructuredGenerationRequest,
+)
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from .canonical_workers import SectionSemanticActionResponse
 from .enrichment import ResolvedSectionContext
 from .planner import CompilationMode, SectionTask
 from .section_semantics import SectionSemanticDraft, validate_section_semantics
+from .semantic_actions import SectionSemanticAction, lower_section_action
 from .semantic_section_compiler import compile_section_semantics
+from .worker_contracts import CanonicalWorkerResult
 
 TYPED_SECTION_INPUT_VERSION = "cm56.typed-section-input.v1"
 TYPED_SECTION_PROVIDER_INPUT_VERSION = "cm57.typed-section-provider-input.v1"
-RESPONSE_SCHEMA_SHA256 = "93f1b7d26f1196a1105b733bc13a8de784da19f44eaaa990989d59abaf9fa2d4"
+RESPONSE_SCHEMA_SHA256 = "5113b708f50b40fabc0653beab9ce887d641d21df1d20c192fb955e1023a3607"
 TYPED_SECTION_SEMANTIC_METADATA_MAX_BYTES = 8192
 TYPED_SECTION_SEMANTIC_TARGET_PATHS = frozenset(
     {
@@ -281,6 +290,136 @@ class TypedSectionCompiler:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class CanonicalSectionWorker:
+    """Generate and lower the one canonical section action contract."""
+
+    backend: ModelBackendProtocol
+
+    async def compile(
+        self,
+        *,
+        task_index: int,
+        context: object,
+        document: object,
+        authoritative_request: str,
+        timeout_seconds: float,
+        temperature: float | None = None,
+        max_output_tokens: int | None = None,
+    ) -> CanonicalWorkerResult:
+        """Generate exactly one action and lower it without document mutation."""
+        section_context = ResolvedSectionContext.model_validate(context.sections[task_index])
+        task = SectionTask.model_validate(context.plan.section_tasks[task_index])
+        payload = {
+            "section_task": task.model_dump(mode="json"),
+            "section_context": _canonical_section_context(section_context),
+            "authoritative_request": authoritative_request,
+            "authority_rules": {
+                "authoritative_request": "source of explicit scientist semantics",
+                "section_task": "scoped decomposition and requirements",
+                "section_context": "host-grounded source and existing-object facts",
+            },
+            "rules": (
+                "Return exactly one action: reconstruct, update_curve_scale, add_track, or "
+                "add_fill. Only fields belonging to that action are allowed. Use request-local "
+                "curve handles for existing targets. Never return canonical IDs, paths, programs, "
+                "SDK calls, or renderer state."
+            ),
+        }
+        request = StructuredGenerationRequest(
+            system_prompt=(
+                "You are the Wellplot section semantic worker. Return one JSON object with "
+                "a required action discriminator. Valid action values are reconstruct, "
+                "update_curve_scale, add_track, and add_fill. Include only fields for the "
+                "selected action. Source/channel facts are authoritative host context; "
+                "existing curves use request-local handles."
+            ),
+            user_prompt=_json_payload(payload),
+            timeout_seconds=timeout_seconds,
+            temperature=temperature,
+            max_output_tokens=max_output_tokens,
+        )
+        try:
+            generated = await self.backend.generate_structured(
+                request,
+                response_model=SectionSemanticActionResponse,
+            )
+        except ProviderRequestError:
+            raise
+        except ValidationError:
+            return _canonical_failure(
+                "structured_schema_validation_failure",
+                "Section output did not match the canonical semantic action schema.",
+            )
+        try:
+            action: SectionSemanticAction = generated.value.root
+            intent = lower_section_action(action, context=section_context, document=document)
+            return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
+        except ValidationError:
+            return _canonical_failure(
+                "semantic_context_validation_failure",
+                "Section semantics failed canonical validation.",
+            )
+        except ValueError as error:
+            return _canonical_failure(
+                getattr(error, "code", "semantic_context_validation_failure"),
+                "Section semantics could not be validated safely.",
+            )
+        except Exception:
+            return _canonical_failure(
+                "semantic_lowering_failure",
+                "Section semantics could not be lowered safely.",
+            )
+
+
+def _canonical_section_context(context: ResolvedSectionContext) -> dict[str, object]:
+    """Expose only bounded source facts and request-local existing handles."""
+    return {
+        "target": {"kind": "existing" if context.section_id else "new"},
+        "sources": [
+            {
+                "candidate_id": source.candidate_id,
+                "channels": [
+                    {"mnemonic": channel.mnemonic, "kind": channel.kind, "unit": channel.unit}
+                    for channel in source.channels
+                ],
+            }
+            for source in context.sources
+        ],
+        "existing_curves": [
+            {
+                "handle": f"curve-{index}",
+                "track_title": curve.track_title,
+                "track_kind": curve.track_kind,
+                "channel": curve.channel,
+                "label": curve.label,
+                "scale_kind": curve.scale_kind,
+                "scale_minimum": curve.scale_minimum,
+                "scale_maximum": curve.scale_maximum,
+                "reverse": curve.reverse,
+            }
+            for index, curve in enumerate(context.existing_curves, start=1)
+        ],
+    }
+
+
+def _canonical_failure(code: str, message: str) -> CanonicalWorkerResult:
+    """Create bounded canonical failure evidence without raw provider data."""
+    return CanonicalWorkerResult(
+        success=False,
+        intent_fragment=None,
+        diagnostics=(
+            SemanticDiagnostic(
+                stage="semantic_worker",
+                code=code,
+                message=message,
+                remediation_hint="Return one valid canonical semantic action.",
+            ),
+        ),
+        metrics=SemanticMetrics(),
+    )
+
+
 def build_typed_section_input(
     task: SectionTask,
     *,
@@ -493,6 +632,11 @@ def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def _json_payload(value: object) -> str:
+    """Serialize canonical worker input deterministically."""
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
 __all__ = [
     "RESPONSE_SCHEMA_SHA256",
     "TYPED_SECTION_CAPABILITIES",
@@ -515,6 +659,7 @@ __all__ = [
     "TypedSectionWorkerInput",
     "TypedSectionWorkerError",
     "TypedSectionWorkerErrorCode",
+    "CanonicalSectionWorker",
     "build_typed_section_input",
     "build_typed_section_provider_input",
     "build_typed_section_system_prompt",

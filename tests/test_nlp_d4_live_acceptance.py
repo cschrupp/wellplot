@@ -18,10 +18,15 @@ from pydantic import BaseModel
 from scripts import nlp_d4_live_acceptance as d4
 from tests._mcp_fixtures import REPO_ROOT
 from tests.test_nlp_d4r1_integrated_acceptance import (
+    _canonical_section_action,
     _cbl_report_response,
     _section_response,
 )
 
+from wellplot.agent.code_mode.canonical_workers import (
+    ReportSemanticResponse,
+    SectionSemanticActionResponse,
+)
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.code_mode.typed_delivery import (
     DeliveryReportResponse,
@@ -1563,8 +1568,8 @@ class _D4SessionReportBackend:
         self,
         request: StructuredGenerationRequest,
         *,
-        response_model: type[DeliveryReportResponse],
-    ) -> StructuredGenerationResult[DeliveryReportResponse]:
+        response_model: type[ReportSemanticResponse],
+    ) -> StructuredGenerationResult[ReportSemanticResponse]:
         """Return only the typed report fields required by the D4 turn."""
         payload = json.loads(request.user_prompt)
         authoritative_request = str(payload["authoritative_request"])
@@ -1573,7 +1578,7 @@ class _D4SessionReportBackend:
         else:
             value = _cbl_report_response(payload)
         return StructuredGenerationResult(
-            value=response_model.model_validate(value),
+            value=response_model.model_validate(value.model_dump(mode="json")),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
 
@@ -1586,12 +1591,12 @@ class _D4SessionSectionBackend:
         self,
         request: StructuredGenerationRequest,
         *,
-        response_model: type[DeliverySectionResponse],
-    ) -> StructuredGenerationResult[DeliverySectionResponse]:
+        response_model: type[SectionSemanticActionResponse],
+    ) -> StructuredGenerationResult[SectionSemanticActionResponse]:
         """Return one typed section response for the requested D4 turn."""
         payload = json.loads(request.user_prompt)
         requirement = str(payload["authoritative_request"])
-        value = _section_response(requirement, payload)
+        value = _canonical_section_action(_section_response(requirement, payload), payload)
         return StructuredGenerationResult(
             value=response_model.model_validate(value),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
@@ -1615,13 +1620,13 @@ class _D4SessionBackend:
         """Select the typed fixture response by the production response model."""
         if response_model is SemanticPlan:
             return await self.planner.generate_structured(request, response_model=SemanticPlan)
-        if response_model is DeliveryReportResponse:
+        if response_model is ReportSemanticResponse:
             return await self.report.generate_structured(
-                request, response_model=DeliveryReportResponse
+                request, response_model=ReportSemanticResponse
             )
-        if response_model is DeliverySectionResponse:
+        if response_model is SectionSemanticActionResponse:
             return await self.section.generate_structured(
-                request, response_model=DeliverySectionResponse
+                request, response_model=SectionSemanticActionResponse
             )
         raise AssertionError(f"unexpected D4 response model: {response_model!r}")
 
@@ -1865,6 +1870,7 @@ def test_safe_actionable_failure_uses_observed_diagnostics_not_request_text() ->
     [
         ("D4-L02:T1", "enrichment.section_hint_ambiguous", "ambiguous section"),
         ("D4-L03:C01", "enrichment.source_missing", "source missing"),
+        ("D4-L04:C01", "channel_missing", "No source channel matches 'NPHI'."),
         ("D4-L04:C01", "typed.channel_missing", "No source channel matches 'RT'."),
     ],
 )

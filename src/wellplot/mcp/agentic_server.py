@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from ..agent.composition import create_canonical_dependencies, create_provider_backend
 from ..errors import DependencyUnavailableError
 from .server import create_mcp_server
 
@@ -33,67 +34,14 @@ def _provider_backend(
     base_url: str | None,
     timeout: float | None,
 ) -> object:
-    """Construct one async provider-v2 backend from host configuration."""
-    from ..agent.providers._v2_client import (
-        is_loopback_url,
-        load_api_key,
-        load_async_openai_client,
-    )
-
-    if provider == "openai":
-        token = load_api_key(
-            server_root=server_root,
-            api_key=api_key,
-            env_var_names=("OPENAI_API_KEY",),
-            env_file_keys=("OPENAI_API_KEY",),
-            text_file_names=("OPENAI_API_KEY.txt", "openai_api_key.txt"),
-            missing_message=(
-                "Set OPENAI_API_KEY, pass api_key=..., or create OPENAI_API_KEY.txt "
-                "under the configured server root."
-            ),
-        )
-        from ..agent.providers.openai_v2 import OpenAIBackendV2
-
-        return OpenAIBackendV2(
-            model=model,
-            client=load_async_openai_client(api_key=token, timeout=timeout),
-        )
-
-    if base_url is None or not base_url.strip():
-        raise ValueError("provider='openai_compat' requires a non-empty base_url.")
-    normalized_base_url = base_url.strip()
-    try:
-        token = load_api_key(
-            server_root=server_root,
-            api_key=api_key,
-            env_var_names=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-            env_file_keys=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-            text_file_names=(
-                "OPENAI_COMPAT_API_KEY.txt",
-                "openai_compat_api_key.txt",
-                "OPENAI_API_KEY.txt",
-                "openai_api_key.txt",
-            ),
-            missing_message="OpenAI-compatible API key was not configured.",
-        )
-    except RuntimeError:
-        if not is_loopback_url(normalized_base_url):
-            raise RuntimeError(
-                "Pass api_key=..., set OPENAI_COMPAT_API_KEY or OPENAI_API_KEY, or "
-                "create an OpenAI-compatible key file under the configured server root."
-            ) from None
-        token = "wellplot-local-openai-compat"
-
-    from ..agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
-
-    return OpenAICompatibleBackendV2(
+    """Construct the shared provider-v2 backend from host configuration."""
+    return create_provider_backend(
+        provider=provider,
         model=model,
-        client=load_async_openai_client(
-            api_key=token,
-            base_url=normalized_base_url,
-            timeout=timeout,
-        ),
-        structured_output="json_schema",
+        server_root=server_root,
+        api_key=api_key,
+        base_url=base_url,
+        timeout=timeout,
     )
 
 
@@ -115,15 +63,8 @@ def create_agentic_mcp_server(
 
     server_root = Path.cwd().resolve() if root is None else Path(root).expanduser().resolve()
     try:
-        from ..agent.code_mode.enrichment import SemanticEnricher
         from ..agent.code_mode.facade import CodeModeCompileFacade
-        from ..agent.code_mode.planner import SemanticPlanner
-        from ..agent.code_mode.program_worker import ProgramSectionCompiler
-        from ..agent.code_mode.report_worker import ReportProgramCompiler
-        from ..agent.code_mode.source_loader import LogfileSourceLoader
-        from ..agent.code_mode.workflow import CodeModeGraphDependencies
         from ..agent.session import AgentSession, AgentSessionConfig
-        from ..capabilities import create_builtin_registry
     except ModuleNotFoundError as exc:
         if exc.name in {"langgraph", "openai"}:
             raise DependencyUnavailableError(
@@ -140,21 +81,9 @@ def create_agentic_mcp_server(
         base_url=base_url,
         timeout=timeout,
     )
-    registry = create_builtin_registry()
-    dependencies = CodeModeGraphDependencies(
-        planner=SemanticPlanner(backend=backend, registry=registry),
-        enricher=SemanticEnricher(
-            loader=LogfileSourceLoader(),
-            allowed_roots={"server": server_root},
-        ),
-        report_compiler=ReportProgramCompiler(
-            backend=backend,
-            registry=registry,
-        ),
-        section_compiler=ProgramSectionCompiler(
-            backend=backend,
-            registry=registry,
-        ),
+    dependencies = create_canonical_dependencies(
+        backend=backend,
+        server_root=server_root,
     )
     session = AgentSession(
         compiler=CodeModeCompileFacade(dependencies),

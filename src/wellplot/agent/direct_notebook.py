@@ -16,17 +16,10 @@ from ..authoring_service import AuthoringService
 from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
-from .code_mode.enrichment import LoadedSource, SemanticEnricher
-from .code_mode.facade import CodeModeCompileFacade
-from .code_mode.planner import SemanticPlanner
+from .code_mode.enrichment import LoadedSource
 from .code_mode.source_loader import LogfileSourceLoader
-from .code_mode.typed_delivery import (
-    TypedDeliveryReportCompiler,
-    TypedDeliverySectionCompiler,
-)
-from .code_mode.workflow import CodeModeGraphDependencies
+from .composition import create_canonical_compile_facade, create_provider_backend
 from .core import AuthoringResult, AuthoringRunState, AuthoringUserReport
-from .providers._v2_client import is_loopback_url, load_api_key, load_async_openai_client
 from .session import (
     AgentSession,
     AgentSessionConfig,
@@ -151,65 +144,15 @@ def _provider_backend(
     base_url: str | None,
     timeout: float | None,
 ) -> tuple[object, str | None]:
-    """Construct one provider-v2 backend and a bounded credential label."""
-    if provider == "openai":
-        token = load_api_key(
-            server_root=root,
-            api_key=api_key,
-            env_var_names=("OPENAI_API_KEY",),
-            env_file_keys=("OPENAI_API_KEY",),
-            text_file_names=("OPENAI_API_KEY.txt", "openai_api_key.txt"),
-            missing_message=(
-                "Set OPENAI_API_KEY, pass api_key=..., or create OPENAI_API_KEY.txt "
-                "under the configured server root."
-            ),
-        )
-        from .providers.openai_v2 import OpenAIBackendV2
-
-        return (
-            OpenAIBackendV2(
-                model=model,
-                client=load_async_openai_client(api_key=token, timeout=timeout),
-            ),
-            "configured",
-        )
-
-    if base_url is None or not base_url.strip():
-        raise ValueError("provider='openai_compat' requires a non-empty base_url.")
-    normalized_base_url = base_url.strip()
-    try:
-        token = load_api_key(
-            server_root=root,
-            api_key=api_key,
-            env_var_names=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-            env_file_keys=("OPENAI_COMPAT_API_KEY", "OPENAI_API_KEY"),
-            text_file_names=(
-                "OPENAI_COMPAT_API_KEY.txt",
-                "openai_compat_api_key.txt",
-                "OPENAI_API_KEY.txt",
-                "openai_api_key.txt",
-            ),
-            missing_message="OpenAI-compatible API key was not configured.",
-        )
-    except RuntimeError:
-        if not is_loopback_url(normalized_base_url):
-            raise RuntimeError(
-                "Pass api_key=..., set OPENAI_COMPAT_API_KEY or OPENAI_API_KEY, or "
-                "create an OpenAI-compatible key file under the configured server root."
-            ) from None
-        token = "wellplot-local-openai-compat"
-
-    from .providers.openai_compat_v2 import OpenAICompatibleBackendV2
-
+    """Construct one shared provider-v2 backend and bounded credential label."""
     return (
-        OpenAICompatibleBackendV2(
+        create_provider_backend(
+            provider=provider,  # type: ignore[arg-type]
             model=model,
-            client=load_async_openai_client(
-                api_key=token,
-                base_url=normalized_base_url,
-                timeout=timeout,
-            ),
-            structured_output="json_schema",
+            server_root=root,
+            api_key=api_key,
+            base_url=base_url,
+            timeout=timeout,
         ),
         "configured",
     )
@@ -236,21 +179,9 @@ def _build_agent_session(
         base_url=base_url,
         timeout=timeout,
     )
-    from ..capabilities import create_builtin_registry
-
-    registry = create_builtin_registry()
-    dependencies = CodeModeGraphDependencies(
-        planner=SemanticPlanner(backend=backend, registry=registry),
-        enricher=SemanticEnricher(
-            loader=LogfileSourceLoader(),
-            allowed_roots={"server": root},
-        ),
-        report_compiler=TypedDeliveryReportCompiler(backend=backend),
-        section_compiler=TypedDeliverySectionCompiler(backend=backend),
-    )
     return (
         AgentSession(
-            compiler=CodeModeCompileFacade(dependencies),
+            compiler=create_canonical_compile_facade(backend=backend, server_root=root),
             config=session_config,
         ),
         credential_source,

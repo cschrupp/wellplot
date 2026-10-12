@@ -14,6 +14,7 @@ from scripts import nlp_d4_live_acceptance as d4
 from tests._mcp_fixtures import REPO_ROOT
 
 from wellplot.agent import direct_notebook
+from wellplot.agent.code_mode.canonical_workers import ReportSemanticResponse
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.code_mode.typed_delivery import (
     DeliveryCurve,
@@ -438,6 +439,143 @@ def _section_response(request: str, payload: dict[str, Any]) -> DeliverySectionR
     )
 
 
+def _canonical_section_action(
+    response: DeliverySectionResponse,
+    payload: dict[str, Any],
+) -> dict[str, object]:
+    """Translate the frozen fixture response into the canonical action contract."""
+    if response.mode == "update_curve_scale":
+        target_channel = response.target.channel if response.target is not None else None
+        handles = payload["section_context"]["existing_curves"]
+        handle = next(
+            item["handle"]
+            for item in handles
+            if target_channel is None or item["channel"] == target_channel
+        )
+        return {
+            "action": "update_curve_scale",
+            "target": {"handle": handle},
+            "scale": response.scale.model_dump(mode="json"),
+        }
+    if response.mode in {"add_track", "add_track_curve"}:
+        track = response.track
+        assert track is not None
+        bindings: list[dict[str, object]] = []
+        for curve in track.curves:
+            item = {
+                "kind": "curve",
+                "semantic_id": curve.semantic_id,
+                "channel": curve.channel,
+            }
+            if curve.label is not None:
+                item["label"] = curve.label
+            if curve.scale is not None:
+                item["scale"] = curve.scale.model_dump(mode="json")
+            if curve.style is not None:
+                item["style"] = curve.style.model_dump(mode="json")
+            bindings.append(item)
+        track_payload: dict[str, object] = {
+            "semantic_id": track.semantic_id,
+            "kind": track.kind,
+            "title": track.title,
+            "bindings": bindings,
+        }
+        if track.width_mm is not None:
+            track_payload["width_mm"] = track.width_mm
+        if track.scale is not None:
+            track_payload["x_scale"] = track.scale.model_dump(mode="json")
+        return {"action": "add_track", "track": track_payload}
+    if response.mode == "add_fill":
+        target_channel = response.target.channel if response.target is not None else None
+        handles = payload["section_context"]["existing_curves"]
+        handle = next(
+            item["handle"]
+            for item in handles
+            if target_channel is None or item["channel"] == target_channel
+        )
+        assert response.fill is not None
+        fill_payload = {
+            key: value
+            for key, value in response.fill.model_dump(mode="json").items()
+            if value is not None
+        }
+        return {
+            "action": "add_fill",
+            "target": {"handle": handle},
+            "fill": fill_payload,
+        }
+    assert response.section is not None
+    tracks: list[dict[str, object]] = []
+    for track in response.section.tracks:
+        bindings: list[dict[str, object]] = []
+        for curve in track.curves:
+            item = {
+                "kind": "curve",
+                "semantic_id": curve.semantic_id,
+                "channel": curve.channel,
+                "label": curve.label,
+                "scale": curve.scale.model_dump(mode="json") if curve.scale else None,
+                "style": (
+                    {
+                        key: value
+                        for key, value in curve.style.model_dump(mode="json").items()
+                        if value is not None
+                    }
+                    if curve.style
+                    else None
+                ),
+            }
+            bindings.append({key: value for key, value in item.items() if value is not None})
+        for raster in track.rasters:
+            item = {
+                "kind": "raster",
+                "semantic_id": raster.semantic_id,
+                "channel": raster.channel,
+                "label": raster.label,
+                "profile": raster.profile,
+                "colormap": raster.colormap,
+                "alpha": raster.alpha,
+                "colorbar_enabled": raster.colorbar_enabled,
+                "colorbar_label": raster.colorbar_label,
+                "colorbar_position": raster.colorbar_position,
+                "sample_axis": (
+                    raster.sample_axis.model_dump(mode="json") if raster.sample_axis else None
+                ),
+            }
+            bindings.append({key: value for key, value in item.items() if value is not None})
+        track_payload = {
+            "semantic_id": track.semantic_id,
+            "kind": track.kind,
+            "title": track.title,
+            "bindings": bindings,
+        }
+        if (
+            track.grid_vertical_main_visible is not None
+            or track.grid_vertical_secondary_visible is not None
+        ):
+            track_payload["grid"] = {
+                key: value
+                for key, value in {
+                    "vertical_main_visible": track.grid_vertical_main_visible,
+                    "vertical_secondary_visible": track.grid_vertical_secondary_visible,
+                }.items()
+                if value is not None
+            }
+        if track.width_mm is not None:
+            track_payload["width_mm"] = track.width_mm
+        if track.scale is not None:
+            track_payload["x_scale"] = track.scale.model_dump(mode="json")
+        tracks.append(track_payload)
+    return {
+        "action": "reconstruct",
+        "section": {
+            "title": response.section.title,
+            "source_candidate": response.section.source_candidate,
+            "tracks": tracks,
+        },
+    }
+
+
 @dataclass
 class _D4R1Backend:
     """Deterministic provider boundary for the integrated typed rehearsal."""
@@ -468,15 +606,17 @@ class _D4R1Backend:
             value: object = _plan_for(self.current_request)
         else:
             payload = json.loads(request.user_prompt)
-            if response_model is DeliveryReportResponse:
+            if response_model is ReportSemanticResponse:
                 self.worker_kinds.append("report")
                 if self.current_request.startswith("Rename this report"):
-                    value = DeliveryReportResponse(title="Formation Integrity Review")
+                    value = {"title": "Formation Integrity Review"}
                 else:
-                    value = _cbl_report_response(payload)
+                    value = _cbl_report_response(payload).model_dump(mode="json")
             else:
                 self.worker_kinds.append("section")
-                value = _section_response(self.current_request, payload)
+                value = _canonical_section_action(
+                    _section_response(self.current_request, payload), payload
+                )
         return StructuredGenerationResult(
             value=response_model.model_validate(value),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),

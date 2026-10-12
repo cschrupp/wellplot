@@ -29,12 +29,18 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from wellplot.agent.code_mode.canonical_workers import (
+    ReportSemanticResponse as DeliveryReportResponse,
+)
+from wellplot.agent.code_mode.canonical_workers import (
+    SectionSemanticActionResponse as DeliverySectionResponse,
+)
 from wellplot.agent.code_mode.planner import SemanticPlan
 from wellplot.agent.code_mode.typed_delivery import (
-    DeliveryReportResponse,
-    DeliverySectionResponse,
-    TypedDeliveryReportCompiler,
-    TypedDeliverySectionCompiler,
+    DeliveryReportResponse as LegacyDeliveryReportResponse,
+)
+from wellplot.agent.code_mode.typed_delivery import (
+    DeliverySectionResponse as LegacyDeliverySectionResponse,
 )
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
@@ -420,6 +426,8 @@ class CountingBackend:
             SemanticPlan: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
+            LegacyDeliveryReportResponse: "report_worker",
+            LegacyDeliverySectionResponse: "section_worker",
         }
         try:
             return roles[response_model]
@@ -1357,7 +1365,7 @@ def _is_actionable_safe_diagnostic(code: str, message: str) -> bool:
     """Recognize only bounded diagnostics for deterministic safe rejection."""
     if code in {"enrichment.section_hint_ambiguous", "enrichment.source_missing"}:
         return True
-    if code == "typed.channel_missing":
+    if code in {"channel_missing", "typed.channel_missing"}:
         return True
     return (
         code == "program.dry_run_error"
@@ -1550,27 +1558,15 @@ def build_notebook_session(
     timeout: float,
 ) -> DirectNotebookSession:
     """Compose the unchanged production notebook graph around one backend."""
-    from wellplot.agent.code_mode.enrichment import SemanticEnricher
-    from wellplot.agent.code_mode.facade import CodeModeCompileFacade
-    from wellplot.agent.code_mode.planner import SemanticPlanner
-    from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
-    from wellplot.agent.code_mode.workflow import CodeModeGraphDependencies
+    from wellplot.agent.composition import create_canonical_compile_facade
     from wellplot.agent.session import AgentSession, AgentSessionConfig
-    from wellplot.capabilities import create_builtin_registry
 
-    registry = create_builtin_registry()
-    dependencies = CodeModeGraphDependencies(
-        planner=SemanticPlanner(backend=backend, registry=registry),
-        enricher=SemanticEnricher(
-            loader=LogfileSourceLoader(),
-            allowed_roots={"server": server_root},
-        ),
-        report_compiler=TypedDeliveryReportCompiler(backend=backend),
-        section_compiler=TypedDeliverySectionCompiler(backend=backend),
-    )
     return DirectNotebookSession(
         session=AgentSession(
-            compiler=CodeModeCompileFacade(dependencies),
+            compiler=create_canonical_compile_facade(
+                backend=backend,
+                server_root=server_root,
+            ),
             config=AgentSessionConfig(timeout_seconds=timeout),
         ),
         provider=provider,

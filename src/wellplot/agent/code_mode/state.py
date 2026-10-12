@@ -7,11 +7,8 @@ from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from ...authoring_program.models import (
-    ProgramDiagnostic,
-    ProgramMetrics,
-)
 from ...model.intent import AuthoringDocumentIntent
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .planner import CompilationMode
 
 
@@ -32,8 +29,8 @@ class WorkerOutcome(BaseModel):
     plan_order: int = Field(ge=0)
     success: bool
     intent_fragment: AuthoringDocumentIntent | None = None
-    diagnostics: tuple[ProgramDiagnostic, ...] = ()
-    metrics: ProgramMetrics = Field(default_factory=ProgramMetrics)
+    diagnostics: tuple[SemanticDiagnostic, ...] = ()
+    metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
 
     @model_validator(mode="after")
     def validate_evidence(self) -> WorkerOutcome:
@@ -56,6 +53,7 @@ class CodeModeGraphState(TypedDict, total=False):
     document: dict[str, Any]
     source_candidates: list[dict[str, Any]]
     timeout_seconds: float
+    planner_temperature: float | None
     temperature: float | None
     max_output_tokens: int | None
     plan: dict[str, Any]

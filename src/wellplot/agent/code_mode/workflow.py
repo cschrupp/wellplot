@@ -11,12 +11,16 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Send
 
-from ...authoring_program.inspection import AuthoringInspectionFacade
-from ...authoring_program.models import ProgramDiagnostic, ProgramMetrics
 from ...capabilities import create_builtin_registry
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
-from ..providers.base import ProviderRequestError
+from ..inspection import AuthoringInspectionFacade
+from ..providers.base import ProviderFailureCategory, ProviderRequestError
+from ..providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    StructuredResponseProviderError,
+)
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .capability_safety import enforce_capability_safety
 from .enrichment import (
     EnrichedSemanticContext,
@@ -42,9 +46,9 @@ class CodeModeGraphDependencies:
 
     planner: SemanticPlanner
     enricher: SemanticEnricher
-    # The default notebook route supplies typed delivery compilers.  The
-    # historical program compilers remain accepted here for compatibility with
-    # the frozen D0-D3 provider-free tests and research fixtures.
+    # The shared composition supplies canonical semantic workers. Historical
+    # worker implementations remain accepted here only for frozen evidence
+    # tests and research fixtures.
     report_compiler: object
     section_compiler: object
 
@@ -62,7 +66,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             current_document_summary=summary.model_dump(mode="json"),
             source_summary=_planner_source_summary(state),
             timeout_seconds=state["timeout_seconds"],
-            temperature=0.0,
+            temperature=state.get("planner_temperature", 0.0),
             max_output_tokens=state.get("max_output_tokens"),
         )
         return {"plan": plan.model_dump(mode="json")}
@@ -200,9 +204,9 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     max_output_tokens=worker_state.get("max_output_tokens"),
                 )
         except ProviderRequestError as error:
-            diagnostic = ProgramDiagnostic(
+            diagnostic = SemanticDiagnostic(
                 stage="provider",
-                code=f"provider.{error.category.value}",
+                code=_provider_diagnostic_code(error),
                 message=error.safe_message,
                 remediation_hint="Retry the graph with a functioning provider configuration.",
             )
@@ -211,7 +215,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 plan_order=plan_order,
                 success=False,
                 diagnostics=(diagnostic,),
-                metrics=ProgramMetrics(),
+                metrics=SemanticMetrics(),
             )
             return _outcome_state(outcome)
 
@@ -224,8 +228,8 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             plan_order=plan_order,
             success=result.success,
             intent_fragment=intent_fragment if result.success else None,
-            diagnostics=result.diagnostics,
-            metrics=result.metrics,
+            diagnostics=_semantic_diagnostics(result.diagnostics),
+            metrics=_semantic_metrics(result.metrics),
         )
         return _outcome_state(outcome)
 
@@ -270,6 +274,41 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     builder.add_edge("compile_worker", "merge_intent")
     builder.add_edge("merge_intent", END)
     return builder.compile()
+
+
+def _semantic_metrics(value: object) -> SemanticMetrics:
+    """Normalize compatible worker measurements at the shared graph boundary."""
+    if isinstance(value, SemanticMetrics):
+        return value
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        return SemanticMetrics.model_validate(model_dump(mode="json"))
+    raise TypeError("Worker metrics must expose a provider-neutral model mapping.")
+
+
+def _semantic_diagnostics(values: object) -> tuple[SemanticDiagnostic, ...]:
+    """Normalize compatible worker diagnostics at the shared graph boundary."""
+    if not isinstance(values, (tuple, list)):
+        raise TypeError("Worker diagnostics must be a sequence.")
+    diagnostics: list[SemanticDiagnostic] = []
+    for value in values:
+        if isinstance(value, SemanticDiagnostic):
+            diagnostics.append(value)
+            continue
+        model_dump = getattr(value, "model_dump", None)
+        if not callable(model_dump):
+            raise TypeError("Worker diagnostics must expose a provider-neutral model mapping.")
+        payload = model_dump(mode="json")
+        diagnostics.append(
+            SemanticDiagnostic(
+                stage=payload["stage"],
+                message=payload["message"],
+                severity=payload.get("severity", "error"),
+                code=payload.get("code"),
+                remediation_hint=payload.get("remediation_hint"),
+            )
+        )
+    return tuple(diagnostics)
 
 
 def merge_v2_intents(
@@ -394,6 +433,17 @@ def _outcome_state(outcome: WorkerOutcome) -> dict[str, object]:
             for diagnostic in outcome.diagnostics
         ]
     return state
+
+
+def _provider_diagnostic_code(error: ProviderRequestError) -> str:
+    """Classify provider and structured-output failures without raw payloads."""
+    if isinstance(error, StructuredResponseProviderError):
+        if error.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION:
+            return "structured_schema_validation_failure"
+        return "structured_output_decode_failure"
+    if error.category is ProviderFailureCategory.TRANSPORT:
+        return "provider_transport_failure"
+    return f"provider.{error.category.value}"
 
 
 def _validate_outcomes(

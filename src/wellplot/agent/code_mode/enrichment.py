@@ -12,12 +12,12 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...authoring_context import AuthoringChannelCandidate
-from ...authoring_program.inspection import (
+from ...model.authoring import AuthoringDocumentSpec
+from ..inspection import (
     AuthoringInspectionFacade,
     ChannelInspectionSummary,
     HeaderSlotInspectionSummary,
 )
-from ...model.authoring import AuthoringDocumentSpec
 from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
