@@ -36,17 +36,9 @@ from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
 from wellplot.agent.code_mode.planner import SemanticPlan
-from wellplot.agent.code_mode.typed_delivery import (
-    DeliveryReportResponse as LegacyDeliveryReportResponse,
-)
-from wellplot.agent.code_mode.typed_delivery import (
-    DeliverySectionResponse as LegacyDeliverySectionResponse,
-)
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
-    ProgramGenerationRequest,
-    ProgramGenerationResult,
     ProviderFailureCategory,
     ProviderMetrics,
     ProviderRequestError,
@@ -86,110 +78,16 @@ JOURNAL_RELATIVE = Path("workspace/evaluations/d4-live-acceptance/d4-live-v1.jso
 FROZEN_CASES_SHA256 = "f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298"
 FROZEN_GOLD_SHA256 = "99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968"
 FROZEN_UV_LOCK_SHA256 = "0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6"
-PRODUCTION_COMPONENT_PATHS = (
-    "src/wellplot/agent/code_mode/planner.py",
-    "src/wellplot/agent/code_mode/typed_delivery.py",
-    "src/wellplot/agent/code_mode/state.py",
-    "src/wellplot/agent/code_mode/workflow.py",
-    "src/wellplot/agent/code_mode/capability_safety.py",
-    "src/wellplot/agent/code_mode/report_boundary_safety.py",
-    "src/wellplot/agent/code_mode/section_leaf_safety.py",
-    "src/wellplot/agent/code_mode/enrichment.py",
-    "src/wellplot/agent/code_mode/report_worker.py",
-    "src/wellplot/agent/code_mode/program_worker.py",
-    "src/wellplot/agent/code_mode/repair.py",
-    "src/wellplot/agent/providers/base.py",
-    "src/wellplot/agent/providers/openai.py",
-    "src/wellplot/agent/providers/openai_v2.py",
-    "src/wellplot/agent/providers/openai_program_v2.py",
-    "src/wellplot/agent/providers/openai_compat_v2.py",
-    "src/wellplot/agent/providers/_v2_client.py",
-    "src/wellplot/agent/direct_notebook.py",
-    "src/wellplot/authoring.py",
-    "src/wellplot/authoring_reconciler.py",
-    "src/wellplot/authoring_executor.py",
-    "src/wellplot/authoring_service.py",
-    "src/wellplot/agent/operation_executor.py",
-    "scripts/verify_cbl_packet.py",
-    "scripts/verify_las_revision.py",
-)
+D5_PRODUCTION_MANIFEST_PATH = Path("docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json")
 FROZEN_PRODUCTION_COMPONENT_SHA256 = {
-    "src/wellplot/agent/code_mode/planner.py": (
-        "1e2858b4663996ccacaf1c42979fc62fe988ba7501d6ec63e00911e6cdc86740"
-    ),
-    "src/wellplot/agent/code_mode/typed_delivery.py": (
-        "f76148ba49e5d08b74ab7dd1d6fbc4c3671a7e03ba7073ab053d9d22a2537e32"
-    ),
-    "src/wellplot/agent/code_mode/state.py": (
-        "0d95670d0ac7f3b1e97ec1a2ca7cae94d42fcf398a333f3ba257dab0d13d3212"
-    ),
-    "src/wellplot/agent/code_mode/workflow.py": (
-        "2d4c0ead84c9ff2336decc3dc22e1af7c5a8eb9e9a50f6e66a99a65ad394fa52"
-    ),
-    "src/wellplot/agent/code_mode/capability_safety.py": (
-        "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568"
-    ),
-    "src/wellplot/agent/code_mode/report_boundary_safety.py": (
-        "cc94431bdc9c0d8b7e582de4f931aabf3bd4bea61bbd847051658abf86135c46"
-    ),
-    "src/wellplot/agent/code_mode/section_leaf_safety.py": (
-        "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4"
-    ),
-    "src/wellplot/agent/code_mode/enrichment.py": (
-        "78cfec5e1f704dcd4218ff5047b0d29282ea154ed668b5244f5c6a40d709dd0b"
-    ),
-    "src/wellplot/agent/code_mode/report_worker.py": (
-        "ec1eca740df5218a7a2f204425dfe69e5ba00e3db62392c3852426b2f89d2723"
-    ),
-    "src/wellplot/agent/code_mode/program_worker.py": (
-        "f3e7876693f9da2cc02d396c6f0f958ae4cf2c588480076177b90aecc8efaac7"
-    ),
-    "src/wellplot/agent/code_mode/repair.py": (
-        "c1470b491c442b5e743a0421a49046cccf8e3f12635293c40b44ff0864a53804"
-    ),
-    "src/wellplot/agent/providers/base.py": (
-        "4c14afc1e6e53faef1ef99266059b7b88b6c4dec4bfb5a4768ca5b36efc3f049"
-    ),
-    "src/wellplot/agent/providers/openai.py": (
-        "0e49f227ee03f761f3a215f013feb1ab40c542b28ac10e428159065c9ab29a91"
-    ),
-    "src/wellplot/agent/providers/openai_v2.py": (
-        "a3548b5d373767abe614c0600194b9558b1057e1caa07b17df948956cc5c0759"
-    ),
-    "src/wellplot/agent/providers/openai_program_v2.py": (
-        "e68b4bb63da930b4eb5c399741bfd486a4a8563d405a505d5aafefb86c6bc062"
-    ),
-    "src/wellplot/agent/providers/openai_compat_v2.py": (
-        "579b299c6a01604207cfac3abf20eff15004a634ea773be75ec3c156835fc787"
-    ),
-    "src/wellplot/agent/providers/_v2_client.py": (
-        "41a0589c909d48eba3117ac4984b86b3d6eff1e4bebe32eb9e031f3db186cb33"
-    ),
-    "src/wellplot/agent/direct_notebook.py": (
-        "9dbb4182ac73897e028bd6b24bd7cd5a05638737099130944f7548709980827d"
-    ),
-    "src/wellplot/authoring.py": (
-        "0c6c0d04c6d71fcc07c7fa6d130c1ff9e026fbd7ae8dc1bb463d50d009caa99b"
-    ),
-    "src/wellplot/authoring_reconciler.py": (
-        "1c599c6c6e3945816fd7114b5b35631267f85fd77ff75a7bced87a38fb891034"
-    ),
-    "src/wellplot/authoring_executor.py": (
-        "f1218bbddf706751e6cbb019017ed9efbae60d9909b1c08660dbc9edda0eb28b"
-    ),
-    "src/wellplot/authoring_service.py": (
-        "458d2c1c54e7013c3c66bd2196830849148f68364f217df1b95b276a776da954"
-    ),
-    "src/wellplot/agent/operation_executor.py": (
-        "b52ab3eaae90a23092d584687caf5a53a742ff4c263bee763eee97e342b878ee"
-    ),
-    "scripts/verify_cbl_packet.py": (
-        "528a0ed80d6eb43ddf74188fcc10038e25a696b5f6fd792eaeddd5bc96516613"
-    ),
-    "scripts/verify_las_revision.py": (
-        "abf9f513a3f0b35c03d70f8bc429204a2cc6929cd459452e223ee7785492c004"
-    ),
+    str(path): digest
+    for path, digest in json.loads(
+        (Path(__file__).resolve().parents[1] / D5_PRODUCTION_MANIFEST_PATH).read_text(
+            encoding="utf-8"
+        )
+    )["production_components"].items()
 }
+PRODUCTION_COMPONENT_PATHS = tuple(FROZEN_PRODUCTION_COMPONENT_SHA256)
 SECRET_KEYS = frozenset(
     {
         "api_key",
@@ -426,8 +324,6 @@ class CountingBackend:
             SemanticPlan: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
-            LegacyDeliveryReportResponse: "report_worker",
-            LegacyDeliverySectionResponse: "section_worker",
         }
         try:
             return roles[response_model]
@@ -450,7 +346,7 @@ class CountingBackend:
         *,
         generation_role: str,
     ) -> int:
-        if operation not in {"structured", "program"}:
+        if operation != "structured":
             raise ValueError(f"unsupported operation: {operation}")
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
@@ -568,14 +464,6 @@ class CountingBackend:
             metrics=result.metrics,
         )
         return result
-
-    async def generate_program(
-        self,
-        request: ProgramGenerationRequest,
-    ) -> ProgramGenerationResult:
-        """Reject legacy program generation before any delegation or call reservation."""
-        del request
-        raise PreflightError("program generation is forbidden for the typed D4 harness")
 
 
 @dataclass(frozen=True, slots=True)

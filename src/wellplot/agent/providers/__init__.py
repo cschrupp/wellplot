@@ -17,29 +17,6 @@
 #
 ###############################################################################
 
-"""Provider adapters for the public wellplot authoring API.
+"""Provider-v2 transports used by the canonical authoring engine."""
 
-The canonical Code Mode engine imports provider-v2 modules directly. Legacy
-tool-loop adapters remain available only through explicit compatibility
-attribute access and are not loaded as a package side effect.
-"""
-
-__all__ = [
-    "OpenAIAuthoringBackend",
-    "OpenAICompatibleAuthoringBackend",
-    "load_openai_api_key",
-    "load_openai_compatible_api_key",
-]
-
-
-def __getattr__(name: str) -> object:
-    """Load one legacy provider adapter only for explicit compatibility use."""
-    if name in {"OpenAIAuthoringBackend", "load_openai_api_key"}:
-        from . import openai
-
-        return getattr(openai, name)
-    if name in {"OpenAICompatibleAuthoringBackend", "load_openai_compatible_api_key"}:
-        from . import openai_compat
-
-        return getattr(openai_compat, name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+__all__: list[str] = []

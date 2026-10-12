@@ -78,8 +78,14 @@ def test_d5_production_manifest_is_current() -> None:
     )
     assert result.returncode == 0, result.stderr
     result = json.loads(result.stdout)
-    assert result["manifest_version"] == "wellplot.d5.single-engine-production.v1"
-    assert result["production_components"]
+    assert result["manifest_version"] == "wellplot.d5.single-engine-production.v2"
+    components = set(result["production_components"])
+    assert components
+    assert "src/wellplot/agent/composition.py" in components
+    assert "src/wellplot/agent/code_mode/canonical_workers.py" in components
+    assert "src/wellplot/agent/code_mode/typed_section_worker.py" in components
+    assert "src/wellplot/agent/code_mode/typed_delivery.py" not in components
+    assert "src/wellplot/agent/core.py" not in components
 
 
 def _document() -> AuthoringDocumentSpec:

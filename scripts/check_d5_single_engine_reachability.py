@@ -9,12 +9,18 @@ import subprocess
 import sys
 from pathlib import Path
 
+from d5_single_engine_attestation import (
+    D5_RETIRED_SOURCE_PATHS,
+    canonical_component_paths,
+)
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CANONICAL_ENTRYPOINTS = (
     "wellplot.agent",
     "wellplot.agent.composition",
     "wellplot.agent.direct_notebook",
     "wellplot.agent.notebook",
+    "wellplot.mcp.agentic",
     "wellplot.mcp.agentic_server",
 )
 FORBIDDEN_MODULES = (
@@ -23,8 +29,12 @@ FORBIDDEN_MODULES = (
     "wellplot.agent.code_mode.program_worker",
     "wellplot.agent.code_mode.report_worker",
     "wellplot.agent.code_mode.typed_delivery",
+    "wellplot.agent.code_mode.semantic_ir_v2",
     "wellplot.agent.code_mode.semantic_ir_v2_compiler",
+    "wellplot.agent.code_mode.semantic_ir_v2_registry",
+    "wellplot.agent.code_mode.semantic_ir_v2r",
     "wellplot.agent.code_mode.semantic_ir_v2r_compiler",
+    "wellplot.agent.code_mode.visual_correction",
     "wellplot.agent.graph",
 )
 FORBIDDEN_SOURCE_REFERENCES = {
@@ -32,12 +42,6 @@ FORBIDDEN_SOURCE_REFERENCES = {
         "from .core import",
         'engine == "v1"',
         'Literal["v1"',
-    ),
-    "src/wellplot/agent/core.py": ("stable_fallback", "catalog_fallback"),
-    "src/wellplot/agent/code_mode/visual_correction.py": (
-        "ProgramSectionCompiler",
-        "ReportProgramCompiler",
-        "TypedDeliverySectionCompiler",
     ),
 }
 
@@ -51,7 +55,11 @@ import wellplot.agent
 import wellplot.agent.composition
 import wellplot.agent.direct_notebook
 import wellplot.agent.notebook
+import wellplot.mcp.agentic
 import wellplot.mcp.agentic_server
+from pathlib import Path
+from wellplot.agent.composition import create_canonical_dependencies
+create_canonical_dependencies(backend=object(), server_root=Path("."))
 print(json.dumps({name: name in sys.modules for name in FORBIDDEN}))
 """
     env = dict(os.environ)
@@ -71,6 +79,25 @@ print(json.dumps({name: name in sys.modules for name in FORBIDDEN}))
 
 def run_audit(repo_root: Path = REPO_ROOT) -> dict[str, object]:
     """Return and validate the canonical runtime reachability evidence."""
+    retired = [relative for relative in D5_RETIRED_SOURCE_PATHS if (repo_root / relative).exists()]
+    if retired:
+        raise RuntimeError(f"Retired production sources remain: {retired!r}")
+
+    components = canonical_component_paths(repo_root)
+    required_components = {
+        "src/wellplot/agent/composition.py",
+        "src/wellplot/agent/direct_notebook.py",
+        "src/wellplot/agent/code_mode/canonical_workers.py",
+        "src/wellplot/agent/code_mode/typed_section_worker.py",
+        "src/wellplot/agent/code_mode/facade.py",
+        "src/wellplot/authoring_reconciler.py",
+        "src/wellplot/authoring_executor.py",
+        "src/wellplot/authoring_service.py",
+    }
+    missing_components = sorted(required_components - set(components))
+    if missing_components:
+        raise RuntimeError(f"Canonical production components are missing: {missing_components!r}")
+
     runtime = _runtime_probe(repo_root)
     loaded = [name for name, present in runtime.items() if present]
     if loaded:
@@ -87,6 +114,8 @@ def run_audit(repo_root: Path = REPO_ROOT) -> dict[str, object]:
 
     return {
         "entrypoints": list(CANONICAL_ENTRYPOINTS),
+        "canonical_component_count": len(components),
+        "canonical_components": list(components),
         "forbidden_modules_loaded": [],
         "source_violations": [],
         "status": "PASS",

@@ -16,25 +16,19 @@ import pytest
 import yaml
 from pydantic import BaseModel
 from scripts import nlp_d4_live_acceptance as d4
-from tests._mcp_fixtures import REPO_ROOT
-from tests.test_nlp_d4r1_integrated_acceptance import (
+from tests._d4_canonical_fixtures import (
     _canonical_section_action,
     _cbl_report_response,
     _section_response,
 )
+from tests._mcp_fixtures import REPO_ROOT
 
 from wellplot.agent.code_mode.canonical_workers import (
     ReportSemanticResponse,
     SectionSemanticActionResponse,
 )
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
-from wellplot.agent.code_mode.typed_delivery import (
-    DeliveryReportResponse,
-    DeliverySectionResponse,
-)
 from wellplot.agent.providers.base import (
-    ProgramGenerationRequest,
-    ProgramGenerationResult,
     ProviderMetrics,
     StructuredGenerationRequest,
     StructuredGenerationResult,
@@ -87,9 +81,8 @@ class _FakeClient:
 class _Backend:
     """Provider-free backend that records delegation without raw payloads."""
 
-    def __init__(self, *, program_text: str = "report = wp.report()") -> None:
+    def __init__(self) -> None:
         self.calls = 0
-        self.program_text = program_text
 
     async def generate_structured(
         self,
@@ -101,17 +94,6 @@ class _Backend:
         self.calls += 1
         return StructuredGenerationResult(
             value=_Value(),
-            metrics=ProviderMetrics(input_tokens=2, output_tokens=3, total_tokens=5),
-        )
-
-    async def generate_program(
-        self,
-        request: ProgramGenerationRequest,
-    ) -> ProgramGenerationResult:
-        del request
-        self.calls += 1
-        return ProgramGenerationResult(
-            text=self.program_text,
             metrics=ProviderMetrics(input_tokens=2, output_tokens=3, total_tokens=5),
         )
 
@@ -129,16 +111,6 @@ def _structured_request() -> StructuredGenerationRequest:
 def _worker_structured_request() -> StructuredGenerationRequest:
     """Build the controls emitted by the accepted typed-worker route."""
     return StructuredGenerationRequest(
-        system_prompt="system",
-        user_prompt="user",
-        timeout_seconds=120.0,
-        temperature=None,
-        max_output_tokens=None,
-    )
-
-
-def _program_request() -> ProgramGenerationRequest:
-    return ProgramGenerationRequest(
         system_prompt="system",
         user_prompt="user",
         timeout_seconds=120.0,
@@ -320,7 +292,7 @@ def test_frozen_contract_attestation_binds_checkpoint_and_all_artifacts(
     assert observed["gold_fixture_sha256"] == authorization.gold_fixture_sha256
     assert set(observed["production_component_sha256"]) == set(d4.PRODUCTION_COMPONENT_PATHS)
     for relative in (
-        "src/wellplot/agent/code_mode/typed_delivery.py",
+        "src/wellplot/agent/code_mode/canonical_workers.py",
         "src/wellplot/agent/code_mode/state.py",
     ):
         assert relative in d4.PRODUCTION_COMPONENT_PATHS
@@ -368,7 +340,7 @@ def test_frozen_contract_attestation_rejects_component_manifest_drift(
         d4.verify_frozen_contract(REPO_ROOT, drifted)
 
 
-def test_frozen_contract_rejects_typed_delivery_component_drift(
+def test_frozen_contract_rejects_canonical_worker_component_drift(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -376,7 +348,7 @@ def test_frozen_contract_rejects_typed_delivery_component_drift(
     authorization = _authorization()
     real_git = d4._git
     real_sha256_file = d4.sha256_file
-    typed_delivery = REPO_ROOT / "src/wellplot/agent/code_mode/typed_delivery.py"
+    canonical_workers = REPO_ROOT / "src/wellplot/agent/code_mode/canonical_workers.py"
     monkeypatch.setattr(
         d4,
         "_git",
@@ -385,7 +357,7 @@ def test_frozen_contract_rejects_typed_delivery_component_drift(
     monkeypatch.setattr(
         d4,
         "sha256_file",
-        lambda path: "0" * 64 if path == typed_delivery else real_sha256_file(path),
+        lambda path: "0" * 64 if path == canonical_workers else real_sha256_file(path),
     )
     monkeypatch.setattr(d4, "STATE_RELATIVE", tmp_path / "state.json")
     monkeypatch.setattr(d4, "JOURNAL_RELATIVE", tmp_path / "journal.jsonl")
@@ -741,15 +713,7 @@ def test_real_compat_backend_uses_frozen_sparse_token_contract() -> None:
     assert "max_tokens" not in structured_kwargs
     assert "max_completion_tokens" not in structured_kwargs
 
-    program_client = _FakeClient("report = wp.report()")
-    program = OpenAICompatibleBackendV2(model=d4.EXPECTED_MODEL, client=program_client)
-    asyncio.run(program.generate_program(_program_request()))
-    program_kwargs = program_client.chat.completions.kwargs
-    assert program_kwargs is not None
-    assert program_kwargs["model"] == d4.EXPECTED_MODEL
-    assert "temperature" not in program_kwargs
-    assert "max_tokens" not in program_kwargs
-    assert "max_completion_tokens" not in program_kwargs
+    assert not hasattr(structured, "generate_program")
 
 
 @pytest.mark.parametrize("content", ["not-json", "{}"])
@@ -1109,10 +1073,8 @@ def test_counting_backend_preserves_controls_and_records_bounded_metadata() -> N
     async def run() -> None:
         await backend.generate_structured(_structured_request(), response_model=SemanticPlan)
         await backend.generate_structured(
-            _worker_structured_request(), response_model=DeliveryReportResponse
+            _worker_structured_request(), response_model=ReportSemanticResponse
         )
-        with pytest.raises(d4.PreflightError, match="program generation"):
-            await backend.generate_program(_program_request())
 
     asyncio.run(run())
     assert delegate.calls == 2
@@ -1147,7 +1109,7 @@ def test_counting_backend_rejects_role_control_drift_before_delegation() -> None
         asyncio.run(
             worker_backend.generate_structured(
                 replace(_worker_structured_request(), max_output_tokens=128),
-                response_model=DeliveryReportResponse,
+                response_model=ReportSemanticResponse,
             )
         )
     assert worker_delegate.calls == 0
@@ -1162,14 +1124,14 @@ def test_call_46_is_rejected_before_delegation() -> None:
         for _ in range(d4.MAX_LOGICAL_CALLS):
             if _ % 2:
                 request = _worker_structured_request()
-                response_model = DeliveryReportResponse
+                response_model = ReportSemanticResponse
             else:
                 request = _structured_request()
                 response_model = SemanticPlan
             await backend.generate_structured(request, response_model=response_model)
         with pytest.raises(d4.CallCapExceeded):
             await backend.generate_structured(
-                _worker_structured_request(), response_model=DeliverySectionResponse
+                _worker_structured_request(), response_model=SectionSemanticActionResponse
             )
 
     asyncio.run(run())
@@ -1574,11 +1536,12 @@ class _D4SessionReportBackend:
         payload = json.loads(request.user_prompt)
         authoritative_request = str(payload["authoritative_request"])
         if authoritative_request.startswith("Rename this report"):
-            value = DeliveryReportResponse(title="Formation Integrity Review")
+            value = ReportSemanticResponse(title="Formation Integrity Review")
         else:
             value = _cbl_report_response(payload)
+        serialized = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
         return StructuredGenerationResult(
-            value=response_model.model_validate(value.model_dump(mode="json")),
+            value=response_model.model_validate(serialized),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
 
@@ -1629,11 +1592,6 @@ class _D4SessionBackend:
                 request, response_model=SectionSemanticActionResponse
             )
         raise AssertionError(f"unexpected D4 response model: {response_model!r}")
-
-    async def generate_program(self, request: ProgramGenerationRequest) -> ProgramGenerationResult:
-        """Fail if the aligned D4 route attempts legacy program generation."""
-        del request
-        raise AssertionError("D4 typed harness must not call generate_program")
 
 
 @dataclass
@@ -2020,10 +1978,29 @@ def _write_rehearsal_document(path: Path, payload: dict[str, object]) -> None:
 
 def _build_rehearsal_cbl_artifact(root: Path) -> Path:
     """Write the accepted D0/D3 canonical CBL artifact as a fixture input."""
-    from tests.test_nlp_d0_acceptance import _cbl_payload
+    contract_path = REPO_ROOT / "tests" / "fixtures" / "agentic_cbl" / "compile_contract.json"
+    starter_path = REPO_ROOT / "tests" / "fixtures" / "agentic_cbl" / "cased_hole_starter.log.yaml"
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    from wellplot.authoring import load_authoring_document
+    from wellplot.authoring_executor import execute_authoring_plan
+    from wellplot.authoring_reconciler import reconcile_authoring
+    from wellplot.authoring_service import AuthoringService
+    from wellplot.model.intent import AuthoringDocumentIntent
+
+    service = AuthoringService(load_authoring_document(starter_path, allowed_root=REPO_ROOT))
+    plan = reconcile_authoring(
+        AuthoringDocumentIntent.model_validate(contract["merged_intent"]),
+        existing=service.document,
+        available_channels={
+            section: source["channels"] for section, source in contract["source_manifest"].items()
+        },
+        header_aliases=contract["execution_context"]["header_aliases"],
+    )
+    execution = execute_authoring_plan(service, plan)
+    assert execution.success, execution.errors
 
     output = root / "d4-cbl-output.log.yaml"
-    output.write_text(yaml.safe_dump(_cbl_payload(), sort_keys=False), encoding="utf-8")
+    output.write_text(yaml.safe_dump(service.to_mapping(), sort_keys=False), encoding="utf-8")
     return output
 
 

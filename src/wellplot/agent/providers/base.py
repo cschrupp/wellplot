@@ -34,27 +34,6 @@ class StructuredGenerationRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class ProgramGenerationRequest:
-    """Explicit provider-neutral request for plain authoring program text."""
-
-    system_prompt: str
-    user_prompt: str
-    timeout_seconds: float
-    temperature: float | None = None
-    max_output_tokens: int | None = None
-
-    def __post_init__(self) -> None:
-        """Reject malformed request values before provider dispatch."""
-        _require_text(self.system_prompt, "system_prompt")
-        _require_text(self.user_prompt, "user_prompt")
-        _require_positive_number(self.timeout_seconds, "timeout_seconds")
-        if self.temperature is not None:
-            _require_nonnegative_number(self.temperature, "temperature")
-        if self.max_output_tokens is not None:
-            _require_positive_integer(self.max_output_tokens, "max_output_tokens")
-
-
-@dataclass(frozen=True, slots=True)
 class ProviderMetrics:
     """Per-call provider measurements with unavailable values represented by None."""
 
@@ -88,19 +67,6 @@ class StructuredGenerationResult(Generic[TModel]):
 
     value: TModel
     metrics: ProviderMetrics
-
-
-@dataclass(frozen=True, slots=True)
-class ProgramGenerationResult:
-    """Plain program source text and measurements from one provider call."""
-
-    text: str
-    metrics: ProviderMetrics
-
-    def __post_init__(self) -> None:
-        """Require text to remain a plain string at the provider boundary."""
-        if not isinstance(self.text, str):
-            raise TypeError("Program generation result text must be a string.")
 
 
 class ProviderFailureCategory(StrEnum):
@@ -178,7 +144,7 @@ class ProviderRequestError(RuntimeError):
 
 
 class ModelBackendProtocol(Protocol):
-    """Async provider contract for validated structured and plain generation."""
+    """Async provider contract for validated structured generation."""
 
     async def generate_structured(
         self,
@@ -187,13 +153,6 @@ class ModelBackendProtocol(Protocol):
         response_model: type[TModel],
     ) -> StructuredGenerationResult[TModel]:
         """Return a response validated as the supplied Pydantic model."""
-
-    async def generate_program(
-        self,
-        request: ProgramGenerationRequest,
-    ) -> ProgramGenerationResult:
-        """Return plain program source without parsing or interpreting it."""
-
 
 def _require_text(value: object, field_name: str) -> None:
     """Require one non-empty string without retaining provider payloads."""
@@ -235,8 +194,6 @@ def _require_nonnegative_integer(value: object, field_name: str) -> None:
 
 __all__ = [
     "ModelBackendProtocol",
-    "ProgramGenerationRequest",
-    "ProgramGenerationResult",
     "ProviderFailureCategory",
     "ProviderMetrics",
     "ProviderRequestError",

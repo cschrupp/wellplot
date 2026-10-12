@@ -11,10 +11,7 @@ from typing import Literal, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from ._program_output import PROGRAM_MAX_SOURCE_CHARS, extract_program_source
 from .base import (
-    ProgramGenerationRequest,
-    ProgramGenerationResult,
     ProviderFailureCategory,
     ProviderMetrics,
     ProviderRequestError,
@@ -130,29 +127,9 @@ class OpenAICompatibleBackendV2:
             metrics=_metrics(usage, latency_ms=(perf_counter() - started) * 1000),
         )
 
-    async def generate_program(
-        self,
-        request: ProgramGenerationRequest,
-    ) -> ProgramGenerationResult:
-        """Generate one plain program through one tool-free Chat call."""
-        started = perf_counter()
-        response = await self._create(self._request_arguments(request))
-        message, usage = _extract_message(response)
-        content = _message_content(message)
-        source = extract_program_source(content, provider_label="OpenAI-compatible")
-        if len(source) > PROGRAM_MAX_SOURCE_CHARS:
-            raise ProviderRequestError(
-                ProviderFailureCategory.INVALID_RESPONSE,
-                "OpenAI-compatible returned a program exceeding the source length limit.",
-            )
-        return ProgramGenerationResult(
-            text=source,
-            metrics=_metrics(usage, latency_ms=(perf_counter() - started) * 1000),
-        )
-
     def _request_arguments(
         self,
-        request: StructuredGenerationRequest | ProgramGenerationRequest,
+        request: StructuredGenerationRequest,
     ) -> dict[str, object]:
         """Build the sparse, deterministic Chat Completions request."""
         arguments: dict[str, object] = {

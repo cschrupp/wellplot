@@ -79,39 +79,3 @@ __all__ = [
     "stable_tool_budget",
     "stable_tool_profile",
 ]
-
-
-_LEGACY_COMPATIBILITY_EXPORTS = frozenset(
-    {
-        "AuthoringPlanPhase",
-        "AuthoringPlanResult",
-        "AuthoringRequest",
-        "AuthoringToolCall",
-        "BranchOperationGroup",
-        "DirectBranchCompilationResult",
-        "ExecutedAuthoringPhase",
-        "RevisionRequest",
-        "build_branch_operation_groups",
-        "compile_direct_branch_operations",
-        "revise_authoring_request",
-        "run_authoring_request",
-    }
-)
-
-
-def __getattr__(name: str) -> object:
-    """Load historical core exports only for explicit compatibility callers."""
-    if name not in _LEGACY_COMPATIBILITY_EXPORTS:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    if name in {
-        "BranchOperationGroup",
-        "DirectBranchCompilationResult",
-        "build_branch_operation_groups",
-        "compile_direct_branch_operations",
-    }:
-        from . import branch_compiler
-
-        return getattr(branch_compiler, name)
-    from . import core
-
-    return getattr(core, name)
