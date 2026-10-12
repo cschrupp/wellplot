@@ -24,6 +24,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 
@@ -46,6 +47,7 @@ from wellplot import (
 )
 from wellplot.api import build_documents
 from wellplot.errors import TemplateValidationError
+from wellplot.renderers import MatplotlibRenderer
 
 
 def _build_dataset(name: str, *, phase: float = 0.0) -> WellDataset:
@@ -610,6 +612,27 @@ class ApiRenderTests(unittest.TestCase):
 
         with self.assertRaisesRegex(TemplateValidationError, "page_index"):
             render_png_bytes(report, page_index=99)
+
+    def test_render_png_bytes_closes_non_selected_pages_during_render(self) -> None:
+        """Preview rendering does not retain every page in memory."""
+        report = _build_report()
+        document = build_documents(report)[0]
+        dataset = report.datasets_by_section["main"]
+        renderer = MatplotlibRenderer(dpi=72)
+
+        import matplotlib.pyplot as plt
+
+        with mock.patch("matplotlib.pyplot.close", wraps=plt.close) as close:
+            result = renderer.render_documents(
+                (document,) * 25,
+                (dataset,) * 25,
+                page_index=0,
+            )
+
+        self.assertEqual(result.page_count, 50)
+        self.assertEqual(len(result.artifact), 1)
+        self.assertGreaterEqual(close.call_count, 20)
+        plt.close(result.artifact[0])
 
 
 if __name__ == "__main__":

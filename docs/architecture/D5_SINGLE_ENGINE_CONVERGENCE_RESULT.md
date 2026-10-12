@@ -1,6 +1,6 @@
 # D5-2 Single-Engine Convergence Result
 
-Status: `D5-2R2 IMPLEMENTED / INDEPENDENT REVIEW PENDING`
+Status: `D5-2R2 IMPLEMENTED / READY FOR INDEPENDENT REVIEW`
 
 Branch: `d5/single-engine-convergence`
 
@@ -100,14 +100,18 @@ is involved.
 The replacement regression coverage exercises the canonical worker boundary
 for report title revision, existing-curve scale revision, grounded track and
 curve creation, grounded fill creation, missing-channel rejection, and the
-real generated CBL artifact verifier. The exact frozen nine-turn D4 rehearsal
-was started through the canonical route with zero provider/endpoint/model
-calls, but did not complete in this closeout run: the process terminated with
-native status 139 after the generated CBL artifact was written. An isolated
-probe reproduced the underlying renderer pressure: the in-memory preview
-path opened more than 20 Matplotlib figures while processing the real 107 MB
-DLIS source and exceeded the bounded observation window. No semantic result
-or 9/9 acceptance claim is made from that incomplete run.
+real generated CBL artifact verifier. The first exact nine-turn rehearsal
+exposed deferred in-memory Matplotlib figure cleanup and a stale deterministic
+CBL report fixture. The bounded correction closes non-selected preview figures
+as they are created and aligns the fixture with the already-frozen CBL-01
+header contract. No renderer backend, semantic contract, fixture population,
+or gold value was changed.
+
+The corrected exact nine-turn rehearsal completed through the canonical route
+with zero provider/endpoint/model calls: `9/9 PASS`, including real
+persistence, reload, rendering, and CBL-01 through CBL-09 verification. The
+observed run completed in 264.97 seconds and recorded the frozen 18 logical
+structured calls.
 
 The D4 harness remains historical evidence. Its attestation is mechanically
 checked against the successor D5 manifest for this provider-free validation;
@@ -120,8 +124,7 @@ Provider, endpoint, and model calls: `0`.
 Required validation for this checkpoint:
 
 - canonical regression, D5 convergence, and D4R1 integration tests;
-- exact provider-free nine-turn D4 rehearsal (blocked in this run by the
-  renderer/resource failure described above);
+- exact provider-free nine-turn D4 rehearsal (`9/9 PASS`, 18 logical calls);
 - D3 CBL and canonical semantic/revision/report tests;
 - Direct Notebook and MCP composition tests;
 - repository-wide runtime reachability audit;
@@ -136,7 +139,7 @@ is authorized by this result.
 
 ```yaml
 D5-2R2:
-  status: IMPLEMENTED / INDEPENDENT REVIEW PENDING
+  status: IMPLEMENTED / READY FOR INDEPENDENT REVIEW
   canonical_engine: FROZEN_FOR_REVIEW
   legacy_v1_engine_reachable: false
   stable_fallback_reachable: false
@@ -144,7 +147,7 @@ D5-2R2:
   program_workers_reachable: false
   semantic_ir_compilers_reachable: false
   successor_production_attestation: PASS
-  provider_free_nine_turn_rehearsal: BLOCKED_RENDER_RESOURCE_FAILURE
+  provider_free_nine_turn_rehearsal: 9/9 PASS
   provider_model_calls: 0
   d5-3: NOT AUTHORIZED
 ```

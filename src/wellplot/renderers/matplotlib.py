@@ -716,9 +716,15 @@ class MatplotlibRenderer(Renderer):
         dataset: WellDataset,
         *,
         output_path: str | Path | None = None,
+        page_index: int | None = None,
     ) -> RenderResult:
         """Render one document by delegating to the multi-document pipeline."""
-        return self.render_documents((document,), dataset, output_path=output_path)
+        return self.render_documents(
+            (document,),
+            dataset,
+            output_path=output_path,
+            page_index=page_index,
+        )
 
     def render_documents(
         self,
@@ -726,8 +732,11 @@ class MatplotlibRenderer(Renderer):
         dataset: WellDataset | tuple[WellDataset, ...] | list[WellDataset],
         *,
         output_path: str | Path | None = None,
+        page_index: int | None = None,
     ) -> RenderResult:
         """Render one or more documents and optionally write a combined artifact."""
+        if page_index is not None and page_index < 0:
+            raise TemplateValidationError("page_index must be non-negative.")
         normalized_documents = tuple(documents)
         if not normalized_documents:
             raise ValueError("render_documents requires at least one document.")
@@ -738,13 +747,18 @@ class MatplotlibRenderer(Renderer):
             if len(normalized_datasets) != len(normalized_documents):
                 raise ValueError("render_documents requires one dataset per document.")
         document_dataset_pairs = tuple(zip(normalized_documents, normalized_datasets, strict=True))
-        return self._render_documents(document_dataset_pairs, output_path=output_path)
+        return self._render_documents(
+            document_dataset_pairs,
+            output_path=output_path,
+            page_index=page_index,
+        )
 
     def _render_documents(
         self,
         document_dataset_pairs: tuple[tuple[LogDocument, WellDataset], ...],
         *,
         output_path: str | Path | None = None,
+        page_index: int | None = None,
     ) -> RenderResult:
         output = Path(output_path) if output_path is not None else None
 
@@ -827,8 +841,10 @@ class MatplotlibRenderer(Renderer):
                     if pdf is not None:
                         pdf.savefig(report_fig, dpi=self.dpi)
                         plt.close(report_fig)
-                    else:
+                    elif page_index is None or page_index == total_pages:
                         figures.append(report_fig)
+                    else:
+                        plt.close(report_fig)
                     total_pages += 1
                 for source_document, section_dataset in document_dataset_pairs:
                     render_document = source_document
@@ -929,8 +945,10 @@ class MatplotlibRenderer(Renderer):
                         if pdf is not None:
                             pdf.savefig(fig, dpi=self.dpi)
                             plt.close(fig)
-                        else:
+                        elif page_index is None or page_index == global_page_number - 1:
                             figures.append(fig)
+                        else:
+                            plt.close(fig)
 
                     total_pages += len(layouts)
                 if (
@@ -958,12 +976,20 @@ class MatplotlibRenderer(Renderer):
                     if pdf is not None:
                         pdf.savefig(report_tail_fig, dpi=self.dpi)
                         plt.close(report_tail_fig)
-                    else:
+                    elif page_index is None or page_index == total_pages:
                         figures.append(report_tail_fig)
+                    else:
+                        plt.close(report_tail_fig)
                     total_pages += 1
             finally:
                 if pdf is not None:
                     pdf.close()
+
+        if page_index is not None and page_index >= total_pages:
+            raise TemplateValidationError(
+                f"Requested page_index {page_index} is out of range for "
+                f"{total_pages} rendered pages."
+            )
 
         artifact = str(output) if output is not None else figures
         return RenderResult(
@@ -4575,17 +4601,11 @@ class MatplotlibRenderer(Renderer):
     def _uses_independent_curve_scales(self, track: TrackSpec) -> bool:
         if self._is_reference_track(track) or self._is_annotation_track(track):
             return False
-        curve_scales = [
-            element.scale or track.x_scale
-            for element in self._curve_elements(track)
-        ]
+        curve_scales = [element.scale or track.x_scale for element in self._curve_elements(track)]
         if len(curve_scales) < 2:
             return False
         first_scale = curve_scales[0]
-        return any(
-            not self._scales_match(first_scale, scale)
-            for scale in curve_scales[1:]
-        )
+        return any(not self._scales_match(first_scale, scale) for scale in curve_scales[1:])
 
     def _track_has_bottom_header_on_page(self, page_layout: PageLayout, track: TrackSpec) -> bool:
         return any(frame.track is track for frame in page_layout.track_header_bottom_frames)

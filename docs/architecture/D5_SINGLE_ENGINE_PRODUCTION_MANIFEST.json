@@ -47,7 +47,7 @@
     "src/wellplot/agent/session.py": "41a65bb23937e43defa5ac5fb3aedae9bb31189640b89af41918558589073a92",
     "src/wellplot/agent/tool_contract.py": "fe78991e27f5cd08ee8fd14ae7fe4bcc27c4a1a721c9033df58199571ecd46c5",
     "src/wellplot/api/builder.py": "5aa1171f4d157421f9ee910c1e8eff22d8752b122aa681c7e9585ca1c5491112",
-    "src/wellplot/api/render.py": "6ea74e3473c69998fe663adcb32500a2e0f548ce06b4b53e8478538eb7c968a8",
+    "src/wellplot/api/render.py": "e79a9a45a3c0a3b17d13d48acf90ec0a6c70c8eab5463ca5f120686d3a307351",
     "src/wellplot/api/serialize.py": "36c01f3949aa0f98925ef639ab41a82eca00c87eb5fe2a288bcbc39e4a396b61",
     "src/wellplot/authoring.py": "0c6c0d04c6d71fcc07c7fa6d130c1ff9e026fbd7ae8dc1bb463d50d009caa99b",
     "src/wellplot/authoring_context.py": "0c9ede9aa509ebe1cd40b706942e02665f5fc297179438c2ffc35c220d29e5aa",

@@ -283,6 +283,7 @@ def render_report(
     report: ProgrammaticLogSpec,
     *,
     output_path: str | Path | None = None,
+    page_index: int | None = None,
     section_ids: list[str] | tuple[str, ...] | None = None,
     track_ids_by_section: dict[str, list[str] | tuple[str, ...]] | None = None,
     depth_range: tuple[float, float] | None = None,
@@ -328,7 +329,12 @@ def render_report(
         if matplotlib_style is not None:
             renderer_kwargs["style"] = deepcopy(matplotlib_style)
         renderer = MatplotlibRenderer(**renderer_kwargs)
-        return renderer.render_documents(documents, document_datasets, output_path=resolved_output)
+        return renderer.render_documents(
+            documents,
+            document_datasets,
+            output_path=resolved_output,
+            page_index=page_index,
+        )
 
     if filtered.spec.render_backend == "plotly":
         if len(documents) > 1:
@@ -466,13 +472,14 @@ def render_png_bytes(
     result = render_report(
         report,
         output_path=None,
+        page_index=page_index,
         section_ids=section_ids,
         track_ids_by_section=track_ids_by_section,
         depth_range=depth_range,
         depth_range_unit=depth_range_unit,
         include_report_pages=include_report_pages,
     )
-    return _result_figure_bytes(result, image_format="png", page_index=page_index, dpi=dpi)
+    return _result_figure_bytes(result, image_format="png", page_index=0, dpi=dpi)
 
 
 def render_svg_bytes(
