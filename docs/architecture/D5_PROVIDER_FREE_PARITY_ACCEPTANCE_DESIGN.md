@@ -5,6 +5,8 @@
 ```yaml
 slice: WELLPLOT-D5-3
 authorization: WELLPLOT-D5-3-DESIGN-AUTH-001
+design_rework_authority: WELLPLOT-D5-3-DESIGN-REWORK-AUTH-001
+current_corrective_authority: WELLPLOT-D5-3-DESIGN-REWORK2-AUTH-001
 design_status: DESIGN_ONLY / READY FOR INDEPENDENT DESIGN REVIEW
 starting_checkpoint: 560ec48d2b2809ed2feb55467da15195f527ec44
 production_implementation: NOT AUTHORIZED
