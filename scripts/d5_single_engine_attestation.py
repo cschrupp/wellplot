@@ -66,21 +66,33 @@ def _module_path(repo_root: Path, module: str) -> Path | None:
     return package_file if package_file.is_file() else None
 
 
-def _relative_import_module(module: str, node: ast.ImportFrom) -> str:
-    """Resolve an AST relative-import node against its containing module."""
-    package_parts = module.split(".")[:-1]
-    if node.level > 1:
-        package_parts = package_parts[: -(node.level - 1)]
+def _relative_import_module(
+    module: str,
+    node: ast.ImportFrom,
+    *,
+    is_package: bool,
+) -> str:
+    """Resolve an AST relative import using Python package semantics."""
+    package_parts = module.split(".") if is_package else module.split(".")[:-1]
+    levels_up = node.level - 1
+    if levels_up:
+        if levels_up >= len(package_parts):
+            return ""
+        package_parts = package_parts[:-levels_up]
     return ".".join(package_parts + ([node.module] if node.module else []))
 
 
-def _import_candidates(module: str, node: ast.AST) -> tuple[str, ...]:
+def _import_candidates(module: str, node: ast.AST, *, is_package: bool) -> tuple[str, ...]:
     """Return possible internal module names referenced by one AST import."""
     if isinstance(node, ast.Import):
         return tuple(alias.name for alias in node.names)
     if not isinstance(node, ast.ImportFrom):
         return ()
-    base = _relative_import_module(module, node) if node.level else (node.module or "")
+    base = (
+        _relative_import_module(module, node, is_package=is_package)
+        if node.level
+        else (node.module or "")
+    )
     if not base:
         return ()
     return (base, *(f"{base}.{alias.name}" for alias in node.names if alias.name != "*"))
@@ -101,14 +113,16 @@ def canonical_component_paths(repo_root: Path = REPO_ROOT) -> tuple[str, ...]:
         if path in discovered:
             continue
         discovered.add(path)
-        module = "wellplot." + ".".join(
-            path.relative_to(repo_root / "src" / "wellplot").with_suffix("").parts
-        )
+        relative_path = path.relative_to(repo_root / "src")
         if path.name == "__init__.py":
-            module = ".".join(path.relative_to(repo_root / "src").parent.parts)
+            module = ".".join(relative_path.parent.parts)
+            is_package = True
+        else:
+            module = ".".join(relative_path.with_suffix("").parts)
+            is_package = False
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         for node in ast.walk(tree):
-            for candidate in _import_candidates(module, node):
+            for candidate in _import_candidates(module, node, is_package=is_package):
                 if candidate != "wellplot" and candidate.startswith("wellplot."):
                     imported = _module_path(repo_root, candidate)
                     if imported is not None and imported not in discovered:

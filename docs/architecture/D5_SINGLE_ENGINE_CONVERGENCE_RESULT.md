@@ -54,6 +54,12 @@ composition root, canonical workers, typed section worker, semantic lowering,
 reconciliation, execution, persistence, MCP adapters, models, and rendering.
 It no longer inherits the historical D4 component tuple.
 
+The closure resolver is package-aware: relative imports from a package
+initializer are resolved against that package rather than against its parent.
+The corrected deterministic closure contains 91 production components,
+including the concrete Matplotlib and Plotly renderers and the capability
+implementation modules reached through their package exports.
+
 The following executable source families were physically removed from
 `src/wellplot` because they have no canonical callers:
 

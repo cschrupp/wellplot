@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
+import importlib.util
 import inspect
 import json
 import os
 import subprocess
 import sys
+import types
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -42,6 +45,16 @@ from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _attestation_module() -> types.ModuleType:
+    """Load the provider-free attestation implementation under test."""
+    path = REPO_ROOT / "scripts" / "d5_single_engine_attestation.py"
+    spec = importlib.util.spec_from_file_location("d5_single_engine_attestation", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_canonical_entrypoints_do_not_load_retired_modules() -> None:
@@ -86,6 +99,103 @@ def test_d5_production_manifest_is_current() -> None:
     assert "src/wellplot/agent/code_mode/typed_section_worker.py" in components
     assert "src/wellplot/agent/code_mode/typed_delivery.py" not in components
     assert "src/wellplot/agent/core.py" not in components
+
+
+def test_package_relative_imports_use_package_aware_closure() -> None:
+    """Package exports and relative imports reach their actual child modules."""
+    attestation = _attestation_module()
+    paths = {
+        "src/wellplot/__init__.py": (
+            "from . import renderers\nfrom .capabilities import create_builtin_registry\n"
+        ),
+        "src/wellplot/renderers/__init__.py": (
+            "from .matplotlib import MatplotlibRenderer\nfrom .plotly import PlotlyRenderer\n"
+        ),
+        "src/wellplot/renderers/matplotlib.py": "class MatplotlibRenderer: pass\n",
+        "src/wellplot/renderers/plotly.py": "class PlotlyRenderer: pass\n",
+        "src/wellplot/capabilities/__init__.py": (
+            "from .builtins import create_builtin_registry\n"
+            "from .registry import CapabilityRegistry\n"
+        ),
+        "src/wellplot/capabilities/builtins.py": "def create_builtin_registry(): pass\n",
+        "src/wellplot/capabilities/registry.py": "class CapabilityRegistry: pass\n",
+    }
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        for relative, content in paths.items():
+            file_path = root / relative
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(content, encoding="utf-8")
+        discovered = set(attestation.canonical_component_paths(root))
+    assert {
+        "src/wellplot/renderers/matplotlib.py",
+        "src/wellplot/renderers/plotly.py",
+        "src/wellplot/capabilities/builtins.py",
+        "src/wellplot/capabilities/registry.py",
+    } <= discovered
+
+
+def test_relative_import_resolution_covers_package_and_module_cases() -> None:
+    """Relative imports resolve correctly for packages and ordinary modules."""
+    attestation = _attestation_module()
+    parse = ast.parse
+
+    package_child = parse("from .x import y\n").body[0]
+    package_parent = parse("from ..x import y\n").body[0]
+    package_import = parse("from . import module\n").body[0]
+    assert (
+        attestation._relative_import_module("wellplot.pkg", package_child, is_package=True)
+        == "wellplot.pkg.x"
+    )
+    assert (
+        attestation._relative_import_module("wellplot.pkg", package_parent, is_package=True)
+        == "wellplot.x"
+    )
+    assert (
+        attestation._relative_import_module("wellplot.pkg.module", package_child, is_package=False)
+        == "wellplot.pkg.x"
+    )
+    assert (
+        attestation._relative_import_module("wellplot.pkg.module", package_parent, is_package=False)
+        == "wellplot.x"
+    )
+    assert attestation._import_candidates("wellplot.pkg", package_import, is_package=True) == (
+        "wellplot.pkg",
+        "wellplot.pkg.module",
+    )
+
+
+def test_transitive_manifest_drift_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A changed transitive production module invalidates the committed manifest."""
+    attestation = _attestation_module()
+    root = tmp_path
+    files = {
+        "src/wellplot/__init__.py": "from . import renderers\n",
+        "src/wellplot/renderers/__init__.py": "from .matplotlib import Renderer\n",
+        "src/wellplot/renderers/matplotlib.py": "class Renderer: pass\n",
+    }
+    for relative, content in files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    manifest_path = root / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(attestation.build_manifest(root), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(attestation, "MANIFEST_PATH", manifest_path)
+    attestation.verify_manifest(root)
+
+    (root / "src/wellplot/renderers/matplotlib.py").write_text(
+        "class Renderer:\n    changed = True\n", encoding="utf-8"
+    )
+    with pytest.raises(RuntimeError, match="attestation drifted"):
+        attestation.verify_manifest(root)
 
 
 def _document() -> AuthoringDocumentSpec:
