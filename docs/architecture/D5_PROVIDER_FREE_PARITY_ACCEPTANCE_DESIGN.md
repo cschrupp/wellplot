@@ -4,7 +4,7 @@
 
 ```yaml
 slice: WELLPLOT-D5-3
-authorization: WELLPLOT-D5-DESIGN-AUTH-001
+authorization: WELLPLOT-D5-3-DESIGN-AUTH-001
 design_status: DESIGN_ONLY / READY FOR INDEPENDENT DESIGN REVIEW
 starting_checkpoint: 560ec48d2b2809ed2feb55467da15195f527ec44
 production_implementation: NOT AUTHORIZED
@@ -245,12 +245,12 @@ There is no open-ended case-addition rule.
 | Case ID | Starting state/input | Deterministic response | Expected result | Preservation/render requirement |
 | --- | --- | --- | --- | --- |
 | D5-CBL-01 | D3 cased-hole scaffold plus the accepted Main/Repeat DLIS pair | `_cbl_report_response` plus `_cbl_section_response` | CBL-01..09 PASS, `DIRECT_CORRECT` | generated artifact persists, reloads, and real-renders |
-| D5-LAS-01-T1 | D4 canonical LAS seed, title `Original Well Log Report` | sparse report title response | title changes only | canonical diff is title plus mirrors; persist/reload/render |
-| D5-LAS-01-T2 | prior accepted state with original GR scale | existing-curve scale action | GR becomes linear 5..125 | all non-scale state unchanged; render |
-| D5-LAS-01-T3 | prior accepted state with six-track LAS seed | add-track plus grounded ILD binding | one Resistivity QC track is appended | existing tracks/bindings unchanged; persist/reload/render |
+| D5-LAS-01-T1 | D4 canonical LAS seed, title `Original Well Log Report` | sparse report title response | title changes only | canonical diff plus mirrors; persist/reload |
+| D5-LAS-01-T2 | prior accepted state with original GR scale | existing-curve scale action | GR becomes linear 5..125 | all non-scale state unchanged; persist/reload |
+| D5-LAS-01-T3 | prior accepted state with six-track LAS seed | add-track plus grounded ILD binding | one Resistivity QC track is appended | existing tracks/bindings unchanged; persist/reload |
 | D5-LAS-01-T4 | prior accepted state with GR binding | grounded lower-limit fill action | one GR fill is created | fill parent identity preserved; persist/reload/render |
 | D5-LAS-02-T1 | two matching Main Log candidates | scale response is not dispatched because target is ambiguous | bounded ambiguity failure | zero mutation and no persistence |
-| D5-LAS-02-T2 | clarified Main Log - Upper target | existing-curve scale action | clarified target changes | other section and state preserved; persist/reload/render |
+| D5-LAS-02-T2 | clarified Main Log - Upper target | existing-curve scale action | clarified target changes | other section and state preserved; persist/reload |
 | D5-LAS-03-C01 | valid seed, hint `missing_neutron.las` | no worker response; enrichment rejects source | `enrichment.source_missing` | zero workers, zero mutation, byte-identical artifact |
 | D5-LAS-04-C01 | valid seed, valid source without `RT` | attempted unavailable-channel response | `typed.channel_missing` or canonical `channel_missing` per frozen route | no substitution, zero mutation, byte-identical artifact |
 | D5-REL-01 | D2E S0 with `main.gr.GR.3` and another track's real binding | fill targeting a binding owned by another track | bounded ownership failure | no canonical mutation or persistence |
@@ -269,7 +269,7 @@ backend and semantic expectations:
 | Overlay ID | Replayed case | Adapter assertion |
 | --- | --- | --- |
 | D5-MCP-01 | D5-LAS-01-T1 title mutation | MCP builds the same canonical dependency roles and produces the same normalized title diff |
-| D5-MCP-02 | D5-LAS-01-T2 GR scale mutation | MCP preserves grounding, canonical binding identity, and normalized preservation result |
+| D5-MCP-02 | D5-LAS-01-T2 GR scale mutation | MCP preserves grounding, canonical binding identity, normalized preservation, persistence/reload, and the required real render |
 | D5-MCP-03 | D5-LAS-04-C01 unavailable channel | MCP returns the same bounded failure class and leaves the artifact unchanged |
 
 The overlay compares normalized canonical outcomes, not internal object
@@ -282,7 +282,7 @@ The D5-3 implementation must declare finite local bounds before execution:
 
 - one provider-free run of the 10 Direct Notebook cases;
 - one provider-free run of the three MCP overlays;
-- one real CBL render and one real representative LAS render per adapter set;
+- exactly the required real renders: D5-CBL-01, D5-LAS-01-T4, and D5-MCP-02;
 - no generation calls beyond deterministic fixture backend calls;
 - no live network requests;
 - fail the slice on timeout, missing external source custody, or unclassified
@@ -408,15 +408,22 @@ Final parity evidence must use the actual configured renderer and produce a
 non-empty output artifact. No renderer mock or bypass may stand in for the
 final render assertion.
 
-Rendering is required for:
+The required real-render acceptance subset is exactly:
 
-- the generated CBL artifact;
-- one accepted Direct Notebook LAS revision state;
-- one accepted MCP overlay state, using the same canonical render path.
+1. `D5-CBL-01`: the generated CBL artifact must persist, reload, real-render,
+   and pass CBL-01 through CBL-09.
+2. `D5-LAS-01-T4`: the cumulative Direct Notebook state after title, scale,
+   track/binding, and fill revisions must pass canonical correctness,
+   preservation, persistence, reload, and real render.
+3. `D5-MCP-02`: the MCP GR-scale overlay must pass adapter semantic parity,
+   canonical grounding and binding identity, normalized preservation,
+   persistence, reload, and real render.
 
-The implementation may render additional states for diagnosis but may not make
-rendering optional in the required representative set. The D5-2 Matplotlib
-resource correction remains part of the frozen production path.
+All other successful cases retain their canonical semantic, preservation, and
+case-specific persistence/reload requirements, but do not independently
+require a real render. Diagnostic renders may occur during implementation;
+they are not part of the frozen minimum acceptance population. The D5-2
+Matplotlib resource correction remains part of the frozen production path.
 
 ## 14. Public-Adapter Parity Strategy
 
@@ -585,7 +592,7 @@ D5-3 PROVIDER-FREE PARITY / REGRESSION ACCEPTANCE DESIGN:
 COMPLETE / READY FOR INDEPENDENT DESIGN REVIEW
 
 Authority:
-WELLPLOT-D5-DESIGN-AUTH-001
+WELLPLOT-D5-3-DESIGN-AUTH-001
 
 Branch:
 design/d5-3-provider-free-parity-acceptance
