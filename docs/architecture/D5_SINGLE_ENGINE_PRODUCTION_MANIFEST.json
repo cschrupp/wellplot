@@ -79,7 +79,7 @@
     "src/wellplot/logfile.py": "438dd8eb471d47962ef140d8fc6d8fb84261ed17c046989e50351a7c3d16625e",
     "src/wellplot/logfile_schema.py": "f028ba578a825c197a443ed8a55b8153068937864ae55ace06109e24f7fb8a9d",
     "src/wellplot/mcp/__init__.py": "804db132c01bc964aa092c15d3ccf6321304ecadafbeb381ceea9226e91804c0",
-    "src/wellplot/mcp/agentic.py": "ec520a23b5eb207599568fb6d1020ca96817b84ce6245ce83a5f59f749eb79d4",
+    "src/wellplot/mcp/agentic.py": "4730189011c08dfc0aea4136664c914e891121b29cc87904ad3cc9b8eb4504fb",
     "src/wellplot/mcp/agentic_server.py": "a5accd10fb357dd6b9b157f5bdb5967d5871b5cd310924536ccb99c612d8b68b",
     "src/wellplot/mcp/authoring_defaults.py": "02649d20c566849e6add3ccbd930eb3247972603a6ef08fe07f84a67d7d70205",
     "src/wellplot/mcp/header_archetypes.py": "a16dab5f21124248df40343932137aaa6c94498cf6ea26750ba18c57a31e540e",

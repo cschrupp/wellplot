@@ -9,15 +9,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..agent.code_mode.enrichment import LoadedSource
+from ..agent.code_mode.source_loader import LogfileSourceLoader
 from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
 from ..agent.session import AgentSession, AgentSourceConfig
 from ..api.serialize import report_to_dict
+from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
@@ -50,6 +54,7 @@ class _McpDocumentContext:
     logfile_path: Path
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
+    available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
 
 
 def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
@@ -76,10 +81,38 @@ def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
         )
         for index, (path, source_format) in enumerate(unique_sources, start=1)
     )
+    candidate_by_source = {
+        (Path(candidate.path), candidate.trusted_format or "auto"): candidate
+        for candidate in candidates
+    }
+    loader = LogfileSourceLoader()
+    loaded: dict[tuple[Path, str], LoadedSource] = {}
+    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
+    for section_id, (path, source_format) in declared.items():
+        if not path.is_file():
+            continue
+        cache_key = (path, source_format)
+        if cache_key not in loaded:
+            loaded[cache_key] = loader.load(path, source_format)
+        source = loaded[cache_key]
+        candidate = candidate_by_source[(path, source_format)]
+        available_channels[section_id] = tuple(
+            AuthoringChannelCandidate(
+                mnemonic=channel.mnemonic,
+                kind=channel.kind,
+                unit=channel.unit,
+                description=channel.description,
+                aliases=list(channel.aliases),
+                value_shape=list(channel.shape),
+                source_path=candidate.path,
+            )
+            for channel in source.channels
+        )
     return _McpDocumentContext(
         logfile_path=resolved_logfile,
         document=document,
         source_candidates=candidates,
+        available_channels=available_channels,
     )
 
 
@@ -127,7 +160,11 @@ def _apply_session_result(
         )
 
     private_service = AuthoringService(context.document)
-    plan = reconcile_authoring(intent, existing=private_service.document)
+    plan = reconcile_authoring(
+        intent,
+        existing=private_service.document,
+        available_channels=context.available_channels,
+    )
     if not plan.ready:
         return (
             False,
