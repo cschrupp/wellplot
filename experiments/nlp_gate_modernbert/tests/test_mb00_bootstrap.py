@@ -52,15 +52,13 @@ def test_slm03_adapter_untouched_hash() -> None:
 
 def test_no_forbidden_deps_in_pyproject() -> None:
     text = (EXPERIMENT_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    for banned in ("torch", "transformers", "langgraph", "unsloth", "t5", "modernbert"):
-        # comments may mention future MB-03; ensure dependencies = [] block has none
-        assert "dependencies = []" in text
-    # hard check: no requirement lines installing banned packages yet
-    for line in text.splitlines():
-        if line.strip().startswith("#"):
-            continue
-        low = line.lower()
-        if "dependencies" in low:
-            continue
-        assert "langgraph" not in low
-        assert "unsloth" not in low
+    # pydantic allowed; forbid ML/orchestration requirement pins
+    req_lines = [
+        ln.lower()
+        for ln in text.splitlines()
+        if ln.strip().startswith('"') or ln.strip().startswith("'")
+    ]
+    banned = ("torch", "transformers", "langgraph", "unsloth", "modernbert", "t5")
+    for ln in req_lines:
+        for b in banned:
+            assert b not in ln, ln

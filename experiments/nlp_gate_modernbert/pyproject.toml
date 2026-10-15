@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nlp-gate-modernbert"
-version = "0.1.0"
-description = "WellPlot NLP Runtime V2 — encoder gate experiment (MB-01 corpus audit)"
+version = "0.2.0"
+description = "WellPlot NLP Runtime V2 — MB-02 deterministic resolver / fact projector"
 readme = "README.md"
 requires-python = ">=3.11"
-# No torch/transformers/encoder deps until MB-03 authority.
-dependencies = []
+# No torch/transformers/encoder deps (MB-03 not justified).
+dependencies = ["pydantic>=2.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]

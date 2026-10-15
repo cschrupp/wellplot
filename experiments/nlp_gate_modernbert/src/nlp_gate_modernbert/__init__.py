@@ -1,10 +1,11 @@
-"""Encoder-gate experiment package (Runtime V2).
+"""Encoder-gate / Runtime V2 experiment package.
 
-Current authorized slice: MB-01R gate corpus audit rework.
+Current authorized slice: MB-02 deterministic resolver / fact projector.
 """
 
-__version__ = "0.1.1"
-SLICE = "MB-01R"
-AUTHORITY = "WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-REWORK-AUTH-001"
+__version__ = "0.2.0"
+SLICE = "MB-02"
+AUTHORITY = "WELLPLOT-NLP-RUNTIME-V2-MB02-DETERMINISTIC-RESOLVER-FACT-PROJECTOR-AUTH-001"
 MB00_AUTHORITY = "WELLPLOT-NLP-RUNTIME-V2-MB00-BOOTSTRAP-AUTH-001"
 MB01_AUTHORITY = "WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-AUTH-001"
+MB01R_AUTHORITY = "WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-REWORK-AUTH-001"
