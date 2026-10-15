@@ -136,23 +136,123 @@ def _normalize_document(document: Mapping[str, object]) -> dict[str, object]:
             data_source = section.get("data_source")
             if isinstance(data_source, dict):
                 data_source["source_path"] = "<declared-source>"
+    extensions = normalized.get("extensions")
+    if isinstance(extensions, dict):
+        compatibility = extensions.get("compatibility")
+        if isinstance(compatibility, dict):
+            legacy_document = compatibility.get("legacy_document")
+            if isinstance(legacy_document, dict):
+                layout = legacy_document.get("layout")
+                if isinstance(layout, dict):
+                    for section in layout.get("log_sections", []):
+                        if isinstance(section, dict):
+                            data = section.get("data")
+                            if isinstance(data, dict):
+                                data["source_path"] = "<declared-source>"
     return normalized
 
 
-def _canonical_semantic_projection(document: Mapping[str, object]) -> dict[str, object]:
-    """Exclude compatibility mirrors from normalized semantic parity evidence."""
+def _pointer_state(document: Mapping[str, object], path: str) -> tuple[bool, object]:
+    """Return presence and value for one JSON-pointer-like path."""
+    try:
+        return True, d4._pointer_value(document, path)
+    except (KeyError, IndexError, TypeError, ValueError):
+        return False, None
+
+
+def _remove_exact_paths(document: dict[str, object], paths: set[str]) -> None:
+    """Remove only explicitly enumerated mapping leaves from a parity copy."""
+    for path in paths:
+        parts = path.lstrip("/").split("/")
+        current: object = document
+        for part in parts[:-1]:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            elif isinstance(current, list) and part.isdigit() and int(part) < len(current):
+                current = current[int(part)]
+            else:
+                current = None
+                break
+        if isinstance(current, dict):
+            current.pop(parts[-1], None)
+
+
+def _mcp_compatibility_completion_values(
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+) -> dict[str, object]:
+    """Return known serializer-completion mirrors and their canonical values."""
+    completions: dict[str, object] = {}
+    for section_index, section in enumerate(after["sections"]):
+        for track_index, _track in enumerate(section["tracks"]):
+            for mirror_name, canonical_key in (
+                ("main", "horizontal_major_alpha"),
+                ("secondary", "horizontal_minor_alpha"),
+            ):
+                canonical_path = (
+                    f"/sections/{section_index}/tracks/{track_index}/grid/{canonical_key}"
+                )
+                expected_present, expected = _pointer_state(after, canonical_path)
+                mirror_paths = (
+                    f"/sections/{section_index}/tracks/{track_index}/extensions/"
+                    f"compatibility/legacy_track/grid/horizontal/{mirror_name}/alpha",
+                    f"/extensions/compatibility/legacy_document/layout/log_sections/"
+                    f"{section_index}/tracks/{track_index}/grid/horizontal/{mirror_name}/alpha",
+                )
+                if not expected_present:
+                    continue
+                for mirror_path in mirror_paths:
+                    before_present, _ = _pointer_state(before, mirror_path)
+                    after_present, actual = _pointer_state(after, mirror_path)
+                    if not before_present and after_present:
+                        assert actual == expected, (mirror_path, expected, actual)
+                        completions[mirror_path] = expected
+    return completions
+
+
+def _assert_mcp_raw_las_contract(
+    turn_id: str,
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+) -> set[str]:
+    """Check raw MCP preservation before applying explicit parity normalization."""
+    contract = _d4_gold(turn_id)["contract"]
+    for assertion in contract["before_assertions"]:
+        assert d4._assertion_matches(before, assertion), (turn_id, "before", assertion)
+    for assertion in contract["after_assertions"]:
+        assert d4._assertion_matches(after, assertion), (turn_id, "after", assertion)
+
+    changed = _changed_paths(before, after)
+    completions = _mcp_compatibility_completion_values(before, after)
+    assert changed, f"{turn_id} must produce a canonical change"
+    assert any(
+        _path_matches(path, required)
+        for path in changed
+        for required in contract["required_change_paths"]
+    ), (turn_id, changed, contract["required_change_paths"])
+    unexpected = [
+        path
+        for path in changed
+        if not any(_path_matches(path, allowed) for allowed in contract["allowed_change_paths"])
+        and path not in completions
+    ]
+    assert not unexpected, (turn_id, unexpected)
+
+    normalized_before = copy.deepcopy(before)
+    normalized_after = copy.deepcopy(after)
+    _remove_exact_paths(normalized_before, set(completions))
+    _remove_exact_paths(normalized_after, set(completions))
+    _assert_frozen_las_contract(turn_id, normalized_before, normalized_after)
+    return set(completions)
+
+
+def _canonical_semantic_projection(
+    document: Mapping[str, object],
+    excluded_paths: set[str],
+) -> dict[str, object]:
+    """Exclude only explicitly verified compatibility paths for parity."""
     normalized = _normalize_document(document)
-
-    def remove_compatibility(value: object) -> None:
-        if isinstance(value, dict):
-            value.pop("compatibility", None)
-            for child in value.values():
-                remove_compatibility(child)
-        elif isinstance(value, list):
-            for child in value:
-                remove_compatibility(child)
-
-    remove_compatibility(normalized)
+    _remove_exact_paths(normalized, excluded_paths)
     return normalized
 
 
@@ -200,12 +300,28 @@ def _assert_overlay_parity(
     mcp_after: Mapping[str, object],
 ) -> None:
     """Require equivalent normalized canonical outcomes across both adapters."""
-    normalized_direct_before = _canonical_semantic_projection(direct_before)
-    normalized_mcp_before = _canonical_semantic_projection(mcp_before)
-    normalized_direct_after = _canonical_semantic_projection(direct_after)
-    normalized_mcp_after = _canonical_semantic_projection(mcp_after)
-    _assert_frozen_las_contract(turn_id, normalized_direct_before, normalized_direct_after)
-    _assert_frozen_las_contract(turn_id, normalized_mcp_before, normalized_mcp_after)
+    _assert_frozen_las_contract(turn_id, direct_before, direct_after)
+    compatibility_completions = _assert_mcp_raw_las_contract(
+        turn_id,
+        mcp_before,
+        mcp_after,
+    )
+    normalized_direct_before = _canonical_semantic_projection(
+        direct_before,
+        compatibility_completions,
+    )
+    normalized_mcp_before = _canonical_semantic_projection(
+        mcp_before,
+        compatibility_completions,
+    )
+    normalized_direct_after = _canonical_semantic_projection(
+        direct_after,
+        compatibility_completions,
+    )
+    normalized_mcp_after = _canonical_semantic_projection(
+        mcp_after,
+        compatibility_completions,
+    )
     assert normalized_direct_before == normalized_mcp_before
     assert normalized_direct_after == normalized_mcp_after
     assert _changed_paths(normalized_direct_before, normalized_direct_after) == _changed_paths(

@@ -58,7 +58,10 @@ declared source and passes its section-scoped channel inventory to canonical
 reconciliation; the test proves that the exact inspected source exposes scalar
 GR. The title and GR-scale overlays compare complete normalized canonical
 before/after outcomes against Direct Notebook controls, including identities,
-allowed-change projection, unrelated-state preservation, and reload.
+allowed-change projection, unrelated-state preservation, and reload. Raw MCP
+compatibility state remains observable: only the explicitly enumerated
+serializer-completion mirrors are normalized, and each is checked against its
+canonical grid source before parity comparison.
 `D5-MCP-03` proves unavailable-channel failure without mutation.
 `D5-MCP-02` performs the required real render.
 
@@ -84,6 +87,7 @@ r1_complete_frozen_gold_semantic_assertions: PASS
 r1_preservation_allowed_change_checks: PASS
 r2_direct_notebook_mcp_normalized_parity: PASS
 r2_source_grounding: PASS
+r2_unrelated_compatibility_preservation: PASS
 r3_cross_track_ownership_diagnostic: PASS
 las_requirements: LAS-01..LAS-09 covered by complete frozen D4 gold assertions
 rejection_cases: PASS / zero mutation / bounded diagnostics
