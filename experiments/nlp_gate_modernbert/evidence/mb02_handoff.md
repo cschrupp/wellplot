@@ -6,7 +6,7 @@ AUTHORITY: WELLPLOT-NLP-RUNTIME-V2-MB02-DETERMINISTIC-RESOLVER-FACT-PROJECTOR-AU
 REPOSITORY: /home/user/projects/wellplot
 BRANCH: exp/wellplot-nlp-slm-01
 STARTING SHA: 9d2bd840eeef361917776e4a9a6bf1713a446606
-CANDIDATE SHA: (filled after commit)
+CANDIDATE SHA: 85da5283985cea55543d4b2775359e6af2bdd4cb
 REMOTE SHA: origin/main @ 225977d (local branch ahead; not pushed)
 
 CLAIM:
@@ -79,7 +79,7 @@ ARTIFACTS:
 - evidence/mb02_replay_mismatches.json
 - evidence/mb02/ (copies)
 
-WORKING TREE: (updated after commit)
+WORKING TREE: clean after handoff SHA stamp commit
 STATUS: STOP FOR INDEPENDENT MB-02 REVIEW
 ```
 
