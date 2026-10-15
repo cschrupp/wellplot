@@ -92,8 +92,8 @@ def test_fill_cross_track_precondition() -> None:
     assert d.public_envelope.reason == "capability_not_available"
 
 
-def test_silent_cross_track_fill_not_precondition() -> None:
-    """Corpus OK cases allow between_curves without explicit cross-track assertion."""
+def test_objective_cross_track_fill_precondition_r6() -> None:
+    """R6: cross-track between-fill fails from workspace state, not utterance asserts."""
     ws = project_workspace("d0_with_rhob")
     req = NormalizedRequest(
         requested_operation="DEFINE_FILL",
@@ -105,8 +105,9 @@ def test_silent_cross_track_fill_not_precondition() -> None:
         ),
     )
     d = adjudicate(req, ws)
-    assert d.authority == "OK"
-    assert d.public_envelope.status == "ok"
+    assert d.authority == "DETERMINISTIC_PRECONDITION"
+    assert "FILL_CROSS_TRACK" in d.facts.precondition_failures
+    assert d.public_envelope.status == "unsupported"
 
 
 def test_invalid_log_bounds_reuses_scalespec() -> None:

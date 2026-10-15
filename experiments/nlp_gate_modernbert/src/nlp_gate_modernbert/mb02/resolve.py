@@ -13,36 +13,80 @@ def _norm(text: str) -> str:
     return " ".join(t.split())
 
 
+def _curve_alias_blob(c) -> set[str]:
+    ids = {_norm(c.id)}
+    if c.channel:
+        ids.add(_norm(c.channel))
+    if c.handle:
+        ids.add(_norm(c.handle))
+        ids.add(_norm(c.handle.replace("-", " ")))
+    aliases = set(c.aliases) | ids
+    if c.label:
+        aliases.add(_norm(c.label))
+    if c.id.startswith("curve"):
+        aliases.add(_norm(c.id.replace("-", " ")))
+    return aliases
+
+
+def _curve_token_hit(q: str, aliases: set[str], curve_id: str) -> bool:
+    if q in aliases or q == _norm(curve_id):
+        return True
+    if " " in q:
+        blob = " ".join(sorted(aliases))
+        toks = q.split()
+        return all(t in blob for t in toks)
+    return False
+
+
 def match_curves(workspace: ProjectedWorkspace, query: str) -> ReferenceMatch:
     """Match curve query to workspace entries.
 
     Duplicate placed instances (same channel, distinct handles) each count.
     Unplaced catalog-only entries count by channel id once.
+    Ordinals (first/second) and view qualifiers (wide/narrow) select instances.
     """
     q = _norm(query)
-    hits: list[str] = []
+    q = re.sub(r"\s+views?$", "", q).strip()
+
+    # Ordinal instance: "first CBL", "second GR instance"
+    ord_m = re.match(r"^(first|second|third|1st|2nd|3rd)\s+(.+)$", q)
+    if ord_m:
+        ord_word = ord_m.group(1)
+        rest = re.sub(r"\s+instances?$", "", ord_m.group(2)).strip()
+        rest = re.sub(r"\s+views?$", "", rest).strip()
+        idx = {"first": 0, "1st": 0, "second": 1, "2nd": 1, "third": 2, "3rd": 2}[ord_word]
+        ranked: list[str] = []
+        for c in workspace.curves:
+            aliases = _curve_alias_blob(c)
+            if _curve_token_hit(rest, aliases, c.id):
+                label = c.handle or c.id
+                if label not in ranked:
+                    ranked.append(label)
+        hits = [ranked[idx]] if len(ranked) > idx else []
+        return ReferenceMatch(
+            field="curve", query=query, candidate_ids=hits, candidate_count=len(hits)
+        )
+
+    # Qualifier + mnemonic: "narrow CBL", "wide CBL", "narrow CBL view"
+    qual_m = re.match(r"^(wide|narrow)\s+(.+)$", q)
+    if qual_m:
+        qual = qual_m.group(1)
+        rest = re.sub(r"\s+views?$", "", qual_m.group(2)).strip()
+        hits: list[str] = []
+        for c in workspace.curves:
+            aliases = _curve_alias_blob(c)
+            if qual in aliases and _curve_token_hit(rest, aliases, c.id):
+                label = c.handle or c.id
+                if label not in hits:
+                    hits.append(label)
+        return ReferenceMatch(
+            field="curve", query=query, candidate_ids=hits, candidate_count=len(hits)
+        )
+
+    hits = []
     for c in workspace.curves:
-        ids = {_norm(c.id)}
-        if c.channel:
-            ids.add(_norm(c.channel))
-        if c.handle:
-            ids.add(_norm(c.handle))
-        aliases = set(c.aliases) | ids
-        if c.label:
-            aliases.add(_norm(c.label))
-        # handle "curve-3" / "curve 3"
-        if c.handle:
-            aliases.add(_norm(c.handle.replace("-", " ")))
-        if c.id.startswith("curve"):
-            aliases.add(_norm(c.id.replace("-", " ")))
-        # multi-word query: all tokens present in alias/label blob
-        blob = " ".join(sorted(aliases))
-        token_hit = q in aliases or q == _norm(c.id)
-        if not token_hit and " " in q:
-            toks = q.split()
-            token_hit = all(t in blob for t in toks)
-        if token_hit:
-            # Distinct instance id: prefer handle when present (duplicate channels)
+        aliases = _curve_alias_blob(c)
+        if _curve_token_hit(q, aliases, c.id):
             label = c.handle or c.id
             if label not in hits:
                 hits.append(label)
@@ -108,17 +152,63 @@ def match_tracks(workspace: ProjectedWorkspace, query: str) -> ReferenceMatch:
 
 
 def match_fills(workspace: ProjectedWorkspace, query: str) -> ReferenceMatch:
+    """Match fill by ref, curve channel/handle, and optional kind (upper/lower)."""
     q = _norm(query)
+    want_lower = "lower" in q
+    want_upper = "upper" in q
     hits: list[str] = []
+
+    def _fill_curve_names(f) -> set[str]:
+        names: set[str] = set()
+        raw = _norm(f.curve or "")
+        if raw:
+            names.add(raw)
+            names.add(raw.replace("-", " "))
+        for c in workspace.curves:
+            label = c.handle or c.id
+            if raw and raw in {_norm(c.id), _norm(c.handle or ""), _norm(c.channel or "")}:
+                names |= _curve_alias_blob(c)
+                if c.channel:
+                    names.add(_norm(c.channel))
+            elif label and raw == _norm(label):
+                names |= _curve_alias_blob(c)
+        return names
+
+    def _kind_ok(f) -> bool:
+        mode = _norm(f.mode or "")
+        if want_lower and "lower" not in mode:
+            return False
+        if want_upper and "upper" not in mode:
+            return False
+        return True
+
     for f in workspace.fills:
-        curve = _norm(f.curve or "")
+        if not _kind_ok(f):
+            continue
+        curve_names = _fill_curve_names(f)
         ref = _norm(f.ref)
-        if q in {ref, curve} or (q and (q in curve or curve in q)):
+        # strip filler words from query for curve token check
+        q_core = re.sub(r"\b(fill|the|exactly|upper|lower|limit|to)\b", " ", q)
+        q_core = " ".join(q_core.split())
+        hit = False
+        if q in {ref} or ref in q:
+            hit = True
+        elif curve_names and any(n and (n in q or n == q_core) for n in curve_names):
+            hit = True
+        elif q_core and any(n == q_core or q_core in n for n in curve_names):
+            hit = True
+        if hit and f.ref not in hits:
             hits.append(f.ref)
-        # "gr fill" style
-        if "fill" in q and curve and curve in q:
-            if f.ref not in hits:
-                hits.append(f.ref)
+
+    # If kind filter yielded nothing but query named a curve uniquely without kind,
+    # fall back only when neither upper nor lower was requested.
+    if not hits and not want_lower and not want_upper:
+        for f in workspace.fills:
+            curve_names = _fill_curve_names(f)
+            if any(n and n in q for n in curve_names):
+                if f.ref not in hits:
+                    hits.append(f.ref)
+
     return ReferenceMatch(
         field="fill", query=query, candidate_ids=hits, candidate_count=len(hits)
     )

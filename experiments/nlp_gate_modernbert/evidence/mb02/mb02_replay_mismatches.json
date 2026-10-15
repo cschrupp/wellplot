@@ -1,5 +1,44 @@
 [
   {
+    "case_id": "GOLD-0061",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
+    "case_id": "GOLD-0062",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
+    "case_id": "GOLD-0063",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
     "case_id": "SEED-cm-9643c020e2e02463",
     "gold_detail": null,
     "gold_reason": null,
@@ -13,110 +52,6 @@
     "suppressed": []
   },
   {
-    "case_id": "D5GAP-0025",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_CARDINALITY",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0067",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0068",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0072",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": "conditional_threshold_fill_outside_well_ir_v1",
-    "pred_reason": "operation_not_supported",
-    "pred_status": "unsupported",
-    "selected_authority": "STATIC_CAPABILITY_BOUNDARY",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0074",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": "invalid_interval_order",
-    "pred_status": "invalid",
-    "selected_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0075",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0076",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0080",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": "unknown_request_kind",
-    "pred_reason": "operation_not_supported",
-    "pred_status": "unsupported",
-    "selected_authority": "STATIC_CAPABILITY_BOUNDARY",
-    "suppressed": []
-  },
-  {
     "case_id": "D5GAP-0085",
     "gold_detail": null,
     "gold_reason": null,
@@ -127,32 +62,6 @@
     "pred_reason": "operation_not_supported",
     "pred_status": "unsupported",
     "selected_authority": "STATIC_CAPABILITY_BOUNDARY",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0086",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_PRECONDITION",
-    "pred_detail": null,
-    "pred_reason": null,
-    "pred_status": "ambiguous",
-    "selected_authority": "DETERMINISTIC_CARDINALITY",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0088",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_CARDINALITY",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
     "suppressed": []
   },
   {
@@ -195,32 +104,6 @@
     "suppressed": []
   },
   {
-    "case_id": "D5GAP-0105",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
-    "pred_detail": null,
-    "pred_reason": "reference_not_found",
-    "pred_status": "unsupported",
-    "selected_authority": "DETERMINISTIC_NOT_FOUND",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0112",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
-    "pred_detail": null,
-    "pred_reason": null,
-    "pred_status": "ambiguous",
-    "selected_authority": "DETERMINISTIC_CARDINALITY",
-    "suppressed": []
-  },
-  {
     "case_id": "D5GAP-0117",
     "gold_detail": null,
     "gold_reason": null,
@@ -256,31 +139,5 @@
     "pred_reason": "reference_not_found",
     "pred_status": "unsupported",
     "selected_authority": "DETERMINISTIC_NOT_FOUND"
-  },
-  {
-    "case_id": "D5GAP-0142",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_CARDINALITY",
-    "pred_detail": null,
-    "pred_reason": null,
-    "pred_status": "ambiguous",
-    "selected_authority": "DETERMINISTIC_CARDINALITY",
-    "suppressed": []
-  },
-  {
-    "case_id": "D5GAP-0147",
-    "gold_detail": null,
-    "gold_reason": null,
-    "gold_status": "ok",
-    "kind": "status",
-    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
-    "pred_detail": null,
-    "pred_reason": null,
-    "pred_status": "ambiguous",
-    "selected_authority": "DETERMINISTIC_CARDINALITY",
-    "suppressed": []
   }
 ]

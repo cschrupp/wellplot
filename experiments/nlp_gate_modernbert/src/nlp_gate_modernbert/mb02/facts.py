@@ -60,11 +60,13 @@ def derive_facts(req: NormalizedRequest, ws: ProjectedWorkspace) -> DerivedFacts
         if req.query and req.query.kind == "track" and req.query.text:
             matches.append(match_tracks(ws, req.query.text))
 
-    # Fill between preconditions
+    # Fill between preconditions (R6: objective workspace state, not utterance asserts).
+    # Only for single-op BETWEEN on current workspace. BETWEEN_INSTANCES selects handles.
+    # Multi-op compositions that mutate scale/track first are SCOPE_CONTRACT_GAP (R7).
     if (
         req.requested_operation == "DEFINE_FILL"
         and req.fill
-        and req.fill.mode == "BETWEEN"
+        and req.fill.mode in {"BETWEEN", "BETWEEN_INSTANCES"}
         and req.fill.primary_query
         and req.fill.predicate
         and req.fill.predicate.secondary_query
@@ -75,7 +77,7 @@ def derive_facts(req: NormalizedRequest, ws: ProjectedWorkspace) -> DerivedFacts
         if a.candidate_count == 1 and b.candidate_count == 1:
             ca = _curve_by_id(ws, a.candidate_ids[0])
             cb = _curve_by_id(ws, b.candidate_ids[0])
-            if ca and cb:
+            if ca and cb and req.fill.mode == "BETWEEN":
                 cross = (
                     ca.track_ref is not None
                     and cb.track_ref is not None
@@ -87,14 +89,12 @@ def derive_facts(req: NormalizedRequest, ws: ProjectedWorkspace) -> DerivedFacts
                     and ca.scale_max == cb.scale_max
                     and ca.scale_reverse == cb.scale_reverse
                 )
-                # Fail-closed only when request asserts the incompatible setup
-                # (silent cross-track may still be gold-ok; explicit phrase → unsupported).
-                if req.fill.asserts_cross_track and cross:
+                if cross:
                     facts.precondition_failures.append("FILL_CROSS_TRACK")
                     facts.precondition_details["FILL_CROSS_TRACK"] = (
                         "between_fill_requires_same_track"
                     )
-                if req.fill.asserts_scale_mismatch and not same_scale:
+                elif not same_scale:
                     facts.precondition_failures.append("FILL_SCALE_INCOMPATIBLE")
                     facts.precondition_details["FILL_SCALE_INCOMPATIBLE"] = (
                         "between_fill_requires_matching_effective_scales"

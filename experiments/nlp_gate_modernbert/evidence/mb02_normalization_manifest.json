@@ -3,8 +3,8 @@
   "frontier_model_calls": 0,
   "gold_available_during_generation": false,
   "method_counts": {
-    "MANUAL_NORMALIZATION": 9,
-    "RULE_BUILDER": 291
+    "MANUAL_NORMALIZATION": 8,
+    "RULE_BUILDER": 292
   },
   "n_records": 300,
   "path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/mb02/mb02_normalized_requests.jsonl",

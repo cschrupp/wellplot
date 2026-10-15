@@ -33,6 +33,9 @@ def _pct_to_alpha(text: str) -> float | None:
 
 def build_threshold_fill(text: str, _family: str) -> NormalizedRequest | None:
     low = text.lower()
+    # Split-fill is baseline_split, not conditional threshold shading
+    if "split-fill" in low or "split fill" in low:
+        return None
     if not (("shade" in low or "fill" in low) and ("exceeds" in low or "above" in low or "below" in low)):
         return None
     if "where" not in low and "only" not in low and "portions" not in low:
@@ -86,6 +89,9 @@ def _clean_curve_token(text: str) -> str:
     t = re.sub(r"\([^)]*\)", " ", text)
     t = re.sub(r"\bpad\s+\d+\b", " ", t, flags=re.I)
     t = re.sub(r"\bthe\b", " ", t, flags=re.I)
+    # Preserve handle references like "curve 3" / "curve-3"
+    if re.search(r"\bcurve[\s-]*\d+\b", t, re.I):
+        return " ".join(t.split()).strip()
     t = re.sub(r"\bcurve\b", " ", t, flags=re.I)
     return " ".join(t.split()).strip()
 
@@ -115,6 +121,8 @@ def build_place_density_or_curve(text: str, _family: str) -> NormalizedRequest |
         curve = _clean_curve_token(m.group(1))
         track = m.group(2).strip()
         track = re.sub(r"\([^)]*\)", " ", track)
+        # Drop trailing display clauses after the track target
+        track = re.split(r"\s+and\b", track, maxsplit=1, flags=re.I)[0].strip()
         track = " ".join(track.split())
         if "fill" in curve.lower() or not curve or curve[0].isdigit():
             return None
@@ -163,12 +171,42 @@ def build_reverse_named(text: str, _family: str) -> NormalizedRequest | None:
     return None
 
 
+def build_configure_named_scale(text: str, _family: str) -> NormalizedRequest | None:
+    """Set/configure a named curve (incl. wide/narrow view) to an explicit scale."""
+    low = text.lower()
+    if "split-fill" in low or "fill between" in low:
+        return None
+    m = re.search(
+        r"set\s+(?:the\s+)?(.+?)\s+to\s+a?\s*(\d+(?:\.\d+)?)\s*[–-]\s*(\d+(?:\.\d+)?)\s*(linear|log(?:arithmic)?)?\s*scale",
+        text,
+        re.I,
+    )
+    if not m:
+        return None
+    curve = m.group(1).strip()
+    curve = re.sub(r"\s+view$", "", curve, flags=re.I).strip()
+    lo, hi = float(m.group(2)), float(m.group(3))
+    kind = "log" if m.group(4) and "log" in m.group(4).lower() else "linear"
+    return NormalizedRequest(
+        requested_operation="CONFIGURE_CURVE_DISPLAY",
+        query=SemanticQuery(kind="curve", text=curve),
+        scale_bounds=ScaleBounds(kind=kind, minimum=lo, maximum=hi),
+    )
+
+
 def build_fill_to_limit(text: str, _family: str) -> NormalizedRequest | None:
     m = re.search(
         r"fill\s+(?:from\s+)?(?:the\s+)?(.+?)\s+(?:curve\s+)?to\s+its\s+(lower|upper)\s+(?:scale\s+)?limit",
         text,
         re.I,
     )
+    if not m:
+        # "On reversed RHOB, fill to the upper scale limit."
+        m = re.search(
+            r"on\s+(?:reversed\s+|logarithmic\s+)?(\w+)\s*,\s*fill\s+to\s+(?:the\s+)?(lower|upper)\s+(?:scale\s+)?limit",
+            text,
+            re.I,
+        )
     if not m:
         return None
     curve = m.group(1).strip()
@@ -180,6 +218,77 @@ def build_fill_to_limit(text: str, _family: str) -> NormalizedRequest | None:
             mode="TO_LIMIT",
             primary_query=curve,
             predicate=FillPredicate(kind="TO_LIMIT", limit=limit),  # type: ignore[arg-type]
+        ),
+    )
+
+
+def build_baseline_split(text: str, _family: str) -> NormalizedRequest | None:
+    """WELL-IR baseline_split / split-fill (supported), not conditional threshold."""
+    low = text.lower()
+    if "split-fill" not in low and "split fill" not in low:
+        return None
+    curve = None
+    val = None
+    m = re.search(
+        r"split-fill\s+(\w+)\s+(?:at|around)\s+(\d+(?:\.\d+)?)",
+        text,
+        re.I,
+    )
+    if m:
+        curve, val = m.group(1), float(m.group(2))
+    if not m:
+        m = re.search(
+            r"on\s+(?:reversed\s+|logarithmic\s+)?(\w+)\s*,\s*split-fill\s+(?:around|at)\s+(\d+(?:\.\d+)?)",
+            text,
+            re.I,
+        )
+        if m:
+            curve, val = m.group(1), float(m.group(2))
+    if not curve:
+        for name in ("RHOB", "GR", "RT", "NPHI", "CALI", "DT"):
+            if re.search(rf"\b{name}\b", text, re.I):
+                curve = name
+                break
+        nums = re.findall(r"(\d+(?:\.\d+)?)", text)
+        if nums:
+            val = float(nums[0])
+    if not curve or val is None:
+        return None
+    return NormalizedRequest(
+        requested_operation="DEFINE_FILL",
+        query=SemanticQuery(kind="curve", text=curve),
+        fill=FillSpec(
+            mode="BASELINE_SPLIT",
+            primary_query=curve,
+            baseline_value=val,
+            predicate=FillPredicate(kind="BASELINE_SPLIT", value=val),  # type: ignore[arg-type]
+        ),
+    )
+
+
+def build_between_instances(text: str, _family: str) -> NormalizedRequest | None:
+    low = text.lower()
+    if "fill between" not in low:
+        return None
+    if "two" not in low or "instance" not in low:
+        return None
+    curve = None
+    for name in ("GR", "CBL", "RHOB", "RT", "NPHI"):
+        if re.search(rf"\b{name}\b", text, re.I):
+            curve = name
+            break
+    if not curve:
+        return None
+    alpha = _pct_to_alpha(text)
+    return NormalizedRequest(
+        requested_operation="DEFINE_FILL",
+        alpha=alpha,
+        fill=FillSpec(
+            mode="BETWEEN_INSTANCES",
+            primary_query=f"first {curve}",
+            predicate=FillPredicate(
+                kind="BETWEEN_CURVES", secondary_query=f"second {curve}"
+            ),
         ),
     )
 
@@ -196,6 +305,8 @@ def build_remove_fill(text: str, _family: str) -> NormalizedRequest | None:
 
 def build_fill_between(text: str, _family: str) -> NormalizedRequest | None:
     low = text.lower()
+    if "two" in low and "instance" in low:
+        return None  # handled by build_between_instances
     m = re.search(r"fill\s+between\s+(.+?)\s+and\s+(.+?)(?:\s+even|\.|$)", text, re.I)
     if not m:
         m = re.search(r"fill\s+between\s+(?:the\s+)?(.+?)\s+and\s+(?:the\s+)?(.+?)(?:\.|$)", text, re.I)
@@ -204,14 +315,32 @@ def build_fill_between(text: str, _family: str) -> NormalizedRequest | None:
     a, b = m.group(1).strip(), m.group(2).strip()
     a = re.sub(r"\s+views?$", "", a, flags=re.I)
     b = re.sub(r"\s+views?$", "", b, flags=re.I)
+    # Strip trailing style / opacity / primary clauses from secondary
+    b = re.split(
+        r"\s+using\b|\s+in\s+\w+\b|\s+at\s+\d|\s+with\b|\s+even\b",
+        b,
+        maxsplit=1,
+        flags=re.I,
+    )[0].strip()
+    a = re.split(r"\s+using\b|\s+in\s+\w+\b|\s+at\s+\d|\s+with\b", a, maxsplit=1, flags=re.I)[
+        0
+    ].strip()
+    # "neutron and density porosity using NPHI as primary"
+    if "nphi as primary" in low or "using nphi" in low:
+        a, b = "NPHI", "density porosity"
+    elif "neutron" in a.lower() and "density" in b.lower():
+        a, b = "neutron", "density porosity"
     asserts_cross = "different track" in low or "even though" in low
-    asserts_scale = "wide and narrow" in low or "mismatched" in low or "scale" in low and "incompat" in low
-    # wide/narrow CBL views → scale mismatch case in corpus
+    asserts_scale = "wide and narrow" in low or "mismatched" in low or (
+        "scale" in low and "incompat" in low
+    )
     if "wide" in low and "narrow" in low:
         asserts_scale = True
         a, b = "wide CBL", "narrow CBL"
+    alpha = _pct_to_alpha(text)
     return NormalizedRequest(
         requested_operation="DEFINE_FILL",
+        alpha=alpha,
         fill=FillSpec(
             mode="BETWEEN",
             primary_query=a,
@@ -290,6 +419,9 @@ def build_plot_interval(text: str, _family: str) -> NormalizedRequest | None:
 
 def build_invalid_interval(text: str, _family: str) -> NormalizedRequest | None:
     low = text.lower()
+    # Do not steal split-fill baseline numerals as depth intervals
+    if "split-fill" in low or "split fill" in low:
+        return None
     if "interval" not in low and "top" not in low and "base" not in low:
         return None
     nums = [float(x) for x in re.findall(r"(\d+(?:\.\d+)?)\s*m?", text)]
@@ -350,6 +482,9 @@ def build_invalid_scale(text: str, _family: str) -> NormalizedRequest | None:
 
 def build_alpha_width(text: str, _family: str) -> NormalizedRequest | None:
     low = text.lower()
+    # Between-instances / between-curves own opacity on the fill request
+    if "fill between" in low:
+        return None
     if "opacity" in low or "alpha" in low:
         a = _pct_to_alpha(text)
         if a is None:
@@ -476,11 +611,14 @@ def build_generic_ok(text: str, family: str) -> NormalizedRequest | None:
 # Ordered builders — more specific first
 BUILDERS: list[tuple[str, BuilderFn]] = [
     ("contradiction_v1", build_contradiction),
+    ("baseline_split_v1", build_baseline_split),
+    ("between_instances_v1", build_between_instances),
     ("threshold_fill_v1", build_threshold_fill),
     ("capability_phrases_v1", build_capability_phrases),
     ("plot_interval_v1", build_plot_interval),
     ("invalid_interval_v1", build_invalid_interval),
     ("invalid_scale_v1", build_invalid_scale),
+    ("configure_named_scale_v1", build_configure_named_scale),
     ("alpha_width_v1", build_alpha_width),
     ("deictic_reverse_v1", build_deictic_reverse),
     ("reverse_named_v1", build_reverse_named),

@@ -35,17 +35,31 @@ class SemanticQuery(BaseModel):
 
 
 class FillPredicate(BaseModel):
-    kind: Literal["ABOVE_THRESHOLD", "BELOW_THRESHOLD", "BETWEEN_CURVES", "TO_LIMIT"]
+    kind: Literal[
+        "ABOVE_THRESHOLD",
+        "BELOW_THRESHOLD",
+        "BETWEEN_CURVES",
+        "TO_LIMIT",
+        "BASELINE_SPLIT",
+    ]
     value: float | None = None
     secondary_query: str | None = None
     limit: Literal["lower", "upper"] | None = None
 
 
 class FillSpec(BaseModel):
-    mode: Literal["CONDITIONAL", "BETWEEN", "TO_LIMIT", "SOLID"] | None = None
+    mode: Literal[
+        "CONDITIONAL",
+        "BETWEEN",
+        "BETWEEN_INSTANCES",
+        "TO_LIMIT",
+        "BASELINE_SPLIT",
+        "SOLID",
+    ] | None = None
     predicate: FillPredicate | None = None
     primary_query: str | None = None
-    # Explicit request language asserting cross-track / incompatible setup
+    baseline_value: float | None = None
+    # Retained for diagnostics only; R6: objective workspace state drives preconditions
     asserts_cross_track: bool = False
     asserts_scale_mismatch: bool = False
 

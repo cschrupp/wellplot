@@ -41,7 +41,7 @@ def assess_capability(req: NormalizedRequest) -> tuple[bool, str | None, str | N
     if op not in _SUPPORTED_OPS:
         return False, "operation_not_supported", f"operation_outside_well_ir:{op}"
 
-    # DEFINE_FILL with conditional threshold is unsupported
+    # DEFINE_FILL: conditional threshold unsupported; baseline_split / between* supported
     if op == "DEFINE_FILL" and req.fill and req.fill.mode == "CONDITIONAL":
         pred = req.fill.predicate
         if pred and pred.kind in {"ABOVE_THRESHOLD", "BELOW_THRESHOLD"}:

@@ -101,10 +101,20 @@ def project_workspace(fixture_id: str) -> ProjectedWorkspace:
         for t in (ws.get("current_tracks") or d0.get("tracks") or [])
     ]
 
-    fills = [
-        FillFact(ref=str(f.get("ref")), curve=f.get("curve"), mode=f.get("mode"))
-        for f in (ws.get("fills") or d0.get("fills") or [])
-    ]
+    fills: list[FillFact] = []
+    # Prefer D5 manifest fills (include curve_handle); loader often drops it
+    manifest_fills = manifest.get("fills") if isinstance(manifest, dict) else None
+    if manifest_fills:
+        for i, f in enumerate(manifest_fills):
+            ref = str(f.get("handle") or f.get("ref") or f"fill-{i+1}")
+            curve = f.get("curve_handle") or f.get("curve") or f.get("curve_ref") or ""
+            mode = f.get("kind") or f.get("mode") or "unknown"
+            fills.append(FillFact(ref=ref, curve=str(curve) if curve else None, mode=str(mode)))
+    else:
+        for f in ws.get("fills") or d0.get("fills") or []:
+            fills.append(
+                FillFact(ref=str(f.get("ref")), curve=f.get("curve"), mode=f.get("mode"))
+            )
 
     focus_curve = None
     focus_track = None
