@@ -1,0 +1,95 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "fixture_format": "d5_semantic_manifest_r1",
+  "manifest": {
+    "aliases": {},
+    "existing_curves": [
+      {
+        "aliases": [],
+        "channel": "CBL",
+        "handle": "curve-1",
+        "label": "CBL Amplitude wide",
+        "scale": {
+          "kind": "linear",
+          "maximum": 100,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 1,
+        "track_title": "CBL"
+      },
+      {
+        "aliases": [],
+        "channel": "CBL",
+        "handle": "curve-2",
+        "label": "CBL Amplitude narrow",
+        "scale": {
+          "kind": "linear",
+          "maximum": 10,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 1,
+        "track_title": "CBL"
+      },
+      {
+        "aliases": [],
+        "channel": "GR",
+        "handle": "curve-3",
+        "label": "GR",
+        "scale": {
+          "kind": "linear",
+          "maximum": 150,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 2,
+        "track_title": "Gamma Ray"
+      }
+    ],
+    "fills": [],
+    "fixture_id": "d5_duplicate_cbl",
+    "focus": null,
+    "note": "Grounded in D4 canonical reconstruction: two distinct CBL binding instances on one normal track.",
+    "section": {
+      "depth_unit": "ft",
+      "id": "main",
+      "title": "Main Log"
+    },
+    "sources": [
+      {
+        "candidate_id": "source-1",
+        "channels": [
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "CBL",
+            "unit": "mV"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          }
+        ],
+        "source_format": "las"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "cbl",
+        "kind": "normal",
+        "ref": 1,
+        "title": "CBL"
+      },
+      {
+        "id": "gr",
+        "kind": "normal",
+        "ref": 2,
+        "title": "Gamma Ray"
+      }
+    ]
+  }
+}

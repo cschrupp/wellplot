@@ -1,0 +1,68 @@
+{
+  "historical_sha": "d77649765dee81ebd0b8f460ac28515b244f70da",
+  "sources": [
+    {
+      "source_id": "tests_fixtures_typed_worker_cm59a_system_reevaluation_cases.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm59a_system_reevaluation_cases.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "tests_fixtures_typed_worker_cm56_shadow_cases.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm56_shadow_cases.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "tests_fixtures_typed_worker_cm57c_shadow_cases.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm57c_shadow_cases.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "tests_fixtures_typed_worker_cm57p10_final_promotion_cases.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm57p10_final_promotion_cases.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "tests_fixtures_typed_worker_cm57p5_fresh_holdout.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm57p5_fresh_holdout.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "tests_fixtures_typed_worker_cm57p7_fresh_promotion.json",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "tests/fixtures/typed_worker/cm57p7_fresh_promotion.json",
+      "source_kind": "historical_fixture"
+    },
+    {
+      "source_id": "docs_evaluations_agent-code-mode_EXP-TW-consolidated-development-memory.md",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "docs/evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md",
+      "source_kind": "development_memory"
+    },
+    {
+      "source_id": "docs_evaluations_agent-code-mode_CM-59A-development-memory.md",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "docs/evaluations/agent-code-mode/CM-59A-development-memory.md",
+      "source_kind": "development_memory"
+    },
+    {
+      "source_id": "docs_evaluations_agent-code-mode_CM-43-development-memory.md",
+      "repository": "cschrupp/wellplot",
+      "source_ref": "d77649765dee81ebd0b8f460ac28515b244f70da",
+      "path": "docs/evaluations/agent-code-mode/CM-43-development-memory.md",
+      "source_kind": "development_memory"
+    }
+  ]
+}

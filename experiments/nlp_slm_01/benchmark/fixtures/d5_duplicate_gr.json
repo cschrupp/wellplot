@@ -1,0 +1,101 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "fixture_format": "d5_semantic_manifest_r1",
+  "manifest": {
+    "aliases": {},
+    "existing_curves": [
+      {
+        "aliases": [],
+        "channel": "GR",
+        "handle": "curve-1",
+        "label": "Gamma Ray",
+        "scale": {
+          "kind": "linear",
+          "maximum": 150,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 1,
+        "track_title": "Gamma Ray"
+      },
+      {
+        "aliases": [],
+        "channel": "GR",
+        "handle": "curve-2",
+        "label": "GR QC",
+        "scale": {
+          "kind": "linear",
+          "maximum": 120,
+          "minimum": 20,
+          "reverse": false
+        },
+        "track_ref": 2,
+        "track_title": "Gamma QC"
+      },
+      {
+        "aliases": [],
+        "channel": "RT",
+        "handle": "curve-3",
+        "label": "RT",
+        "scale": {
+          "kind": "log",
+          "maximum": 2000,
+          "minimum": 0.2,
+          "reverse": false
+        },
+        "track_ref": 3,
+        "track_title": "Resistivity"
+      }
+    ],
+    "fills": [],
+    "fixture_id": "d5_duplicate_gr",
+    "focus": null,
+    "note": "Two existing GR binding instances require request-local handles for exact revision.",
+    "section": {
+      "depth_unit": "m",
+      "id": "main",
+      "title": "Main Log"
+    },
+    "sources": [
+      {
+        "candidate_id": "source-1",
+        "channels": [
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "RT",
+            "unit": "ohm.m"
+          }
+        ],
+        "source_format": "las"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "gr-main",
+        "kind": "normal",
+        "ref": 1,
+        "title": "Gamma Ray"
+      },
+      {
+        "id": "gr-qc",
+        "kind": "normal",
+        "ref": 2,
+        "title": "Gamma QC"
+      },
+      {
+        "id": "rt",
+        "kind": "normal",
+        "ref": 3,
+        "title": "Resistivity"
+      }
+    ]
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "phase": "smoke",
+  "limit": 8,
+  "prompt_arm": "Q2",
+  "arms": {
+    "C": {
+      "label": "smollm3_gguf_q4",
+      "semantic": 0.5,
+      "n": 8,
+      "backend": "gguf",
+      "quant": "UD-Q4_K_XL"
+    },
+    "D": {
+      "label": "phi4mini_gguf_q4",
+      "semantic": 0.5,
+      "n": 8,
+      "backend": "gguf",
+      "quant": "Q4_K_M"
+    },
+    "A": {
+      "label": "smollm3_bf16_hf",
+      "semantic": 0.5,
+      "n": 8,
+      "backend": "hf",
+      "quant": "bf16_offload"
+    },
+    "B": {
+      "label": "phi4mini_bf16_hf",
+      "semantic": 0.0,
+      "n": 8,
+      "backend": "hf",
+      "quant": "bf16_offload"
+    }
+  },
+  "notes": [
+    "GGUF context raised to 8192 for Q2 few-shot",
+    "HF arms used Unsloth studio python (torch 2.11+cu130) due to experiment venv CUDA wheel download failures",
+    "Phi-4 HF loaded with trust_remote_code=False",
+    "BF16 Phi-4 offload ~40min for 8 cases \u2014 full held-out on A/B will be very slow"
+  ]
+}

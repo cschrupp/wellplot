@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wellplot-nlp-slm-01"
+version = "0.1.0"
+description = "WELLPLOT-NLP-SLM-01: WELL-IR semantic compiler feasibility study (experimental)."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "pydantic>=2.7",
+  "jsonschema>=4.23",
+  "PyYAML>=6.0",
+]
+
+[tool.uv.sources]
+wellplot = { path = "../../", editable = true }
+
+[project.optional-dependencies]
+eval = [
+  "transformers>=4.51",
+  "torch>=2.2",
+  "accelerate>=0.33",
+  "outlines>=0.1",
+  "httpx>=0.27",
+]
+qlora = [
+  "transformers>=4.51",
+  "torch>=2.2",
+  "peft>=0.12",
+  "bitsandbytes>=0.43",
+  "datasets>=2.20",
+  "accelerate>=0.33",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["well_ir*", "lowerer*", "eval*", "runners*", "benchmark*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

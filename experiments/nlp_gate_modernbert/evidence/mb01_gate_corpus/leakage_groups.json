@@ -1,0 +1,2003 @@
+{
+  "leak:ambiguity_unsupported|ambiguous|fill the cbl curve to its lower limit": {
+    "case_ids": [
+      "D5GAP-0122"
+    ],
+    "group_id": "leak:ambiguity_unsupported|ambiguous|fill the cbl curve to its lower limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|ambiguous|put pef on the qc track": {
+    "case_ids": [
+      "D5GAP-0123"
+    ],
+    "group_id": "leak:ambiguity_unsupported|ambiguous|put pef on the qc track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|ambiguous|remove the gr fill": {
+    "case_ids": [
+      "D5GAP-0124"
+    ],
+    "group_id": "leak:ambiguity_unsupported|ambiguous|remove the gr fill",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|ambiguous|reverse the gr curve": {
+    "case_ids": [
+      "D5GAP-0121"
+    ],
+    "group_id": "leak:ambiguity_unsupported|ambiguous|reverse the gr curve",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|contradictory_scale_direction|request specifies mutually exclusive scale directions|make rhob both increasing and decreasing": {
+    "case_ids": [
+      "D5GAP-0140"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|contradictory_scale_direction|request specifies mutually exclusive scale directions|make rhob both increasing and decreasing",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|contradictory_scale_direction|request specifies mutually exclusive scale directions|make the rhob scale both increasing and decreasing": {
+    "case_ids": [
+      "GOLD-0155"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|contradictory_scale_direction|request specifies mutually exclusive scale directions|make the rhob scale both increasing and decreasing",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|contradictory_target|request specifies two exclusive curve destinations|move rhob to track <n> and track <n> at the same time": {
+    "case_ids": [
+      "GOLD-0156"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|contradictory_target|request specifies two exclusive curve destinations|move rhob to track <n> and track <n> at the same time",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_alpha|curve alpha must be between 0 and 1|set gr opacity to <n>": {
+    "case_ids": [
+      "D5GAP-0138"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_alpha|curve alpha must be between 0 and 1|set gr opacity to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_fill_alpha|fill alpha must be between 0 and 1|set the gr fill opacity to <n>": {
+    "case_ids": [
+      "GOLD-0152"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_fill_alpha|fill alpha must be between 0 and 1|set the gr fill opacity to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_interval_order|interval base must be greater than top|set the interval top to <n> m and the base to <n> m": {
+    "case_ids": [
+      "GOLD-0147"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_interval_order|interval base must be greater than top|set the interval top to <n> m and the base to <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_interval_order|section depth_range base must be greater than top|set top to <n> m and base to <n> m": {
+    "case_ids": [
+      "D5GAP-0137"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_interval_order|section depth_range base must be greater than top|set top to <n> m and base to <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_interval_zero_span|interval top and base must differ|set both the interval top and base to <n> m": {
+    "case_ids": [
+      "GOLD-0148"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_interval_zero_span|interval top and base must differ|set both the interval top and base to <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_line_width|line width must be positive|set gr line width to <n>": {
+    "case_ids": [
+      "D5GAP-0139"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_line_width|line width must be positive|set gr line width to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_line_width|line width must be positive|set the gr line width to zero": {
+    "case_ids": [
+      "GOLD-0154"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_line_width|line width must be positive|set the gr line width to zero",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_log_scale_bounds|logarithmic scales require positive bounds|set rt to a logarithmic scale from <n> to <n>": {
+    "case_ids": [
+      "D5GAP-0136",
+      "GOLD-0149"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_log_scale_bounds|logarithmic scales require positive bounds|set rt to a logarithmic scale from <n> to <n>",
+    "n_cases": 2,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_scale_bounds|scale minimum and maximum must differ|set gr to <n> <n>": {
+    "case_ids": [
+      "D5GAP-0135"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_scale_bounds|scale minimum and maximum must differ|set gr to <n> <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|invalid|invalid_scale_bounds|scale minimum and maximum must differ|set the gr scale from <n> to <n>": {
+    "case_ids": [
+      "GOLD-0151"
+    ],
+    "group_id": "leak:ambiguity_unsupported|invalid|invalid_scale_bounds|scale minimum and maximum must differ|set the gr scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|annotations_outside_well_ir_v1|add a formation top marker at <n> m": {
+    "case_ids": [
+      "D5GAP-0127"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|annotations_outside_well_ir_v1|add a formation top marker at <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|cbl_vdl_or_multi_section_construct|create two new log plot sections main pass from the main source and repeat pass ": {
+    "case_ids": [
+      "SEED-cm-4ac6f8124d33c892"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|cbl_vdl_or_multi_section_construct|create two new log plot sections main pass from the main source and repeat pass ",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|conditional_threshold_fill_outside_well_ir_v1|shade gr only where it exceeds <n> api": {
+    "case_ids": [
+      "D5GAP-0134"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|conditional_threshold_fill_outside_well_ir_v1|shade gr only where it exceeds <n> api",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|d4_cbl_construct_or_report_scaffold|using cbl_main dlis as the main pass data and cbl_repeat dlis as the repeat pass": {
+    "case_ids": [
+      "SEED-d4-b9ce7afb862ab472"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|d4_cbl_construct_or_report_scaffold|using cbl_main dlis as the main pass data and cbl_repeat dlis as the repeat pass",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|instantiate_layout deferred beyond WELL-IR v1|give me a standard triple combo": {
+    "case_ids": [
+      "GOLD-0137"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|instantiate_layout deferred beyond WELL-IR v1|give me a standard triple combo",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|multi_well_outside_well_ir_v1|compare this well with the offset well": {
+    "case_ids": [
+      "D5GAP-0133"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|multi_well_outside_well_ir_v1|compare this well with the offset well",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|page_authoring_outside_well_ir_v1|switch the page to landscape": {
+    "case_ids": [
+      "D5GAP-0130"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|page_authoring_outside_well_ir_v1|switch the page to landscape",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|raster_waveform_outside_well_ir_v1|plot vdl as a waveform raster": {
+    "case_ids": [
+      "D5GAP-0128"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|raster_waveform_outside_well_ir_v1|plot vdl as a waveform raster",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_authoring_outside_well_ir_v1|rename the report formation review": {
+    "case_ids": [
+      "D5GAP-0129"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_authoring_outside_well_ir_v1|rename the report formation review",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_metadata_outside_well_ir_v1|prepare the aurora basin handover brief with the heading completion integrity me": {
+    "case_ids": [
+      "SEED-cm-d74de4927459a802"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_metadata_outside_well_ir_v1|prepare the aurora basin handover brief with the heading completion integrity me",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_rename|rename this report formation integrity review do not alter the plotted sections": {
+    "case_ids": [
+      "SEED-d4-13dd5c7acf75744a"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|report_rename|rename this report formation integrity review do not alter the plotted sections",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|section_targeting_outside_well_ir_v1|apply that <n> <n> linear gr scale change only to main log upper": {
+    "case_ids": [
+      "SEED-d4-44ab1264d78443aa"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|section_targeting_outside_well_ir_v1|apply that <n> <n> linear gr scale change only to main log upper",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|source_selection_outside_well_ir_v1|create one new normal track titled selected gr using the secondary source not th": {
+    "case_ids": [
+      "SEED-cm-16d5b41fa632ded9"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|source_selection_outside_well_ir_v1|create one new normal track titled selected gr using the secondary source not th",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|source_selection_outside_well_ir_v1|use gr from the secondary source": {
+    "case_ids": [
+      "D5GAP-0131"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|source_selection_outside_well_ir_v1|use gr from the secondary source",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|template_instantiation_outside_well_ir_v1|give me a standard triple combo": {
+    "case_ids": [
+      "D5GAP-0132"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|template_instantiation_outside_well_ir_v1|give me a standard triple combo",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|operation_not_supported|tw_cbl_worker_projection|using main and repeat cbl passes finish the supported cased hole cbl vdl report ": {
+    "case_ids": [
+      "SEED-tw-293744a4235fc673"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|operation_not_supported|tw_cbl_worker_projection|using main and repeat cbl passes finish the supported cased hole cbl vdl report ",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|reference_not_found||create one new normal track titled cbl views bind the scalar cbl channel twice a": {
+    "case_ids": [
+      "SEED-cm-843982294d26902b"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|reference_not_found||create one new normal track titled cbl views bind the scalar cbl channel twice a",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|reference_not_found||create one new normal track titled tension bind tens with a tangential scale fro": {
+    "case_ids": [
+      "SEED-cm-5f1b23161fc35b70"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|reference_not_found||create one new normal track titled tension bind tens with a tangential scale fro",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|reference_not_found||in main log add a <n> mm normal track titled neutron qc and plot nphi from missi": {
+    "case_ids": [
+      "SEED-d4-a56636363f8f3535"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|reference_not_found||in main log add a <n> mm normal track titled neutron qc and plot nphi from missi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:ambiguity_unsupported|unsupported|reference_not_found||in main log add a <n> mm normal track titled resistivity alias qc and plot rt fr": {
+    "case_ids": [
+      "SEED-d4-9a19bd0b9e3522da"
+    ],
+    "group_id": "leak:ambiguity_unsupported|unsupported|reference_not_found||in main log add a <n> mm normal track titled resistivity alias qc and plot rt fr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|append a gamma qc track with gr <n> <n> then show <n> <n> ft": {
+    "case_ids": [
+      "D5GAP-0118"
+    ],
+    "group_id": "leak:composition|ok|append a gamma qc track with gr <n> <n> then show <n> <n> ft",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|append a normal track named resistivity qc plot rt on it with a logarithmic <n> <n> scale": {
+    "case_ids": [
+      "SEED-d4-7e5b10ed31ecd3db"
+    ],
+    "group_id": "leak:composition|ok|append a normal track named resistivity qc plot rt on it with a logarithmic <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|bind tt at <n> to <n> reversed on the combo track": {
+    "case_ids": [
+      "GOLD-0177"
+    ],
+    "group_id": "leak:composition|ok|bind tt at <n> to <n> reversed on the combo track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a normal resistivity reverse track bind rt from <n> down to <n> and enable reverse direction": {
+    "case_ids": [
+      "SEED-cm-5b80ffa938aa98af"
+    ],
+    "group_id": "leak:composition|ok|create a normal resistivity reverse track bind rt from <n> down to <n> and enable reverse direction",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a normal track called natural gamma plot gr on that track with a linear range from <n> to <n>": {
+    "case_ids": [
+      "SEED-cm-b1ec505a139d1e2b"
+    ],
+    "group_id": "leak:composition|ok|create a normal track called natural gamma plot gr on that track with a linear range from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a normal track named deep resistivity display rt logarithmically from <n> to <n>": {
+    "case_ids": [
+      "SEED-cm-9e41577060b4160c"
+    ],
+    "group_id": "leak:composition|ok|create a normal track named deep resistivity display rt logarithmically from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a normal track named selected gr display gr with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-ed1b0da82219efe0"
+    ],
+    "group_id": "leak:composition|ok|create a normal track named selected gr display gr with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a pef qc track plot pef <n> <n> there and fill pef to its lower limit": {
+    "case_ids": [
+      "D5GAP-0110"
+    ],
+    "group_id": "leak:composition|ok|create a pef qc track plot pef <n> <n> there and fill pef to its lower limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create a track beside track <n> and put gr there": {
+    "case_ids": [
+      "GOLD-0078"
+    ],
+    "group_id": "leak:composition|ok|create a track beside track <n> and put gr there",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create an sp qc track plot sp there and make it blue and dotted": {
+    "case_ids": [
+      "D5GAP-0109"
+    ],
+    "group_id": "leak:composition|ok|create an sp qc track plot sp there and make it blue and dotted",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled cali bind cali with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-baadebfd50455fa9"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled cali bind cali with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled cali qc bind cali with a scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-de951d323598dc66"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled cali qc bind cali with a scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled density bind rhob with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-a6944584ec401ac6"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled density bind rhob with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled density bind rhob with a logarithmic scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-cm-0c560bf95749e391"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled density bind rhob with a logarithmic scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled density bind rhob with a scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-cbf37ac4d9236c7d"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled density bind rhob with a scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled density qc bind rhob with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-77485acf50c6fc3d"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled density qc bind rhob with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled gamma check bind gr with a scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-8e1d0adc5083e9c9"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled gamma check bind gr with a scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled gr bind gr with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-cm-6d425f59c4d92ce4"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled gr bind gr with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled neutron bind nphi with a linear scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-ca51524459f4b989"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled neutron bind nphi with a linear scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled neutron bind nphi with a scale from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-111788000432c647"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled neutron bind nphi with a scale from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled petrophysics gr bind gr with a linearly from <n> to <n>": {
+    "case_ids": [
+      "SEED-para-f415c54c4b482790"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled petrophysics gr bind gr with a linearly from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled resistivity bind rt with a linear scale from <n> to <n> and rever": {
+    "case_ids": [
+      "SEED-cm-3e8eba7a490f2b8e"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled resistivity bind rt with a linear scale from <n> to <n> and rever",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled resistivity panel bind rt with a log scale <n> <n>": {
+    "case_ids": [
+      "SEED-para-c277e58e76236196"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled resistivity panel bind rt with a log scale <n> <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one new normal track titled resistivity reverse bind rt with a from <n> down to <n>": {
+    "case_ids": [
+      "SEED-para-b52440f2f9b14a94"
+    ],
+    "group_id": "leak:composition|ok|create one new normal track titled resistivity reverse bind rt with a from <n> down to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|create one normal track named petrophysics first plot gr linearly from <n> to <n> then plot rt logar": {
+    "case_ids": [
+      "SEED-cm-9643c020e2e02463"
+    ],
+    "group_id": "leak:composition|ok|create one normal track named petrophysics first plot gr linearly from <n> to <n> then plot rt logar",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put cali beside gr": {
+    "case_ids": [
+      "GOLD-0202"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put cali beside gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put cali with gr": {
+    "case_ids": [
+      "GOLD-0187"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put cali with gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put rhob beside nphi": {
+    "case_ids": [
+      "GOLD-0192"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put rhob beside nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put rhob with nphi": {
+    "case_ids": [
+      "GOLD-0207"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put rhob with nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put rt beside nphi": {
+    "case_ids": [
+      "GOLD-0212"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put rt beside nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|from <n> to <n> m put rt with nphi": {
+    "case_ids": [
+      "GOLD-0197"
+    ],
+    "group_id": "leak:composition|ok|from <n> to <n> m put rt with nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|move cali to track <n> and make it dashed": {
+    "case_ids": [
+      "D5GAP-0111"
+    ],
+    "group_id": "leak:composition|ok|move cali to track <n> and make it dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|move gr to track <n> and make it dashed": {
+    "case_ids": [
+      "GOLD-0090"
+    ],
+    "group_id": "leak:composition|ok|move gr to track <n> and make it dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put density with neutron and reverse the density scale": {
+    "case_ids": [
+      "GOLD-0084"
+    ],
+    "group_id": "leak:composition|ok|put density with neutron and reverse the density scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put msfl beside rt and use a logarithmic <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0107"
+    ],
+    "group_id": "leak:composition|ok|put msfl beside rt and use a logarithmic <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put pef on track <n> and make it green with a <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0105"
+    ],
+    "group_id": "leak:composition|ok|put pef on track <n> and make it green with a <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put pef with gr make it orange then fill it to the upper limit at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0114"
+    ],
+    "group_id": "leak:composition|ok|put pef with gr make it orange then fill it to the upper limit at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put sp and pef with gr set both to <n> <n> linear scales then fill between pef and sp": {
+    "case_ids": [
+      "D5GAP-0116"
+    ],
+    "group_id": "leak:composition|ok|put sp and pef with gr set both to <n> <n> linear scales then fill between pef and sp",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|put sp with gr and make sp dashed": {
+    "case_ids": [
+      "D5GAP-0106"
+    ],
+    "group_id": "leak:composition|ok|put sp with gr and make sp dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|remove dt and set the interval to <n> <n> m": {
+    "case_ids": [
+      "D5GAP-0113"
+    ],
+    "group_id": "leak:composition|ok|remove dt and set the interval to <n> <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|remove the gr lower limit fill and reverse gr": {
+    "case_ids": [
+      "D5GAP-0112"
+    ],
+    "group_id": "leak:composition|ok|remove the gr lower limit fill and reverse gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|set <n> <n> m put pef with gr and fill pef to its lower limit": {
+    "case_ids": [
+      "D5GAP-0108"
+    ],
+    "group_id": "leak:composition|ok|set <n> <n> m put pef with gr and fill pef to its lower limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|set rhob to <n> <n> reversed and split fill it at <n>": {
+    "case_ids": [
+      "D5GAP-0117"
+    ],
+    "group_id": "leak:composition|ok|set rhob to <n> <n> reversed and split fill it at <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|set the depth interval to <n> <n> m and fill from gr to its upper scale limit": {
+    "case_ids": [
+      "GOLD-0096"
+    ],
+    "group_id": "leak:composition|ok|set the depth interval to <n> <n> m and fill from gr to its upper scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|set the depth interval to <n> <n> m place rhob with nphi configure rhob with a <n> <n> reversed scal": {
+    "case_ids": [
+      "GOLD-0072"
+    ],
+    "group_id": "leak:composition|ok|set the depth interval to <n> <n> m place rhob with nphi configure rhob with a <n> <n> reversed scal",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|show <n> <n> m and fill gr to its lower limit": {
+    "case_ids": [
+      "D5GAP-0104"
+    ],
+    "group_id": "leak:composition|ok|show <n> <n> m and fill gr to its lower limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|show <n> <n> m and reverse rhob": {
+    "case_ids": [
+      "D5GAP-0103"
+    ],
+    "group_id": "leak:composition|ok|show <n> <n> m and reverse rhob",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:composition|ok|show <n> <n> m append a pef track and plot pef <n> <n> there": {
+    "case_ids": [
+      "D5GAP-0115"
+    ],
+    "group_id": "leak:composition|ok|show <n> <n> m append a pef track and plot pef <n> <n> there",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:curve_placement|ok|put cali on track <n>": {
+    "case_ids": [
+      "GOLD-0008",
+      "GOLD-0009",
+      "GOLD-0010"
+    ],
+    "group_id": "leak:curve_placement|ok|put cali on track <n>",
+    "n_cases": 3,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:curve_placement|ok|put rhob on track <n>": {
+    "case_ids": [
+      "GOLD-0001",
+      "GOLD-0005",
+      "GOLD-0006"
+    ],
+    "group_id": "leak:curve_placement|ok|put rhob on track <n>",
+    "n_cases": 3,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:curve_placement|ok|put rt on track <n>": {
+    "case_ids": [
+      "GOLD-0011",
+      "GOLD-0012",
+      "GOLD-0013"
+    ],
+    "group_id": "leak:curve_placement|ok|put rt on track <n>",
+    "n_cases": 3,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:curve_placement|ok|remove gr": {
+    "case_ids": [
+      "GOLD-0004"
+    ],
+    "group_id": "leak:curve_placement|ok|remove gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:deictic_no_focus|ambiguous|ambiguity_unsupported": {
+    "case_ids": [
+      "D5GAP-0120",
+      "D5GAP-0126",
+      "GOLD-0169"
+    ],
+    "group_id": "leak:deictic_no_focus|ambiguous|ambiguity_unsupported",
+    "n_cases": 3,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:density_alias|ambiguous|ambiguity_unsupported": {
+    "case_ids": [
+      "D5GAP-0119",
+      "D5GAP-0125",
+      "GOLD-0102"
+    ],
+    "group_id": "leak:density_alias|ambiguous|ambiguity_unsupported",
+    "n_cases": 3,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|change rt to logarithmic and keep its current bounds": {
+    "case_ids": [
+      "D5GAP-0035"
+    ],
+    "group_id": "leak:display_configuration|ok|change rt to logarithmic and keep its current bounds",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|in main log change the gr curve to a linear <n> <n> scale": {
+    "case_ids": [
+      "SEED-d4-dc13ab810dd8ea87"
+    ],
+    "group_id": "leak:display_configuration|ok|in main log change the gr curve to a linear <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|in main log set the gr curve to a linear <n> <n> scale leave its label and styling unchanged": {
+    "case_ids": [
+      "SEED-d4-40fa44cb825c9220"
+    ],
+    "group_id": "leak:display_configuration|ok|in main log set the gr curve to a linear <n> <n> scale leave its label and styling unchanged",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make cali dashed with increasing scale": {
+    "case_ids": [
+      "GOLD-0019"
+    ],
+    "group_id": "leak:display_configuration|ok|make cali dashed with increasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make cali orange width <n> at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0046"
+    ],
+    "group_id": "leak:display_configuration|ok|make cali orange width <n> at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make dt solid": {
+    "case_ids": [
+      "D5GAP-0049"
+    ],
+    "group_id": "leak:display_configuration|ok|make dt solid",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make gr dashed": {
+    "case_ids": [
+      "D5GAP-0040"
+    ],
+    "group_id": "leak:display_configuration|ok|make gr dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make gr dashed with increasing scale": {
+    "case_ids": [
+      "GOLD-0014"
+    ],
+    "group_id": "leak:display_configuration|ok|make gr dashed with increasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make gr dotted": {
+    "case_ids": [
+      "D5GAP-0041"
+    ],
+    "group_id": "leak:display_configuration|ok|make gr dotted",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make gr dotted with increasing scale": {
+    "case_ids": [
+      "GOLD-0015"
+    ],
+    "group_id": "leak:display_configuration|ok|make gr dotted with increasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make gr green": {
+    "case_ids": [
+      "D5GAP-0039"
+    ],
+    "group_id": "leak:display_configuration|ok|make gr green",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make nphi increase left to right without changing its bounds": {
+    "case_ids": [
+      "D5GAP-0034"
+    ],
+    "group_id": "leak:display_configuration|ok|make nphi increase left to right without changing its bounds",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make nphi solid with decreasing scale": {
+    "case_ids": [
+      "GOLD-0016"
+    ],
+    "group_id": "leak:display_configuration|ok|make nphi solid with decreasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make rhob blue and dashed": {
+    "case_ids": [
+      "D5GAP-0044"
+    ],
+    "group_id": "leak:display_configuration|ok|make rhob blue and dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make rhob dashed with decreasing scale": {
+    "case_ids": [
+      "GOLD-0017"
+    ],
+    "group_id": "leak:display_configuration|ok|make rhob dashed with decreasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make rhob solid with increasing scale": {
+    "case_ids": [
+      "GOLD-0018"
+    ],
+    "group_id": "leak:display_configuration|ok|make rhob solid with increasing scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make rt dotted with width <n>": {
+    "case_ids": [
+      "D5GAP-0045"
+    ],
+    "group_id": "leak:display_configuration|ok|make rt dotted with width <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make that curve dashed": {
+    "case_ids": [
+      "D5GAP-0146"
+    ],
+    "group_id": "leak:display_configuration|ok|make that curve dashed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|make the qc gr instance green": {
+    "case_ids": [
+      "D5GAP-0148"
+    ],
+    "group_id": "leak:display_configuration|ok|make the qc gr instance green",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|put <n> on the left and <n> on the right for rhob in g cm3": {
+    "case_ids": [
+      "D5GAP-0038"
+    ],
+    "group_id": "leak:display_configuration|ok|put <n> on the left and <n> on the right for rhob in g cm3",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|reverse gr but keep its current bounds and scale kind": {
+    "case_ids": [
+      "D5GAP-0033"
+    ],
+    "group_id": "leak:display_configuration|ok|reverse gr but keep its current bounds and scale kind",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|reverse that curve": {
+    "case_ids": [
+      "GOLD-0157",
+      "GOLD-0158",
+      "GOLD-0159",
+      "GOLD-0160",
+      "GOLD-0161",
+      "GOLD-0162",
+      "GOLD-0163",
+      "GOLD-0164",
+      "GOLD-0165",
+      "GOLD-0166",
+      "GOLD-0167",
+      "GOLD-0168"
+    ],
+    "group_id": "leak:display_configuration|ok|reverse that curve",
+    "n_cases": 12,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|reverse the density scale": {
+    "case_ids": [
+      "GOLD-0002"
+    ],
+    "group_id": "leak:display_configuration|ok|reverse the density scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set dt to a tangential <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0029"
+    ],
+    "group_id": "leak:display_configuration|ok|set dt to a tangential <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set gr line width to <n>": {
+    "case_ids": [
+      "D5GAP-0042"
+    ],
+    "group_id": "leak:display_configuration|ok|set gr line width to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set gr opacity to <n>": {
+    "case_ids": [
+      "D5GAP-0043"
+    ],
+    "group_id": "leak:display_configuration|ok|set gr opacity to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set gr to <n> <n> api": {
+    "case_ids": [
+      "D5GAP-0036"
+    ],
+    "group_id": "leak:display_configuration|ok|set gr to <n> <n> api",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set gr to a <n> <n> scale and make it green": {
+    "case_ids": [
+      "D5GAP-0047"
+    ],
+    "group_id": "leak:display_configuration|ok|set gr to a <n> <n> scale and make it green",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set gr to a linear <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0027"
+    ],
+    "group_id": "leak:display_configuration|ok|set gr to a linear <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set rhob from <n> down to <n>": {
+    "case_ids": [
+      "D5GAP-0037"
+    ],
+    "group_id": "leak:display_configuration|ok|set rhob from <n> down to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set rhob to <n> <n> reversed": {
+    "case_ids": [
+      "D5GAP-0030"
+    ],
+    "group_id": "leak:display_configuration|ok|set rhob to <n> <n> reversed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set rhob to <n> <n> reversed dashed width <n>": {
+    "case_ids": [
+      "D5GAP-0048"
+    ],
+    "group_id": "leak:display_configuration|ok|set rhob to <n> <n> reversed dashed width <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set rt line width to <n>": {
+    "case_ids": [
+      "D5GAP-0050"
+    ],
+    "group_id": "leak:display_configuration|ok|set rt line width to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set rt to a logarithmic <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0028"
+    ],
+    "group_id": "leak:display_configuration|ok|set rt to a logarithmic <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|set the narrow cbl view to a <n> <n> linear scale": {
+    "case_ids": [
+      "D5GAP-0147"
+    ],
+    "group_id": "leak:display_configuration|ok|set the narrow cbl view to a <n> <n> linear scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|use a reversed logarithmic <n> <n> scale for rt": {
+    "case_ids": [
+      "D5GAP-0031"
+    ],
+    "group_id": "leak:display_configuration|ok|use a reversed logarithmic <n> <n> scale for rt",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:display_configuration|ok|use a reversed tangential <n> <n> scale for dt": {
+    "case_ids": [
+      "D5GAP-0032"
+    ],
+    "group_id": "leak:display_configuration|ok|use a reversed tangential <n> <n> scale for dt",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between density porosity and neutron": {
+    "case_ids": [
+      "D5GAP-0087"
+    ],
+    "group_id": "leak:fills|ok|fill between density porosity and neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between gr and neutron": {
+    "case_ids": [
+      "GOLD-0062"
+    ],
+    "group_id": "leak:fills|ok|fill between gr and neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between neutron and density porosity": {
+    "case_ids": [
+      "D5GAP-0079"
+    ],
+    "group_id": "leak:fills|ok|fill between neutron and density porosity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between neutron and density porosity using nphi as primary in green": {
+    "case_ids": [
+      "D5GAP-0088"
+    ],
+    "group_id": "leak:fills|ok|fill between neutron and density porosity using nphi as primary in green",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between nphi and dphi at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0083"
+    ],
+    "group_id": "leak:fills|ok|fill between nphi and dphi at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between nphi and dphi in gray at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0084"
+    ],
+    "group_id": "leak:fills|ok|fill between nphi and dphi in gray at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between nphi and gr": {
+    "case_ids": [
+      "GOLD-0063"
+    ],
+    "group_id": "leak:fills|ok|fill between nphi and gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between rhob and neutron": {
+    "case_ids": [
+      "GOLD-0061"
+    ],
+    "group_id": "leak:fills|ok|fill between rhob and neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between the two gr instances after selecting them exactly": {
+    "case_ids": [
+      "D5GAP-0080"
+    ],
+    "group_id": "leak:fills|ok|fill between the two gr instances after selecting them exactly",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill between the two gr instances at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0086"
+    ],
+    "group_id": "leak:fills|ok|fill between the two gr instances at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill cali to its upper limit in blue at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0066"
+    ],
+    "group_id": "leak:fills|ok|fill cali to its upper limit in blue at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill from gr to its lower scale limit": {
+    "case_ids": [
+      "GOLD-0056"
+    ],
+    "group_id": "leak:fills|ok|fill from gr to its lower scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill from gr to its upper scale limit": {
+    "case_ids": [
+      "GOLD-0186"
+    ],
+    "group_id": "leak:fills|ok|fill from gr to its upper scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill from nphi to its lower scale limit": {
+    "case_ids": [
+      "GOLD-0057"
+    ],
+    "group_id": "leak:fills|ok|fill from nphi to its lower scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill from rhob to its lower scale limit": {
+    "case_ids": [
+      "GOLD-0055"
+    ],
+    "group_id": "leak:fills|ok|fill from rhob to its lower scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill from rhob to its upper scale limit": {
+    "case_ids": [
+      "GOLD-0052"
+    ],
+    "group_id": "leak:fills|ok|fill from rhob to its upper scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill gr to its lower scale limit": {
+    "case_ids": [
+      "D5GAP-0061"
+    ],
+    "group_id": "leak:fills|ok|fill gr to its lower scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill gr to its upper scale limit": {
+    "case_ids": [
+      "D5GAP-0062"
+    ],
+    "group_id": "leak:fills|ok|fill gr to its upper scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill nphi to its upper limit at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0064"
+    ],
+    "group_id": "leak:fills|ok|fill nphi to its upper limit at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill rhob to its lower limit in light gray": {
+    "case_ids": [
+      "D5GAP-0063"
+    ],
+    "group_id": "leak:fills|ok|fill rhob to its lower limit in light gray",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill rt to its lower limit in pale yellow at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0065"
+    ],
+    "group_id": "leak:fills|ok|fill rt to its lower limit in pale yellow at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|fill the first cbl view to its lower limit": {
+    "case_ids": [
+      "D5GAP-0067"
+    ],
+    "group_id": "leak:fills|ok|fill the first cbl view to its lower limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|first change the narrow cbl view to <n> <n> then fill between the first and second cbl instances": {
+    "case_ids": [
+      "D5GAP-0089"
+    ],
+    "group_id": "leak:fills|ok|first change the narrow cbl view to <n> <n> then fill between the first and second cbl instances",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|make both cbl views use <n> <n> then fill between them in blue": {
+    "case_ids": [
+      "D5GAP-0085"
+    ],
+    "group_id": "leak:fills|ok|make both cbl views use <n> <n> then fill between them in blue",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|on logarithmic rt split fill around <n>": {
+    "case_ids": [
+      "D5GAP-0076"
+    ],
+    "group_id": "leak:fills|ok|on logarithmic rt split fill around <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|on main log s gr track fill from the gr curve to its lower scale boundary with f2e8a0 at <n> opacity": {
+    "case_ids": [
+      "SEED-d4-d1433317902f665a"
+    ],
+    "group_id": "leak:fills|ok|on main log s gr track fill from the gr curve to its lower scale boundary with f2e8a0 at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|on reversed rhob fill to the upper scale limit": {
+    "case_ids": [
+      "D5GAP-0068"
+    ],
+    "group_id": "leak:fills|ok|on reversed rhob fill to the upper scale limit",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|on reversed rhob split fill around <n>": {
+    "case_ids": [
+      "D5GAP-0075"
+    ],
+    "group_id": "leak:fills|ok|on reversed rhob split fill around <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|put sp and pef with gr give both a <n> <n> linear scale then fill between pef and sp": {
+    "case_ids": [
+      "D5GAP-0090"
+    ],
+    "group_id": "leak:fills|ok|put sp and pef with gr give both a <n> <n> linear scale then fill between pef and sp",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|remove the gr fill": {
+    "case_ids": [
+      "GOLD-0064",
+      "GOLD-0065",
+      "GOLD-0066",
+      "GOLD-0067",
+      "GOLD-0068",
+      "GOLD-0069",
+      "GOLD-0070",
+      "GOLD-0071"
+    ],
+    "group_id": "leak:fills|ok|remove the gr fill",
+    "n_cases": 8,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill gr about <n>": {
+    "case_ids": [
+      "GOLD-0059"
+    ],
+    "group_id": "leak:fills|ok|split fill gr about <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill gr around <n> in gray": {
+    "case_ids": [
+      "D5GAP-0070"
+    ],
+    "group_id": "leak:fills|ok|split fill gr around <n> in gray",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill gr around zero": {
+    "case_ids": [
+      "D5GAP-0078"
+    ],
+    "group_id": "leak:fills|ok|split fill gr around zero",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill gr at <n> with a black baseline line": {
+    "case_ids": [
+      "D5GAP-0073"
+    ],
+    "group_id": "leak:fills|ok|split fill gr at <n> with a black baseline line",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill gr at <n> with a dashed <n> baseline line": {
+    "case_ids": [
+      "D5GAP-0074"
+    ],
+    "group_id": "leak:fills|ok|split fill gr at <n> with a dashed <n> baseline line",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill nphi about <n>": {
+    "case_ids": [
+      "GOLD-0060"
+    ],
+    "group_id": "leak:fills|ok|split fill nphi about <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill nphi around <n> at <n> opacity": {
+    "case_ids": [
+      "D5GAP-0071"
+    ],
+    "group_id": "leak:fills|ok|split fill nphi around <n> at <n> opacity",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill rhob about <n>": {
+    "case_ids": [
+      "GOLD-0058"
+    ],
+    "group_id": "leak:fills|ok|split fill rhob about <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill rhob around <n>": {
+    "case_ids": [
+      "D5GAP-0069"
+    ],
+    "group_id": "leak:fills|ok|split fill rhob around <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill rhob at <n> with blue below and red above": {
+    "case_ids": [
+      "D5GAP-0072"
+    ],
+    "group_id": "leak:fills|ok|split fill rhob at <n> with blue below and red above",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|ok|split fill sp around <n>": {
+    "case_ids": [
+      "D5GAP-0077"
+    ],
+    "group_id": "leak:fills|ok|split fill sp around <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|unsupported|capability_not_available|between_fill_requires_matching_effective_scales|fill between the wide and narrow cbl views": {
+    "case_ids": [
+      "D5GAP-0081"
+    ],
+    "group_id": "leak:fills|unsupported|capability_not_available|between_fill_requires_matching_effective_scales|fill between the wide and narrow cbl views",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|unsupported|capability_not_available|between_fill_requires_same_track|fill between gr and nphi even though they are on different tracks": {
+    "case_ids": [
+      "D5GAP-0082"
+    ],
+    "group_id": "leak:fills|unsupported|capability_not_available|between_fill_requires_same_track|fill between gr and nphi even though they are on different tracks",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:fills|unsupported|operation_not_supported|conditional_threshold_fill_outside_well_ir_v1|shade gr only where it exceeds <n> api": {
+    "case_ids": [
+      "GOLD-0053"
+    ],
+    "group_id": "leak:fills|unsupported|operation_not_supported|conditional_threshold_fill_outside_well_ir_v1|shade gr only where it exceeds <n> api",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|on this feet log show <n> <n> m": {
+    "case_ids": [
+      "D5GAP-0058"
+    ],
+    "group_id": "leak:intervals|ok|on this feet log show <n> <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|on this metric log show <n> <n> ft": {
+    "case_ids": [
+      "D5GAP-0057"
+    ],
+    "group_id": "leak:intervals|ok|on this metric log show <n> <n> ft",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|plot from <n> to <n> ft": {
+    "case_ids": [
+      "GOLD-0024",
+      "GOLD-0025"
+    ],
+    "group_id": "leak:intervals|ok|plot from <n> to <n> ft",
+    "n_cases": 2,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|plot from <n> to <n> m": {
+    "case_ids": [
+      "GOLD-0020",
+      "GOLD-0021",
+      "GOLD-0022",
+      "GOLD-0023",
+      "GOLD-0026",
+      "GOLD-0027"
+    ],
+    "group_id": "leak:intervals|ok|plot from <n> to <n> m",
+    "n_cases": 6,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|restrict depth to <n> through <n> ft": {
+    "case_ids": [
+      "D5GAP-0056"
+    ],
+    "group_id": "leak:intervals|ok|restrict depth to <n> through <n> ft",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|set depth from <n> to <n> m": {
+    "case_ids": [
+      "GOLD-0003"
+    ],
+    "group_id": "leak:intervals|ok|set depth from <n> to <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|set interval <n> <n> m": {
+    "case_ids": [
+      "GOLD-0184",
+      "GOLD-0189",
+      "GOLD-0194",
+      "GOLD-0199",
+      "GOLD-0204",
+      "GOLD-0209",
+      "GOLD-0214",
+      "GOLD-0219"
+    ],
+    "group_id": "leak:intervals|ok|set interval <n> <n> m",
+    "n_cases": 8,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|set top <n> m and base <n> m": {
+    "case_ids": [
+      "D5GAP-0053"
+    ],
+    "group_id": "leak:intervals|ok|set top <n> m and base <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|show <n> <n> cm": {
+    "case_ids": [
+      "D5GAP-0054"
+    ],
+    "group_id": "leak:intervals|ok|show <n> <n> cm",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|show <n> <n> ft": {
+    "case_ids": [
+      "D5GAP-0052"
+    ],
+    "group_id": "leak:intervals|ok|show <n> <n> ft",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|show <n> <n> m": {
+    "case_ids": [
+      "D5GAP-0051"
+    ],
+    "group_id": "leak:intervals|ok|show <n> <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|top is <n> m base is <n> m": {
+    "case_ids": [
+      "D5GAP-0055"
+    ],
+    "group_id": "leak:intervals|ok|top is <n> m base is <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|use the complete <n> <n> m interval": {
+    "case_ids": [
+      "D5GAP-0059"
+    ],
+    "group_id": "leak:intervals|ok|use the complete <n> <n> m interval",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:intervals|ok|zoom to <n> <n> m": {
+    "case_ids": [
+      "D5GAP-0060"
+    ],
+    "group_id": "leak:intervals|ok|zoom to <n> <n> m",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:missing_cali|unsupported|ambiguity_unsupported": {
+    "case_ids": [
+      "GOLD-0117",
+      "GOLD-0118",
+      "GOLD-0119",
+      "GOLD-0120"
+    ],
+    "group_id": "leak:missing_cali|unsupported|ambiguity_unsupported",
+    "n_cases": 4,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:missing_dt|unsupported|ambiguity_unsupported": {
+    "case_ids": [
+      "GOLD-0125",
+      "GOLD-0126",
+      "GOLD-0127",
+      "GOLD-0128"
+    ],
+    "group_id": "leak:missing_dt|unsupported|ambiguity_unsupported",
+    "n_cases": 4,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:missing_msfl|unsupported|ambiguity_unsupported": {
+    "case_ids": [
+      "GOLD-0133",
+      "GOLD-0134",
+      "GOLD-0135",
+      "GOLD-0136"
+    ],
+    "group_id": "leak:missing_msfl|unsupported|ambiguity_unsupported",
+    "n_cases": 4,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:missing_pef|unsupported|ambiguity_unsupported": {
+    "case_ids": [
+      "GOLD-0121",
+      "GOLD-0122",
+      "GOLD-0123",
+      "GOLD-0124"
+    ],
+    "group_id": "leak:missing_pef|unsupported|ambiguity_unsupported",
+    "n_cases": 4,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:missing_sp|unsupported|ambiguity_unsupported": {
+    "case_ids": [
+      "GOLD-0129",
+      "GOLD-0130",
+      "GOLD-0131",
+      "GOLD-0132"
+    ],
+    "group_id": "leak:missing_sp|unsupported|ambiguity_unsupported",
+    "n_cases": 4,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:move_remove|ok|move rt beside the gr track without changing its display scale": {
+    "case_ids": [
+      "D5GAP-0144"
+    ],
+    "group_id": "leak:move_remove|ok|move rt beside the gr track without changing its display scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:move_remove|ok|move the existing cali curve to the gr track": {
+    "case_ids": [
+      "D5GAP-0143"
+    ],
+    "group_id": "leak:move_remove|ok|move the existing cali curve to the gr track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:move_remove|ok|remove the first gr instance not the qc copy": {
+    "case_ids": [
+      "D5GAP-0141"
+    ],
+    "group_id": "leak:move_remove|ok|remove the first gr instance not the qc copy",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:move_remove|ok|remove the rhob upper limit fill exactly": {
+    "case_ids": [
+      "D5GAP-0142"
+    ],
+    "group_id": "leak:move_remove|ok|remove the rhob upper limit fill exactly",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put cali on track <n>": {
+    "case_ids": [
+      "D5GAP-0006"
+    ],
+    "group_id": "leak:reference_resolution|ok|put cali on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put deep resistivity on track <n>": {
+    "case_ids": [
+      "D5GAP-0005"
+    ],
+    "group_id": "leak:reference_resolution|ok|put deep resistivity on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put density on track <n>": {
+    "case_ids": [
+      "D5GAP-0003"
+    ],
+    "group_id": "leak:reference_resolution|ok|put density on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put gamma ray on track <n>": {
+    "case_ids": [
+      "D5GAP-0002"
+    ],
+    "group_id": "leak:reference_resolution|ok|put gamma ray on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put gr on track <n>": {
+    "case_ids": [
+      "D5GAP-0001"
+    ],
+    "group_id": "leak:reference_resolution|ok|put gr on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put micro resistivity on track <n>": {
+    "case_ids": [
+      "D5GAP-0010"
+    ],
+    "group_id": "leak:reference_resolution|ok|put micro resistivity on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put neutron on track <n>": {
+    "case_ids": [
+      "D5GAP-0004"
+    ],
+    "group_id": "leak:reference_resolution|ok|put neutron on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put pef factor on track <n>": {
+    "case_ids": [
+      "D5GAP-0008"
+    ],
+    "group_id": "leak:reference_resolution|ok|put pef factor on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put sonic on track <n>": {
+    "case_ids": [
+      "D5GAP-0007"
+    ],
+    "group_id": "leak:reference_resolution|ok|put sonic on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|put sp on track <n>": {
+    "case_ids": [
+      "D5GAP-0009"
+    ],
+    "group_id": "leak:reference_resolution|ok|put sp on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:reference_resolution|ok|reverse it": {
+    "case_ids": [
+      "D5GAP-0145"
+    ],
+    "group_id": "leak:reference_resolution|ok|reverse it",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put cali beside gr": {
+    "case_ids": [
+      "GOLD-0190"
+    ],
+    "group_id": "leak:relational_targeting|ok|put cali beside gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put cali beside neutron": {
+    "case_ids": [
+      "GOLD-0044"
+    ],
+    "group_id": "leak:relational_targeting|ok|put cali beside neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put cali with gr": {
+    "case_ids": [
+      "GOLD-0036"
+    ],
+    "group_id": "leak:relational_targeting|ok|put cali with gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put density beside gr": {
+    "case_ids": [
+      "GOLD-0032"
+    ],
+    "group_id": "leak:relational_targeting|ok|put density beside gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put density with neutron": {
+    "case_ids": [
+      "GOLD-0028"
+    ],
+    "group_id": "leak:relational_targeting|ok|put density with neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put msfl beside rt": {
+    "case_ids": [
+      "D5GAP-0021"
+    ],
+    "group_id": "leak:relational_targeting|ok|put msfl beside rt",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put msfl beside track <n>": {
+    "case_ids": [
+      "D5GAP-0024"
+    ],
+    "group_id": "leak:relational_targeting|ok|put msfl beside track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put pef beside the cali track": {
+    "case_ids": [
+      "D5GAP-0022"
+    ],
+    "group_id": "leak:relational_targeting|ok|put pef beside the cali track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put pef with curve <n>": {
+    "case_ids": [
+      "D5GAP-0025"
+    ],
+    "group_id": "leak:relational_targeting|ok|put pef with curve <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put pef with gr": {
+    "case_ids": [
+      "D5GAP-0019"
+    ],
+    "group_id": "leak:relational_targeting|ok|put pef with gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put pef with the neutron curve": {
+    "case_ids": [
+      "D5GAP-0023"
+    ],
+    "group_id": "leak:relational_targeting|ok|put pef with the neutron curve",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put resistivity beside neutron": {
+    "case_ids": [
+      "GOLD-0040"
+    ],
+    "group_id": "leak:relational_targeting|ok|put resistivity beside neutron",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put rhob beside nphi": {
+    "case_ids": [
+      "GOLD-0210"
+    ],
+    "group_id": "leak:relational_targeting|ok|put rhob beside nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put rt with gr": {
+    "case_ids": [
+      "GOLD-0048"
+    ],
+    "group_id": "leak:relational_targeting|ok|put rt with gr",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put rt with nphi": {
+    "case_ids": [
+      "GOLD-0185"
+    ],
+    "group_id": "leak:relational_targeting|ok|put rt with nphi",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put sp beside curve <n>": {
+    "case_ids": [
+      "D5GAP-0026"
+    ],
+    "group_id": "leak:relational_targeting|ok|put sp beside curve <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:relational_targeting|ok|put sp with density": {
+    "case_ids": [
+      "D5GAP-0020"
+    ],
+    "group_id": "leak:relational_targeting|ok|put sp with density",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a <n> mm normal track named sp and plot sp on it": {
+    "case_ids": [
+      "D5GAP-0092"
+    ],
+    "group_id": "leak:track_creation|ok|add a <n> mm normal track named sp and plot sp on it",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a density qc track and plot rhob <n> <n> reversed": {
+    "case_ids": [
+      "D5GAP-0098"
+    ],
+    "group_id": "leak:track_creation|ok|add a density qc track and plot rhob <n> <n> reversed",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a new normal track immediately after the resistivity track and plot msfl there": {
+    "case_ids": [
+      "D5GAP-0099"
+    ],
+    "group_id": "leak:track_creation|ok|add a new normal track immediately after the resistivity track and plot msfl there",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a new normal track immediately before the sonic track and plot pef there": {
+    "case_ids": [
+      "D5GAP-0100"
+    ],
+    "group_id": "leak:track_creation|ok|add a new normal track immediately before the sonic track and plot pef there",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a normal track named formation and plot pef sp and msfl on it": {
+    "case_ids": [
+      "D5GAP-0094"
+    ],
+    "group_id": "leak:track_creation|ok|add a normal track named formation and plot pef sp and msfl on it",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a normal track named pef and plot pef on it": {
+    "case_ids": [
+      "D5GAP-0091"
+    ],
+    "group_id": "leak:track_creation|ok|add a normal track named pef and plot pef on it",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a normal track named qc and plot pef and sp on it": {
+    "case_ids": [
+      "D5GAP-0093"
+    ],
+    "group_id": "leak:track_creation|ok|add a normal track named qc and plot pef and sp on it",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a pef qc track with pef <n> <n> and a green line": {
+    "case_ids": [
+      "D5GAP-0095"
+    ],
+    "group_id": "leak:track_creation|ok|add a pef qc track with pef <n> <n> and a green line",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a petrophysics track with gr <n> <n> and rt logarithmic <n> <n>": {
+    "case_ids": [
+      "D5GAP-0096"
+    ],
+    "group_id": "leak:track_creation|ok|add a petrophysics track with gr <n> <n> and rt logarithmic <n> <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|add a resistivity qc track and plot rt logarithmically from <n> to <n>": {
+    "case_ids": [
+      "D5GAP-0097"
+    ],
+    "group_id": "leak:track_creation|ok|add a resistivity qc track and plot rt logarithmically from <n> to <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|append a <n> mm cali qc track and plot cali on it at <n> <n>": {
+    "case_ids": [
+      "D5GAP-0101"
+    ],
+    "group_id": "leak:track_creation|ok|append a <n> mm cali qc track and plot cali on it at <n> <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_creation|ok|append a gamma qc track and plot gr with a <n> <n> scale": {
+    "case_ids": [
+      "D5GAP-0102"
+    ],
+    "group_id": "leak:track_creation|ok|append a gamma qc track and plot gr with a <n> <n> scale",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|add sp to the track with id cali": {
+    "case_ids": [
+      "D5GAP-0018"
+    ],
+    "group_id": "leak:track_targeting|ok|add sp to the track with id cali",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put msfl on the first track": {
+    "case_ids": [
+      "D5GAP-0011"
+    ],
+    "group_id": "leak:track_targeting|ok|put msfl on the first track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put msfl on the resistivity track": {
+    "case_ids": [
+      "D5GAP-0013"
+    ],
+    "group_id": "leak:track_targeting|ok|put msfl on the resistivity track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put pef on the third track": {
+    "case_ids": [
+      "D5GAP-0016"
+    ],
+    "group_id": "leak:track_targeting|ok|put pef on the third track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put pef on the track named sonic": {
+    "case_ids": [
+      "D5GAP-0017"
+    ],
+    "group_id": "leak:track_targeting|ok|put pef on the track named sonic",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put pef on track <n>": {
+    "case_ids": [
+      "D5GAP-0014"
+    ],
+    "group_id": "leak:track_targeting|ok|put pef on track <n>",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put sp on the gr track": {
+    "case_ids": [
+      "D5GAP-0012"
+    ],
+    "group_id": "leak:track_targeting|ok|put sp on the gr track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  },
+  "leak:track_targeting|ok|put sp on the last track": {
+    "case_ids": [
+      "D5GAP-0015"
+    ],
+    "group_id": "leak:track_targeting|ok|put sp on the last track",
+    "n_cases": 1,
+    "note": "Proposed only; must not cross eventual splits once frozen."
+  }
+}

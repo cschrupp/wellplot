@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "baselines_complete": true,
+    "family_breadth": false,
+    "gold_frozen": true,
+    "ir_frozen": true,
+    "ir_limit_lt_15": true,
+    "learnable_ge_70": true,
+    "lowerer_100": true,
+    "no_leakage": true,
+    "non_goals": true,
+    "semantic_floor_50": true,
+    "split_frozen": true,
+    "taxonomy_complete": true
+  },
+  "decision": "IR-REWORK"
+}

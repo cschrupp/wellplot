@@ -1,0 +1,50 @@
+{
+  "arm_B_status": "Q1_complete_Q2_aborted",
+  "arms": {
+    "A": {
+      "backend": "hf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "smollm3_bf16_hf",
+      "quant": "bf16_offload",
+      "semantic_correctness_executable": 0.2807017543859649
+    },
+    "B": {
+      "backend": "hf",
+      "best_prompt_arm": "Q1",
+      "family_breadth_ok": false,
+      "label": "phi4mini_bf16_hf",
+      "quant": "bf16_offload",
+      "semantic_correctness_executable": 0.15789473684210525
+    },
+    "C": {
+      "backend": "gguf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "smollm3_gguf_q4",
+      "quant": "UD-Q4_K_XL",
+      "semantic_correctness_executable": 0.21052631578947367
+    },
+    "D": {
+      "backend": "gguf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "phi4mini_gguf_q4",
+      "quant": "Q4_K_M",
+      "semantic_correctness_executable": 0.21052631578947367
+    }
+  },
+  "best_model_arm": "A",
+  "best_semantic_correctness": 0.2807017543859649,
+  "gate_decision": "MODEL-SIZE-FAIL",
+  "n_held_out": 70,
+  "notes": [
+    "Arm B Q2 aborted by user (RAM offload too slow); B scored on Q1 n=70 only.",
+    "Qwen3-1.7B SLM-01 reference best Q2: 42.1%.",
+    "Best 01B arm remains below 50% floor => MODEL-SIZE-FAIL.",
+    "Local 3B fine-tune on 6GB RTX 3060 judged impractical."
+  ],
+  "parent_slm01_decision": "MODEL-SIZE-FAIL",
+  "qwen_1_7b_reference_semantic": 0.42105263157894735,
+  "schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b"
+}

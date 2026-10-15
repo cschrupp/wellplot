@@ -1,0 +1,40 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "families": {
+    "ambiguity_unsupported": 64,
+    "composition": 48,
+    "curve_placement": 10,
+    "display_configuration": 48,
+    "fills": 51,
+    "intervals": 27,
+    "move_remove": 4,
+    "reference_resolution": 11,
+    "relational_targeting": 17,
+    "track_creation": 12,
+    "track_targeting": 8
+  },
+  "gold_sha256": "172e70825d51bf3cb68ea3798ff87f20da21e7365d14ff0efd383b69d9013a11",
+  "n_cases": 300,
+  "n_trainable": 164,
+  "revision": "d5-grounded-300-r1",
+  "statuses": {
+    "ambiguous": 10,
+    "invalid": 14,
+    "ok": 233,
+    "unsupported": 43
+  },
+  "support_levels": {
+    "authoring_supported": 106,
+    "d5_context_lowerable": 20,
+    "d5_current": 77,
+    "envelope_only": 67,
+    "resolver_extension": 30
+  },
+  "trainable_support_levels": [
+    "d5_context_lowerable",
+    "d5_current",
+    "envelope_only"
+  ],
+  "well_ir_version": "1.2-candidate"
+}

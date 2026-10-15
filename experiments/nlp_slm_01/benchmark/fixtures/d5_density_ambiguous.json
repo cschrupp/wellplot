@@ -1,0 +1,117 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "fixture_format": "d5_semantic_manifest_r1",
+  "manifest": {
+    "aliases": {},
+    "existing_curves": [
+      {
+        "aliases": [
+          "density",
+          "bulk density"
+        ],
+        "channel": "RHOB",
+        "handle": "curve-1",
+        "label": "RHOB",
+        "scale": {
+          "kind": "linear",
+          "maximum": 2.95,
+          "minimum": 1.95,
+          "reverse": true
+        },
+        "track_ref": 1,
+        "track_title": "Bulk Density"
+      },
+      {
+        "aliases": [
+          "density"
+        ],
+        "channel": "RHOZ",
+        "handle": "curve-2",
+        "label": "RHOZ",
+        "scale": {
+          "kind": "linear",
+          "maximum": 2.9,
+          "minimum": 1.9,
+          "reverse": true
+        },
+        "track_ref": 2,
+        "track_title": "Alternative Density"
+      },
+      {
+        "aliases": [],
+        "channel": "GR",
+        "handle": "curve-3",
+        "label": "GR",
+        "scale": {
+          "kind": "linear",
+          "maximum": 150,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 3,
+        "track_title": "Gamma Ray"
+      }
+    ],
+    "fills": [],
+    "fixture_id": "d5_density_ambiguous",
+    "focus": null,
+    "note": "Two density candidates intentionally make generic density ambiguous.",
+    "section": {
+      "depth_unit": "m",
+      "id": "main",
+      "title": "Main Log"
+    },
+    "sources": [
+      {
+        "candidate_id": "source-1",
+        "channels": [
+          {
+            "aliases": [
+              "density",
+              "bulk density"
+            ],
+            "kind": "scalar",
+            "mnemonic": "RHOB",
+            "unit": "g/cm3"
+          },
+          {
+            "aliases": [
+              "density"
+            ],
+            "kind": "scalar",
+            "mnemonic": "RHOZ",
+            "unit": "g/cm3"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          }
+        ],
+        "source_format": "las"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "rhob",
+        "kind": "normal",
+        "ref": 1,
+        "title": "Bulk Density"
+      },
+      {
+        "id": "rhoz",
+        "kind": "normal",
+        "ref": 2,
+        "title": "Alternative Density"
+      },
+      {
+        "id": "gr",
+        "kind": "normal",
+        "ref": 3,
+        "title": "Gamma Ray"
+      }
+    ]
+  }
+}

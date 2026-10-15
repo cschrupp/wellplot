@@ -1,0 +1,2422 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-REWORK-AUTH-001",
+  "by_case": {
+    "D5GAP-0001": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0002": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0003": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0004": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0005": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0006": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0007": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0008": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0009": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0010": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "reference_resolution",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0011": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0012": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0013": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0014": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0015": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0016": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0017": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0018": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "track_targeting",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0019": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0020": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0021": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0022": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0023": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0024": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0025": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0026": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0027": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0028": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0029": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0030": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0031": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0032": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0033": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0034": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0035": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0036": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0037": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0038": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0039": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0040": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0041": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0042": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0043": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0044": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0045": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0046": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0047": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0048": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0049": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0050": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0051": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0052": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics_ft",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0053": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0054": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0055": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0056": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics_ft",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0057": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0058": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics_ft",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0059": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0060": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0061": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0062": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0063": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0064": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0065": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0066": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0067": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0068": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0069": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0070": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0071": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0072": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0073": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0074": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0075": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0076": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0077": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0078": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0079": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_porosity_pair",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0080": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_gr_same_track",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0081": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "unsupported",
+      "rationale": "fill/capability precondition: between_fill_requires_matching_effective_scales",
+      "semantic_family": "fills",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0082": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "unsupported",
+      "rationale": "fill/capability precondition: between_fill_requires_same_track",
+      "semantic_family": "fills",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0083": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_porosity_pair",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0084": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_porosity_pair",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0085": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0086": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_gr_same_track",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0087": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_porosity_pair",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0088": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_porosity_pair",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0089": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0090": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0091": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0092": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0093": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0094": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0095": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0096": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0097": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0098": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0099": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0100": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0101": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_main_las",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0102": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_main_las",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "track_creation",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0103": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0104": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0105": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0106": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0107": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0108": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0109": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0110": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0111": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0112": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_existing_fills",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0113": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0114": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0115": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0116": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0117": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0118": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_main_las",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0119": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_density_ambiguous",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_density_ambiguous",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0120": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_no_focus",
+      "gold_status": "ambiguous",
+      "rationale": "deictic requires focus; focus absent",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0121": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_duplicate_gr",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_duplicate_gr",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0122": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_duplicate_cbl",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0123": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_qc_track_ambiguous",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_qc_track_ambiguous",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0124": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_two_gr_fills",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_two_gr_fills",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0125": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_density_ambiguous",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d5_density_ambiguous",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0126": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_no_focus",
+      "gold_status": "ambiguous",
+      "rationale": "deictic requires focus; focus absent",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0127": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: annotations_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0128": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_array_vdl",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: raster_waveform_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0129": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_main_las",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: report_authoring_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0130": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_main_las",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: page_authoring_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0131": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_multi_source",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: source_selection_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0132": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: template_instantiation_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0133": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: multi_well_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0134": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: conditional_threshold_fill_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0135": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_scale_bounds",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0136": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_log_scale_bounds",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0137": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_interval_order",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0138": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_alpha",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0139": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_line_width",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0140": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_petrophysics",
+      "gold_status": "invalid",
+      "rationale": "explicit contradictory request (contradictory_scale_direction); no residual learned judgment",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "D5GAP-0141": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_duplicate_gr",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "move_remove",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0142": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_existing_fills",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "move_remove",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0143": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "move_remove",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0144": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d5_petrophysics",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "move_remove",
+      "support_level": "resolver_extension"
+    },
+    "D5GAP-0145": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_focus_gr",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "reference_resolution",
+      "support_level": "d5_context_lowerable"
+    },
+    "D5GAP-0146": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d5_focus_rhob",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "D5GAP-0147": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_duplicate_cbl",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "D5GAP-0148": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d5_duplicate_gr",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0001": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0002": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0003": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0004": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0005": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0006": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0008": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0009": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0010": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0011": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0012": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0013": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "curve_placement",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0014": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0015": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0016": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0017": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0018": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0019": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0020": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0021": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0022": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0023": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0024": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0025": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0026": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0027": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0028": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0032": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0036": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0040": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0044": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0048": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0052": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0053": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: conditional_threshold_fill_outside_well_ir_v1",
+      "semantic_family": "fills",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0055": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0056": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0057": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0058": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0059": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0060": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0061": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_rhob",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0062": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0063": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0064": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_0",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0065": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_1",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0066": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_2",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0067": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_3",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0068": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_4",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0069": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_5",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0070": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_6",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0071": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_with_fill_7",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0072": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0078": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "GOLD-0084": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0090": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0096": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0102": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_ambiguous_density",
+      "gold_status": "ambiguous",
+      "rationale": "multi-match fixture d0_ambiguous_density",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0117": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_CALI_0",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0118": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_CALI_1",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0119": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_CALI_2",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0120": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_CALI_3",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0121": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_PEF_0",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0122": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_PEF_1",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0123": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_PEF_2",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0124": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_PEF_3",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0125": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_DT_0",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0126": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_DT_1",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0127": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_DT_2",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0128": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_DT_3",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0129": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_SP_0",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0130": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_SP_1",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0131": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_SP_2",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0132": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_SP_3",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0133": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_MSFL_0",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0134": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_MSFL_1",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0135": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_MSFL_2",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0136": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_missing_MSFL_3",
+      "gold_status": "unsupported",
+      "rationale": "missing-curve fixture; reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0137": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: instantiate_layout deferred beyond WELL-IR v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0147": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_interval_order",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0148": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_interval_zero_span",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0149": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_log_scale_bounds",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0151": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_scale_bounds",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0152": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_fill_alpha",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0154": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "schema/domain invalid: invalid_line_width",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0155": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "explicit contradictory request (contradictory_scale_direction); no residual learned judgment",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0156": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "invalid",
+      "rationale": "explicit contradictory request (contradictory_target); no residual learned judgment",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0157": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_0",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0158": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_1",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0159": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_2",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0160": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_3",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0161": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_4",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0162": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_5",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0163": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_6",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0164": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_7",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0165": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_8",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0166": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_9",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0167": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_10",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0168": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_focus_rhob_11",
+      "gold_status": "ok",
+      "rationale": "ok deictic with focus present (contrast)",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_context_lowerable"
+    },
+    "GOLD-0169": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ambiguous",
+      "rationale": "deictic requires focus; focus absent",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "GOLD-0177": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0184": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0185": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0186": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "GOLD-0187": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0189": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0190": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0192": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0194": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0197": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0199": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0202": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0204": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0207": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0209": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0210": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after unique object resolution",
+      "semantic_family": "relational_targeting",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0212": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "resolver_extension"
+    },
+    "GOLD-0214": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "GOLD-0219": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_triple_combo",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "intervals",
+      "support_level": "authoring_supported"
+    },
+    "SEED-cm-0c560bf95749e391": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-16d5b41fa632ded9": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: source_selection_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-cm-3e8eba7a490f2b8e": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-4ac6f8124d33c892": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: cbl_vdl_or_multi_section_construct",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-cm-5b80ffa938aa98af": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-5f1b23161fc35b70": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "gold reason reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-cm-6d425f59c4d92ce4": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-843982294d26902b": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "gold reason reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-cm-9643c020e2e02463": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-9e41577060b4160c": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-b1ec505a139d1e2b": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-cm-d74de4927459a802": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: report_metadata_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-13dd5c7acf75744a": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: report_rename",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-40fa44cb825c9220": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "SEED-d4-44ab1264d78443aa": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: section_targeting_outside_well_ir_v1",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-7e5b10ed31ecd3db": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-d4-9a19bd0b9e3522da": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "gold reason reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-a56636363f8f3535": {
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "gold reason reference_not_found",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-b9ce7afb862ab472": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: d4_cbl_construct_or_report_scaffold",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    },
+    "SEED-d4-d1433317902f665a": {
+      "decision_authority": "DETERMINISTIC_PRECONDITION",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok fill after deterministic preconditions",
+      "semantic_family": "fills",
+      "support_level": "d5_current"
+    },
+    "SEED-d4-dc13ab810dd8ea87": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "display_configuration",
+      "support_level": "d5_current"
+    },
+    "SEED-para-111788000432c647": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-77485acf50c6fc3d": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-8e1d0adc5083e9c9": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-a6944584ec401ac6": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-b52440f2f9b14a94": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-baadebfd50455fa9": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-c277e58e76236196": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-ca51524459f4b989": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-cbf37ac4d9236c7d": {
+      "decision_authority": "DETERMINISTIC_CARDINALITY",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok unique density/alias resolution contrast",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-de951d323598dc66": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-ed1b0da82219efe0": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-para-f415c54c4b482790": {
+      "decision_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+      "fixture": "d0_base",
+      "gold_status": "ok",
+      "rationale": "ok after schema/domain-valid parameters",
+      "semantic_family": "composition",
+      "support_level": "d5_current"
+    },
+    "SEED-tw-293744a4235fc673": {
+      "decision_authority": "STATIC_CAPABILITY_BOUNDARY",
+      "fixture": "d0_base",
+      "gold_status": "unsupported",
+      "rationale": "unsupported capability: tw_cbl_worker_projection",
+      "semantic_family": "ambiguity_unsupported",
+      "support_level": "envelope_only"
+    }
+  },
+  "classes": [
+    "DETERMINISTIC_CARDINALITY",
+    "DETERMINISTIC_NOT_FOUND",
+    "DETERMINISTIC_PRECONDITION",
+    "DETERMINISTIC_SCHEMA_DOMAIN",
+    "STATIC_CAPABILITY_BOUNDARY",
+    "LEARNED_SEMANTIC_GATE"
+  ],
+  "counts": {
+    "DETERMINISTIC_CARDINALITY": 66,
+    "DETERMINISTIC_NOT_FOUND": 24,
+    "DETERMINISTIC_PRECONDITION": 64,
+    "DETERMINISTIC_SCHEMA_DOMAIN": 129,
+    "LEARNED_SEMANTIC_GATE": 0,
+    "STATIC_CAPABILITY_BOUNDARY": 17
+  },
+  "slice": "MB-01R"
+}

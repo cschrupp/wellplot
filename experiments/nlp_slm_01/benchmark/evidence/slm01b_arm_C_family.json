@@ -1,0 +1,40 @@
+{
+  "families": {
+    "ambiguity_unsupported": {
+      "correct": 2,
+      "n": 13,
+      "rate": 0.15384615384615385
+    },
+    "composition": {
+      "correct": 4,
+      "n": 13,
+      "rate": 0.3076923076923077
+    },
+    "curve_placement": {
+      "correct": 0,
+      "n": 9,
+      "rate": 0.0
+    },
+    "display_configuration": {
+      "correct": 1,
+      "n": 4,
+      "rate": 0.25
+    },
+    "fills": {
+      "correct": 0,
+      "n": 10,
+      "rate": 0.0
+    },
+    "intervals": {
+      "correct": 4,
+      "n": 9,
+      "rate": 0.4444444444444444
+    },
+    "relational_targeting": {
+      "correct": 3,
+      "n": 12,
+      "rate": 0.25
+    }
+  },
+  "model_arm": "C"
+}

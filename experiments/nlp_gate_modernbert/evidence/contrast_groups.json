@@ -1,0 +1,224 @@
+{
+  "contrast:curve_present_vs_absent": {
+    "case_ids": [
+      "GOLD-0117",
+      "GOLD-0118",
+      "GOLD-0119",
+      "GOLD-0120",
+      "GOLD-0121",
+      "GOLD-0122",
+      "GOLD-0123",
+      "GOLD-0124",
+      "GOLD-0125",
+      "GOLD-0126",
+      "GOLD-0127",
+      "GOLD-0128",
+      "GOLD-0129",
+      "GOLD-0130",
+      "GOLD-0131",
+      "GOLD-0132",
+      "GOLD-0133",
+      "GOLD-0134",
+      "GOLD-0135",
+      "GOLD-0136",
+      "SEED-cm-5f1b23161fc35b70",
+      "SEED-cm-843982294d26902b"
+    ],
+    "group_id": "contrast:curve_present_vs_absent",
+    "n_cases": 22,
+    "statuses": [
+      "unsupported"
+    ]
+  },
+  "contrast:curve_unique_vs_duplicate": {
+    "case_ids": [
+      "D5GAP-0080",
+      "D5GAP-0086",
+      "D5GAP-0121"
+    ],
+    "group_id": "contrast:curve_unique_vs_duplicate",
+    "n_cases": 3,
+    "statuses": [
+      "ambiguous",
+      "ok"
+    ]
+  },
+  "contrast:density_relational_unique_vs_ambiguous": {
+    "case_ids": [
+      "D5GAP-0125",
+      "GOLD-0028",
+      "GOLD-0084"
+    ],
+    "group_id": "contrast:density_relational_unique_vs_ambiguous",
+    "n_cases": 3,
+    "statuses": [
+      "ambiguous",
+      "ok"
+    ]
+  },
+  "contrast:density_unique_vs_ambiguous": {
+    "case_ids": [
+      "D5GAP-0003",
+      "D5GAP-0020",
+      "D5GAP-0119",
+      "GOLD-0001",
+      "GOLD-0032",
+      "GOLD-0102"
+    ],
+    "group_id": "contrast:density_unique_vs_ambiguous",
+    "n_cases": 6,
+    "statuses": [
+      "ambiguous",
+      "ok"
+    ]
+  },
+  "contrast:fill_unique_vs_ambiguous": {
+    "case_ids": [
+      "D5GAP-0124",
+      "GOLD-0064",
+      "GOLD-0065",
+      "GOLD-0066",
+      "GOLD-0067",
+      "GOLD-0068",
+      "GOLD-0069",
+      "GOLD-0070",
+      "GOLD-0071",
+      "GOLD-0152"
+    ],
+    "group_id": "contrast:fill_unique_vs_ambiguous",
+    "n_cases": 10,
+    "statuses": [
+      "ambiguous",
+      "invalid",
+      "ok"
+    ]
+  },
+  "contrast:focus_present_vs_missing": {
+    "case_ids": [
+      "D5GAP-0120",
+      "D5GAP-0126",
+      "D5GAP-0145",
+      "D5GAP-0146",
+      "GOLD-0157",
+      "GOLD-0158",
+      "GOLD-0159",
+      "GOLD-0160",
+      "GOLD-0161",
+      "GOLD-0162",
+      "GOLD-0163",
+      "GOLD-0164",
+      "GOLD-0165",
+      "GOLD-0166",
+      "GOLD-0167",
+      "GOLD-0168",
+      "GOLD-0169"
+    ],
+    "group_id": "contrast:focus_present_vs_missing",
+    "n_cases": 17,
+    "statuses": [
+      "ambiguous",
+      "ok"
+    ]
+  },
+  "contrast:supported_fill_vs_threshold_fill": {
+    "case_ids": [
+      "D5GAP-0134",
+      "GOLD-0053"
+    ],
+    "group_id": "contrast:supported_fill_vs_threshold_fill",
+    "n_cases": 2,
+    "statuses": [
+      "unsupported"
+    ]
+  },
+  "contrast:supported_vs_unsupported_between_fill": {
+    "case_ids": [
+      "D5GAP-0079",
+      "D5GAP-0081",
+      "D5GAP-0082",
+      "D5GAP-0083",
+      "D5GAP-0084",
+      "D5GAP-0085",
+      "D5GAP-0087",
+      "D5GAP-0088",
+      "D5GAP-0089",
+      "D5GAP-0090",
+      "D5GAP-0116",
+      "GOLD-0061",
+      "GOLD-0062",
+      "GOLD-0063"
+    ],
+    "group_id": "contrast:supported_vs_unsupported_between_fill",
+    "n_cases": 14,
+    "statuses": [
+      "ok",
+      "unsupported"
+    ]
+  },
+  "contrast:track_title_unique_vs_ambiguous": {
+    "case_ids": [
+      "D5GAP-0095",
+      "D5GAP-0097",
+      "D5GAP-0098",
+      "D5GAP-0101",
+      "D5GAP-0102",
+      "D5GAP-0109",
+      "D5GAP-0110",
+      "D5GAP-0118",
+      "D5GAP-0123"
+    ],
+    "group_id": "contrast:track_title_unique_vs_ambiguous",
+    "n_cases": 9,
+    "statuses": [
+      "ambiguous",
+      "ok"
+    ]
+  },
+  "contrast:valid_vs_invalid_log_bounds": {
+    "case_ids": [
+      "D5GAP-0028",
+      "D5GAP-0031",
+      "D5GAP-0057",
+      "D5GAP-0058",
+      "D5GAP-0076",
+      "D5GAP-0096",
+      "D5GAP-0107",
+      "D5GAP-0136",
+      "GOLD-0149",
+      "SEED-cm-0c560bf95749e391",
+      "SEED-cm-4ac6f8124d33c892",
+      "SEED-cm-9643c020e2e02463",
+      "SEED-cm-9e41577060b4160c",
+      "SEED-d4-44ab1264d78443aa",
+      "SEED-d4-7e5b10ed31ecd3db",
+      "SEED-d4-9a19bd0b9e3522da",
+      "SEED-d4-a56636363f8f3535",
+      "SEED-d4-b9ce7afb862ab472",
+      "SEED-d4-d1433317902f665a",
+      "SEED-d4-dc13ab810dd8ea87",
+      "SEED-para-c277e58e76236196"
+    ],
+    "group_id": "contrast:valid_vs_invalid_log_bounds",
+    "n_cases": 21,
+    "statuses": [
+      "invalid",
+      "ok",
+      "unsupported"
+    ]
+  },
+  "contrast:valid_vs_invalid_scale_bounds": {
+    "case_ids": [
+      "D5GAP-0135",
+      "D5GAP-0137",
+      "GOLD-0147",
+      "GOLD-0148",
+      "GOLD-0151",
+      "GOLD-0155"
+    ],
+    "group_id": "contrast:valid_vs_invalid_scale_bounds",
+    "n_cases": 6,
+    "statuses": [
+      "invalid"
+    ]
+  }
+}

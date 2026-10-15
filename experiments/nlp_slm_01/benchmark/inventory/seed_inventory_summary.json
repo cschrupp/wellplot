@@ -1,0 +1,8 @@
+{
+  "n_candidates": 125,
+  "by_decision": {
+    "OUT_OF_SCOPE_V1": 51,
+    "PARTIALLY_REUSABLE": 21,
+    "IN_SCOPE_V1": 53
+  }
+}

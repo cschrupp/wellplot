@@ -1,0 +1,12 @@
+{
+  "pydantic_validation": "PASS",
+  "outlines_compile": "IMPORT_OK_COMPILE_DEFERRED_TO_RUNTIME",
+  "llama_cpp_json_schema": "KNOWN_LIMITATIONS",
+  "schema_path": "benchmark/schema/well_ir_v1.json",
+  "schema_title": "WELL-IR 1.0",
+  "notes": [
+    "llama.cpp JSON-schema\u2192grammar supports a subset of JSON Schema.",
+    "Canonical WELL-IR schema remains authoritative; use a projection if needed.",
+    "Do not weaken WELL-IR semantics solely for llama.cpp compatibility."
+  ]
+}
