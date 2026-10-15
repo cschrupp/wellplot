@@ -1,0 +1,170 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-ORACLE-RECONCILIATION-01-AUTH-001",
+  "slice": "ORACLE-01",
+  "starting_branch_tip": "9809b5f8c20506288b7018336617c6136a15041d",
+  "accepted_mb02r_candidate": "c2f158b8222e3c1b4ae3ae737c2544fc3b25f994",
+  "historical_gold": "PRESERVED_UNMODIFIED",
+  "resolver_behavior": "UNCHANGED",
+  "scope_contract_cases": "UNTOUCHED",
+  "cases": [
+    {
+      "case_id": "D5GAP-0125",
+      "fixture_id": "d5_density_ambiguous",
+      "source_utterance": "Put neutron with density.",
+      "historical_gold": {
+        "status": "ambiguous",
+        "reason": null,
+        "detail": null,
+        "mb01r_decision_authority": "DETERMINISTIC_CARDINALITY",
+        "mb01r_rationale": "multi-match fixture d5_density_ambiguous"
+      },
+      "canonical_successor_truth": {
+        "status": "unsupported",
+        "reason": "reference_not_found",
+        "detail": null,
+        "authority": "DETERMINISTIC_NOT_FOUND",
+        "subtype": null,
+        "suppressed_terminal_facts": ["DETERMINISTIC_CARDINALITY"]
+      },
+      "conflict_class": "POLICY_PRECEDENCE_CONFLICT",
+      "authoritative_rule": {
+        "id": "MB-02R-Q5-PRECEDENCE",
+        "statement": "SCHEMA → CAPABILITY → NOT_FOUND → CARDINALITY → PRECONDITION → OK",
+        "application": "NOT_FOUND > CARDINALITY when one required reference has 0 matches and another has >1 matches"
+      },
+      "evidence": {
+        "reference_matches": {
+          "neutron": {"candidate_count": 0, "candidate_ids": []},
+          "density": {"candidate_count": 2, "candidate_ids": ["curve-1", "curve-2"]}
+        },
+        "workspace_channels_present": ["RHOB", "RHOZ", "GR"],
+        "neutron_absent": true,
+        "density_ambiguous": true,
+        "well_ir_public_envelope_policy_gap": false,
+        "mb02r_behavior_change": false
+      },
+      "rationale": "Fixture lacks any neutron/NPHI channel while density matches both RHOB and RHOZ. Frozen Q5 already defines precedence among coexisting deterministic failures; successor truth follows NOT_FOUND rather than CARDINALITY. Historical ambiguous/CARDINALITY gold is preserved but superseded for successor evaluation. Not NEEDS_SEPARATE_IR_DECISION: WELL-IR/public-envelope policy for this situation is defined by accepted Q5.",
+      "required_followup": "none for MB-02R; any change to NOT_FOUND > CARDINALITY requires a separate future policy/design authority and does not reopen MB-02R or ORACLE-01"
+    },
+    {
+      "case_id": "GOLD-0061",
+      "fixture_id": "d0_with_rhob",
+      "source_utterance": "Fill between RHOB and neutron.",
+      "historical_gold": {
+        "status": "ok",
+        "reason": null,
+        "detail": null,
+        "mb01r_decision_authority": "DETERMINISTIC_PRECONDITION",
+        "mb01r_rationale": "ok fill after deterministic preconditions"
+      },
+      "canonical_successor_truth": {
+        "status": "unsupported",
+        "reason": "capability_not_available",
+        "detail": "between_fill_requires_same_track",
+        "authority": "DETERMINISTIC_PRECONDITION",
+        "subtype": "FILL_CROSS_TRACK"
+      },
+      "conflict_class": "ORACLE_DEFECT",
+      "authoritative_rule": {
+        "id": "CANONICAL-RENDERER-BETWEEN-FILL-SAME-TRACK",
+        "statement": "between_curves fill resolves other_channel only within the same track; cross-track pairs are invalid",
+        "provenance": "wellplot.renderers.matplotlib curve-fill preparation / TemplateValidationError for missing other_channel in track"
+      },
+      "evidence": {
+        "primary": {"query": "RHOB", "candidate_ids": ["RHOB"], "track_ref": 4},
+        "secondary": {"query": "neutron", "candidate_ids": ["NPHI"], "track_ref": 3},
+        "cross_track": true,
+        "same_track_invariant_authoritative": true,
+        "historically_coherent_under_prior_accepted_policy": false,
+        "mb02r_r6_alignment": true,
+        "mb02r_behavior_change": false
+      },
+      "rationale": "Named curves resolve uniquely but on different tracks (RHOB track 4, NPHI track 3). Canonical renderer same-track between-fill invariant was already authoritative when historical gold ok was authored; the label contradicts project semantics rather than a later policy supersession. MB-01R bucketed the case as DETERMINISTIC_PRECONDITION but treated the outcome as ok after preconditions—incorrect relative to the invariant. Do not weaken R6 or fill validation.",
+      "required_followup": "none for MB-02R"
+    },
+    {
+      "case_id": "GOLD-0062",
+      "fixture_id": "d0_triple_combo",
+      "source_utterance": "Fill between GR and neutron.",
+      "historical_gold": {
+        "status": "ok",
+        "reason": null,
+        "detail": null,
+        "mb01r_decision_authority": "DETERMINISTIC_PRECONDITION",
+        "mb01r_rationale": "ok fill after deterministic preconditions"
+      },
+      "canonical_successor_truth": {
+        "status": "unsupported",
+        "reason": "capability_not_available",
+        "detail": "between_fill_requires_same_track",
+        "authority": "DETERMINISTIC_PRECONDITION",
+        "subtype": "FILL_CROSS_TRACK"
+      },
+      "conflict_class": "ORACLE_DEFECT",
+      "authoritative_rule": {
+        "id": "CANONICAL-RENDERER-BETWEEN-FILL-SAME-TRACK",
+        "statement": "between_curves fill resolves other_channel only within the same track; cross-track pairs are invalid",
+        "provenance": "wellplot.renderers.matplotlib curve-fill preparation / TemplateValidationError for missing other_channel in track"
+      },
+      "evidence": {
+        "primary": {"query": "GR", "candidate_ids": ["GR"], "track_ref": 2},
+        "secondary": {"query": "neutron", "candidate_ids": ["NPHI"], "track_ref": 3},
+        "cross_track": true,
+        "same_track_invariant_authoritative": true,
+        "historically_coherent_under_prior_accepted_policy": false,
+        "mb02r_r6_alignment": true,
+        "mb02r_behavior_change": false
+      },
+      "rationale": "GR (track 2) and neutron/NPHI (track 3) are cross-track. Historical gold ok is an oracle defect against the canonical same-track between-fill invariant. Successor truth matches MB-02R R6 objective precondition evaluation. Historical SLM-03 gold left unmodified.",
+      "required_followup": "none for MB-02R"
+    },
+    {
+      "case_id": "GOLD-0063",
+      "fixture_id": "d0_triple_combo",
+      "source_utterance": "Fill between NPHI and GR.",
+      "historical_gold": {
+        "status": "ok",
+        "reason": null,
+        "detail": null,
+        "mb01r_decision_authority": "DETERMINISTIC_PRECONDITION",
+        "mb01r_rationale": "ok fill after deterministic preconditions"
+      },
+      "canonical_successor_truth": {
+        "status": "unsupported",
+        "reason": "capability_not_available",
+        "detail": "between_fill_requires_same_track",
+        "authority": "DETERMINISTIC_PRECONDITION",
+        "subtype": "FILL_CROSS_TRACK"
+      },
+      "conflict_class": "ORACLE_DEFECT",
+      "authoritative_rule": {
+        "id": "CANONICAL-RENDERER-BETWEEN-FILL-SAME-TRACK",
+        "statement": "between_curves fill resolves other_channel only within the same track; cross-track pairs are invalid",
+        "provenance": "wellplot.renderers.matplotlib curve-fill preparation / TemplateValidationError for missing other_channel in track"
+      },
+      "evidence": {
+        "primary": {"query": "NPHI", "candidate_ids": ["NPHI"], "track_ref": 3},
+        "secondary": {"query": "GR", "candidate_ids": ["GR"], "track_ref": 2},
+        "cross_track": true,
+        "same_track_invariant_authoritative": true,
+        "historically_coherent_under_prior_accepted_policy": false,
+        "mb02r_r6_alignment": true,
+        "mb02r_behavior_change": false
+      },
+      "rationale": "NPHI (track 3) and GR (track 2) are cross-track. Same ORACLE_DEFECT pattern as GOLD-0061/0062. Canonical successor is unsupported FILL_CROSS_TRACK; do not mutate historical gold or reopen MB-02R.",
+      "required_followup": "none for MB-02R"
+    }
+  ],
+  "summary": {
+    "n_cases": 4,
+    "by_conflict_class": {
+      "POLICY_PRECEDENCE_CONFLICT": 1,
+      "ORACLE_DEFECT": 3,
+      "HISTORICALLY_VALID_BUT_SUPERSEDED": 0,
+      "NEEDS_SEPARATE_IR_DECISION": 0
+    },
+    "historical_gold_mutated": false,
+    "resolver_code_changed": false,
+    "scope_contract_gap_cases_touched": false
+  }
+}
