@@ -7,8 +7,9 @@ PARENT: WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-AUTH-001
 REPOSITORY: /home/user/projects/wellplot
 BRANCH: exp/wellplot-nlp-slm-01
 STARTING SHA: 225977d80e945923d7c883f0c829d90dd16aa75f
-CANDIDATE SHA: (filled after commit)
+CANDIDATE SHA: b45820f111c638109c52833d464a8234165f815b
 REMOTE SHA: origin/main @ 225977d80e945923d7c883f0c829d90dd16aa75f
+  (branch has no upstream; local tip ahead of origin/main)
 
 IMPLEMENTED:
 - Closed UQ-01..UQ-05 with terminal dispositions
@@ -72,8 +73,8 @@ INVARIANTS VERIFIED:
 - No LEARNED_SEMANTIC_GATE residual
 - No sealed split
 
-WORKING TREE: (updated after commit)
-REMOTE MATCH: (local commit ahead of origin/main until push)
+WORKING TREE: clean at candidate (evidence commit); handoff SHA stamp may be a follow-up commit
+REMOTE MATCH: local branch ahead of origin/main; not pushed
 STATUS: STOP FOR INDEPENDENT MB-01R REVIEW
 ```
 
