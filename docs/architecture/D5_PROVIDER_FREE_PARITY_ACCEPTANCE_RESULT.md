@@ -59,9 +59,11 @@ reconciliation; the test proves that the exact inspected source exposes scalar
 GR. The title and GR-scale overlays compare complete normalized canonical
 before/after outcomes against Direct Notebook controls, including identities,
 allowed-change projection, unrelated-state preservation, and reload. Raw MCP
-compatibility state remains observable: only the explicitly enumerated
-serializer-completion mirrors are normalized, and each is checked against its
-canonical grid source before parity comparison.
+compatibility state remains observable. Canonical serialization is stabilized
+before the measured request transition; request-time preservation admits only
+the compatibility paths explicitly listed by that turn's frozen allowlist.
+No serializer completion is treated as a request-time exception, and the
+negative regression rejects an unrelated compatibility mutation.
 `D5-MCP-03` proves unavailable-channel failure without mutation.
 `D5-MCP-02` performs the required real render.
 

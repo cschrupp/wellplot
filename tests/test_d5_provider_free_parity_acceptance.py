@@ -8,6 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
 from scripts import nlp_d4_live_acceptance as d4
 from tests._mcp_fixtures import REPO_ROOT
 from tests.test_nlp_d4_live_acceptance import (
@@ -152,14 +153,6 @@ def _normalize_document(document: Mapping[str, object]) -> dict[str, object]:
     return normalized
 
 
-def _pointer_state(document: Mapping[str, object], path: str) -> tuple[bool, object]:
-    """Return presence and value for one JSON-pointer-like path."""
-    try:
-        return True, d4._pointer_value(document, path)
-    except (KeyError, IndexError, TypeError, ValueError):
-        return False, None
-
-
 def _remove_exact_paths(document: dict[str, object], paths: set[str]) -> None:
     """Remove only explicitly enumerated mapping leaves from a parity copy."""
     for path in paths:
@@ -177,44 +170,11 @@ def _remove_exact_paths(document: dict[str, object], paths: set[str]) -> None:
             current.pop(parts[-1], None)
 
 
-def _mcp_compatibility_completion_values(
-    before: Mapping[str, object],
-    after: Mapping[str, object],
-) -> dict[str, object]:
-    """Return known serializer-completion mirrors and their canonical values."""
-    completions: dict[str, object] = {}
-    for section_index, section in enumerate(after["sections"]):
-        for track_index, _track in enumerate(section["tracks"]):
-            for mirror_name, canonical_key in (
-                ("main", "horizontal_major_alpha"),
-                ("secondary", "horizontal_minor_alpha"),
-            ):
-                canonical_path = (
-                    f"/sections/{section_index}/tracks/{track_index}/grid/{canonical_key}"
-                )
-                expected_present, expected = _pointer_state(after, canonical_path)
-                mirror_paths = (
-                    f"/sections/{section_index}/tracks/{track_index}/extensions/"
-                    f"compatibility/legacy_track/grid/horizontal/{mirror_name}/alpha",
-                    f"/extensions/compatibility/legacy_document/layout/log_sections/"
-                    f"{section_index}/tracks/{track_index}/grid/horizontal/{mirror_name}/alpha",
-                )
-                if not expected_present:
-                    continue
-                for mirror_path in mirror_paths:
-                    before_present, _ = _pointer_state(before, mirror_path)
-                    after_present, actual = _pointer_state(after, mirror_path)
-                    if not before_present and after_present:
-                        assert actual == expected, (mirror_path, expected, actual)
-                        completions[mirror_path] = expected
-    return completions
-
-
 def _assert_mcp_raw_las_contract(
     turn_id: str,
     before: Mapping[str, object],
     after: Mapping[str, object],
-) -> set[str]:
+) -> None:
     """Check raw MCP preservation before applying explicit parity normalization."""
     contract = _d4_gold(turn_id)["contract"]
     for assertion in contract["before_assertions"]:
@@ -223,27 +183,25 @@ def _assert_mcp_raw_las_contract(
         assert d4._assertion_matches(after, assertion), (turn_id, "after", assertion)
 
     changed = _changed_paths(before, after)
-    completions = _mcp_compatibility_completion_values(before, after)
     assert changed, f"{turn_id} must produce a canonical change"
     assert any(
         _path_matches(path, required)
         for path in changed
         for required in contract["required_change_paths"]
     ), (turn_id, changed, contract["required_change_paths"])
-    unexpected = [
-        path
+    assert all(
+        any(_path_matches(path, allowed) for allowed in contract["allowed_change_paths"])
         for path in changed
-        if not any(_path_matches(path, allowed) for allowed in contract["allowed_change_paths"])
-        and path not in completions
-    ]
-    assert not unexpected, (turn_id, unexpected)
+    ), (turn_id, changed, contract["allowed_change_paths"])
+    _assert_frozen_las_contract(turn_id, before, after)
 
-    normalized_before = copy.deepcopy(before)
-    normalized_after = copy.deepcopy(after)
-    _remove_exact_paths(normalized_before, set(completions))
-    _remove_exact_paths(normalized_after, set(completions))
-    _assert_frozen_las_contract(turn_id, normalized_before, normalized_after)
-    return set(completions)
+
+def _compatibility_projection_paths(turn_id: str) -> set[str]:
+    """Return only compatibility paths explicitly allowed for this turn."""
+    allowed_paths = set(_d4_gold(turn_id)["contract"]["allowed_change_paths"])
+    compatibility_paths = {path for path in allowed_paths if "/compatibility/" in path}
+    assert all("/compatibility/" in path for path in compatibility_paths)
+    return compatibility_paths
 
 
 def _canonical_semantic_projection(
@@ -301,26 +259,23 @@ def _assert_overlay_parity(
 ) -> None:
     """Require equivalent normalized canonical outcomes across both adapters."""
     _assert_frozen_las_contract(turn_id, direct_before, direct_after)
-    compatibility_completions = _assert_mcp_raw_las_contract(
-        turn_id,
-        mcp_before,
-        mcp_after,
-    )
+    _assert_mcp_raw_las_contract(turn_id, mcp_before, mcp_after)
+    compatibility_paths = _compatibility_projection_paths(turn_id)
     normalized_direct_before = _canonical_semantic_projection(
         direct_before,
-        compatibility_completions,
+        compatibility_paths,
     )
     normalized_mcp_before = _canonical_semantic_projection(
         mcp_before,
-        compatibility_completions,
+        compatibility_paths,
     )
     normalized_direct_after = _canonical_semantic_projection(
         direct_after,
-        compatibility_completions,
+        compatibility_paths,
     )
     normalized_mcp_after = _canonical_semantic_projection(
         mcp_after,
-        compatibility_completions,
+        compatibility_paths,
     )
     assert normalized_direct_before == normalized_mcp_before
     assert normalized_direct_after == normalized_mcp_after
@@ -397,11 +352,16 @@ def _mcp_operations(root: Path) -> tuple[GraphAuthoringMcpOperations, list[d4.Lo
 
 
 def _mcp_seed(path: Path, source: Path) -> None:
-    """Materialize the frozen canonical LAS seed as a real MCP logfile."""
+    """Stabilize the frozen LAS seed before measuring the MCP request."""
     payload = copy.deepcopy(d4.load_gold(REPO_ROOT)["canonical_las_seed"])
     payload["sections"][0]["data_source"]["source_path"] = str(source)
     payload["sections"][0]["data_source"]["source_format"] = "las"
     _write_rehearsal_document(path, payload)
+    mcp_service.persist_authoring_document(
+        AuthoringDocumentSpec.model_validate(d4.load_logfile_document(path)),
+        logfile_path=path,
+        root=REPO_ROOT,
+    )
 
 
 def _add_foreign_cali_track(payload: dict[str, object]) -> None:
@@ -558,6 +518,24 @@ def test_d5_invalid_relation_fails_at_canonical_reconciliation() -> None:
         for error in execution.errors
     ), execution.errors
     assert service.document.model_dump(mode="json") == before
+
+
+def test_d5_mcp_rejects_unrelated_compatibility_mutation() -> None:
+    """Do not hide an unrelated compatibility change in the parity projection."""
+    source = REPO_ROOT / d4.SOURCE_RELATIVE
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        logfile = Path(temporary) / "overlay.log.yaml"
+        _mcp_seed(logfile, source)
+        before = d4.load_logfile_document(logfile)
+        after = copy.deepcopy(before)
+        after["title"] = "Formation Integrity Review"
+        grid = after["sections"][0]["tracks"][0]["extensions"]["compatibility"]["legacy_track"][
+            "grid"
+        ]["horizontal"]["main"]
+        grid["alpha"] = float(grid["alpha"]) + 0.01
+
+        with pytest.raises(AssertionError, match="legacy_track/grid"):
+            _assert_mcp_raw_las_contract("D4-L01:T1", before, after)
 
 
 def test_d5_mcp_overlays_use_the_shared_composition_and_preserve_semantics() -> None:
