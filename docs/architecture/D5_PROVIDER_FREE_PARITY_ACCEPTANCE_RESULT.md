@@ -3,6 +3,7 @@
 ```yaml
 authority: WELLPLOT-D5-3-IMPL-AUTH-001
 corrective_authority: WELLPLOT-D5-3-IMPL-CORRECTIVE-AUTH-001
+rework_authority: WELLPLOT-D5-3-IMPL-REWORK-AUTH-001
 design_authority: WELLPLOT-D5-3-DESIGN-AUTH-001
 design_checkpoint: f4d984a455c98f9d4b80c99dc774a9fd1911ce5d
 implementation_branch: implementation/d5-3-provider-free-parity-acceptance
@@ -41,19 +42,25 @@ permission to substitute data.
 and reloads the generated artifact, runs the frozen CBL-01 through CBL-09
 verifier, and performs the required real render.
 
-The cumulative Direct Notebook LAS sequence proves title, GR scale, grounded
-ILD track/binding, and GR fill semantics while checking normalized changes and
-reload after each step. `D5-LAS-01-T4` performs the required real render.
-Ambiguity, missing-source, missing-channel, and cross-track relation cases
-fail closed with byte/canonical preservation. The cross-track relation is
-checked at the canonical reconciliation/execution boundary.
+The cumulative Direct Notebook LAS sequence consumes the complete frozen D4
+before/after gold assertions for title, GR scale, grounded ILD track/binding,
+and GR fill semantics. Each successful transition proves its required change,
+allowed-change containment, and reload equivalence; `D5-LAS-02-T2` also proves
+the unrelated section remains unchanged. `D5-LAS-01-T4` performs the required
+real render. Ambiguity, missing-source, missing-channel, and cross-track
+relation cases fail closed with byte/canonical preservation. The cross-track
+relation is checked at the canonical reconciliation/execution boundary with
+the bounded missing-binding ownership diagnostic.
 
 The three MCP overlays use `GraphAuthoringMcpOperations` with the same
 canonical dependency roles. The MCP context deterministically inspects each
 declared source and passes its section-scoped channel inventory to canonical
-reconciliation. Title and GR-scale overlays compare normalized canonical
-outcomes and persist/reload; `D5-MCP-03` proves unavailable-channel failure
-without mutation. `D5-MCP-02` performs the required real render.
+reconciliation; the test proves that the exact inspected source exposes scalar
+GR. The title and GR-scale overlays compare complete normalized canonical
+before/after outcomes against Direct Notebook controls, including identities,
+allowed-change projection, unrelated-state preservation, and reload.
+`D5-MCP-03` proves unavailable-channel failure without mutation.
+`D5-MCP-02` performs the required real render.
 
 The required real-render subset is exactly:
 
@@ -73,8 +80,13 @@ population: 13/13
 direct_notebook: 10/10
 mcp_overlays: 3/3
 cbl_requirements: CBL-01..CBL-09 PASS
-las_requirements: LAS-01..LAS-09 covered by frozen D4 gold and direct assertions
-rejection_cases: PASS / zero mutation
+r1_complete_frozen_gold_semantic_assertions: PASS
+r1_preservation_allowed_change_checks: PASS
+r2_direct_notebook_mcp_normalized_parity: PASS
+r2_source_grounding: PASS
+r3_cross_track_ownership_diagnostic: PASS
+las_requirements: LAS-01..LAS-09 covered by complete frozen D4 gold assertions
+rejection_cases: PASS / zero mutation / bounded diagnostics
 persistence_reload: PASS
 required_real_renders: 3/3 non-empty
 production_files_changed: 1

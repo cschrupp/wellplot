@@ -27,6 +27,7 @@ from wellplot.authoring import AuthoringDocumentSpec
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_reconciler import reconcile_authoring
 from wellplot.authoring_service import AuthoringService
+from wellplot.mcp import agentic as mcp_agentic
 from wellplot.mcp import service as mcp_service
 from wellplot.mcp.agentic import GraphAuthoringMcpOperations
 from wellplot.model.intent import AuthoringDocumentIntent, AuthoringFillIntent
@@ -93,6 +94,128 @@ def _assert_allowed_changes(
         ), (path, allowed_paths)
 
 
+def _path_matches(path: str, expected: str) -> bool:
+    """Match a frozen gold path at either a leaf or an enclosing object."""
+    return (
+        path == expected
+        or path.startswith(f"{expected.rstrip('/')}/")
+        or expected.startswith(f"{path.rstrip('/')}/")
+    )
+
+
+def _assert_frozen_las_contract(
+    turn_id: str,
+    before: Mapping[str, object],
+    after: Mapping[str, object],
+) -> None:
+    """Apply all frozen D4 assertions and preservation constraints to one LAS turn."""
+    contract = _d4_gold(turn_id)["contract"]
+    for assertion in contract["before_assertions"]:
+        assert d4._assertion_matches(before, assertion), (turn_id, "before", assertion)
+    for assertion in contract["after_assertions"]:
+        assert d4._assertion_matches(after, assertion), (turn_id, "after", assertion)
+
+    changed = _changed_paths(before, after)
+    assert changed, f"{turn_id} must produce a canonical change"
+    assert any(
+        _path_matches(path, required)
+        for path in changed
+        for required in contract["required_change_paths"]
+    ), (turn_id, changed, contract["required_change_paths"])
+    assert all(
+        any(_path_matches(path, allowed) for allowed in contract["allowed_change_paths"])
+        for path in changed
+    ), (turn_id, changed, contract["allowed_change_paths"])
+
+
+def _normalize_document(document: Mapping[str, object]) -> dict[str, object]:
+    """Normalize only host-specific source paths before adapter parity comparison."""
+    normalized = copy.deepcopy(document)
+    for section in normalized.get("sections", []):
+        if isinstance(section, dict):
+            data_source = section.get("data_source")
+            if isinstance(data_source, dict):
+                data_source["source_path"] = "<declared-source>"
+    return normalized
+
+
+def _canonical_semantic_projection(document: Mapping[str, object]) -> dict[str, object]:
+    """Exclude compatibility mirrors from normalized semantic parity evidence."""
+    normalized = _normalize_document(document)
+
+    def remove_compatibility(value: object) -> None:
+        if isinstance(value, dict):
+            value.pop("compatibility", None)
+            for child in value.values():
+                remove_compatibility(child)
+        elif isinstance(value, list):
+            for child in value:
+                remove_compatibility(child)
+
+    remove_compatibility(normalized)
+    return normalized
+
+
+def _identity_projection(document: Mapping[str, object]) -> tuple[object, ...]:
+    """Project section, track, binding, and fill identities for parity checks."""
+    projection: list[object] = []
+    for section in document["sections"]:
+        for track in section["tracks"]:
+            projection.append(
+                (
+                    section["id"],
+                    track["id"],
+                    tuple(binding["binding_id"] for binding in track.get("bindings", [])),
+                    tuple(fill.get("fill_id") for fill in track.get("fills", [])),
+                )
+            )
+    return tuple(projection)
+
+
+def _run_direct_overlay(
+    root: Path,
+    source: Path,
+    *,
+    turn_id: str,
+) -> tuple[Path, Mapping[str, object], Mapping[str, object], object]:
+    """Run one Direct Notebook control for an MCP parity overlay."""
+    harness = _new_direct_harness(root, source)
+    path = harness.adapter._base_for("D4-L01")
+    before = d4.load_logfile_document(path)
+    result = asyncio.run(
+        harness.adapter.session.revise(
+            feedback=_d4_case(turn_id)["request"],
+            logfile_path=path,
+        )
+    )
+    after = d4.load_logfile_document(path)
+    return path, before, after, result
+
+
+def _assert_overlay_parity(
+    turn_id: str,
+    direct_before: Mapping[str, object],
+    direct_after: Mapping[str, object],
+    mcp_before: Mapping[str, object],
+    mcp_after: Mapping[str, object],
+) -> None:
+    """Require equivalent normalized canonical outcomes across both adapters."""
+    normalized_direct_before = _canonical_semantic_projection(direct_before)
+    normalized_mcp_before = _canonical_semantic_projection(mcp_before)
+    normalized_direct_after = _canonical_semantic_projection(direct_after)
+    normalized_mcp_after = _canonical_semantic_projection(mcp_after)
+    _assert_frozen_las_contract(turn_id, normalized_direct_before, normalized_direct_after)
+    _assert_frozen_las_contract(turn_id, normalized_mcp_before, normalized_mcp_after)
+    assert normalized_direct_before == normalized_mcp_before
+    assert normalized_direct_after == normalized_mcp_after
+    assert _changed_paths(normalized_direct_before, normalized_direct_after) == _changed_paths(
+        normalized_mcp_before, normalized_mcp_after
+    )
+    assert _identity_projection(direct_before) == _identity_projection(direct_after)
+    assert _identity_projection(mcp_before) == _identity_projection(mcp_after)
+    assert _identity_projection(direct_after) == _identity_projection(mcp_after)
+
+
 def _assert_reloaded(path: Path, expected: Mapping[str, object]) -> None:
     """Require persistence and reload to preserve the canonical result."""
     reloaded = d4.load_logfile_document(path)
@@ -112,16 +235,25 @@ def _run_direct_revision(
     *,
     case_id: str,
     turn_id: str,
-) -> tuple[Path, bytes, bytes, object]:
+) -> tuple[
+    Path,
+    bytes,
+    bytes,
+    Mapping[str, object],
+    Mapping[str, object],
+    object,
+]:
     """Run one isolated Direct Notebook revision and retain custody evidence."""
     harness = _new_direct_harness(root, source)
     path = harness.adapter._base_for(case_id)
     before = path.read_bytes()
+    before_document = d4.load_logfile_document(path)
     result = asyncio.run(
         harness.adapter.session.revise(feedback=_d4_case(turn_id)["request"], logfile_path=path)
     )
     after = path.read_bytes()
-    return path, before, after, result
+    after_document = d4.load_logfile_document(path)
+    return path, before, after, before_document, after_document, result
 
 
 def _mcp_operations(root: Path) -> tuple[GraphAuthoringMcpOperations, list[d4.LogicalCall]]:
@@ -239,16 +371,9 @@ def test_d5_direct_notebook_population_passes_with_bounded_real_renders() -> Non
             )
             assert result.report_facts["success"] is True, result.report_facts
             after = d4.load_logfile_document(current)
-            contract = _d4_gold(turn_id)["contract"]
-            _assert_allowed_changes(before, after, contract["allowed_change_paths"])
+            _assert_frozen_las_contract(turn_id, before, after)
             _assert_reloaded(current, after)
-            if turn_id == "D4-L01:T1":
-                assert after["title"] == "Formation Integrity Review"
-            elif turn_id == "D4-L01:T2":
-                assert after["sections"][0]["tracks"][1]["bindings"][0]["scale"]["minimum"] == 5.0
-            elif turn_id == "D4-L01:T3":
-                assert after["sections"][0]["tracks"][3]["bindings"][0]["channel"] == "ILD"
-            else:
+            if turn_id == "D4-L01:T4":
                 fill = after["sections"][0]["tracks"][1]["fills"][0]
                 assert fill["binding_id"] == "main.gr.GR.1"
                 render_path = root / "cumulative" / "D5-LAS-01-T4.pdf"
@@ -265,7 +390,7 @@ def test_d5_direct_notebook_population_passes_with_bounded_real_renders() -> Non
             ("D4-L04", "D4-L04:C01"),
         ):
             case_root = root / turn_id.replace(":", "-")
-            path, before, after, result = _run_direct_revision(
+            path, before, after, before_document, after_document, result = _run_direct_revision(
                 case_root,
                 source,
                 case_id=case_id,
@@ -284,13 +409,8 @@ def test_d5_direct_notebook_population_passes_with_bounded_real_renders() -> Non
                 assert expected in codes or "typed.channel_missing" in codes
             else:
                 assert result.report_facts["success"] is True
-                reloaded = d4.load_logfile_document(path)
-                assert (
-                    reloaded["sections"][0]["tracks"][1]["bindings"][0]["scale"]["minimum"] == 20.0
-                )
-                assert (
-                    reloaded["sections"][0]["tracks"][1]["bindings"][0]["scale"]["maximum"] == 110.0
-                )
+                _assert_frozen_las_contract(turn_id, before_document, after_document)
+                _assert_reloaded(path, after_document)
 
 
 def test_d5_invalid_relation_fails_at_canonical_reconciliation() -> None:
@@ -317,6 +437,10 @@ def test_d5_invalid_relation_fails_at_canonical_reconciliation() -> None:
     before = document.model_dump(mode="json")
     execution = execute_authoring_plan(service, plan)
     assert execution.success is False
+    assert any(
+        "Track gr fill references missing binding ids: ['main.cali.CALI.4']." in error
+        for error in execution.errors
+    ), execution.errors
     assert service.document.model_dump(mode="json") == before
 
 
@@ -325,6 +449,20 @@ def test_d5_mcp_overlays_use_the_shared_composition_and_preserve_semantics() -> 
     source = REPO_ROOT / d4.SOURCE_RELATIVE
     with TemporaryDirectory(dir=REPO_ROOT) as temporary:
         root = Path(temporary)
+        direct_controls: dict[str, tuple[Path, Mapping[str, object], Mapping[str, object]]] = {}
+        for overlay_id, turn_id in (
+            ("D5-MCP-01", "D4-L01:T1"),
+            ("D5-MCP-02", "D4-L01:T2"),
+        ):
+            direct_path, direct_before, direct_after, direct_result = _run_direct_overlay(
+                root / f"direct-{overlay_id}",
+                source,
+                turn_id=turn_id,
+            )
+            assert direct_result.report_facts["success"] is True, direct_result.report_facts
+            _assert_reloaded(direct_path, direct_after)
+            direct_controls[overlay_id] = (direct_path, direct_before, direct_after)
+
         overlay_results: dict[str, object] = {}
         for overlay_id, turn_id in (
             ("D5-MCP-01", "D4-L01:T1"),
@@ -337,6 +475,7 @@ def test_d5_mcp_overlays_use_the_shared_composition_and_preserve_semantics() -> 
             _mcp_seed(logfile, source)
             operations, calls = _mcp_operations(overlay_root)
             before = logfile.read_bytes()
+            before_document = d4.load_logfile_document(logfile)
             result = asyncio.run(
                 operations.revise(logfile_path=str(logfile), request=_d4_case(turn_id)["request"])
             )
@@ -349,11 +488,33 @@ def test_d5_mcp_overlays_use_the_shared_composition_and_preserve_semantics() -> 
             assert result.success is True
             assert result.changed is True
             document = d4.load_logfile_document(logfile)
+            _, direct_before, direct_after = direct_controls[overlay_id]
+            _assert_overlay_parity(
+                turn_id,
+                direct_before,
+                direct_after,
+                before_document,
+                document,
+            )
+            assert _normalize_document(d4.load_logfile_document(logfile)) == _normalize_document(
+                document
+            )
             if overlay_id == "D5-MCP-01":
                 assert document["title"] == "Formation Integrity Review"
             else:
-                assert (
-                    document["sections"][0]["tracks"][1]["bindings"][0]["scale"]["minimum"] == 5.0
+                binding = document["sections"][0]["tracks"][1]["bindings"][0]
+                assert binding["binding_id"] == "main.gr.GR.1"
+                assert binding["channel"] == "GR"
+                assert binding["scale"]["kind"] == "linear"
+                assert binding["scale"]["minimum"] == 5.0
+                assert binding["scale"]["maximum"] == 125.0
+                context = mcp_agentic._request_context(str(logfile), root=REPO_ROOT)
+                assert "main" in context.available_channels
+                assert any(
+                    channel.mnemonic == "GR"
+                    and channel.kind == "scalar"
+                    and channel.source_path == str(source.resolve())
+                    for channel in context.available_channels["main"]
                 )
                 render_path = overlay_root / "D5-MCP-02.pdf"
                 rendered = mcp_service.render_logfile_to_file(
