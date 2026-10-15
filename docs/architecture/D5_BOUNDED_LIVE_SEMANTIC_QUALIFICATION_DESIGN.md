@@ -258,7 +258,7 @@ llama.cpp permits a model ID derived from a path or a configured alias:
 | Context | Runtime context size and deterministic request-budget fit | Exact observed value; the authorization must include the required minimum context budget. |
 | Slots | `total_slots` | Exact match; concurrency remains one. |
 | Chat template | Name/fingerprint and capability projection | Must be recorded and match the authorized serving contract. |
-| Structured output | JSON-object/JSON-schema capability for the requested contract | Must be established before scientific grading; schema validation remains local and authoritative. |
+| Structured output | Authorized server/runtime configuration for the JSON-object/JSON-schema contract | The two GETs establish the declared configuration only; actual endpoint acceptance is measured on the first scientific generation. Schema validation remains local and authoritative. |
 | SDK | OpenAI Python version `2.34.0` | Exact match. |
 | Retry policy | SDK `max_retries=2`, no WellPlot retry | Exact match. |
 
@@ -289,29 +289,41 @@ The client-side generation controls are frozen as follows:
 ```yaml
 planner:
   temperature: 0.0
-  max_output_tokens: ABSENT_OR_NONE
+  max_output_tokens: null  # None in the client; absent on the wire
 report_worker:
-  temperature: ABSENT_OR_NONE
-  max_output_tokens: ABSENT_OR_NONE
+  temperature: null        # None in the client; absent on the wire
+  max_output_tokens: null  # None in the client; absent on the wire
 section_worker:
-  temperature: ABSENT_OR_NONE
-  max_output_tokens: ABSENT_OR_NONE
+  temperature: null        # None in the client; absent on the wire
+  max_output_tokens: null  # None in the client; absent on the wire
 all_roles:
   max_tokens: ABSENT
   max_completion_tokens: ABSENT
-  top_p: ABSENT_UNLESS_FROZEN_IN_RUN_AUTH
-  top_k: ABSENT_UNLESS_FROZEN_IN_RUN_AUTH
-  seed: ABSENT_UNLESS_FROZEN_IN_RUN_AUTH
+  top_p: ABSENT
+  top_k: ABSENT
+  seed: ABSENT
   model_substitution: FORBIDDEN
 ```
 
-Any server-side default that affects decoding must be captured in the
-authorized runtime identity/configuration. It must not be tuned after the
-first scientific call. The run authorization must also freeze the server's
-reasoning/thinking mode explicitly; automatic mode selection is not allowed.
-The selected D5-4 default is reasoning/thinking off so that the structured
-worker output is the measured artifact. If the server cannot honor that
-setting, readiness fails before `STARTED`.
+The `null` values above are the existing production request-builder semantics:
+the optional field is omitted from the wire request. No run authorization may
+turn an omitted `top_p`, `top_k`, or `seed` into an explicit decoder control.
+All material llama.cpp generation defaults exposed by `/props` must instead be
+captured as a bounded sanitized projection or stable fingerprint of the
+serving configuration. The future run authorization supplies expected
+observed values for that projection; runtime-default drift is `NOT_READY`
+before `STARTED`, not permission to accept a new decoder policy.
+
+The frozen production backend does not send llama.cpp-specific
+`chat_template_kwargs`, `reasoning_effort`, or `reasoning_format`. Therefore
+D5-4 does not claim request-level enforcement of reasoning/thinking mode.
+Reasoning/thinking off is a server/runtime readiness precondition. The future
+authorization must provide the exact expected chat-template fingerprint and
+relevant runtime/default-generation projection that establishes this
+condition. The two readiness observations must verify that configuration. If
+thinking-off cannot be established without modifying the frozen production
+client or serving configuration, readiness is `NOT_READY` and the campaign
+does not start; a separate production/runtime authority is required.
 
 Structured output is not accepted merely because JSON parses. The local
 decoder, Pydantic/DTO validation, canonical semantic worker, reconciliation,
@@ -357,7 +369,7 @@ static repository/source preflight
   -> credential discovery without value disclosure
   -> authenticated /v1/models
   -> authenticated /props
-  -> exact runtime/model/structured-output contract verification
+  -> exact runtime/model/declared structured-output contract verification
   -> OpenAI-compatible client construction
   -> LIVE_READY
   -> create fresh campaign state and journal with STARTED
@@ -380,9 +392,18 @@ Static preflight must verify, before credential-bearing calls:
 - no model substitution or fallback is configured.
 
 Operational readiness then verifies credential availability, bounded endpoint
-identity, chat-template/structured-output capability, context-budget fit,
-client construction, and the exact expected identity. Raw credentials and raw
-HTTP bodies are never persisted.
+identity, chat-template/runtime configuration, the declared structured-output
+contract, context-budget fit, client construction, and the exact expected
+identity. The two GETs identify and configure the runtime; they do not prove
+that a Chat Completions generation accepts `response_format`.
+
+There is no pre-campaign model-generation probe in D5-4. The first measured
+scientific generation exercises the frozen `response_format` contract. If the
+otherwise-valid endpoint rejects or cannot execute that contract, classify the
+campaign as `INCONCLUSIVE` with attribution
+`PROVIDER_BOUNDARY / STRUCTURED_OUTPUT`, preserve the evidence, and do not
+replay or repair the campaign. Raw credentials and raw HTTP bodies are never
+persisted.
 
 No provider or endpoint call is made by this design document or its design
 review. The future implementation and run authorization must provide the
@@ -512,6 +533,7 @@ defects. It is not a synonym for "the model performed poorly."
 | Credential absent or endpoint identity mismatch before `STARTED` | Operational readiness | `NOT_READY`; readiness may be retried without consuming a campaign. |
 | Model catalog, props, chat template, context, or build drift | Runtime/configuration drift | `NOT_READY` before `STARTED`; `INCONCLUSIVE` if discovered after. |
 | JSON/schema decode failure on a model response | Model/provider boundary | Record bounded failure; classify according to whether the request completed and whether the deterministic contract can grade it. No replay. |
+| Endpoint rejects or cannot execute the frozen `response_format` contract on the first measured generation | Provider boundary / structured output | `INCONCLUSIVE`; preserve evidence and do not classify as semantic model `FAIL` or replay the turn. |
 | Valid structured output with wrong WellPlot semantics | Model capability/qualification | `FAIL`; preserve evidence. |
 | Canonical worker, reconciler, executor, persistence, renderer, or attestation defect | Production defect | Stop immediately; `INCONCLUSIVE`; no repair in campaign. |
 | Unexpected mutation or unsafe rejection | Model/production attribution pending deterministic evidence | Preserve before/after and diagnostics; do not continue after a production defect or integrity breach. |
@@ -653,9 +675,9 @@ does not authorize that comparison.
 | Q1 Population | Exact nine D4 turns, in frozen order; no additions or reductions. |
 | Q2 Adapter scope | Direct Notebook only; MCP remains provider-free D5-3 evidence. |
 | Q3 Model/runtime | Local llama.cpp, OpenAI-compatible boundary, Qwen3.6-35B-A3B; exact catalog/path/build/context/slots/template contract. |
-| Q4 Prompt/decoder | Exact D4 requests/hashes; accepted typed worker schemas; fixed client controls; explicit reasoning mode; no tuning. |
+| Q4 Prompt/decoder | Exact D4 requests/hashes; accepted typed worker schemas; fixed client controls with top-p/top-k/seed absent; reasoning-off server/runtime precondition; no tuning. |
 | Q5 Calls/retries | 45 logical generation ceiling, SDK max retries 2, 135 physical-attempt upper bound, concurrency 1, 900-second generation timeout, no WellPlot retry. |
-| Q6 Readiness | Static custody and D5 attestation, credential, `/v1/models`, `/props`, identity, structured-output contract, context fit, client construction, then `LIVE_READY` before `STARTED`. |
+| Q6 Readiness | Static custody and D5 attestation, credential, `/v1/models`, `/props`, declared structured-output/runtime contract, context fit, client construction, then `LIVE_READY` before `STARTED`; actual schema acceptance is measured on the first scientific generation. |
 | Q7 Evidence | Fresh state/journal/terminal/summary/evidence namespace; sanitized identity, bounded ledger, hashes, redaction, immutable terminal custody. |
 | Q8 D4 relationship | Reuse cases, gold, sources, graders, custody, route, ledger, and safe-failure contracts; adapt identity/preflight/taxonomy; replace inherited provider target. |
 | Q9 Grading | Existing deterministic CBL/LAS/D5 graders; complete gold and persistence/reload/render obligations; no new model-dependent grader. |
