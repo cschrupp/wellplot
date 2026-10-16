@@ -3,7 +3,7 @@
   "all_local_ref_adapters_resolved_from_binding_table": true,
   "all_task_effects_post_ok_only": true,
   "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-RUNTIME-01-AUTH-001",
-  "candidate_sha": null,
+  "candidate_sha": "4c6b0600a836e21b888da2c2062520194c9e5908",
   "case_terminals": {
     "D5GAP-0085": {
       "authority": "OK",
