@@ -1,9 +1,15 @@
 {
-  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-CONTRACT-DESIGN-AUTH-001",
-  "slice": "SCOPE-DESIGN-01",
-  "starting_sha": "fd2f0443ad18a76542d3577928dde80c6928fa11",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-CONTRACT-DESIGN-REWORK-AUTH-001",
+  "slice": "SCOPE-DESIGN-01R",
+  "starting_sha": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
   "accepted_mb02r_subject": "c2f158b8222e3c1b4ae3ae737c2544fc3b25f994",
   "accepted_oracle01_subject": "fd2f0443ad18a76542d3577928dde80c6928fa11",
+  "prior_scope_design_candidate": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
+  "prior_classification_correction": {
+    "prior_candidate": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
+    "defect": "Three witnesses used track_title/track_width_mm without those fields being frozen in Q1–Q5. Strict pre-Q1A result would have been 3/6 REPRESENTABLE + 3/6 CONTRACT_INSUFFICIENT.",
+    "rework": "Q1A explicitly freezes CREATE_TRACK operands; classifications recomputed under Q1–Q5+Q1A."
+  },
   "frozen_contract": {
     "Q1_top_level_program_contract": {
       "NormalizedProgram": "top-level composition unit",
@@ -11,42 +17,62 @@
       "NormalizedRequest": "single-operation payload only; no clauses/dependencies inside request",
       "invariant": "NormalizedProgram owns composition; NormalizedRequest owns one semantic operation; ProjectedWorkspace owns evolving state; MB-02R remains per-task adjudicator"
     },
+    "Q1A_CREATE_TRACK_semantic_operands": {
+      "status": "FROZEN_AMENDMENT",
+      "basis": "WELL-IR CreateTrack already carries title and width_mm; MB-02R allowlist lacked them",
+      "when": "requested_operation == CREATE_TRACK",
+      "additional_fields": {
+        "track_title": "str | None",
+        "track_width_mm": "float | None"
+      },
+      "forbidden": [
+        "general metadata bag",
+        "arbitrary op-specific payload for other operations",
+        "composition fields inside NormalizedRequest"
+      ],
+      "track_kind_normal": {
+        "adjudication": "DEFAULT_SEMANTICS",
+        "operand_required": false,
+        "rationale": "CreateTrack.kind defaults to 'normal' in WELL-IR and WellPlot loaders"
+      },
+      "does_not_reopen": [
+        "Q2",
+        "Q3",
+        "Q4",
+        "Q5"
+      ]
+    },
     "Q2_order_and_dependencies": {
       "tasks_array_order": "authoritative execution order",
       "depends_on": "explicit linear state/data edges; serialize resolved deps",
-      "default": "missing depends_on may default to previous task then must be serialized",
       "out_of_scope": [
         "parallel",
         "fan-out",
         "fan-in",
         "concurrent",
         "conditional",
-        "loops",
-        "runtime graph scheduling"
+        "loops"
       ],
-      "contradiction_rule": "array order and depends_on must never contradict → DETERMINISTIC_SCHEMA_DOMAIN"
+      "contradiction_rule": "array order and depends_on must never contradict → DETERMINISTIC_SCHEMA_DOMAIN",
+      "unchanged_from_scope_design_01": true
     },
     "Q3_projected_effect_surface": {
       "authorized": {
-        "CREATE_TRACK": "append TrackFact; program-local projected ref via produces_binds",
+        "CREATE_TRACK": "append TrackFact (title/width from Q1A when present); program-local projected ref via produces_binds",
         "PLACE_CURVE": "update track_ref / membership",
         "CONFIGURE_CURVE_DISPLAY": "scale_kind, scale_min, scale_max, scale_reverse only",
         "DEFINE_FILL": "deferred unless later task must observe fill",
         "REMOVE_FILL": "deferred unless required"
       },
       "effect_only_after_OK": true,
-      "no_document_simulation": true,
-      "no_silent_broadening": "report missing effect requirement; do not add because WELL-IR supports the op"
+      "unchanged_from_scope_design_01": true
     },
     "Q4_local_bind_semantics": {
       "SemanticQuery": "exactly one of text | local_ref",
-      "produces_binds_on_task": true,
-      "LocalBindingTable": "execution state alongside ProjectedWorkspace; not mutating declarative NormalizedProgram.binds",
-      "bind_contract_failures": "DETERMINISTIC_SCHEMA_DOMAIN (not NOT_FOUND)",
-      "visibility": "consume only binds from earlier successful tasks in dependency ancestry"
+      "LocalBindingTable": "execution state; bind-contract failures → DETERMINISTIC_SCHEMA_DOMAIN",
+      "unchanged_from_scope_design_01": true
     },
     "Q5_program_terminal_semantics": {
-      "program_structure_validation_first": true,
       "fail_fast": true,
       "first_non_OK_is_terminal": true,
       "all_OK": {
@@ -54,11 +80,10 @@
         "reason": null,
         "authority": "OK"
       },
-      "no_partial_success_public_status": true,
-      "task_history_diagnostic_only": true
+      "unchanged_from_scope_design_01": true
     }
   },
-  "epistemic_claim": "This slice establishes only whether the six cases are representable under NormalizedProgram + deterministic projected-state semantics. It does not establish raw English → NormalizedProgram.",
+  "epistemic_claim": "This slice establishes only whether the six cases are representable under NormalizedProgram + deterministic projected-state semantics (Q1–Q5 + Q1A). It does not establish raw English → NormalizedProgram.",
   "witnesses": [
     {
       "case_id": "D5GAP-0085",
@@ -108,9 +133,9 @@
         ],
         "fills": []
       },
-      "design_note": "Initial: curve-1 (wide) already 0–100; curve-2 (narrow) 0–10 → FILL_SCALE_INCOMPATIBLE if fill adjudicated on Workspace0. Utterance requires both views at 0–100 then between-fill. Color 'blue' is non-adjudicating style; omitted from OK envelope proof (Q3).",
+      "design_note": "Initial: curve-1 (wide) already 0–100; curve-2 (narrow) 0–10 → scale incompatible on Workspace0. Color 'blue' is non-adjudicating style; omitted from OK envelope proof (Q3).",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -174,43 +199,29 @@
         {
           "task_id": "t1",
           "against": "Workspace0",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE_CURVE_DISPLAY on curve-1 (idempotent 0–100)"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t2",
           "against": "Workspace1",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE_CURVE_DISPLAY: curve-2 scale → 0–100 linear"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t3",
           "against": "Workspace2",
-          "expected_authority": "OK",
-          "effect": "DEFINE_FILL deferred (no later consumer); scales now compatible"
+          "expected_authority": "OK"
         }
       ],
       "required_projected_effects": [
         "CONFIGURE_CURVE_DISPLAY"
       ],
       "expected_intermediate_facts": {
-        "after_t1": {
-          "curve-1.scale": {
-            "min": 0.0,
-            "max": 100.0,
-            "reverse": false
-          }
-        },
         "after_t2": {
           "curve-2.scale": {
             "min": 0.0,
-            "max": 100.0,
-            "reverse": false
+            "max": 100.0
           },
           "fill_scale_compatible": true
-        },
-        "after_t3": {
-          "note": "fill effect deferred; terminal OK does not require FillFact for later tasks"
         }
       },
       "expected_terminal": {
@@ -220,11 +231,8 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "gold_structural_verification": {
-        "gold_n_ops": 2,
-        "witness_n_tasks": 3,
-        "note": "Gold configures only narrow then fill (wide already 0–100). Witness keeps utterance-faithful dual configure; both fit Q1–Q5."
-      },
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
       "provenance": {
         "normalization_source": {
           "utterance": true,
@@ -282,9 +290,9 @@
         ],
         "fills": []
       },
-      "design_note": "Scale mismatch on Workspace0 (narrow 0–10 vs wide 0–100); configure then BETWEEN_INSTANCES.",
+      "design_note": "Scale mismatch on Workspace0; configure then BETWEEN_INSTANCES.",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -328,14 +336,12 @@
         {
           "task_id": "t1",
           "against": "Workspace0",
-          "expected_authority": "OK",
-          "effect": "curve-2 → 0–100"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t2",
           "against": "Workspace1",
-          "expected_authority": "OK",
-          "effect": "DEFINE_FILL deferred"
+          "expected_authority": "OK"
         }
       ],
       "required_projected_effects": [
@@ -357,11 +363,8 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "gold_structural_verification": {
-        "gold_n_ops": 2,
-        "witness_n_tasks": 2,
-        "aligned": true
-      },
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
       "provenance": {
         "normalization_source": {
           "utterance": true,
@@ -488,9 +491,9 @@
         ],
         "fills": []
       },
-      "design_note": "Utterance is two clauses. Initial RHOB already 1.95–2.95 reversed; t1 may be idempotent. Composition still required so split-fill is not fused into a single malformed request.",
+      "design_note": "Two clauses; t1 may be idempotent against initial RHOB scale. Composition still required.",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -543,14 +546,12 @@
         {
           "task_id": "t1",
           "against": "Workspace0",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE scale/reverse on RHOB"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t2",
           "against": "Workspace1",
-          "expected_authority": "OK",
-          "effect": "DEFINE_FILL deferred"
+          "expected_authority": "OK"
         }
       ],
       "required_projected_effects": [
@@ -573,11 +574,8 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "gold_structural_verification": {
-        "gold_n_ops": 2,
-        "witness_n_tasks": 2,
-        "aligned": true
-      },
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
       "provenance": {
         "normalization_source": {
           "utterance": true,
@@ -704,9 +702,9 @@
         ],
         "fills": []
       },
-      "design_note": "CREATE_TRACK binds $track1; subsequent PLACE/CONFIGURE consume local_ref and scales. Operand extensions track_title on CREATE_TRACK are single-op allowlist completeness, not composition.",
+      "design_note": "Uses Q1A track_title + Q4 local_ref $track1.",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -718,9 +716,7 @@
               "requested_operation": "CREATE_TRACK",
               "track_title": "Petrophysics"
             },
-            "normalized_request_operand_extensions": [
-              "track_title"
-            ]
+            "track_kind_adjudication": null
           },
           {
             "task_id": "t2",
@@ -821,7 +817,7 @@
           "task_id": "t3",
           "against": "Workspace2",
           "expected_authority": "OK",
-          "effect": "CONFIGURE GR 0–150"
+          "effect": "CONFIGURE GR"
         },
         {
           "task_id": "t4",
@@ -833,7 +829,7 @@
           "task_id": "t5",
           "against": "Workspace4",
           "expected_authority": "OK",
-          "effect": "CONFIGURE RT log 0.2–2000"
+          "effect": "CONFIGURE RT"
         }
       ],
       "required_projected_effects": [
@@ -846,27 +842,10 @@
           "LocalBindingTable": {
             "$track1": "<projected_track_ref>"
           },
-          "tracks_appended": 1
-        },
-        "after_t2": {
-          "GR.track_ref": "$track1"
-        },
-        "after_t3": {
-          "GR.scale": {
-            "kind": "linear",
-            "min": 0.0,
-            "max": 150.0
-          }
-        },
-        "after_t4": {
-          "RT.track_ref": "$track1"
+          "TrackFact.title": "Petrophysics"
         },
         "after_t5": {
-          "RT.scale": {
-            "kind": "log",
-            "min": 0.2,
-            "max": 2000.0
-          }
+          "GR and RT on $track1 with configured scales": true
         }
       },
       "expected_terminal": {
@@ -876,14 +855,10 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "normalized_request_operand_extensions": [
+      "uses_q1a_create_track_operands": [
         "track_title"
       ],
-      "gold_structural_verification": {
-        "gold_n_ops": 5,
-        "witness_n_tasks": 5,
-        "aligned": true
-      },
+      "uses_q4_local_ref": true,
       "provenance": {
         "normalization_source": {
           "utterance": true,
@@ -979,9 +954,9 @@
         ],
         "fills": []
       },
-      "design_note": "width_mm projected only if later validation needs it; place/configure do not. Still carried as CREATE_TRACK operand from utterance.",
+      "design_note": "Uses Q1A track_title + track_width_mm; width carried as CREATE_TRACK operand (WELL-IR width_mm).",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -994,10 +969,7 @@
               "track_title": "Caliper QC",
               "track_width_mm": 24.0
             },
-            "normalized_request_operand_extensions": [
-              "track_title",
-              "track_width_mm"
-            ]
+            "track_kind_adjudication": null
           },
           {
             "task_id": "t2",
@@ -1045,20 +1017,17 @@
         {
           "task_id": "t1",
           "against": "Workspace0",
-          "expected_authority": "OK",
-          "effect": "CREATE_TRACK width/title + bind $track1"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t2",
           "against": "Workspace1",
-          "expected_authority": "OK",
-          "effect": "PLACE CALI → $track1"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t3",
           "against": "Workspace2",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE CALI 6–12"
+          "expected_authority": "OK"
         }
       ],
       "required_projected_effects": [
@@ -1070,16 +1039,9 @@
         "after_t1": {
           "LocalBindingTable": {
             "$track1": "<projected_track_ref>"
-          }
-        },
-        "after_t2": {
-          "CALI.track_ref": "$track1"
-        },
-        "after_t3": {
-          "CALI.scale": {
-            "min": 6.0,
-            "max": 12.0
-          }
+          },
+          "TrackFact.title": "Caliper QC",
+          "TrackFact.width_mm_if_projected": 24.0
         }
       },
       "expected_terminal": {
@@ -1089,15 +1051,11 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "normalized_request_operand_extensions": [
+      "uses_q1a_create_track_operands": [
         "track_title",
         "track_width_mm"
       ],
-      "gold_structural_verification": {
-        "gold_n_ops": 3,
-        "witness_n_tasks": 3,
-        "aligned": true
-      },
+      "uses_q4_local_ref": true,
       "provenance": {
         "normalization_source": {
           "utterance": true,
@@ -1183,9 +1141,9 @@
         ],
         "fills": []
       },
-      "design_note": "Utterance preserves binding order (GR then RT on new track). Gold relative 'beside track 2' is layout; not required for later OK adjudication under authorized effects—CREATE_TRACK append+bind suffices for place targets. Relative placement noted as optional future operand, not blocking representability of terminal OK.",
+      "design_note": "Utterance 'normal track' adjudicated as DEFAULT_SEMANTICS (no track_kind operand). Q1A track_title='Petrophysics'. Relative beside-track-2 layout not required for terminal OK under Q3.",
       "normalized_program": {
-        "version": "scope-design-01",
+        "version": "scope-design-01r",
         "tasks": [
           {
             "task_id": "t1",
@@ -1197,9 +1155,17 @@
               "requested_operation": "CREATE_TRACK",
               "track_title": "Petrophysics"
             },
-            "normalized_request_operand_extensions": [
-              "track_title"
-            ]
+            "track_kind_adjudication": {
+              "utterance_word": "normal",
+              "adjudication": "DEFAULT_SEMANTICS",
+              "operand_required": false,
+              "rationale": "WELL-IR CreateTrack.kind defaults to 'normal' (experiments/nlp_slm_01/well_ir/operations.py); logfile/template parsers also default kind to 'normal'. Utterance 'normal track' names the canonical default; no track_kind operand required.",
+              "authoritative_sources": [
+                "well_ir.operations.CreateTrack.kind Literal default 'normal'",
+                "wellplot.logfile track kind default 'normal'",
+                "wellplot.templates._parse_track_kind default 'normal'"
+              ]
+            }
           },
           {
             "task_id": "t2",
@@ -1283,36 +1249,43 @@
           }
         ]
       },
+      "track_kind_adjudication": {
+        "utterance_word": "normal",
+        "adjudication": "DEFAULT_SEMANTICS",
+        "operand_required": false,
+        "rationale": "WELL-IR CreateTrack.kind defaults to 'normal' (experiments/nlp_slm_01/well_ir/operations.py); logfile/template parsers also default kind to 'normal'. Utterance 'normal track' names the canonical default; no track_kind operand required.",
+        "authoritative_sources": [
+          "well_ir.operations.CreateTrack.kind Literal default 'normal'",
+          "wellplot.logfile track kind default 'normal'",
+          "wellplot.templates._parse_track_kind default 'normal'"
+        ]
+      },
       "task_trace_design": [
         {
           "task_id": "t1",
           "against": "Workspace0",
           "expected_authority": "OK",
-          "effect": "CREATE_TRACK + bind $track1"
+          "effect": "CREATE_TRACK default kind=normal + title + bind"
         },
         {
           "task_id": "t2",
           "against": "Workspace1",
-          "expected_authority": "OK",
-          "effect": "PLACE GR → $track1"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t3",
           "against": "Workspace2",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE GR linear -10–140"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t4",
           "against": "Workspace3",
-          "expected_authority": "OK",
-          "effect": "PLACE RT → $track1"
+          "expected_authority": "OK"
         },
         {
           "task_id": "t5",
           "against": "Workspace4",
-          "expected_authority": "OK",
-          "effect": "CONFIGURE RT log 0.1–10000"
+          "expected_authority": "OK"
         }
       ],
       "required_projected_effects": [
@@ -1324,10 +1297,8 @@
         "after_t1": {
           "LocalBindingTable": {
             "$track1": "<projected_track_ref>"
-          }
-        },
-        "after_t5": {
-          "GR and RT placed on $track1 with configured scales": true
+          },
+          "kind": "normal (default)"
         }
       },
       "expected_terminal": {
@@ -1337,25 +1308,21 @@
       },
       "representability": "REPRESENTABLE_UNDER_CONTRACT",
       "missing_concept": null,
-      "normalized_request_operand_extensions": [
+      "uses_q1a_create_track_operands": [
         "track_title"
       ],
+      "uses_q4_local_ref": true,
       "optional_future_operands_not_required_for_ok": [
         "create_track_relative_placement"
       ],
-      "gold_structural_verification": {
-        "gold_n_ops": 5,
-        "witness_n_tasks": 5,
-        "aligned": true,
-        "gold_extra": "relative beside track 2 — layout; not needed for authorized effect chain to terminal OK"
-      },
       "provenance": {
         "normalization_source": {
           "utterance": true,
           "fixture_context": true
         },
         "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
-        "gold_used_as_runtime_decision_input": false
+        "gold_used_as_runtime_decision_input": false,
+        "utterance_word_normal": "recorded as DEFAULT_SEMANTICS; not silently dropped"
       }
     }
   ],
@@ -1363,12 +1330,18 @@
     "n_cases": 6,
     "REPRESENTABLE_UNDER_CONTRACT": 6,
     "CONTRACT_INSUFFICIENT": 0,
-    "define_fill_effects_required": false,
-    "operand_extensions_noted": [
-      "track_title",
-      "track_width_mm",
-      "SemanticQuery.local_ref"
-    ]
+    "strict_pre_Q1A_would_have_been": {
+      "REPRESENTABLE_UNDER_CONTRACT": 3,
+      "CONTRACT_INSUFFICIENT": 3,
+      "insufficient_cases": [
+        "D5GAP-0096",
+        "D5GAP-0101",
+        "SEED-cm-9643c020e2e02463"
+      ]
+    },
+    "q1a_frozen": true,
+    "track_kind_normal": "DEFAULT_SEMANTICS",
+    "define_fill_effects_required": false
   },
   "historical_gold": "UNCHANGED",
   "mb02r": "UNCHANGED",

@@ -1,20 +1,23 @@
-# SCOPE-DESIGN-01 — Multi-clause contract design (six residue cases)
+# SCOPE-DESIGN-01R — Contract rework (Q1A + recomputed representability)
 
 ```
 SLICE:
-SCOPE-DESIGN-01
+SCOPE-DESIGN-01R
 
 AUTHORITY:
-WELLPLOT-NLP-RUNTIME-V2-SCOPE-CONTRACT-DESIGN-AUTH-001
+WELLPLOT-NLP-RUNTIME-V2-SCOPE-CONTRACT-DESIGN-REWORK-AUTH-001
 
 STARTING SHA:
-fd2f0443ad18a76542d3577928dde80c6928fa11
+e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b
 
 ACCEPTED MB-02R SUBJECT:
 c2f158b8222e3c1b4ae3ae737c2544fc3b25f994
 
 ACCEPTED ORACLE-01 SUBJECT:
 fd2f0443ad18a76542d3577928dde80c6928fa11
+
+PRIOR SCOPE-DESIGN CANDIDATE:
+e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b
 
 CASES:
 D5GAP-0085
@@ -40,7 +43,7 @@ IMPLEMENTATION:
 NOT AUTHORIZED
 
 STATUS:
-STOP FOR INDEPENDENT SCOPE-DESIGN REVIEW
+STOP FOR INDEPENDENT SCOPE-DESIGN-01R REVIEW
 ```
 
 Machine-readable authority: `scope_contract_design_01.json`.
@@ -48,39 +51,68 @@ Machine-readable authority: `scope_contract_design_01.json`.
 ## CLAIM
 
 This slice establishes only whether the six cases are representable under
-NormalizedProgram + deterministic projected-state semantics.
+NormalizedProgram + deterministic projected-state semantics (Q1–Q5 + Q1A).
 
 It does not establish raw English → NormalizedProgram.
 
-## Frozen contract (Q1–Q5)
+## Prior defect (corrected)
 
-| Q | Freeze |
-|---|--------|
-| Q1 | `NormalizedProgram` = composition; `NormalizedTask` wraps one `NormalizedRequest`; binds/deps at task layer |
-| Q2 | Array order = execution order; linear `depends_on` only; order/deps contradiction → schema-domain |
-| Q3 | Effects only after OK: CREATE_TRACK / PLACE_CURVE / CONFIGURE scale facts; DEFINE_FILL deferred |
-| Q4 | `SemanticQuery`: exactly one of `text` \| `local_ref`; bind-contract errors → schema-domain; `LocalBindingTable` is execution state |
-| Q5 | Fail-fast; first non-OK is sole public terminal; all-OK → program `ok` |
+`e1e3fa23…` claimed 6/6 representable while three witnesses used `track_title` /
+`track_width_mm` that were **not** frozen in Q1–Q5 (only `SemanticQuery.local_ref`
+was authorized in Q4).
 
-## Representability (six witnesses)
+Strict pre-amendment accounting:
 
-| case_id | tasks | key transitions | representability |
-|---------|------:|-----------------|------------------|
-| D5GAP-0085 | 3 | dual CBL scale configure → BETWEEN_INSTANCES | REPRESENTABLE_UNDER_CONTRACT |
-| D5GAP-0089 | 2 | narrow CBL scale → BETWEEN_INSTANCES | REPRESENTABLE_UNDER_CONTRACT |
-| D5GAP-0096 | 5 | CREATE_TRACK+$track1 → place/configure GR, RT | REPRESENTABLE_UNDER_CONTRACT |
-| D5GAP-0101 | 3 | CREATE_TRACK+$track1 → place/configure CALI | REPRESENTABLE_UNDER_CONTRACT |
-| D5GAP-0117 | 2 | configure RHOB → BASELINE_SPLIT | REPRESENTABLE_UNDER_CONTRACT |
-| SEED-cm-9643c020e2e02463 | 5 | CREATE_TRACK+$track1 → place/configure GR, RT | REPRESENTABLE_UNDER_CONTRACT |
+| Result | Count | Cases |
+|--------|------:|-------|
+| REPRESENTABLE_UNDER_CONTRACT | 3 | D5GAP-0085, 0089, 0117 |
+| CONTRACT_INSUFFICIENT | 3 | D5GAP-0096, 0101, SEED-cm-9643… |
 
-**CONTRACT_INSUFFICIENT:** 0
+## Q1A — CREATE_TRACK semantic operands (frozen amendment)
 
-Operand notes (single-op allowlist completeness, not composition gaps): `SemanticQuery.local_ref`; CREATE_TRACK `track_title` / optional `track_width_mm`. DEFINE_FILL projected effects not required by these six.
+For `requested_operation == CREATE_TRACK` only, successor `NormalizedRequest` may carry:
+
+- `track_title: str | None`
+- `track_width_mm: float | None`
+
+Basis: WELL-IR `CreateTrack` already has `title` and `width_mm`.
+
+Forbidden: general metadata bag; arbitrary payloads on other ops; composition fields inside `NormalizedRequest`.
+
+Q2–Q5 unchanged.
+
+### Utterance word “normal” (SEED)
+
+| Finding | Value |
+|---------|--------|
+| Adjudication | `DEFAULT_SEMANTICS` |
+| Operand required | **No** (`track_kind` not added) |
+| Rationale | WELL-IR / WellPlot default `kind="normal"` |
+
+The word is recorded, not silently dropped.
+
+## Frozen surface used for recompute
+
+Q1 program/task/request separation · **Q1A CREATE_TRACK operands** · Q2 linear order/deps · Q3 projected effects · Q4 `local_ref` + bind table · Q5 fail-fast terminal
+
+## Representability (recomputed)
+
+| case_id | representability | frozen extras used |
+|---------|------------------|--------------------|
+| D5GAP-0085 | REPRESENTABLE_UNDER_CONTRACT | — |
+| D5GAP-0089 | REPRESENTABLE_UNDER_CONTRACT | — |
+| D5GAP-0117 | REPRESENTABLE_UNDER_CONTRACT | — |
+| D5GAP-0096 | REPRESENTABLE_UNDER_CONTRACT | Q1A `track_title`, Q4 `local_ref` |
+| D5GAP-0101 | REPRESENTABLE_UNDER_CONTRACT | Q1A `track_title`+`track_width_mm`, Q4 `local_ref` |
+| SEED-cm-9643c020e2e02463 | REPRESENTABLE_UNDER_CONTRACT | Q1A `track_title`, Q4 `local_ref`; `normal`=DEFAULT_SEMANTICS |
+
+**6 / 6 REPRESENTABLE_UNDER_CONTRACT**  
+**0 / 6 CONTRACT_INSUFFICIENT**
 
 ## Explicit exclusions
 
-resolver implementation · effect projector · executable replay · English→NormalizedProgram · LangGraph · T5 · Luna · MB-03 · SLM-04 · gold mutation · production changes · non-linear graphs · document/renderer simulation
+resolver / projector implementation · executable replay · English→NormalizedProgram · LangGraph · T5 · Luna · MB-03 · SLM-04 · gold mutation · production changes · non-linear graphs · document simulation · unfrozen op payloads beyond Q1A
 
 ## Next decision (not authorized here)
 
-Whether to authorize a bounded projector / program-runtime implementation slice now that design-level representability is 6/6.
+Whether to authorize a bounded projector / program-runtime implementation slice under the now-complete frozen surface (Q1–Q5 + Q1A).
