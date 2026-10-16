@@ -9,7 +9,7 @@ frozen_design: 1658c1593330620501baa4a551b965fa209cc95b
 accepted_d5_3_engine: 51fd23fe18ca77c067b0cdf702f88a57ba4c457d
 branch: implementation/d5-4-bounded-live-semantic-qualification
 phase: PROVIDER_FREE_HARNESS_IMPLEMENTATION
-status: COMPLETE / READY FOR INDEPENDENT IMPLEMENTATION REVIEW
+status: COMPLETE / READY FOR INDEPENDENT REWORK REVIEW
 live_qualification: NOT RUN / NOT AUTHORIZED
 production_promotion: NOT AUTHORIZED
 ```
@@ -41,24 +41,33 @@ or model activity:
   checkpoints, source/case/gold/lock custody, OpenAI version/retry contract,
   D5 attestation/reachability, and fresh artifact paths;
 - readiness accepts only the ordered `/v1/models` then `/props` observations;
-- readiness projects model identity, sanitized model path identity, context,
-  slots, build, chat template, runtime-default fingerprint, and thinking-off
-  state without persisting credentials, raw responses, or absolute paths;
+- readiness projects the documented llama.cpp `/props` identity fields:
+  model path identity, context, slots, build, chat template, and runtime
+  defaults without synthetic capability or thinking fields, credentials, raw
+  responses, or absolute paths;
 - readiness does not perform a structured-generation probe;
 - actual `response_format` acceptance belongs to the first measured scientific
   generation, with rejection classified as
   `INCONCLUSIVE / PROVIDER_BOUNDARY / STRUCTURED_OUTPUT`;
 - planner and worker decoder controls match the frozen production request
   builder, with optional controls absent on the wire and no model substitution;
-- `STARTED` is created only after readiness and consumes a one-shot campaign;
-- logical call 46 is rejected before delegation, while SDK retries remain
-  physical attempts on the same logical call;
+- `STARTED` is created only after readiness, is bound to the external
+  authorization and fixed campaign ID, and cannot be bypassed by a new runner;
+- logical call 46 is rejected before delegation, while each observed SDK/HTTP
+  retry remains a physical attempt on the same logical call;
 - the exact nine-turn D4 population executes in order through the canonical
   Direct Notebook adapter in the deterministic rehearsal;
 - deterministic D4 grading remains the authority for semantic and safe-negative
   results; no second grader was introduced;
 - state, journal, terminal, summary, and evidence artifacts are fresh,
-  cross-referenced, redacted, and terminally immutable;
+  authorization-bound, cross-referenced through a recomputable acyclic hash
+  chain, redacted, and terminally immutable;
+- the explicit `--execute-live` path wires static preflight, the two readiness
+  GETs, provider construction, fixed `STARTED` custody, and the canonical
+  nine-turn adapter using injected doubles in provider-free tests;
+- deterministic persistence/render failures are classified as
+  `INCONCLUSIVE / PRODUCTION_OR_INFRASTRUCTURE`, while valid but wrong
+  structured semantics remain `FAIL / SEMANTIC_CONTRACT`;
 - semantic failures are `FAIL`, while provider, transport, production,
   persistence/render, evidence, interruption, and configuration failures are
   `INCONCLUSIVE`.
@@ -69,7 +78,7 @@ Final focused harness validation:
 
 ```text
 tests/test_nlp_d5_live_semantic_qualification.py
-14 passed
+18 passed
 ```
 
 The deterministic rehearsal included in that suite proves:
@@ -86,6 +95,16 @@ provider calls: 0
 endpoint calls: 0
 model calls: 0
 terminal: PASS
+```
+
+Rework regressions:
+
+```yaml
+authorization-bound one-shot: PASS
+retry integration: 9 logical / 27 physical PASS
+persistence/render attribution: PASS
+five-artifact digest recomputation: PASS
+provider-free --execute-live wiring: PASS
 ```
 
 Adjacent validation:

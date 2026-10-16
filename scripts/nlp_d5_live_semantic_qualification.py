@@ -9,6 +9,7 @@ unless a future, separately authorized live runner supplies those operations.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import importlib.metadata
 import inspect
@@ -17,6 +18,8 @@ import os
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -153,6 +156,8 @@ class D5Authorization:
     """External facts required to qualify one exact harness checkout."""
 
     implementation_checkpoint: str
+    authorization_id: str = ""
+    campaign_id: str = ""
     accepted_d5_engine_checkpoint: str = D5_ENGINE_CHECKPOINT
     accepted_d5_design_checkpoint: str = D5_DESIGN_CHECKPOINT
     provider: str = EXPECTED_PROVIDER
@@ -171,14 +176,19 @@ class D5Authorization:
     structured_output_contract: str = "json_schema"
     sdk_version: str = EXPECTED_OPENAI_VERSION
     sdk_max_retries: int = EXPECTED_SDK_MAX_RETRIES
+    artifact_root: str = "workspace/evaluations/d5-4-live-qualification"
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
         """Parse required authorization facts without deriving them locally."""
-        if "implementation_checkpoint" not in value:
-            raise D5StaticPreflightError("implementation checkpoint is missing")
+        required = {"implementation_checkpoint", "authorization_id", "campaign_id"}
+        missing = required - set(value)
+        if missing:
+            raise D5StaticPreflightError(f"authorization is missing: {sorted(missing)!r}")
         return cls(
             implementation_checkpoint=str(value["implementation_checkpoint"]),
+            authorization_id=str(value["authorization_id"]),
+            campaign_id=str(value["campaign_id"]),
             accepted_d5_engine_checkpoint=str(
                 value.get("accepted_d5_engine_checkpoint", D5_ENGINE_CHECKPOINT)
             ),
@@ -204,6 +214,9 @@ class D5Authorization:
             structured_output_contract=str(value.get("structured_output_contract", "json_schema")),
             sdk_version=str(value.get("sdk_version", EXPECTED_OPENAI_VERSION)),
             sdk_max_retries=int(value.get("sdk_max_retries", EXPECTED_SDK_MAX_RETRIES)),
+            artifact_root=str(
+                value.get("artifact_root", "workspace/evaluations/d5-4-live-qualification")
+            ),
         )
 
 
@@ -218,7 +231,6 @@ class D5ReadinessProjection:
     build_info: str
     total_slots: int
     chat_template: str
-    chat_template_caps: tuple[str, ...]
     runtime_defaults_sha256: str
     thinking_off: bool
     structured_output_contract: str
@@ -234,7 +246,6 @@ class D5ReadinessProjection:
             "build_info": self.build_info,
             "total_slots": self.total_slots,
             "chat_template": self.chat_template,
-            "chat_template_caps": list(self.chat_template_caps),
             "runtime_defaults_sha256": self.runtime_defaults_sha256,
             "thinking_off": self.thinking_off,
             "structured_output_contract": self.structured_output_contract,
@@ -327,6 +338,10 @@ def _default_static_checks(
         raise D5StaticPreflightError("authorized runtime-default fingerprint is missing")
     if authorization.minimum_context_size <= 0:
         raise D5StaticPreflightError("authorized minimum context size is missing")
+    if not authorization.authorization_id or not authorization.campaign_id:
+        raise D5StaticPreflightError("authorization/campaign identity is missing")
+    if artifact_paths.campaign_id != authorization.campaign_id:
+        raise D5StaticPreflightError("campaign path is not bound to authorization")
     for path in (
         artifact_paths.state,
         artifact_paths.journal,
@@ -505,9 +520,30 @@ class D5LogicalCallLedger:
 
     def complete(self, logical_index: int, outcome: str) -> None:
         """Close one logical call with bounded outcome metadata."""
+        outcome = {"success": "completed", "failure": "failed"}.get(outcome, outcome)
         if outcome not in {"completed", "failed", "rejected"}:
             raise D5HarnessError("unknown logical-call outcome")
         self.calls[logical_index - 1]["outcome"] = outcome
+
+    def annotate_completion(
+        self,
+        logical_index: int,
+        *,
+        failure_category: str | None = None,
+        metrics: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Retain bounded completion metrics without provider payloads."""
+        row = self.calls[logical_index - 1]
+        if failure_category is not None:
+            row["failure_category"] = str(failure_category)
+        if metrics:
+            row["metrics"] = {
+                key: value
+                for key, value in metrics.items()
+                if key in {"latency_ms", "input_tokens", "output_tokens", "total_tokens"}
+                and isinstance(value, (int, float))
+                and not isinstance(value, bool)
+            }
 
     def record_d4_event(self, event: Mapping[str, Any]) -> None:
         """Attach D4 CountingBackend events to this D5 ledger."""
@@ -518,7 +554,6 @@ class D5LogicalCallLedger:
             expected = self.reserve(role)
             if expected != index:
                 raise D5HarnessError("D4/D5 logical call index drift")
-            self.physical_attempt(index)
         elif event_name == "logical_call_completed":
             self.complete(index, str(event.get("outcome", "failed")))
 
@@ -542,6 +577,9 @@ class D5CampaignCustody:
     campaign_id: str
     state: dict[str, Any]
     ledger: D5LogicalCallLedger
+    authorization_id: str
+    require_physical_observer: bool = False
+    _active_logical_index: int | None = None
     _terminal_written: bool = False
 
     @classmethod
@@ -549,14 +587,18 @@ class D5CampaignCustody:
         cls,
         paths: EvidencePaths,
         *,
+        authorization: D5Authorization,
         provenance: Mapping[str, Any],
         readiness: D5ReadinessProjection,
     ) -> D5CampaignCustody:
         """Create STARTED custody only after successful readiness."""
         ensure_fresh_namespace(paths)
+        if paths.campaign_id != authorization.campaign_id:
+            raise D5HarnessError("campaign path does not match authorization")
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": paths.campaign_id,
+            "authorization_id": authorization.authorization_id,
             "status": "STARTED",
             "readiness_status": "LIVE_READY",
             "provider": EXPECTED_PROVIDER,
@@ -576,6 +618,7 @@ class D5CampaignCustody:
                 "event": "campaign_started",
                 "experiment_version": D5_EXPERIMENT_VERSION,
                 "campaign_id": paths.campaign_id,
+                "authorization_id": authorization.authorization_id,
                 "status": "STARTED",
             },
             exclusive=True,
@@ -585,11 +628,13 @@ class D5CampaignCustody:
             campaign_id=paths.campaign_id,
             state=state,
             ledger=D5LogicalCallLedger(),
+            authorization_id=authorization.authorization_id,
         )
 
     def record_call_started(self, event: Mapping[str, Any]) -> None:
         """Persist one role-aware logical call before delegation."""
         self.ledger.record_d4_event(event)
+        self._active_logical_index = int(event["index"])
         self.state["logical_generation_calls"] = self.ledger.logical_calls
         self.state["physical_generation_attempts"] = self.ledger.physical_attempts
         _atomic_json(self.paths.state, self.state)
@@ -597,6 +642,7 @@ class D5CampaignCustody:
             "event": "logical_call_started",
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": self.campaign_id,
+            "authorization_id": self.authorization_id,
             "index": event.get("index"),
             "generation_role": event.get("generation_role"),
             "provider": event.get("provider"),
@@ -606,18 +652,59 @@ class D5CampaignCustody:
 
     def record_call_completed(self, event: Mapping[str, Any]) -> None:
         """Persist bounded completion metadata without payload material."""
+        index = int(event.get("index", 0))
+        call = self.ledger.calls[index - 1]
+        if call["physical_attempt_count"] == 0:
+            if self.require_physical_observer:
+                raise D5HarnessError("physical attempt was not observed")
+            self.ledger.physical_attempt(index)
+        self.ledger.complete(index, str(event.get("outcome", "failed")))
+        self.ledger.annotate_completion(
+            index,
+            failure_category=event.get("failure_category"),
+            metrics=event,
+        )
+        self.state["logical_generation_calls"] = self.ledger.logical_calls
+        self.state["physical_generation_attempts"] = self.ledger.physical_attempts
+        _atomic_json(self.paths.state, self.state)
         bounded = {
             "event": "logical_call_completed",
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": self.campaign_id,
-            "index": event.get("index"),
+            "authorization_id": self.authorization_id,
+            "index": index,
             "generation_role": event.get("generation_role"),
             "provider": event.get("provider"),
             "model": event.get("model"),
             "outcome": event.get("outcome"),
             "failure_category": event.get("failure_category"),
+            "physical_attempt_count": call["physical_attempt_count"],
+            "latency_ms": event.get("latency_ms"),
+            "input_tokens": event.get("input_tokens"),
+            "output_tokens": event.get("output_tokens"),
+            "total_tokens": event.get("total_tokens"),
         }
         _append_jsonl(self.paths.journal, bounded)
+
+    def record_physical_attempt(self, index: int | None = None) -> None:
+        """Record one observed SDK/HTTP attempt for the active logical call."""
+        logical_index = index if index is not None else self._active_logical_index
+        if logical_index is None:
+            raise D5HarnessError("physical attempt has no active logical call")
+        self.ledger.physical_attempt(logical_index)
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "physical_attempt",
+                "experiment_version": D5_EXPERIMENT_VERSION,
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "index": logical_index,
+                "physical_attempt_count": self.ledger.calls[logical_index - 1][
+                    "physical_attempt_count"
+                ],
+            },
+        )
 
     def append_turn(self, row: Mapping[str, Any]) -> None:
         """Append one redacted bounded turn result."""
@@ -643,11 +730,25 @@ class D5CampaignCustody:
                 "event": "campaign_terminal",
                 "experiment_version": D5_EXPERIMENT_VERSION,
                 "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
                 "decision": decision,
                 "attribution": attribution,
                 "completed_turns": len(rows),
             },
         )
+        self.state.update(
+            {
+                "status": "TERMINAL",
+                "decision": decision,
+                "attribution": attribution,
+                "completed_turns": len(rows),
+                "logical_generation_calls": self.ledger.logical_calls,
+                "physical_generation_attempts": self.ledger.physical_attempts,
+            }
+        )
+        _atomic_json(self.paths.state, self.state)
+        if not self.paths.evidence.exists():
+            self.paths.evidence.touch()
         evidence_digest = (
             _sha256_file(self.paths.evidence) if self.paths.evidence.exists() else None
         )
@@ -656,6 +757,7 @@ class D5CampaignCustody:
         terminal = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": self.campaign_id,
+            "authorization_id": self.authorization_id,
             "decision": decision,
             "attribution": attribution,
             "completed_turns": len(rows),
@@ -669,6 +771,7 @@ class D5CampaignCustody:
         summary = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": self.campaign_id,
+            "authorization_id": self.authorization_id,
             "decision": decision,
             "attribution": attribution,
             "completed_turns": len(rows),
@@ -677,18 +780,47 @@ class D5CampaignCustody:
             "terminal_sha256": _sha256_file(self.paths.terminal),
         }
         _atomic_json(self.paths.summary, summary, exclusive=True)
-        self.state.update(
-            {
-                "status": "TERMINAL",
-                "decision": decision,
-                "attribution": attribution,
-                "completed_turns": len(rows),
-                "terminal_sha256": _sha256_file(self.paths.terminal),
-            }
-        )
-        _atomic_json(self.paths.state, self.state)
         self._terminal_written = True
         return terminal
+
+
+def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
+    """Recompute the retained five-file custody chain without mutation."""
+    required = paths.all_paths()
+    if not all(path.is_file() for path in required):
+        raise D5HarnessError("custody artifact set is incomplete")
+    state = json.loads(paths.state.read_text(encoding="utf-8"))
+    terminal = json.loads(paths.terminal.read_text(encoding="utf-8"))
+    summary = json.loads(paths.summary.read_text(encoding="utf-8"))
+    if not isinstance(state, Mapping) or not isinstance(terminal, Mapping):
+        raise D5HarnessError("custody JSON shape is invalid")
+    if not isinstance(summary, Mapping) or not evidence_is_redacted(state):
+        raise D5HarnessError("custody redaction failed")
+    if not evidence_is_redacted(terminal) or not evidence_is_redacted(summary):
+        raise D5HarnessError("custody redaction failed")
+    if state.get("status") != "TERMINAL":
+        raise D5HarnessError("final state is not terminal")
+    if state.get("campaign_id") != paths.campaign_id:
+        raise D5HarnessError("state campaign identity mismatch")
+    if terminal.get("campaign_id") != paths.campaign_id:
+        raise D5HarnessError("terminal campaign identity mismatch")
+    if summary.get("campaign_id") != paths.campaign_id:
+        raise D5HarnessError("summary campaign identity mismatch")
+    digests = {
+        "state_sha256": _sha256_file(paths.state),
+        "journal_sha256": _sha256_file(paths.journal),
+        "evidence_sha256": _sha256_file(paths.evidence),
+        "terminal_sha256": _sha256_file(paths.terminal),
+    }
+    if terminal.get("state_snapshot_sha256") != digests["state_sha256"]:
+        raise D5HarnessError("terminal state digest mismatch")
+    if terminal.get("journal_sha256") != digests["journal_sha256"]:
+        raise D5HarnessError("terminal journal digest mismatch")
+    if terminal.get("evidence_sha256") != digests["evidence_sha256"]:
+        raise D5HarnessError("terminal evidence digest mismatch")
+    if summary.get("terminal_sha256") != digests["terminal_sha256"]:
+        raise D5HarnessError("summary terminal digest mismatch")
+    return digests
 
 
 def _project_model_catalog(payload: object, expected_model: str) -> tuple[str, ...]:
@@ -704,7 +836,7 @@ def _project_model_catalog(payload: object, expected_model: str) -> tuple[str, .
 
 
 def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
-    """Sanitize llama.cpp runtime properties and fingerprint defaults."""
+    """Project documented llama.cpp `/props` fields without synthetic flags."""
     if not isinstance(payload, Mapping):
         raise D5ReadinessError("endpoint_identity_mismatch", 2)
     path = payload.get("model_path")
@@ -712,7 +844,6 @@ def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
     build_info = payload.get("build_info")
     slots = payload.get("total_slots")
     chat_template = payload.get("chat_template")
-    chat_caps = payload.get("chat_template_caps", [])
     if (
         not isinstance(path, str)
         or not path.strip()
@@ -727,14 +858,10 @@ def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
         or slots <= 0
         or not isinstance(chat_template, str)
         or not chat_template.strip()
-        or not isinstance(chat_caps, list)
-        or not all(isinstance(item, str) for item in chat_caps)
     ):
         raise D5ReadinessError("endpoint_identity_mismatch", 2)
     if expected_contract != "json_schema":
         raise D5ReadinessError("endpoint_identity_mismatch", 2)
-    if "json_schema" not in chat_caps:
-        raise D5ReadinessError("structured_output_contract_mismatch", 2)
     normalized_path = path.strip()
     basename = Path(normalized_path).name
     runtime_defaults = dict(generation)
@@ -745,9 +872,7 @@ def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
         "build_info": build_info.strip(),
         "total_slots": slots,
         "chat_template": chat_template.strip(),
-        "chat_template_caps": tuple(sorted(chat_caps)),
         "runtime_defaults_sha256": _sha256_json(runtime_defaults),
-        "thinking_off": payload.get("thinking_off") is True,
         "structured_output_contract": expected_contract,
         "gguf_byte_identity": str(payload.get("gguf_byte_identity", "NOT_AVAILABLE")),
     }
@@ -766,9 +891,7 @@ def validate_readiness_projection(
         "build_info",
         "total_slots",
         "chat_template",
-        "chat_template_caps",
         "runtime_defaults_sha256",
-        "thinking_off",
         "structured_output_contract",
     }
     if not required <= set(observed):
@@ -783,18 +906,25 @@ def validate_readiness_projection(
         and observed["runtime_defaults_sha256"] != authorization.runtime_defaults_sha256
     ):
         raise D5ReadinessError("runtime_defaults_mismatch", 2)
-    if observed["thinking_off"] is not True or authorization.thinking_off is not True:
-        raise D5ReadinessError("thinking_off_not_established", 2)
     if observed["structured_output_contract"] != authorization.structured_output_contract:
         raise D5ReadinessError("structured_output_contract_mismatch", 2)
     expected = dict(authorization.endpoint_identity)
+    if not isinstance(expected.get("chat_template"), str):
+        raise D5ReadinessError("thinking_off_not_established", 2)
     for key, value in expected.items():
         observed_value = observed.get(key)
         if isinstance(observed_value, tuple) and isinstance(value, list):
             observed_value = list(observed_value)
         if observed_value != value:
             raise D5ReadinessError("endpoint_identity_mismatch", 2)
-    return D5ReadinessProjection(**dict(observed))
+    thinking_off = (
+        authorization.thinking_off is True
+        and observed["chat_template"] == expected["chat_template"]
+        and observed["runtime_defaults_sha256"] == authorization.runtime_defaults_sha256
+    )
+    if not thinking_off:
+        raise D5ReadinessError("thinking_off_not_established", 2)
+    return D5ReadinessProjection(**dict(observed), thinking_off=thinking_off)
 
 
 @dataclass(frozen=True, slots=True)
@@ -803,6 +933,7 @@ class D5OperationalReadiness:
 
     projection: D5ReadinessProjection
     endpoint_calls: tuple[str, str]
+    adapter: object | None = None
     provider_calls: int = 0
     model_calls: int = 0
 
@@ -813,6 +944,7 @@ def prepare_readiness(
     api_key_loader: Callable[[], str],
     endpoint_get: Callable[[str, str], object],
     static_preflight: Mapping[str, Any],
+    provider_factory: Callable[[str], object] | None = None,
 ) -> D5OperationalReadiness:
     """Perform exactly two injectable identity observations after static checks."""
     if static_preflight.get("status") != "PASS":
@@ -831,13 +963,209 @@ def prepare_readiness(
         props = _project_props(get(PROPS_URL), authorization.structured_output_contract)
         observed = {"model_catalog": catalog, **props}
         projection = validate_readiness_projection(observed, authorization)
-    except D5ReadinessError:
-        raise
+    except D5ReadinessError as error:
+        raise D5ReadinessError(error.reason, len(calls)) from None
     except Exception:
         raise D5ReadinessError("endpoint_unreachable", len(calls)) from None
     if tuple(calls) != (MODEL_CATALOG_URL, PROPS_URL):
         raise D5ReadinessError("endpoint_order_mismatch", len(calls))
-    return D5OperationalReadiness(projection=projection, endpoint_calls=("/v1/models", "/props"))
+    adapter = None
+    if provider_factory is not None:
+        try:
+            adapter = provider_factory(token)
+        except D5ReadinessError:
+            raise
+        except Exception:
+            raise D5ReadinessError("provider_construction_failed", len(calls)) from None
+    return D5OperationalReadiness(
+        projection=projection,
+        endpoint_calls=("/v1/models", "/props"),
+        adapter=adapter,
+    )
+
+
+class _PhysicalAttemptObserver:
+    """Observe each Chat Completions HTTP send while one logical call is active."""
+
+    def __init__(self) -> None:
+        self.active_logical_index: int | None = None
+        self.callback: Callable[[int], None] | None = None
+
+    async def on_request(self, request: object) -> None:
+        """Count only generation requests, never readiness GETs."""
+        url = getattr(request, "url", None)
+        path = str(getattr(url, "path", ""))
+        if not path.endswith("/chat/completions"):
+            return
+        if self.active_logical_index is None or self.callback is None:
+            raise D5HarnessError("generation attempt has no active logical call")
+        self.callback(self.active_logical_index)
+
+
+class _ObservedLiveAdapter:
+    """Add D5 custody hooks around the accepted D4 canonical adapter."""
+
+    observes_physical_attempts = True
+
+    def __init__(self, inner: object, observer: _PhysicalAttemptObserver) -> None:
+        self.inner = inner
+        self.observer = observer
+
+    def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind logical custody and select the active HTTP call."""
+
+        def wrapped(event: dict[str, Any]) -> None:
+            self.observer.active_logical_index = int(event["index"])
+            callback(event)
+
+        self.inner.bind_call_started(wrapped)
+
+    def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Forward bounded logical completion custody."""
+        self.inner.bind_call_completed(callback)
+
+    def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
+        """Bind the D5 ledger to each observed SDK transport attempt."""
+        self.observer.callback = callback
+
+    @property
+    def logical_call_count(self) -> int:
+        """Expose the canonical adapter's logical cursor."""
+        return int(self.inner.logical_call_count)
+
+    async def execute_turn(
+        self,
+        case: Mapping[str, Any],
+        expected: Mapping[str, Any],
+    ) -> Mapping[str, Any]:
+        """Execute through the accepted Direct Notebook adapter."""
+        return await self.inner.execute_turn(case, expected)
+
+
+def create_live_adapter(
+    *,
+    repo_root: Path,
+    artifact_root: Path,
+    api_key: str,
+) -> _ObservedLiveAdapter:
+    """Build the accepted canonical adapter with retry-visible HTTP transport."""
+    import httpx
+    from openai import AsyncOpenAI
+
+    from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+
+    observer = _PhysicalAttemptObserver()
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=OPENAI_COMPAT_BASE_URL,
+        timeout=GENERATION_TIMEOUT_SECONDS,
+        max_retries=EXPECTED_SDK_MAX_RETRIES,
+        http_client=httpx.AsyncClient(event_hooks={"request": [observer.on_request]}),
+    )
+    backend = OpenAICompatibleBackendV2(
+        model=EXPECTED_MODEL,
+        client=client,
+        structured_output="json_schema",
+    )
+    calls: list[Any] = []
+    ledger = d4.LogicalCallLedger()
+    counted = d4.CountingBackend(
+        delegate=backend,
+        provider=EXPECTED_PROVIDER,
+        model=EXPECTED_MODEL,
+        calls=calls,
+        ledger=ledger,
+    )
+    session = d4.build_notebook_session(
+        backend=counted,
+        provider=EXPECTED_PROVIDER,
+        model=EXPECTED_MODEL,
+        server_root=repo_root,
+        credential_source="configured",
+        timeout=GENERATION_TIMEOUT_SECONDS,
+    )
+    inner = d4.D4CampaignAdapter(
+        repo_root=repo_root,
+        artifact_root=artifact_root,
+        session=session,
+        call_source=d4.CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
+        provider_backed=True,
+    )
+    return _ObservedLiveAdapter(inner, observer)
+
+
+def _credential_bearing_json_get(url: str, api_key: str) -> object:
+    """Read one bounded readiness response without retaining its raw body."""
+    request = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {api_key}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20.0) as response:
+            if response.geturl() != url:
+                raise D5ReadinessError("endpoint_identity_mismatch", 0)
+            body = response.read(MAX_ENDPOINT_RESPONSE_BYTES + 1)
+    except D5ReadinessError:
+        raise
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
+        raise D5ReadinessError("endpoint_unreachable", 0) from None
+    if len(body) > MAX_ENDPOINT_RESPONSE_BYTES:
+        raise D5ReadinessError("endpoint_identity_mismatch", 0)
+    try:
+        return json.loads(body)
+    except (TypeError, ValueError):
+        raise D5ReadinessError("endpoint_identity_mismatch", 0) from None
+
+
+def execute_live_campaign(
+    *,
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_root: Path,
+    endpoint_get: Callable[[str, str], object] = _credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+    static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
+    provider_factory: Callable[[Path, Path, str], object] | None = None,
+) -> dict[str, Any]:
+    """Run the explicit live path after static/readiness interlocks."""
+    paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    static = provider_free_preflight(
+        repo_root,
+        authorization,
+        paths,
+        static_checker=static_checker,
+    )
+    load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
+    build_provider = provider_factory or (
+        lambda key_root, key_artifact_root, token: create_live_adapter(
+            repo_root=key_root,
+            artifact_root=key_artifact_root,
+            api_key=token,
+        )
+    )
+    readiness = prepare_readiness(
+        authorization=authorization,
+        api_key_loader=load_key,
+        endpoint_get=endpoint_get,
+        static_preflight=static,
+        provider_factory=lambda token: build_provider(repo_root, artifact_root, token),
+    )
+    if readiness.adapter is None:
+        raise D5ReadinessError("provider_construction_failed", 2)
+    runner = D5CampaignRunner(
+        repo_root=repo_root,
+        authorization=authorization,
+        paths=paths,
+        readiness=readiness,
+        provenance={
+            "authorization_id": authorization.authorization_id,
+            "implementation_checkpoint": authorization.implementation_checkpoint,
+            "accepted_d5_engine_checkpoint": authorization.accepted_d5_engine_checkpoint,
+            "accepted_d5_design_checkpoint": authorization.accepted_d5_design_checkpoint,
+        },
+    )
+    return asyncio.run(runner.run(readiness.adapter))
 
 
 def _turn_hash(value: object) -> str | None:
@@ -858,6 +1186,7 @@ def _bounded_turn_row(
     *,
     execution_index: int,
     call_count: int,
+    physical_attempt_count: int,
 ) -> dict[str, Any]:
     """Project one D4 actual/grade pair into redacted D5 evidence."""
     verifier = grade.get("verifier_requirements", [])
@@ -878,10 +1207,39 @@ def _bounded_turn_row(
         "persisted": actual.get("persisted") is True,
         "rendered": actual.get("rendered") is True,
         "logical_generation_calls": call_count,
-        "physical_attempts": call_count,
+        "physical_attempts": physical_attempt_count,
         "provider": EXPECTED_PROVIDER,
         "model": EXPECTED_MODEL,
     }
+
+
+_INFRASTRUCTURE_GRADE_ERRORS = frozenset(
+    {
+        "persistence_not_proven",
+        "render_not_proven",
+        "cbl_persistence_not_proven",
+        "cbl_render_not_proven",
+        "cbl_rendered_wrong_artifact",
+    }
+)
+
+
+def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) -> str | None:
+    """Classify deterministic persistence/render faults without message heuristics."""
+    errors = {str(error) for error in grade.get("errors", [])}
+    if not errors.intersection(_INFRASTRUCTURE_GRADE_ERRORS):
+        return None
+    if actual.get("apply_status") in {
+        "rejected",
+        "compile_failed",
+        "reconciliation_blocked",
+        "execution_failed",
+    }:
+        return None
+    evidence = actual.get("execution_evidence")
+    if isinstance(evidence, Mapping) and evidence.get("accepted") is True:
+        return "PRODUCTION_OR_INFRASTRUCTURE"
+    return None
 
 
 def _classify_exception(error: Exception) -> tuple[str, str]:
@@ -929,8 +1287,12 @@ class D5CampaignRunner:
         self._started = True
         custody = D5CampaignCustody.start(
             self.paths,
+            authorization=self.authorization,
             provenance=self.provenance,
             readiness=self.readiness.projection,
+        )
+        custody.require_physical_observer = bool(
+            getattr(adapter, "observes_physical_attempts", False)
         )
         rows: list[dict[str, Any]] = []
         try:
@@ -938,6 +1300,8 @@ class D5CampaignRunner:
                 adapter.bind_call_started(custody.record_call_started)
             if callable(getattr(adapter, "bind_call_completed", None)):
                 adapter.bind_call_completed(custody.record_call_completed)
+            if callable(getattr(adapter, "bind_physical_attempt", None)):
+                adapter.bind_physical_attempt(custody.record_physical_attempt)
             cases = d4.load_cases(self.repo_root)
             gold = {item["turn_id"]: item for item in d4.load_gold(self.repo_root)["cases"]}
             if tuple(item["turn_id"] for item in cases) != FROZEN_TURN_IDS:
@@ -948,6 +1312,7 @@ class D5CampaignRunner:
             for execution_index, case in enumerate(cases, start=1):
                 expected = gold[case["turn_id"]]
                 cursor = int(getattr(adapter, "logical_call_count", 0))
+                physical_cursor = custody.ledger.physical_attempts
                 started = time.perf_counter()
                 actual = await execute_turn(case, expected)
                 grade = d4.grade_turn(dict(actual), expected)
@@ -959,11 +1324,19 @@ class D5CampaignRunner:
                     grade,
                     execution_index=execution_index,
                     call_count=calls,
+                    physical_attempt_count=custody.ledger.physical_attempts - physical_cursor,
                 )
                 row["duration_seconds"] = round(time.perf_counter() - started, 6)
+                row["authorization_id"] = self.authorization.authorization_id
+                row["failure_category"] = classify_grade_failure(actual, grade)
+                row["infrastructure_failure"] = row["failure_category"] is not None
                 custody.append_turn(row)
                 rows.append(row)
-            if len(rows) != 9:
+                if row["infrastructure_failure"]:
+                    break
+            if any(row["infrastructure_failure"] for row in rows):
+                decision, attribution = "INCONCLUSIVE", "PRODUCTION_OR_INFRASTRUCTURE"
+            elif len(rows) != 9:
                 decision, attribution = "INCONCLUSIVE", "POPULATION_INCOMPLETE"
             elif all(row["grader_status"] == "PASS" for row in rows):
                 decision, attribution = "PASS", "DETERMINISTIC_GRADING"
@@ -972,6 +1345,7 @@ class D5CampaignRunner:
         except Exception as error:
             decision, attribution = _classify_exception(error)
         terminal = custody.finish(decision, attribution=attribution, rows=rows)
+        custody_digests = verify_custody_artifacts(self.paths)
         self._finished = True
         return {
             "decision": decision,
@@ -981,6 +1355,7 @@ class D5CampaignRunner:
             "terminal": terminal,
             "logical_generation_calls": custody.ledger.logical_calls,
             "physical_generation_attempts": custody.ledger.physical_attempts,
+            "custody_digests": custody_digests,
             "provider_calls": 0,
             "endpoint_calls": 0,
             "model_calls": 0,
@@ -1020,19 +1395,32 @@ def _load_authorization(path: Path) -> D5Authorization:
 
 
 def main() -> int:
-    """Run only the provider-free static preflight CLI path."""
+    """Run provider-free preflight or one explicit live campaign."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--provider-free-preflight", action="store_true")
+    parser.add_argument("--execute-live", action="store_true")
+    parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--authorization-json", type=Path, required=True)
     args = parser.parse_args()
-    if not args.provider_free_preflight:
-        parser.error("D5-4 implementation supports provider-free preflight only")
+    if args.provider_free_preflight == args.execute_live:
+        parser.error("choose exactly one of --provider-free-preflight or --execute-live")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
-    campaign_id = f"d5-4-provider-free-{uuid.uuid4().hex}"
-    paths = EvidencePaths(repo_root / "workspace/evaluations/d5-4-live-qualification", campaign_id)
-    result = provider_free_preflight(repo_root, authorization, paths)
+    artifact_root = (
+        args.artifact_root.resolve()
+        if args.artifact_root is not None
+        else (repo_root / authorization.artifact_root).resolve()
+    )
+    paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    if args.provider_free_preflight:
+        result = provider_free_preflight(repo_root, authorization, paths)
+    else:
+        result = execute_live_campaign(
+            repo_root=repo_root,
+            authorization=authorization,
+            artifact_root=artifact_root,
+        )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

@@ -17,7 +17,7 @@ from tests.test_nlp_d4_live_acceptance import _D4SessionHarness
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _props(*, thinking_off: bool = True) -> dict[str, object]:
+def _props() -> dict[str, object]:
     """Build a sanitized llama.cpp property double."""
     return {
         "model_path": "/srv/models/qwen3.6-35b-a3b.gguf",
@@ -29,19 +29,21 @@ def _props(*, thinking_off: bool = True) -> dict[str, object]:
         "build_info": "llama.cpp provider-free test build",
         "total_slots": 1,
         "chat_template": "qwen3",
-        "chat_template_caps": ["json_schema", "json_object"],
-        "thinking_off": thinking_off,
         "gguf_byte_identity": "NOT_AVAILABLE",
     }
 
 
-def _authorization(*, thinking_off: bool = True) -> d5.D5Authorization:
+def _authorization(
+    *, thinking_off: bool = True, campaign_id: str = "campaign"
+) -> d5.D5Authorization:
     """Build an external-style authorization for injected readiness tests."""
-    props = _props(thinking_off=thinking_off)
+    props = _props()
     defaults = props["default_generation_settings"]
     assert isinstance(defaults, dict)
     return d5.D5Authorization(
         implementation_checkpoint="synthetic-checkpoint",
+        authorization_id="auth-test-001",
+        campaign_id=campaign_id,
         endpoint_identity={
             "model_catalog": [d5.EXPECTED_MODEL],
             "model_path_basename": "qwen3.6-35b-a3b.gguf",
@@ -50,9 +52,7 @@ def _authorization(*, thinking_off: bool = True) -> d5.D5Authorization:
             "build_info": "llama.cpp provider-free test build",
             "total_slots": 1,
             "chat_template": "qwen3",
-            "chat_template_caps": ["json_object", "json_schema"],
             "runtime_defaults_sha256": d5._sha256_json(defaults),
-            "thinking_off": thinking_off,
             "structured_output_contract": "json_schema",
             "gguf_byte_identity": "NOT_AVAILABLE",
         },
@@ -72,7 +72,6 @@ def _ready() -> d5.D5OperationalReadiness:
         build_info="test build",
         total_slots=1,
         chat_template="qwen3",
-        chat_template_caps=("json_object", "json_schema"),
         runtime_defaults_sha256="b" * 64,
         thinking_off=True,
         structured_output_contract="json_schema",
@@ -244,11 +243,11 @@ def test_readiness_rejects_thinking_on_without_generation_probe() -> None:
         calls.append(url)
         if url == d5.MODEL_CATALOG_URL:
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
-        return _props(thinking_off=False)
+        return _props()
 
     with pytest.raises(d5.D5ReadinessError, match="thinking_off_not_established") as raised:
         d5.prepare_readiness(
-            authorization=_authorization(),
+            authorization=_authorization(thinking_off=False),
             api_key_loader=lambda: "secret-token",
             endpoint_get=endpoint_get,
             static_preflight={"status": "PASS"},
@@ -346,17 +345,52 @@ def test_redaction_rejects_secrets_raw_payloads_and_absolute_paths() -> None:
     assert d5.evidence_is_redacted({"model": d5.EXPECTED_MODEL, "sha256": "a" * 64})
 
 
+def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) -> None:
+    """A second runner cannot reuse or rename the consumed authorized campaign."""
+    authorization = _authorization()
+    paths = _paths(tmp_path)
+    custody = d5.D5CampaignCustody.start(
+        paths,
+        authorization=authorization,
+        provenance=_provenance(),
+        readiness=_ready().projection,
+    )
+    custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
+    second_paths = _paths(tmp_path, "different-campaign")
+    with pytest.raises(d5.D5HarnessError, match="campaign path"):
+        d5.D5CampaignCustody.start(
+            second_paths,
+            authorization=authorization,
+            provenance=_provenance(),
+            readiness=_ready().projection,
+        )
+    with pytest.raises(d5.D5StaticPreflightError, match="collision"):
+        d5.D5CampaignCustody.start(
+            paths,
+            authorization=authorization,
+            provenance=_provenance(),
+            readiness=_ready().projection,
+        )
+
+
 def test_started_campaign_is_one_shot_and_terminal_is_written_once(tmp_path: Path) -> None:
     """STARTED consumes the campaign and terminal custody cannot be rewritten."""
     paths = _paths(tmp_path)
     custody = d5.D5CampaignCustody.start(
         paths,
+        authorization=_authorization(),
         provenance=_provenance(),
         readiness=_ready().projection,
     )
     terminal = custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
     assert terminal["decision"] == "INCONCLUSIVE"
     assert json.loads(paths.terminal.read_text(encoding="utf-8"))["campaign_id"] == "campaign"
+    digests = d5.verify_custody_artifacts(paths)
+    terminal_payload = json.loads(paths.terminal.read_text(encoding="utf-8"))
+    summary_payload = json.loads(paths.summary.read_text(encoding="utf-8"))
+    assert terminal_payload["state_snapshot_sha256"] == digests["state_sha256"]
+    assert terminal_payload["journal_sha256"] == digests["journal_sha256"]
+    assert summary_payload["terminal_sha256"] == digests["terminal_sha256"]
     with pytest.raises(d5.D5HarnessError, match="terminal artifact"):
         custody.finish("PASS", attribution="TEST", rows=[])
     with pytest.raises(d5.D5StaticPreflightError, match="collision"):
@@ -414,6 +448,133 @@ def test_exception_classification_is_fail_closed() -> None:
     )
 
 
+def test_persistence_and_render_failures_are_inconclusive_infrastructure() -> None:
+    """D4 infrastructure diagnostics cannot be reported as model semantic FAIL."""
+    accepted = {"execution_evidence": {"accepted": True}, "apply_status": "persisted"}
+    assert (
+        d5.classify_grade_failure(
+            accepted,
+            {"errors": ["persistence_not_proven"]},
+        )
+        == "PRODUCTION_OR_INFRASTRUCTURE"
+    )
+    assert (
+        d5.classify_grade_failure(
+            accepted,
+            {"errors": ["render_not_proven"]},
+        )
+        == "PRODUCTION_OR_INFRASTRUCTURE"
+    )
+    rejected = {"execution_evidence": {"accepted": False}, "apply_status": "rejected"}
+    assert (
+        d5.classify_grade_failure(
+            rejected,
+            {"errors": ["persistence_not_proven", "render_not_proven"]},
+        )
+        is None
+    )
+
+
+class _RetryingAdapter:
+    """Provider-free adapter exercising integrated logical/physical custody hooks."""
+
+    logical_call_count = 0
+    observes_physical_attempts = True
+
+    def __init__(self, retry_count: int) -> None:
+        self.retry_count = retry_count
+        self._started: Callable[[dict[str, object]], None] | None = None
+        self._completed: Callable[[dict[str, object]], None] | None = None
+        self._physical: Callable[[int], None] | None = None
+
+    def bind_call_started(self, callback: Callable[[dict[str, object]], None]) -> None:
+        self._started = callback
+
+    def bind_call_completed(self, callback: Callable[[dict[str, object]], None]) -> None:
+        self._completed = callback
+
+    def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
+        self._physical = callback
+
+    async def execute_turn(
+        self,
+        case: dict[str, object],
+        expected: dict[str, object],
+    ) -> dict[str, object]:
+        del expected
+        self.logical_call_count += 1
+        index = self.logical_call_count
+        event = {
+            "event": "logical_call_started",
+            "index": index,
+            "generation_role": "planner",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
+        assert self._started is not None
+        self._started(event)
+        assert self._physical is not None
+        for _ in range(self.retry_count + 1):
+            self._physical(index)
+        assert self._completed is not None
+        self._completed({**event, "event": "logical_call_completed", "outcome": "completed"})
+        return {
+            "canonical_before": {},
+            "canonical_after": {},
+            "persisted": True,
+            "rendered": True,
+            "verifier": {"status": "PASS", "requirements": []},
+            "execution_evidence": {"accepted": True},
+            "apply_status": "persisted",
+            "case_id": case["case_id"],
+        }
+
+
+def test_integrated_retry_observer_keeps_one_logical_id(tmp_path: Path) -> None:
+    """Two SDK retries become three physical attempts on each logical call."""
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=_authorization(),
+        paths=_paths(tmp_path),
+        readiness=_ready(),
+        provenance=_provenance(),
+    )
+    result = asyncio.run(runner.run(_RetryingAdapter(retry_count=2)))
+    assert result["logical_generation_calls"] == 9
+    assert result["physical_generation_attempts"] == 27
+    journal = result["custody_digests"]
+    assert journal["journal_sha256"]
+
+
+def test_execute_live_wiring_is_provider_free_with_injected_doubles(tmp_path: Path) -> None:
+    """The explicit live command wires readiness and STARTED without network calls."""
+    endpoint_calls: list[str] = []
+    provider_calls: list[str] = []
+
+    def endpoint_get(url: str, token: str) -> object:
+        assert token == "secret-token"
+        endpoint_calls.append(url)
+        if url == d5.MODEL_CATALOG_URL:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        return _props()
+
+    result = d5.execute_live_campaign(
+        repo_root=REPO_ROOT,
+        authorization=_authorization(),
+        artifact_root=tmp_path / "evidence",
+        endpoint_get=endpoint_get,
+        api_key_loader=lambda: "secret-token",
+        static_checker=lambda repo, auth, paths: {"status": "PASS"},
+        provider_factory=lambda repo, root, token: (
+            provider_calls.append(token) or _WrongSemanticAdapter()
+        ),
+    )
+    assert endpoint_calls == [d5.MODEL_CATALOG_URL, d5.PROPS_URL]
+    assert provider_calls == ["secret-token"]
+    assert result["completed_turns"] == 9
+    assert result["terminal"]["authorization_id"] == "auth-test-001"
+
+
 def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> None:
     """Rehearse all nine frozen turns through the accepted canonical adapter."""
     with TemporaryDirectory(dir=REPO_ROOT) as temporary:
@@ -421,7 +582,7 @@ def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> N
         harness = _D4SessionHarness.create(root)
         runner = d5.D5CampaignRunner(
             repo_root=REPO_ROOT,
-            authorization=_authorization(),
+            authorization=_authorization(campaign_id="nine-turn"),
             paths=_paths(root, "nine-turn"),
             readiness=_ready(),
             provenance=_provenance(),
