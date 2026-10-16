@@ -9,10 +9,21 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+import httpx
 import pytest
+from pydantic import BaseModel
 from scripts import nlp_d4_live_acceptance as d4
 from scripts import nlp_d5_live_semantic_qualification as d5
-from tests.test_nlp_d4_live_acceptance import _D4SessionHarness
+from tests.test_nlp_d4_live_acceptance import (
+    _D4PlannerBackend,
+    _D4SessionBackend,
+    _D4SessionHarness,
+    _D4SessionPlanner,
+    _D4SessionReportBackend,
+    _D4SessionSectionBackend,
+)
+
+from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -34,7 +45,10 @@ def _props() -> dict[str, object]:
 
 
 def _authorization(
-    *, thinking_off: bool = True, campaign_id: str = "campaign"
+    *,
+    thinking_off: bool = True,
+    campaign_id: str = "campaign",
+    artifact_root: str = "workspace/evaluations/d5-4-live-qualification",
 ) -> d5.D5Authorization:
     """Build an external-style authorization for injected readiness tests."""
     props = _props()
@@ -51,7 +65,7 @@ def _authorization(
             "context_size": 32768,
             "build_info": "llama.cpp provider-free test build",
             "total_slots": 1,
-            "chat_template": "qwen3",
+            "chat_template_sha256": d4.sha256_text("qwen3"),
             "runtime_defaults_sha256": d5._sha256_json(defaults),
             "structured_output_contract": "json_schema",
             "gguf_byte_identity": "NOT_AVAILABLE",
@@ -59,6 +73,7 @@ def _authorization(
         minimum_context_size=16384,
         runtime_defaults_sha256=d5._sha256_json(defaults),
         thinking_off=thinking_off,
+        artifact_root=artifact_root,
     )
 
 
@@ -71,7 +86,7 @@ def _ready() -> d5.D5OperationalReadiness:
         context_size=32768,
         build_info="test build",
         total_slots=1,
-        chat_template="qwen3",
+        chat_template_sha256=d4.sha256_text("qwen3"),
         runtime_defaults_sha256="b" * 64,
         thinking_off=True,
         structured_output_contract="json_schema",
@@ -231,6 +246,9 @@ def test_two_get_readiness_order_and_sanitized_projection() -> None:
     sanitized = json.dumps(result.projection.as_dict(), sort_keys=True)
     assert "secret-token" not in sanitized
     assert "/srv/models" not in sanitized
+    projection = result.projection.as_dict()
+    assert "chat_template" not in projection
+    assert len(projection["chat_template_sha256"]) == 64
     assert result.provider_calls == result.model_calls == 0
 
 
@@ -558,21 +576,42 @@ def test_execute_live_wiring_is_provider_free_with_injected_doubles(tmp_path: Pa
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
         return _props()
 
+    authorization = _authorization(artifact_root=str(tmp_path / "evidence"))
     result = d5.execute_live_campaign(
         repo_root=REPO_ROOT,
-        authorization=_authorization(),
+        authorization=authorization,
         artifact_root=tmp_path / "evidence",
         endpoint_get=endpoint_get,
         api_key_loader=lambda: "secret-token",
         static_checker=lambda repo, auth, paths: {"status": "PASS"},
         provider_factory=lambda repo, root, token: (
-            provider_calls.append(token) or _WrongSemanticAdapter()
+            provider_calls.append(token) or _RetryingAdapter(retry_count=0)
         ),
     )
     assert endpoint_calls == [d5.MODEL_CATALOG_URL, d5.PROPS_URL]
     assert provider_calls == ["secret-token"]
     assert result["completed_turns"] == 9
     assert result["terminal"]["authorization_id"] == "auth-test-001"
+    assert result["provider_calls"] == result["model_calls"] == 9
+    assert result["endpoint_calls"] == 2
+    assert result["terminal"]["provider_calls"] == 9
+
+
+def test_execute_live_rejects_artifact_root_relocation_before_readiness(tmp_path: Path) -> None:
+    """One authorization cannot be replayed in a different artifact namespace."""
+    authorization = _authorization(artifact_root=str(tmp_path / "authorized"))
+    endpoint_calls: list[str] = []
+    with pytest.raises(d5.D5StaticPreflightError, match="artifact root"):
+        d5.execute_live_campaign(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=tmp_path / "different",
+            endpoint_get=lambda url, token: endpoint_calls.append(url),
+            api_key_loader=lambda: "secret-token",
+            static_checker=lambda repo, auth, paths: {"status": "PASS"},
+            provider_factory=lambda repo, root, token: _WrongSemanticAdapter(),
+        )
+    assert endpoint_calls == []
 
 
 def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> None:
@@ -598,3 +637,198 @@ def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> N
     terminal = result["terminal"]
     assert terminal["decision"] == "PASS"
     assert d5.evidence_is_redacted(terminal)
+
+
+def _live_transport_response_model(name: str) -> type[BaseModel]:
+    """Map the real request schema name to the accepted D4 response model."""
+    models = {
+        d4.SemanticPlan.__name__: d4.SemanticPlan,
+        d4.DeliveryReportResponse.__name__: d4.DeliveryReportResponse,
+        d4.DeliverySectionResponse.__name__: d4.DeliverySectionResponse,
+    }
+    return models[name]
+
+
+def _live_transport_factory(
+    *,
+    retry_count: int,
+    clients: list[httpx.AsyncClient],
+    requests: list[httpx.Request],
+) -> Callable[[Callable[[object], Any]], object]:
+    """Build an in-memory transport around the real D5 live adapter factory."""
+    fixture_backend = _D4SessionBackend(
+        planner=_D4PlannerBackend(_D4SessionPlanner(calls=[])),
+        report=_D4SessionReportBackend(),
+        section=_D4SessionSectionBackend(),
+    )
+    attempt_number = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempt_number
+        requests.append(request)
+        attempt_number += 1
+        if attempt_number <= retry_count:
+            return httpx.Response(
+                500,
+                json={"error": {"message": "provider-free retry fixture"}},
+                request=request,
+            )
+        payload = json.loads(request.content)
+        messages = payload["messages"]
+        response_model = _live_transport_response_model(
+            payload["response_format"]["json_schema"]["name"]
+        )
+        generated = await fixture_backend.generate_structured(
+            StructuredGenerationRequest(
+                system_prompt=str(messages[0]["content"]),
+                user_prompt=str(messages[1]["content"]),
+                timeout_seconds=float(payload.get("timeout", 10.0)),
+                temperature=payload.get("temperature"),
+                max_output_tokens=payload.get("max_completion_tokens", payload.get("max_tokens")),
+            ),
+            response_model=response_model,
+        )
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "role": "assistant",
+                            "content": generated.value.model_dump_json(),
+                        },
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            request=request,
+        )
+
+    def factory(observer: Callable[[object], Any]) -> object:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            event_hooks={"request": [observer]},
+        )
+        clients.append(client)
+        return client
+
+    return factory
+
+
+def _live_planner_request() -> StructuredGenerationRequest:
+    """Build the smallest real planner request accepted by the D4 backend."""
+    return StructuredGenerationRequest(
+        system_prompt="You are the WellPlot semantic planner.",
+        user_prompt="Context:\n"
+        + json.dumps(
+            {
+                "request": "Rename this report to Formation Integrity Review.",
+                "mode": "revise",
+                "current_document_summary": {},
+                "source_summary": {},
+            }
+        ),
+        timeout_seconds=10.0,
+        temperature=0.0,
+        max_output_tokens=None,
+    )
+
+
+@pytest.mark.parametrize("retry_count", [0, 1, 2])
+def test_real_live_adapter_transport_retries_keep_one_logical_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, retry_count: int
+) -> None:
+    """The real OpenAI/client/backend/notebook path counts transport retries."""
+    del tmp_path
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        server_root = Path(temporary)
+        clients: list[httpx.AsyncClient] = []
+        requests: list[httpx.Request] = []
+        adapter = d5.create_live_adapter(
+            repo_root=server_root,
+            artifact_root=server_root / "live",
+            api_key="provider-free-test-token",
+            http_client_factory=_live_transport_factory(
+                retry_count=retry_count,
+                clients=clients,
+                requests=requests,
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        started: list[dict[str, Any]] = []
+        completed: list[dict[str, Any]] = []
+        physical: list[int] = []
+        adapter.bind_call_started(started.append)
+        adapter.bind_call_completed(completed.append)
+        adapter.bind_physical_attempt(physical.append)
+        try:
+            backend = adapter.inner.session.session.compiler.dependencies.planner.backend
+            result = asyncio.run(
+                backend.generate_structured(
+                    _live_planner_request(),
+                    response_model=d4.SemanticPlan,
+                )
+            )
+        finally:
+            asyncio.run(clients[0].aclose())
+        assert result.value.report_task is not None
+        assert started[0]["index"] == 1
+        assert completed[0]["index"] == 1
+        assert physical[: retry_count + 1] == [1] * (retry_count + 1)
+        assert len(requests) == retry_count + 1
+
+
+def test_real_live_transport_physical_ceiling_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The integrated observer rejects a third attempt at a two-attempt cap."""
+    del tmp_path
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        server_root = Path(temporary)
+        clients: list[httpx.AsyncClient] = []
+        requests: list[httpx.Request] = []
+        adapter = d5.create_live_adapter(
+            repo_root=server_root,
+            artifact_root=server_root / "live",
+            api_key="provider-free-test-token",
+            http_client_factory=_live_transport_factory(
+                retry_count=2,
+                clients=clients,
+                requests=requests,
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        ledger = d5.D5LogicalCallLedger(max_physical_attempts=2)
+        observed: list[int] = []
+        adapter.bind_call_started(ledger.record_d4_event)
+        adapter.bind_call_completed(ledger.record_d4_event)
+
+        def record_attempt(index: int) -> None:
+            observed.append(index)
+            ledger.physical_attempt(index)
+
+        adapter.bind_physical_attempt(record_attempt)
+        try:
+            backend = adapter.inner.session.session.compiler.dependencies.planner.backend
+            with pytest.raises(ProviderRequestError):
+                asyncio.run(
+                    backend.generate_structured(
+                        _live_planner_request(),
+                        response_model=d4.SemanticPlan,
+                    )
+                )
+        finally:
+            asyncio.run(clients[0].aclose())
+        assert observed[:2] == [1, 1]
+        assert observed[2:] == [1]
+        assert ledger.physical_attempts == 2
+        assert len(requests) == 2

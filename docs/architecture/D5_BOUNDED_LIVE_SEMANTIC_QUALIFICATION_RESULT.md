@@ -9,7 +9,7 @@ frozen_design: 1658c1593330620501baa4a551b965fa209cc95b
 accepted_d5_3_engine: 51fd23fe18ca77c067b0cdf702f88a57ba4c457d
 branch: implementation/d5-4-bounded-live-semantic-qualification
 phase: PROVIDER_FREE_HARNESS_IMPLEMENTATION
-status: COMPLETE / READY FOR INDEPENDENT REWORK REVIEW
+status: COMPLETE / READY FOR INDEPENDENT REWORK 2 REVIEW
 live_qualification: NOT RUN / NOT AUTHORIZED
 production_promotion: NOT AUTHORIZED
 ```
@@ -42,9 +42,9 @@ or model activity:
   D5 attestation/reachability, and fresh artifact paths;
 - readiness accepts only the ordered `/v1/models` then `/props` observations;
 - readiness projects the documented llama.cpp `/props` identity fields:
-  model path identity, context, slots, build, chat template, and runtime
-  defaults without synthetic capability or thinking fields, credentials, raw
-  responses, or absolute paths;
+  model path identity, context, slots, build, a SHA-256 chat-template
+  identity, and runtime defaults without synthetic capability or thinking
+  fields, credentials, raw responses, or absolute paths;
 - readiness does not perform a structured-generation probe;
 - actual `response_format` acceptance belongs to the first measured scientific
   generation, with rejection classified as
@@ -52,7 +52,8 @@ or model activity:
 - planner and worker decoder controls match the frozen production request
   builder, with optional controls absent on the wire and no model substitution;
 - `STARTED` is created only after readiness, is bound to the external
-  authorization and fixed campaign ID, and cannot be bypassed by a new runner;
+  authorization, fixed campaign ID, and authorized artifact root, and cannot
+  be bypassed by a new runner or relocated artifact namespace;
 - logical call 46 is rejected before delegation, while each observed SDK/HTTP
   retry remains a physical attempt on the same logical call;
 - the exact nine-turn D4 population executes in order through the canonical
@@ -64,7 +65,12 @@ or model activity:
   chain, redacted, and terminally immutable;
 - the explicit `--execute-live` path wires static preflight, the two readiness
   GETs, provider construction, fixed `STARTED` custody, and the canonical
-  nine-turn adapter using injected doubles in provider-free tests;
+  nine-turn adapter; live result and custody counts distinguish readiness
+  endpoint calls from logical and physical generation calls;
+- the real `AsyncOpenAI` transport, OpenAI-compatible backend, D4 counting
+  backend, and canonical Direct Notebook composition are qualified through an
+  in-memory HTTP transport for zero, one, and two SDK retries, including the
+  physical-attempt ceiling;
 - deterministic persistence/render failures are classified as
   `INCONCLUSIVE / PRODUCTION_OR_INFRASTRUCTURE`, while valid but wrong
   structured semantics remain `FAIL / SEMANTIC_CONTRACT`;
@@ -78,7 +84,7 @@ Final focused harness validation:
 
 ```text
 tests/test_nlp_d5_live_semantic_qualification.py
-18 passed
+23 passed
 ```
 
 The deterministic rehearsal included in that suite proves:
@@ -104,7 +110,11 @@ authorization-bound one-shot: PASS
 retry integration: 9 logical / 27 physical PASS
 persistence/render attribution: PASS
 five-artifact digest recomputation: PASS
-provider-free --execute-live wiring: PASS
+artifact-root authorization binding: PASS
+truthful live/provider-free call accounting: PASS
+real transport retry qualification: PASS
+physical-attempt ceiling on real transport path: PASS
+chat-template fingerprint custody: PASS
 ```
 
 Adjacent validation:

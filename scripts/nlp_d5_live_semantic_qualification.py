@@ -220,6 +220,12 @@ class D5Authorization:
         )
 
 
+def _authorized_artifact_root(repo_root: Path, authorization: D5Authorization) -> Path:
+    """Resolve the one artifact namespace allowed by external authorization."""
+    configured = Path(authorization.artifact_root).expanduser()
+    return (configured if configured.is_absolute() else repo_root / configured).resolve()
+
+
 @dataclass(frozen=True, slots=True)
 class D5ReadinessProjection:
     """Sanitized runtime identity and declared structured-output contract."""
@@ -230,7 +236,7 @@ class D5ReadinessProjection:
     context_size: int
     build_info: str
     total_slots: int
-    chat_template: str
+    chat_template_sha256: str
     runtime_defaults_sha256: str
     thinking_off: bool
     structured_output_contract: str
@@ -245,7 +251,7 @@ class D5ReadinessProjection:
             "context_size": self.context_size,
             "build_info": self.build_info,
             "total_slots": self.total_slots,
-            "chat_template": self.chat_template,
+            "chat_template_sha256": self.chat_template_sha256,
             "runtime_defaults_sha256": self.runtime_defaults_sha256,
             "thinking_off": self.thinking_off,
             "structured_output_contract": self.structured_output_contract,
@@ -578,6 +584,7 @@ class D5CampaignCustody:
     state: dict[str, Any]
     ledger: D5LogicalCallLedger
     authorization_id: str
+    live: bool = False
     require_physical_observer: bool = False
     _active_logical_index: int | None = None
     _terminal_written: bool = False
@@ -590,6 +597,7 @@ class D5CampaignCustody:
         authorization: D5Authorization,
         provenance: Mapping[str, Any],
         readiness: D5ReadinessProjection,
+        live: bool = False,
     ) -> D5CampaignCustody:
         """Create STARTED custody only after successful readiness."""
         ensure_fresh_namespace(paths)
@@ -606,6 +614,10 @@ class D5CampaignCustody:
             "logical_generation_calls": 0,
             "physical_generation_attempts": 0,
             "identity_endpoint_calls": 2,
+            "endpoint_calls": 2 if live else 0,
+            "provider_calls": 0,
+            "model_calls": 0,
+            "live_execution": live,
             "endpoint_identity": readiness.as_dict(),
             "provenance": dict(provenance),
         }
@@ -629,6 +641,7 @@ class D5CampaignCustody:
             state=state,
             ledger=D5LogicalCallLedger(),
             authorization_id=authorization.authorization_id,
+            live=live,
         )
 
     def record_call_started(self, event: Mapping[str, Any]) -> None:
@@ -744,6 +757,9 @@ class D5CampaignCustody:
                 "completed_turns": len(rows),
                 "logical_generation_calls": self.ledger.logical_calls,
                 "physical_generation_attempts": self.ledger.physical_attempts,
+                "endpoint_calls": 2 if self.live else 0,
+                "provider_calls": self.ledger.logical_calls if self.live else 0,
+                "model_calls": self.ledger.logical_calls if self.live else 0,
             }
         )
         _atomic_json(self.paths.state, self.state)
@@ -763,6 +779,9 @@ class D5CampaignCustody:
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
+            "endpoint_calls": 2 if self.live else 0,
+            "provider_calls": self.ledger.logical_calls if self.live else 0,
+            "model_calls": self.ledger.logical_calls if self.live else 0,
             "state_snapshot_sha256": state_digest,
             "journal_sha256": journal_digest,
             "evidence_sha256": evidence_digest,
@@ -777,6 +796,9 @@ class D5CampaignCustody:
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
+            "endpoint_calls": 2 if self.live else 0,
+            "provider_calls": self.ledger.logical_calls if self.live else 0,
+            "model_calls": self.ledger.logical_calls if self.live else 0,
             "terminal_sha256": _sha256_file(self.paths.terminal),
         }
         _atomic_json(self.paths.summary, summary, exclusive=True)
@@ -871,7 +893,7 @@ def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
         "context_size": generation["n_ctx"],
         "build_info": build_info.strip(),
         "total_slots": slots,
-        "chat_template": chat_template.strip(),
+        "chat_template_sha256": d4.sha256_text(chat_template.strip()),
         "runtime_defaults_sha256": _sha256_json(runtime_defaults),
         "structured_output_contract": expected_contract,
         "gguf_byte_identity": str(payload.get("gguf_byte_identity", "NOT_AVAILABLE")),
@@ -890,7 +912,7 @@ def validate_readiness_projection(
         "context_size",
         "build_info",
         "total_slots",
-        "chat_template",
+        "chat_template_sha256",
         "runtime_defaults_sha256",
         "structured_output_contract",
     }
@@ -909,7 +931,7 @@ def validate_readiness_projection(
     if observed["structured_output_contract"] != authorization.structured_output_contract:
         raise D5ReadinessError("structured_output_contract_mismatch", 2)
     expected = dict(authorization.endpoint_identity)
-    if not isinstance(expected.get("chat_template"), str):
+    if not isinstance(expected.get("chat_template_sha256"), str):
         raise D5ReadinessError("thinking_off_not_established", 2)
     for key, value in expected.items():
         observed_value = observed.get(key)
@@ -919,7 +941,7 @@ def validate_readiness_projection(
             raise D5ReadinessError("endpoint_identity_mismatch", 2)
     thinking_off = (
         authorization.thinking_off is True
-        and observed["chat_template"] == expected["chat_template"]
+        and observed["chat_template_sha256"] == expected["chat_template_sha256"]
         and observed["runtime_defaults_sha256"] == authorization.runtime_defaults_sha256
     )
     if not thinking_off:
@@ -934,6 +956,7 @@ class D5OperationalReadiness:
     projection: D5ReadinessProjection
     endpoint_calls: tuple[str, str]
     adapter: object | None = None
+    live: bool = False
     provider_calls: int = 0
     model_calls: int = 0
 
@@ -981,6 +1004,7 @@ def prepare_readiness(
         projection=projection,
         endpoint_calls=("/v1/models", "/props"),
         adapter=adapter,
+        live=provider_factory is not None,
     )
 
 
@@ -1047,6 +1071,7 @@ def create_live_adapter(
     repo_root: Path,
     artifact_root: Path,
     api_key: str,
+    http_client_factory: Callable[[Callable[[object], Any]], object] | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -1055,12 +1080,17 @@ def create_live_adapter(
     from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
     observer = _PhysicalAttemptObserver()
+    http_client = (
+        http_client_factory(observer.on_request)
+        if http_client_factory is not None
+        else httpx.AsyncClient(event_hooks={"request": [observer.on_request]})
+    )
     client = AsyncOpenAI(
         api_key=api_key,
         base_url=OPENAI_COMPAT_BASE_URL,
         timeout=GENERATION_TIMEOUT_SECONDS,
         max_retries=EXPECTED_SDK_MAX_RETRIES,
-        http_client=httpx.AsyncClient(event_hooks={"request": [observer.on_request]}),
+        http_client=http_client,
     )
     backend = OpenAICompatibleBackendV2(
         model=EXPECTED_MODEL,
@@ -1129,6 +1159,8 @@ def execute_live_campaign(
     provider_factory: Callable[[Path, Path, str], object] | None = None,
 ) -> dict[str, Any]:
     """Run the explicit live path after static/readiness interlocks."""
+    if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
+        raise D5StaticPreflightError("artifact root is not authorized")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     static = provider_free_preflight(
         repo_root,
@@ -1284,12 +1316,18 @@ class D5CampaignRunner:
         """Run the immutable nine-turn order through the supplied adapter."""
         if self._started or self._finished:
             raise D5HarnessError("campaign cannot be resumed or invoked twice")
+        if self.readiness.live and (
+            self.paths.root.resolve()
+            != _authorized_artifact_root(self.repo_root, self.authorization)
+        ):
+            raise D5StaticPreflightError("artifact root is not authorized")
         self._started = True
         custody = D5CampaignCustody.start(
             self.paths,
             authorization=self.authorization,
             provenance=self.provenance,
             readiness=self.readiness.projection,
+            live=self.readiness.live,
         )
         custody.require_physical_observer = bool(
             getattr(adapter, "observes_physical_attempts", False)
@@ -1356,9 +1394,9 @@ class D5CampaignRunner:
             "logical_generation_calls": custody.ledger.logical_calls,
             "physical_generation_attempts": custody.ledger.physical_attempts,
             "custody_digests": custody_digests,
-            "provider_calls": 0,
-            "endpoint_calls": 0,
-            "model_calls": 0,
+            "provider_calls": custody.ledger.logical_calls if self.readiness.live else 0,
+            "endpoint_calls": len(self.readiness.endpoint_calls) if self.readiness.live else 0,
+            "model_calls": custody.ledger.logical_calls if self.readiness.live else 0,
         }
 
 
